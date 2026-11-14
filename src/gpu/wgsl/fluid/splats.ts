@@ -13,14 +13,12 @@ import { DISH_GAP_RANGE, DISH_REST_GAP } from '../../../lib/turntable';
 
 export const SPLAT_KERNELS: Record<string, string> = {
   /*
-    Fused deltaDye + deltaVel + liquidForces.
-    A.a = (soapGradScale, thinLive, bodyDrag, heavyScale),
-    A.b = (polarScale, repelScale, maxf, mulMode):
-      mulMode > 0.5: bilinear-sample mulT (cpuMulTex) on the fly;
-      mulMode <= 0.5: textureLoad(mulT, p, 0) (deltaMulTex);
-      mulMode < 0.0: dye-only (pourImage), skip dstVel write.
-    With the plate a thin gap (A.a.y = 1, PLAN §18a) a hand's velocity is
-    imposed rather than added.
+    Fused deltaDye + deltaVel (soap thinning and liquid forces moved to
+    stepLiquids in PLAN 15e-1).
+    A.a.x > 0.5: thinLive (hand velocity imposed rather than added).
+    A.a.y > 0.5: bilinear-sample mulT (cpuMulTex) on the fly;
+    A.a.y in [-0.5, 0.5]: textureLoad(mulT, p, 0) (deltaMulTex);
+    A.a.y < -0.5: dye-only (pourImage / pourInk), skip dstVel write.
   */
   deltaFold: `${HEAD}${BILERP_N}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -28,94 +26,25 @@ export const SPLAT_KERNELS: Record<string, string> = {
 @group(0) @binding(4) var addDyeT: texture_2d<f32>;
 @group(0) @binding(5) var addVelT: texture_2d<f32>;
 @group(0) @binding(6) var mulT: texture_2d<f32>;
-@group(0) @binding(7) var liquids0: texture_2d<f32>;
-@group(0) @binding(8) var liquids1: texture_2d<f32>;
-@group(0) @binding(9) var dstDye: texture_storage_2d<DYE_FORMAT, write>;
-@group(0) @binding(10) var dstVel: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(7) var dstDye: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(8) var dstVel: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  let l0 = textureLoad(liquids0, p, 0);
-  let soap = l0.r;
-  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
-  let mul = select(textureLoad(mulT, p, 0).r, bilerpN(mulT, uvOf(id), S.l).r, A.b.w > 0.5);
-  let addD = textureLoad(addDyeT, p, 0);
-  textureStore(dstDye, p, capDye(d * mul * soapMul + addD));
-  if (A.b.w < 0.0) { return; }
+  let mul = select(textureLoad(mulT, p, 0).r, bilerpN(mulT, uvOf(id), S.l).r, A.a.y > 0.5);
+  textureStore(dstDye, p, capDye(d * mul + textureLoad(addDyeT, p, 0)));
+  if (A.a.y < -0.5) { return; }
 
   let v0 = textureLoad(vel, p, 0);
   let a = textureLoad(addVelT, p, 0);
   var u = v0.xy + a.xy;
   let sp = length(a.xy);
-  if (A.a.y > 0.5 && sp > 0.0) {
+  if (A.a.x > 0.5 && sp > 0.0) {
     let dir = a.xy / sp;
     u = v0.xy + dir * max(0.0, sp - dot(v0.xy, dir));
   }
-  let v = safeVel(vec4f(u, v0.z + a.z, 0.0));
-
-  let l1 = textureLoad(liquids1, p, 0);
-  let body = l0.g;
-  let repel = l0.b;
-  let heavy = l0.a;
-  let polar = l1.r;
-  if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
-    textureStore(dstVel, p, v);
-    return;
-  }
-
-  var fx = 0.0;
-  var fy = 0.0;
-  let dt = S.dt;
-  let s = S.n;
-
-  if (soap > 0.0) {
-    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
-    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
-    fx -= gx * A.a.x * dt * s;
-    fy -= gy * A.a.x * dt * s;
-  }
-
-  if (body > 0.0 && A.a.y == 0.0) {
-    let k = min(0.9, body * A.a.z * dt);
-    fx -= v.x * k;
-    fy -= v.y * k;
-  }
-
-  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
-    fx += S.rock.x * heavy * A.a.w * dt * s;
-    fy += S.rock.y * heavy * A.a.w * dt * s;
-  }
-
-  if (polar != 0.0) {
-    let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
-    let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
-    let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
-    let dD = textureLoad(liquids1, p - vec2i(0, 1), 0).r - polar;
-    fx -= (dR * dR - dL * dL) * A.b.x * dt * s;
-    fy -= (dU * dU - dD * dD) * A.b.x * dt * s;
-  }
-
-  if (repel > 0.0) {
-    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).b - textureLoad(liquids0, p - vec2i(1, 0), 0).b) * 0.5;
-    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).b - textureLoad(liquids0, p - vec2i(0, 1), 0).b) * 0.5;
-    let g = sqrt(gx * gx + gy * gy);
-    if (g > 1e-5) {
-      let nx = -gx / g;
-      let ny = -gy / g;
-      let outF = v.x * nx + v.y * ny;
-      if (outF > 0.0) {
-        let k = min(0.9, repel * A.b.y * dt * 60.0);
-        fx -= nx * outF * k;
-        fy -= ny * outF * k;
-      }
-    }
-  }
-
-  let maxf = A.b.z;
-  fx = clamp(fx, -maxf, maxf);
-  fy = clamp(fy, -maxf, maxf);
-  textureStore(dstVel, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
+  textureStore(dstVel, p, safeVel(vec4f(u, v0.z + a.z, 0.0)));
 }`,
 
   /*
@@ -223,6 +152,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   let take = clamp(A.a.w * w, 0.0, 1.0);
   textureStore(dst, vec2i(id.xy), mix(v, A.b, take));
+}`,
+
+  /*
+    A title's ink carrier (PLAN 37x-10g, `pourInk` with a carrier): the
+    title's coverage mask, sampled as `pourInk` samples it for the dye (the
+    mean of a few bilinear taps over the cell's footprint, so the carrier
+    lies exactly under the letters' dye), replaces that share of the column
+    with the ink's own liquid, as a pour laid without its volume does
+    (speciesSplat with A.b.w at 0): r toward 1, g toward its ln(ν/ν_water),
+    b toward its scatter, a toward its index. A.a is (share at coverage 1,
+    ln(ν/ν_water), scatter, index).
+  */
+  inkSpecies: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var mask: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var lin: sampler;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let taps = vec2u(clamp(ceil(vec2f(textureDimensions(mask)) / S.n), vec2f(1.0), vec2f(4.0)));
+  var cover = 0.0;
+  for (var j = 0u; j < taps.y; j = j + 1u) {
+    for (var i = 0u; i < taps.x; i = i + 1u) {
+      let uv = (vec2f(id.xy) + (vec2f(f32(i), f32(j)) + 0.5) / vec2f(taps)) / S.n;
+      cover += textureSampleLevel(mask, lin, uv, 0.0).r;
+    }
+  }
+  let f = clamp(cover / f32(taps.x * taps.y) * A.a.x, 0.0, 1.0);
+  let was = textureLoad(src, p, 0);
+  textureStore(dst, p, mix(was, vec4f(1.0, A.a.y, A.a.z, A.a.w), f));
 }`,
 
   speciesSplat: `${HEAD}

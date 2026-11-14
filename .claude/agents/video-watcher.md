@@ -20,14 +20,19 @@ For each video you are given:
    for another download trick, and never ask for cookies.
 2. Read `timeline.png` first, then every `sheet-N.png`. Take `--at` stills of
    the moments that matter and read them.
-3. Write what happens, in time order, in plain prose: what is on screen, how it
+3. Read the summary's Design, Physics and Techniques sections (the skill
+   says what each measure means). If the camera shows a room, crop to the
+   projection with `--crop` first. Open the links the Techniques section
+   lists when the caller asks how it was made.
+4. Write what happens, in time order, in plain prose: what is on screen, how it
    moves (speed, direction, where motion concentrates, whether it pulses), the
    palette and how much of the frame is dark, edges (crisp or soft), scale of
    the structures, the cuts, and whether motion follows the sound. Attach the
    numbers from the summary to each claim.
 
 When asked to compare the app against a reference, run both with the same
-`--frames` and windows of the same length, then give: the three biggest
+`--frames` and windows of the same length, the app's with `--vs <the
+reference's out folder>`, then give: the three biggest
 visible differences in order of impact, each with the measurement that shows
 it (near-black fraction, motion median, hue split, motion vs loudness) and the
 time stamps of the frames that show it best.

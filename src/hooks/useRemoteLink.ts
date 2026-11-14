@@ -16,7 +16,8 @@ import {
 export type RemoteStatus = 'connecting' | 'connected' | 'offline' | 'denied' | 'locked';
 
 interface UseRemoteLinkOptions {
-  role: 'display' | 'controller' | 'mirror';
+  /** `tv` is a TV at home playing the plate as video (PLAN 12-tv, components/TvDisplay.tsx); it takes the show key, as a mirror does. */
+  role: 'display' | 'controller' | 'mirror' | 'tv';
   /** Called for every message addressed to this role. */
   onMessage?: (message: RemoteMessage) => void;
   /**
@@ -29,6 +30,14 @@ interface UseRemoteLinkOptions {
    * (a Firebase-hosted page, say) so the app behaves exactly as it always has.
    */
   enabled?: boolean;
+  /**
+   * A TV only (PLAN 12-tv-2): the key it kept from pairing, used when the URL
+   * carries none; and, with no key at all, ask the relay to pair by four
+   * digits instead of being turned away. The key the relay then hands over
+   * is used from that moment, reconnects included.
+   */
+  keptKey?: string | null;
+  pair?: boolean;
 }
 
 /** Reconnect backoff, milliseconds. */
@@ -44,7 +53,7 @@ const PROBE_INTERVAL = 30000;
  * sleeping shouldn't need anyone to reload anything — and stays completely
  * silent when there's no relay to talk to.
  */
-export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRemoteLinkOptions) {
+export function useRemoteLink({ role, onMessage, state, enabled = true, keptKey = null, pair = false }: UseRemoteLinkOptions) {
   const [status, setStatus] = useState<RemoteStatus>(enabled ? 'connecting' : 'offline');
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(RETRY_MIN);
@@ -55,7 +64,9 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
   const seenRef = useRef(false);
   // The show key: from the URL a phone or display was given, or — on the
   // machine the server runs on — from the relay itself.
-  const keyRef = useRef<string | null>(showKeyFromUrl());
+  const keyRef = useRef<string | null>(showKeyFromUrl() ?? keptKey);
+  const pairRef = useRef(pair);
+  pairRef.current = pair;
 
   // Handlers and state are read through refs so a re-render never tears the
   // socket down and reconnects.
@@ -149,7 +160,8 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       socket.onopen = () => {
         retryRef.current = RETRY_MIN;
         setStatus('connected');
-        socket.send(JSON.stringify({ type: 'hello', role, key: keyRef.current ?? undefined } satisfies RemoteMessage));
+        const key = keyRef.current ?? undefined;
+        socket.send(JSON.stringify({ type: 'hello', role, key, pair: !key && pairRef.current ? true : undefined } satisfies RemoteMessage));
         if (role === 'display' && stateRef.current) {
           socket.send(JSON.stringify({ type: 'state', state: stateRef.current } satisfies RemoteMessage));
         }
@@ -175,11 +187,14 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
             }, Math.max(RETRY_MAX, message.retryMs ?? 5 * 60_000));
             return;
           }
-          // Wrong key: no point retrying with the same one.
+          // Wrong key: no point retrying with the same one. A TV's page
+          // hears why too: pairing has more reasons than a wrong key.
           closedRef.current = true;
           setStatus('denied');
+          if (role === 'tv') onMessageRef.current?.(message);
           return;
         }
+        if (message.type === 'tv-key') keyRef.current = message.key;
         if (message.type === 'request-state' && role === 'display' && stateRef.current) {
           socket.send(JSON.stringify({ type: 'state', state: stateRef.current } satisfies RemoteMessage));
           return;

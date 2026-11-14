@@ -97,10 +97,20 @@ newer version:
   ChromaGlass <version>…* (or the button in Profile & Store) opens the new download;
   drag it over the old one in Applications.
 
-Either way it never restarts, opens a window or asks anything by itself during a
-show: one notification on the laptop at most, and none while a projector window is
-open. *ChromaGlass → Check for Updates…* looks now. `CHROMAGLASS_NO_UPDATES=1`
-switches it off.
+**Install Updates Automatically** (*ChromaGlass* menu, and the switch in Profile &
+Store's Mac app card; on unless switched off, kept in `show.json` as `autoUpdate`).
+Off, the app still looks and says once that a version is available, and downloads
+nothing until the performer picks *Install ChromaGlass <version>…*; that download then
+installs on the next quit, or at once with *Restart to Update*. A version macOS has
+already taken installs on quit whatever the switch says (Squirrel.Mac does that
+itself), and the menu says *Restart to Update* for it.
+
+Never in the middle of a show: while the show is on the projector or live, nothing
+downloads by itself (it looks again ten minutes later), *Restart to Update* asks
+first, and the owner's assistant's install is refused. Either way it never restarts,
+opens a window or asks anything by itself: one notification on the laptop at most,
+and none while a projector window is open. *ChromaGlass → Check for Updates…* looks
+now. `CHROMAGLASS_NO_UPDATES=1` switches it off.
 
 ## First launch
 
@@ -168,10 +178,13 @@ download, once more, and update in place from then on.
   keeps the show key, starts the server, grants the show's permissions (sound,
   cameras, MIDI, screens) to its own pages only, opens the show window, and puts the
   projector window on the projector's screen in full screen. Why each of these, at
-  length, is in its comments.
+  length, is in its comments. It hands the show server the Show menu's OSC-in and Syphon
+  doors for the owner's assistant (`outputsHook`, PLAN 44k-14; also
+  `globalThis.__chromaglassOutputs` for `npm run desktop`).
 - `updates.js`: finds new releases and offers or installs them (above), with
   electron-updater; `npm run updates` checks it in plain Node, and `npm run
   desktop -- --packaged` checks the packed app against a feed of its own.
+- `pickSource.js`: Film → a window asks the person at the Mac which window or screen, a sheet of their names (it took the first one listed; the security review of 2026-11-13). `npm run assistant`'s `pick-window`.
 - `preload.cjs`: tells the page it is in the app (`isDesktopApp()` in
   `src/lib/platform.ts`), which is what lets `useProjector` send the show to a
   projector without waiting for a click.

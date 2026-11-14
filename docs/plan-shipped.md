@@ -680,6 +680,17 @@ messages, a beat arrives 1.0 ms after it is sent and is released 50 ms later, a 
 moves nothing, off and below-Pro send nothing; the built app's switch, refused target,
 its own reports and the switch back on after a reload.
 
+### 13.5-osc-beats. The beat line waits for kicks, not seconds (2026-11-09)
+
+The fifth Mac shard's line in `npm run oscout`, "each beat the plate presses on reaches
+the VJ app, one for one", counted the plate's kicks in a fixed 15 s of wall time against
+a floor of 10. It went red twice on #772 (8 kicks, then 5) while the pairing it is there
+to prove held both times (8 sent for 8, 4 for 5): both shards ran slow, and the ear hears
+on frames, so a slow hosted Mac lands fewer kicks a second. It now waits for 12 kicks, up
+to 60 s, and asks the same ±1 pairing; a plate that presses on no beat still fails, after
+the minute. How many kicks a second the ear lands on a slow runner stays the ear's line
+(`npm run music`), not OSC out's.
+
 ### 13.4. Control, written up (2026-10-31)
 
 `docs/osc.md` is every address the show server takes over OSC (settings, every
@@ -761,6 +772,38 @@ do unasked, and that the builder config, the app and the site agree on the .dmg'
 feed); `npm run desktop -- --packaged` 11/11 on the Linux pack, its new "updates" line the shipped
 electron-updater reading a feed the check serves (`1.3.0 → 999.0.0 (idle → checking →
 available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same and told it as it happened: `checking → available 999.0.0`).
+
+### 13-update-auto. Install Updates Automatically, on or off (2026-11-11)
+
+Asked by the owner on 2026-11-11: "can we have turn on/off auto updates? so people aren't
+surprised by an update?" A signed app had downloaded each release by itself and installed
+it on the next quit, so a performer who quit after soundcheck could open a different
+version than the one they rehearsed with. Nothing ever installed mid-set (only a quit or
+a click did), but nothing stopped a 150 MB download in the background while the show was
+live either.
+
+- **The switch** (`desktop/updates.js`): *ChromaGlass → Install Updates Automatically*, a
+  tick under the update item, and the same switch in Profile & Store's Mac app card
+  (`MacAppCard.tsx`, the preload's `updates.setAuto`); kept in `show.json` as `autoUpdate`,
+  on unless switched off, so every copy keeps the behaviour it had. Off, the app still
+  looks every six hours and says once that a version is available; the menu and the card
+  offer *Install ChromaGlass <version>…*, which downloads it, and it installs on the next
+  quit or at once with *Restart to Update*. An ad hoc copy, which never installs in place,
+  has no switch.
+- **Why `autoInstallOnAppQuit` follows the click too.** electron-updater's MacUpdater hands
+  the downloaded zip to Squirrel.Mac only when it is true; with it false the zip sits on
+  disk and Restart to Update would never come (and `quitAndInstall` then quits whenever
+  Squirrel finishes, minutes after the click). So it is on with the switch and for a
+  version the performer asked for; one switched off mid-download is offered as Install,
+  and the click hands the same zip over. A version Squirrel already has installs on quit
+  whatever the switch says, and the state says so (`ready`).
+- **Never in the middle of a show** (`busy()` in main.js: the projector window open, or a
+  live stream starting or on air): nothing downloads by itself (`autoDownload` is set at
+  each check) and the look comes again in ten minutes (`BUSY_RETRY_MS`), not six hours;
+  *Restart to Update* clicked during one asks first (Restart Now / Later); the owner's
+  assistant's install is refused with the reason.
+- **Checked** by `npm run updates`: 127 lines (30 new), the updater on stand-ins and the
+  relay's rules on the real updater. 13-update-auto-a (a recording as a show) found.
 
 ### 14a. The show goes deaf when its window is hidden
 
@@ -3997,6 +4040,51 @@ error object (`{"message":"rate limited"}`) gave an empty answer, which reads as
 it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
 function (2 FAIL) and green on the new.
 
+**19k-16 shipped** 2026-11-11.
+**`draftwall --frames` read 0 painted frames on the Mac.** "The projector window is painted
+from the wall's canvas" counts the frames the projector paints over 8 s. It was red on #734
+(2026-11-08) and then three times in a row on #798's tree (two PR runs and main's deploy),
+each time with the mirror hooked, the window not dark, `paints:0` and the show's canvas at
+1920x1080 where a green run reads 672x378. A tally of 54 Mac runs found the same picture on
+5, four of them on trees without #798, so it was not that PR. The wall was opened a fixed
+1500 ms after the show loaded, about 2.8 s in, while a cold Mac opening takes 13.5 to 14.8 s
+to build its pipelines and take its first step. Until that step the projector's rAF asks for
+frames the show cannot draw (19k-16a), and the canvas already carries the projector's size;
+on a slow opening the 8 s count ended before the show's first frame. The line now waits for
+the show's first step (`waitForShow`, as every app check does) before it opens the wall,
+under `--frames` only; without frames there is no step to wait for and it keeps its 1500 ms.
+The bar (frames painted from either canvas) is unchanged.
+
+**19k-17 shipped** 2026-11-10.
+**`lab5` past its 25 minutes on every speed-hunt PR.**
+`samelook` was given `lab5` as a part of its own because it runs about eleven
+minutes (15:18 on the slow tier) when a PR's title or label asks for it and prints
+"not asked" otherwise. #778 moved `inktitle -- --thin` there and #780 moved
+`logomelt`, both relying on samelook being not asked (seven to fourteen minutes and
+three more). On 2026-11-10 H2c-labels (its title matches the hunt's `H2c-`) came
+back from merging main with `lab5` cancelled at the limit, inside `inktitle --thin`,
+on its first run and again on the re-run. Neither tree touches the title, so the
+same would happen to every 46x, H2c- or 14aa/14ab PR. Those two checks now
+have a part of their own, `lab6`, and samelook has `lab5` to itself again. The
+same day `lab3` hit the limit on the slow tier on both PRs' runs and on a re-run:
+`soap` (8:14) and `soapbreak` (4:35) brought it to `inktitle` at 17:50, and
+`inktitle` takes seven to ten minutes there. So `inktitle` moved to `lab7`, which
+leaves lab3 at about 17 minutes. Its own bound then stopped it at 9:00 on the slow
+tier (H2c-labels' next run), so the bound is 14 minutes, as the thin arms' is 16. No check, bar or bound changed. `lab2` is still
+close to the limit (21:14 on main's deploy that day, cancelled at 25 on 24.3's
+first run, green on its re-run), so the next check for it goes to a new part.
+
+**19k-18 shipped** 2026-11-11.
+**`lab2` past its 25 minutes on #802's deploy.**
+19k-17 left `lab2` close to the limit. On 2026-11-11 the deploy of #802 (44k-11, which
+touches no check in it) ran `lab2` for 25:06 and, on the one re-run, 25:17, each cancelled
+at the limit inside its last check with every check before it green; the same twelve
+checks ran 19:13 on #802's own run an hour before. The per-check times scale together
+(`lampzero` 2:41 to 3:55, `moire` 4:28 to 6:23, `signin` 2:46 to 3:10), so it was the slow
+runner tier, as in 19k-11 and 19k-17, not a check grown slow. The moiré sheets' check,
+the largest piece after `lampzero`, has a part of its own, `lab9`, which leaves `lab2` at
+about 19 minutes on the slow tier. No check, bar or bound changed.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239
@@ -4370,6 +4458,10 @@ of a third round, and one escape puts its class back on review before merge for 
 
 Measured: see #701, which quotes the stubbed-`gh`
 cases, `npm run actionlint` and `npm run reach`.
+
+**19al-6 shipped** 2026-11-10 (seen, no code): the first live run labelled five
+Antigravity PRs on 2026-11-09 between 05:35Z and 09:16Z, each with its `READY` line
+naming the head, and each head's checks were green when the label went on.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -4862,6 +4954,61 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   stencil and 3×3 bounds remain, now done once rather than three times.
   `npm run slump` (14/14) and `npm run grating` (24/24) passed on the same Mac.
 
+#### 18m-5c. The grid filter still reshapes a slumping drop's edge (shipped 2026-11-08)
+
+- **Reported:** since the glass gap became a real 2 mm (38r, #655), the glycerine drop at
+  256² barely slumps on its own: its 2% front goes `3.94 → 4.13 mm` in 20 s with `dampGrid`
+  off, but `3.94 → 4.50 mm` (`+0.360 mm`) with it on, and its half-peak contour comes in
+  `2.92 → 2.79 mm` (`-0.136 mm`). In the 6 mm gap before #655, the filter moved the 2% front
+  `0.00 mm`, the 5% contour out `0.18 mm` and the half-peak contour in `0.22 mm`, the same at
+  Grid Damp `0.05` and `0.5`.
+- **What the rim slice showed** (slicing the glycerine drop's rim from the centre `(128, 128)`
+  at `t = 2 s` and `t = 20 s`, filter off vs on, and decomposing one filter step on the bare
+  field into `curv = u`, `limit = c − (here + u)` and `return = final − c`):
+  - Before the fix (`main`, `1a1c748d`), at `t = 20 s` the bare 2% threshold (`0.1098`) sits
+    inside `r = 5.00 cells` (`3.91 mm`), with `(5, 0) = 0.0643` and `(5, 1) = 0.0197` below
+    2% and only `(4, 2) = 0.1561` (`r = 4.47 cells`, `3.49 mm`) and `(4, 3)` (`r = 5.00`)
+    above it (`front = 4.135 mm`). With the filter on, `(5, 0)` climbed `0.0643 → 0.1107`
+    (`Δ = +0.0464`, `[curv=+2.26e-4, limit=-2.26e-4]`) and `(5, 1)` climbed `0.0197 → 0.1108`
+    (`Δ = +0.0911`, `[curv=+5.72e-5, return=+1.27e-7]`), both crossing `0.1095` (`r = 5.10
+    cells`, pushing the 95th-percentile 2% front to `4.495 mm`, `+0.360 mm`). At `(5, 1)`,
+    once the slump raised `here` to `0.0197` between `nE = 0` and `nW = 1.0220`, the one-sided
+    foot gate `6.0 * (here − mn) > mx − here` opened `hi` to `nW` so the positive `curv` lobe
+    (`k_{±1} = -4`) passed unclamped (`limit = 0`). Meanwhile, on the inner shoulder `(2, 2)`
+    (`r = 2.83 cells`, `2.21 mm`, right at the half-peak contour `2.745`), `curv = -1.53e-4`
+    eroded `(2, 2)` from `2.8107` to `2.6997` (`Δ = -0.1110`, pulling the half-peak contour in
+    `-0.136 mm`) because the smooth axial dome cells `(1, 0)` and `(2, 0)` had large room `w`
+    and absorbed the 7×7 returned excess (`(2, 0)` grew `3.9644 → 4.0606`, `Δ = +0.0963`),
+    leaving `(2, 2)` with only `return = +9.39e-5` against `curv = -1.53e-4`.
+- **Why 1D difference gates fail on `pressed`:** gating on 1D second differences `δx²f`, `δy²f`
+  is blinded by the dome's own radial curvature (`pressed` `94%–98%` vs `< 68%`), and gating
+  on 1D fourth differences `δx⁴f`, `δy⁴f` is blinded by 1D front steps (`pressed` `72%–75%`).
+  A 1D profile `f(x) + g(y)` or a radially symmetric dome `a − b(x² + y²)` is separable, so
+  its cross second difference `m = δx²δy²f` vanishes identically inside the dome and on 1D
+  fronts while seeing every 2D wave `cos(kx x + ky y)` with factor `4(1 − cos kx)(1 − cos ky)`.
+- **What changed** (`src/gpu/wgsl/fluid/gridFilter.ts`): inside the existing 5×5 stencil loop
+  (with zero extra texture loads), `dampGridCurv`, `dampGridLimit` and `dampGrid` accumulate
+  the 5 row and 5 column second differences `r2[0..4]`, `c2[0..4]` (`k2 = [0, 1, -2, 1, 0]`)
+  to form `m = δx²δy²f` at the cell (`m0`) and its four axial neighbours (`mW, mE, mS, mN`),
+  and hold `[lo, hi]` to `here` (`lo = select(here, lo, alt); hi = select(here, hi, alt);`,
+  `alt = ax & ay`) unless `m` oscillates along both X and Y — either changing sign to an axial
+  neighbour (`mW * m0 < 0 | mE * m0 < 0`) or having both axial neighbours below `m0 / 2`
+  (`(2*mW − m0)*m0 < 0 & (2*mE − m0)*m0 < 0`, which holds at wave crests whenever `cos k < 1/2`,
+  i.e. `k in (π/3, π]`, covering `grating`'s `near` and `far` wave packets as well as `(π, π)`).
+  At the drop's rim `(5, 0)` and `(5, 1)`, `m` does not oscillate along the front (`alt = false`),
+  so `lo = hi = here` clamps `c = here` (`limit = -curv`) and sets `w = 0`: `(5, 0)` stays at
+  `0.0488` and `(5, 1)` at `0.0625` (both below the `0.1094` 2% contour), while inside the dome
+  `(1, 0)` and `(2, 0)` have `w = 0` so `(2, 2)` gets `return = +1.51e-4` against
+  `curv = -1.56e-4` and holds `2.7574 > 2.7355` above the half-peak contour.
+- **Measured:** `npm run slump` (no `--owed`, removed `-- --owed=front` from `scripts/checks.json`),
+  15/15 passed: check 14 reads `2 s: dye -0.0000%`, `20 s: dye +0.0001%`, `156 of 65536 cells
+  not the bare run's at 20 s`; check 14b reads `2 s: front +0.000 mm of the bare run's (at 5%
+  of the peak +0.000 mm, half the peak 0.000 mm, printed only); 20 s: front +0.000 mm of the
+  bare run's (at 5% of the peak +0.000 mm, half the peak 0.000 mm, printed only)`.
+  `npm run grating`: 24/24 ok (`1 step 94.6%`, `60 steps 4.3%`, `faint 4.3%`, `near 29.7%`,
+  `far 6.9%`, `pressed 66.8% < 68%`, `lines/rows 0.000%`, `disc ring 0.001%`, `halo 0.0%`,
+  `cons +1.21 ppm/s`).
+
 ### 19aa-3. The API scripts never print the token
 
 **Shipped** 2026-10-19. A transient 502 from the Actions API stopped `npm run flakes` on
@@ -5075,6 +5222,15 @@ lays the app's own seed and prints it in the lab: on main 71% of the plate absor
 three channels, the view 57% black, 37% red, 0% white, yellow and blue, 16 dots, mean
 3.69; now 0.1%, 9.9% black, 57% white, red 12.8%, yellow 6.8%, blue 9.8%, 254 dots, mean
 0.115. The phone lays the same seed (it is the plate, not a control).
+
+**Shipped (21b): the back plate is outlined from its own dye.** The Ben-Day print's pen
+line (`benDayEdge`, moved to `src/gpu/wgsl/plateBenDay.ts` beside `plate.ts`) was called
+on `layer0` only, so a second plate's pools printed in flat inks and dots without a black
+outline. It now runs on `layer1` at `fuv1` with `layer1`'s own screen-pixel step, dish
+mask and mixer level (`U.mixLevel.z`), combined with the front plate's line by `max`.
+`npm run benday` line 8 (`--owed=back` removed from `scripts/checks.json`): on main the
+front pool was ringed in black on 180 of 180 rays and the back plate's rotated pool on 0;
+now both are ringed on 180 of 180 rays, and lines 1 to 7 on a single plate are unchanged.
 
 ### 19ai-8. App() into its domains' hooks
 
@@ -5325,6 +5481,16 @@ Asked in PLAN Wave 5 lane D, direction B of the owner's 2026-10-24 exploration o
 - **The dial.** `melodyWalk` (0 on every look; Aurora 0.7, Oil & Water 0.8) on the desk (the Show section, beside Kick Bloom), the phone remote, MIDI learn and the help text; held out of Evolve's pool. Laid in `LiquidVisualizer.tsx` (`layMelodyDrop`) with the area cords' step, the dye under the look's fill as every music pour is.
 - **Checked by** `npm run melody` (18 lines, in `scripts/checks.json` on the logic shard): a 15-note scale with a kick on every beat and a snare on the backbeat through the real analyser.
 
+### 24.3. MIDI notes as voices (shipped)
+
+Asked in PLAN §24 (`24.3`, widened in §30 and VS 2's chords placed, with `24.3-place-1` folded in): a sequencer's notes play the plate rather than press a button. A channel learned once from any note on it picks the tool (`dropper` or `streak`) and the liquid; each note-on lets go one real pipette drop placed by pitch on Melody Walk's own line and scale, its size by velocity; a held note pours for as long as it is held, with an attack and a release; a chord lands as several drops at once; each channel has a voice cap (4 by default, the oldest held note gives way); and notes become a patch-bay source (`notes`: `velocity`, `pitch`, `held`).
+
+- **Shared placement (`src/lib/melodyWalk.ts`, `melodyPlace(pitch, line)` — `24.3-place-1`).** Taken out of `MelodyWalk.update` so a MIDI note and a heard note at the same pitch sit on the exact same `{ x, y, along }` along the look's line and circle-of-fifths offset (`npm run melody` 30/30 unchanged).
+- **Voice state (`src/lib/noteVoices.ts`).** Plain functions over one pre-allocated state (`makeNoteVoices`, `voiceOn`, `voiceOff`, `voicePour`, `noteSource`, `VOICE_DEFAULTS = { attack: 0, release: 0, cap: 4 }`), with no per-note allocation in the frame. `voiceOn` maps `pitch & 0x7f` through `melodyPlace`, dye class `((pitch % 12) + 12) % 12 / 12`, and velocity into volume `0.35 + 0.65 * (vel / 127)`. When a channel's held voices reach `cap`, the oldest held slot is released at `now` (`releasedAt = now`, `levelAtRelease = slotPourAt(oldest, now)`) before the new voice takes a slot. `voicePour(state, now)` advances each active slot's attack (`(now - startedAt) / attack`) and release (`levelAtRelease * (1 - (now - releasedAt) / release)`), freeing finished slots, and `noteSource(state, now, channel?)` reports `{ velocity, pitch, held }` across active voices.
+- **Channel-wide MIDI binding (`src/lib/midi.ts`).** `MidiTarget` gains `{ kind: 'voices'; tool?: VoiceTool; liquid?: string; attack?: number; release?: number; cap?: number; area?: number }`. Learning a `voices` target from any note stores a binding on that channel, and `liveBindings` answers it for every note (`0..127`) on that channel while leaving other channels and CCs untouched; `parseMidiMap` preserves and clamps its fields.
+- **Solver path & Patch Bay (`src/sim/noteVoicesStep.ts`, `src/components/LiquidVisualizer.tsx`, `src/hooks/useMidi.ts`, `src/components/MidiPanel.tsx`, `src/components/settings/MidiSection.tsx`).** Note-on drops queue onto the visualizer handle and lay through `layMelodyDrop` (real pipette drops in the solver, never a shader stamp), while held voices pour each simulation step at their `voicePour` level. `'notes'` (`velocity`, `pitch`, `held`) is added to the Patch Bay's sources (`src/types.ts`, `src/lib/sceneMap.ts`, `src/components/settings/patchLists.ts`). Both the desk's MIDI panel and the phone's MIDI section offer learning a channel as Notes as voices and editing its tool, liquid, attack, release, and voice cap.
+- **Checked by** `npm run soundowed` (`id: voices`, 9/9 checks passed; 14/14 checks passed with `--owed=lfo`); owed judging in `docs/judging.md` §121 (a sequencer playing a chord on the owner's Mac).
+
 ## 25. Areas of interest: several places on one plate
 
 **Why a look had one.** Read off the code, every look was built to have a single area
@@ -5515,6 +5681,41 @@ notes), three of 25i's looks misbehaved.
   neither stepped nor drawn. They are gone (nothing a band plays changes a dish's chemistry, and
   `npm run areacords` now holds that no look carries a cord on a reaction's strength); the snare
   drops activator in the third place instead, beside the kick's own touches in turn.
+
+### 25i-10. The loop's own hands still poured dye on a reagent (shipped)
+
+The owner, on the second private rehearsal stream (2026-11-10, Mac app 1.3.1276, Chemical Clock
+for the whole set): "we're still getting these flower like bubble things showing up. I thought we
+fixed that". The frame showed dark green and teal clusters in the upper right, over the gel's
+blue waves, where the clock's second place is (0.7, 0.38), and a larger dark mass at the bottom
+place.
+
+What was fixed before was 25i: an area cord on a reagent area (Chemical Clock's activator,
+Red Cabbage's acid and base) pours a drop of that reagent and no dye. The visualizer's own hands
+on the music were left as they were, and on an area look each lands in an area in that area's
+dye: the kick's bloom (5 to 11 droplets a kick, pushed out in lobes), the bass's pulse in the
+area's middle, the mid's stream, the treble's sparks, the energy's swell and the automation's
+drops. Chemical Clock's three places are all on the bass, so every kick threw a cluster of a
+pool's dye at one of them; the gel stands still (Global Speed 0.024, Thick), so kick after kick
+the clusters piled up there. A real BZ dish touched with a drop of bromous acid gains no colour:
+the ring that runs out is the ferroin turning blue.
+
+`musicDyeIn(area)` (lib/areaCords.ts) is 0 for an area of a reagent and 1 for any other, and
+every one of those pours takes it as the share of its amount that is colour (`autoInject`'s
+`dye`, the bloom's dye gain, the sparks' amount). The hands still land where they did, with the
+same splash, push and drop of the reagent (`doseArea`), so the gel still fires on each kick.
+Red Cabbage's wells had the same fault (painted pink and green over the indicator's). First the
+bloom moved out of the frame loop to lib/kickBloom.ts in a commit of its own (19ai-10), and
+panel.mjs's two text lines on it became `npm run kickbloom`, which runs it on a recording sink.
+
+`npm run kickbloom` (logic shard), 8 lines: the dial scales the dye x2.000 and the push x2.000,
+each alone; a dye gain of 0 lays no dye and the same push; the droplets' largest gap is 2.44x an
+even ring's (the old ring 1.38x); 5 to 11 droplets; `musicDyeIn` is 0 on all 5 reagent areas
+and 1 on the 31 others; `autoInject` with no colour lays none in any of its five styles (only the
+drop honoured its `dye` before, so a spray or pour of reagent was still coloured: the review
+found it); and every area colour in the loop is read into a const used only in pours, each with
+`musicDyeIn` of the same area in the argument that lays the colour (7 colours, 8 pours; on main
+6 miss it, and six planted faults each turn the line red).
 
 ## 26. A reaction that prints: Turing stripes in black and white
 
@@ -5938,6 +6139,197 @@ plate), 27f-7 (the lift's circulation is the even gap's; the mix's oil has the w
 viscosity), 18g-6 (a body touching the rim drains through it by its own surface tension, on
 main).
 
+### 27f-9. A standing plate is a sealed bottle (2026-11-11)
+
+Found by the preset retune (2026-11-11): Lava Lamp, filmed on the Mac, showed a flat tan lamp,
+its wax poured in and run straight out over the plate's edge. Since 18a the gap's solve holds the
+rim at the air's pressure, p = 0, which is right for two glasses lying on a projector (a press's
+liquid goes out and comes back). The weight on a standing plate was laid into that solve as a
+body force, F = G·w (Dye Weight, the lamp's heat lift and the oil's lightness in `mixForce`, and
+the Buoyancy dial's heat lift S.up·curBuoy·T in the lasting current, which on a thin gap is laid
+into the solve as a speed too), so nothing held a column of wax up: it fell out of the bottom,
+clear liquid came in at the top, and what the lamp warmed went out of the top. Measured in the
+lab (128², Plate Upright 1, Dye Weight 0.7, seven wax drops a fifth of the way up): 68% of the
+dye left after 8 s and still falling; flat, all of it. 28i-2 had held the wax in with Centre
+Gravity 0.32, a pull to the middle no lamp has.
+
+A lava lamp is a sealed bottle: no flux through its wall, so an even weight is a pressure and
+moves nothing, and an uneven one turns the liquid round in closed loops. Between two glasses at
+an even gap that is the closed dish's Darcy circulation, u = ∇⊥ψ, −∇²ψ = curl F, ψ = 0 at the
+wall, which 27f-5 already lays for the oil's lift. For F = G·w, ψ = G_y Ψ_x − G_x Ψ_y with
+−∇²Ψ_a = ∂w/∂a, so the oil lift's relaxation (`hsLiftRelax`) runs unchanged on buffers of its
+own: `sealSource` (the weight's right-hand side on the lift's grid, the current's heat lift
+capped as the current capped it), eight warm red-black sweeps a step, `sealFlow` (∇⊥ψ into the
+velocity, in the units `mixForce` laid G·w in). On a thin gap with Plate Upright above nothing
+(the Gravity dial, the phone's Tip pad, Lava Lamp), `mixForce` lays no weight of its own and
+`writeSim` takes the heat lift out of the current while the seal runs (not with a boil: 36e-2's
+own buoyancy stays in the current). Until the kernels are built (behind the show with the oil
+lift's, or asked for once off the frame) a standing plate takes its weight on the open rim as
+before. A mean added to w moves nothing, so the dish's mean density drops out by itself.
+
+`npm run sealed` (Measure lab7, about six minutes on SwiftShader): with the seal held off the
+standing plate keeps 68.2% over 8 s; sealed, 100.0%; a lone drop where the wall is far falls at
+95.5% of its open speed (Darcy's inclusion goes the same in a sealed cell when the wall is far);
+lamp on with Lava Lamp's Buoyancy, 100.0% over 10 s with the wax's centroid 0.026 of the plate
+higher than with the dial at 0 (by hand, with the current's heat lift left on the open rim:
+98.1% at 12 s, 92% by 20 s). Each sealed line holds only if the seal's kernels were built.
+The check-skeptic pass cut a flat-plate line that could not fail (a flat plate never reaches
+the seal) and made line 4 see a dropped lift. Lava Lamp's
+Centre Gravity is 0. Filmed on the Mac (one take, 60 s): main drained to pale tan with red specks by 45 s; sealed, the wax stays the whole minute, but the plate is red wall to wall with no blobs (27f-9c; Dye Budget 0.35 was tried and read the same). Left open: 27f-9c (the wax as an immiscible phase), 27f-9a (Plate Rock's and Rain Drip's weight on a standing plate)
+and 27f-9b (the circulation is the even gap's, so where the mobility varies the gap's solve
+takes the rest through the open rim: 1.3% in 20 s where the wax lies on the bottom rim).
+The seal's three kernels are waited for at opening where the look opens on a standing thin gap
+(`Opening.sealed`, gpu/opening.ts) and built behind the show otherwise: the Mac's `npm run startup`
+found Lava Lamp asking for them in its first steps with no list naming them.
+
+### 27f-9c. Lava Lamp's wax is a liquid of its own (2026-11-11)
+
+Sealed in its bottle (27f-9), Lava Lamp's wax stayed in the plate, but the Mac filmed the plate
+red wall to wall with no blob in it: the wax was dye with a weight (Dye Weight), and dye is one
+liquid with the water. A lamp's wax is an immiscible liquid that holds itself in bodies by its
+surface tension, a few per cent heavier than the liquid cold, and lighter once the lamp has
+warmed it.
+
+The engine's immiscible phase is the oil (Oil Tension's Cahn–Hilliard mix; Oil Bodies keeps a
+colour in it), whose weight was fixed at the mineral oil's lightness, 0.15 of a unit of dye. Now
+a setting, **Oil Weight** (−1..1, OIL_RHO 3 dye units at full; the default −0.05 is that 0.15, so
+every oil look keeps it), and a piece of physics every oil has on a standing plate: it swells
+with heat more than water (OIL_EXPAND 2: paraffin about 7.6e-4 per kelvin against water's
+2.1e-4). `mixForce` and `sealSource` weigh the oil with both (Sim slots 52–53); the oil's lift
+up a rocked plate and the centrifuge's lightness take its sign. The lamp warms the wax as a
+body (cells a quarter to three quarters oil and up) in a band clear of the rim (heated at the
+rim, where the seal's circulation is held at zero, the wax churned into a haze), and where the
+wax is the oil the dye is only colour and is not warmed. Lava Lamp lays a pool and three bodies
+of wax as oil (`lib/oilLay.ts`, `LAVA_BODIES`), has Oil Tension 0.9, Oil Bodies 1, Oil Weight
+0.6, heat spreading at water's own rate (doubleDiffusion 0: at 0.5 the heat leaked out of the
+wax into a warm pool that held it up), Buoyancy 0.1 (at 0.42 the warmed water lifted the wax off
+the floor as a sheet) and no stirring (Turbulence 0.42, half the hand's speed, tore the wax into
+the liquid: inside the rim 1545 of 2465 of the oil left after six seconds against 2196 still).
+
+A melt went in and came out again: a heavy oil heavy below 2 of the heat's units and as light
+above, which is what a real lamp runs on. On the look's own step, measured with a lab built
+without it, it changed nothing (the wax's centre of mass at six seconds 0.24 of the height with
+it, 0.23 without), so it went (27f-9d).
+
+`npm run lavawax` (Measure, a part of its own, `lab8`, about ten minutes on SwiftShader), on the
+look's settings, its own step and the app's lay, six seconds, every line against a run that takes
+away the one thing it names: 77% of the dish clear, with 68% of the colour inside the bodies
+against 57% with Oil Bodies off; the cold top body sinks (9% of the oil laid above 0.7 of the
+height stays over the first three seconds, 32% at Oil Weight 0); the lamp holds the wax up (its
+centre of mass 0.23 of the height against 0.13 with no heat and 0.21 with the swelling taken
+out). Its first draft measured on the lab's step rather than the look's and could pass on the
+lay alone; the check skeptic's review is why each line has its control. Left open: the wax
+settles over the lamp as a low sheet instead of cycling (27f-9e), a quarter of its colour
+leaves it in its first seconds (27f-9f), and a melt that does something (27f-9d).
+
+### 27f-9e. Lava Lamp's wax goes round (2026-11-12)
+
+With the heat carried (38f-1) Lava Lamp's wax went up in plumes with mushroom caps and gathered
+at the top, and stayed: nothing took its heat but Heat Decay, a per-look fade on the look's
+clock (decayVel), which on Lava Lamp's step (0.0013 of a unit against the lab's sixtieth) is a
+time constant of about ten minutes. Before the carry the wax hung as a low sheet over the lamp
+instead (the old story is in the 27f-9e text this replaces: the heat stayed where the lamp laid
+it, so a warmed body rose out of its own heat).
+
+In a thin gap every parcel of liquid touches both glasses a millimetre away, and that is where
+its heat goes: by conduction across the gap, whose slowest mode dies as exp(−π²κt/h²), 2.9 s for
+water and 5.8 s for a paraffin wax (KAPPA_WAX 7e-8 m²/s) at the 2 mm rest gap, on the step's real
+seconds (`lampCoolOf`, Sim slot 54, laid in `mixForce` only where a standing plate's lamp is
+on). A lamp's top is its cooler and its lower glass rides the warm liquid (600 W/m²K through the
+gap against still air's 10), so the glass takes the heat in the plate's upper half
+(`LAMP_COOL_FROM` 0.5), coming in over a glass sheet's fin length (`GLASS_FIN`, 17 mm). Measured in
+the lab (128², 30 s, the oil's centre of mass as a share of the height): no cooling, up to 0.73
+and there; cool glass from the lamp's own band up, one fall and then the floor's pool turned over
+in itself, its top always in the cold (0.29 at 30 s); from 0.35 of the height a shallow cycle;
+from the half, 0.59 at 8 s, 0.31 at 19 s, 0.45 at 26 s. At 192² on the look's own clock (dt
+0.00133): 0.56 at 6 s, 0.28 at 14 s, 0.44 at 22 s, 0.31 at 30 s, two falls in half a minute.
+The glass laid by height is a shortcut, named as 27f-9g.
+
+`npm run lavacycle` (Measure `lab9`, about fifteen minutes on SwiftShader): the wax rises past
+half the height and is 0.15 below its highest by 16 s where a lab built without the cooling stays
+within 0.05 of its own (0.73 at 16 s); it rises again by 0.06 from its lowest by 26 s; and the
+rate is π²κ/h² at the rest gap on real seconds. Not yet seen: the Mac's film of the minute.
+(The check watches two minutes now and runs on the Mac's `show`: 27f-9h below, where the lamp
+this shipped was found to hover from its first minute on.)
+
+### 27f-9h. Lava Lamp looks like a lit lamp (2026-11-12)
+
+The owner, 2026-11-12, after the cycle (27f-9e) shipped: "The lava lamp isn't that exciting
+visually … Let's give it one last try." Rendered in the lab (192², the look's own step, 24 s),
+it went round, but as dark maroon worms on a dim tan: many thin plumes off the floor's pool,
+the wax nearly black, the liquid the colour of mud.
+
+Two things a real lamp has that the look did not. Its wax is fat and round because its Bond
+number is small: a few per cent heavier than its liquid cold, against a low interfacial tension,
+a capillary length of about 1.5 cm, where ours was about 3 mm. Dye Weight (solutalBuoyancy) is
+gravity's weight on the liquids' density differences, the wax's weight and the heat's lift
+alike, so lowering it lowers the Bond number without changing the cycle's balance: 0.7 → 0.2
+grows ℓc by √3.5, and Oil Tension goes to its top, 1. And a lamp's wax is a lightly dyed paraffin
+the bulb shines through, so it glows: the wax was laid with Clock Glass's body dye (2.6), which
+backlit absorbs nearly everything; LAVA_DYE is 0.55 now (0.9 at first, which the Mac filmed
+still darker than the ground). The bulb behind is an incandescent warm white (ledColor #ffc457,
+was #b58c5c), and Exposure 0.55 (was 0.46).
+
+The Mac's first film of that (60 s, the band playing) opened on the fat blobs, a teardrop and an
+upside-down U rising off a glowing gold ground, and by 17 s they were beads of red and faint
+smears that never gathered again; the film before it was the same story as a peach haze. The lab
+had none of that because the lab runs no app hands: Evolve (Evolve Speed 0.30, set in 28i-2 to
+keep the wax moving before the lamp went round on its own) pours colour and breathes air into
+the plate, and the music's hands (Sound Drive 0.55) lay bursts, sparks and streams of dye and
+flow on the beat, and Plate Rock tips it. A lamp is a sealed bottle on a table: none of that
+reaches its wax. All three are 0 on the look now; the band reaches it through the wax's heat,
+the bass on Buoyancy, as the look's own patch comment always said.
+
+Lab, 192², the look's own step, the oil's centre of mass as a share of the height: at 0.7 it
+went up to 0.57 at 8 s, down to 0.31 at 16 s and up to 0.40 at 24 s; at 0.2 up to 0.55 at 8 s,
+down to 0.31 at 26 s and up to 0.41 at 36 s, so it goes round as far, with a slower fall (the
+blobs sink at their lighter weight). The haze (cells a tenth to a half oil) at 24 s fell from 531
+to 384. Contact sheets of both are in the
+PR. The Mac's film of a minute is the owner's verdict.
+
+**The stall, and the warm floor.** The Mac's second film (90 s, no hands) showed fat teardrops
+for twenty seconds, then pale ghosts and no second rise, and `npm run lavacycle` was red on the
+new settings: up to 0.60 at 11 s, then 0.49 to 0.50 from 22 s on. Followed back, the settings
+were not the cause. Dye Weight is floored at 0.5 on a standing plate (`fluid.ts`, so a standing
+bottle always has weight), so the 0.2 above ran as 0.5 and 0.35 and 0.5 are the same run (the
+preset says 0.5 now; the dead range is 27f-9j); the weight the wax lost was its colour's, LAVA_DYE
+2.6 to 0.55 (27f-9k). And main's lamp, at 0.7 with the dark wax, hovers too: run past the 30 s
+the check watched, it damps to 0.49 to 0.50 inside 60 to 80 s. The cycle 27f-9e shipped was one
+or two swings of a damped overshoot.
+
+The cause was the bulb. It was a kick of heat laid in the wax alone, in a band over the floor,
+fast (a thermostat), with the water under and round it left cold. An overdamped body in a thin
+gap has no inertia to overshoot with, so it goes where it is weightless and stays: the wax rose
+off the band, cooled to the weight of the cold water at the band's upper edge, and hung there,
+heated from below exactly as fast as it cooled. A real lamp goes round because its liquid has a
+gradient of its own, hot at the floor and cool at the top, and the wax, slow to warm and slow to
+cool by conduction, is always out of step with the liquid it is passing through. So the floor's
+glass is warm now (LAMP_GLASS, 6 heat units), and everything touching it, water and wax, the wax
+at its own conductivity, relaxes toward it at the gap's conduction rate π²κ/h² over the glass's
+fin length up from the floor: the mirror of 27f-9e's cool glass, and in place of the kick
+wherever there is a wax phase. What floats the wax over warm water is then only that it swells
+more than the water does (OIL_EXPAND), as a real lamp's wax does: with the swelling taken out
+it never leaves the floor.
+
+Lab, 128², the look's settings, the oil's centre of mass on Metal: laid at 0.35 the cold wax
+sinks to 0.15 by 9 s, is up at 0.60 at 23 s, down to 0.19 at 42 s, 0.64 at 56 s, 0.24 at 74 s,
+0.60 at 90 s, 0.22 at 108 s, 0.60 at 120 s, a round about every 32 s, and a run to 180 s was
+still between 0.24 and 0.62. With the cool glass out it rises to 0.81 and stays; with the warm
+floor or the swelling out it sinks to 0.13 and stays. At 192² the same (peaks 0.60, 0.58, 0.59;
+on the look's own dt 0.56, 0.54, 0.56 with lows of 0.17 to 0.20).
+
+`npm run lavacycle` holds that: the first rise and fall (0.55 and a fall of 0.15 by 40 s), a
+second rise inside the first minute, the warm floor's and the swelling's controls, and a fall
+and a rise of 0.2 wholly inside the second minute, which is the line the old lamp is red on.
+The heights it asks are the old ones; its clock is not (the fall was read at 16 s and the
+round at 26 s, when the kick lifted the wax in seconds; conduction takes ten seconds to warm a
+cold lay). Six minutes of the lamp in four labs is half a minute on Metal and two hours on
+SwiftShader, so the check left Measure (`lab10` is gone) for the Mac's `show` (19k-19), and
+`npm run lavawax`'s third line, which read the lamp's lift at 6 s, moved into it as the two
+controls above. Shortcuts kept, each named in 27f-9g: the glass temperatures laid by height,
+the thin gap's rate standing in for a fat bottle's, and dye wax (no oil phase) still on the
+old kick. The Mac's film of two minutes is the owner's verdict.
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
@@ -6120,6 +6512,54 @@ With the followed place (28g-2, #387): a nudge moves the place the follower hold
 the shows read that place. An identification while the follower is unsure resyncs to
 the fingerprint's offset plus the nudge, so a nudge survives a re-anchor.
 
+### 28h-8. Listen: the song named, added, and its show designed once heard (asked 2026-11-08)
+
+The owner, on the Sequence tab: the song recognition should be in the Songs panel, a
+button that listens, fills in the details, and designs a sequence around the song after
+it has heard it. All of it existed apart: the song ID (`useMusicIntelligence`), the map
+a first listen makes, the song shows and the stage sequences; a song was named by typing
+and its show built by hand. Nothing new recognises or maps: **Listen** asks the running
+song ID to try now (`listenNow`), turning on the microphone when nothing is chosen, the
+song ID and Follow songs, and `lib/songDesign.ts` does the rest. `listenStep` reads
+what the ear reports and says when to add the song (its show taking the look that is
+up, without a fade) and when to design; `designFromMap` writes one stage per section of
+the map, each its section's length so `startAt` joins a song halfway in the right stage,
+settings by the section's energy against the song's own range (a ballad's chorus opens
+as far as a rock song's), colours from two dyes to the whole palette and the bridge in
+close; and cues pinned to sections: the title, a burst each chorus, new dyes for the
+bridge and the last chorus, the drain 8 s before the end. The map a first listen made
+was forgotten in the same render it was made (the track ends with it), so it is kept as
+`state.heardMap`. App.tsx is over budget, so its run that starts a song's sequence moved
+whole to `app/useSongSequences.ts`, which Listen starts a designed sequence through.
+The phone has it, as the Songs tile opens the same panel. *Measure:* `npm run listen`,
+20 checks: the cues fire on the song through the real scheduler (0:40, 1:30, 2:14 for
+the bursts), every half-second of the song lands in its section's stage, the ballad, a
+song with no chorus, a map with one section, designing twice, and each step of the flow.
+
+### 28h-9. A first listen's map in the song's seconds (found 2026-11-09)
+
+Found building 28h-8: the recorder that makes a song's map starts when the song is named
+(`adoptTrack`), which is seconds into the song (the fingerprint needs a few seconds of
+sound, the service a moment more) and halfway through it when Listen is pressed mid-song.
+The analysis counts from the recording's first sample, so the sections, curves and the
+fingerprint stored with the map were early by that much against the song's position,
+which counts from the song's start: the Score drew a chorus early, Listen's stages changed
+early and a burst pinned to the chorus fired early. The map moves, not the clock: the
+clock is re-anchored by every match, so the recording's first sample is given the song
+second the clock read then, by the newest anchor the track has when the listen ends
+(`songSecAt`), and `generateSongMap` moves everything by it (`shiftSongMap`,
+`shiftFingerprintFrames`; `lib/songMapLead.ts` says why not a rolling buffer). The part
+never heard is an `unheard` section at the first heard section's energy, no pitch and no
+harmony; a lead under eight seconds, or one inside a short intro, folds into the first
+section, and a first section only called the intro because the recording began there
+becomes a verse. Without the fingerprint's frames moved too, the next local match would
+set the clock early and undo it. The phone shares the hook, so it has it. *Measure:*
+`npm run listen`, 22 → 29 checks: a song heard from 0:30 had its choruses at 0:10, 1:00,
+1:44 and its bursts there, now 0:40, 1:30, 2:14 where the song's are; every half-second
+from 0:30 lands in its own section's stage; the curves read the song's own values; and the
+real local matcher names a snippet ending at 0:54 at 54.02 s (34.00 s before). Old maps
+stay early: 28h-11.
+
 ## 28i. Every look judged again, after the lamp, the soap film and the breakdown
 
 ### 28i-1. Nine looks retired (#408; Antigravity, batch 1 of the overhaul)
@@ -6154,6 +6594,35 @@ ships Beat Squeeze 0 and no patches where the Fillmore had 0.1 and two.
 two lines, one over every retired id against the end of its own chain, written out in the
 check and not taken from `livePresetId`, and one that a chain is followed the whole way.
 With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
+
+### 28i-5. Lumia retired (→ Velvet Underground)
+
+Judged twice on the Mac (the gallery of 2026-10-19, and the film of 2026-11-11 for the owner's
+"redo all of the presets" ask): a muddy teal fog under a red disc, its three veils seldom
+reading as pools. `lumia` left `PRESETS`, `PRESET_CONTRACTS`, the inject styles, the liquid
+table and `PRESET_AREAS`, and entered `RETIRED_PRESETS` → `velvet-underground`, the look
+nearest in what it was after (slow areas of dye on a dark plate). A saved show, set list
+item, MIDI pad, sequence stage, song cue, remote button or `?look=lumia` link plays Velvet
+Underground through `findPreset`; Randomize and the phone's Looks sheet read `PRESETS`, so
+neither offers it. The built-in Set Journey and Light Show Night stages that named it play
+Velvet Underground. Saved presets keep their own copy of every setting, so a Lumia someone
+saved still looks as it did.
+
+The lamp's Lumia stays: the setting, the Mixer row and mover, its MIDI target, desk pin and
+ride. That is why the item waited on a check change: `plate` 5b read red on any quoted
+retired id in `src/` and `scripts/`, which for `lumia` is some twenty lines that name the
+lamp. For an id that is also a `DEFAULT_SETTINGS` key or a `MIX_SOURCE_INFO` row, 5b now
+counts every quoted line unless it has the lamp's shape (`readsAsLamp` in
+`scripts/lookOrLamp.mjs`: a setting key, a mixer type or call, a settings read, a uniform
+field, another setting or row quoted on the line or beside it; a look's shape wins). The
+first version listed look shapes instead; the check-skeptic pass ran it over every live look
+as if retired and it passed 126 look lines, the rule turned round passes 2 of 450 (a JSON
+example in a comment, and the LED mode named Cyberpunk). Every other retired id keeps the
+old any-occurrence test. With only the table entry added on main's tree, 5b listed the
+look sites this PR rewrote (`plateAreas.ts` 147, `sequencer.ts` 247 and 279,
+`presetPlate.ts` 73, 130 and 207, `phone.mjs` 1012, and `plate.mjs`'s own quiet-looks list)
+and none of the lamp's. `phone`'s one-plate Play-sheet
+pass moved from Lumia to Roy, `plate`'s quiet looks are Velvet Underground and Aurora.
 
 ### 28i-2. Give back the black, make the still ones move (this PR)
 
@@ -6648,6 +7117,27 @@ photograph. Nothing is lost (C9 to 1e-9). C6 and C7 still pass on the new model,
 at 120 s, 4.0% black, 18.4% dark, 13% saturated, 8/12 hues.
 
 Checks: `npm run soapfilm` 32/32 (C8 five lines, C9 four; main's model fails eight of the nine new ones (the 300 nm film staying clear is the ninth) and passes the other 23; four look-alikes from the check review, a border solved for one fixed thickness, sides not graded by hydrostatics, a spot spreading its liquid over the whole film, and a clock read from the time since the film was made, each fail one line), `npm run soapgpu` 32/32 on software WebGPU with three new lines (border cell by cell 0.16% of the reference's change, volume lost 5.359% against 5.359%; 21 black cells against 21; Vrij's step 178 against 178), `npm run soapgpu -- --selftest` 32/32.
+
+### 32d. On the plate (and 32e, the phone)
+
+Reported 2026-11-12 (the looks filmed against the owner's references): Soap Film was 82 to 87%
+black, mean luminance 0.05 against 0.48 for the owner's "Liquid Tapestry" photograph, one hue
+(spread 0.02 against 0.41). It had no film: its colour was Thin Film's ring table read off the
+dye's amount and multiplied onto the dye, and the soap tore the dye away. Now the frame holds
+§32's film (`createSoapFilmGpu`, 128² at 1 mm, evaporation 5 nm/s, the 1 mm Plateau border),
+stepped with the plate on the film's own clock (the show's seconds times Drain Rate), and the
+plate draws its reflected colour: `soapFilmLut` (soapFilmRgb's soft-box colour in linear light,
+by h cos θ_t to 2 µm) read through a cubic B-spline of the thickness, laid over the plate as a
+reflection (`c (1 − Y) + film`). The frame fills the view's longer side (`soapFrame.ts`: the
+plate's camera shows the middle two thirds of the plate). Two things join the film to the plate:
+the plate's flow drags it (the overdamped air drag, projected onto ∇·u = 0, so a swirl never a
+stretch; the solver gained an `ext` face push, zero by default, `npm run soapgpu` 32/32
+unchanged), and a drained film (mean under 160 nm) is drawn again top first over two seconds, a
+fresh film thin at the top and thick at the bottom (Mysels' √z, 350 to 750 nm) with patches 6 mm
+across, all on the GPU from the solver's own stats. Measured on the lab's picture of the look
+(`npm run soapplate`): luminance 0.48, 0.1% near black, 11 of 12 hue sectors; the plate's colours
+follow the CPU reference's picture of the read-back film at r = 0.955 (−0.01 upside down); off is
+the plate to the byte. The shortcuts it leaves are 32d-1..5.
 
 ## 33. Bubbles and the closeup, per liquid
 
@@ -7211,6 +7701,34 @@ scrollbar hidden. The Macro panel had given its zoom to the Rides and sat off th
   Drain. `npm run layout`: every ride shows whole, Macro Zoom among them, at 1440×900 (3 of 8
   before) and 1512×860 (2 of 8 before).
 
+
+### 35c-7. One page for sound (shipped 2026-11-10)
+
+The owner: "I also don't understand why there are two sound settings pages - can we put
+these all together and simplify things?" There were two. The Sound sheet (drawn on Setup
+as the Music & Drone panel) held where the sound comes from, the shelf, the player, the
+drone and Ambient TV mode; Settings → Sound held how hard the sound drives the plate,
+the device, the calibration, the beat, the tempo and the songs. Setup put both side by
+side, and each sent you to the other for half a job: the sheet's Mic said which device
+and sent you to Settings to change it, Settings said which source and sent you to the
+sheet to change it (35c-3 and 35c-5 made each one home, which left the halves apart).
+
+Now the sheet is the top of Settings → Sound (`SoundPanel` drawn by `SoundSection`
+through `soundSources`), read from the top: the sources, the Input picker under the Mic
+while it is the source, the shelf, the player and the drone, then "How it drives the
+plate" (Sound Drive, Sound Impact, Sensitivity, Bass Boost), then the room, the beat,
+the tempo and the songs. The sheet, its `showSound` state and the `player` panel are
+gone; `player` is in `MERGED_SECTIONS`, so a saved layout with Music & Drone opens Sound
+in its place, once. Setup ships with Sound alone in that column, 340 wide (the player's
+width). Every door that opened the sheet (the Mic dot, the palette) opens the section.
+The phone had one Sound sheet already; its desk tabs draw the merged section.
+
+Checks changed with it, each asking the new shape: `panel` (the section draws the
+sources at its top; no state row or link), `panelOneHome` (one Input select, drawn
+under the Mic; no sheet, panel or link), `desklayout` (Setup with Sound once; a saved
+Music & Drone becomes Sound), `layout` (34 panels, was 35), `shelf` (the shelf in the
+Sound panel), `opensource`, `qa` and `kickbubbles` (the source read and picked in the
+section).
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
@@ -7884,6 +8402,22 @@ Mic or Band pick came back on every launch from `localStorage`.
   the Sound panel and on the phone. `?kiosk=1`, a box with nobody to click, still starts
   the band on its own. The phone is the same App state, so it opens on Off too.
 
+
+#### 14y-2. The Mac app keeps System audio (shipped 2026-11-10)
+
+The owner, after the Mac app came back from an update on Off in the middle of a stream
+rehearsal: "I shouldn't have to click the system audio ever." The cause was 14y itself:
+the source is kept in `sessionStorage`, which a relaunched Electron app does not have, on
+purpose, so that a Mic or a Band never comes back on its own. System audio in the Mac
+app is different on each count 14y was about: it opens no device the room can hear, it
+plays nothing, and macOS asks for it once and then remembers. So it alone is kept, in
+`localStorage` under its own key (`MAC_SYSTEM_AUDIO_KEY`, `src/app/shared.ts`), and
+only in the Mac app: in a browser it is a tab picker, which must never open itself.
+Picking any other source removes it. `npm run opensource`, three new lines with the
+Mac app's bridge stood in: System audio comes back in a new tab (a relaunched app), a
+Band picked after it does not, and a browser never brings the kept key back. With the
+restore taken out the first is red (`reads off, kept 1`). The owner was asked whether
+every source should be kept in the Mac app instead.
 #### 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 
 The owner: "things are a little jittery sometimes"; make sure the GPU is used across
@@ -10419,6 +10953,15 @@ over a second (`originGap >= 1000`).
 
 - **23.17g** (**shipped**, this PR): a key opens the Mac app on two Macs, not any number. The Worker counted machines (`POST /activate`, two per key) but nothing asked it; the show server's own count is per Mac. Now the page asks (`src/lib/macSeat.ts`, called from `activateLocalLicenseKey` in `src/lib/licenseKey.ts`, only in the build the app ships, `VITE_MAC_APP=1`, with the Worker's address already in it) before a key is filed. The Mac's name for the count is a random id kept in the licence file (`seatId`, `server/server-license.js`), not the host name, which two Macs can share and an owner renames; the Worker's refusal now names the Macs holding the seats (`labels`) and the door says which. "Remove from this computer" gives the seat back at the Worker (`deactivateLocalLicenseKey`). Offline is not a refusal, by the never-lock-out rule (23.10): a Mac the Worker cannot be reached from opens on the key's signature, is filed as unconfirmed (`seatConfirmed`), and at every online start (`syncServerLicense` → `confirmHeldSeat`, which asks again even for a seat it holds, the Worker answering a known seat as a refresh) is seated and filed as such for the offline starts after; a refunded key, or a full key on a Mac the Worker never seated, leaves the Mac from its next start (`retireStoredLicenseKey`), never from the page it is showing. A "full" for a Mac the Worker had seated only marks it unconfirmed, so a hiccup in the Worker's store cannot take the app off a paying Mac; the start after, still full, retires it. This is what lets a refund reach a Mac that typed the key in at the door with no sign-in (`heldKeyRefunded` needs the window signed in under the key's email) — 12h. *Measured:* `npm run license-worker` 12a–12j (the real `licenseKey.ts`, bundled as the app builds it, and the real licence manager, five Macs against one key: a third is refused with the two named, a release frees a seat, an offline Mac is let in and sorted at its next online start, a refunded key says so; 12f is the control, the same page built for the site, which asks nothing and opens a third Mac).
 
+#### 23.17f. A sign-in from the Mac app signs its window in, and an Account sheet that says where you stand
+
+- **23.17f** (**shipped**, this PR). The owner, 2026-11-10, with a screenshot of 1.3.1276's Account sheet: "this login stuff is fucked. google is no longer there? and the screen is really cluttered and disorganized." The audit found four faults, three of them real breakage. (1) The Google button's mark had two of its four strokes, one drawn off the edge of its box, which left a grey smile; and once pressed in the app its label became "Finish in your browser…" for good, so Google's name was nowhere on the sheet. (2) The browser tab the app sent a sign-in to (`/show?macSignIn=1`) checked the licence first, and on a Mac that already held a key it said "Your licence is on this Mac now" and never asked anyone to sign in, while the window waited. (3) Even when the browser did sign in, only the account's key came back (23.17d's hand-off); the window stayed signed out, so the sheet said "You're not signed in" over a Pro key and cloud sync and running shows never reached the app. (4) Signed out, the sheet showed nothing of the plan, and an active key appeared only as grey placeholder text ("Pro key active") inside an empty box with Activate beside it.
+  Now the window makes a one-time code (128 bits) and puts it, with the provider, in the address it opens; the browser tab leads with that provider's button, says when a key is already on the Mac (the owner: "perhaps we acknowledge that a license key was detected?"), signs in, and posts the provider's credential (Google's or Apple's ID token, caught from Firebase's result, `takeProviderCredential`) to the app's server under the code (`server/signin-handoff.js`). The window asks for it every two seconds, at module level so the door opening on the licence cannot cut it off, and signs in with `signInWithCredential`. The server holds it in memory only, two minutes at most, hands it out once, takes only Google or Apple credentials, and answers only the laptop with a loopback Host (no phone on the Wi-Fi, no page that rebinds its name to 127.0.0.1) and only pages of its own origin. The sheet leads with one status row, signed in or not (the account or "Not signed in", the plan, "Pro licence found on this Mac"), drops the newsletter box from its sign-in (the switch is there once signed in), shows an active key as a line with Remove beside it and the paste box only when there is something to paste, and says "Mac" or "browser" for where the key is. The phone's bottom sheet is the same component. *Measured:* `npm run signin` 25 (the app's window and a browser with its own storage; Google answered in the browser; the window's sheet names the account, the code is spent, a cross-site page and a rebound name are refused; fails on the code before, whose address carries no code). Open: 23.17f-1 (Apple on the live project), 23.17f-2 (the emailed link).
+
+#### 23.17f-3. After the web sign-in, the app comes forward and the browser tab closes itself
+
+**After the web sign-in, the app comes forward and the browser tab closes itself.** The owner, 2026-11-11: "sign in from my local app is weird - it asks me to continue on the webpage. It then never actually logs into the app though. if it wants me to use SSO on the web, it shouldn't go to the chromaglass play page after logging in, it should just close the login window and go back to the app." What he described is 1.3.1276 before 23.17f (the tab opened a whole show, the window never signed in); 1.3.1313 carries 23.17f. What 23.17f still left: the tab said "go back to the app" and stayed, without knowing whether the window had the sign-in, and the window signed in behind the browser where nobody saw it. Now the window, as it takes the credential, comes to the front (`bringToFront` in `desktop/preload.cjs`, `chromaglass:bring-to-front` in `desktop/main.js`, only the show's own window may ask); the tab asks the app's server whether the window took it (`/signin-handoff?h=…&status=1`, yes or no, never the credential) and then says done and closes itself (`window.close()`, which a browser allows a tab the system opened with one page of history), or, if the window never took it within 30 s, says the app did not pick it up. *Measured:* `npm run signin` 25 (the tab sees the app take it and closes itself, the window brought forward) and new 25b, the owner's own case: a Mac already holding a Pro key, Continue with Google from the Account sheet; the tab signs in without opening a show, closes itself, and the sheet names the account. Before (main at 3731e2c): 25 and 25b FAIL on "the app took it unsaid, tab stayed open, window forward 0×". `npm run desktop` reads the new bridge call. *Owed:* the release, then the owner's Mac (judging: Continue with Google from the sheet, the app forward, the tab gone).
+
 #### 23.17m. The Mac app's findings from the security audit
 
 - **23.17m. The Mac app's findings from the security audit (2026-10-28), shipped.** (4) OSC has no show key, so anyone on the venue's Wi-Fi could drive the show; the app now opens with it off, and *Show → OSC input* turns it on for this Mac only (127.0.0.1) or from the network (0.0.0.0), live (`setOsc` in `server/remote-server.js`) and kept in `show.json`; `OSC_PORT` in the environment still decides outright, and `OSC_BIND=127.0.0.1` narrows the terminal server. A menu on the laptop with no phone version, on purpose: a phone that could open the show to the network would hand that to whoever holds its key. (7) Electron 44.10.0 and `npm audit fix` in `desktop/` (0 advisories). (9) A packed app quits when launched with `--remote-debugging-port` or `-pipe`, unless Node's inspector is already open (the build whose fuse is open, which the check drives). (10) `/license-info.json`, `/license-activate` and `/license-deactivate` turn away a request that came from another site (`Sec-Fetch-Site`, `Origin`) and a POST that is not JSON. (13) `disable-library-validation` and `allow-unsigned-executable-memory` are out of the entitlements. *Measure:* `npm run tiers` 3b (fails on the old server), `npm run desktop -- --packaged` lines `OSC closed`, `no debugger`, `entitlements`.
@@ -11066,7 +11609,83 @@ model cannot reach one, the PR says what it reached and asks.
     infrared (36e-4), and that build adds a tighter dry-out ledger line. `boilgpu`'s
     boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
 
+#### 36e-2. The GPU build
+
+  - **36e-2. The GPU build (shipped, 2026-11-08).** `src/gpu/lampBoil.ts` (`createBoilPlateGpu`,
+    `seedBoilSites`, `waterDensity`, `waterViscosity`, `nucleationSuperheat`, `BOIL_BUOY_PER_KG_M3`) and
+    `src/gpu/wgsl/lampBoil.ts` (`BOIL_PROPERTIES_WGSL`, `BOIL_DISH_WGSL`, `PLATE_BOIL_WGSL`)
+    build the 36e-1 model on the GPU, pass for pass, without importing `src/lib/lampBoil.ts`:
+    - *Standalone dish solver (`createBoilPlateGpu`):* `boilThermal` (two-band Beer–Lambert
+      lamp heating $0.12(1 - e^{-A_{\text{dye}}(1-\alpha)}) + 0.88(1 - e^{-\kappa_{\text{IR}}d(1-\alpha)})$,
+      forced/natural air cooling $h_{\text{Forced}} = 50$ or $h_{\text{Natural}} = 10\,\text{W/(m}^2\text{K)}$
+      inside `HAND_RADIUS` of a held hand, and two-face radiation $2\epsilon\sigma(T^4 - T_a^4)$),
+      40-iteration Jacobi sideways conduction (`boilConductionJacobi`) with implicit open-rim
+      clamping to `T_AMBIENT`, cavity nucleation at each cell's largest cavity superheat
+      $\Delta T_{\text{nuc}} = 2\sigma T_{\text{sat}}/(\rho_v L r_c)$ with gap-wide nucleus floor
+      $\alpha_{\text{min}} = \min(0.25, \pi(d/2)^2/\text{d}x^2)$ and two-way rim heat exchange
+      $A_{\text{int}} = 2\sqrt{\pi\alpha}\,d/\text{d}x$ (`boilPhaseChange`), Hele-Shaw Kell buoyancy
+      $(\rho(T_a) - \rho(T))g\,\text{up}$ and Vogel viscosity with 160-iteration red-black SOR
+      pressure projection (`boilPressureSetup`, `boilSorRed`, `boilSorBlack`, `boilVelocity`)
+      sourced by thermal expansion + phase change $\nabla\cdot\mathbf{u} = \beta\dot{T}(1-\alpha) + \dot{\alpha}(1 - \rho_v/\rho_l)$,
+      and CFL-substepped (`dtSub <= 0.45 * dx / vmax`) minmod-limited face-flux advection of
+      liquid temperature (scaled by `C_LIQUID / C_TOTAL` while the glass stays put), vapour
+      $\alpha$ and dye (`boilMaxSpeed`, `boilAdvectFlux`, `boilAdvectApply`).
+    - *Live plate integration (`36e-2b`):* `stepPlateBoil` (`src/gpu/fluid/passes.ts`, stepped
+      before `this.air.splat` in `src/gpu/fluid.ts`) decodes `A_dye` from the plate's dye
+      texture (`0.60 * max(r,g,b) + 0.32 * mean(r,g,b)`), keeps the boil's temperature in
+      float32 (`boilAlpha.g` in `rg32float`) so 1/60 s increments (~0.007 K) are not lost to
+      `vel.z`'s half-float precision while updating `vel.z` and taking any external write to
+      `vel.z` more than one half-float ULP from its own (`abs(half - own) > ulp`), adds liquid
+      thermal expansion to `this.hsPour` while `air.field` (`setBoilAlpha` in `src/gpu/air.ts`,
+      read by `hsDivergence` in `src/gpu/wgsl/thinGap.ts`) counts the steam's volume once and
+      shades the vapour pocket as H6's air, and uses preallocated uniform views (`boilUniF`,
+      `boilUniU`) in `FluidCore` and pooled hold entries in `syncBoilHolds` (`src/sim/tools.ts`).
+      In `currentForces` (`src/gpu/wgsl/fluid/forces.ts` and `src/sim/stepping.ts`), `Heat = 0`
+      (`A.a.z <= 0.0` / `(p.heat ?? 0) <= 1e-4`) runs today's exact lines and order byte-for-byte;
+      when `Heat > 0`, `clamp(temp, 0, 50)` is removed, `maxCurrent` clamps only the non-buoyant
+      current, and buoyancy uses Kell's `waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + temp)`
+      scaled by `BOIL_BUOY_PER_KG_M3 = 4.8350587` ($1 / |d\rho/dT(T_{\text{ambient}})|$).
+    - *Controls:* **Heat** (`heat`, 0..1, default 0 so every look opens byte-for-byte as
+      today, held by `npm run lampzero`, `npm run plateboil -- --part=zero` and `npm run boilgpu`
+      check 6) in Settings → Lamp & Light, Perform desk (`SECTION_OF` in `src/lib/deskPins.ts`),
+      MIDI (`LEARNABLE_SETTINGS` in `src/lib/midi.ts`), `PER_LAYER` (`src/lib/sceneMap.ts`),
+      excluded from Evolve (`NOT_THE_LOOK` in `src/lib/drift.ts`) and Lucky (`heat: 0`), remote
+      (`src/components/RemoteControl.tsx`) and phone (`src/components/phone/PhoneStage.tsx`);
+      and a pointer hold on the pad (`boilHolds`, desk, iPad and phone) that blocks the fan's
+      air under the finger while held (`docs/judging.md` §115).
+    - *Measured:* `PW_WEBGPU=1 npm run boilgpu` 54/54 on `apple metal-3` (`cost: 4.40 ms a step at 768 × 768 on apple metal-3, lamp on`), `npm run boilgpu -- --selftest` 54/54, `npm run plateboil -- --part=zero` 8/8, `PW_WEBGPU=1 npm run plateboil -- --part=boil` 6/6 on `apple metal-3` (`rate` 0.98x, `hold` 108.7 °C peak and steam at 142 s, `fan` 85.8 °C and 0.000 steam, `steam` 1.01x displaced and 1.00x arriving beyond the ring, `writes` 1.00 kept; `rate,hold,fan,steam,writes` removed from `--owed` in `scripts/checks.json`), `npm run boil` 38/38, `PW_WEBGPU=1 npm run heat` 10/10, `npm run wgsl` 162 shaders, `npm run panel` 263/263, `npm run desk` 48/48.
+
 ### 37. Marketing and social media (asked 2026-10-29)
+
+#### 37x-10c. Words poured from the phone, the show server and the assistant
+
+  - **37x-10c. Words poured from the phone, the show server and the assistant (shipped
+    2026-11-08).** The owner asked, during the first live album show: "use the ability
+    to paste in song info at the beginning of each song as ink/liquids that eventually
+    get swept away". The pour existed (the song action `{do:'title'}` hands
+    `titleRows(song)` to the visualizer's `pourText`), but it fired only for a song the
+    ear had identified, and the album was playing from files through the Mac's
+    speakers, which names nothing; and no remote, show server or assistant message
+    could pour words at all (`pourText` was on the check hooks only). So:
+    - `src/lib/pourText.ts`: `parsePourText` reads a `pour-text` message as untrusted
+      whoever sent it (four rows, sixty characters each, weights 0.25 to 3, a hex
+      colour or `contrast`), and `pourTextRows` lays out what a person typed as a title
+      card: the first line the name in capitals on one or two rows, each line after it
+      a credit, and "Song - Artist" on one line read as both.
+    - `remoteProtocol.ts`: `{type:'pour-text', rows, colour?}`; `useRemote` pours it,
+      one pour every 1.5 s at most (a pour adds dye, and a double tap stacked the words).
+    - The relay passes a phone's straight through (a hand at the plate); the guard
+      (`server/assistant.js`) passes the assistant's in Play, paced as a setting change,
+      shape only. The assistant's program gains `pour_text` and a line in its guide.
+    - The phone remote's Controls gain "Pour words" (`RemotePourText.tsx`, its own file
+      beside the 61 KB remote), with "This song" to fill it from the ear's name; the box
+      empties once poured.
+    - Checks: `npm run assistant` (Suggest refuses, Play passes rows and colour only,
+      blank rows refused, a phone's pour reaches the display, the page's parse caps and
+      lays out; two new mutants), `npm run remotemix` (typed and pressed on the phone,
+      one pour on a display socket, the box empty after). Not measured in a cloud
+      session: how the words look and how long a look's flow takes to carry them off;
+      that is the Mac's (docs/judging.md §117), and 37x-10d is the sweep.
 
 #### 37x-4c-2. YouTube's acknowledgements are too coarse to judge by
 
@@ -11082,6 +11701,64 @@ model cannot reach one, the PR says what it reached and asks.
     YouTube-like listener: 247 of 570 frames dropped and 4.9 s behind before, none and
     0.02 s after. On YouTube the readout is therefore the socket's, blind to a slow
     link for seconds (37x-4c's item).
+
+#### 37x-4g. Sound and picture judged on one clock dropped a healthy stream
+
+  - **37x-4g. Sound and picture judged on one clock dropped a healthy stream (shipped
+    2026-11-09).** Found in the private rehearsal on the Mac app 1.3.1257: six minutes
+    Excellent on YouTube, then the upload fell from about 7 Mbps to under 1 and Studio said
+    "No data"; a restart held for fifteen seconds, then eighteen minutes stuck. The uplink
+    measured 592 Mbps. The readout that decides to drop video (37x-4c) took the newest
+    timestamp written on *either* track and subtracted the timestamp of the last packet
+    delivered on *either* track. With sound and picture apart by more than the 2 s bound,
+    any brief wait on a WAN (a keyframe pending a few milliseconds) read as more than 2 s
+    behind, and the client dropped video to the next keyframe, again and again: keyframes
+    and sound only, the rehearsal's picture. On loopback nothing waits, so it never showed
+    here. Now each track is judged on its own clock: how far the newest packet written on
+    a track is ahead of that track's oldest packet still waiting. A first draft used the
+    track's last *delivered* timestamp; it went stale across a drop, so the keyframe that
+    ended one drop started the next (five runs for one backlog). `npm run livedrop`'s seven
+    new lines, a scripted client with sound 3 s behind, in step and 3 s ahead on a link
+    that waits briefly around each keyframe: before, with no backlog at all, 593 frames
+    dropped in 8 runs with sound 3 s behind (the same on a server's fresh acknowledgements)
+    and 120 in 3 runs with it 3 s ahead, and after a real 3.5 s backlog 594 in 7 runs with
+    no frame in the last second; after, none dropped without a backlog at every skew, and
+    one run of 89 frames (90 worked from the bound and the keyframes) with 31 in the last
+    second after it. (The in-step rows' 59 frames before the first keyframe were the old
+    readout comparing against a delivered timestamp of zero, not the skew.) The readout now shows the skew (`avSkewSeconds`, "sound X s late" past half
+    a second) and the audio encoder's queue (`audioQueue`), the numbers the next rehearsal
+    needs to say where the skew comes from (37x-4g-1). A fifteen-minute local run under
+    load (grid 256, a 33 ms plate) stayed in step within 0.04 s with nothing dropped, so the
+    skew's source on the owner's Mac is not yet reproduced here.
+
+#### 37x-4h. The stream looked softer and flatter than the app
+
+  - **37x-4h. The stream looked softer and flatter than the app (shipped 2026-11-10).**
+    Found in the second private rehearsal: the owner asked why YouTube's picture looked
+    different from the app beside it. The colours matched (both sRGB); the bits did not.
+    The stream took the song film's rate (render.ts's `videoBitrate`, 0.1 bit a pixel a frame:
+    6.2 Mb/s at 1080p30; about 6.2 Mb/s steady on the encoder for 42 minutes), and the
+    panel opened at 30 fps while the plate is drawn at 60. YouTube then compresses again
+    for every viewer, from what our pass left. Now the stream has its own rate
+    (`src/lib/liveRate.ts`): `pixels × √fps × K`, 14 Mb/s at 1080p60, 9.9 at 1080p30, 6.2
+    at 720p60 (a P-frame pays for the change between frames, which halves when the frames
+    double, so a doubled frame rate asks about √2 more bits, not 2×); capped at the
+    strictest platform on the shared encode (Twitch 6, Kick 8, Facebook and X 9,
+    Instagram 4, TikTok 6 Mb/s); fitted under the last stream's measured ceiling with the
+    20% headroom, the ceiling kept up to 12 hours so fitted streams do not swing back to
+    full rate. The panel opens at 1080p60 (a saved 30 stays 30) and says the picture's
+    rate and what limits it. One configuration (`liveVideoConfig`) for the encoder, its
+    probe and the check. `npm run live`'s two new lines encode 3 s of a picture that
+    changes everywhere (three noise planes sliding and cross-fading; the encoder makes
+    30 Mb/s on it when asked for 30, so it is the rate control being measured) at
+    1920x1080 and 60 fps: 13,744 kb/s made of 14,000 asked (98%), and 6,000 asked lands
+    near 6,000; the old rule's 6,221 at 1080p30 made 6,124. On the lab's plate the stream
+    carried 41 kb/s of 1,500 asked: a near-still picture any non-padding CBR encoder
+    undershoots, so that number is printed, not judged. `npm run liveshow`'s five new
+    lines: the hand-worked rates, the panel's 1080p60 at 14 Mb/s, each platform's ceiling,
+    the fit to a ceiling and its floor, the ceiling kept and dropped; in the panel, Go
+    live hands the encoder 60 fps at Twitch's 6 and Instagram's 4 Mb/s and says so, then
+    fits to a 3 Mb/s ceiling at the 2 Mb/s floor. The song film's and Record's rates are unchanged (Record already offers 60 fps at 12 Mb/s).
 
 #### 37x-4d-7. The moving line read a looping bar on two frames
 
@@ -11439,6 +12116,46 @@ model cannot reach one, the PR says what it reached and asks.
     0.15 of the oil's pixels), and brightens nothing in focus. Nothing changes at Focus's middle, which every
     look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
+  - **38h-15 (shipped 2026-11-11).** Bubbles drawn at the screen's resolution. The owner:
+    "the bubbles still look shitty and pixelated. They look like a old computer drew them."
+    In the lab every projected bubble's outline was a polygon, one flat facet per texel of
+    the air field (five to eleven screen pixels at the app's sizes): the projector's bubble
+    was as opaque as the field's coverage, `smoothstep(0.02, 0.28, coverage)`, and a contour
+    of a bilinearly filtered grid has its corners on the grid. Its size came from a
+    sixteen-step log packing 28% apart, and the closeup fitted a centre and radius to sixteen
+    gathered texels (`camBubble`). Now the field's fourth channel names which bubble of the
+    list a texel is (inside a rim, or a skirt three texels past it with no coverage, so a
+    pixel just outside a bubble still finds it; the boiling's steam keeps its own number and
+    the field's drawing), the air keeps a copy of the list as it was stamped, in the splat's
+    own encoder (`WebGPUAir.geo`), and the plate draws the rim from the disc, its exact
+    radius and fingers, one screen pixel wide in both views (`airHere`). Where the gathered
+    texels name two bubbles the one the point is most inside wins, so neighbours keep their
+    own rims. The camera's view through a bubble's wall, where its lens lands in the grid's
+    ramp just outside the rim, now reads the liquid past the hole (`airLiquid`); inside the
+    rim it still reads the field's hole (38h-16).
+    `npm run bubbleround` (new, lab9): rim radius along 96 rays, 1.5 to 6 cells at about 11
+    px a cell, spread 0.35 to 0.42 px (the field's drawing 3.2 to 3.5, and a 1.5 cell bubble
+    too faint to have a rim), at the laid radius within 0.41 px (the field's 3.7 to 4.6 px
+    inside it); two bubbles 2.5 cells apart 0.36 px. Found: 38h-16 (the projector's band and
+    the main decode still read the grid's hole).
+  - **38h-17 (shipped 2026-11-11).** The oil beads drawn at the screen's resolution. The
+    owner, after 38h-15: "Fix the small bubbles as well." Filmed on the Mac in Macro Bead,
+    the small balls with a dark wall, 40 to 60 px across, had scalloped outlines: they are
+    the oil beads (`beads` 0.7 there), not bubbles. Their mask is drawn on the GPU from each
+    bead's exact disc (14ab-6), but into a 512² picture of eight-bit channels read back
+    filtered: in a closeup a mask texel is six to ten screen pixels, the coverage's contour
+    a polygon, and the lens's push read from the eight-bit dome's gradient (`dropLens`)
+    swung round the rim with the steps. For the rings (`beadDrops` 0, every look but those
+    that turn the drops on) the mask is one function of a point, so the plate evaluates it
+    at the point it draws (`beadRingsAt`, `wgsl/beadShape.ts`), from the same list and tiles
+    the mask was drawn from (`BeadMask.rings`, bindings 20 to 22), at float precision with
+    its edge a screen pixel wide; the drops and a picture handed in place of a list read the
+    mask. `npm run beadround` (new, lab9): beads of 3 to 9 cells at 3x, rim radius along 96
+    rays, spread 0.16 to 0.60 px in the projector and the closeup; the mask's reading 1.7 to
+    3.6 px on every bead up to 7 cells (the 9 cell bead's facets shallow enough to pass).
+    The bubbles' "dark-cored holes with serrated rims" in the same film are 38h-16 (the
+    camera's read of the grid's hole inside the rim); two tries at it are written there.
+
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
 #### 39a. Settings → Feedback, mailed and kept
@@ -11781,6 +12498,96 @@ value) by default on every look, and free to ramp up so a long show keeps bursti
   clears `73.8%` of the dye in its radius in $2\text{ s}$ at `1` (`0.0%` at `0`, `99.5%`
   on clean water), with bursts returning from dial `0.87` ($25\text{ s}$ half-life).
 
+## 38f-1. The heat rides the liquid on a thin gap (2026-11-11)
+
+Found reading 38f for its build (2026-10-30), and the root the 27f-9f thread named for Lava
+Lamp's wax that never cycles (27f-9e) and its peach wash (27f-9f). The temperature lives in the
+velocity's z, and a thin gap never self-advects the velocity (its inertia is the drag time), so
+the lamp's heat stayed in the cell it was laid in while the flow it drove moved the liquid out
+from under it. A warmed body of wax rose out of its own heat into cold cells, was heavy again
+at once, and the lamp's band held the wax as a sheet at its top edge.
+
+Now `carryHeat` (fluid/passes.ts) carries it as the colour is carried, through the thin solve's
+faces in the colour's substeps: heatPack lays the column's heat h·T (its warm and cold parts,
+since the carry keeps amounts at zero or more) beside the column's liquid h, both go through the
+same `bodyAdvectSub` fluxes, and heatUnpack puts back the one over the other. The ratio is
+mixing's own mean, and it holds a uniform temperature exactly whatever the gap does in the step;
+dividing by the gap instead would count a press twice, since the gap moved before the solve.
+fluid.ts did not grow (one stage line, a comment shortened).
+
+Measured: `npm run heat` line 9, a warm heavy blob sinking down a standing plate, colour −2.78
+cells and heat −2.75, heat kept 99.9% (with the carry off: heat 0.00). Lava Lamp in the lab
+(`lavalong`, 16 s): at 192² the wax goes up in plumes with mushroom caps and gathers at the top
+(centre of mass 0.75 of the height against 0.24 lying on the floor without the carry); the colour
+the rising plumes strip is 38f-2, below, shipped with it; the cooling that would bring the wax
+down is 27f-9e.
+
+## 38u-5, 38u-4 (the multiplier). The music stirs through a cord (2026-11-13)
+
+Found by the third physics pass (38u, 2026-11-13). The plate's rule is that sound reaches it
+only through cords and preset patches, and the solver's own step broke it three ways:
+`stirOf(dial, energy, impact)` multiplied Turbulence's stir by the analyser's energy, up to
+two; `deriveStep` set "spin" from (0.6 mid + 0.4 treble) times Sound Drive and the forces pass
+laid it as a second noise curl wherever there was dye; and Vibration's push swelled with the
+energy, 0.3 to 1. None had a cord, a patch or a control, so a look with every cord pulled
+still churned with the band. The owner chose (the same day) to route it through cords, not to
+remove it and not to leave it.
+
+Shipped: `FluidSimulation.step(settings, time, noise2D)` takes no sound and its file never
+names the analyser's data; `spin` is gone from `GpuStepParams`, from the forces shader and from
+the CPU grid (the uniform's slot is kept, unused); `stirOf` takes the dial alone; Vibration's
+push is the dial's at 0.65, the middle of its old swing. Every look on the shelf carries one
+more cord, the sound's mids on Turbulence (`lib/stir.ts` `stirCord`, laid on all of them by
+one rule, `layStirCords`), at `stirCordDepth` of its own Turbulence and Sound Drive. The mids
+and not the energy: the dial's curve is a fourth power, and over three test songs an energy
+cord deep enough to carry the eddies' steady share ran 0.64 to 1.66 of the old stir by song
+and up to 3.4 times at loud moments, where mids ran 0.80 to 1.16 and never over. The depth is
+set at the song's loud fifth, not its mean (set at the mean, Bass Drop stirred 1.41 times at
+loud moments). The phone's Sound sheet has **Music Stir**, that cord's depth; the desk has
+the cord in Patches. Sound Drive is no longer a per-plate setting (the step does not read it).
+
+Measured, `npm run musicstir` (new, node, in Measure): before, 1 of 9 lines (the step took 4
+arguments and named the analyser 17 times; `stirOf(0.5)` with a band read 1.375 against 0.688
+alone). After, 18 of 18: with every cord at zero and the band at its ceiling, each of 41
+looks' 163 cords folds to the look's own settings key for key; a plate of hard-edged pools
+at Turbulence 0 is the same plate value for value in silence and under that band (r.m.s. speed
+1.2e-12, the solver's rounding), and with a cord patched has a speed of 9.9e-4 and 3.5% of its
+ink somewhere else after 120 steps; over the club song each look's stir through its cord is
+0.89 to 1.00 of what the multiplier and eddies gave, and 0.87 to 1.02 at its loudest
+twentieth; in silence it is the dial's exactly. `soundpatch` counts the stir cord apart from a
+look's two or three answers to the drums; `rides` holds the dial's curve on the dial alone.
+
+A shortcut, said plainly: the stir is still curl noise on a clock. Routing the music onto it
+makes the sound's path honest, not the stir's; the stir as a tool (a stick as a Brinkman
+solid, or the lamp's convection) is the rest of 38u-4, open. The equivalence of the old
+eddies to stir (`EDDY_AS_STIR`, 0.68) is a judgement from their amplitudes; the picture is
+judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music still speeds and
+slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
+saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
+
+## 38f-2. Wax and water mix like immiscible liquids (2026-11-11)
+
+Found shipping 38f-1: with the heat carried, Lava Lamp's rising plumes left their trailing edges
+as a haze about 0.15 oil, and it never came back (`npm run lavawax` line 1 red, 60% clear against
+70%). The haze was the oil itself, its colour with it (Oil Bodies held), inside the old quartic
+well's metastable band: c²(1 − c)² turns unstable only past 0.21, so a smear under a fifth oil
+could rest for ever with nothing to nucleate it. Real wax and water mix to parts per million, a
+deep quench whose spinodal lies within a few per cent of the pure liquids.
+
+Now mixMu's f′ is that shape (`wgsl/fluid/capillary.ts`): a steep wall from each pure liquid up
+to `OIL_SPINODAL` 0.05, then a straight line to zero at half full with curvature −1, the old
+well's own at the middle, so an edge keeps its width; the wall's curvature 9 keeps the explicit
+step stable (M·dt < 0.0147, the stage runs 0.012). The capillary force reads σκ∇c̃, not μ, so a
+body's tension is unchanged; what changed is that a mixture has nowhere to rest between the two
+liquids. A scratch CH on the same stencil, a r = 3 drop beside a haze patch: the quartic dissolved
+the drop (centre 0.42) and grew the haze; the deep well kept the drop and the haze fell to 40%.
+
+Measured, Lava Lamp in the lab at 6 s (`lavasplit`, quartic against deep): 192², haze 4,370 →
+1,474 cells, colour in the bodies 42% → 72%, dish 67% → 83% clear, centre of mass 0.63 → 0.65;
+256², haze 2,795 cells, colour in the bodies 70%, dish 80% clear, centre 0.62. `npm run lavawax`
+4/4: clear 79%, colour in the bodies 67% (31% Oil Bodies off), centre 0.608 (0.129 no heat,
+0.468 no swelling).
+
 ## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
 
 *Asked:* the owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." The rest gap had
@@ -12075,6 +12882,119 @@ phones, the song action's modes and kicks), the page's own still rule on the rea
 `PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
 drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).
 
+## 37x-10. The song's title painted as ink, then swept away (2026-11-08), with 37x-10d
+
+The owner's words of 2026-11-07, replacing a lower third: "let titles get painted on as
+ink and then swept away"; and on 2026-11-08, during the first live album show, "build the
+proper wash-away now". Built by Claude against the check written first
+(`npm run inktitle`, #695), its seven ids taken out of `--owed` together.
+
+**What it is.** When the identified song changes (`TrackIdentity`, 14z) and the Title
+switch is on, `inkTitleCue` (src/lib/inkTitle.ts) gives one title a song, keyed by its
+isrc, else artist and title, clipped at 40 characters. `inkTitleMask` rasterises the
+title and artist once, two rows (the artist at 0.68 of the title's height), in a 900-weight
+sans on an OffscreenCanvas at the solver's own N, rows turned over so row 0 is the plate's
+bottom; the size is fitted to the mask's own ink (the font's advance and its letters'
+ink differ by a side bearing, and at 192 cells that was 0.849 against the 0.85 bar), then
+the mask is shifted by whole cells so its middle lands at `inkTitleY`, inside the wall's
+square. `PlateSolver.pourInk` (gpu/fluid/inputs.ts, kernel `pourInk` in wgsl/splat.ts)
+takes the mask as an r8unorm texture, samples it onto N with area taps as the video pour
+samples its frame, writes the dye's delta and folds it through `foldDye` (pulled out of
+`foldDeltas`, so Oil Bodies shares the ink as any dye), adding `INK_TITLE_DENSITY` (1, a
+drop's depth) where coverage is 1. A plate without the WebGPU solver lays the mask at L
+through `addDensity`. Then `inkTitleWash` adds, over the title's rows and a margin one
+eddy tall, a drift across the plate and stirring cells a sixth of the plate wide from a
+stream function (so the push neither piles liquid up nor thins it), the cells turning
+and travelling; the stirring waits 5.5·(1 − dial) s, comes in over 1.5 s at the dial's
+bottom to 0.4 s at its top, runs 10 s and dies away. Nothing fades the title: the dye
+stays as colour. The frame loop's side is src/lib/inkTitleRun.ts (`queueInkTitle`,
+`stepInkTitle`, one call a step that returns at once when no title is up), so
+LiquidVisualizer.tsx shrank by 2,162 bytes (the old canvas pour went) and App.tsx is
+untouched: the cue's hook (`app/useInkTitle.ts`) is called from `useRemote`, beside the
+remote's `pour-text` message.
+
+**37x-10d.** The visualizer's `pourText` (the title card of a song show, its sign-off, the
+check hook, and 37x-10c's `pour-text` words from the phone, the relay and the assistant)
+now queues its rows into the same ink and wash instead of drawing a picture into the
+CPU's arrays at 192². Its `columns` option had no caller and went.
+
+**The dials** (`inkTitle` false, `inkTitleColor` '' for the look's first colour,
+`inkTitleSize` 0.5, `inkTitleY` 0.5, `inkTitleSweep` 0.5; rig keys, no look sets them,
+Evolve leaves them): Settings → Logo & Titles (switch, the look's ink or a picker, Size,
+Height, Sweep); Sweep, Size and Height on MIDI and the desk's pins; the phone's Title
+switch with its Sweep (`components/phone/PhoneInkTitle.tsx`) on the More sheet and the
+remote's Controls.
+
+**Measured** (`npm run inktitle`, SwiftShader): 7 of 7; the mask 54% clear and 32% solid at
+0.5, widths 0.25 → 0.86, size 0 0.063 tall, middles 0.20, 0.50, 0.80; lands at 0.944 with
+strokes 0.823 against gaps 0.024 and 875.8 of 869.8 poured; at the default 0.919 at 3 s and
+gone at 6 s, at the top gone at 1.5 s, at 0.01 0.900 at 6 s; kept 873 to 985 of 870. A side
+run of the same arms on the thin gap, which every look opens on and where a pushed cell is
+brought up to the push and no faster: 0.949 landing, 0.915 at 3 s, gone at 8.5 s and 1 s,
+870 of 870 kept. The first strengths, half these, passed on the old plate and left the
+title at 0.317 after 12 s on the thin one; 37x-10e puts thin arms in the check.
+
+## 37x-10g. Titles readable on a busy look: thick ink on a clear pad, washed off by a rinse (2026-11-09), with 37x-10e
+
+**What was wrong.** In the private rehearsal of the first live stream (2026-11-09) every
+title card poured, and the looks' own flow smeared it in about a second, before anyone
+could read it and before 37x-10's wash had begun. The ink was dye in the plate's own
+liquid, as thin as what it lay in, so every eddy the music stirred carried its letters off
+at the eddy's speed.
+
+**What changed.** On a thin gap (every look's plate) `stepInkTitle` now pours the title's
+dye onto a pad of the plate's liquid thickened `INK_TITLE_THICK` (20) times: the letters'
+mask blurred over a tenth of the title's height and raised three times (`inkTitlePad`), laid
+into the species field under the dye by `pourInk`'s new optional `carrier` (kernel
+`inkSpecies`, wgsl/fluid/splats.ts), index left at water's (a gum's share of a percent), so
+hsPrep's Darcy drag and mobility make the flow go round it (PLAN 18d). Thick letters alone
+were tried first and only doubled the time: a thin stroke across the flow cannot be gone
+round, only pushed. The pad also resists the wash's stirring (0.60 after 12 s), so the wash
+now rinses: when it comes in, `inkTitleRinse` gives twelve points (two rows of six across
+the box) where clear liquid is poured with its volume (the solver's `pour`, PLAN 18c) for
+about two seconds, which fingers through the thick pad (Saffman–Taylor) and splits it; the
+stirring mixes what it splits. The old plate is unchanged (no species viscosity, no thin
+solve to pour into).
+
+**Measured** (`npm run inktitle -- --thin`, SwiftShader, through the app's `stepInkTitle` on
+the lab's solver): under a lively flow (eddies an eighth of the plate across) the title as
+37x-10 poured it read 0.533 a second after landing; as poured now 0.816 at 2.5 s, then
+gone 1.5 s after the rinse came in; on a still plate 0.952 at landing, gone in 1 s at the
+dial's top, 0.947 at 6 s at 0.01; every arm kept 96% or more of its dye; the pad's share
+under the box 0.70. 37x-10e (the thin-gap arms the check owed) ships as these arms.
+
+## 37x-11. The logo melts at the start of a film or a stream (2026-11-10)
+
+**What was asked.** The owner, 2026-11-10: "dump a big chromaglass logo at the beginning
+of our videos and let it melt away before the beginning of the show".
+
+**Why not the obvious thing.** The mark (`markMix`) is a picture over the finished frame;
+drawn big and faded out under a ripple it would look like a melt and be a fade, which the
+plate's rule (physics writes, rendering reads) does not allow. So the logo is dye.
+
+**What changed.** `src/lib/logoMelt.ts` rasterises the intro's wordmark
+(`public/intro-name.svg`) from its alpha into a mask at the solver's grid, three fifths of
+the plate across and turned against the plate's own turn. `queueInkTitle` takes
+`{ logo }` and pours it through a second run inside the title's (`InkTitleRun.logo`, at
+its own fixed sweep), so the frame loop still makes one call and a film's logo and its
+first title card each keep their own box and wash; `LiquidVisualizer.tsx` (427 KB) only
+hands its options through, so it did not grow. On the thin gap the logo lands as the
+title's thick ink on its clear pad (37x-10g), holds against the look's flow, and the rinse
+fingers through the pad while the wash's eddies mix it in: it melts, and its dye stays as
+colour. `app/useLogoMelt.ts` pours it when the Live Show's phase goes `live` or the
+recorder starts, with `logoMelt` on (default off, one of the show's keys). Desk: Settings
+→ Logo & Titles. Phone: the Logo melt switch under Title (the More sheet and the remote's
+Controls).
+
+**Measured** (`npm run logomelt`, SwiftShader, 2026-11-10, thin gap under the lively flow
+inktitle's thin arms use): the logo reads 0.959 at 0.5 s, 0.920 at 1 s, 0.835 at 2 s and
+0.787 at 3 s, 0.331 at 4 s, and is gone (0.3 or worse) at 4.5 s; 96% of its dye (569 of
+591) is still on the plate at 7 s (95% at 12 s on a longer arm; the check runs 7 s, since
+CI's lab4 was cancelled at its 25-minute bound six minutes into a 12 s one, and sits in lab5); the species' share under it after the pour is 0.70
+(the pad). 8/8. A first width of four fifths of the plate put the C and the last s past
+the frame's edges in the lab's render (the frame is the square inside the dish's circle),
+so it is three fifths.
+
 ## 14c-4k, 14c-governor, 14b-120, 14c-readout, H2c-10. Wave 4 ladder, wall pacing, readout and grid32 (2026-11-07)
 
 Five Wave 4 items checked by `scripts/rungs-owed.mjs` (`npm run rungs`). **14c-4k**
@@ -12131,6 +13051,632 @@ chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte fi
 the bytes exact; private by default; an update naming only the title keeping the rest)
 and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).
 
+
+## 44h. The owner's assistant over the internet (2026-11-12)
+
+Asked 2026-11-07 ("internet control too", owner-only, his account) and started on the
+owner's word 2026-11-12. claude.ai on the web and the phone reaches only an `https://`
+MCP server on the public internet, and Claude's own enterprise tunnels are not offered on
+the owner's plan, so it is ours: `mcp/tunnel-worker.js`, a Cloudflare Worker with one
+Durable Object (`wrangler.tunnel.toml`, SQLite-backed, inside the free plan for one
+person), and the Mac's end, `node mcp/chromaglass-mcp.js tunnel` (`mcp/tunnel.js`), which
+dials out to it, so nothing on the Mac listens on the internet. The Worker is a pipe,
+not a second server: each JSON-RPC request is handed down the tunnel whole and answered
+by the stdio server's own `onRequest`, so the tools, the guide and the guard on the Mac
+are the local ones, and a rule cannot drift between the two. Sign-in is OAuth 2.1 as
+Claude's connector pages describe it (read the same day): a 401 naming the resource
+metadata, DCR, PKCE S256 on every request, a form-encoded `/token`, refresh tokens
+rotated, `invalid_grant` for a dead one. The `/authorize` page signs in with Firebase,
+the app's own accounts, and admits only `OWNER_UID`, checked by signature with
+`firebase-token.js`, and only from a sign-in made on that page (its `auth_time`, now
+returned as `authTime`), so one of the owner's tokens copied from elsewhere cannot be
+posted by a script to mint a code. `/register` takes only Claude's hosted callbacks
+(claude.ai, claude.com; not a loopback, where any local program could listen), so a code
+is never delivered to a stranger's server, and one address gets twenty registrations or
+sign-in pages in ten minutes. Tokens,
+codes and the Mac's key are kept only as SHA-256; every token carries its uid and dies
+when `OWNER_UID` changes; an old refresh token after a minute's grace ends its sign-in, and inside the grace
+leaves one live pair; a client whose tokens have all run out is dropped;
+`tunnel revoke` ends them all with the Mac's key. The tunnel is open only while the
+show server admits the assistant (the app running, the switch on), so the owner's one
+switch turns the internet off with the rest; while it is closed, claude.ai still lists
+the menu the Mac last sent and every call says the show is not connected. Check:
+`npm run relay`, 32 lines (the Worker in Node with the runtime's pieces stood in, the
+real show server, a stand-in display, the real MCP server in tunnel mode) and 18 of 18
+mutants (one security review pass: the fresh sign-in, the flood limit, one pair per
+rotation, clients dropped, the loopback callback taken out, a reconnect not failing calls
+sent on the new socket, which no line measures). Open: 44h-1 (the owner's deploy and one real sign-in), 44h-2 to 44h-5.
+
+## 44j. The live stream and the sound from the assistant (2026-11-09)
+
+The owner asked whether the live streaming was run through the assistant. It was
+not: the rehearsal drove the app through the show link, and the assistant could
+start and stop a stream but not see where it would go, how it was going, or what the
+show heard. Now `show_state` carries `liveSetup` (the Live Show panel's saved
+destinations by name, service and whether a key is kept, never an address or a key,
+and how the last start or stream ended, read every 5 s since the keys live in the Mac
+app's main process), `live.destinations` (each one's phase, kbps, seconds behind,
+dropping, reconnects, error) and `sound` (the source, and the file's name).
+`go_live {test?, destinations?}` starts the stream, to just the named destinations
+when given (matched in any case, on or off in the panel; a name not saved, or saved
+without a key, is an error that names the list, never a quiet drop:
+`liveShow.pickSaved`). `set_sound_source` goes through the Sound panel's own door
+(`app/soundNow.ts`, a holder because App.tsx may not grow), Full only, and is refused
+while on air: the stream keeps the track it started with, so a change would leave it
+silent (44j-2 is the real fix); the guard counts the stream on air from the start it
+sends, not from the display's next word a second later. Check: `npm run assistant`,
+107 lines, seven new mutants (on air, on air before the display says so, unknown
+source, unknown name, no names, names dropped, a phone's sound), and the guard's,
+the tool's and the page's source lists compared.
+
+
+### 44j-2. On air too (2026-11-10)
+
+The owner, in a stream rehearsal: "I shouldn't have to click the system audio ever. You
+should be able to do it." The rehearsal found the Mac app back on Off after an update and
+nothing the assistant could reach to set it. `set_sound_source` was built (44j) but
+refused on air, since then the encoder took the sound once at Go and a change left the
+stream silent. 37x-4f-2 made the stream follow a change of source (`setLiveAudio`), so
+the refusal only stood between the assistant and the stream it was asked to run: it
+went, with the guard's on-air bookkeeping that existed only for it (the "sound-race"
+line and mutant with it). `npm run assistant`: the `sound-air` line now asks that a
+source set on air reaches the display, and its mutant puts a refusal back. The tool's
+text says macOS asks once for Screen & System Audio Recording the first time (44j-3).
+## 44k-4, 44k-6, 44k-7, 44k-8. The Mixer's takes, the bench, the tempo and the Sequence from the assistant (2026-11-11)
+
+The first of 44k's gaps, built by Claude (the owner, 2026-11-11: "lets do this
+building now", with Antigravity out of credits). Each is a door through the guard
+(`server/assistant.js`) to a message `useRemote` runs through the desk's own call.
+
+- 44k-4: the guard allowed the Mixer's row takes in Full and `useRemote` ran them;
+  only `show_action`'s list left them out, so the assistant never knew they were
+  there. Now in the list, with a line that the list covers every action in the
+  guard's `FULL_ACTIONS` (it failed on main with all seven missing).
+- 44k-6: `show_state`'s `bench` (each bottle's id, name and colour, the one in hand);
+  `bottle` (by name or id, refused with the bench's list when not there, where the
+  display would drop it in silence); `finger` drawn as five of the phone's own
+  `finger` messages along the line, and `flick` as six `spin` messages a third of the
+  way round the middle with one hand's id; its amount is how fast the arc is drawn,
+  since the display's Spin reads the finger's angle over time and no amount. Found: every assistant message carries
+  its answer's `id`, which collides with `liquid`'s bottle id and `spin`'s finger id,
+  so the assistant sends `bottle` and `hand` and the guard sends them on as `id`.
+  `useRemote` now takes the bench itself (`liquidTypes`, not its ref) so the state
+  re-sends when a bottle changes; App.tsx shrank by three bytes.
+- 44k-7: `tempo` (a typed bpm, 60 to 200, the beat clock's own range, refused past it
+  rather than folded; heard; a tap) in Play, `link` (on, transport) in Full since it
+  joins other people's machines, and `show_state`'s `tempo`. `useTempo` publishes its
+  label and sets the door in `app/tempoNow.ts`, as `soundNow.ts` does for the sound.
+  While Link leads, a typed bpm is refused: the clock reads Link's tempo and would
+  keep the typed one underneath, unheard (found in review).
+- 44k-8: `sequencer` `select` (by name, any case, refused with the list) and `stage`
+  (from 1, of the run, playing or paused; refused with no run, since `goTo` on a
+  stopped sequencer starts it without holding the performer's Pacing, found in
+  review), and the state lists every sequence and the one chosen.
+
+The phone has its own bench, Tempo block and Sequence picker, so it gains nothing
+here; the relay drops `assistant-tempo`, `assistant-link` and `assistant-seq` from a
+phone (`phone-tempo`). `npm run assistant`: thirteen new lines, seven new mutants, all
+caught.
+
+## 44k-2. The music player from the assistant (2026-11-11)
+
+The third batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete
+control of the show from Claude). Full, as the sound source is, and paced as a setting.
+
+- `show_state`'s `player`: what is loaded (a shelf track's title, or a file's name),
+  its kind and artist, its length, where it is (`at`, seconds), playing or not, the
+  loop, and the shelf. Where it is goes into the display's state only on a play, a
+  pause, a seek, a new file and the end, with the epoch time it was read (`atTime`),
+  and the MCP carries it forward while it plays: the element's clock moves four times
+  a second, and a state re-sent at that rate goes to every phone for a number only the
+  assistant reads.
+- `play_track`: a shelf track by its title (the exact title in any case, else the one
+  title holding the words; "rain" on a shelf with two is refused with the shelf), or a
+  file by its full path on the Mac. The page cannot open a path, so the show server
+  (`server/assistantMusic.js`) admits it: a sound file by its extension, a real file,
+  inside the music folder (~/Music, or `CHROMAGLASS_MUSIC_DIR`), judged with links and
+  `..` resolved, so a link in the folder that points out, or `~/Music/../.ssh/…`, is
+  outside. Admitted, the file is served at `/assistant-music/<32 hex>`, to the laptop
+  alone and by Range (an audio element seeks by asking for bytes); the page is handed
+  that address and the file's name, never the path, and takes a file at no other
+  address. The last eight addresses are kept.
+- `music`: play, pause, seek (refused past the track's end, with its length), loop,
+  close. The door is the player's own buttons' callbacks (`useSoundSource`'s
+  `playTrack`, `toggleMusic`, `closeMusicFile`, the element's seek, `useSoundState`'s
+  loop), through `app/musicNow.ts`, so music the assistant opened is what the show
+  hears exactly as music opened by hand is. Each call is answered by the display, so a
+  play after a close the state had not caught up with comes back with the display's
+  reason.
+
+The phone has its own player on the Sound sheet, so it gains nothing; the relay drops
+`assistant-music` from a phone (`phone-music`). `npm run assistant`: fourteen new lines
+(three on the page's own door and its address), eleven new mutants, in
+`scripts/assistant-music.mjs` beside the scenario (which is near the 100 KB line).
+Found in review: a piped read stream was never closed when the audio element dropped a
+Range request (thirty dropped requests held thirty file descriptors), so the route now
+uses `pipeline`; a missing path outside the folder said "no file at" where an existing
+one said "outside it", which let a steered assistant ask whether any file on the Mac
+exists (now both say outside, `music-probe`); the address is judged again as it is
+served (`music-swap`); and the folder is compared in its native case. Found: 44k-2a (a
+file the player cannot decode is answered as done), 44k-2b (more music folders), 44k-2c
+(the page's real door in a browser line). Found too: two older mutants (`bottle-bench`, `seq-unknown`) bring the
+show server down rather than fail a line; harmless to the real code, but the new
+lines fetch from the server, so they treat a failed fetch as a failed line.
+
+## 44k-13. Film, pours, the room camera and the mark from the assistant (2026-11-11)
+
+The seventh batch of 44k's gaps, built by Claude. Everything that puts a picture on the
+plate from outside it lived in `App()`'s hooks, not in the settings, so `set` could not
+reach it: the film that drives the plate (a file, a cartoon, a camera, a window), a
+picture or a film poured into the dish, the room camera that stirs it, the mark (the
+logo card). Full, as the plan's table had it, and paced as a setting.
+
+- Four tools: `film` (file by path, cartoon, camera by name, window, clear),
+  `pour_file` (a picture laid once as dye or a film poured frame by frame, by path; a
+  cartoon; stop), `room_camera` (on or off, a camera by name) and `mark` (a picture by
+  path, or clear). `show_state`'s `media` reads each back: the film's source, name,
+  cartoon and camera; what pours; the room camera on, which camera, and whether last
+  session left it on; the mark; the cameras by the pickers' names; the cartoon shelf.
+- A file by its path goes through the music player's door (44k-2), made general:
+  `admitFile` in `server/assistantMusic.js` holds the folder, the links, the `..`, the
+  probe and the swap for any kind of file, and an admitted film or picture is served
+  under `/assistant-media/<token>`, its own eight addresses, to the laptop alone, with
+  Range. The media folders are `~/Movies` and `~/Pictures` (or `CHROMAGLASS_MEDIA_DIR`),
+  not the music folder. Each call takes its kind: a film a video (mp4, m4v, mov, webm),
+  the mark a picture (png, jpg, gif, webp), a pour either. No SVG: a picture served on
+  the page's own origin that can carry a script is not one to hand an assistant.
+- A camera by its name and a cartoon by its title (any case) are judged in
+  `server/assistantMedia.js` on the display's lists and sent on as the display lists
+  them (the shelf's id); the page judges again (`app/mediaNow.ts` `askMedia`) and
+  answers once a camera or a window has opened or failed: `startFilmCamera` and
+  `startFilmWindow` now say why, which the desk's buttons ignore.
+- Each hook sets its own door and publishes its piece of the copy: `useFilm` (the film,
+  the cameras), `usePour` (the pour; `pourImageFrom`, which the file input now shares),
+  `useSceneSource` (the room camera, through `toggleScene`, so the assistant's "on"
+  counts as asked), `useCastFeed` (the mark, fetched and handed to `loadMark` as the
+  file input's, so the free tier's word, the cast and the relay follow). App()
+  unchanged. A cartoon the assistant puts on shows lit on the desk's and the phone
+  layout's shelf (the same state).
+
+`npm run assistant`: ten new lines (one on the page's own door), twelve new mutants,
+in `scripts/assistant-media.mjs`; the music-type mutant follows the refusal's words.
+`assistantMedia.js` joins the Mac app's `server` filter. Found: 44k-13a (the phone
+layout's film, room camera and mark), 44k-13b (the doors in a browser), 44k-13c (the
+owner's own media folders).
+
+
+## 44k-14. OSC out, OSC in, MIDI and Syphon from the assistant (2026-11-11)
+
+The eighth batch of 44k's gaps, built by Claude, toward the owner's goal of complete
+control of the show from Claude. The four outputs live in three places, so each call
+goes to the one that owns it and nothing keeps a second copy of a switch the desk shows:
+
+- OSC out's switch is the page's (`useShowFeed` remembers the performer's choice and
+  asks a restarted server to open it again), so `outputs osc_out` goes to the display
+  and flips the Sound panel row's own door; sent straight to the server's socket, the
+  next restart would have put back what the page remembered. The target is held to the
+  row's `address:port` (an IPv4 address or localhost) by the guard and again by the page.
+- MIDI is the page's (Web MIDI): on or off and its two ports by the MIDI panel's names,
+  found in any case and refused with the list when not there. Switching on waits for
+  Web MIDI to answer (`useMidi` gains `open`), so a refused permission comes back as the
+  reason and never as "done". Learning a control stays the person's.
+- OSC in is the show server's socket and the Mac app's Show menu choice, so `osc_in`
+  (off, local, network) is answered by the relay at once through a hook main.js hands
+  the server (`setAppOutputs`): the menu ticks it, `show.json` keeps it, and a port
+  another program holds is the refusal, with no dialog. A show run from a terminal
+  opens its own socket and keeps nothing past a restart.
+- Syphon out is not on main (13.2, its own thread), so `syphon` goes through the Show
+  menu item `syphon-out` its check holds it to, and a build without it says so (44k-14a).
+- `show_state`'s `outputs` merges the display's two with the relay's two; `outputs
+  status` reads the relay's in any mode. Everything that changes an output is Full.
+
+Checks: `npm run assistant` gains `scripts/assistant-outputs.mjs` (15 lines, 11 mutants);
+`npm run desktop`'s OSC block gains the line that the assistant's choice is the menu's.
+`assistantOutputs.js` joins the Mac app's `server` filter. Found: 44k-14a (Syphon on a
+real Syphon build), 44k-14b (MIDI's permission on a fresh Mac app).
+
+## 44k-15. The projector and the wall from the assistant (2026-11-11)
+
+The ninth batch of 44k's gaps, built by Claude, toward the owner's goal of complete
+control of the show from Claude. Two tools, both Full, since the projector is the room
+and never the look:
+
+- `projector`: `cast` opens the show's window full size on the second screen the page
+  found (or a window, when none), as the projector chip's click does, and closes it;
+  `mode` is the chip's ask, auto or off; `test` puts the test card up or down, `identify`
+  flashes the screen's name for three seconds. The cast answers once the window is
+  open: in a browser a window no click opened is a blocked popup, and the answer says
+  so instead of "done" for a wall that stayed dark. The Mac app opens it at once.
+- `wall`: the geometry and grade (flips, the four corners, the masks and their feather,
+  gain, gamma), only the keys named, laid on through `normalizeOutput` as every other
+  way into the wall is; `reset` squares the projector and keeps the mapped shapes, as
+  the desk's Reset does. The shapes themselves stay the desk's: placing one on a panel
+  is done by eye, in the room.
+- The guard (`server/assistantProjector.js`) refuses, rather than clamps, a geometry
+  that would leave the wall dark: corners that cross or fold the picture, a picture
+  less than half on the screen, or one shrunk under a fiftieth of it; and numbers out
+  of their ranges, with the range. The flash guard can be turned on and never off from
+  the assistant: `outputConfig.ts` keeps it out of the settings so that a preset cannot
+  switch a safety off, and the same holds for an assistant.
+- The state reaches the remote link through `app/projectorNow.ts`, published from
+  `useControllers` (the cast and the mode) and `useOutput` (the wall), so App() gained
+  only `stopCast` in `useControllers`' arguments and still shrank by six bytes.
+
+Checks: `npm run assistant` gains `scripts/assistant-projector.mjs` (14 lines, 12
+mutants, each caught), a page line on the real `projectorNow.ts`, and a line that the
+page's wait for the window (2 s) ends inside the MCP server's wait for its answer
+(2.5 s), found in review: at 4 s a blocked window came back "allowed, not confirmed".
+`tsconfig.json` now leaves out `scratch/`, where the mutant run's copies of `server/`
+had run `npm run lint` out of heap. `assistantProjector.js`
+joins the Mac app's `server` filter. Found: 44k-15a (the cast on the Mac with a real
+projector), 44k-15b (whether the window fills its screen).
+## 44k-16, 44k-17. The desk from the assistant (2026-11-12)
+
+The tenth batch of 44k's gaps, built by Claude, toward the owner's goal of complete
+control of ChromaGlass from Claude: the desk's own layout, added on the owner's word of
+2026-11-11, and the parts of 44k-16 a show reaches for. Six tools, one message type
+(`assistant-desk`), read back in `show_state`'s `desk`:
+
+- Play, because they change the person's screen or the next gesture and not the plate:
+  `desk_tab` puts a tab up, and `hand` sets the palette lock (by its harmony's name, or
+  off), the tool, its amount and the plate a gesture lands on, as the palette picker,
+  the tool picker, its Amount and the layer chips do.
+- Full, because they change the owner's saved desk, which travels to the account
+  (8-tabs-a): `desk_tabs` (rename, move, add or copy, delete, reset every tab),
+  `desk_panel` (open, dock, float, close, fold or unfold a panel; fold them all; fold
+  the deck; a tab's plate mode, live or preview), `desk_pins` (a dial on the rides or
+  the recipe) and `desk_view` (the MIDI activity overlay, Ambient TV mode).
+- A delete and a reset of every tab are Undo's to put back: the guard remembers them,
+  Undo sends `tab-restore`, and the page puts back the one it kept (`restoreTab`: at its
+  old place, with its panels, once).
+- The guard (`server/assistantDesk.js`) holds the verbs, the shapes and the ranges, and
+  refuses an amount past 5, a move of 0 places, a name past 24 characters rather than
+  clamping them. Names are the page's (`app/deskNow.ts`), which alone knows a renamed
+  tab, and a wrong one is answered with the ones there are.
+- App() could not carry the doors, so the desk's state moved out of it whole: the tabs,
+  the pins and the MIDI activity overlay to `app/useDesk.ts`, the tool, its amounts and
+  the plate in hand to `app/useHand.ts`; the palette lock and Ambient TV publish from
+  their own hooks. App.tsx went from 208,528 to 205,716 bytes.
+
+Checks: `npm run assistant` gains `scripts/assistant-desk.mjs` (12 scenario lines, 11
+mutants, each caught) and a page line on the real `deskNow.ts`, `deskTabs.ts` and
+`deskLayout.ts` (an edit survives a reload of the stored tabs; a deleted tab comes back
+with its panels). Found on the way: the mutant run made each mutant's copy of `server/`
+in a folder named by its rule, so two mutants of one rule (five rules had two or
+three) shared a folder and the first was run on the second's code. Each now has its
+own folder; the eleven mutants of those rules were run again, each caught on its own
+code. `assistantDesk.js` joins the Mac app's `server` filter. Found: 44k-16a (set
+lists' and sequences' own editing and files), 44k-17a (a panel in its own window),
+44k-17b (the desk's doors in a browser).
+## 44k-12. The microphone's input from the assistant (2026-11-11)
+
+The sixth batch of 44k's gaps, built by Claude. `set_sound_source microphone` opened
+whichever input the Sound panel's picker last held, and nothing the assistant could
+read said which inputs there were. On a stage the input is the whole question (a USB
+interface fed from the sound desk, not the laptop hearing the room), so "listen to the
+Scarlett" had no way through. Full, as the plan's table had it, and paced as a setting.
+
+- `show_state`'s `sound` gains `inputs` (the picker's own names, from `enumerateDevices`)
+  and `input` (the one chosen, null for the default microphone or an input unplugged).
+  Names, not device ids: an id is an opaque string the owner never sees. The ids stay
+  on the page, in `app/soundNow.ts`.
+- `set_sound_source microphone` takes `device`: a name from that list, in any case, or
+  `default`. The guard (`server/assistantSound.js`) refuses a name not listed with the
+  list, and a device with any other source. It sends the display the name as the
+  display lists it; the page finds the id by that name and judges again on its own
+  list (an interface unplugged since the guard's copy), and its answer comes back once
+  the source has opened or failed (getUserMedia refuses an interface gone or held by
+  another app only then, and the source falls back to none): `set_sound_source` now
+  waits for the display's word, as the record and set tools do.
+- The door keeps the input as the picker does (`keepAudioInput`, shared with
+  `chooseAudioInput`), so the choice is remembered and shows in the panel on the desk
+  and in the phone layout's sound sheet (the same picker), then opens the source on it.
+
+`useSoundState` publishes the inputs (it owns them), `useSoundSource` sets the door;
+App() unchanged. `npm run assistant`: seven new lines (one on the page's own door),
+four new mutants, in `scripts/assistant-sound.mjs`. `assistantSound.js` joins the Mac
+app's `server` filter (the packed-app line caught it missing). Found: 44k-12a (are the
+inputs named at launch on the Mac).
+
+## 44k-11. Recording's options and the Takes from the assistant (2026-11-11)
+
+The fifth batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete
+control of the show from Claude). Full, as the plan's table had it (a delete cannot be
+undone, and the options change what the owner's next Record writes to disk), and paced
+as a setting.
+
+- `record_options`: the Record panel's options by its own names: what the one Record
+  button makes (`lib/recordChoice.ts`: video, take or both), and the Plate video's
+  quality (master, standard, compact), fps (60 or 30, the panel's two), container
+  (auto, webm, mp4) and sound (`includeAudio`). Any of them, the rest kept; through the
+  panel's own `setRecordChoice` and `recorder.setOptions`, so the choice is saved where
+  the panel's is and lit in it.
+- A container the encoder cannot write is refused with the ones it can. Found while
+  building it: the recorder would not refuse it, since `pickMime` falls back from MP4
+  to WebM without a word, so the assistant would have told the owner MP4 while the
+  file was WebM. The display now reports `formats` (`videoFormats` in
+  `hooks/useRecorder.ts`, the same MIME lists `pickMime` walks).
+- `take`: replay, stop, delete a kept Take by its number in `show_state`'s list (1, the
+  newest). The guard sends the display the Take's id, not the number, so the Take
+  deleted is the one the assistant read even if a new one is kept between its read and
+  its call. A number past the list is refused with the count.
+- `show_state`'s `record`: the options, the containers, the last Plate video, the newest
+  30 Takes (title, artist, seconds, gestures, song or wall clock) and the one replaying.
+  Published only when one of those changes, never with the recording's clock.
+
+The door lives in `app/recordNow.ts`, set by `useRecording` (which holds the choice and
+the recorder, and is handed the Takes), since App() may not grow. The guard's rules are
+`server/assistantRecord.js`, on the Mac app's `server` filter. `npm run assistant`: ten
+new lines (one on the page's own door), eight new mutants, in
+`scripts/assistant-record.mjs`. Found: 44k-11a (the phone's Record sheet), 44k-11b (the
+real door in a browser line), 44k-11c (options changed mid-recording).
+
+## 44k-10. Calibrate, the song detector and Listen from the assistant (2026-11-11)
+
+The fourth batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete
+control of the show from Claude). Full, as the plan's table had it, and paced as a
+setting.
+
+- `calibrate`: the Sound panel's Recalibrate room (`useBench`'s `calibrateNonce`, which
+  restarts the ear and its room tracker for its three-second listen). Refused by the
+  guard with Auto Calibrate off (the ear does not calibrate then, so the press would
+  restart it for nothing), naming `autoCalibrate`; refused by the display when it hears
+  nothing to calibrate to.
+- `song_detection`: Song Detection on or off (`musicSettings.enabled`), a boolean only.
+- `listen`: start, cancel and name (the Songs panel's Name it, a title and an artist
+  both), `useListen`'s own callbacks; a cancel with Listen idle is the display's refusal.
+- `show_state`'s `ear`: the detector, the room's calibration (`calibrating`, then the
+  floor and peak it found, dBFS rounded; null with Auto Calibrate off or nothing heard)
+  and Listen's phase, the song it named and the panel's own line. The room is copied
+  only when the calibration starts or ends or the ear starts or stops hearing, not per
+  reading (the floor, the peak and `signal` move all the time, and a state re-sent at
+  that rate goes to every phone).
+
+The doors live in `app/earNow.ts`, set by `useBench` (calibrate), `useListen` (detector,
+Listen) and `useCastFeed` (the room's reading, the hook App() hands the ear to), since
+App() may not grow. The guard's rules are `server/assistantEar.js` (`assistant.js` is
+past 40 KB), on the Mac app's `server` filter. The phone layout's display takes the
+tools as the desk's does (the doors are hooks, not panels); its Sound sheet lacking the
+three presses is 44k-10b. `npm run assistant`: fourteen new lines (three on the page's own
+door), six new mutants, in `scripts/assistant-ear.mjs`. Found: 44k-10a (the real doors
+in a browser line), 44k-10b.
+
+## 44k-3, 44k-5, 44f-4. The set list and the song shows from the assistant, and the display's answer (2026-11-11)
+
+The second batch of 44k's gaps, built by Claude (the owner, 2026-11-11). Each is a
+door through the guard to a holder beside `tempoNow.ts` (App.tsx may not grow), so
+the desk's own callbacks do the work.
+
+- 44k-3: `show_state`'s `set` numbers the performer's items from 1 as the desk lists
+  them (name, kind, the look it sends, its own fade, gone or not), with the one armed
+  and the Go's fade. `set_list` arms item N and takes the cue back (Suggest), sends an
+  item or a look now and sets the fade (Play), and names Revert; `back_plate` sends the
+  armed look or a look to the back plate, or lets it follow (Full). An item past the
+  set is refused with its length; a fade off the desk's choices (0, 1, 2, 4, 8) is
+  refused with them, since 3 s would light no segment of the desk's Fade. A Go now is
+  under Go's gap and on Undo's list, except an item that is a sequence (Undo's Back
+  would leave the sequence running). The doors: `app/setNow.ts`, set by `useLookFades`
+  (arm and the Go's) and `useSetListState` (the fade, cancel), which publishes the set.
+- 44k-5: `show_state`'s `songs` lists Follow songs, the show running, the playing
+  song's show and every show in brief; `song_show` reads one whole (each action in
+  words, with its id and `mine` for the assistant's own), and is Suggest rather than
+  the Play first written, since reading changes nothing. `remove_song_action` takes one
+  out (Play: only the assistant's own `asst-` ids, the performer's are refused; Full:
+  any), `song_show_run` starts and stops a show as the Songs panel's Run does, and
+  switches Follow songs (Full), and `nudge` moves the song's clock to the next section,
+  the section's start, back, or by up to 30 s. The doors: `app/songShowNow.ts`, set by
+  `useSongScore` and `useShowLibrary`. The state carries the shows in brief only, so a
+  phone is not sent every action of every show on every change; a read is asked of the
+  display and answered to the assistant alone.
+- 44f-4: the display now answers. A song action, a set list call and a song show call
+  carry `answer`, and the display sends `assistant-answer` (done, or why not, and what
+  a read found), which the relay passes to the assistant only and only from the
+  display. The MCP waits up to 2.5 s for it after the guard's yes (`askDone`), and
+  says "allowed but not confirmed" when a display one build older gives none. So a song
+  action the display does not know, or a Go now of a look the library lacks, comes back
+  with the display's reason rather than as done. Found in review: each assistant numbers
+  its messages from 1, so with two connected a broadcast answer settled the other's
+  call; the relay now hands the guard a number of its own and sends each answer only
+  to the assistant that asked, under its own id (`answer-own`).
+
+Found: a message type with its own `action` field turns `RemoteMessage`'s `action`
+into a discriminant, and `tsc` then narrows the action switch's `message` to never;
+the song show's field is `actionId`. The phone has its own set list and Songs sheet,
+so it gains nothing; the relay drops `assistant-set` and `assistant-songs` from a
+phone (`phone-set`) and an `assistant-answer` from anyone but the display
+(`answer-phone`). `npm run assistant`: nineteen new lines (three on the page's own
+doors), fourteen new mutants.
+
+## 12-ctl-1. The songs on the phone (2026-11-11)
+
+The owner asked for the phone apps to be the Mac app's controller (12-ctl). Draw, the
+dials, the sequencer and the looks were already on the remote; what a performer reaches
+for between songs, the next item of the set and the song's show, was only on the
+Perform desk. This is the first of three pieces, built against `npm run controller`,
+which was written first with these lines owed.
+
+The laptop sends two new parts of `RemoteState` (`lib/remoteProtocol.ts`): `setList`
+(the set's name, its items by id and name, the live item and the one armed for the
+next Go) and `songs` (the saved song shows by id and title, the one running, and
+Follow songs). It acts on four new messages with the same calls the desk's rows make:
+`cue-set-item` arms an item through `setNow.armSetItem` (by id, not by index, so a set
+reordered on the laptop while the phone's list is a frame old never arms the wrong
+song), `song-run` and `song-stop` go through `askSongs`, `song-follow` turns the switch.
+`setNow` gained the live item so the phone can mark it. The relay passes the four on
+to the display like any other controller message.
+
+The phone's Songs screen (`components/RemoteSongs.tsx`) opens from a Songs button on
+Draw and a "Set list & songs" row on Controls, and goes back to where it came from.
+Rows are a thumb high and the names wrap. Every mark on it (Live, Next, the running
+show, the switch) is read back from the laptop rather than set by the tap, so a tap
+the laptop refused never shows a cue the Go will not play. On an iPad the two lists
+sit side by side.
+
+Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setlist`,
+`songs` and `display` lines now passing (an item tapped arms its look on the laptop,
+`cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
+the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
+
+## 12-ctl-3. The Android app (2026-11-11)
+
+The owner asked for the phone apps to be the Mac app's controller (12-ctl), and the
+Android app first planned as a Trusted Web Activity could not be: a TWA is the https
+site in Chrome, and an https page cannot open the plain ws:// socket the laptop's
+remote server listens on. So Android is Capacitor too, as the iPhone is: `android/`
+beside `ios/`, the same bundled build in the system WebView, applicationId
+`app.chromaglass`, minSdk 24. The manifest allows cleartext and the config mixed
+content, so the remote reaches a laptop on the show network; it asks for the
+microphone and camera (both optional features), keeps the screen on
+(`FLAG_KEEP_SCREEN_ON`, since the WebView has no Wake Lock) and hides the system bars,
+which a swipe brings back. The window is black from the first frame, so no white
+flash comes before the page.
+
+Android's WebView has WebGPU on fewer phones than Chrome does, so a phone without it
+does not get the website's list of browsers (the person is not in a browser) but
+`NeedsWebGpu.tsx`'s app form: a sentence, **Open the show in Chrome** (a local plugin,
+`OpenInChromePlugin.java`, sends https only, to Chrome, or to the default browser if
+Chrome is missing) and **Be the laptop's remote**, which needs no GPU. The iPhone app
+never gets it. `appLink.ts` gained `isAndroidApp()`, `SITE_SHOW_URL` and
+`openInChrome()`; the check hook `__cgOpenExternal` lets `controller` see the call.
+
+`android.yml` builds an unsigned debug APK on every PR that touches the shell and
+keeps it as the run's artifact, with no secrets; signing, the upload key and the
+Play upload are 12-ctl-ship. `npm run android` builds, syncs and opens Android Studio.
+`npm run controller` dropped `android` and `nogpu` from its owed lines (25/25, owed
+`scan` only).
+
+## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
+
+The owner asked for a Google TV app that plays the show on a big screen at home,
+for Home and Pro, and chose route 2 of 12-tv: a receiver that plays the Mac's own
+plate, since a TV box's GPU cannot run the solver. This is its first half.
+
+The show's page (the Mac app's window, or any show on a show server) sends the
+wall's canvas to each TV as a WebRTC video track (`src/lib/tvFeed.ts`). The frame
+task copies the canvas into a 2D stage of at most 1920 x 1080, thirty times a
+second, only while a TV is connected (a line in `lib/frameTaps.ts` beside the Live
+Show's and Draw's); `captureStream` on the stage is one track for every TV. The
+offer puts H.264 first, which every TV box decodes in hardware (VP8 is Chrome's
+first choice and a software decode on a Cortex-A55). The handshake goes through
+the show server's relay: a new `tv` role with the show key, an id per TV, each TV
+paired with one display so two of the laptop's tabs never both offer, `tv-show` to
+tell a TV the show came or went, and nothing else a TV says reaches the show. Home
+or Pro on the laptop (`canUseHomeFeature`), asked at each join; three TVs at most.
+The Mac app offers its real network address rather than an mDNS name, for routers
+that drop multicast.
+
+`/tv?key=…` (`src/components/TvDisplay.tsx`) answers the offer and shows the
+track: no visualizer, no GPU, and it works on plain http, where WebGPU would not
+start. With no show it plays the press clips of the plate, and goes live by itself
+when the show comes. A phone or tablet opens the same page as a second screen,
+the picture fitted to the way it is held (the feature's phone version). The cast
+menu's TV entry (`components/CastNetworkItems.tsx`, the network-display block moved
+out of `App.tsx` with it) gives the address and the count.
+
+Found while building it, and fixed in it: Chrome's encoder starts at 300 kb/s, so
+the TV showed 320 x 180 for 11.7 s on loopback before climbing to 1280; the
+sender now writes a 4 Mb/s start into the answer (`x-google-start-bitrate`) and the
+first frames are the stage's size. A plate that draws slowly or not at all (the
+real app on a software GPU; Freeze) left a joining TV connected with no frame,
+restarting every ten seconds; the sender now re-sends the stage once a second when
+nothing new is drawn, and the TV waits for its first frame once connected. And
+(found by the check's review) a TV joining a frozen plate after the other TVs had
+left got a 2 x 2 black stage; the stage now keeps its last picture between TVs.
+
+Check: `npm run tv`, 33 lines (one skeptic pass: four lines that could not fail
+were made to, among them the GPU count on a page with no `navigator.gpu` and the
+phone's fit measured on the element rather than the picture): the codec order, the start rate and the stage size
+in node; then a real show server, the built `/tv` page at the server's network
+address, and a stand-in laptop running the real sender over a canvas painted one
+colour at a time. The TV's own pixels follow each change of colour (55–82 ms on
+the cloud's loopback, under a 700 ms bar), H.264 agreed, three TVs and a fourth
+refused, free and wrong key refused with their reasons, a TV's patch never reaching
+the laptop, films when the laptop goes and live again when it comes, the last TV
+gone stopping the stage, a frozen plate after it, and the phone. By hand on the cloud:
+the real app on a software GPU feeding a TV page in a second browser over the
+network address, the plate on the TV.
+
+## 12-tv-remote. The TV's remote picks the look (2026-11-12)
+
+Asked by the owner (2026-11-12): the TV stays a receiver for now, playing the Mac's
+plate as video, but the remote should choose what plays, a random look or one of
+the presets. The coordinator's reading, built: the D-pad's right and left play the
+next and previous preset, OK a random one, up (or Menu) a list to choose from.
+
+- **The relay** (`server/tv-remote.js`, beside `remote-server.js`, which is past the
+  size the repo warns at). Until now a TV could say nothing but its half of the
+  video handshake. It may now send `tv-pick` naming a preset, which the relay hands
+  the display as the `preset` a phone sends, only if the laptop listed that preset
+  in its last state, and at most one every `TV_PICK_MS` (400 ms) from each TV: a
+  preset cuts the plate to clean glass, and a held button repeats ten times a
+  second. The TV names the preset rather than sending `preset-next`, so the relay
+  knows what it passes on and a TV can never reach a patch or another action. A
+  TV is sent `tv-looks` (the presets' ids and names, the live one) as it joins and
+  when either changes, not the phone's whole state. Any TV in the show may pick: a
+  paired one, or one opened with the show key, which could already be a phone;
+  a TV still asking to pair cannot.
+- **The page** (`src/components/TvRemote.tsx`, `src/lib/tvLooks.ts`): the keys as
+  the Android TV WebView hands them; repeats ignored; a step counts from the last
+  pick, so two presses before the laptop answers move two; a random pick is never
+  the live one; a line at the top names the look coming, then the one playing.
+  Off on a refusal and on the films. In a TV's own browser the first OK still goes
+  full screen. Phone version: a tap brings a bar of Previous, Random, Next and
+  Looks; the bottom line no longer takes taps (it covered the bar).
+- **The app** (`MainActivity.dispatchKeyEvent`, `Shows.pageKey`): Menu, and Back
+  while the list is open, go to the page as `ContextMenu` and `Escape`; the page
+  says when its list is open through the bridge's new `menu`, so Back closes the
+  list rather than leaving the show.
+
+Measured: `npm run tvremote` 45/45 (new: the rules, the relay against the real show
+server and a stand-in laptop, the page's keys, a TV browser's first OK, the phone's
+bar and list); `npm run tvpair` 52/52 and `npm run tv` 33/33 unchanged. Not yet
+seen: a real remote through a TV's WebView (`docs/judging.md` §126).
+
+## 12-tv-2. The Android TV app finds the Mac and pairs by four digits (2026-11-09)
+
+Asked: the owner's TV app for Home and Pro (2026-11-08), route 2: a receiver of
+the Mac's stream (12-tv-1). This PR is the app and the two things it needs from
+the show.
+
+- **The app** (`androidtv/`): one Activity in plain Java, no libraries. NsdManager
+  looks for `_chromaglass._tcp`; the Mac played last opens as soon as it is
+  seen, else the only one after a three-second look, else a list for the
+  remote's arrows. A WebView then plays `/tv?app=android` (autoplay without a
+  gesture, screen kept on, held to the Mac's origin). The `ChromaglassTv` bridge
+  keeps the key the Mac hands over by the show's id from the advert, not by
+  address. Back returns to the list. Java rather than Kotlin, Capacitor or a
+  TWA: the shell is a WebView and a service lookup, and a TWA could not open
+  `ws://` on the LAN. Its own workflow (`androidtv.yml`, as `ios.yml` is): build,
+  9 unit tests of `Shows.java`, Android lint, the debug APK kept 14 days. Lint
+  found `URLEncoder.encode(String, Charset)`, API 33, which would have crashed
+  every TV older than Android 13: the key's pattern needs no encoding.
+- **The advert** (`server/bonjour.js`): a small mDNS responder in the show
+  server itself rather than `desktop/main.js` as planned, so `npm run remote` on
+  any computer advertises too and the check asks the same code. PTR, SRV, TXT
+  (`v`, `id`, `path`) and an A record per LAN address; legacy unicast answered;
+  announced three times at start, goodbye on the Mac app's quit. The SRV names
+  its own host (`chromaglass-<id>.local`), never the Mac's, which mDNSResponder
+  defends. The show key is never in it.
+- **Pairing** (`server/tv-pairing.js`, the relay's `pairing` role): a `tv` hello
+  with `pair` and no key waits, relaying nothing; the relay picks four digits
+  (unique among asks, so a stranger cannot ask with the real TV's), the laptop's
+  page shows a card at the top of its screen and rows in Cast → TV at home;
+  Allow hands that TV `tv-<32 hex>`, kept in `CHROMAGLASS_TV_FILE` (the Mac
+  app's `tvs.json`, mode 600); No counts as a wrong key (three lock the address
+  out); an unknown TV key is `unpaired`, never a lockout, and the page pairs
+  again; Forget closes every paired TV. Four asks at most, two minutes each,
+  one per address.
+- **The page**: `/tv` with no key pairs (big digits over the films); keeps the
+  key in localStorage and the bridge (`lib/tvKey.ts`); a forgotten key in the
+  URL is dropped and the page pairs again. App.tsx carries the card in no more
+  bytes than before (its file is over the size limit).
+
+Measured: `npm run tvpair` 52/52 (the advert asked both ways, pairing, kept
+keys across a restart, unknown keys, Forget, No and the lockout, the built page,
+the card laid out with the built stylesheet at laptop and phone width, the
+digits on a phone); `npm run tv` 33/33 unchanged; `./gradlew assembleDebug
+testDebugUnitTest lintDebug` green, APK 159 KB. Not yet seen: a real TV (12-tv-2c).
+
 ## 45a-2. Selling the moiré pack to Home (2026-11-07)
 
 The owner chose to sell the moiré pack as a $15 add-on to Home and to include it in Pro.
@@ -12178,50 +13724,546 @@ Garden read as scattered specks at this size and is left off too.
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
 
-## 46a. A faster opening (2026-11-14)
+## 12-tv-signin. A TV signs in by a short code (2026-11-08)
 
-Classic's opening waited for 65 pipelines in its ledger and asked WebGPU for 66 before the
-first step (`OPENING_MOST = 52` in `scripts/openingtime.mjs`, `--bar`). Each pipeline is a
-separate WGSL compile pass before frame 1, and seven of the opening's pipelines (`jacobi:dye`,
-`output`, `airGiveSub:thin`, `airGiveThin:thin`, `beadDrops`, `beadHoles`, `beadFinish`)
-were never drawn in Classic's first 40 steps, while several pairs of dispatches ran back to
-back over the same cells.
+A TV receiver (12-tv route 2, 12-tv-apple) has no keyboard worth typing a password
+on and no browser for Google's sign-in, so it signs in the way TV apps do: it shows
+a code, the player types it on a phone where they are already signed in, and the
+TV is told. The licence Worker answers four routes in `server/tv-code.js`:
+`/tv/code` draws an eight-letter code (consonants only, so no word and no 0/O or
+1/I) and a 43-character device code, and keeps only the device code's SHA-256
+under `tvcode:<code>` for ten minutes; `/tv/claim` takes the phone's Firebase
+token and the code and files the account's best licence on it (Pro over Home,
+newest first, never a revoked or expired key, 403 `needs: home` when there is
+none); `/tv/poll` hands the TV its pass exactly once, comparing the device code's
+hash in constant time and deleting the record before signing.
 
-Two changes cut Classic's opening from 66 WebGPU pipelines (65 ledger) to 51 WebGPU
-pipelines (50 ledger) without dropping anything a look draws or loosening `src/gpu/opening.ts`:
+What the TV gets is not the licence key. A `cg1.` key carries the buyer's email
+and counts machines (two per key), and a TV taking a seat would lock a buyer out
+of their second Mac; a refunded key would also keep working on a TV forever. So
+the TV gets a `cgtv1.` pass (key id, tier, 30 days) signed with the same Ed25519
+key, which `verifyLicenseKey` and `/activate` refuse, and renews it through
+`/tv/renew`, which reads the stored key and so drops a refunded one within the
+pass's life and takes a tier change from the store. Each route is rate-limited by
+the same hourly counters `/activate` uses (codes per address, claim misses per
+account, renewals per address), so eight letters from twenty are not guessable
+inside ten minutes. The phone's half is `?tvlink` (`src/components/phone/TvLink.tsx`
+over `src/lib/tvCode.ts`): the site's own sign-in form, then a code field that
+formats as it is typed, prefilled from the TV's QR code. `npm run tvcode` (34
+checks) proves each route against the real handler and a fake KV.
 
-1. **Five kernel fusions and a buffer clear (`-10` opening pipelines):**
-   - `deltaFold` (`src/gpu/fluid/inputs.ts`, `src/gpu/wgsl/fluid/splats.ts`): folded
-     `deltaDye`, `deltaVel` and `liquidForces` into one pass, and sampled `cpuMulTex`
-     directly via `bilerpN` unless `videoPending || bodyMul`, deferring `upsampleDelta:r32float`
-     while keeping `upsample` on `cpuDyeTex`/`cpuVelTex` (`npm run videoflow` reads those
-     intermediate textures directly).
-   - `forcesB` (`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/forces.ts`): folded `addCurrent`
-     into `forcesB` (preserving the `forcesB` kernel name used by `scripts/crash.mjs`).
-   - `grainStep` (`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/dye.ts`): folded `advect` and
-     `seedGrain` into one dispatch (`-2` pipelines).
-   - `decay` (`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/dye.ts`): folded `decayDye` and
-     `decayVel` into one dispatch.
-   - `packVel` (`src/gpu/wgsl/pack.ts`, `src/gpu/plate.ts`): folded `packDye` into
-     `packVel` (preserving `textureLoad(vel, vec2i(id.xy), 0).xy;` for `scripts/cellride.mjs`
-     and keeping `packVelDrop` ordered after the plate loop when `height` is present).
-   - `FluidCore.clear()` (`src/gpu/fluid/core.ts`, `src/gpu/fluid/fields.ts`): replaced the
-     `clearBuffer` compute dispatch on `press`, `spress` and `hsLiftPsi` with
-     `enc.clearBuffer(...)` (`COPY_DST`), while keeping `mgZero` in `hsCycle()` (`encode`
-     H2c-1/H2c-3). Added `velScratch` (`rgba16float` in `src/gpu/fluid/fields.ts` and
-     `src/gpu/fluid/passes.ts`) for `jacobi(this.vel)`, taking `scaleDye:dye` out of the
-     opening (`-1`).
-2. **Deferred behind the show (`later` builds):** moved `jacobi:dye`,
-   `airGiveSub:thin` and `airGiveThin:thin` (`THIN_GAP_LATER_KERNELS` in
-   `src/gpu/fluid/constants.ts`), `beadDrops`/`beadHoles`/`beadFinish` (`src/gpu/beadMask.ts`)
-   and `output` (`src/gpu/output.ts`) to `later` builds so the app compiles them after the
-   opening without missing a draw in Classic's first steps.
+The one review the licence Worker's changes get found five things, fixed before
+merge. A pass worked on any TV it was copied to and renewed forever, so each link
+is now a record (`tvpass:<id>`: key, tier, account, a generation), the pass names
+its link and generation, and a renewal must match the record's generation and moves
+it on: a copied pass and its original cannot both keep renewing, and the first
+mismatch deletes the link, so both die. An account keeps at most ten links, and the
+eleventh drops the oldest. A refund of an upgrade stranded the TV on the refunded
+key; a renewal now falls back to the account's best remaining key. `/tv/poll` had no
+allowance; it has 1440 an hour per address (one every few seconds for an hour from
+a TV is about 720). And a code that arrived in a link was sent on one tap, which
+let anyone send their own TV's code and take the victim's licence onto it; the
+phone now asks the player to tick that the TV in front of them shows the code,
+and a code typed by hand asks nothing. `npm run tvcode` (42 checks, from 37) and
+`npm run tvlink` (6 checks, the phone page in Chromium; the phish check is red on
+the page before the fix). Two found things stay open as 12-tv-signin-3 and -4.
 
-Removed `--owed=count` from `"The opening waits for fewer pipelines, owed"` in
-`scripts/checks.json`. Checks: `PW_WEBGPU=1 node scripts/openingtime.mjs --bar --runs 1`
-51 WebGPU pipelines (50 in ledger, first step 0.81 s, building 0.33 s; down from 66 / 65);
-warm `npm run openingtime -- --runs 3` median first step 0.59 s (down from 0.70 s);
-`npm run samelook` 0.00% diff across all 6 looks; `npm run startup` opens all 34 looks
-(50 to 70 pipelines, no stop in the opening); `npm run physics` 20/20, `npm run thingap`
-16/16, `npm run grating` 24/24, `npm run videoflow` 24/24, `npm run cellride` 14/14,
-`npm run crash` 37/37.
+## 45a-13. Random looks land on moiré one pick in sixteen, not one in five (2026-11-11)
+
+The owner: "the randomize button picks the moiré patterns way too frequently". Two causes.
+Randomise (`luckyLook`, lib/lucky.ts) keeps every setting it does not name, and it named none
+of the sheets', so after one moiré look every roll was a new liquid under the same two sheets:
+350 of 350 rolls from a moiré look kept them. It now sets `moireAmount: 0` (the designs and
+turn stay, so the fader brings the same pair back), as it does the comic print: 0 of 350. And
+the three look pickers (the phone's Surprise me, a new song in "New preset" mode, the opening
+look) drew evenly from the 38 non-closeup looks, of which the pack's 7 are one idea over 7
+house liquids: moiré on 18.9% of picks, on copies without the pack too. They now go through
+`pickLook` (lib/lookPick.ts; `randomLook` in app/shared.ts): a house look weighs 1, a pack
+weighs `PACK_WEIGHT` = 2 looks in all (5.8% of 20,000 picks), a pack this copy lacks weighs
+nothing (`isPackLocked`; 0 of 20,000), the opening look is never a pack's (the licence is not
+read yet), and a pick never lands on the liquid on the plate or one of the last six picked (a
+pack look counts as its house look's liquid; 0 repeats, all 31 house looks within 200 picks).
+Checks: `npm run panel` (scripts/panelRandomLooks.mjs).
+
+45a-14, in the same PR: asked whether Randomise should ever lay sheets itself, the owner said
+"for the sheets - now and then is fine". On a copy with the pack (`canUseMoirePack`, asked by
+`useLucky` and the new-song roll) a roll lays one of the pack looks' whole sheet stages one
+time in sixteen (`LUCKY_SHEETS_CHANCE`; 252 of 4,000 seeded rolls, 6.3%), with Lamp Ground 1
+and the LED ring off, as the pack's looks are lit; 0 without the pack, and owning the pack
+changes no other setting a seeded roll lands on (both draws are taken on every roll).
+
+## H2c-labels. Timestamp labels kept with their ring slot (2026-11-08)
+
+`GpuProfiler` (`src/gpu/kit.ts`) handed out timestamp slots as a frame encoded, resolved
+them into a `ReadbackRing` slot in `resolveInto`, and in `afterSubmit` set `lastLabels` to
+the labels of the frame just handed to `collect` while reading `ring.latest`, which held a
+copy that had landed one to three frames earlier. When a frame's pass list changed
+(camera, particles, finish, output, a projector's source), every pass after the change
+read its neighbour's timestamps for as long as the ring lagged, and `gpuFrameMs` jumped on
+the frame of the change instead of when the frame that ran the new pass landed.
+
+Now `resolveInto` keeps each copy's label list in `labelsBySeq` under `ring.issued` when
+`ring.copyFrom` succeeds (frames dropped when every ring slot is busy are left untimed),
+and `afterSubmit` reads `ring.latest` against the labels stored for `ring.landed`,
+dropping entries older than `ring.landed`. Keyed by the copy's sequence number rather than
+the slot buffer because `resolveInto` reuses a freed slot at the end of encoding before
+`afterSubmit` folds in the reading that slot just published.
+
+Measured (`npm run timelabels`, five runs with mappings landing 0 to 3 frames after their
+copy and one stalling until the ring fills, camera on at frame 100 and off at frame 110):
+133 → 0 readings off their pass in the 8 frames from each change, `gpuFrameMs` move on a
+change 30.0 % → 0.0 % (bar ≤ 10 %), 2/2 checks passed (`labels` removed from `--owed` in
+`scripts/checks.json`). The flash probe's pixel count has the same fault and remains open
+under 14r.
+
+## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
+
+**19am-1.** The owner's rule (2026-11-01, docs/handoff.md): when the same check is red on
+two main deploys in a row, nothing merges but the fix until a deploy is green. It was a
+rule for whoever read it. On 2026-11-08 the fifth Mac shard was red on deploys 699 and
+701, the open shard on 685 and 699, and 16 of that day's 34 merges landed while main's
+last deploy was red; each one started another deploy that ran the same red shard and
+gave the fix one more commit to be bisected against. The owner adopted making it
+mechanical on 2026-11-09 (13:12Z).
+
+Changed: `scripts/mainhold.mjs` judges each check on its own. "A check" is a job of the
+deploy: a Mac shard, a Measure part, the build; not the summary jobs `Checks / WebGPU
+(macOS)` and `Checks / Measure` (red whenever any shard is, they would make two shards
+look like one check) and not the owner's-Mac probe, the watchdog or the deploy gate. For
+each check it walks main's deploys newest first and takes only those that ran it; main is
+held when some check's newest two results are both red, and lifted the first time it runs
+green. Cancelled deploys are left out (31 of the last 40: the deploy's concurrency group
+cancels a run the next push supersedes, and the watchdog one it hands to GitHub's Macs).
+A deploy whose PR passed its exact tree (`deploygate.sh` said `tested`, so Checks was
+skipped and it built) counts green for every check, or a fix merged with main in its head
+would never lift the hold. A re-run in progress keeps its last attempt's results.
+
+The first draft judged whole deploys (two red deploys running, any green one lifts), and
+its review found the hole: a docs-only deploy, a `disjoint` one (Measure, no Mac) and a
+red one whose typecheck stopped the shards all run no Mac check, and the draft let any of
+them break a run or lift a hold the fix never touched. It also read only 30 runs with no
+paging, posted one PR at a time with no concurrency group (a slow run that read "held"
+could post after a later green), and never posted on a PR retargeted to main.
+
+`.github/workflows/hold.yml` posts the verdict as the commit status `Main not held red`,
+red with the check and the two deploys, or green on a PR labelled `fixes-main`. Each run
+reads every open PR's current status in one GraphQL query and posts only where it
+differs, so a push costs one post, and runs queue one at a time in one group. It runs
+when a deploy finishes, on a PR's opening, push, label or retargeting, and by hand. It
+uses `pull_request_target` so that a fork's PR gets the status too, and checks out only
+main's copy of the script, never the PR's code. Its job is named `Post the main hold`, not
+like the status, so that a green job can never stand in for the status in a required check.
+
+Measured: `npm run mainhold -- --self-test` (Measure, logic) holds the rule against main's
+deploys 738 down to 699 with every job as the API listed them
+(`scripts/mainhold-deploys.json`): held after 701 (fifth red on 699 and 701, 700
+cancelled between) and after no other of the 40 that finished, still held through 702
+and 703 (cancelled), lifted by 704 (fifth green). Against made-up histories it holds
+across a cancelled, docs-only, `disjoint` or shard-less deploy, lifts on a green run of
+the check or a tested-on-its-PR deploy, and does not hold on two different shards, the
+plumbing red twice or one red. The API reading stops early, and the self-test replays
+the stop from each of the 40 to show the verdict at the stop is the verdict on all.
+
+Edge cases, the rule as written: "two deploys in a row" is read per check, so the two
+reds may have deploys between them that did not run that check (the 11-08 pair had a
+cancelled one). A quarantined flake (19ak-1) is a warning only on a pull request: main's
+deploy holds every line to its bar, so a quarantined line red on two deploys running
+holds main like any check. That is the rule as adopted; 19am-3 is where a line-level
+hold could choose otherwise.
+
+## 37x-10j. Song titles as a corner caption, like a 1980s music channel (2026-11-10)
+
+**What was wrong.** The owner judged 37x-10g's thick-ink titles on the Mac's film "not
+very readable honestly" and asked for titles that "just show up like MTV used to have them
+in the bottom left corner and then fade away. Simple ui overlay", then "as much like 1980s
+MTV as possible". Ink in a moving liquid is the wrong medium for words a viewer must read
+in a few seconds.
+
+**What changed.** `lib/songCaption.ts` holds the card: artist, the song in quotation
+marks, album, label, white "Helvetica Neue" at a twenty-fourth of the picture's height,
+left-aligned in the title-safe corner, a black drop shadow under the white, up in 200 ms,
+held 7 s, out in 450 ms. The screen draws it on a window-sized canvas layer
+(`components/songCaptionLayer.ts`, mounted by useRemote because App.tsx may not grow);
+the live stream's encoder draws it on each output's staging canvas after the plate
+(`lib/liveStream.ts` `stage`), so YouTube receives it and the portrait encode has it in
+its own corner. `app/songTitle.ts` chooses caption or ink by the new `titleCaption`
+setting (default the caption) for the ear's titles and a song show's title; a new
+`song-title` message (phone, show server, the assistant's `song_title` MCP tool) always
+shows the caption. Desk: Logo & Titles → As a corner caption. Phone: Caption / Ink under
+the Title switch.
+
+**What it measured.** `npm run caption`: the card's lines and fade; on a dark 1280x720
+plate 3.7% of the bottom-left box white and the other corners untouched; on bright cream
+a blurred shadow alone left 0.0% of the box near-black round the letters (white on cream,
+unreadable), the drop shadow 2.1%; streamed and decoded, the landscape's bottom-left box
+0.0% white before the card, at least 2.0% while it is up, 0.0% after, the top-right
+never touched, and the portrait at least 5.3% in its own corner.
+
+
+## 37x-10m. The poured-ink titles shelved (2026-11-12)
+
+**What was asked.** The owner, of the ink titles (37x-10, 37x-10c, 37x-10g): "I think
+this poured option never really worked. We should shelve this". The corner caption
+(37x-10j) had been the default since 2026-11-10; the ink was still the other choice on the
+desk (As a corner caption off, the ink's colour, size, height and sweep), on the phone
+(Caption / Ink and Sweep under Title), on MIDI (three knobs), and was what the phone's
+"Pour words" box, the assistant's `pour_text` and a song show's sign-off still poured.
+
+**What changed.** `useRemote`'s title sink shows the caption only and no longer reads
+`titleCaption`, so a show saved with the ink chosen gets the caption rather than a title
+nobody can switch off. A `pour-text` message (the assistant's `pour_text`, a phone or a
+conductor one build older) is read back into a card by `lib/pourText.ts` `rowsCaption`
+(the leading heavy rows the title, the lighter rows the artist, album and label) and shown
+as the caption. The phone's box is now "Song title" with a Show button and sends
+`song-title`, built from what was typed by `typedCaption`, case kept. The sign-off shows
+"ChromaGlass" in the corner. The ink's controls are gone from Logo & Titles, the phone and
+MIDI, and `titleCaption` is deleted; the ink's own four settings stay, listed in `npm run panel`'s deliberately-without-a-control set (37x-10n takes them out). The ink itself
+(`lib/inkTitle.ts`, the solver's `pourInk`, the pad and rinse) stays for the logo melt
+(37x-11), and the owed Mac film of the ink (judging §114, §117) is cancelled.
+
+**What it measured.** `npm run caption`'s `wired` line now fails on main's source (the
+sink choosing by `titleCaption`, `pour-text` poured, the phone's Caption / Ink, the desk's
+ink controls, the poured sign-off) and passes here. `npm run remotemix`: the phone's box
+was heard as one `pour-text` of ink rows (SUNSHINE OF@1.25|YOUR LOVE@1.25|Cream@0.75); now
+one `song-title`, "Sunshine of Your Love" by "Cream", and a `pour-text` from it fails the
+line. `npm run assistant`: `typedCaption` and `rowsCaption` in node; the guard's
+`pour_text` lines unchanged.
+
+## 44k-18. The Mac app's updates from the assistant (2026-11-11)
+
+Built with 13-update-auto, on the coordinator's word that the switch be "exposed to
+Claude's app control too". `app_updates` (status in any mode; auto, check and install in
+Full) is the one assistant call that never reaches the display: the updater is the Mac
+app's main process's, so main.js hands the show server its doors (`setAppUpdates` with
+desktop/updates.js's `updatesHook`), and the relay answers from them at once
+(`server/assistantUpdates.js`), the updater's state in the answer. A show run from a
+terminal has no updater and says so. install never restarts the app mid-show: the
+updater's `install()` refuses while the show is on the projector or live. A phone's
+`assistant-updates` is dropped (`ASSISTANT_ONLY`). Checked by `npm run updates` (the rules
+on the real updater) and `npm run assistant` (`updates-full`, `phone-updates`, each with
+its mutant).
+
+## 47v-47w-1. Watching any link: the fetch fixed, a design, physics and techniques read (2026-11-12)
+
+The owner asked to point Claude at any video or animation and have it watch, then use what it
+learns, with "enhanced design evaluation (color, form, etc)", "a physics read", "scan pages
+for the techniques used or guess based on video", and to judge our own visuals with it.
+
+The fetch. YouTube refuses cloud addresses; the owner's Mac is not refused. The download on
+the Mac had left picture and sound as two files (47w): reproduced on the owner's Mac, yt-dlp
+printed "ffmpeg-location ffmpeg does not exist! Continuing without ffmpeg", because
+`watch.mjs` handed it the bare name `findFfmpeg` returns when ffmpeg is on PATH. It now
+passes the full path (`ffmpegLocation`), joins any pair itself (`pickSource`) and refuses an
+audio-only fetch. A refused fetch in the cloud prints the one-line Mac command
+(`macFetch`), which a thread runs with Desktop Commander and stages back. Vimeo wants a
+login from anyone and its copies were DRM-locked: a screen recording is the route.
+
+The reads. `scripts/watchdesign.mjs`: palette, colourfulness (Hasler–Süsstrunk), hue
+harmony, contrast, edge width, form scale, flow-line coherence, forms and elongation,
+symmetry, composition. `scripts/watchphysics.mjs`: block-matched flow a second apart,
+coarse to fine with normalised SAD, the whole-field part set apart by an affine fit (its
+rotation and divergence), the share of change the flow carries, turnover, lifetime, the
+spectrum's slope, vertical drift; the page's technique words, chapters and links, and
+guesses from the numbers. `--vs` ranks the gaps against a reference; `--crop` reads only a
+projection. 22 new self-test lines (`scripts/watchreadtest.mjs` and watch.mjs) on known
+frames and flows: a texture slid at 2.5% of the width a second read 2.50, turned once a
+minute read one turn in 62 s (and the opposite sign turned back), sinking and rising read drift +2.49 and −2.49, pulsing in place read carried 0.02. One check-skeptic pass found seven ways the first draft could pass while broken (no window on the spectrum, the curl sign, a cooking video named as technique); each is now a line that goes red on its mutant. Proved on Liquid Light
+Lab's *Quick Tutorial* fetched on the owner's Mac (47y holds what it found).
+
+
+## 47w-2-47v-2-47v-3. Dissolves, a reference library, and real shows beside the physics bands (2026-11-12)
+
+The follow-up the owner asked for to the watch tool, as one PR.
+
+Dissolves (47w-2). On *Streams II* the cut detector read 3.8 cuts a minute against about 7 by
+eye: a dissolve spreads a cut's change over a second, no one sample of it is an outlier, and
+lowering the bar cannot work on liquid, which changes by itself as fast. What a dissolve has
+that a pour does not is its arithmetic: every frame is a mix of its two ends.
+`scripts/watchcuts.mjs` finds a run of raised change on a 32×18 thumbnail, asks that its ends
+differ by 2.5 times what each take changes by itself over the span, that every frame inside
+fit a·A + (1−a)·B leaving under a tenth of the ends' difference, and that the new picture is
+unlike anything the old take showed in the three seconds before (a lamp that dims and returns
+is a perfect mix of its ends). Both bars come from real footage: the Joshua Light Show
+film's dissolves leave 0.005 to 0.024 and the runs the mix turns down 0.14 and up; without
+the take-relative gap step the single-camera bar show read 9 dissolves and the film 37. Each dissolve is one cut at its middle; its
+samples are left out of the motion and flow reads. Self-test clip F (a same-colour dissolve
+over 1.5 s pausing one sample half-way, a hard cut, a dissolve into other colours) reads
+cuts at 4.80 (dissolve), 8.00, 10.50 (dissolve), left 0.01, its fades exactly the dissolves'
+samples and its physics read's longest shot the first take (4.10 s); clip G (one take: a
+pour sweeping across, a dye body spreading, the lamp dimming and coming back) reads none,
+the pour (left 0.42) and the dye body (0.14) turned down by the mix and the lamp both ways
+by the revisit. One check-skeptic pass found nine ways the first draft's lines could pass
+broken (the fades' effect unmeasured, an untested 'falls' rule, a line on clip D that never
+reached the detector); each now has a line or was removed, and mutants of the mix bar, the
+revisit, the bridge over a quiet sample and the fades in the physics read each turn a line
+red. On the Joshua
+Light Show film: 12 dissolves in ten minutes, each a superimposition of two loops on the
+sheets; on the bar, one camera, none. At two samples a second a hard cut no longer counts
+twice on the next sample.
+
+A reference library (47v-2). `--keep <name> [--note]` copies a watched clip's design.json,
+summary, timeline, first sheet and palette with a `ref.json` (title, link, crop, span, why)
+into `/mnt/project-files/references/<name>/` (on the Mac `~/chromaglass-films/references`,
+or `$CHROMAGLASS_REFERENCES`), `--vs <name>` compares with it without fetching again and
+`--refs` lists the library with its numbers (`scripts/watchrefs.mjs`). Outside the repo: the
+repository is public.
+
+Real shows (47v-3). Two performance films from the Internet Archive watched at 10 samples a
+second and kept: the Joshua Light Show's *Liquid Loops 1969* (35 mm film of the loops; flow
+8.0% of the width a second, carried 0.19, turnover 1.5 s, lifetime 0.9 s, spectrum −2.69) and
+a liquid light show on the wall behind a band at a bar, one camera from the floor, cropped to
+the wall (2.0, 0.13, 2.4 s, 5.0 s, −2.79). Their numbers are `REAL_SHOWS` in
+`scripts/watchphysics.mjs`; the physics read prints the range beside flow, carried, turnover,
+lifetime and spectrum and says when a clip is under or over every real show. The finding:
+real shows read carried 0.13 to 0.19, which the synthetic bands called "changes in place …
+or a digital effect"; the in-place guess now fires only under the real shows' floor (47v-5
+is the measure's fix). The Dregs (2023), the third archive film considered, is mostly
+digital overlay over a band and was left out. Liquid Light Lab's films were fetched on the
+owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a video mirror and
+colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
+row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).
+
+## 47z-5. Foam Cells: a packed foam whose films meet at 120° (2026-11-13)
+
+The owner asked for every finding of the Microlab films (2026-11-13, "Ok let's do this all"),
+cells first among them: cellular networks came up in five of the ten, and a macro film of a
+packed foam (`cosmo-packed-foam-cells`) was already in the library. Drawn cells were retired at
+his word (2026-10-29, 33g-3), so these had to come from the liquid.
+
+What the field did with a packed crowd, in the lab (SwiftShader): laid pressed (a power diagram
+of random drops cut by water films), a crowd with two-cell films merged into one body in two
+seconds even with Film Hold; with four-cell films it held. With cells twenty grid cells across,
+four-cell films leave a third of the dish water, over the sixth at which discs in the plane
+jam, and the cells rounded up into a wet crowd (68 cells to 33 in twelve seconds, water in
+lanes): the right physics for a wet foam. With cells fifty across and the foam laid to the
+dish's open rim (laid past it, 1.3% of the oil ran out over the rim in four seconds), the oil
+is 0.84 of the dish and the crowd is a foam: it holds, its films flatten and its junctions turn
+toward 120° (Plateau's laws in the plane of the gap) from the lay's random angles, by the
+tension alone.
+
+Sticky films were tried for a crowd that packs itself (47z-6): a push falling as e^(−h/5)
+against the hold's e^(−h/2.5), and the same as a chemical potential. The drops pulled together
+and then merged through the film at every strength tried; the potential seeded oil in the film.
+
+The tension had to come down for the app's grid: at 384² a fifty-cell cell is smaller on the
+plate than at 256², its pressure higher, and at 0.45 half the cells merged in four seconds, at
+0.2 a quarter, at 0.1 four of 39. The look is Foam Cells (`src/presetsFoam.ts`, laid by
+`layFoamCells` in `src/lib/oilLay.ts` through the solver's new `layOil`). `npm run foam` (384²,
+four seconds): laid 39 cells, median 14.5° off 120°, 31% within 10°; after, 35 cells, median
+7.3°, 69% within 10°, every junction three-way and still there, no oil made or lost. The
+reader's floor on an exact hexagonal foam is a median 2.3° and 99% (192²); it reads each film
+past its border's arcs, after the check-skeptic showed a fixed ring read rounded corners. To make room for the
+seed in `fluidSimulation.ts`, which is over its size budget, Clock Glass's lay moved beside its
+bodies in `oilLay.ts` (`layClockGlass`, the same cells in the same order).
+
+
+
+## 47e-47d-1-47b-1. Glitter in the liquid, the lens that photographs it, and a side lamp (2026-11-13)
+
+Asked by the owner after the Microlab films were watched in the page: suspended specks,
+out-of-focus specks as discs, star glints from a stopped-down lens, and a second amber or
+red light raking in from the side over the blue glow, as one PR, modelled as the optics are.
+
+The glitter (47e's flake half). Up to 32,768 flakes (Glitter, 0 to 1), 10 to 50 µm across
+and 3 to 12 % as thick, polystyrene's density, 5 % over water's. They are stepped once a frame
+in the lens pass (`gpu/glint.ts`), not in the solver: they ride the packed `velForced` the
+dye rides, scaled by Poiseuille's 6z(1−z) at their height, by the lead plate's own
+displacement read from its cell clock (lib/detailFlow), so a flake and the dye beside it
+move together however many solver steps a frame took. They turn in Jeffery orbits integrated
+in closed form, tan θ = r tan ξ with ξ advancing by the strain over (r + 1/r) (stepped from
+the equation in node: worst 0.000°, a thin flake within 20° of flat for 90 % of its turn);
+settle by Stokes on the volume-equivalent sphere (0.020 mm/s, about 100 s to cross the
+2 mm gap) and lie flat where they land; and live 40 to 160 s, fading in and out.
+
+The lens (47d-1). Magnification 0.27 × zoom on a 36 mm sensor, Lens Stop f/1.4 to f/22, the
+focal plane at Projector Focus. A flake is drawn as its aperture's image: a disc of
+diameter |z − z_f|·gap·m/(N(1+m)), a hexagon from the six-bladed iris above f/2 and a circle
+wide open, its energy spread over its area in linear light; stopped down its Airy core
+grows (1.22 λ N (1+m)/m, by colour) and six spikes reach out at the share of the light the
+blade edges diffract, fading as the flake leaves focus. Each flake's light is the mirror
+law: the side lamp's and the softbox's (Light Play) rays reflected off its normal, spread by
+the lamp's size and the flake's crinkle (0.15 rad), times 0.85; a flake under the dye is
+filtered by the dye above it, and on a lamp ground it is a dark speck by its shadow.
+
+The side lamp (47b-1). Side Light, Side Colour (default amber, 30°) and Side Angle (160°): a
+lamp 0.35 rad above the stage, 30 cm off, its light refracted into the water by Snell,
+falling off by the inverse square and the slant across the stage, scattered back by the
+pigment (0.35 of it, filtered by the dye; on black a fluorescent dye counts as pale) and
+reflected by the glasses' slopes by Fresnel (3 %), read from the plate's normals.
+
+The pass. At Glitter and Side Light 0 nothing runs and nothing is held (a frame that does
+not want the pass lets its pictures and flakes go): the plate draws to its target as before,
+to the byte. Otherwise the display draws, unfinished, into the pass's half-float picture (in
+8 bits a dark ramp would band before the finish's dither), and the lens pass adds the light
+and lays the finish the display would have (`lensFinish`). The flakes age and settle on the
+plate's own clock, so a paused show pauses them, and a gap in it over a quarter second
+carries nothing. A stage glides Side Colour and Side Angle the short way round the circle. Desks (Camera and Lamp sections), MIDI, glides, drift's not-the-look
+list and the phone's remote all carry the five dials.
+
+Measured (`npm run glint`, 20 lines): the laws in node; off is off to the byte with every
+other lens dial moved, and Side Light 0.05 is not; under the side lamp the black ground
+rises at most 1 level, the dye gains red over blue (+69.7 against +0.4) and the half toward
+the lamp gains more (69.7 against 59.7, both ways round); on a lamp ground at 4× the dark
+specks at Glitter 1 are about twice those at 0.5 (412 against 216, none at 0); at 8× and
+1024 px the glints cover 3.8 times the pixels wide open as at f/5.6 (5291 against 1388),
+and at f/16 the brightest glint's light along the six spike directions is 326 against 7
+between them, where wide open it is 4; focused on the floor glass the glints at f/5.6 cover
+2442 pixels against 1388 mid-gap. Over eight frames on one plate pushed to +x (the lab's
+`keepPlate` and `glintSpecks`, the flakes read back), mid-gap flakes go 3.64 times as far as
+those by the glass where 6z(1−z) says 3.66, and their travel over 6z(1−z) is 0.0197 of the
+plate against the dye's own 0.0198. One check-skeptic pass found that every line drew a
+single frame of newborn flakes (the step shader never measured), that "none at 0" compared
+a picture with itself, and that nothing could see the pass's picture upside down or the
+lamp's hue ignored; each is now a line. Found doing it: 47b-2 (the side lamp casts no
+shadows), 47b-3 (sources and the kaleidoscope draw without the pass), 47d-2 (discs and stars
+only on the glitter), 47e-1 (microbubbles), 47e-2 (the orbit constant and rebirth shortcuts).
+
+
+## 47n-1. The tank seen through its side (2026-11-13)
+
+Asked by the owner on 2026-11-13 after the Microlab films were watched: Davy Evans' *Gravity
+L1* films a tank of water from the side, fluorescent dye falling as a jet that stretches into
+one thread, lands and runs along the floor as a gravity current whose head curls. Two ways
+were put to the owner: stand the plate up (Gravity with Dye Weight, which already pours heavy
+dye downhill) or a solver of its own. The plate is a Hele-Shaw cell: the glass's drag,
+12ν/h² across a millimetre, is about ten a second, so it keeps no momentum from step to step,
+and a falling jet thins only because it keeps its momentum and speeds up. The owner chose the
+solver.
+
+What it is. `src/lib/tank.ts`, the CPU reference: a vertical slice 24 cm by 13.5 cm, the
+incompressible Navier–Stokes equations in the Boussinesq approximation on a staggered grid,
+water's own viscosity, glass walls and floor no-slip, the surface stress-free, heavy dye
+(g′ = g Δρ/ρ₀, half a percent by default) carried in flux form with a minmod limiter, the
+momentum semi-Lagrangian, the pressure by a multigrid V-cycle. A nozzle feeds dye at the surface; the
+water it adds leaves through the floor (Drain) or raises the level. Substeps from a bound on
+the fall speed, √(feed² + 2g′H), so the GPU never reads the field back to choose them.
+`src/gpu/tank.ts` and `src/gpu/wgsl/tank.ts` are the same substep, pass for pass, in compute passes;
+`src/gpu/tankPlate.ts` steps it with the plate (beside the soap film, `stepBeside`, the
+settings through `gpu/besidePlate.ts`) and `src/gpu/tankDraw.ts` draws it in the plate's place,
+the dye's fluorescence 1 − exp(−3c) on black, so the camera, the post-effects and the projector
+take it as they take the plate.
+
+Measured. `npm run tank` 18/18: a stable tank's largest flow 3.3e-9 m/s in 10 s; heavy over
+light falls 28% of the height in 10 s and not at all without gravity; the lock exchange's
+fronts at 0.424 (floor) and 0.457 (surface) of √(g′H), Benjamin's 0.5 and experiments' 0.44 to
+0.48 (0.427, 0.420, 0.417 on 96, 128 and 200 cells wide: the model's, not the grid's); the jet
+carries 99.9% and 100.1% of the nozzle's flux through 80% and 55% of the height, thins from
+1.75 to 1.38 mm of dye as it speeds from 3.2 to 4.1 cm/s (free fall 7.8); with g′ = 0 it never
+reaches 55%; the dye kept to 1e-9 of what was fed less what drained. `npm run tankgpu` 15/15 on
+SwiftShader (24/24 after the multigrid): the faces 5.7e-7 and the dye 7.9e-8 of the reference
+after two steps, the jet's dye identical to 0.001% after a second, the same fronts (0.424,
+0.457) and jet (99.9% and 100.1% of Q, 1.75 → 1.38 mm as 3.2 → 4.1 cm/s) at the app's two
+V-cycles a substep, the closed tank's dye kept to 2.9e-7, the jet's leftover divergence
+4.5e-9 m/s·cell; the app's own tank at the heaviest settings (Weight 3%, Feed 6 cm/s, set
+through `TankPlate.step`) holding exactly what the bore fed for two seconds, and at three, the
+jet on the floor, finite, the dye within 0 to 0.9985, its divergence 2.1e-8 m/s·cell.
+
+Found building it: the pressure solve. The first GPU solve was red-black SOR, 40 sweeps a
+substep, which held every check on the checks' grids (up to 128 × 72) and blew the app's own
+256 × 144 tank to NaN in a quarter of a second at Weight 1% and Feed 3 cm/s (150 sweeps held;
+Chebyshev-accelerated SOR at 40 blew up sooner). The nozzle feeds at the surface and the drain
+takes the water out across the floor, so the pressure between them spans the whole tank, and
+a sweep carries news one cell: 40 cannot reach a floor 144 cells down, the flow stays
+divergent and the dye's flux runs past its bound. The fix is a V-cycle (two red-black
+Gauss–Seidel sweeps a level, the residual summed over 2 × 2 blocks, the coarsest 16 × 9 by SOR
+at its optimal ω, bilinear back up), the CPU reference first and the GPU pass for pass after;
+`tankgpu` gained the heaviest-settings line on the app's grid so the next solver change is
+judged where this one failed.
+
+Shortcuts, each an open item: the momentum's smear (47n-2), the finger's mapping (47n-3), no
+built-in look yet (47n-4), a sheet and not a rod, and one dye (47n-5), the dish's solver still
+running under the tank (47n-6).
+
+
+## 47z-1 (with 28i-7b and 28k-5). A drop takes the water out of the light's path (2026-11-13)
+
+The owner asked for the drops' physics and their vivid colour (2026-11-12, against Liquid Light
+Lab's `lll-oscilloscope-vectors`: colourfulness 137, coloured 0.99 of the frame; Splodascope's
+take 43 and 0.39). Splodascope with the photograph's cobalt water had turned every drop green and
+ringed each with black, so it had been given a pale water (28i-7b), and a crowd's yellow drops
+went orange and brown from their edges inward over ten seconds (28k-5).
+
+Measured in the lab first (192², the look's own settings, four seconds): the solver had already
+kept the colours apart inside the drops (the water's dye in cells over 0.95 oil 16.5 against the
+oil's 8496), so the drops were not green from water in them. The black was the edge, two ways:
+
+- **The plate multiplied the two liquids in a part-oil cell.** 3438 cells between a tenth and
+  nine tenths oil against 7374 deep in drops, and there the composite summed both liquids'
+  absorbance, as if the light went through one and then the other. In the gap a drop spans
+  glass to glass, so a column of light goes through one liquid or the other; the part-oil cell
+  is Cahn–Hilliard's few-cell smear of a sharp edge. `packDyeBodies` (`src/gpu/wgsl/pack.ts`)
+  averages the light over the cell, c·exp(−k·o/c) + (1 − c)·exp(−k·w/(1 − c)), and writes back
+  the absorbance that lets it through, so every decode of the plate reads it unchanged; the
+  total in alpha is kept. The solver's fields hand the plate the oil's share and the mix
+  (`fields.oilDye`, `fields.mix`) where Oil Bodies keeps one.
+- **The lay labelled the rim's colours the wrong way.** A look lays its drops' colours as dye
+  on the CPU's 192² grid and the oil as a sharp disc on the solver's; the dye was then shared by
+  the oil under each cell (`bodyLand`), so on each rim the water's cobalt became the oil's and
+  the drop's colour the water's. The cobalt then spread into the drop as the oil's own colour
+  (28k-5's browning) and the drop's colour lay round it in the water, multiplying toward black.
+  A lay now says which colour is the oil's (`FluidSimulation.addOilDensity`, `applyDeltas`'
+  `oilAdd`, the `bodyLay` kernel); Splodascope and Clock Glass lay that way.
+
+`npm run dropcolour` (a red drop in cobalt water, the look's settings with its two refraction
+stand-ins off, 47z-4's): the darkest pixel across the edge 0.0002 → 0.061 of relative luminance,
+the water's own 0.063; the edge 0.050 off the line between the two colours; the drop's middle
+ΔE 0.00 from the same drop in clear water, before and after. Splodascope in the lab (192², four
+seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89; cobalt before
+140.2 / 0.82; cobalt now 168.3 / 0.97. With the boundary line off too, 186.8 / 0.98 (47z-4's).
+On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
+131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).
+
+## 15e-1 (met again as 14ab-16) and 46r. A poured liquid acts on every step, and the lasting current's args have a name of their own (shipped 2026-11-13)
+
+Two faults of the solver's plumbing, each with a check written red first.
+
+**46r.** A dispatch's eight numbers live in a uniform buffer kept under a name (`arg`), and a
+buffer holds what was written to it last before the submit. Three calls in one step shared
+'current grid' with different numbers: the lasting current's forces and projection (z = the
+boil is running), the swirl's projection (z = 0) and the open plate's `addCurrent` (z = Depth
+Drag, w = the swirl's scale). On the open plate (Thin Gap off) `addCurrent` wrote last, so
+`currentForces` read Depth Drag as the boil: at Depth Drag above 0 the lamp's lift left the
+clamped linear rise for the boil's uncapped density rise with no boil running, and at Heat
+above 0 with Depth Drag 0 the boil's plate got the clamped one. A thin gap's `addCurrent`
+already had its own name, so no shipped look showed it (all open thin) and `plateboil` (thin,
+or Depth Drag 0) did not see it. Each call has its own name now ('current step', 'swirl
+grid', 'add current'). `npm run argnames` watches the solver's `argWrite` from the lab's page
+on eleven plates (a planted pair is its control) and asks the current after one step to be
+the same at Depth Drag 0 and 1.5, bit for bit. Before: 'current grid' given two values on
+five of the eleven; the current at Depth Drag 1.5 different in 1121 values, by up to 0.33
+against its own 0.0094 (64², upright, a 30 K spot, the lab's Buoyancy 0.45); a 70 K spot's
+current at Heat 1 at its cap (1.9e-3), the boil's rise unread. After: no clash, none
+different, and the boil's rise read (1.07 against a cap of 0.002 at the lab's numbers).
+
+What it changes in the app, measured on a 128² open plate at the app's own numbers
+(Buoyancy 0.45 × 0.3, its cap of three quarters of a cell a step, upright): at Heat 0 almost
+nothing, since the unheated plate's warmth is hundredths of a degree and there the two rises
+agree (the current's fastest after 30 steps at Depth Drag 1.5 was 4.51e-2 against 4.28e-2 at
+Depth Drag 0, and is 4.28e-2 now). At Heat 1 with Depth Drag 0, a plate 60 K over the room
+under a held hand: the current's mean after 30 steps 0.268 → 0.463 and after 120 steps
+0.139 → 0.178, its fastest on the first step 0.135 → 0.329, and by 240 steps the two are
+within a tenth. So a boiling open plate's plume starts about 1.7 times as fast as it did.
+Pictures in the project's files (`open-plate-46r/before-after.png`). No shipped look runs the
+open plate. Seen in both pictures and left as 36e-5: bands in the dye at the floor.
+
+**15e-1.** What a bottle's liquid does to the plate (`liquidForces`, and the soap's thinning
+inside `deltaDye`) ran in the fold of a frame's hand-laid deltas, so only on a step something
+else wrote deltas for. The app folded every step by accident: the CPU's copy of the liquids
+marked the deltas written while it held any, and held its first pour forever (15e-11). After a
+Clear that copy stays empty, so a liquid poured then was carried and drawn and did nothing
+until a hand, a kick or a bubble wrote a delta; and a step folded twice (a frame that read
+the plate back) pushed twice. The step runs both itself now, in a pass of their own first in
+the step, in the fold's order (`stepLiquids`; the thinning is its own kernel, `soapThin`, the
+same arithmetic), only on a plate a bottle was poured on (`liquidsLive`), so a show that did
+fold every step sees the same numbers. `npm run liquidpush` (a heavy drop and a soap's on a
+rocked plate, open and thin, each against the plate without them): before, with no fold and
+after a Clear the slide and the thinning were 0 where one fold a step gave 3.4e-2 and 8.3%,
+and two folds gave 1.86× and 1.92×; after, all four ways give the same to three places.
+`npm run liquidsgpu`'s five "a still plate" lines owed to 15e-1 pass and gate (soap leaves
+89.3% at its spot at half a second and 71.7% at two, what the fold-every-step plate leaves;
+silicone 61.7% in its middle), three more lose 15e-1 from what they are owed to, and a new
+line asks milk's held edge on a still plate to be the fold-every-step plate's (effect 0.00106
+both ways): 27 gate, 11 owed.
+
+Found on the way: on a thin gap the push is read as momentum and the drag has it within the
+step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).

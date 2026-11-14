@@ -32,14 +32,14 @@ web views differ in what matters here:
 
 | | iPhone | Android |
 |---|---|---|
-| Shell | Capacitor: the built site **bundled** in the app, drawn by WKWebView | A Trusted Web Activity (Bubblewrap): the **live** site in full-screen Chrome |
-| WebGPU | iOS 26 (iPhone 11 and newer), Safari and WKWebView alike | Chrome on Android 12+, Qualcomm and ARM GPUs; the app's "needs WebGPU" screen covers the rest |
-| Web MIDI | None in WebKit; a CoreMIDI plugin later | Chrome has it, so USB controllers work from day one |
-| Record and Render | A web download does not save in a web view: route to the share sheet or Photos | Chrome downloads as it does now |
-| Updates | A new App Store build each time (guideline 2.5.2: no downloading code that changes the app) | Every deploy to `main` reaches the app at once; the store only sees a new build when the shell changes |
-| Offline | Everything is inside the app | The service worker (`public/sw.js`) caches a file only once it has been fetched; precaching the build is 14h |
+| Shell | Capacitor: the built site **bundled** in the app, drawn by WKWebView | Capacitor too (12-ctl-3, in place of the Trusted Web Activity first planned): the same bundled build, drawn by Android's WebView |
+| WebGPU | iOS 26 (iPhone 11 and newer), Safari and WKWebView alike | Android's WebView, on fewer phones than Chrome (Android 12+, Qualcomm and ARM GPUs); where it has none the app says so and offers Chrome or the Laptop remote (`NeedsWebGpu.tsx`) |
+| Web MIDI | None in WebKit; a CoreMIDI plugin later | None in the WebView either; Chrome has it, which the website on the phone keeps |
+| Record and Render | A web download does not save in a web view: route to the share sheet or Photos | The same in the WebView: route to the share sheet |
+| Updates | A new App Store build each time (guideline 2.5.2: no downloading code that changes the app) | A new Play build each release (12-ctl-ship), as on the iPhone |
+| Offline | Everything is inside the app | Everything is inside the app, with no service worker (as on the iPhone) |
 | Account | Apple Developer Program, $99 a year | Google Play Console, $25 once |
-| Tools | Xcode on the Mac | Bubblewrap (JDK and Android SDK), on the Mac or in CI; Android Studio optional |
+| Tools | Xcode on the Mac | JDK 21 and the Android SDK: `android.yml` builds a debug APK in CI; `npm run android` opens Android Studio |
 
 A Trusted Web Activity is Chrome itself, not a web view, so Android gets WebGPU, Web
 MIDI, WebCodecs, wake lock and downloads exactly as the website has them today. A
@@ -47,6 +47,9 @@ Capacitor Android app would run in Android's WebView instead, which has no Web M
 and whose WebGPU would need its own test; the TWA is less work and does more. iOS
 has no equivalent (every iPhone browser is WebKit, and Apple does not take a shell
 that just points at a website), so there the build ships inside the app.
+*Overtaken 2026-11-09 (12-ctl-3, built 2026-11-11): a TWA is the https site, which cannot
+open a plain ws:// socket to the Mac, so it could never be the controller; Android is
+Capacitor too, and a phone whose WebView lacks WebGPU is sent to Chrome.*
 
 `detectTier()` in `src/lib/platform.ts` already has a `native` tier keyed on
 `window.__CHROMAGLASS_NATIVE__`; the iPhone shell sets it. The Android app is the
@@ -97,7 +100,9 @@ forms and a 15 % cut.
    `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
    The upload key stays with the owner, never in the repo. Then the closed test
-   starts, 12 testers for 14 days, while the iPhone work carries on. *Not started.*
+   starts, 12 testers for 14 days, while the iPhone work carries on. *Built instead as
+   12-ctl-3 (2026-11-11): `android/`, a Capacitor project, its debug APK from `android.yml`;
+   signing and the Play upload are 12-ctl-ship.*
 4. **The iPhone shell** (one PR): Capacitor's `ios/` project with `webDir: dist`,
    no service worker in the app, permission strings, status bar hidden, minimum
    iOS 26, and an `xcodebuild` step on the macOS runner. ***Built*** (the "iPhone
@@ -167,12 +172,11 @@ feature ships its phone version is what keeps them whole.
 - **12-link** *(later, US only)*: a "Get the Mac app" link from the iPhone app to our
   own checkout, once the court has set what Apple may charge on linked-out sales.
   Outside the US the app names no price and links to no purchase.
-- **12-play-org** *(owner)*: the Play Console account as the LLC (organization,
+- **12-play-org** *(owner; cleared Google's review 2026-11-12)*: the Play Console account as the LLC (organization,
   D-U-N-S number), not a personal one, so publishing does not wait on the 14-day
-  closed test. Before it, step 1's Android smoke test. Unchecked: the iPhone app's
-  laptop remote leans on the app's own origin (4a), and a TWA is the https site,
-  which cannot open a plain ws:// socket to a laptop, so the Android app may have
-  no laptop remote without more work.
+  closed test. Before it, step 1's Android smoke test. *Answered by 12-ctl-3
+  (2026-11-11): the Android app is Capacitor, not a TWA, with cleartext and mixed
+  content allowed, so it has the laptop remote as the iPhone's does.*
 - **12-mas** *(not doing, for now)*: a Mac App Store build. It would need a
   sandboxed Electron build in place of the Developer ID one, give up
   `desktop/updates.js` for Apple's review of every release, and put at risk the
@@ -194,37 +198,32 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- **12-ctl-1** (M, Antigravity): **the songs on the phone.** The Perform desk's set list (its cue
-  list, `lib/setList.ts`) and the song shows (`lib/songShows.ts`) reach the remote in
-  `RemoteState.setList` and `RemoteState.songs`, on a Songs screen one tap from Draw and from
-  Controls: an item tapped is armed for the next Go, a song show run or stopped, Follow songs
-  turned over. The laptop's half sends them from what it has saved and acts on `cue-set-item`,
-  `song-run`, `song-stop`, `song-follow` with the functions the desk's rows call. *Measure:*
-  `controller` lines `setlist`, `songs`, `display`.
+- **12-ctl-1: the songs on the phone (shipped; story in `docs/plan-shipped.md` §12-ctl-1).**
+  A Songs screen one tap from Draw and from Controls: the laptop's set list (tap to arm an item
+  for the next Go) and its song shows (Run, Stop, Follow songs), sent as `RemoteState.setList`
+  and `RemoteState.songs`; `npm run controller` lines `setlist`, `songs`, `display`.
 - **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
   which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
   Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is
   refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
   camera (it opens the show server's own remote in the browser) and the app. *Measure:*
   `controller` line `scan`.
-- **12-ctl-3** (M, Antigravity): **the Android app, as Capacitor, not a TWA.** Step 3 planned a
-  Trusted Web Activity: the hosted https site in Chrome, which cannot open a plain `ws://` socket
-  to the Mac on the LAN (mixed content; 12-play-org's open question), so it could never be the
-  controller. The Android app is therefore the iPhone's shell on Android: `npx cap add android`
-  beside `ios/`, the same bundled build and app id `app.chromaglass`, the microphone and camera,
-  cleartext and mixed content allowed for the LAN, and a CI workflow that builds an unsigned debug
-  APK (no secrets). What it gives up is the TWA's every-deploy-reaches-the-app; a release builds a
-  new bundle (12-ctl-ship). Android's WebView has WebGPU on fewer phones than Chrome does, so when
-  the plate cannot start in the app it says so, offers the Laptop remote, and opens the show in
-  Chrome. Step 1's Android smoke test still stands for Chrome. *Measure:* `controller` lines
-  `android`, `nogpu`, and the workflow green.
+- ~~**12-ctl-3**~~ *(shipped 2026-11-11)*: the Android app, a Capacitor project beside `ios/`; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
-  when 12-tv-2's advert is on main.
+  when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,
+  TXT `id` and `path`; `browse()` there is a querier a check can reuse).
 - **12-ctl-ship** (Claude): the Android bundle signed through Play App Signing (the upload key
   stays with the owner, the CI secret is Claude's to wire), an upload job to the Play closed test
   from main, and the iPhone's half is 12-ship. Sign-in, in-app account deletion (5.1.1(v)), the
   licence Worker and anything that touches a key are Claude's, never in an Antigravity brief.
+- **12-ctl-weight** (S, found 2026-11-11 building 12-ctl-3): the phone apps bundle all of
+  `dist/`, so the Android debug APK is 148 MB (`android.yml`'s artifact, 147774968 bytes), and
+  the iPhone app carries the same. Most of it is media the website streams: `dist/video` 81 MB
+  (the cartoons 78 MB), `dist/music` 38 MB, `dist/press` 27 MB. Play's limit for a bundle's base
+  is 200 MB, and a phone used as a remote needs none of it. Leave those folders out of the
+  apps' copy (or serve them from the site when the app plays one) before 12-ctl-ship, and add a
+  size line to `controller` so the bundle cannot grow back unseen.
 
 **12-tv: the plate on a living-room TV (asked 2026-11-08; the owner chose route 2, the receiver app, the same day).** The
 owner asked whether a Google TV / Android TV app should play the plate on a big
@@ -279,7 +278,188 @@ low-latency HLS that `AVPlayer` plays natively (a second or two of lag, fine for
 evening) or the app carries a community WebRTC build. Store rules: a free app that
 only opens what an account bought on the web, with no buy button or price, should
 fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs the
-App Store Connect record from 12-ship. Size: M, after route 2's first PR.
+App Store Connect record from 12-ship. Size: M, after route 2's first PR, and
+after 12-tv-hls (below).
+
+**12-tv-1: the stream and the `/tv` page (shipped, PR 1 of route 2; story in
+`docs/plan-shipped.md` §12-tv-1).** The show's page sends the wall's canvas to a
+TV on the network as WebRTC video, signalled through the show server's relay
+(`src/lib/tvFeed.ts`, `server/remote-server.js`'s `tv` role); `/tv?key=…` plays it
+with no GPU (`src/components/TvDisplay.tsx`), films while the show is off; Home or
+Pro on the laptop, three TVs at most; `npm run tv`.
+
+What route 2 still needs, found while building 12-tv-1:
+
+- **12-tv-2: the Android TV app, the Bonjour advert and pairing by four digits
+  (shipped 2026-11-12, merged with 12-tv-2b after #768 sat green unmerged; story in
+  `docs/plan-shipped.md` §12-tv-2).** `androidtv/`
+  (plain Java, a WebView on `/tv` plus NsdManager; the `Android TV app` workflow
+  builds, unit-tests and lints it and keeps the debug APK); `server/bonjour.js`
+  (`_chromaglass._tcp` from the show server itself, so `npm run remote` and the
+  Mac app both advertise); `server/tv-pairing.js` (four digits, Allow and No on
+  the laptop, a key per TV, Forget); `npm run tvpair`.
+- **12-tv-2b: the Play listing (S; the repository's half built 2026-11-12, the
+  owner's half in Play Console open).** The Play org account cleared Google's
+  review on 2026-11-12. Built: the signed release bundle (`bundleRelease`, signed
+  by the owner's upload key through the `ANDROID_UPLOAD_KEYSTORE` and
+  `ANDROID_UPLOAD_PASSWORD` secrets, version code the run number; Actions →
+  Android TV app → Run workflow with *release* ticked, main only, artifact
+  `chromaglass-tv-release`); `scripts/android-upload-key.sh`, which makes the
+  upload key on the owner's Mac with its own openssl (PKCS#12, password in the
+  Keychain) and sets both secrets, and which 12-ctl-ship can share; the TV listing
+  in `docs/store-listings.md` (no price, no tier, "needs the ChromaGlass app on a
+  Mac" said plainly; data safety: nothing collected; the reviewer's App access
+  text); the 1280 x 720 TV banner and the 320 x 180 launcher banner drawn by
+  `npm run brand` (`tvBanner`, replacing the cut from the social card); six TV
+  screenshots at 1920 x 1080 from the press stills. Found and fixed: with no Mac on
+  the network the app showed only "Looking for the show…", which is all Play's TV
+  review (a real TV, no Mac) would have seen, and a reason Play turns TV apps away;
+  the first screen now has **Watch a sample film**, the press clips played in a
+  `VideoView` with their CC BY music credit on screen, while it keeps looking (a
+  Mac that turns up takes over). *Measure:* `presskit` (the TV listing's limits and
+  no selling words, the banners' sizes with no alpha, the screenshots' sizes, the
+  sample clips served by the site); the workflow's `bundleRelease` on every PR and
+  its unit tests (every clip carries its credit). Owed by the owner: the upload key
+  (one command), then the Play Console steps (create the app, the forms, the TV
+  form factor, the first upload by hand).
+- **12-tv-remote: the TV's remote picks the look (shipped 2026-11-12; story in
+  `docs/plan-shipped.md` §12-tv-remote).** Asked 2026-11-12, the TV staying a
+  receiver: right and left play the next and previous preset on the Mac, OK a
+  random one, up, down or Menu the list. The relay lets a TV pick only a preset
+  the laptop listed, one every 0.4 s (`server/tv-remote.js`); the page reads the
+  D-pad (`src/components/TvRemote.tsx`), the app passes on Menu and Back; the
+  phone version is a tap bar. `npm run tvremote`; on a real TV `docs/judging.md` §126.
+- **12-tv-remote-2: more than presets from the remote (S, if asked).** The remote
+  picks presets only. The owner's own looks and the set list's songs are the next
+  things a sofa might want (the set list's Go is `cue-set-item` on the phone), and
+  a long-press of OK could arm Go rather than cut to clean glass at once.
+- **12-tv-2e: uploads to Play from CI (S, after the first upload).** Play's first
+  bundle for an app must go up by hand in Play Console; after that the release job
+  could send each bundle to the internal track itself with the Play Developer API
+  (a Google Cloud service account the owner adds in Play Console → Users and
+  permissions, its JSON as a secret). Shared with 12-ctl-ship's upload job.
+- **12-tv-2c: judged on a real TV (S, the owner's eyes).** Side-load the
+  workflow's APK on a Google TV, pair it with the Mac app, watch an evening.
+  Unseen so far: NsdManager against the advert on a real network, the advert
+  beside the Mac's own mDNSResponder (both on udp 5353; it works on Linux in
+  the check, and Node Bonjour libraries share the port the same way on macOS),
+  and the WebView's WebRTC decode on a TV box. `docs/judging.md` §125; the
+  sample film (12-tv-2b) on the TV too: Back returns to the list, and a Mac
+  starting its show replaces it.
+- **12-tv-2d: the newer NSD calls (S).** `resolveService` is deprecated from
+  Android 14 for `registerServiceInfoCallback`, which also follows a Mac whose
+  address changes while the TV watches; the app uses the old call on every
+  version today, which still works. And an IPv6 link-local address with a zone
+  (`fe80::1%wlan0`) would need its `%` escaped in the URL; NSD hands back IPv4
+  first on every box seen in documentation, so it is left until one does not.
+- **12-tv-signin: films with the Mac off, and the TV-code sign-in (M).** Today
+  `/tv` plays films only while the Mac's show server answers. With the Mac off,
+  the shell opens the site's `/tv`, which shows a code and a QR; the phone signs
+  in (a device-code flow: the licence Worker issues the code, the phone's signed-in
+  page claims it, the TV polls and gets a short-lived token naming the tier) and
+  the TV plays the long rendered films (§6) for Home and Pro. Licence Worker and
+  auth: gets one Claude review before merge.
+- **12-tv-hls: low-latency HLS beside WebRTC, for Apple TV (M, before
+  12-tv-apple).** `AVPlayer` plays HLS natively and tvOS has no official
+  libwebrtc. The Mac app's Live Show encoder (`lib/liveStream.ts`) already makes
+  H.264 packets; the show server would cut them into fMP4 parts and serve an
+  `.m3u8` on the LAN. A second or two of lag, fine at home.
+- **12-tv-flat: the TV gets the plate without the wall's geometry (S).** The TV
+  is sent `#liquid-canvas`, the wall as the projector has it, keystone and corner
+  pin included; at home with no projector that is the plate as it is, but a rig
+  that also feeds a projector sends its warp to the TV too. The Live Show's
+  `stack` frames (37x-4d-1) are the flat picture to send instead.
+- **12-tv-sound: the music on the TV's speakers (S, if asked).** The TV is sent
+  no sound: the music plays where the Mac plays it. Sending the show's audio as a
+  second track would keep it in step with the picture (WebRTC syncs the two),
+  for a Mac whose music should come out of the TV.
+
+Progress (2026-11-08): the transport is settled without HLS. LiveKit's
+`webrtc-xcframework` (MIT, a binary Swift package of Google's libwebrtc, tag
+150.7871.05) ships a tvOS slice, so the app answers the Mac's WebRTC offer exactly
+as the `/tv` page does, at LAN latency, and 12-tv-hls is a fallback, not a
+prerequisite. The sign-in it needs shipped first (12-tv-signin below).
+
+Progress (2026-11-08, later): the app's core is written, in `tvos/` as a Swift
+package that builds without Xcode: the offline pass check, the sign-in client that
+keeps a live code on screen, and the relay's messages. `npm run tvswift` builds it
+and runs it against the Worker's own `/tv/` handler (link, a code running out, the
+pass verified, renewed to the next generation, a spent pass unlinking). Left: the
+app target in `tvos/App` (the code screen with its QR, the video view answering the
+Mac's offer through LiveKitWebRTC, the pass in the keychain), which waits on Xcode
+with the tvOS SDK on the owner's Mac.
+
+Progress (2026-11-08, evening): the receiver and the app are written. The /tv page's
+connection rules are one Swift value, `ReceiverMachine`, driven over URLSession's
+WebSocket by `ReceiverDriver`; `npm run tvswift` now also runs it against a stand-in
+relay (live, a wrong key, a lockout, a show going off, a stuck picture). The peer
+connection over LiveKit's WebRTC is `tvos/Video` (`LiveKitPeer`), and `npm run tvvideo`
+proves it on a Mac with no Xcode: a Chromium page sends a canvas over WebRTC through a
+stand-in relay, and the receiver goes live in 0.4 s and decodes 30 frames a second at
+640x360, dark and light as sent (two mutations, a grey page and a receiver that never
+reports a frame, each turn it red). The app (`tvos/App`, an XcodeGen spec) has the code
+screen with its QR, the address screen, the show view over `LKRTCMTLVideoView`, and the
+pass in the keychain; `.github/workflows/tvos.yml` builds it for the tvOS simulator and
+runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
+
+- **12-tv-apple-1, finding the Mac.** Today the TV reads the Mac's "TV at home"
+  address (`RelayAddress`), typed with the remote. Bonjour (`_chromaglass._tcp`)
+  would find it with no typing; the Mac side is route 2's, so it is agreed with the
+  Google TV app before either builds it.
+- **12-tv-apple-2, swift-crypto on Linux.** `npm run tvswift` runs on Measure's
+  `logic` part, so a cold runner compiles swift-crypto's BoringSSL (about a minute)
+  each time it runs. If that shows in the shard's time, cache `tvos/.build` or move
+  the check to a Mac shard, where CryptoKit needs no build.
+- **12-tv-apple-3, films while the show is off.** The /tv page plays films until the
+  show starts (its `films` state); the app shows "Looking for the show…" on black. Play
+  the same films (an `AVPlayer` over the site's film list) under the waiting screen.
+- **12-tv-apple-4, the 50 ms jitter buffer.** The page sets `TV_JITTER_MS = 50` on its
+  receiver (`jitterBufferTarget`); LiveKit's Objective-C API may not expose the
+  receiver's jitter target. Find whether it does (`LKRTCRtpReceiver`), and if not,
+  measure the TV's delay against the page's on one Mac (a flash on both screens filmed
+  together) before deciding it matters.
+- **12-tv-apple-5, a shorter link for the phone.** The code screen shows
+  `chromaglass.art/?tvlink` to type on a phone; a path such as `chromaglass.art/tv-link`
+  (a Firebase rewrite to the same page) reads better aloud and from across a room.
+- **12-tv-apple-6, the app on a TV, judged.** First run done 2026-11-13: Xcode built it
+  and it ran in the Apple TV 4K simulator, showed its code, received its pass when a
+  Home account claimed the code, and played the live plate over WebRTC. That run used a
+  local copy of the licence Worker with a demo signing key and a local show server with
+  a throwaway key, the address handed in at launch. LiveKit's tvOS simulator slice is
+  arm64 only, so `project.yml` excludes x86_64 for the simulator SDK. Left: run it
+  against the Mac app's own show and the live Worker, then on an Apple TV (judging),
+  and sign it with the owner's team for TestFlight once the App Store Connect record
+  exists (12-ship).
+
+**~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
+`/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
+§12-tv-signin.** Open from it:
+
+- **12-tv-signin-1, the TVs read it.** The Apple TV app (12-tv-apple) and the
+  Google TV shell (route 2) call `/tv/code` and `/tv/poll`, show the code and a QR
+  of `https://chromaglass.art/?tvlink=<code>`, keep the `cgtv1.` pass in the
+  keychain (Android: EncryptedSharedPreferences), verify it offline against the
+  built-in public key, and renew it through `/tv/renew` within a week of `exp`.
+- **12-tv-signin-2, a list of linked TVs.** The Worker keeps each link now
+  (`tvpass:<id>`, and `tvpasses:<email>` lists an account's ten), so dropping one
+  is deleting its record; what is missing is the account page that lists them
+  (when linked, a name the TV sends) with a button to unlink, if owners ask.
+- **12-tv-signin-3, the live Worker carries `/tv/`.** The licence Worker is deployed by
+  hand from the owner's Mac with the owner's go, so the merged `/tv/` routes answer only
+  once it is redeployed; until then a TV cannot get a code.
+- **12-tv-signin-3, KV's lag between locations.** Workers KV is eventually
+  consistent across Cloudflare's locations, for up to about a minute. A phone and
+  a TV served by different locations can see each other's writes late: the phone
+  may be told "no such code" for a code the TV drew a moment ago, and the TV may
+  poll "pending" for up to a minute after the phone linked it. Both recover on
+  their own (the phone's player tries again, the TV keeps polling), so it is a
+  delay, not a failure; if owners meet it, move the code and pass records to a
+  Durable Object, which is consistent.
+- **12-tv-signin-4, a renewal lost on the way.** Each renewal moves the link's
+  generation on, and a pass from an older generation kills the link (that is how
+  a copied pass dies). So a renewal whose answer never reaches the TV (the Wi-Fi
+  drops mid-reply) costs a re-link with a fresh code. Rare, and safe; if it is
+  met, keep the previous generation valid for a few minutes after a renewal.
 
 **Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
 TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`

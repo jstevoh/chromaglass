@@ -27,6 +27,8 @@
  *   stack's own rule (`moveInMix`);
  * - a blend picked on the phone is the display's blend for that row;
  * - the level, stepped from the phone's slider, is the display's level;
+ * - words typed in the remote's text box and poured (PLAN 37x-10c) reach
+ *   the display as one pour-text message, laid out as a title card;
  * - the take button (PLAN.md §11 step 4) walks the display's level down
  *   over the fade time set on the display with no jump, lights on the phone
  *   while it runs and then says "Fade in", and a second press brings it
@@ -217,6 +219,40 @@ try {
   }
   check('the back plate\'s button takes the back plate out, and leaves the front plate where it is',
     backWas > 0 && backNow === 0 && frontHeld, `back ${backWas} → ${backNow}${frontHeld ? '' : ', the front plate moved'}`);
+
+  // ── A song's title from the phone (PLAN 37x-10c, 37x-10m) ──────
+  // The remote's text box, typed into on the phone and pressed, reaches the
+  // display as one song-title message, the corner caption's, with the song
+  // and the artist as typed. It sent a pour-text of ink rows until the owner
+  // shelved the poured ink (2026-11-12); a pour-text from this box now would
+  // be the shelved path come back, so one heard here fails the line. Witnessed
+  // by a second display socket on the relay, holding the display's key as the
+  // laptop's page does: the display page itself draws the caption over a
+  // plate this harness does not read (that is `npm run caption`'s), and
+  // lib/pourText's `typedCaption` is checked in node by `npm run assistant`.
+  {
+    const info = await (await fetch(`${BASE}/remote-info.json`)).json();
+    const witness = new WebSocket(`ws://localhost:${PORT}/remote-ws`);
+    const heard = [];
+    await new Promise((resolve, reject) => {
+      witness.onopen = () => { witness.send(JSON.stringify({ type: 'hello', role: 'display', key: info.displayKey })); resolve(); };
+      witness.onerror = reject;
+    });
+    witness.onmessage = (e) => { try { const m = JSON.parse(String(e.data)); if (m.type === 'song-title' || m.type === 'pour-text') heard.push(m); } catch { /* not ours */ } };
+    await remote.waitForTimeout(300);
+    const box = remote.getByTestId('remote-pour-text-input');
+    await box.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await box.fill('Sunshine of Your Love - Cream');
+    const label = await remote.getByTestId('remote-pour-text-go').innerText();
+    await press(remote.getByTestId('remote-pour-text-go'));
+    for (let i = 0; i < 20 && heard.length === 0; i++) await remote.waitForTimeout(100);
+    await remote.waitForTimeout(300);   // a second pour from one press would land in this
+    const got = heard.map(m => (m.type === 'song-title' ? `song-title "${m.title}" by "${m.artist}"` : m.type)).join(', ');
+    check('a title typed in the phone\'s box and pressed reaches the display as one song-title, the song and the artist as typed, and no pour',
+      heard.length === 1 && heard[0].type === 'song-title' && heard[0].title === 'Sunshine of Your Love' && heard[0].artist === 'Cream', `${heard.length} heard: ${got} (button "${label}")`);
+    check('and the box is empty after, so the same title is never one tap from showing twice', (await box.inputValue()) === '' && await remote.getByTestId('remote-pour-text-go').isDisabled(), `"${await box.inputValue()}"`);
+    witness.close();
+  }
 
   // ── S14n: One malformed message cannot end the plate (PLAN.md §14n) ──
   const settingsBefore = await shown();

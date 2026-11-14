@@ -123,8 +123,13 @@ export interface SettingsPanelProps {
   midi?: MidiController;
   /** The full MIDI panel, for the things this panel's section does not hold. */
   onOpenMidi?: () => void;
-  /** Open the Sound sheet, where the source is chosen. */
-  onOpenSound?: () => void;
+  /**
+   * Where the sound comes from, drawn at the top of Sound (PLAN 35c-7): the
+   * sources, the shelf, the player and the drone, handed the section's input
+   * picker to draw under the Mic. App() builds it, since the player's state is
+   * its own.
+   */
+  soundSources?: (inputPicker: React.ReactNode) => React.ReactNode;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: TempoLabel;
   onTap?: () => void;
@@ -170,7 +175,7 @@ export interface SettingsPanelProps {
   cartoons?: CartoonShelfProps;
 }
 
-export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'onOpenSound' | 'onFlickPlate' | 'cartoons'>
+export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'soundSources' | 'onFlickPlate' | 'cartoons'>
   & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'pourName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
   & {
     filmInputRef: React.RefObject<HTMLInputElement | null>;

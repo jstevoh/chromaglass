@@ -9,8 +9,106 @@
 
 import { BILERP_N, HEAD, NOISE_WGSL, W } from './shared';
 import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../lib/turntable';
+import { BOIL_PROPERTIES_WGSL } from '../lampBoil';
 
 export const FORCE_KERNELS: Record<string, string> = {
+  /*
+    A poured soap thins the dye it lies on, once a step (stepLiquids,
+    PLAN 15e-1). This is the multiply `deltaDye` carried, with the same
+    numbers, moved out of the fold of the hand's deltas so that it runs on
+    every step the soap is there and once on each. It erases where a soap
+    should push the dye out of its way; that is PLAN 15e-5's to replace.
+  */
+  soapThin: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let soap = textureLoad(liquids0, p, 0).r;
+  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
+  textureStore(dst, p, capDye(textureLoad(dye, p, 0) * soapMul));
+}`,
+
+  liquidForces: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var liquids1: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let l0 = textureLoad(liquids0, p, 0);
+  let l1 = textureLoad(liquids1, p, 0);
+  
+  let soap = l0.r;
+  let body = l0.g;
+  let repel = l0.b;
+  let heavy = l0.a;
+  let polar = l1.r;
+  
+  if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
+    textureStore(dst, p, safeVel(v));
+    return;
+  }
+  
+  var fx = 0.0;
+  var fy = 0.0;
+  let dt = S.dt;
+  let s = S.n;
+  
+  if (soap > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
+    fx -= gx * A.a.x * dt * s;
+    fy -= gy * A.a.x * dt * s;
+  }
+  
+  if (body > 0.0 && A.a.y == 0.0) {
+    let k = min(0.9, body * A.a.z * dt);
+    fx -= v.x * k;
+    fy -= v.y * k;
+  }
+  
+  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
+    fx += S.rock.x * heavy * A.a.w * dt * s;
+    fy += S.rock.y * heavy * A.a.w * dt * s;
+  }
+  
+  if (polar != 0.0) {
+    let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
+    let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
+    let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
+    let dD = textureLoad(liquids1, p - vec2i(0, 1), 0).r - polar;
+    fx -= (dR * dR - dL * dL) * A.b.x * dt * s;
+    fy -= (dU * dU - dD * dD) * A.b.x * dt * s;
+  }
+  
+  if (repel > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).b - textureLoad(liquids0, p - vec2i(1, 0), 0).b) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).b - textureLoad(liquids0, p - vec2i(0, 1), 0).b) * 0.5;
+    let g = sqrt(gx * gx + gy * gy);
+    if (g > 1e-5) {
+      let nx = -gx / g;
+      let ny = -gy / g;
+      let outF = v.x * nx + v.y * ny;
+      if (outF > 0.0) {
+        let k = min(0.9, repel * A.b.y * dt * 60.0);
+        fx -= nx * outF * k;
+        fy -= ny * outF * k;
+      }
+    }
+  }
+  
+  let maxf = A.b.z;
+  fx = clamp(fx, -maxf, maxf);
+  fy = clamp(fy, -maxf, maxf);
+  
+  textureStore(dst, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
+}`,
+
   // Everything the CPU applies after the projection, fused with addCurrent.
   forcesB: `${HEAD}${NOISE_WGSL}${BILERP_N}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -45,29 +143,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
 
   /*
-    Spin's stir, where there is colour. Masked by the colour of the cell and
-    its four neighbours, [1 4 1] each way, not of the cell alone (PLAN 38r-6).
-    A force between two glasses does not stop at a cell's edge: the gap's
-    viscous shear spreads it over about the gap's own width (Brinkman's
-    ν∇²u, whose reach in a Hele-Shaw cell is h/√12), and at 2 mm that is a
-    cell or so of the app's plate. Masked by the cell alone the stir stepped
-    from nothing to whole at every pool's sharp edge, and glycerine, which
-    takes a step's force whole (kΔt 50), left that step's grid-scale
-    pressure in the flow: \`npm run thingap\` read its |∇·(hu)| at 0.0059 of
-    the flux against 0.005, and 0.00056 with Spin off.
+    The music's eddies were here: a second curl of noise laid wherever there
+    was colour, sized by mid and treble read straight off the analyser, with
+    no cord and no control (PLAN 38u-5; the physics audit, 2026-11-13).
+    Sound reaches the plate only through cords, so they are gone, and what
+    they added is in the depth of each look's cord from the sound's mids
+    onto Turbulence above (lib/stir.ts); npm run musicstir holds it.
   */
-  if (S.spin > 0.0) {
-    let n4 = textureLoad(dye, clampP(q + vec2i(1, 0), S.n), 0).a + textureLoad(dye, clampP(q - vec2i(1, 0), S.n), 0).a
-           + textureLoad(dye, clampP(q + vec2i(0, 1), S.n), 0).a + textureLoad(dye, clampP(q - vec2i(0, 1), S.n), 0).a;
-    let dm = (4.0 * d + n4) / 8.0;
-    if (dm > 0.05) {
-      let qn = p * 0.025 + vec2f(0.0, S.time * 0.08);
-      let n = snoise(qn);
-      let dn_dx = (snoise(qn + vec2f(0.01, 0.0)) - n) * 100.0;
-      let dn_dy = (snoise(qn + vec2f(0.0, 0.01)) - n) * 100.0;
-      v = vec4f(v.xy + vec2f(dn_dy, -dn_dx) * (S.spin / 0.03) * (0.4 / 3.0) * min(1.0, dm), v.z, v.w);
-    }
-  }
 
   if (S.tension > 0.0 && d >= 0.01) {
     let col = dyeC.rgb / d;
@@ -192,7 +274,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The lasting current, at half resolution: A.a.x is 1/M for its own grid.
-  currentForces: `${HEAD}${BILERP_N}
+  currentForces: `${HEAD}${BILERP_N}${BOIL_PROPERTIES_WGSL}
 @group(0) @binding(2) var cur: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
@@ -203,15 +285,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let q = vec2i(id.xy);
   let uv = (vec2f(id.xy) + 0.5) / m;
   var c = textureLoad(cur, q, 0).xy;
-  let temp = bilerpN(vel, uv, S.n).z;
-  /*
-    Buoyancy is linear with temperature (Boussinesq, PLAN §18f), with the tanh
-    removed so plumes have a strength proportional to their heat rather than
-    saturating at once. S.up is gated on upright, so a level plate has no in-plane
-    buoyancy.
-  */
+  let rawTemp = bilerpN(vel, uv, S.n).z;
+  let boiling = A.a.z > 0.0;
+  let temp = select(clamp(rawTemp, 0.0, 50.0), 0.0, boiling);
+  var f = S.up * (S.curBuoy * temp);
   let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  var f = S.up * (S.curBuoy * clamp(temp, 0.0, 50.0));
   f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
@@ -219,6 +297,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   c = c * S.curDamp + f * (1.0 - S.curDamp);
   let s = length(c);
   if (s > S.maxCur) { c *= S.maxCur / s; }
+  /*
+    While the boil model runs (A.a.z > 0), buoyancy comes from water's real
+    density deficit Δρ = ρ(T_ambient) − ρ(T) (Kell 1975, PLAN §18f and §36e-2),
+    converted from kg/m³ to the current's per-kelvin Darcy rise units via
+    BOIL_BUOY_PER_KG_M3 = 1 / |dρ/dT(T_ambient)| and added uncapped by maxCur
+    after the non-thermal current is capped. At Heat = 0, today's exact lines
+    above run byte for byte.
+  */
+  if (boiling && S.curBuoy > 0.0 && rawTemp > 0.0) {
+    let dRho = max(0.0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + rawTemp));
+    c += S.up * (S.curBuoy * (dRho * BOIL_BUOY_PER_KG_M3) * (1.0 - S.curDamp));
+  }
   textureStore(dst, q, select(vec4f(0.0), vec4f(c, 0.0, 0.0), finite2(c)));
 }`,
 

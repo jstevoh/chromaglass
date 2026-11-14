@@ -66,7 +66,7 @@ them is played, in order.
 The built-in looks by id: `classic`, `comet`, `galaxy`, `cyberpunk`, `acid-trip`,
 `bass-drop`, `microscopic-chaos`, `aurora-borealis`, `solar-flare`,
 `jellyfish-bloom`, `fractal-dream`, `velvet-underground`, `neon-coral-reef`,
-`stardust-collapse`, `lumia`, `turing-print`, `poster-1969`, `macro-bead`,
+`stardust-collapse`, `turing-print`, `poster-1969`, `macro-bead`,
 `cell-bloom`, `lace-run`, `crowd-plate`, `milk-marble`, `soap-film`,
 `oil-and-water`, `red-cabbage`, `chemical-clock`, `magnet-garden`, `home-movie`,
 `clock-glass`, `splodascope`, `ferro-paint`, `roy`, `lava-lamp`, `saffron-lace`. A look you saved

@@ -101,7 +101,7 @@ declare global {
     /** Stop the song's show. */
     chromaglassSongStop?: () => void;
     /** Pour rows of text onto the plate. */
-    chromaglassPourText?: (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => unknown;
+    chromaglassPourText?: (rows: { text: string; weight?: number }[], opts?: { colour?: string }) => unknown;
     /** Start the bench (`npm run bench`). */
     chromaglassBench?: (opts?: BenchOptions) => void;
     /** The cast session as the show sees it. */
@@ -119,6 +119,8 @@ declare global {
     __cgFadeLog?: unknown[];
     /** The licence key's public key, swapped for a test pair by the licence checks (`lib/licenseKey.ts`). */
     __cgTestLicensePublicKey?: JsonWebKey;
+    /** Where the Android app's Open in Chrome hands the show's address instead of Chrome, so a check can read it (`lib/appLink.ts`, `openInChrome`; `npm run controller`). */
+    __cgOpenExternal?: (url: string) => void;
 
     // ── Elsewhere (the file and its gate on each line) ──
 

@@ -383,6 +383,12 @@ rest is routine and the owner's calls.
     - *The encoder's own keyframes.* OpenH264 (the lab) starts a new group whenever the
       picture changes a lot, on top of the one asked for every two seconds; the check allows
       it. VideoToolbox should not; `npm run live` on the Mac shard says.
+    - *The last mark has no room.* (Open, 37x-4b-1.) The keyframe line builds a mark every
+      two seconds up to the stream's span, so a run whose frames land on exactly 0..30000
+      ms (901 frames, as on #753's lab shard, 2026-11-09) gets a mark at 30000 that is
+      the stream's last frame, with no two frames after it, and goes red with every mark
+      that has room keyed. Count only the marks with a full two-frame window inside the
+      stream (`m + 2 * 1000 / FPS <= lastMs`), and say so above the line.
     - *The app's encoder on GitHub's Mac.* (Open; 37x-4c added the measurement.) On GitHub's macOS runner (a virtual machine with
       no GPU of its own) the packed app encodes 640x360 at 170 ms a frame under every
       WebCodecs hint (`__cgLive.probe()`: no-preference 171, prefer-software 198 ms, hardware
@@ -490,6 +496,72 @@ rest is routine and the owner's calls.
       it is replaced (New key), which suits YouTube, Twitch and Kick. For the two that
       change it each stream, the row could clear the key when a stream ends and say so,
       rather than fail the next show with last week's key.
+  - **37x-4f. The stream always carries an audio track.** *(built 2026-11-09; landing on
+    YouTube to be seen in the rehearsal.)* The Mac app 1.3.1250 streamed to YouTube for
+    minutes at 10 to 11 Mbps with no error and Studio showed "No data", while ffmpeg's test
+    pattern with a tone showed at once on the same key. With the sound source at None the
+    encoder had no track and sent video alone; our listener and ffmpeg's both take that,
+    YouTube's ingest does not start a broadcast from it. Now a stream with no source
+    carries AAC silence on the stream's clock (`src/lib/liveSilence.ts`), and a source
+    switched off on air hands over to silence from its last sample. `npm run live`'s four
+    new lines: both cases carry a track from first frame to last with no hole, and it
+    decodes (silence; the tone, then silence). Wire and media otherwise compared with
+    ffmpeg's on a local server, message by message: the same but for transaction ids,
+    chunk streams and ffmpeg's `_checkbw`.
+    - *37x-4f-1. Seen on YouTube.* The cloud cannot reach YouTube's ingest (its proxy drops
+      RTMPS), and the Mac's guard would not let a session read the key, so the proof is
+      the private rehearsal on the next Mac build: Studio shows the picture.
+    - *37x-4f-2. A source opened on air is heard at once.* *(built 2026-11-09.)* The
+      encoder took its track at Go, so a song started after Go streamed as silence until
+      the next start. Now useAudioAnalyzer hands every change of source to the stream on
+      air (`setLiveAudio` → `LiveEncoder.setAudio`): the old track's reader is let go,
+      silence carries the track until the new source's first chunk, which is placed where
+      it was made on the stream's clock; the source is fitted to the encoder's rate and
+      channels (a 44.1 kHz source into the 48 kHz silent track is resampled, or it plays
+      a semitone and a half sharp), and silence stays under it as a floor 150 ms behind
+      now if it stalls (`src/lib/liveAudioSwitch.ts`). Not an AudioContext bus, as first
+      planned: a context the stream makes can start suspended and make no samples, the
+      hole 37x-4f closed. `npm run live`'s four new lines: silence then the tone at
+      220.0 Hz; a step in the tone lands where the page made it within 30 ms (measured
+      +2 ms); the track runs to the last frame; one switch, resampled. Red without the
+      fix (0/641 loud), without the resampling (239.5 Hz), and with a 100 ms hole at the
+      switch (the step 93 ms early: the encoder stamps by sample count, so a hole is the
+      rest of the sound arriving early, not a gap).
+      - *37x-4f-3. A cubic, not a polyphase filter.* The resampler is Catmull-Rom: fine
+        for a 160 kbit stream, but a proper band-limited resampler (or one shared with
+        Record's) would keep the top octave whole. Only met when the source's rate is not
+        the encoder's (most Macs run 48 kHz throughout).
+  - **37x-4g. Sound and picture judged on one clock dropped a healthy stream** *(shipped
+    2026-11-09; story in docs/plan-shipped.md §37x-4g.)*
+    - *37x-4g-1. The audio encoder's queue has no bound.* Video skips a frame at three
+      waiting; `audio.encode()` is never gated, so a loaded Mac can emit AAC seconds late
+      in write order. Likely source of the rehearsal's skew; the new `audioQueue` and
+      "sound X s late" readouts will say. Bound it (drop or skip the oldest audio, never
+      the clock) once a rehearsal shows the number.
+    - *37x-4g-2. Did 37x-4c-3's 256 KB window share the bug?* Its listener never recovered
+      in `npm run livedrop`; the old readout compared against a delivered timestamp that
+      went stale across a drop, the same five-runs trap this fix found. Re-run it on main.
+  - **37x-4h. The stream looked softer and flatter than the app** *(shipped 2026-11-10;
+    story in docs/plan-shipped.md §37x-4h.)*
+    - *37x-4h-1. YouTube held to Twitch's rate when both are on.* One landscape encode
+      feeds every landscape destination, so it goes at the least any takes: YouTube and
+      Twitch together both get 6 Mb/s. A second landscape encode for the uncapped ones
+      costs a second encoder and readback; measure the Mac's headroom at 1080p60 first.
+    - *37x-4h-2. The rate does not follow the link on air.* It is fitted at Go to the last
+      stream's ceiling; a link that sags mid-show falls behind and the session drops video
+      until the next keyframe. Lower the encoder's rate on air (`VideoEncoder.configure`
+      with a new bitrate) when a destination is a second behind on the server's count,
+      and raise it back when it keeps up.
+    - *37x-4h-4. The 2 Mb/s floor is too low for 1080p60.* Fitted to a short link the
+      encode can drop to 2 Mb/s at 1920x1080 60 fps; on the rate check's moving picture
+      openh264 asked for 2 Mb/s made 4.26 (the check-skeptic's run), past the link it was
+      fitted to. Below about a third of the size's rate, step the encode down to 720p (or
+      30 fps) instead of starving it; measure the plate's own floor first, which is
+      smoother than the check's picture.
+    - *37x-4h-3. Owed on the Mac.* The rate lines on the Mac shard (VideoToolbox's CBR,
+      not openh264's) on the first run; a film of the stream before and after on YouTube;
+      the first 1080p60 stream needs about 17 Mb/s of upload for one destination, so its
+      upload line says whether the link held.
   - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
     bound and transitioned from the panel with 37s's token, so the owner never pastes a
     YouTube key; Content ID's cut reported in the health readout.
@@ -540,44 +612,92 @@ rest is routine and the owner's calls.
   song's chapter is a link in the cuts' captions; the albums are one playlist ("Albums")
   beside 37b's three. The 60-second look videos (37b) continue less often, as the site's
   library.
-- **37x-10. The song's title painted as ink, then swept away.** *(build, M; Antigravity
-  from the brief; its check shipped 2026-11-07, `npm run inktitle`, red on main and owed.)*
-  A stream's viewer needs to know what is playing, and the 1920s legends their credit. The
-  first idea, a lower third drawn over the picture's corner for eight seconds, the owner
-  replaced on 2026-11-07: "let titles get painted on as ink and then swept away". When a
-  song starts and the switch is on, its artist and title (two lines, each clipped at 40
-  characters) are rasterised once into a mask and poured into the dye field as ink, at
-  the solver's own grid (`pourInk`, sampled from the mask as the video pour samples its
-  frame, 14ab-2); then a wash, a real flow added to the step's velocity, drifts and stirs
-  it until the letters break up. Nothing in the plate's shaders knows about titles
-  (physics writes, rendering reads), so the title is on the wall, in the stream and in
-  every recording at once, and the dye it leaves behind stays in the show as colour.
-  - *The dials.* `inkTitle` (the switch, off by default; the Live Show panel and the phone
-    turn it on), `inkTitleColor` ('' is the look's palette, its first colour, or a chosen
-    colour), `inkTitleSize` (small to the plate's width, never off the wall: a long title
-    shrinks to fit), `inkTitleY` (where it lands, up the plate) and `inkTitleSweep` (a
-    slow drift at 0.01 that still reads after 6 s, gone by 12 s at the default, by 2 s at
-    the top). No look sets any of them.
-  - *When.* The identified song (`TrackIdentity` from the song ID, 14z) changes while the
-    switch is on: `inkTitleCue` gives one title a song, keyed by its isrc, else artist
-    and title, and none for a song with no title. The album show's queue (37x-7) knows its
-    track list ahead; feeding the cue from it instead of the ear, so a title lands on the
-    song's first beat rather than when the ear recognises it, is 37x-10b.
-  - *The check.* `npm run inktitle` (scripts/inktitle.mjs): readable means the dye in the
-    title's box follows the letters, the correlation of the dye's density with the mask
-    at its best shift (a title that slid away intact still counts as readable). 0.8 or
-    better half a second after it lands, strokes four times the dye of their gaps, the
-    dye added as poured within 10%; 0.7 or better at 3 s; 0.3 or worse by 12 s; 90% of
-    its dye still on the plate when it is gone (swept, not faded). A throwaway reference
-    build passed every lab line (0.922 at landing, gone by 8 s at the dial's middle,
-    2 s at the top) before the check was committed.
-  - *Phone version.* A "Title" switch in Live Show on the phone (the remote's Live Show
-    chip, `LiveRemoteChip.tsx`, or the phone's own Live Show sheet), same setting.
-  - *Owed after the build.* The owner judges it on the Mac's film on two or three looks
-    (the lab measures a still plate; a busy look's own flow may break a title up before
-    3 s, and how a look's flow treats it is taste): docs/judging.md takes a section then.
+- **37x-10. The song's title painted as ink, then swept away.** *(shipped 2026-11-08;
+  shelved 2026-11-12 by 37x-10m.)*
+  The identified song's title and artist poured into the dye as ink at the solver's own
+  grid (`pourInk`), then a wash (a drift and eddies added to the step's velocity) breaks
+  the letters up; Settings → Logo & Titles and the phone's Title switch; every title pour
+  (song-show title cards, 37x-10c's `pour-text` words) goes through it, which was
+  37x-10d. `npm run inktitle`; story in `docs/plan-shipped.md` §37x-10. Found building it:
+  - **37x-10e. The check's arms on the thin gap too.** *(shipped 2026-11-09 with
+    37x-10g: `npm run inktitle -- --thin`.)*
+  - **37x-10g. Titles readable on a busy look: thick ink on a clear pad, washed off by a
+    rinse.** *(shipped 2026-11-09; superseded 2026-11-10 by 37x-10j; shelved 2026-11-12
+    by 37x-10m.)* The owner judged
+    the thick-ink titles still not readable enough and asked for a corner caption instead.
+    The pad and rinse stay for the logo melt (37x-11, `npm run inktitle -- --thin`); story in
+    `docs/plan-shipped.md` §37x-10g. Its follow-ups 37x-10h (a shear-thinning gum) and
+    37x-10i (one pour call for the rinse) are dropped with it.
+  - **37x-10j. Song titles as a corner caption, like a 1980s music channel.** *(shipped
+    2026-11-10.)* The default for song titles: artist, the song in quotes, album and label,
+    white in the bottom-left corner for seven seconds, on the screen and burned into the
+    live stream; since 37x-10m the only kind of title. `npm run caption`; story in
+    `docs/plan-shipped.md` §37x-10j. Found building it:
+    - **37x-10k. The caption on the projector, the cast and recordings.** *(S.)* The card
+      is drawn on the window's own layer and on the stream's encode; the projector window
+      (CastDisplay's mirror), a cast, Syphon and the Record button take the plate's canvas
+      and do not carry it. Draw it where those copy the frame (`lib/frameTaps.ts`).
+    - **37x-10l. The conductor sends `song_title`.** *(S.)* The rehearsal's conductor
+      script poured `pour_text` at 4 s into each track; it should call `song_title` with the
+      album sheet's artist, title, album and label, and 37x-10b's cue from the album queue
+      should do the same in the app.
+  - **37x-10f. The dead GPU picture pour.** *(S.)* `WebGPUFluid.pourImage` (gpu/fluid/
+    inputs.ts) has no caller (the app's `injectImage` lays a picture through the CPU's
+    arrays), and its fold binds three textures to `deltaDye`, which reads four since
+    the soap's breakdown: it would fail validation if called. Fold it through
+    `foldDye` and pour pictures at the solver's grid, or delete it.
+  - **37x-10m. The poured-ink titles shelved.** *(shipped 2026-11-12.)* The owner: "this
+    poured option never really worked. We should shelve this". Every title is the corner
+    caption; the ink's controls are off the desk, the phone and MIDI, and `titleCaption` is gone; the phone's box,
+    `pour_text` and a song show's sign-off go up as the caption. The ink stays, dormant,
+    for the logo melt. `npm run caption`, `remotemix`, `assistant`; story in
+    `docs/plan-shipped.md` §37x-10m. Found doing it:
+    - **37x-10n. Take the dormant ink settings out.** *(S.)* `inkTitleColor`,
+      `inkTitleSize`, `inkTitleY` and `inkTitleSweep` are still in `VisualizerSettings`,
+      the look fade's rig keys, drift and the desk pins, and listed in `npm run panel`'s
+      deliberately-without-a-control set; only the ink's run reads them, for a title
+      nothing sends (`titleCaption` itself went with 37x-10m). Remove them (with
+      `npm run inktitle`'s setting line) once the owner is sure the ink is not coming
+      back, or bring the ink back through `app/songTitle.ts`'s sink with its controls.
+  - *Owed:* nothing: the Mac film of the ink (judging §114, §117) was cancelled with
+    37x-10m.
   - **37x-10b. The title from the album's queue.** *(S, after 37x-10.)* As above: the
-    show's own track list and its clock, so the title lands on the song's first beat.
+    show's own track list and its clock, so the caption goes up on the song's first beat.
+  - **37x-10c. Words poured from the phone, the show server and the assistant.**
+    *(shipped 2026-11-08; shown as the corner caption since 37x-10m.)* A `pour-text` message (`src/lib/pourText.ts`) that pours any
+    words onto the plate through today's title pour, from the phone remote's "Pour words"
+    box, the relay, and the owner's assistant (`pour_text`), so a set played from files,
+    which the ear names nothing in, still gets its titles; `npm run assistant` and
+    `npm run remotemix`; story in `docs/plan-shipped.md` §37x-10c. Found building it:
+    - **37x-10d. Send `pour-text` into 37x-10's ink.** *(shipped 2026-11-08 with 37x-10;
+      undone by 37x-10m: `pour-text` is the caption now.)* Today the
+      words go through `pourText`, which adds them to the dye in one pour and leaves
+      the look's own flow to carry them off: real dye, really advected, but with no wash,
+      so on a still look the letters stay readable longer than 37x-10's sweep allows.
+      When 37x-10's `pourInk` and wash land, a `pour-text` message goes through them
+      (rows as its two lines, the colour as `inkTitleColor`), and the live conductor's
+      cue at 0 s of each track gets the sweep the owner asked for.
+- **37x-11. The logo melts at the start of a film or a stream.** *(shipped 2026-11-10.)*
+  With Logo & Titles → *Melt the logo at the start* (or the phone's Logo melt) on, the Live
+  Show going live or a Record take starting pours the intro's ChromaGlass wordmark across
+  three fifths of the plate as the title's thick ink (37x-10g), and the rinse and wash melt
+  it into the show's first colour. `npm run logomelt`; story in `docs/plan-shipped.md`
+  §37x-11. Found building it:
+  - **37x-11a. Song films (the offline render) open on it too.** *(S.)* The render
+    (`app/useSongRendering.ts`) steps the show on its own clock from a seed and is not a
+    Record take, so it does not melt the logo; pour it on the render's first step, inside
+    the seed's determinism (`npm run render-app` hashes frames twice).
+  - **37x-11b. A band's own mark melts instead.** *(S.)* Home and Pro can load their own
+    logo (`loadMark`); the melt pours the ChromaGlass wordmark whatever is loaded. Pour the
+    loaded mark when there is one, from its alpha, as `logoMeltMask` already takes any
+    picture.
+  - **37x-11c. The first song waits for the melt.** *(S.)* The logo is melted by about
+    4.5 s on a lively look; a live album set that starts its first track at Go plays over
+    it. The album conductor (37x-3) could start the first track when the logo has gone.
+  - **37x-11d. Two inks for the two words.** *(S.)* The wordmark is "Chroma" in teal and
+    "Glass" in white; a dye is an absorbance, so white is no dye, and the logo pours in
+    one teal. "Glass" could pour as a pale tint of the look's own dye beside it.
+  - *Owed:* the owner judges it on the Mac's film (docs/judging.md §119).
 
 ## Who does what
 
