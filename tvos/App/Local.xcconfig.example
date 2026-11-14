@@ -1,0 +1,8 @@
+// Copy to Local.xcconfig (git-ignored) and fill in. The repo is public, so the licence
+// Worker's address and the signing team live only here, on the machine that builds.
+//
+// CG_LICENCE_URL: the licence Worker's address with no path, the same value the site
+// builds with as VITE_FIREBASE_LICENSES_URL, less any /keys. A '//' starts a comment in an
+// xcconfig, so write it as https:/$()/example.workers.dev
+CG_LICENCE_URL =
+CG_TEAM =

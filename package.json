@@ -130,6 +130,7 @@
     "license-worker": "node scripts/license-worker.mjs",
     "tvcode": "node scripts/tvcode.mjs",
     "tvlink": "node scripts/tvlink.mjs",
+    "tvswift": "node scripts/tvswift.mjs",
     "updates": "node scripts/updates.mjs",
     "cloudsync": "esbuild scripts/cloudsync.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/cloudsync.mjs && node node_modules/.cache/cloudsync.mjs",
     "privacy": "node scripts/privacy.mjs",
@@ -341,7 +342,8 @@
     "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",
     "logomelt": "PW_WEBGPU=1 node scripts/logomelt.mjs",
     "presskit": "node scripts/presskit.mjs",
-    "loopseam": "node --experimental-strip-types scripts/loopseam.mjs"
+    "loopseam": "node --experimental-strip-types scripts/loopseam.mjs",
+    "tvvideo": "node scripts/tvvideo.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
