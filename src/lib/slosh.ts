@@ -221,9 +221,102 @@ export const SLOSH_LENS = Math.sqrt((2 * Math.abs(SLOSH_SPREADING) * 1000) / (9.
 /** The oil's share below which a cell holds no lens (the mix's fringe), and the thinnest layer the drag is solved for, plate widths. */
 const SLOSH_THIN = 1e-5;
 
-/** How many SLOSH_DT steps `seconds` takes, and so how long each is: the step never longer than SLOSH_DT. */
-export function sloshSteps(seconds: number): number {
-  return Math.max(1, Math.ceil(seconds / SLOSH_DT - 1e-9));
+/**
+ * How many steps `seconds` takes, and so how long each is: the step never
+ * longer than SLOSH_DT, and shorter while the dish spins fast (`spin`, rad/s;
+ * PLAN 22n). Spun, the liquid can run at up to the dish's own rim speed against
+ * it (|Ω| R, the moment a hand starts or stops the glass) and heaps against the
+ * rim to a depth h₀ + Ω²R²/2g, whose waves are faster than the rest depth's; at
+ * the hand's top speed (a turn and a half a second) that is ten plate widths a
+ * second against the resting dish's 1.2, and SLOSH_DT's Courant number would be
+ * past five. So the step is cut to keep the worst of those under
+ * SLOSH_SPIN_COURANT. Below about 1.3 rad/s it is SLOSH_DT, so a dish that does
+ * not spin, or spins slowly, steps exactly as it did. The GPU's dish takes the
+ * same count (gpu/slosh.ts), so the two stay value for value (`npm run sloshgpu`).
+ */
+export function sloshSteps(seconds: number, spin = 0): number {
+  const w = Number.isFinite(spin) ? Math.abs(spin) : 0;
+  let dt = SLOSH_DT;
+  if (w > 0) {
+    const speed = SLOSH_SPIN_RUN * w * SLOSH_RADIUS + Math.sqrt(SLOSH_G * (SLOSH_REST_DEPTH + (w * w * SLOSH_RADIUS * SLOSH_RADIUS) / (2 * SLOSH_G)));
+    dt = Math.min(dt, SLOSH_SPIN_COURANT / (2 * speed * SLOSH_N));
+  }
+  return Math.max(1, Math.ceil(seconds / dt - 1e-9));
+}
+
+/**
+ * The spin to size the step for (sloshSteps), rad/s: the glass's own, or, once
+ * it slows or stops, what the liquid may still be carrying. A dish stopped dead
+ * stops nothing in it (that is the overshoot the owner asked for, PLAN 22n): the
+ * liquid runs on at the glass's old rim speed and loses it at about the drag
+ * rate r (1/s at the rest depth), so the step stays short for as long as it
+ * does. Sized for the glass alone, the first frames after a hard stop from a turn
+ * and a half a second ran at a Courant number of 1.8 (`npm run spinslosh` 8).
+ * The GPU's dish keeps the same envelope (gpu/slosh.ts), so the two step alike.
+ */
+export function sloshSpinFast(was: number, spin: number, r: number, seconds: number): number {
+  const w = Number.isFinite(spin) ? Math.abs(spin) : 0;
+  const k = Number.isFinite(r) && r > 0 ? Math.min(r, SLOSH_SPIN_FADE) : 0;
+  const s = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+  const held = (Number.isFinite(was) ? was : 0) * Math.exp(-k * s);
+  return Math.max(w, held < 1e-3 ? 0 : held);
+}
+
+/**
+ * The fastest the step's envelope lets go, 1/s (sloshSpinFast). A thick liquid
+ * loses its turn in a tenth of a second, but the heap it was spun into does not
+ * go with it: it falls back into the middle as a surge whose speed is the heap's
+ * wave speed, for as long as the dish's lowest mode rings (about a second at the
+ * default Thickness, SLOSH_OMEGA). Let go at the drag rate, the default's
+ * envelope was gone while that surge still ran into the dry middle and the step
+ * ran at a Courant number past one (`npm run spinslosh` 8).
+ */
+export const SLOSH_SPIN_FADE = 1;
+
+/**
+ * How many times the rim's speed |Ω|R the step is sized for (sloshSteps). The
+ * liquid runs at up to the rim's speed against the glass when it is started or
+ * stopped, and faster where the heap falls back into the thinned middle. At 1
+ * the worst stage of `npm run spinslosh` 8's sweep (2.5 to 9.4 rad/s, water and
+ * the default Thickness) ran at 0.62 against the 0.7 aimed for; 1.5 is that
+ * with room, 0.53.
+ */
+export const SLOSH_SPIN_RUN = 1.5;
+/** The Courant number the spun dish's step is cut to (sloshSteps): under the resting dish's worst forcing, 0.76, and SLOSH_COURANT_MAX. */
+export const SLOSH_SPIN_COURANT = 0.7;
+/**
+ * Below these the spin alone does not wake the dish (PLAN 22n): a speed whose
+ * heap, Ω²R²/2g, is under a hundredth of the rest depth (0.34 rad/s, a turn
+ * every eighteen seconds), and a change of speed under 0.25 rad/s². The looks'
+ * own motors turn their dishes at 0.001 to 0.31 rad/s, so a look nobody spins
+ * leaves the dish asleep and costs what it did; a hand on the Spin tool, a
+ * flick or Auto Spin above three rev/min wakes it. A dish already awake for
+ * another reason (a tilt, a kick) feels the spin at any speed.
+ */
+export const SLOSH_SPIN_MIN = Math.sqrt((0.01 * SLOSH_REST_DEPTH * 2 * SLOSH_G) / (SLOSH_RADIUS * SLOSH_RADIUS));
+export const SLOSH_SPIN_ACCEL_MIN = 0.25;
+/**
+ * What the visualizer hands the dish of its glass's spin each frame (PLAN 22n;
+ * fluidSimulation stepSlosh): Ω, the whole dish's speed that frame (the hand,
+ * Auto Spin, the look's motor, a flick: its dishSpin), Ω̇ as its change since
+ * the last frame, and whether that is enough to wake the dish by itself
+ * (spinWakes). Here, beside the dish, so the visualizer's file does not grow.
+ */
+export class SloshSpin {
+  private was = 0;
+  read(spin: number, dt: number): { spin: number; rate: number; wakes: boolean } {
+    const w = Number.isFinite(spin) ? spin : 0;
+    const r = dt > 0 && Number.isFinite(dt) ? (w - this.was) / dt : 0;
+    this.was = w;
+    const rate = Number.isFinite(r) ? r : 0;
+    return { spin: w, rate, wakes: spinWakes(w, rate) };
+  }
+  reset(): void { this.was = 0; }
+}
+
+/** Whether the dish's spin (rad/s) and its change (rad/s²) are enough to wake the dish by themselves. */
+export function spinWakes(spin: number, spinRate: number): boolean {
+  return (Number.isFinite(spin) && Math.abs(spin) > SLOSH_SPIN_MIN) || (Number.isFinite(spinRate) && Math.abs(spinRate) > SLOSH_SPIN_ACCEL_MIN);
 }
 
 /**
@@ -348,10 +441,25 @@ export type SloshPress = { x: number; y: number; radius: number; depth: number }
 /**
  * What the visualizer hands the GPU's dish for a step (gpu/fluid.ts setSlosh):
  * the tilt's acceleration, plate widths a second squared; the water's
- * viscosity, plate widths² a second (`sloshNu`); the presses on the liquid; and
- * whether to lay it level and still first.
+ * viscosity, plate widths² a second (`sloshNu`); the presses on the liquid;
+ * whether to lay it level and still first; and the dish's spin Ω, rad/s, and
+ * its change Ω̇, rad/s² (PLAN 22n: the dish is solved in the frame that turns
+ * with the glass).
+ *
+ * What drives it (fluidSimulation stepSlosh; this account moved here from
+ * there, so that file need not grow): the solver steps it on the GPU before its
+ * own step. Led by what the owner's hand sets (the Gravity and Tilt Direction
+ * faders and the phone's tilt, through the Slosh dial) and by Beat Squeeze's
+ * glass on the kick (`pressKick`), the same glass the thin gap is pressed by.
+ * And by Plate Rock's swing only as far as Frame Sway lets the music move the
+ * frame (rockAccel: a rocked dish sways the whole picture), so at Frame Sway's
+ * default 0 not at all, and on Bass Drop at its 0.35. And by the dish's spin,
+ * in the glass's frame (PLAN 22n, SloshSpin), at any speed while it runs and
+ * by itself only past spinWakes. With nothing driving it and its ring gone
+ * (SloshClock) it is not stepped at all and the solver is told once, so the
+ * default plate is the same bits it was (`npm run slosh`, `npm run sloshgpu`).
  */
-export type SloshDrive = { ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean };
+export type SloshDrive = { ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean; spin: number; spinRate: number };
 
 /** The lowest mode's angular frequency, c k with k = 1.8412/R (the first zero of J1' on a round dish): 4.46 /s. */
 export const SLOSH_OMEGA = (SLOSH_C * 1.8412) / SLOSH_RADIUS;
@@ -517,6 +625,35 @@ export class SloshDish {
   /** The density ratio and the oil's viscosity, the dish's own constants, settable for the check's one-liquid case. */
   oilDensity = SLOSH_OIL_DENSITY;
   oilNu = SLOSH_OIL_NU;
+  /**
+   * The dish's spin Ω, rad/s, and its rate of change Ω̇, rad/s² (PLAN 22n), set
+   * by the caller before `step` and held through it. The dish is solved in the
+   * frame that turns with its glass, so the floor is at rest and the liquid
+   * feels the frame's three forces: the centrifugal Ω²r outward (a paraboloid
+   * floor, `rates`), the Euler force −Ω̇ ẑ×r and the Coriolis force −2Ω ẑ×u.
+   * Both zero, the dish is the tilting dish it always was, to the bit.
+   *
+   * Why here and not in the thin gap. The liquid between the plate's two
+   * glasses follows the dish within its drag time h²/12ν (lib/turntable.ts),
+   * a third of a second for water at 2 mm and a sixtieth for the thick
+   * liquid, and with no free surface a liquid of one density cannot heap: so
+   * a spin there was all but a rigid turn of the picture, and a dish stopped
+   * dead stopped its liquid with it. The owner (2026-11-13): "if I'm spinning
+   * the plate, shouldn't the liquid follow the physics? and get spread out and
+   * if stopped suddenly, overshoot?" This dish has the free surface. Spun up,
+   * its liquid is left behind and climbs to the rim, thinning in the middle
+   * (Ω²r²/2g: 1.7 mm at a flick's 1.8 rad/s on its 6 mm), and dye rides out
+   * with it; stopped hard, the liquid runs on past the glass for its drag time
+   * (three seconds on water, a seventh at the default Thickness), still holding
+   * its heap, which fills back in as its turn runs down (`npm run spinslosh`).
+   * Its flow is the glass's frame's and is laid over the solver's, whose frame
+   * turns with the thin gap's liquid; the two differ by the thin gap's own lag,
+   * a third of a second at most (shortcut 22n in PLAN §22).
+   */
+  spin = 0;
+  spinRate = 0;
+  /** The spin the step count is sized for (sloshSpinFast): the glass's, or what the liquid may still carry from it. */
+  private spinFast = 0;
 
   // The RK stages' copies, and each stage's rates.
   private readonly s0: Float32Array[];
@@ -577,6 +714,7 @@ export class SloshDish {
     this.syncDepth();
     this.qx.fill(0); this.qy.fill(0); this.ox.fill(0); this.oy.fill(0);
     this.presses.length = 0;
+    this.spinFast = 0;
   }
 
   /** Set the water's depth at cell k (a check's starting state): stored as its departure from rest, as the step stores it. */
@@ -678,14 +816,17 @@ export class SloshDish {
    * only approach that for ever.
    */
   step(seconds: number, ax: number, ay: number, r: number): boolean {
+    if (!Number.isFinite(this.spin)) this.spin = 0;
+    if (!Number.isFinite(this.spinRate)) this.spinRate = 0;
     if (!(seconds > 0) || !Number.isFinite(seconds)) return this.live(ax, ay);
     ax = Number.isFinite(ax) ? ax : 0;
     ay = Number.isFinite(ay) ? ay : 0;
     r = Number.isFinite(r) ? Math.max(0, r) : 0;
-    // Level, still, not tipped and not pressed: nothing to compute, and the cost of a dish nobody is tilting is zero.
-    if (this.resting && ax === 0 && ay === 0 && !this.pressing()) return false;
+    // Level, still, not tipped, not pressed and not spun: nothing to compute, and the cost of a dish nobody is tilting is zero.
+    if (this.resting && ax === 0 && ay === 0 && !this.pressing() && !this.spun()) return false;
     this.resting = false;
-    const subs = sloshSteps(seconds);
+    this.spinFast = sloshSpinFast(this.spinFast, this.spin, r, seconds);
+    const subs = sloshSteps(seconds, this.spinFast);
     const dt = seconds / subs;
     const nu = sloshNu(r, this.restDepth);
     for (let s = 0; s < subs; s++) this.substep(dt, ax, ay, nu);
@@ -695,12 +836,15 @@ export class SloshDish {
   private live(ax: number, ay: number): boolean {
     const sp = this.maxSpeed(), rise = this.maxRise();
     if (!(sp < 1e3 && rise < 1e3)) { this.blowups++; this.rest(); return false; }
-    if (ax !== 0 || ay !== 0 || this.pressing()) return true;
+    if (ax !== 0 || ay !== 0 || this.pressing() || this.spun()) return true;
     // Speed alone is not rest: a standing wave stops dead at each end of its swing, with all its energy in the head, so the rise counts too.
     if (sp > SLOSH_REST_SPEED || rise > SLOSH_REST_RISE) return true;
     this.rest();
     return false;
   }
+
+  /** Whether the glass turns or changes speed: a dish spinning steadily is held in its paraboloid, not at rest. */
+  private spun(): boolean { return this.spin !== 0 || this.spinRate !== 0; }
 
   /** One step: Heun's two stages, then the drag, implicit. */
   private substep(dt: number, ax: number, ay: number, nu: number): void {
@@ -742,6 +886,7 @@ export class SloshDish {
     const g = SLOSH_G, r = this.oilDensity, inv = 1 / dx;
     const [dh, dqx, dqy, dox, doy] = rate;
     const press = this.presses.filter((p) => p.depth > 0 && p.radius > 0);
+    const w = this.spin, w2 = w * w, wd = this.spinRate;
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i;
       dh[k] = 0; dqx[k] = 0; dqy[k] = 0; dox[k] = 0; doy[k] = 0;
@@ -749,8 +894,8 @@ export class SloshDish {
       const x = (i + 0.5) / n - 0.5, y = (j + 0.5) / n - 0.5;
       let p = 0;
       for (let q = 0; q < press.length; q++) p += pressHead(press[q], (i + 0.5) / n, (j + 0.5) / n);
-      // The water's floor: the tilt (b = −a·x/g), the oil's weight on it, the glass pressing it.
-      z[k] = -(ax * x + ay * y) / g + r * h1[k] + p;
+      // The water's floor: the tilt (b = −a·x/g), the spin's paraboloid (−Ω²r²/2g, PLAN 22n), the oil's weight on it, the glass pressing it.
+      z[k] = -(ax * x + ay * y) / g - (0.5 * w2 * (x * x + y * y)) / g + r * h1[k] + p;
       eta[k] = h[k] + z[k];
       uu[k] = h[k] > SLOSH_DRY ? qx[k] / h[k] : 0;
       vv[k] = h[k] > SLOSH_DRY ? qy[k] / h[k] : 0;
@@ -793,7 +938,37 @@ export class SloshDish {
       dox[k] = -g * gx - advX * inv;
       doy[k] = -g * gy - advY * inv;
     }
+    if (w !== 0 || wd !== 0) this.frameForces(w, wd);
     this.courant = Math.max(this.courant, 2 * courant * dt * inv);
+  }
+
+  /**
+   * The turning frame's two forces that are not a floor (PLAN 22n), added to
+   * the rates: the Euler force −Ω̇ ẑ×r, which is what the liquid feels when the
+   * glass is started or stopped under it (it is left behind, or carried on
+   * past), and the Coriolis force −2Ω ẑ×u, which turns whatever runs in the
+   * spinning dish to its side: the liquid heaping outward is turned against
+   * the spin, and a dish that is stopped hard swings in and out (inertial
+   * oscillations, at 2Ω while it still turns). On the water's momentum they are
+   * h times the force per unit mass for the Euler force and 2Ω ẑ×q for the
+   * Coriolis; on the raft, the force per unit mass on its own velocity, in the
+   * cells that hold a lens as its push is. ẑ×r = (−y, x): positive Ω turns the
+   * plate the way the solver's angle grows (wgsl/fluid/forces.ts spinSwirl).
+   */
+  private frameForces(w: number, wd: number): void {
+    const { n, h, qx, qy, ox, oy, h1, wet, rate } = this;
+    const [, dqx, dqy, dox, doy] = rate;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const k = j * n + i;
+      if (!wet[k]) continue;
+      const x = (i + 0.5) / n - 0.5, y = (j + 0.5) / n - 0.5;
+      dqx[k] += h[k] * wd * y + 2 * w * qy[k];
+      dqy[k] += -h[k] * wd * x - 2 * w * qx[k];
+      if (h1[k] > 0) {
+        dox[k] += wd * y + 2 * w * oy[k];
+        doy[k] += -wd * x - 2 * w * ox[k];
+      }
+    }
   }
 
   /**

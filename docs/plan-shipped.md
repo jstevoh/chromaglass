@@ -4669,6 +4669,16 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   - `npm run lamp`: 9/9 and `npm run lampzero`: 4/4 (every look at Lamp Ground 0 as before the lamp, none different; two projectors add their light, mean error 0.51).
   - `npm run stages` (round 2): drawing pass at 768², two layers, 3.57 vs 3.46 ms base/branch.
 
+- **18e-5 (shipped 2026-11-13, #857). No line where two dyes meet.**
+  - **What was reported:** the owner, with a screenshot of Comet River on the Design desk: "I don't really like the super thick black lines around things. Where does this even come from?" Black bands a few percent of the plate wide ran along every place two colours met (cyan against yellow, orange against violet) and round the islands of one colour inside another.
+  - **Where it came from:** Boundary Contrast (Boundary Glow on the desks, 0.35 by default, 0.6 on Comet River, up to 0.9 on some looks). `boundaryDiff` read the lit colour on a cross of four taps 1.65 cells out and drew a line where it changed, gated since 33a to where the hue changes. It began as a bright seam (the dye times 1.6 plus a quarter of white). 38h-2 put the light under the glass and made the line a deflection, the colour step bending the lamp's light by 1.1 of the line in radians: on the wall `refractionOptics` took up to 78% of the light (`smoothstep(0.25, 1, uB) · 0.78`, at its ceiling from a dial of about 0.45 up), over the four or five cells the taps span; the camera's views took it through `boundaryShade`. In the closeup the same number does more, and still does (the last bullet).
+  - **The real phenomenon:** two dyes in one liquid do not bend light where they meet. A dye at a few percent moves water's index in the fourth decimal place, the liquids are miscible, and there is no surface between them to slope: no index step, no meniscus, nothing for the lens's aperture to lose. What the boundary does is absorb with both dyes where they overlap (Beer–Lambert, the absorbances added), which `decodeFluid` already draws. Dark rims are real where the index steps: oil in water, glycerine poured clear, an air pocket's wall.
+  - **What changed:** on the wall `refractionOptics` is the slope's aperture loss alone (the `uBound` term and its `bEdge`, `edgeK` gone), and the camera's line (`boundaryLine`, `boundaryEdge`, `boundaryShade`) is gone from a photographed look and from the closeup. A thinner or fainter line was not made: at any width it is a line the liquid does not draw. The back plate's painted bright rim (18e-1) and the dial's gain on the optical path are as they were. `boundaryDiff` stays for one reader, the closeup's relief (below).
+  - **Measured (the lab, SwiftShader, 256², `npm run holeline` rewritten to ask it):** Boundary Contrast at 0.35, 1 and 2 against 0 moved a seam between two dyes by up to 173 levels at one depth, 136 at depths five times apart, 13 at hues 0.2 apart and 141 photographed, and the seam on the wall was 43 levels darker than the darker dye beside it; now 0, 0, 0, 0 and 3. Round a bubble's hole and at a pool's rim it moved nothing before or after (33a's hue gate), and out of focus the dial still moves the pool's rim (19 levels on average), so the zeros are the shader's. On a Comet River plate of forty pools in five colours, the picture at the look's 0.6 is now the picture main draws at 0, to the byte.
+  - **Filmed on the Mac (Metal), main against the branch, the same seed and pours:** Comet River, Splodascope and Poster 1969 (the dial at 0.9): the black bands between colours gone in every pair; Splodascope's drops and bubbles keep their rims; the dark zone where red meets blue is in both (the two dyes' own absorbance).
+  - **The closeup is not fixed here, and why.** The closeup's relief (38h-7's `camShadow`) reads the derive pass's `.z` over `.w` as the optical path's curvature, but the camera's branch of that pass has only ever put the colour step's strength in `.z` and 0 in `.w`. So up close a seam between two dyes is shaded darker by the same step (26 levels at one depth in the lab), and that shading is all the depth Macro Relief draws where there are no cells. Two replacements were built and taken back. With nothing in `.z`, `npm run macroview` read relief 0 on every look: a flat closeup. With the wall's path and nine-tap Laplacian there, the Mac's film showed a flat white patch round a cluster of bubbles on pink dye, up to 17% of a closeup frame clipped (0% in any frame of main's), and the lab a doublet 119 levels darker and 99 brighter at a step in the dye's depth. The closeup therefore draws what main drew, to the byte (a Comet River closeup at 3x, Macro Relief 1), and the real thing is 18e-7.
+  - **Found on the way:** 18e-6 (what the dial is for now; `shaderdials`' owed `glow`), 18e-7 (the closeup's relief has never read the path).
+
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
 **Shipped (#352):**
@@ -11041,6 +11051,33 @@ over a second (`originGap >= 1000`).
   swirl's 1e-3 rad/s floor nearly all the time: on CI's Mac, with the built-in band playing,
   the swirl ran on 91–100% of the nine thin looks' steps. It was thirteen dispatches a step on
   the current's half grid (spinSwirl, its divergence, ten Jacobi sweeps, the gradient).
+
+#### 22n. A spun plate's liquid heaps, lags and overshoots
+
+- ~~**22n. A spun plate's liquid did not heap, lag or overshoot.**~~ **Shipped.** The owner,
+  2026-11-13: "if I'm spinning the plate, shouldn't the liquid follow the physics? and get
+  spread out and if stopped suddenly, overshoot?" The liquid between the plate's two glasses
+  followed the dish within h²/12ν, a third of a second for water at the 2 mm gap and a
+  sixtieth for the thick liquid, and with no free surface a liquid of one density cannot
+  heap; only heavier dye moved out. So a spin was all but a rigid turn of the picture, and
+  a dish stopped dead stopped its liquid. The open dish (lib/slosh.ts, the two-layer shallow
+  water that sloshes under a tilt) is now solved in the frame that turns with the glass:
+  the centrifugal force as a paraboloid floor −Ω²r²/2g (the scheme's well-balancing holds
+  the heap at rest exactly), and the Euler force −Ω̇ ẑ×r and the Coriolis force −2Ω ẑ×u on
+  both layers, in the TypeScript reference and the GPU kernels alike. A spin over 0.34 rad/s
+  (a heap of a hundredth of the depth) or a change of speed over 0.25 rad/s² wakes the dish;
+  the looks' own motors (0.31 rad/s at most) do not, so a look nobody spins costs what it
+  did. The step shortens with the spin and with what the liquid still carries after a stop
+  (sloshSpinFast), so a hard stop from the hand's top speed holds. Measured (`npm run spinslosh`): the paraboloid
+  at 2 rad/s to 0.0% of Ω²r²/2g; a ring of dye at r = 0.2 carried out 3.1 mm, 99% of what the
+  heap's volume asks; spun up in 0.1 s, water 90% behind the glass, catching up at 0.309/s
+  against the floor's drag on its own depth, 0.305/s; stopped in 0.05 s from 2 rad/s, water
+  runs on 254° past the glass and the default Thickness 11°, both 74% of Ω/k (22o, the
+  staircase rim, takes the rest); the middle still thinned 0.2 s after the stop and level 16
+  s later; from 2.5 to 9.4 rad/s, every stage under the 0.7 the step is sized for.
+  `npm run sloshgpu` case 6 holds the GPU to the reference through a spin-up and a hard
+  stop with a lens on the water, to 8e-6. No new setting: Thickness already sets the drag,
+  and the phone's Spin tool turns the same dish.
 
 ### 23. Selling it: the site free, the app paid
 
