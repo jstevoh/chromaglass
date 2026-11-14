@@ -37,6 +37,7 @@ import { serveMusicFile } from './assistantMusic.js';
 import { updatesCall } from './assistantUpdates.js';
 import { OSC_IN_BINDS, RELAY_OUTPUTS, oscInMode, outputsCall } from './assistantOutputs.js';
 import { createTvPairing, TV_KEY } from './tv-pairing.js';
+import { createTvRemote } from './tv-remote.js';
 import { advertise, instanceLabel } from './bonjour.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -407,7 +408,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show', 'tv-code', 'tv-key', 'tv-pairing']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show', 'tv-code', 'tv-key', 'tv-pairing', 'tv-looks']);
 
 // ── TVs at home (PLAN 12-tv) ───────────────────────────────────────────
 // A TV plays the display's plate as a WebRTC video (src/lib/tvFeed.ts); the
@@ -433,7 +434,14 @@ const admitTv = (tv) => {
   roles.set(tv, 'tv');
   tvIds.set(tv, `tv${++tvSeq}`);
   pairTv(tv);
+  // The presets its remote picks from (PLAN 12-tv-remote, `tv-remote.js`):
+  // the last list the laptop sent, or ask the laptop for its state.
+  const looks = tvRemote.looks();
+  if (looks) sendTo(tv, looks);
+  else broadcastTo('display', JSON.stringify({ type: 'request-state' }));
 };
+/** The TV remote's rules (PLAN 12-tv-remote): which presets a TV may pick, and how often. */
+const tvRemote = createTvRemote();
 
 // Pairing by four digits (PLAN 12-tv-2, `tv-pairing.js` says why): a TV with
 // no key waits as `pairing`, hears nothing and relays nothing, while the
@@ -480,6 +488,17 @@ const serverOutputs = {
   setOscIn: (mode) => setOsc(mode === 'off' ? 0 : OSC_ON_PORT, OSC_IN_BINDS[mode]),
 };
 const assistantMode = () => assistantNow;
+/*
+  OSC in opened to the whole network by the assistant closes again when the
+  switch goes off (the owner's choice, 2026-11-13). The security review found
+  that Full mode's osc_in network, asked by an assistant a page or a title had
+  talked round, bound unauthenticated OSC on 0.0.0.0 and kept it in show.json,
+  so anyone on the venue's Wi-Fi could drive the show long after the assistant
+  was switched off. This is the mode it was in before the assistant opened it,
+  or null when the assistant has not (or the owner had it open already); the
+  Mac app does not keep the assistant's network choice in show.json either.
+*/
+let assistantOpenedOsc = null;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
 // last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
@@ -499,6 +518,16 @@ const assistantWatch = setInterval(() => {
   guard.stop();
   // Cut, not a closing handshake a stalled socket could sit in for half a minute.
   if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.terminate();
+  if (mode === 'off' && assistantOpenedOsc !== null) {
+    const back = assistantOpenedOsc;
+    assistantOpenedOsc = null;
+    const outs = appOutputs ?? serverOutputs;
+    // The owner picked it in the Show menu since (the Mac app keeps that choice): theirs, left open.
+    if (!(appOutputs && outs.state()?.oscIn?.kept)) {
+      console.log(`  assistant switch off: OSC in back to ${back}`);
+      void Promise.resolve(outs.setOscIn(back)).catch(() => {});
+    }
+  }
 }, 1000);
 assistantWatch.unref?.();
 
@@ -661,9 +690,22 @@ wss.on('connection', (socket, req) => {
       tellPairing();
       return;
     }
+    // A TV's remote picks a look (PLAN 12-tv-remote): only a preset the
+    // laptop listed, at most one every TV_PICK_MS (`tv-remote.js` says why),
+    // handed to the laptop as the `preset` a phone sends, through the guard
+    // as a phone's message goes. From anyone but a TV it is dropped: a phone
+    // has `preset` already.
+    if (message.type === 'tv-pick') {
+      const pick = from === 'tv' ? tvRemote.pick(socket, message) : null;
+      if (pick) {
+        guard.onPerformer(pick);
+        broadcastTo('display', JSON.stringify(pick));
+      }
+      return;
+    }
     // A TV's handshake: display → the one TV it names, TV → its own display
-    // with its id added. A TV says nothing else: it only watches, and a
-    // patch from it must never reach the show as a phone's would.
+    // with its id added. A TV says nothing else but its pick (above): it
+    // watches, and a patch from it must never reach the show as a phone's would.
     if (message.type === 'tv-signal' && (from === 'display' || from === 'tv')) {
       const signal = message.signal;
       if (!signal || typeof signal !== 'object' || typeof signal.kind !== 'string') return;
@@ -698,7 +740,13 @@ wss.on('connection', (socket, req) => {
         reply = updatesCall(message, assistantMode(), appUpdates);
       } else if (message.type === 'assistant-outputs' && RELAY_OUTPUTS.includes(message.do)) {
         // OSC in, Syphon and their status (PLAN 44k-14): the relay's own, answered once the socket has bound.
-        void outputsCall(message, assistantMode(), appOutputs ?? serverOutputs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+        const outs = appOutputs ?? serverOutputs;
+        const oscBefore = message.do === 'osc-in' ? outs.state()?.oscIn?.mode ?? 'off' : null;
+        void outputsCall(message, assistantMode(), outs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+          if (oscBefore !== null && r?.ok) {
+            if (message.mode !== 'network') assistantOpenedOsc = null;
+            else if (oscBefore !== 'network' && assistantOpenedOsc === null) assistantOpenedOsc = oscBefore;
+          }
           if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...r }));
         });
         return;
@@ -734,6 +782,9 @@ wss.on('connection', (socket, req) => {
     if (from === 'display' && message.type === 'state') {
       guard.onDisplayState(message.state);
       broadcastTo('assistant', raw);
+      // The TVs hear the presets and the live one, and only when they change.
+      const looks = tvRemote.onDisplayState(message.state);
+      if (looks) for (const tv of clientsOf('tv')) sendTo(tv, looks);
     }
     // A still is the assistant's alone: a pad on Draw paints the stream, and
     // a 1280 picture a phone would drop unpainted is half a megabyte on its Wi-Fi.

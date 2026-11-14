@@ -315,6 +315,8 @@ const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', '
   'frameSway',
   // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
   'slosh',
+  // Tank is whether the picture is a tank or the dish (PLAN 47n): the whole frame, never the beat's (sceneMap NOT_A_TARGET).
+  'tank',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
@@ -621,6 +623,26 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The film's colours, the rainbow to a real soap film's. A fader because
   // the mix between them is a look of its own, not only the two ends.
   { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },
+  // The frame's soap film (PLAN 32d): how much of it, its clock, its angle.
+  // Faders: riding the angle sweeps every band through the orders at once.
+  { key: 'soapFilm',        label: 'Soap Film',        min: 0, max: 1 },
+  { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
+  { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
+  // Glitter in the liquid and the lens photographing it (PLAN 47e, 47d): a
+  // fader for how much, and the f-number on a curve, so the knob's travel
+  // spends as long on the wide-open discs as on the stopped-down stars.
+  { key: 'glitter',         label: 'Glitter',          min: 0, max: 1 },
+  { key: 'lensStop',        label: 'Lens Stop',        min: 1.4, max: 22, curve: 2 },
+  // The side lamp (PLAN 47b-side): its power, its gel's hue and where it stands round the dish.
+  { key: 'sideLight',       label: 'Side Light',       min: 0, max: 1 },
+  { key: 'sideLightHue',    label: 'Side Colour',      min: 0, max: 360 },
+  { key: 'sideLightAngle',  label: 'Side Angle',       min: 0, max: 360 },
+  { key: 'tank',            label: 'Tank',             min: 0, max: 1 },
+  { key: 'tankFeed',        label: 'Feed',             min: 0, max: 6 },
+  { key: 'tankWeight',      label: 'Dye Weight %',     min: 0.05, max: 3 },
+  { key: 'tankNozzle',      label: 'Nozzle',           min: 0, max: 1 },
+  { key: 'tankDrain',       label: 'Drain',            min: 0, max: 1 },
+  { key: 'tankHue',         label: 'Glow Hue',         min: 0, max: 360 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
@@ -650,11 +672,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // and the bottom of the travel is a whisper of a glass.
   { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
   { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
-  // The song's title as ink (PLAN 37x-10): how fast the wash takes one, on a knob, ridden in a set;
-  // its size and where it lands. The switch, and `titleCaption` (caption or ink, 37x-10j), are the desk's and the phone's (booleans, not faders).
-  { key: 'inkTitleSweep',   label: 'Title Sweep',      min: 0, max: 1 },
-  { key: 'inkTitleSize',    label: 'Title Size',       min: 0, max: 1 },
-  { key: 'inkTitleY',       label: 'Title Height',     min: 0, max: 1 },
+  // The song's title as ink (PLAN 37x-10) had its sweep, size and height on knobs here until the
+  // owner shelved the ink on 2026-11-12 (37x-10m): titles are the corner caption, which has no dial,
+  // and a knob learned to a setting nothing reads would move nothing on the plate.
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.

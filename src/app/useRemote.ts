@@ -39,7 +39,7 @@ import { livePresetId } from '../presets';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
-import { takePourText } from '../lib/pourText';
+import { rowsCaption, takePourText } from '../lib/pourText';
 import { useInkTitle } from './useInkTitle';
 import { setSongTitleSink } from './songTitle';
 import { parseSongCaption, showSongCaption } from '../lib/songCaption';
@@ -136,28 +136,26 @@ export function useRemote({
   /*
     The Live Show's titles (PLAN 37x-10): when the identified song changes
     and the Title switch is on (the phone's, beside the controls below, or
-    the desk's Logo & Titles), its name is poured as ink and the wash takes
-    it. Here beside the remote's `pour-text` message, the other way a title
-    reaches the plate in a set, so the two are read in one place.
+    the desk's Logo & Titles), its credit goes up as the corner caption.
+    Here beside the remote's `pour-text` and `song-title` messages, the
+    other ways a title reaches the show in a set, so they are read in one
+    place.
   */
   useInkTitle(wallRef, musicIntel.state.track, settings.inkTitle);
   /*
-    How a title goes up, wherever it came from (app/songTitle.ts, 37x-10j):
-    the corner caption unless `titleCaption` is off, then the ink as before.
-    The setting is read through a ref when the title is due, so turning it
-    over mid-song does not put a second title up. The caption's screen layer
-    lives as long as this hook does; the stream draws its own copy.
+    How a title goes up, wherever it came from (app/songTitle.ts): the corner
+    caption (37x-10j), always. The ink was the other choice until 2026-11-12,
+    when the owner shelved it (PLAN 37x-10m: "this poured option never really
+    worked"); the `titleCaption` setting that chose went with it, so a show
+    saved with the ink chosen still gets the caption.
+    The caption's screen layer lives as long as this hook does; the stream
+    draws its own copy.
   */
-  const titleCaptionRef = useRef(settings.titleCaption);
-  titleCaptionRef.current = settings.titleCaption;
   useEffect(() => {
-    setSongTitleSink((card, ink) => {
-      if (titleCaptionRef.current !== false) showSongCaption(card);
-      else wallRef.current?.pourText(ink.rows, ink.colour ? { colour: ink.colour } : undefined);
-    });
+    setSongTitleSink((card) => showSongCaption(card));
     const unmount = mountSongCaptionLayer();
     return () => { setSongTitleSink(null); unmount(); };
-  }, [wallRef]);
+  }, []);
   // The logo poured and melted as a film starts (PLAN 37x-11): the stream on air, or a Record take.
   useLogoMelt(wallRef, { live: liveShow.phase === 'live', recording: recorder.recording }, !!settings.logoMelt);
   // Each destination's health too (PLAN 44j), rounded to what a reader acts
@@ -360,7 +358,10 @@ export function useRemote({
           setTvPairing({ asks: message.asks, paired: message.paired });
           break;
         case 'tv-show':
+        case 'tv-looks':
           break;   // the relay's word to a TV, never a display's
+        case 'tv-pick':
+          break;   // a TV's to the relay, which hands the display a `preset` (server/tv-remote.js)
         case 'patch':
           queuePatch(message.settings);
           break;
@@ -505,18 +506,20 @@ export function useRemote({
             (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
           break;
         /*
-          Words poured as ink (PLAN 37x-10c): a song's name at the top of a
-          track, from the phone's text box or the relay's guard. Read as
-          untrusted whoever sent it, and one pour per POUR_TEXT_GAP_MS at
-          most (lib/pourText.ts `takePourText`), since a pour adds dye and a double tap
-          would stack the same words into a blot.
+          Words from the phone's box, the relay's guard or the assistant's
+          `pour_text` (PLAN 37x-10c), shown as the corner caption since the
+          ink was shelved (37x-10m, lib/pourText.ts `rowsCaption`): the
+          message is kept so a sender one build older still gets its title
+          up. Read as untrusted whoever sent it, and one per POUR_TEXT_GAP_MS
+          at most (`takePourText`), as before.
         */
         case 'pour-text': {
           const t = performance.now();
           const pour = takePourText(message, t, lastPourTextRef.current);
           if (!pour) break;
           lastPourTextRef.current = t;
-          wallRef.current?.pourText(pour.rows, { colour: pour.colour });
+          const card = rowsCaption(pour.rows);
+          if (card) showSongCaption(card);
           break;
         }
         /*
@@ -524,9 +527,7 @@ export function useRemote({
           album and label from the phone, the show server's conductor or the
           assistant, for a set the ear cannot name (files played on the Mac).
           Read as untrusted (lib/songCaption.ts `parseSongCaption`); a new
-          card replaces the last, so a double send shows one card. Always the
-          caption, whatever `titleCaption` says: words poured as ink have
-          their own message, `pour-text`, above.
+          card replaces the last, so a double send shows one card.
         */
         case 'song-title': {
           const card = parseSongCaption(message);

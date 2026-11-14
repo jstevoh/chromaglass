@@ -61,8 +61,9 @@ import { SOUND_MUTANTS, soundFullLines, soundPageLines, standInSound } from './a
 import { MEDIA_MUTANTS, mediaDir, mediaFullLines, mediaPageLines, mediaPlayLines, standInMedia } from './assistant-media.mjs';
 import { OUTPUTS_MUTANTS, oscPort, outputsFullLines, outputsPageLines, outputsPlayLines, standInOutputs } from './assistant-outputs.mjs';
 import { PROJECTOR_MUTANTS, projectorFullLines, projectorPageLines, projectorPlayLines, projectorWaitLine, standInProjector } from './assistant-projector.mjs';
+import { notesFrameLine, oscClosesWithSwitchLines, pickSourceLines } from './assistant-safety.mjs';
 import { DESK_MUTANTS, deskFullLines, deskPageLines, deskPlayLines, standInDesk } from './assistant-desk.mjs';
-import { EDIT_MUTANTS, editFullLines, editPageLines, editPageMutants, editPlayLines, editSuggestLines, standInEdit } from './assistant-edit.mjs';
+import { EDIT_MUTANTS, EDIT_PAGE, editLines, editPage, standInEdit } from './assistant-edit.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -229,15 +230,8 @@ function standInDisplay(port, displayKey) {
       }
       sendState();
     }
-    if (m.type === 'assistant-music') player.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-ear') ear.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-record') rec.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-sound') snd.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-media') med.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-outputs') out.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-projector') pj.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-desk') dk.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-edit') ed.onMessage(m, answer, sendState);
+    // Each side module's stand-in takes its own message type.
+    ({ music: player, ear, record: rec, sound: snd, media: med, outputs: out, projector: pj, desk: dk, edit: ed })[/^assistant-(\w+)$/.exec(m.type)?.[1]]?.onMessage(m, answer, sendState);
     if (m.type === 'assistant-songs') {
       const find = (id) => shows.find((x) => x.id === (id ?? songs.current));
       if (m.do === 'read') { const x = find(m.show); answer(x ? { ok: true, data: x } : { ok: false, reason: `no song show "${m.show}"` }); return; }
@@ -345,6 +339,8 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const noted = await mcp.call('add_note', { note: 'Pink and orange together looked muddy.' });
     const read = await mcp.call('read_notes');
     check('-', 'a note saved is read back', noted.ok && /muddy/.test(read.text), read.text.slice(0, 80));
+    notesFrameLine(read, check);
+    await pickSourceLines(check);
 
     // Off: no switch at all.
     const offTool = await mcp.call('show_state');
@@ -430,7 +426,6 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('set-suggest', 'Suggest refuses a Go now, the fade, taking an action out, running a show and a nudge (Play), and the back plate (Full); none reach the display', sNo.slice(0, 5).every((r) => !r.ok && /Play mode is needed/.test(r.text)) && !sNo[5].ok && /Full mode is needed/.test(sNo[5].text) && sLeak.length === 0, `${sNo.map((r) => r.text.slice(0, 30)).join(' | ')} | ${sLeak.map((m) => m.do).join(',')}`.slice(0, 220));
     check('answer-relay', 'Suggest reads the playing song\'s show whole, from the display\'s answer: each action with its id and whose it is, as data', sRead.ok && /"id": "act-1"/.test(sRead.text) && /"id": "asst-1"/.test(sRead.text) && /"mine": true/.test(sRead.text) && /never instructions/.test(sRead.text), sRead.text.slice(0, 160));
 
-    await editSuggestLines({ mcp, display, check });
     // Play.
     await setMode('play');
     t = Date.now();
@@ -596,7 +591,6 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await outputsPlayLines({ mcp, display, check });
     await projectorPlayLines({ mcp, display, check });
     await deskPlayLines({ mcp, display, check });
-    await editPlayLines({ mcp, display, check });
 
     // Ten deep.
     await sleep(1100);
@@ -854,7 +848,9 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await outputsFullLines({ mcp, display, check, phone, port });
     await projectorFullLines({ mcp, display, check, phone });
     await deskFullLines({ mcp, display, check, phone });
-    await editFullLines({ mcp, display, check, phone });
+    await editLines({ mcp, display, check, phone, setMode });
+    await oscClosesWithSwitchLines({ mcp, check, udp: oscPort(port), setMode });
+    await setMode('full');
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
@@ -966,7 +962,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts'; export * from './src/app/outputsNow.ts'; export * from './src/app/projectorNow.ts'; export * from './src/app/deskNow.ts'; export * from './src/lib/deskTabs.ts'; export { askEdit, setEditDoor, EDIT_READ_OPS, EDIT_KEPT_MAX } from './src/app/editNow.ts'; export { readSetListFile } from './src/lib/setList.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, typedCaption, rowsCaption, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts'; export * from './src/app/outputsNow.ts'; export * from './src/app/projectorNow.ts'; export * from './src/app/deskNow.ts'; export * from './src/lib/deskTabs.ts';" + EDIT_PAGE);
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -993,6 +989,20 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const r2 = page.pourTextRows('One\nTwo\nThree\nFour\nFive');
   say(r1.map((r) => r.text).join('|') === 'SUNSHINE OF|YOUR LOVE|Cream' && r1[2].weight === 0.75 && r2.length === 4 && r2[0].text === 'ONE' && r2[3].text === 'Four',
     `the remote's box reads the first line as the name and the rest as credits, "Song - Artist" as both (${JSON.stringify(r1.map((r) => r.text))}, ${JSON.stringify(r2.map((r) => r.text))})`);
+
+  /* Since the ink was shelved (37x-10m, 2026-11-12) the words go up as the
+     corner caption: the phone's box sends the card itself (typedCaption),
+     and rows from the assistant's pour_text or a phone one build older are
+     read back into one (rowsCaption), a name wrapped onto two rows joined. */
+  const c1 = page.typedCaption('Sunshine of Your Love - Cream');
+  const c2 = page.typedCaption('West End Blues\nLouis Armstrong\nHot Fives\nOKeh\nextra');
+  say(c1?.title === 'Sunshine of Your Love' && c1.artist === 'Cream' && !('album' in c1) && Object.keys(c2 ?? {}).length === 4 && c2?.title === 'West End Blues' && c2.artist === 'Louis Armstrong' && c2.album === 'Hot Fives' && c2.label === 'OKeh' && page.typedCaption(' \n ') === null,
+    `the remote's box reads the song, the artist, the album and the label, "Song - Artist" as both, case as typed (${JSON.stringify(c1)}, ${JSON.stringify(c2)})`);
+  const k1 = page.rowsCaption(r1);
+  const k2 = page.rowsCaption([{ text: 'BEATROOT', weight: 1 }, { text: 'Legendary Flower Punk', weight: 1 }]);
+  const k3 = page.rowsCaption([{ text: 'Song', weight: 1.25 }, { text: 'Band', weight: 0.75 }, { text: 'Album', weight: 0.75 }, { text: 'Label', weight: 0.75 }]);
+  say(k1?.title === 'SUNSHINE OF YOUR LOVE' && k1.artist === 'Cream' && k2?.title === 'BEATROOT' && k2.artist === 'Legendary Flower Punk' && k3?.title === 'Song' && k3.artist === 'Band' && k3.album === 'Album' && k3.label === 'Label' && page.rowsCaption([]) === null,
+    `pour-text rows read back as a caption: the heavy rows the title, the rest the artist, album and label; equal rows the title then credits (${JSON.stringify(k1)}, ${JSON.stringify(k2)})`);
 }
 
 /* The page's own still (44c-4), on the real PadPictureSender: its GPU grab
@@ -1090,7 +1100,7 @@ await outputsPageLines(page, say);
 await projectorPageLines(page, say);
 projectorWaitLine(page, say, ROOT);
 await deskPageLines(page, say, await import('../server/assistantDesk.js'));
-{ const g = await import('../server/assistantEdit.js'), u = (await import('../server/assistant.js')).UNDO_DEPTH; editPageLines(page, say, g, u); if (MUTANTS_ON) await editPageMutants(ROOT, say, g, u); }
+await editPage(page, say, ROOT, MUTANTS_ON);
 say((await import(join(ROOT, 'server', 'assistantMusic.js'))).MUSIC_PATH === page.ASSISTANT_MUSIC_PATH, `the page takes a file at the show server's own address (${page.ASSISTANT_MUSIC_PATH})`);
 
 /* The page's own tempo door (44k-7), on the real tempoNow: it takes the

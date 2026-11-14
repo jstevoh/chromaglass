@@ -111,3 +111,54 @@ export function pourTextRows(typed: string): PourTextRow[] {
   const rows = [...nameRows, ...credits.map((t) => ({ text: t, weight: 0.75 }))];
   return rows.slice(0, POUR_TEXT_MAX_ROWS);
 }
+
+/*
+  Shelved 2026-11-12 (PLAN 37x-10m): words "poured" now go up as the corner
+  caption (lib/songCaption.ts). The owner, having watched the ink titles in
+  rehearsal and on the thick-ink pad, said the poured option never really
+  worked: on a busy look the flow smears the letters before they can be read,
+  and the caption the owner asked for on 2026-11-10 is what a set uses now.
+  The message, the phone's box and the assistant's `pour_text` all stay, so a
+  phone or a conductor one build older still gets its title up; only where
+  the words land changed. The ink itself is kept, dormant, in lib/inkTitle.ts
+  for the logo melt (37x-11), which pours the logo through the same pad.
+*/
+
+/** The caption's own fields, as lib/songCaption.ts `SongCaption` holds them (a type here so node can import this file alone). */
+export interface PourTextCaption { title: string; artist: string; album?: string; label?: string }
+
+/**
+ * What a person typed in the phone's box, as a caption: the first line is
+ * the song, the next the artist, then the album and the label; one line
+ * holding a dash between spaces ("Song - Artist", the shape a track list is
+ * pasted in) is read as the song and its artist, as `pourTextRows` reads it.
+ * Case is kept as typed: the caption is a music channel's card, not capitals.
+ */
+export function typedCaption(typed: string): PourTextCaption | null {
+  let lines = String(typed ?? '').split(/\r?\n/).map(cleanRow).filter(Boolean);
+  if (lines.length === 1) {
+    const parts = lines[0].split(/\s+[-–—]\s+/).map(cleanRow).filter(Boolean);
+    if (parts.length >= 2) lines = [parts[0], parts.slice(1).join(' – ')];
+  }
+  if (lines.length === 0) return null;
+  const [title, artist = '', album, label] = lines;
+  return { title, artist, ...(album ? { album } : {}), ...(label ? { label } : {}) };
+}
+
+/**
+ * A `pour-text` message's rows as a caption, for the senders that still
+ * send rows (a phone or the show server one build older, the assistant's
+ * `pour_text`): the leading rows as heavy as the first are the song's name,
+ * a name wrapped onto two rows joined back into one, and the lighter rows
+ * after it the artist, the album and the label in that order. Rows that all
+ * weigh the same are read as the song and then its credits.
+ */
+export function rowsCaption(rows: readonly PourTextRow[]): PourTextCaption | null {
+  if (rows.length === 0) return null;
+  const head = rows[0].weight;
+  let n = 1;
+  if (rows.some((r) => r.weight !== head)) while (n < rows.length && rows[n].weight === head) n++;
+  const title = rows.slice(0, n).map((r) => r.text).join(' ');
+  const [artist = '', album, label] = rows.slice(n).map((r) => r.text);
+  return { title, artist, ...(album ? { album } : {}), ...(label ? { label } : {}) };
+}

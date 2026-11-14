@@ -412,6 +412,52 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
 }
 
 const f = (x, d = 1) => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(d));
+
+/**
+ * Real shows (PLAN 47v-3). The measures above are proved on synthetic flows
+ * (scripts/watchreadtest.mjs), where every pixel is texture and nothing but
+ * the flow changes the picture. Real footage is not like that: film grain or
+ * a camcorder's noise in the dark, the lamp's hot spot, a hand, superimposed
+ * loops, the projector re-aimed. So the bands' words, written from the
+ * synthetic cases, needed the numbers real performances read, beside them:
+ * without those, a real show read "carried 0.19: … a digital effect rather
+ * than transport", which is the measure misreading footage, not the footage
+ * being digital.
+ *
+ * Each film here was watched with this tool at 10 samples a second and is
+ * kept in the reference library (scripts/watchrefs.mjs) under its name, so
+ * `--vs <name>` compares a take with it. The numbers are each film's
+ * medians, copied from its design.json; a range below is the lowest and
+ * highest of them, and physicsLines prints it beside each measure, with
+ * "under" or "over" when a clip falls outside every real show.
+ *
+ * What they say, 2026-11-12: real shows read carried 0.13 to 0.19, low by
+ * the synthetic bands' words, with p90s near 0.4: on real footage this
+ * measure tells a transported plate from a crossfading one only well under
+ * 0.1 or well over 0.4. Lifetime spans 0.9 s (an edited film of the loops,
+ * superimposed) to 5 s (one projector, one take, at a bar). Every one sits
+ * in the spectrum's cascade band, −2.7 to −2.8.
+ */
+export const REAL_SHOWS = [
+  { name: 'jls-liquid-loops-1969', what: 'the Joshua Light Show, Liquid Loops 1969: 35 mm film of the loops, edited, with dissolves and superimpositions; 10 min',
+    own: 8.02, carried: 0.187, turnover: 1.51, lifetime: 0.91, spectrum: -2.69, wholeShare: 0.16 },
+  { name: 'bar-the-dip-2016', what: 'a liquid light show on the wall behind a band at a bar (The Dip, Redding, 2016-08-08), one camera from the floor, cropped to the wall; 10 min of the set',
+    own: 1.96, carried: 0.125, turnover: 2.43, lifetime: 4.98, spectrum: -2.79, wholeShare: 0.14 },
+];
+
+/** The lowest and highest real show for a measure (a key of REAL_SHOWS' rows). */
+export function realRange(key) {
+  const v = REAL_SHOWS.map(r => r[key]).filter(x => x != null && Number.isFinite(x));
+  return v.length ? [Math.min(...v), Math.max(...v)] : null;
+}
+
+/** "; real shows a–b" for a measure, with "under" or "over" when x is outside them. */
+export function realNote(key, x, d = 1) {
+  const r = realRange(key);
+  if (!r || x == null || !Number.isFinite(x)) return '';
+  const where = x < r[0] ? ', under every real show' : x > r[1] ? ', over every real show' : '';
+  return ` (real shows ${f(r[0], d)} to ${f(r[1], d)}${where})`;
+}
 const band = (x, cuts) => { if (x == null || !Number.isFinite(x)) return ''; for (const [lim, w] of cuts) if (x < lim) return w; return cuts.at(-1)[1]; };
 
 /** The physics section of summary.md. */
@@ -425,6 +471,8 @@ export function physicsLines(p) {
   const dv = p.div.med;
   const spread = band(dv, [[-0.02, 'drawing in (converging)'], [0.02, 'neither spreading nor drawing in'], [Infinity, 'spreading out (diverging), as from a pour or a press']]);
   const car = p.carried.med;
+  // The words are the synthetic cases'; the real-show range printed beside
+  // the number says where performances fall (they read low: REAL_SHOWS).
   const carriedWord = band(car, [[0.2, 'the picture changes in place more than it moves (fading, light changes, dissolves, or diffusion outrunning flow)'], [0.5, 'part carried, part changing in place'], [0.75, 'mostly carried by the flow'], [Infinity, 'carried: the material is transported']]);
   const sl = p.spectrum.med;
   const spec = band(sl, [[-2.8, 'steep: smooth blobs and soft edges, little fine detail (defocus, or a coarse grid)'], [-1.8, 'a cascade: detail at every scale, falling off like stirred turbulence'], [Infinity, 'shallow: fine filaments and sharp detail all the way down, as a slowly diffusing dye stretched by flow']]);
@@ -436,14 +484,14 @@ export function physicsLines(p) {
     '',
     `From ${p.pairs} sample pairs; speeds in % of the frame's width a second (×0.25 for cm/s on an overhead projector's 25 cm stage). Definitions: \`scripts/watchphysics.mjs\`.`,
     '',
-    `- **flow**: the fluid's own speed (whole-field motion taken out) median ${f(own, 1)}, 90th ${f(p.own.p90, 1)}: ${pace}. Block speeds median ${f(p.speed.med, 1)}, 90th ${f(p.speed.p90, 1)}; ${f((p.matched ?? 0) * 100, 0)}% of textured blocks matched`,
+    `- **flow**: the fluid's own speed (whole-field motion taken out) median ${f(own, 1)}${realNote('own', own)}, 90th ${f(p.own.p90, 1)}: ${pace}. Block speeds median ${f(p.speed.med, 1)}, 90th ${f(p.speed.p90, 1)}; ${f((p.matched ?? 0) * 100, 0)}% of textured blocks matched`,
     `- **whole-field motion** (camera, or the dish slid, turned or zoomed): median ${f(p.whole.med, 1)}, and it explains ${f((p.wholeShare ?? 0) * 100, 0)}% of the motion`,
     `- **rotation**: curl median ${f(curl, 3)}/s (${f(p.curl.p10, 3)} to ${f(p.curl.p90, 3)}): ${turn}`,
     `- **spreading**: divergence median ${f(dv, 3)}/s (${f(p.div.p10, 3)} to ${f(p.div.p90, 3)}): ${spread}`,
-    `- **carried**: ${f(car, 2)} (${f(p.carried.p10, 2)} to ${f(p.carried.p90, 2)}, over ${p.carried.n} changing pairs) of the change from one sample to the next is the flow moving material: ${carriedWord}`,
-    `- **turnover**: ${turnover != null ? `${f(turnover, 1)} s for the flow to carry a form across its own size` : '–'}${turnover != null ? `, ${band(turnover, [[0.5, 'churning'], [2, 'lively'], [6, 'unhurried'], [Infinity, 'stately, viscous']])}` : ''}`,
-    `- **lifetime**: ${p.lifetime != null ? `a picture stays like itself for about ${f(p.lifetime, 1)} s (correlation with itself falls to a half)` : `longer than the clip shows (longest shot ${f(p.longestShot, 0)} s)`}`,
-    `- **spectrum**: slope ${f(sl, 2)} (${f(p.spectrum.p10, 2)} to ${f(p.spectrum.p90, 2)}) of power per wavenumber band: ${spec}`,
+    `- **carried**: ${f(car, 2)} (${f(p.carried.p10, 2)} to ${f(p.carried.p90, 2)}, over ${p.carried.n} changing pairs)${realNote('carried', car, 2)} of the change from one sample to the next is the flow moving material: ${carriedWord}`,
+    `- **turnover**: ${turnover != null ? `${f(turnover, 1)} s for the flow to carry a form across its own size${realNote('turnover', turnover)}` : '–'}${turnover != null ? `, ${band(turnover, [[0.5, 'churning'], [2, 'lively'], [6, 'unhurried'], [Infinity, 'stately, viscous']])}` : ''}`,
+    `- **lifetime**: ${p.lifetime != null ? `a picture stays like itself for about ${f(p.lifetime, 1)} s (correlation with itself falls to a half)${realNote('lifetime', p.lifetime)}` : `longer than the clip shows (longest shot ${f(p.longestShot, 0)} s)`}`,
+    `- **spectrum**: slope ${f(sl, 2)} (${f(p.spectrum.p10, 2)} to ${f(p.spectrum.p90, 2)})${realNote('spectrum', sl, 2)} of power per wavenumber band: ${spec}`,
     `- **drift**: ${drift}`,
   ];
 }
@@ -519,7 +567,12 @@ export function guessTechniques(d, p, cutsPerMin = 0) {
   if (p?.wholeShare > 0.5 && period != null && period < 90) say(3, 'the glass or dish is turned (or the camera rotates)', `whole-field motion explains ${(p.wholeShare * 100).toFixed(0)}% of the motion, one turn in ${period.toFixed(0)} s`);
   else if (p?.wholeShare > 0.5 && p?.whole?.med > 2) say(2.5, 'the camera pans or the plate is slid: the picture moves as one', `whole-field share ${(p.wholeShare * 100).toFixed(0)}%, ${p.whole.med.toFixed(1)}% of the width a second`);
   if (div != null && div > 0.03) say(2, 'pours or presses: material spreading out from where it is added', `divergence ${div.toFixed(3)}/s`);
-  if (car != null && car < 0.3) say(2.5, 'the picture changes in place more than it flows: crossfades between layers, a colour wheel or lights cycling, dye diffusing, or a digital effect rather than transport', `carried ${car.toFixed(2)}`);
+  // Real shows read carried 0.13 to 0.19 (REAL_SHOWS): noise, the lamp and
+  // superimposition pull it down. So only a clip under every real show is
+  // guessed to change in place rather than flow; the old bar, 0.3, called
+  // both real films digital.
+  const realLow = realRange('carried')?.[0] ?? 0.3;
+  if (car != null && car < realLow) say(2.5, 'the picture changes in place more than it flows, more than any real show: crossfades between layers, a colour wheel or lights cycling, dye diffusing, or a digital effect rather than transport', `carried ${car.toFixed(2)}, under the real shows' ${realLow.toFixed(2)}`);
   if (p?.vertical != null && p.vertical > 0.5) say(1.5, 'gravity: pouring, dripping, or a plate tilted toward the bottom of the frame', `drift down ${p.vertical.toFixed(1)}% of the width a second`);
   if (p?.vertical != null && p.vertical < -0.5) say(1.5, 'buoyancy: warm wax or oil rising, or bubbles', `drift up ${(-p.vertical).toFixed(1)}% of the width a second`);
   if (own != null && own < 1.5 && (p.lifetime ?? Infinity) > 8) say(2, 'viscous oils (mineral oil, glycerin) moved gently, by slow heat or tilting; or footage slowed down', `own flow ${own.toFixed(2)}% a second, a picture lives ${p.lifetime != null ? `${p.lifetime.toFixed(0)} s` : 'longer than the shot'}`);

@@ -102,9 +102,9 @@ export class WebGPUFluid extends FluidCover {
     /*
       Each with whether the show waits for it (`gpu/opening.ts`): true for
       what every look's first steps ask for, the part of the look that uses
-      it, or false for what is built behind the show once it is up. The
-      forty-three every opening asks for were read off all thirty-eight
-      looks' openings; `npm run startup` reads them again on every run.
+      it, or false for what is built behind the show once it is up. What
+      an opening asks for was read off every look's opening;
+      `npm run startup` reads them again each run.
     */
     const byFormat: [string, GPUTextureFormat[], boolean][] = [
       ['fill', [dye, RGBA32, VEL, R32], true],
@@ -113,7 +113,6 @@ export class WebGPUFluid extends FluidCover {
       ['gapReshape', [RGBA32], false],
       ['deltaDye', [dye], true],
       ['deltaVel', [VEL], true],
-      ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RGBA32], true],
       ['scaleDye', [dye], true],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
@@ -180,6 +179,8 @@ export class WebGPUFluid extends FluidCover {
       ['inkSpecies', [RGBA32], false],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
+      ['liquidForces', [VEL], false],
+      ['soapThin', [dye], false],
       /*
         The dye across faces is also how the dye moves wherever the maze
         flows (the advect dye stage), from the maze's first step, so a look
@@ -190,6 +191,7 @@ export class WebGPUFluid extends FluidCover {
       ['bodyPartition', [dye], false],
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
+      ['bodyLay', [dye], false],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -381,7 +383,7 @@ export class WebGPUFluid extends FluidCover {
     const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
     const thin = this.thinGapOn(p);
     f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
-    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
+    f[6] = fin(p.turbScale, 0); f[7] = 0; f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
     f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
     f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
@@ -517,7 +519,7 @@ export class WebGPUFluid extends FluidCover {
       under a bubble that had already popped.
     */
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
-    this.stepPlateBoil(enc, p);
+    this.stepAhead(enc, p);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     /*
       And on the step after the last bubble goes: its hole is a sink in the
@@ -539,6 +541,7 @@ export class WebGPUFluid extends FluidCover {
     this.lastDt = p.dt;
     // The slosh dish, before the step's pass opens: its own pass, whose flow the thin stage reads (PLAN 18a-13).
     this.stepSloshDish(enc, p);
+    this.stepBeside(enc, p);
 
     /*
       One pass, or one per stage.
@@ -972,7 +975,7 @@ export class WebGPUFluid extends FluidCover {
       // The gap rides along: the plate's depth is a mobility on the flow that
       // carries the dye (F), and this is the field that carries it.
       this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read],
-        this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
+        this.arg('add current', [0, this.M, p.depthDrag, swirlScale]));
     }, !thin);
 
     // 9. Dye: dispersion along the flow plus molecular diffusion (PLAN 18h, 18h-2)

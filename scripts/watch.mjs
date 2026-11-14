@@ -4,7 +4,8 @@
  *
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
  *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
- *                                  [--crop x,y,w,h]
+ *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]]
+ *   npm run watch -- --refs        the reference library (--vs takes a name from it)
  *   npm run watch -- --selftest
  *
  * Asked for: "a skill or agent that is able to better watch video … it will make
@@ -72,11 +73,13 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { physicsAcc, physicsFrame, physicsSummary, physicsLines, comparePhysics, techniqueLines } from './watchphysics.mjs';
 import { designFrame, designSummary, designLines, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
-import { readSelftest } from './watchreadtest.mjs';
+import { readSelftest, dissolveClips } from './watchreadtest.mjs';
+import { thumb, findDissolves } from './watchcuts.mjs';
+import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', selftest: false, quiet: false, crop: null, vs: '' };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', selftest: false, quiet: false, crop: null, vs: '', keep: '', note: '', refs: false };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -94,6 +97,11 @@ function parseArgs(argv) {
     else if (a === '--to') opt.to = Number(v()) || 0;
     else if (a === '--at') opt.at = v().split(',').map(Number).filter(Number.isFinite);
     else if (a === '--vs') opt.vs = v();
+    // The reference library (scripts/watchrefs.mjs, 47v-2): keep this clip's
+    // reads under a name, so a later `--vs <name>` needs no fetch.
+    else if (a === '--keep') opt.keep = v();
+    else if (a === '--note') opt.note = v();
+    else if (a === '--refs') opt.refs = true;
     // A footage of the whole room (the projector, the hands, the screen) reads
     // the room; `--crop x,y,w,h` (fractions of the picture) reads only the
     // projection or the plate.
@@ -106,7 +114,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 8).map(l => l.replace(/^ \* ?/, '')).join('\n'));
+  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 9).map(l => l.replace(/^ \* ?/, '')).join('\n'));
 }
 
 // ─── tools ───────────────────────────────────────────────────────────────────
@@ -450,7 +458,7 @@ async function watch() {
   const aw = 320;
 
   // Pass 1: every sample, small, for the numbers and the slit scan.
-  const rows = [], slit = [], design = [], pacc = paletteAcc(), phys = physicsAcc();
+  const rows = [], slit = [], design = [], thumbs = [], pacc = paletteAcc(), phys = physicsAcc();
   // The spectrum costs an FFT a sample: take it on about 400 of them.
   phys.spectrumEvery = known ? Math.max(1, Math.ceil((known * rate) / 400)) : 1;
   let prev = null;
@@ -497,6 +505,7 @@ async function watch() {
     rows.push({ t: opt.from + k / rate, lum: lum / N, sat: sat / N, dark: dark / N, bright: bright / N,
       motion: prev ? (diff / N) * 100 : 0, coloured, colour: coloured / N, hue, hue12, hist: hist.map(v => v / N), hv: hv.map(v => v / N) });
     prev = cur;
+    thumbs.push(thumb(cur, W, H));
     // The design read (colour, form, light, composition) of the same sample:
     // scripts/watchdesign.mjs says what each number is and why.
     design.push(designFrame(px, W, H, pacc));
@@ -551,9 +560,24 @@ async function watch() {
     const colours = change[k] > 0.25 && change[k] > 3 * Math.max(cB, cA) + 0.05;
     const picture = rows[k].motion > 8 && rows[k].motion > 4 * Math.max(mB, mA) + 1;
     // A cut blended over two samples (a short dissolve) shows as two in a
-    // row; one within a third of a second of another is the same cut.
-    if ((colours || picture) && rows[k].motion > 2 && !(cuts.length && k - cuts.at(-1) < rate / 3)) { cuts.push(k); rows[k].cut = true; }
+    // row; one within a third of a second of another (or the next sample, at
+    // two samples a second, where a third of a second is under one) is the same cut.
+    if ((colours || picture) && rows[k].motion > 2 && !(cuts.length && k - cuts.at(-1) < Math.max(2, rate / 3))) { cuts.push(k); rows[k].cut = true; }
   }
+  // Dissolves (47w-2): a take boundary spread over a second, which no one
+  // sample shows; scripts/watchcuts.mjs says how they are told from the
+  // liquid's own change. Each counts as one cut, at its middle sample, and
+  // every sample inside it is a `fade`: left out of whatever reads motion or
+  // flow, as a cut sample is, since a mix of two takes moves like neither.
+  const turnedDown = [];
+  const dissolves = findDissolves({ thumbs, cuts, rate, rejected: turnedDown });
+  for (const v of dissolves) {
+    for (let j = v.from + 1; j <= v.to; j++) rows[j].fade = true;
+    rows[v.mid].cut = rows[v.mid].dissolve = true;
+    cuts.push(v.mid);
+  }
+  cuts.sort((x, y) => x - y);
+  thumbs.length = 0;
 
   // Pass 2: the chosen frames at tile size.
   const want = new Set();
@@ -583,7 +607,7 @@ async function watch() {
     group.forEach((t, i) => {
       const x0 = (i % cols) * (TW + GAP), y0 = Math.floor(i / cols) * (TH + GAP);
       for (let y = 0; y < TH; y++) img.set(t.px.subarray(y * TW * 3, (y + 1) * TW * 3), ((y0 + y) * SW + x0) * 3);
-      label(img, SW, SH, x0 + 4, y0 + 4, stamp(rows[t.k].t) + (rows[t.k].cut ? ' CUT' : ''));
+      label(img, SW, SH, x0 + 4, y0 + 4, stamp(rows[t.k].t) + (rows[t.k].dissolve ? ' DISSOLVE' : rows[t.k].cut ? ' CUT' : ''));
     });
     const f = path.join(out, `sheet-${s + 1}.png`);
     writePng(f, SW, SH, img);
@@ -599,7 +623,7 @@ async function watch() {
   const tl = new Uint8Array(cols * TH2 * 3).fill(18);
   // Scaled to the 99th percentile of motion without the cuts: a cut is a
   // change of the whole frame and would flatten every other bar to nothing.
-  const still = rows.filter((r, k) => k > 0 && !r.cut).map(r => r.motion).sort((x, y) => x - y);
+  const still = rows.filter((r, k) => k > 0 && !r.cut && !r.fade).map(r => r.motion).sort((x, y) => x - y);
   const mMax = Math.max(1e-6, still[Math.floor(still.length * 0.99)] ?? 1);
   for (let x = 0; x < cols; x++) {
     const k = colOf(x), col = slit[k];
@@ -613,6 +637,9 @@ async function watch() {
       const lh = Math.round(Math.max(0, Math.min(1, (loud[k] + 60) / 60)) * (BAR - 6));
       for (let y = 0; y < lh; y++) tl.set([90, 200, 255], ((SLH + 2 * BAR - 2 - y) * cols + x) * 3);
     }
+    // A dissolve's samples are a dim red band under its line, so a take's
+    // edge reads as wide as it was.
+    if (rows[k].fade && !rows[k].cut) for (let y = SLH; y < SLH + 6; y++) tl.set([150, 30, 30], (y * cols + x) * 3);
     if (rows[k].cut && (x === 0 || colOf(x - 1) !== k)) for (let y = 0; y < TH2 - AX; y++) tl.set([255, 40, 40], (y * cols + x) * 3);
   }
   const step = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find(s => span / s <= 12) ?? 1200;
@@ -657,7 +684,7 @@ async function watch() {
       for (let i = 0; i < m; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
       return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
     };
-    const ok = rows.map((r, k) => k > 0 && !r.cut);
+    const ok = rows.map((r, k) => k > 0 && !r.cut && !r.fade);
     let bestLag = { lag: 0, r: -2 };
     const maxLag = Math.round(rate);
     for (let lag = -maxLag; lag <= maxLag; lag++) {
@@ -683,7 +710,7 @@ async function watch() {
   const ds = designSummary(design, pacc);
   // The physics read needs the cuts (no flow is measured across one) and the
   // form size from the design read (for the turnover time).
-  const ps = physicsSummary(phys, { rate, cut: rows.map(r => !!r.cut), W: w, scale: ds.scaleX?.med ?? null });
+  const ps = physicsSummary(phys, { rate, cut: rows.map(r => !!(r.cut || r.fade)), W: w, scale: ds.scaleX?.med ?? null });
   phys.frames.length = 0;
   ds.physics = ps;
   fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds }, null, 1) + '\n');
@@ -691,9 +718,10 @@ async function watch() {
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
   const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, cuts.length / Math.max(1 / 60, span / 60))];
   if (opt.vs) {
-    const vf = fs.existsSync(path.join(opt.vs, 'design.json')) ? path.join(opt.vs, 'design.json') : opt.vs;
+    // A path to a design.json, a folder holding one, or a kept reference's name.
+    const vf = resolveRef(opt.vs);
     let ref = null;
-    try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs} (watch the reference first, with this version of the tool)`, 2); }
+    try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs}, and no reference of that name (npm run watch -- --refs lists them; watch the reference first, with this version of the tool)`, 2); }
     designOut.push('', ...compareDesign(ref, ds, `the reference (${ref.title ?? vf})`, 'this'));
     if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
   }
@@ -716,7 +744,7 @@ async function watch() {
     `- brightness ${mean(r => r.lum).toFixed(2)}; near black ${pct(mean(r => r.dark))} of the frame; blown ${pct(mean(r => r.bright))}; saturation ${mean(r => r.sat).toFixed(2)}`,
     `- colour: ${pct(colTot / (n * w * h))} of pixels are coloured; of those ${hues.map(([nme, v]) => `${nme} ${pct(v)}`).join(', ') || 'none'}`,
     `- motion (mean % change between samples): median ${q(motions, 0.5)?.toFixed(2) ?? 0}, 90th ${q(motions, 0.9)?.toFixed(2) ?? 0}, max ${q(motions, 1)?.toFixed(2) ?? 0}`,
-    `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t)).join(', ') : 'none'}`,
+    `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t) + (rows[k].dissolve ? ' (dissolve)' : '')).join(', ') : 'none'}${dissolves.length ? `; ${dissolves.length} of them dissolves, ${dissolves.map(v => `${((v.to - v.from) / rate).toFixed(1)} s`).join(', ')}` : ''}`,
     ...shapeLines,
     sync ? `- sound: loudness median ${q(loud, 0.5).toFixed(0)} dB; motion vs loudness r = ${sync.r0.toFixed(2)} at no lag, best ${sync.best.toFixed(2)} with motion ${sync.lag >= 0 ? 'following' : 'leading'} the sound by ${Math.abs(sync.lag).toFixed(2)} s` : '- sound: no audio track',
     '',
@@ -733,7 +761,12 @@ async function watch() {
   ];
   fs.writeFileSync(path.join(out, 'summary.md'), lines.join('\n') + '\n');
   if (!opt.quiet) console.log(lines.join('\n'));
-  return { out, rows, cuts, sync, shape: sh, design: ds, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  if (opt.keep) {
+    const kept = keepRef(out, opt.keep, { title: info?.title ?? path.basename(opt.file), url: info?.url ?? (/^https?:/.test(opt.input) ? opt.input : null),
+      crop: opt.crop, from: opt.from, to: opt.from + span, rate, note: opt.note || null });
+    if (!opt.quiet) console.log(`\nkept as a reference: ${kept} (compare with --vs ${path.basename(kept)})`);
+  }
+  return { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, sheets, tiles, picks, timeline, span, pr, w, h, rate };
 }
 
 // ─── the show's shape ────────────────────────────────────────────────────────
@@ -801,7 +834,7 @@ export function shape({ rows, rate, span, cuts = [] }) {
   const med = a => { const s = a.filter(Number.isFinite).sort((x, y) => x - y); return s.length ? s[s.length >> 1] : NaN; };
   const q = (a, p) => { const s = a.filter(Number.isFinite).sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : NaN; };
   const sec = x => Math.max(1, Math.round(x * rate));
-  const m = rows.map((r, k) => (k === 0 || r.cut ? NaN : r.motion));
+  const m = rows.map((r, k) => (k === 0 || r.cut || r.fade ? NaN : r.motion));
 
   const hw = Math.round(1.25 * rate) >> 1;   // a window 1.25 s wide: five samples at 4 a second
   const sm = m.map((_, i) => {
@@ -1027,6 +1060,12 @@ async function selftest() {
   const D = await run(await makeClip(dir, 'd', { sec: 60, frame: frameD, sound: t => 3000 * speed(t) * Math.sin(2 * Math.PI * 440 * t) }));
   const E = await run(await makeClip(dir, 'e', { sec: 60, frame: f => frameD(Math.min(f, SFPS * 20)), sound: () => 0 }));
 
+  // F and G, the dissolve clips (47w-2): scripts/watchreadtest.mjs says
+  // what is in each and why.
+  const { frameF, frameG } = dissolveClips(SW_, SH_, SFPS);
+  const DF = await run(await makeClip(dir, 'f', { sec: 14, frame: frameF, sound: () => 0 }));
+  const DG = await run(await makeClip(dir, 'g', { sec: 18, frame: frameG, sound: () => 0 }));
+
   const checks = [];
   const check = (name, ok, detail) => { checks.push(!!ok); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name} — ${detail}`); };
   const ts = r => r.cuts.map(k => r.rows[k].t.toFixed(2)).join(', ') || 'none';
@@ -1072,6 +1111,42 @@ async function selftest() {
   check('C: the stripes move more than a cut threshold every sample', fast.length >= 15 && Math.min(...fast) > 8, `motion ${Math.min(...fast).toFixed(1)} to ${Math.max(...fast).toFixed(1)}`);
   check('C: a cut into fast motion at 2.0 s, none inside it, and the dissolve at 4.0 s once',
     C.cuts.length === 2 && C.cuts[0] === 20 && (C.cuts[1] === 40 || C.cuts[1] === 41), `cuts at ${ts(C)}`);
+
+  const dv = r => r.dissolves.map(v => `${r.rows[v.from].t.toFixed(1)}–${r.rows[v.to].t.toFixed(1)} s (gap ${v.gap.toFixed(1)}, takes ${v.inside.toFixed(1)}, left ${v.left.toFixed(2)}, fall ${v.fall.toFixed(2)})`).join('; ') || 'none';
+  const tAt = (r, k) => r.rows[k].t;
+  check('F: two dissolves, 4.0–5.5 s and 10.0–11.0 s, each one cut at its middle, and the hard cut at 8.0 s',
+    DF.dissolves.length === 2 && DF.cuts.length === 3 && Math.abs(tAt(DF, DF.cuts[0]) - 4.75) <= 0.3 && Math.abs(tAt(DF, DF.cuts[1]) - 8) <= 0.1
+      && Math.abs(tAt(DF, DF.cuts[2]) - 10.5) <= 0.3 && DF.rows[DF.cuts[0]].dissolve && !DF.rows[DF.cuts[1]].dissolve && DF.rows[DF.cuts[2]].dissolve,
+    `cuts at ${ts(DF)}; dissolves ${dv(DF)}`);
+  // The first dissolve is in the takes' own colours, so the hard-cut test
+  // (colours, or one sample's change) sees nothing of it: what finds it is
+  // the mix. Every sample inside each dissolve is a fade, and none outside.
+  const fades = (t0, t1) => DF.rows.filter(r => r.t > t0 && r.t < t1);
+  const in1 = fades(4.15, 5.4), in2 = fades(10.15, 10.95), out = DF.rows.filter(r => [3.9, 5.6, 9.9, 11.1].some(t => Math.abs(r.t - t) < 0.01));
+  check('F: the samples inside both dissolves are fades, and the samples just outside them are not',
+    in1.length >= 10 && in1.every(r => r.fade) && in2.length >= 7 && in2.every(r => r.fade) && out.length === 4 && !out.some(r => r.fade),
+    `${in1.filter(r => r.fade).length} of ${in1.length}, ${in2.filter(r => r.fade).length} of ${in2.length} marked; outside ${out.filter(r => r.fade).length} of ${out.length}`);
+  // What a fade does: the physics read takes no pair across one. Its longest
+  // shot is then the first take, 0.0 to 4.0 s (41 samples, 4.1 s); with
+  // only the dissolve's middle sample a cut, it would run to 4.7 s.
+  check('F: the physics read measures across no fade: its longest shot is the first take, 4.1 s', Math.abs(DF.design.physics.longestShot - 4.1) < 0.06,
+    `longest shot ${DF.design.physics.longestShot?.toFixed(2)} s`);
+  const why = (r, t0, t1) => r.turnedDown.filter(v => r.rows[v.to].t > t0 && r.rows[v.from].t < t1).map(v => v.why);
+  const downs = r => r.turnedDown.map(v => `${r.rows[v.from].t.toFixed(1)}–${r.rows[v.to].t.toFixed(1)} s ${v.why}${v.left != null ? ` (left ${v.left.toFixed(2)})` : ''}`).join(', ') || 'none';
+  check('G: a pour, a dye body spreading and the lamp dimming and coming back, in one take, are no cut and no dissolve',
+    !DG.cuts.length && !DG.dissolves.length, `cuts at ${ts(DG)}; dissolves ${dv(DG)}`);
+  // Each turned down by the step meant for it, so a step that stops working
+  // reads red here and not only on a film: the pour (its ends differ by a
+  // cut's worth against the calm take) and the dye body by the mix, the
+  // dye body only since the mix's bar was set from the Joshua Light Show
+  // film's dissolves (all under 0.03; the body reads about 0.14); the lamp,
+  // a perfect mix of its ends, by the revisit.
+  check('G: the pour and the dye body are turned down as no mix of their ends; the lamp, both ways, as a return to a picture already shown',
+    why(DG, 3.1, 4.4).includes('mix') && why(DG, 8.1, 8.9).includes('mix') && why(DG, 13.1, 13.9).includes('revisit') && why(DG, 15.1, 15.9).includes('revisit'),
+    `turned down: ${downs(DG)}`);
+  // C's stripes between its two hard cuts raise a run that touches both:
+  // it is the cuts', turned down as such, not judged again as a dissolve.
+  check('C: the raised run between its hard cuts is turned down as touching a cut', why(C, 2.1, 3.9).includes('cut'), `turned down: ${downs(C)}`);
 
   // C stands still twice: the grey square until the cut at 2.0 s (2.0 s
   // still), and the blue from 4.1 s to the end at 6.0 (1.9 s). At the default
@@ -1305,6 +1380,7 @@ if (main) {
   try {
     parseArgs(process.argv.slice(2));
     if (opt.selftest) await selftest();
+    else if (opt.refs) console.log(listRefs().join('\n'));
     else if (!opt.input) { printHelp(); process.exit(2); }
     else await watch();
   } catch (e) {

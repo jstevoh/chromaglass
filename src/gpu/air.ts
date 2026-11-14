@@ -18,12 +18,15 @@
  * the way the thing it describes does.
  */
 
-import { AIR_BOIL_WGSL, AIR_SPLAT_WGSL } from './wgsl/air';
+import { AIR_BOIL_WGSL, AIR_LOOK_SPAN, AIR_SPLAT_WGSL } from './wgsl/air';
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { groupOf, viewOf } from './groupCache';
 
 /** x, y, radius (all as a fraction of the grid) and opacity. */
 const STRIDE = 4 * 4;
+
+/** The bubbles as the field was last stamped from them (38h-15): discs (x, y, r, opacity) and rims (fingering, count, phase, film). */
+export type AirGeo = { readonly discs: GPUBuffer; readonly rims: GPUBuffer };
 
 /**
  * The splat's pipeline, apart from the class so `WebGPUAir.prepare` builds
@@ -107,6 +110,8 @@ export class WebGPUAir {
     nowhere else the previous one survives.
   */
   private readonly fields: [GPUTexture, GPUTexture];
+  /** The bubbles as the field was last stamped from them, for the plate. */
+  readonly geo: AirGeo;
   private which = 0;
   private live = 0;
   private boilTex: GPUTexture | null = null;
@@ -124,13 +129,26 @@ export class WebGPUAir {
     this.buffer = this.disposer.track(device.createBuffer({
       label: 'air discs',
       size: Math.max(1, capacity) * STRIDE,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     }));
     this.fingers = this.disposer.track(device.createBuffer({
       label: 'air fingers',
       size: Math.max(1, capacity) * STRIDE,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    }));
+    /*
+      The list as the field was last stamped from it, for the plate to draw
+      each bubble from its own disc (PLAN 38h-15, wgsl/bubbleShape.ts). A copy
+      taken in the splat's own encoder, not the list as last handed over: a
+      frame the solver does not step draws last step's field, and the list
+      handed over since may have lost a bubble and moved every index after it.
+    */
+    if (capacity > AIR_LOOK_SPAN) throw new Error(`WebGPUAir: room for ${capacity} bubbles, and the field's index holds ${AIR_LOOK_SPAN}`);
+    const geo = (label: string) => this.disposer.track(device.createBuffer({
+      label, size: Math.max(1, capacity) * STRIDE,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }));
+    this.geo = { discs: geo('air discs stamped'), rims: geo('air rims stamped') };
     this.uniform = this.disposer.track(device.createBuffer({
       label: 'air uniforms',
       size: 16,
@@ -183,7 +201,7 @@ export class WebGPUAir {
       this.device.queue.writeBuffer(this.fingers, 0, f, 0, this.live * 4);
     }
     this.device.queue.writeBuffer(this.uniform, 0, new Uint32Array([this.live]));
-    this.device.queue.writeBuffer(this.uniform, 4, new Float32Array([soft, 0, 0]));
+    this.device.queue.writeBuffer(this.uniform, 4, new Float32Array([soft, this.grid, 0]));
   }
 
   /** Whether anything would be drawn — the caller skips the exclusion without it. */
@@ -225,6 +243,10 @@ export class WebGPUAir {
     // Into the one that is not current, which then becomes current: what was
     // there is last frame's air, which is what the push differences against.
     this.which = 1 - this.which;
+    if (this.live > 0) {
+      enc.copyBufferToBuffer(this.buffer, 0, this.geo.discs, 0, this.live * STRIDE);
+      enc.copyBufferToBuffer(this.fingers, 0, this.geo.rims, 0, this.live * STRIDE);
+    }
     const pass = enc.beginRenderPass({
       label: 'air splat',
       colorAttachments: [{

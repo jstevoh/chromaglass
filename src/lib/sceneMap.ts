@@ -80,6 +80,8 @@ const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeIm
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // And the film's dye (PLAN 20b-13): dye dissolved in the oil does not come and go on the beat.
   'clearFilmDye',
+  // Nor the tank (PLAN 47n): whether the picture is a tank or the dish is the whole frame, never the beat's. Its feed, dye and nozzle are cords.
+  'tank',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
   // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).
@@ -109,10 +111,16 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  * (beat squeeze, plate rock, rotation).
  *
  * They are the right ones for the job: speed, turbulence and its detail, evolve
- * rate, dye budget, sound drive, and most of the physics — viscosity's damping,
+ * rate, dye budget, and most of the physics — viscosity's damping,
  * buoyancy, advection, diffusion, surface tension. How a plate moves and how it
  * evolves, which is exactly what you would want a film driving on one layer
  * while the bass drives another.
+ *
+ * Sound Drive was one of them while the step multiplied its stir by the
+ * analyser's energy times that dial. The step takes no sound now (PLAN 38u-4:
+ * the music's stir is a cord on Turbulence, lib/stir.ts), so it reads Sound
+ * Drive nowhere and a plate of its own for it would be a choice that does
+ * nothing; a cord can still be aimed at one plate, which is the real control.
  *
  * Written out rather than derived at runtime because it decides what a dropdown
  * offers, and checked against the solver's own source by `scripts/panel.mjs` in
@@ -122,7 +130,7 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  * of twenty-seven; the check is the only reason that was ever noticed.
  */
 export const PER_LAYER: ReadonlySet<string> = new Set([
-  'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
+  'advection', 'airVelocity', 'automateRate', 'backgroundLoop',
   'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
   'dimmer', 'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heat', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a

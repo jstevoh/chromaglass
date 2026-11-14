@@ -33,7 +33,11 @@
  *             screen's layer and reads `song-title`, the song show's title
  *             and the ear's go through app/songTitle.ts, the encoder's stage
  *             draws the card, the MCP and the assistant pass `song-title`,
- *             and the phone's Title control carries the caption/ink choice
+ *             and, since the ink was shelved (37x-10m, 2026-11-12), every
+ *             title is the caption: the sink reads no `titleCaption`, a
+ *             `pour-text` message's rows go up as the card, the phone's box
+ *             sends `song-title`, and neither the phone, the desk nor a song
+ *             show offers or pours the ink
  *
  * Measured 2026-11-10 in a cloud session (Chromium, software): the numbers
  * are printed on each line.
@@ -41,7 +45,7 @@
 import { chromium } from 'playwright';
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const fails = [];
 const check = (id, what, ok, detail) => {
@@ -132,14 +136,28 @@ const bad = [];
 const remote = src('src/app/useRemote.ts');
 if (!/mountSongCaptionLayer\s*\(/.test(remote)) bad.push('useRemote does not mount the screen\'s caption layer');
 if (!/case 'song-title'[\s\S]{0,200}showSongCaption\s*\(/.test(remote)) bad.push('useRemote does not show a song-title message');
-if (!/setSongTitleSink\s*\(\s*\(/.test(remote) || !/titleCaptionRef\.current !== false\)\s*showSongCaption/.test(remote)) bad.push('useRemote does not choose caption or ink by titleCaption');
+// Since 37x-10m (the ink shelved, 2026-11-12) the sink is the caption alone, whatever `titleCaption` says,
+// and the `pour-text` rows from the assistant or an older phone go up as the caption too.
+if (!/setSongTitleSink\s*\(\s*\(card\)\s*=>\s*showSongCaption\s*\(\s*card\s*\)\s*\)/.test(remote)) bad.push('useRemote\'s title sink is not the caption alone');
+if (/titleCaption/.test(remote) || /\.pourText\s*\(/.test(remote)) bad.push('useRemote still reads titleCaption or pours words as ink');
+if (!/case 'pour-text'[\s\S]{0,300}rowsCaption\s*\([\s\S]{0,80}showSongCaption\s*\(/.test(remote)) bad.push('a pour-text message does not go up as the caption');
 if (!/case 'title':\s*showSongTitle\s*\(/.test(src('src/app/useSongScore.ts'))) bad.push('a song show\'s title does not go through showSongTitle');
 if (!/showSongTitle\s*\(/.test(src('src/app/useInkTitle.ts'))) bad.push('the ear\'s title does not go through showSongTitle');
 if (!/drawSongCaption\s*\(\s*ctx,\s*width,\s*height/.test(src('src/lib/liveStream.ts'))) bad.push('the encoder\'s stage does not draw the card');
 if (!/type: 'song-title'/.test(src('mcp/chromaglass-mcp.js'))) bad.push('the MCP has no song_title');
 if (!/type === 'song-title'/.test(src('server/assistant.js'))) bad.push('the assistant does not pass song-title');
-if (!/titleCaption:\s*v/.test(src('src/components/phone/PhoneInkTitle.tsx'))) bad.push('the phone\'s Title control has no caption/ink choice');
-if (!/titleCaption:\s*true/.test(src('src/types.ts'))) bad.push('titleCaption does not default to the caption');
+if (/titleCaption|inkTitleSweep/.test(src('src/components/phone/PhoneInkTitle.tsx'))) bad.push('the phone\'s Title control still offers the shelved ink');
+if (!/type: 'song-title'/.test(src('src/components/RemotePourText.tsx')) || /type: 'pour-text'/.test(src('src/components/RemotePourText.tsx'))) bad.push('the phone\'s title box does not send song-title');
+{
+  // Every component, not only Logo & Titles: the ink's controls put back on any desk or settings panel are the shelved path back.
+  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${d}/${e.name}`) : /\.tsx?$/.test(e.name) ? [`${d}/${e.name}`] : []));
+  const inked = walk('src/components').filter((p) => /onUpdate\(\{\s*(titleCaption|inkTitleSweep|inkTitleColor|inkTitleSize|inkTitleY)\b|onSetting\(\{\s*(titleCaption|inkTitleSweep)\b|settingKey="inkTitle(Sweep|Size|Y)"/.test(src(p)));
+  if (inked.length) bad.push(`the shelved ink is still offered in ${inked.join(', ')}`);
+}
+if (/\.pourText\s*\(/.test(src('src/app/useSongScore.ts'))) bad.push('a song show still pours words as ink');
+if (!/case 'signoff':\s*showSongCaption\s*\(/.test(src('src/app/useSongScore.ts'))) bad.push('a song show\'s sign-off is not the caption');
+// The caption/ink setting is gone with the ink (37x-10m): a `titleCaption` back in the settings is the choice come back.
+if (/\btitleCaption\b/.test(src('src/types.ts'))) bad.push('titleCaption, the shelved caption/ink choice, is back in the settings');
 check('wired', 'the app, the stream, the phone, the assistant and the MCP all reach the caption', bad.length === 0, bad.join('; '));
 
 console.log(fails.length ? `\n${fails.length} failed: ${fails.join(', ')}` : '\nall passed');

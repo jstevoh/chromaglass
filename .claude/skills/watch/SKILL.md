@@ -18,6 +18,9 @@ npm run watch -- <file or URL> --out <scratchpad>/<name>
 npm run watch -- clip.webm --out … --from 30 --to 90 --frames 36 --at 41.5,62
 npm run watch -- room.mkv --out … --crop 0.52,0.10,0.22,0.40   # only the projection
 npm run watch -- our-take.webm --out … --vs <scratchpad>/<reference>   # ours against it
+npm run watch -- film.mkv --out … --keep <name> --note "why"   # into the reference library
+npm run watch -- our-take.webm --out … --vs <name>   # against a kept reference, no fetch
+npm run watch -- --refs         # the library, with each reference's numbers
 npm run watch -- --selftest     # synthetic clips, frames and flows with known answers
 ```
 
@@ -59,8 +62,8 @@ It prints a summary (also `summary.md`) and writes:
 
 | File | What it is for |
 |---|---|
-| `timeline.png` | **Read first.** The centre column of every sample side by side (time runs right; a streak's slope is its speed), a motion strip, a loudness strip, red lines at cuts. The shape of the whole clip in one picture. |
-| `sheet-N.png` | Frames at even intervals plus every cut, time-stamped, each sheet inside 1568 px so nothing is downscaled. |
+| `timeline.png` | **Read first.** The centre column of every sample side by side (time runs right; a streak's slope is its speed), a motion strip, a loudness strip, red lines at cuts and a dim red band under each dissolve. The shape of the whole clip in one picture. |
+| `sheet-N.png` | Frames at even intervals plus every cut (a dissolve at its middle, labelled DISSOLVE), time-stamped, each sheet inside 1568 px so nothing is downscaled. |
 | `still-*.png` | Full-resolution frames at the `--at` times, for the close look once the sheets say where. |
 | `stats.tsv` | Per sample: brightness, near-black fraction, blown fraction, saturation, motion, loudness. |
 | `palette.png` | The clip's six main colours, each as wide as its share. |
@@ -81,6 +84,36 @@ and 20 s windows. For scale, at `--rate 4`: the Joshua Light Show film reads
 3.1 swells a minute, calm 42%, 2 hues, 9.8 changes a minute; the Dregs (2023)
 2.0, 23%, 3, 8.7, with r −0.13 at 1 s; a 2016 show in a bar 2.0, 20%, with r
 0.22 at 1 s rising to 0.39 at 20 s. Real shows do not follow the beat.
+
+**Cuts and dissolves.** A hard cut is one sample that changes far more than
+the samples around it. A dissolve spreads that change over a second, so it
+is found another way (`scripts/watchcuts.mjs`, 47w-2): a run of raised
+change whose ends differ by a cut's worth, whose every frame is a mix of its
+two ends, and whose new picture the old take never showed. A pour, a dye
+body spreading and a lamp dimming and coming back are each turned down by
+their own step (the self-test's clip G). Each dissolve counts as one cut, at
+its middle, and its samples are left out of the motion and physics reads. On
+the Joshua Light Show film it found 12 dissolves in ten minutes, each a
+superimposition of two loops on the sheets.
+
+## The reference library
+
+The references the owner likes are kept once, outside the public repo, in
+`/mnt/project-files/references/<name>/` (a cloud thread; on the Mac,
+`~/chromaglass-films/references`; `$CHROMAGLASS_REFERENCES` overrides):
+`design.json`, `summary.md`, the timeline, the first sheet, the palette and
+a `ref.json` saying where it came from and why it was kept. `--keep <name>`
+puts a watched clip there, `--vs <name>` compares a take with it without
+fetching again, and `--refs` lists them. A look's retune can be held to its
+reference's numbers this way. `scripts/watchrefs.mjs` has the rules.
+
+Kept so far: `jls-liquid-loops-1969` and `bar-the-dip-2016` (the two real
+shows) and `lll-melt-your-face-1` (Liquid Light Lab's own look: a dish
+camera through a video mirror and colouriser, so not a real-show row).
+
+A crop is decoded 320 pixels wide. A thin strip (a screen filmed from the
+crowd) leaves too few rows for the flow read's blocks, and the physics
+section prints dashes: crop a squarer piece of the screen (47v-6).
 
 ## The design, physics and techniques sections
 
@@ -103,7 +136,12 @@ Definitions, with why each measure and what its bands mean, are at the top of
   for "physics writes, rendering reads"); turnover (seconds to carry a form
   its own size); lifetime (how long a picture stays like itself); the
   luminance spectrum's slope (shallow: fine filaments; steep: smooth, soft).
-  The frames cannot give viscosity or the glass's real size.
+  The frames cannot give viscosity or the glass's real size. Beside flow,
+  carried, turnover, lifetime and spectrum the read prints the range real
+  performances read (`REAL_SHOWS` in `scripts/watchphysics.mjs`, 47v-3), and
+  says when a clip is under or over every one. Real shows read carried only
+  0.13 to 0.19 (film grain, the lamp, superimposition), so a low carried
+  share is a finding only under that.
 - **Techniques:** technique words found in the page (rig, oils, dyes,
   surfactants, heat, magnets, optics, camera speed, digital tools), its
   chapters and links, then guesses from the numbers with their evidence.

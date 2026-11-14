@@ -67,10 +67,10 @@ export function standInEdit(setl, seq) {
 const setOf = (st) => { try { return JSON.parse(st.text.slice(st.text.indexOf('\n{') + 1)).set ?? null; } catch { return null; } };
 
 /** In Suggest: a sequence read and a set's file out answer; an edit is refused for want of Full. */
-export async function editSuggestLines({ mcp, display, check }) {
+async function editSuggestLines({ mcp, display, check }) {
   await sleep(1100);
   const t = Date.now();
-  const read = await mcp.call('sequence_edit', { command: 'read' });
+  const read = await mcp.call('sequence_edit', { command: 'read', sequence: 'Slow build' });
   const out = await mcp.call('set_list_edit', { command: 'export' });
   // Counted, not timed: "nothing sent" is the display's count of edits not moving across the add, so a CI clock that steps back cannot read an earlier message as the add's.
   const before = display.since(0, 'assistant-edit').length;
@@ -84,7 +84,7 @@ export async function editSuggestLines({ mcp, display, check }) {
 }
 
 /** In Play: every edit refused for want of Full; a sequence read is Suggest's and answers. */
-export async function editPlayLines({ mcp, display, check }) {
+async function editPlayLines({ mcp, display, check }) {
   await sleep(1100);
   const t = Date.now();
   const r = [await mcp.call('set_list_edit', { command: 'add', look: 'Calm' }), await mcp.call('sequence_edit', { command: 'new', name: 'Mine' }), await mcp.call('set_list_edit', { command: 'remove', item: 1 })];
@@ -98,7 +98,7 @@ export async function editPlayLines({ mcp, display, check }) {
 }
 
 /** In Full. */
-export async function editFullLines({ mcp, display, check, phone }) {
+async function editFullLines({ mcp, display, check, phone }) {
   const got = (t) => display.since(t, 'assistant-edit');
   const set = async () => setOf(await mcp.call('show_state'));
   const tryIt = async (tool, args) => { const t = Date.now(); const r = await mcp.call(tool, args); await sleep(200); return { r, sent: got(t) }; };
@@ -179,7 +179,7 @@ export async function editFullLines({ mcp, display, check, phone }) {
  * would answer "not an edit this build knows"), and every op the guard lets
  * through is asked at least once and answered as done.
  */
-export function editPageLines(page, say, guard, undoDepth) {
+function editPageLines(page, say, guard, undoDepth) {
   const store = new Map();
   globalThis.localStorage ??= { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
   /*
@@ -354,7 +354,7 @@ const PAGE_MUTANTS = [
   ['seq import not chosen', "put([...userBefore.filter(x => x.id !== q.id), q]); p.choose(q.id);", "put([...userBefore.filter(x => x.id !== q.id), q]); if (m.op !== 'import') p.choose(q.id);"],
 ];
 
-export async function editPageMutants(root, say, guard, undoDepth) {
+async function editPageMutants(root, say, guard, undoDepth) {
   const { build } = await import('esbuild');
   const { readFileSync } = await import('node:fs');
   const orig = readFileSync(`${root}/src/app/editNow.ts`, 'utf8');
@@ -371,4 +371,29 @@ export async function editPageMutants(root, say, guard, undoDepth) {
     if (!red) lived.push(name);
   }
   say(lived.length === 0, `each of the page line's ${PAGE_MUTANTS.length} mutants of app/editNow.ts turns it red${lived.length ? ` (lived: ${lived.join(', ')})` : ''}`);
+}
+
+/**
+ * The three modes' lines in one call from the Full block of scripts/assistant.mjs, which is
+ * past its size limit for another line in each mode: Suggest, then Play, then back to Full.
+ * By then the Play lines there have chosen Peak, so the Suggest read names its sequence.
+ */
+export async function editLines({ mcp, display, check, phone, setMode }) {
+  await setMode('suggest');
+  await editSuggestLines({ mcp, display, check });
+  await setMode('play');
+  await editPlayLines({ mcp, display, check });
+  await setMode('full');
+  await editFullLines({ mcp, display, check, phone });
+}
+
+/** What the page module of scripts/assistant.mjs exports for these lines, kept here so that file stays under its size limit. */
+export const EDIT_PAGE = " export { askEdit, setEditDoor, EDIT_READ_OPS, EDIT_KEPT_MAX } from './src/app/editNow.ts'; export { readSetListFile } from './src/lib/setList.ts';";
+
+/** The page lines on the real editNow.ts, held to the guard's own rules and Undo's depth, then its mutants when they run. */
+export async function editPage(page, say, root, mutantsOn) {
+  const guard = await import('../server/assistantEdit.js');
+  const { UNDO_DEPTH } = await import('../server/assistant.js');
+  editPageLines(page, say, guard, UNDO_DEPTH);
+  if (mutantsOn) await editPageMutants(root, say, guard, UNDO_DEPTH);
 }

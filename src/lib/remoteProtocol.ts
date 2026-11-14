@@ -385,6 +385,14 @@ export type RemoteMessage =
   | { type: 'tv-refuse'; id: string }
   | { type: 'tv-forget' }
   | { type: 'tv-key'; key: string }
+  /**
+   * The TV's remote picks the look (PLAN 12-tv-remote, server/tv-remote.js).
+   * Relay → TV: the laptop's presets in its order, and the live one, when
+   * either changes and when the TV joins. TV → relay: play this one, which
+   * the relay hands the display as `preset` if the laptop listed it.
+   */
+  | { type: 'tv-looks'; presets: { id: string; name: string }[]; active: string | null }
+  | { type: 'tv-pick'; presetId: string }
   /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
   | { type: 'beat' }
   /**
@@ -491,11 +499,12 @@ export type RemoteMessage =
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
   /**
-   * Words poured onto the plate as dye, which the flow then carries off
-   * (PLAN 37x-10c, `lib/pourText.ts`): a song's name and credit at the top
-   * of each track in a live set. From the phone remote's text box, or
-   * through the relay's guard; the display reads it with `parsePourText`
-   * whoever sent it. `colour` is `#rrggbb` or `contrast` (the default).
+   * A song's name and credit as rows (PLAN 37x-10c, `lib/pourText.ts`), at
+   * the top of each track in a live set, through the relay's guard (the
+   * assistant's `pour_text`) or from a phone one build older. Poured onto
+   * the plate as ink until the owner shelved that (37x-10m); the display now
+   * shows it as the corner caption (`rowsCaption`), reading it with
+   * `parsePourText` whoever sent it. `colour` is kept on the wire, unread.
    */
   | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
   /**
