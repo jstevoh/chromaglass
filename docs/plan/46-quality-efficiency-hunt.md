@@ -58,16 +58,19 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   startup's first step on CI's Mac before and after, and startup's "no later than the old
   way" line comes back from quarantine on 2026-11-15.
 - **46a · A faster opening** (**shipped** — story in [`docs/plan-shipped.md`](../plan-shipped.md#46a-a-faster-opening-2026-11-14)):
-  Classic's opening cut from 66 WebGPU pipelines (65 ledger) to 51 WebGPU (50 ledger, at or
-  below `OPENING_MOST = 52`), via five back-to-back kernel fusions (`deltaFold`, `forcesB`,
-  `grainStep`, `decay`, `packVel`), direct `cpuMulTex` sampling in `deltaFold` (keeping `cpuDyeTex`/`cpuVelTex` upsampling),
-  `enc.clearBuffer` in `clear()` (keeping `mgZero` in `hsCycle()`), `velScratch` freeing
-  `scaleDye:dye`, and deferring `jacobi:dye`, `airGiveSub:thin`/`airGiveThin:thin`,
-  `beadDrops`/`beadHoles`/`beadFinish`, and `output` behind the opening (`later`). Removed
-  `--owed=count` from `scripts/checks.json`; warm local `openingtime --runs 3` first step
-  0.70 s -> 0.59 s; `samelook` 0.00% diff across all 6 looks, `physics` 20/20, `thingap` 16/16,
-  `videoflow` 24/24. Main's deploy open shard startup first-step time (was 15.48 s) to be
-  recorded after merge.
+  Classic's opening ledger cut from 67 to 52 pipelines (WebGPU calls before the first step
+  cut from 68 on main to 54–57 with `later` builds starting ahead of step 1; down from 66
+  WebGPU / 65 ledger before `heatPack`/`heatUnpack` landed on main), via five back-to-back
+  kernel fusions (`deltaFold`, `forcesB`, `grainStep`, `decay`, `packVel`), direct `cpuMulTex`
+  sampling in `deltaFold` (keeping `cpuDyeTex`/`cpuVelTex` upsampling), `enc.clearBuffer` in
+  `clear()` (keeping `mgZero` in `hsCycle()`), `velScratch` freeing `scaleDye:dye`, and
+  deferring `jacobi:dye`, `airGiveSub:thin`/`airGiveThin:thin`, `beadDrops`/`beadHoles`/`beadFinish`,
+  `packDyeBodies`, and `output` behind the opening (`later`). Removed `--owed=count` from
+  `scripts/checks.json` (`openingtime --bar` still prints 54 > `OPENING_MOST = 52` because all
+  52 ledger pipelines are drawn in Classic's first 40 steps after `#811` and `prepareShow` starts
+  `later` before step 1 — flagged for `46-3`); `samelook` 0.00% diff across all 6 looks,
+  `physics` 20/20, `thingap` 16/16, `argnames` 9/9, `liquidpush` 9/9, `dropcolour` 4/4, `videoflow` 24/24.
+  Main's deploy open shard startup first-step time (was 15.48 s) to be recorded after merge.
 - **46a-2 · A smaller display** (Antigravity, after 46a): the display's compile, 6.77 s of a
   cold opening on the owner's Mac, split by what a look turns on so Classic compiles only
   what it draws. Held by `samelook` (byte-level after five steps), `plate`, `nolight`,

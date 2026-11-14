@@ -919,7 +919,7 @@ export class WebGPUFluid extends FluidCover {
       */
       stage('current', (pass) => this.stepCurrent(pass));
       stage('forces', (pass) => {
-        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('forces current thin', [1, this.M, 0, swirlScale]));
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('current grid thin', [1, this.M, 0, swirlScale]));
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
@@ -956,7 +956,7 @@ export class WebGPUFluid extends FluidCover {
         // The gap rides along: the plate's depth is a mobility on the flow that
         // carries the dye (F), fused into forcesB for velForced.
         this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read],
-          this.arg('forces current', [0, this.M, p.depthDrag, swirlScale]));
+          this.arg('add current', [0, this.M, p.depthDrag, swirlScale]));
         this.vel.swap();
       });
     }
