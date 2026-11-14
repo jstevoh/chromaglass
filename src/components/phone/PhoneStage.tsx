@@ -7,7 +7,7 @@ import {
   Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
-  Crosshair, LayoutGrid, Plus,
+  Crosshair, LayoutGrid, Plus, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
@@ -23,6 +23,8 @@ import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { canShareClip, shareClip } from '../../lib/shareClip';
+import type { ClipShape } from '../../lib/clipFrame';
 import { OscOutRow } from '../ui/OscOutRow';
 import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -352,7 +354,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
-  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
+  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void; shape: ClipShape; onShape: (s: ClipShape) => void; take: { blob: Blob; filename: string; url: string } | null };
   onHide: () => void;
   onFullLayout: () => void;
   /** The desk's tabs, on the phone (More → Tabs). */
@@ -1285,6 +1287,31 @@ export function PhoneStage(p: PhoneStageProps) {
               testId="phone-record-makes-segmented"
             />
             <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
+            {/* The clip's frame (lib/clipFrame.ts, PLAN 34f): 9:16 to post, or the screen as it is. */}
+            <SectionLabel>Clip frame</SectionLabel>
+            <Segmented
+              value={p.recording.shape}
+              options={[['portrait', 'Portrait 9:16'], ['plate', 'Screen as it is']] as const}
+              onChange={p.recording.onShape}
+              height={44}
+              fill
+              testId="phone-record-shape"
+            />
+            <p className="text-[12px] text-dim">
+              {p.recording.shape === 'portrait'
+                ? 'The middle 9:16 of the screen, with sound, as an MP4 where this phone can write one: ready for Reels and TikTok.'
+                : 'The whole screen, as it is.'}
+            </p>
+            {p.recording.take && !p.recording.on && canShareClip(p.recording.take) && (
+              <button
+                type="button"
+                onClick={() => { void shareClip(p.recording.take!); }}
+                data-testid="phone-share-clip"
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-[14px] font-medium text-text active:bg-hover"
+              >
+                <Share2 size={16} />Share the last clip
+              </button>
+            )}
           </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
