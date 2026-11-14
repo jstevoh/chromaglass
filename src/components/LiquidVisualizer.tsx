@@ -4585,7 +4585,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {
-              fluidsRef.current[li].step(li === 0 ? magnetFor(patch.layer(li)) : patch.layer(li), currentAudioData, time, noise2D);
+              fluidsRef.current[li].step(li === 0 ? magnetFor(patch.layer(li)) : patch.layer(li), time, noise2D);
             }
             const ms = performance.now() - t0;
             simMsRef.current += (ms - simMsRef.current) * 0.3;

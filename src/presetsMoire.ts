@@ -1,4 +1,5 @@
 import type { VisualizerSettings } from './types';
+import type { Preset } from './presets';
 
 /**
  * The moiré pack's looks (PLAN 45a): seven of the house looks with a pair of
@@ -122,3 +123,24 @@ export const MOIRE_LOOKS: readonly {
     },
   },
 ];
+
+/*
+  The moiré pack's looks (PLAN 45a), each laid over the look it starts from
+  (moved here from presets.ts, which calls it; PLAN 38u-5 needed the room). Its cords are that look's, a sheet's cord in the place of
+  the last: a look carries two or three fast cords (PLAN 28i-3b, `npm run
+  soundpatch`); the sheet's added to the house look's three made four, too
+  many to read on the wall. A pack look laid over a look with areas adds
+  none: its areas' cords are the music there, and a plate-wide one beside
+  them is the redundancy 28i-3b turns away. The plate itself (dyes, pours,
+  dish, areas) is the house look's under the pack look's id (presetPlate.ts).
+*/
+export function layMoireLooks(looks: Preset[]): void {
+  for (const m of MOIRE_LOOKS) {
+    const from = looks.find(p => p.id === m.from);
+    if (!from) continue;
+    const own = m.settings.sceneMappings ?? [];
+    const house = from.settings.sceneMappings ?? [];
+    const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
+    looks.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
+  }
+}
