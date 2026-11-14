@@ -15,6 +15,8 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   linkWithCredential,
+  signInWithCredential,
+  OAuthCredential,
   updatePassword,
   EmailAuthProvider,
   signOut,
@@ -95,29 +97,57 @@ export function getFirebaseAuth(): Auth {
   return authInstance;
 }
 
+/**
+ * Apple's provider (PLAN 23.15, the owner 2026-11-08: "should we add the apple
+ * login option as well, now that we have a developer ID?"). The email scope is
+ * what puts an address in Firebase's user at all: the licence is kept under the
+ * account's email (`keys:<email>` in the licence Worker), so an Apple account
+ * with no address could never hold one. Apple sends the address only on the
+ * first sign-in and Firebase keeps it from then on. Someone who picks "Hide My
+ * Email" gets a relay address (`…@privaterelay.appleid.com`), which is a real,
+ * verified, forwarding address and works as the account's email, but it is not
+ * the one a licence was bought under; the account sheet says so
+ * (`isApplePrivateRelay`). The name scope is asked for because Apple's sheet
+ * reads oddly without it, and Firebase keeps it as the display name.
+ */
+function appleProvider(): OAuthProvider {
+  const provider = new OAuthProvider('apple.com');
+  provider.addScope('email');
+  provider.addScope('name');
+  return provider;
+}
+
+/** An address from Apple's "Hide My Email": it forwards, but no licence was bought under it. */
+export function isApplePrivateRelay(email: string | null | undefined): boolean {
+  return /@privaterelay\.appleid\.com$/i.test(email ?? '');
+}
+
 export async function signInWithProvider(
   providerId: 'google.com' | 'apple.com',
 ): Promise<User | null> {
   const auth = getFirebaseAuth();
-  const provider =
-    providerId === 'google.com'
-      ? new GoogleAuthProvider()
-      : new OAuthProvider('apple.com');
+  const provider = providerId === 'google.com' ? new GoogleAuthProvider() : appleProvider();
 
   try {
     const cred = await signInWithPopup(auth, provider);
     setSignedInCached(cred.user.email);
+    keepProviderCredential(providerId, cred);
+    await attachPendingCredential(cred.user);
     return cred.user;
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code;
     if (code === 'auth/account-exists-with-different-credential') {
-      // The email already has a password account that Firebase will not merge on
-      // its own. Keep Google's credential, so the password sign-in that follows
-      // can attach it (`signInWithPassword`): one account, either way in.
-      pendingProviderCredential =
+      // The email already has an account made another way (a password, an
+      // emailed link, or Google when this was Apple), and Firebase will not
+      // merge them on its own. Keep this provider's credential, with the email
+      // it was refused for, so the sign-in that follows the old way can attach
+      // it (`attachPendingCredential`): one account, every way in.
+      const credential =
         providerId === 'google.com'
           ? GoogleAuthProvider.credentialFromError(err as never)
           : OAuthProvider.credentialFromError(err as never);
+      const email = (err as { customData?: { email?: string } })?.customData?.email;
+      pendingProviderCredential = credential && email ? { credential, email: email.toLowerCase() } : null;
     }
     if (
       code === 'auth/popup-blocked' ||
@@ -136,10 +166,69 @@ export async function signInWithProvider(
 }
 
 /**
- * Google's credential from a sign-in Firebase refused because the email already
- * has a password account; the next password sign-in attaches it.
+ * The provider's own credential from the last Google or Apple sign-in in this
+ * tab, as JSON, for the Mac app's window to sign in with (PLAN.md 23.17f,
+ * server/signin-handoff.js). Firebase keeps only its own session, never the
+ * provider's token, so it is caught here, from the sign-in's result, or never.
+ * Taken once.
  */
-let pendingProviderCredential: AuthCredential | null = null;
+let lastProviderCredential: object | null = null;
+
+function keepProviderCredential(providerId: 'google.com' | 'apple.com', result: Parameters<typeof GoogleAuthProvider.credentialFromResult>[0]): void {
+  try {
+    const c = providerId === 'google.com' ? GoogleAuthProvider.credentialFromResult(result) : OAuthProvider.credentialFromResult(result);
+    lastProviderCredential = c ? c.toJSON() : null;
+  } catch {
+    lastProviderCredential = null;
+  }
+}
+
+export function takeProviderCredential(): object | null {
+  const c = lastProviderCredential;
+  lastProviderCredential = null;
+  return c;
+}
+
+/**
+ * Sign this window in with a credential a browser handed over (the Mac app,
+ * PLAN.md 23.17f): Firebase's documented way to sign in with a provider's token
+ * obtained elsewhere. The token is Google's or Apple's, checked by Firebase's
+ * server as any sign-in is; nothing here trusts it.
+ */
+export async function signInWithHandedCredential(json: object): Promise<User> {
+  const auth = getFirebaseAuth();
+  const credential = OAuthCredential.fromJSON(json);
+  if (!credential) throw new Error('That sign-in could not be read.');
+  const res = await signInWithCredential(auth, credential);
+  setSignedInCached(res.user.email);
+  return res.user;
+}
+
+/**
+ * A provider's credential from a sign-in Firebase refused because its email
+ * already has an account made another way, with that email. It is attached on
+ * the next sign-in, and only when that sign-in is the same address (PLAN
+ * 23.10e-5: it was attached to whichever account signed in next, and only
+ * Firebase's own refusal kept it off a stranger's).
+ */
+let pendingProviderCredential: { credential: AuthCredential; email: string } | null = null;
+
+async function attachPendingCredential(user: User): Promise<void> {
+  const waiting = pendingProviderCredential;
+  if (!waiting) return;
+  pendingProviderCredential = null;
+  if ((user.email ?? '').toLowerCase() !== waiting.email) return;
+  // And only to an account whose email is confirmed: a password account made
+  // under someone else's address and never confirmed must not gain their
+  // Apple or Google as a way in (a shared machine, a refused provider sign-in
+  // left on the screen, then that password typed in the same tab). Google,
+  // Apple and the emailed link are always confirmed, so only an unconfirmed
+  // password account goes without the link; it can add it once confirmed.
+  if (!user.emailVerified) return;
+  await linkWithCredential(user, waiting.credential).catch(() => {
+    // Already linked, or the credential went stale: the sign-in itself worked.
+  });
+}
 
 /** The shortest password this app accepts (Firebase's own floor is 6). */
 export const MIN_PASSWORD_LENGTH = 8;
@@ -173,7 +262,9 @@ export function authErrorMessage(err: unknown): string {
     case 'auth/credential-already-in-use':
       return 'That email belongs to a different account.';
     case 'auth/account-exists-with-different-credential':
-      return 'That email already has a password. Sign in with it under Email, then Password; Google is added when you do.';
+      return 'That email already has an account. Sign in the way you made it (Google, Apple, or your email and password) and this way in is added to it; with an emailed link, just use the link.';
+    case 'auth/operation-not-allowed':
+      return 'That way of signing in is not switched on yet. Use another one for now.';
     default:
       return (err as { message?: string })?.message || 'Could not sign in.';
   }
@@ -196,10 +287,18 @@ export async function checkPendingRedirect(): Promise<User | null> {
     const res = await getRedirectResult(auth);
     if (res?.user) {
       setSignedInCached(res.user.email);
+      const pid = res.providerId;
+      if (pid === 'google.com' || pid === 'apple.com') keepProviderCredential(pid, res);
       return res.user;
     }
-  } catch {
-    // ignore if no redirect was pending
+  } catch (err: unknown) {
+    // getRedirectResult answers null, not an error, when nothing was pending,
+    // so an error here is a real one. It was swallowed whole, which left a
+    // refused redirect sign-in (an email that already has an account made
+    // another way, the common case once Apple sits beside Google) back on the
+    // sign-in with no word at all. When this page sent the redirect, say why
+    // it failed; otherwise (a stale result from another visit) stay quiet.
+    if (pending) throw err;
   }
   return null;
 }
@@ -257,13 +356,7 @@ export async function signInWithPassword(email: string, password: string): Promi
   const auth = getFirebaseAuth();
   const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
   setSignedInCached(cred.user.email || email.trim());
-  if (pendingProviderCredential) {
-    const waiting = pendingProviderCredential;
-    pendingProviderCredential = null;
-    await linkWithCredential(cred.user, waiting).catch(() => {
-      // Already linked, or Google's credential went stale: the password worked.
-    });
-  }
+  await attachPendingCredential(cred.user);
   return cred.user;
 }
 
@@ -293,6 +386,8 @@ export interface AccountMethods {
   emailVerified: boolean;
   /** Google is one of the ways in. */
   google: boolean;
+  /** Apple is one of the ways in (PLAN 23.15). */
+  apple: boolean;
   /**
    * Firebase lists "password" for an emailed-link account too, with no password
    * set; it cannot be told apart from here, so the sheet says "set a new password"
@@ -309,6 +404,7 @@ export function getAccountMethods(): AccountMethods | null {
     email: user.email,
     emailVerified: user.emailVerified,
     google: ids.includes('google.com'),
+    apple: ids.includes('apple.com'),
     passwordProvider: ids.includes('password'),
   };
 }

@@ -67,7 +67,7 @@ function setControl(p: DeskProps, key: keyof VisualizerSettings, n: number) {
  * in place. The value is the settings' own, so a fader, the mouse and the
  * phone are three ways to move one number.
  */
-function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps; testId: string; asKnob: boolean }) {
+function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: DeskProps; testId: string; asKnob: boolean; dense?: boolean }) {
   const key = spec.key;
   const raw = p.settings[key];
   const v = typeof raw === 'number' ? raw : spec.min;
@@ -106,6 +106,7 @@ function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps
       onChange={n => setControl(p, key, n)}
       midiKey={`setting:${String(key)}`}
       testId={testId}
+      dense={dense}
     />
   );
 }
@@ -386,19 +387,6 @@ function RidesBody({ p }: { p: DeskProps }) {
   const side = where === 'left' ? 'left' : 'right';
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="rides">
-      <div className="flex h-9 shrink-0 items-center justify-end px-3">
-        <button
-          aria-pressed={picking}
-          onClick={() => setPicking(v => !v)}
-          className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
-            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
-          }`}
-          title="Choose which controls ride here"
-          data-testid="ride-pick"
-        >
-          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
-        </button>
-      </div>
       {picking ? (
         <PickList chosen={p.rideKeys} onChange={p.onRideKeys} testId="ride-picker" />
       ) : (
@@ -408,13 +396,20 @@ function RidesBody({ p }: { p: DeskProps }) {
               Nothing on the strip. <span className="text-text">Choose</span> picks what rides here.
             </p>
           )}
-          {/* Rides are faders in every case: a ride is a hand on a strip. */}
+          {/*
+            Rides are faders in every case: a ride is a hand on a strip. One
+            line each (`Slider dense`): the owner (2026-11-07) could not find
+            Macro Zoom, the seventh, because under the Bottles the column had
+            room for three of the old two-line rows, and chose denser faders
+            over moving it. `npm run layout` asks that all eight show whole on
+            the Perform tab at 1440×900.
+          */}
           {p.rideKeys.map(key => {
             const spec = RANGE.get(String(key));
             if (!spec) return null;          // a key saved by an older build
-            return <DeskControl key={String(key)} spec={spec} p={p} testId={`ride-${String(key)}`} asKnob={false} />;
+            return <DeskControl key={String(key)} spec={spec} p={p} testId={`ride-${String(key)}`} asKnob={false} dense />;
           })}
-          <div className="mt-2 border-t border-border pt-3">
+          <div className="mt-1.5 border-t border-border pt-1.5">
             <Toggle
               label="Random evolve"
               // The real switch. This used to write automateRate between 0 and
@@ -454,13 +449,25 @@ function RidesBody({ p }: { p: DeskProps }) {
         a level is a ride. `npm run layout` asks that it covers none of the plate.
       */}
       {/* The way into every setting is the status bar's, on every tab; a copy stood here until PLAN 35c-5. */}
-      {!mixerOut && (
-        <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
-          <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>
-        </div>
-      )}
-      <div className={`flex shrink-0 gap-2 p-3 ${mixerOut ? 'border-t border-border' : ''}`}>
-        <Button full height={40} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
+      {/*
+        Choose, Mixer and Drain share one row under the strip, so the faders
+        start at the panel's top and keep the column's height: Choose stood in
+        a row of its own above them until 2026-11-07.
+      */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border p-2.5">
+        <button
+          aria-pressed={picking}
+          onClick={() => setPicking(v => !v)}
+          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
+          }`}
+          title="Choose which controls ride here"
+          data-testid="ride-pick"
+        >
+          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
+        </button>
+        {!mixerOut && <Button full height={34} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
+        <Button full height={34} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
       </div>
       {mixerOpen && !mixerOut && createPortal(
         /*
@@ -1082,7 +1089,6 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;
-    case 'player': return p.screens.player;
   }
   const spec = PANEL_BY_ID.get(id);
   if (!spec) return null;

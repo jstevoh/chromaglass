@@ -44,6 +44,7 @@
  * in the same order.
  */
 import type { Rng } from './rng';
+import { MOIRE_LOOKS } from '../presetsMoire';
 
 /** Which of the music's hands land in an area. `any` takes whatever no area claims. */
 export type AreaBand = 'bass' | 'mid' | 'treble' | 'any';
@@ -135,20 +136,6 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     { x: 0.5, y: 0.7, r: 0.13, liquid: 'soap', dye: 2, dyes: [2, 5], band: 'bass' },
   ],
   /*
-    Lumia: Wilfred's light forms came and went in a few places on a dark field,
-    never as a texture over all of it. Three veils of dye on the nearly clear
-    plate, apart: two in glycerine, which holds a fold, and one with a little
-    soap in it, which spreads its veil thin and opens it each time the hands
-    add to it. (Water was tried there first; it carries no property, so the
-    area poured nothing and was a plain patch of the plate.) No beat; what
-    music reaches it takes the areas in turn.
-  */
-  'lumia': [
-    { x: 0.30, y: 0.38, r: 0.16, liquid: 'glycerine', dye: 0, dyes: [0], band: 'any', fill: 0.45 },
-    { x: 0.71, y: 0.30, r: 0.13, liquid: 'soap', dye: 1, dyes: [1], band: 'any', fill: 0.4 },
-    { x: 0.62, y: 0.70, r: 0.12, liquid: 'glycerine', dye: 2, dyes: [2], band: 'any', fill: 0.35 },
-  ],
-  /*
     Cell Bloom: a closeup look, so its areas are where its camera is. It
     followed one pool (follow mode locks onto the liquid nearest its aim and
     rides it, never cutting away), and at its 3.5x zoom its Paint Cells were
@@ -215,7 +202,30 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     { x: 0.7, y: 0.38, r: 0.12, liquid: 'activator', dye: 1, dyes: [1], band: 'bass' },
     { x: 0.5, y: 0.7, r: 0.12, liquid: 'activator', dye: 2, dyes: [2], band: 'bass' },
   ],
+  /*
+    Saffron Lace (after the owner's lace still, 2026-11-07): the colour under
+    a yellow film, laid as pools on the lamp's white rather than as a ground,
+    because yellow over a lavender ground filters to amber (presets.ts says
+    the arithmetic). Right, a wide wash of lavender laid thin (fill), so the
+    film over it stays yellow and its holes show lilac; it pours glycerine,
+    whose body holds the wash in its place, and the mids land there. Left, cobalt with icy-blue drops, where the bass
+    lands and soap is poured: each kick there opens holes in the film over
+    it. Low in the middle, coral, where the treble drops oil, which joins the
+    film and thickens it, so the lace there tears again from fresh. The
+    fills were read off the lab (scratch renders, 2026-11-07): at a full pool
+    the lavender drew violet-blue, the cobalt navy and the coral red, each
+    under a film that darkened them further.
+  */
+  'saffron-lace': [
+    { x: 0.71, y: 0.48, r: 0.16, liquid: 'glycerine', dye: 0, dyes: [0], band: 'mid', fill: 0.2 },
+    { x: 0.28, y: 0.44, r: 0.09, liquid: 'soap', dye: 1, dyes: [1, 3], band: 'bass', fill: 0.28 },
+    { x: 0.46, y: 0.6, r: 0.07, liquid: 'oil', dye: 2, dyes: [2], band: 'treble', fill: 0.3 },
+  ],
 };
+
+// A look of the moiré pack has its house look's areas, as it has its dyes
+// and its dish (presetPlate.ts, PLAN 45a): its cords are the house look's.
+for (const m of MOIRE_LOOKS) if (PRESET_AREAS[m.from]) PRESET_AREAS[m.id] = PRESET_AREAS[m.from];
 
 /**
  * Looks whose areas take the music and the area cords but whose plate is laid

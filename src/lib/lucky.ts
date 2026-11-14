@@ -1,4 +1,5 @@
-import type { VisualizerSettings } from '../types';
+import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { MOIRE_LOOKS } from '../presetsMoire';
 import { DROPPER_COLORS } from '../constants';
 import { DIFFUSION_CEILING } from './deskPins';
 import { stream } from './rng';
@@ -38,6 +39,45 @@ const paperPair = (rand: () => number): { paperA: string; paperB: string } => {
   return { paperA, paperB: pool[Math.floor(rand() * pool.length)] };
 };
 
+/*
+  Now and then, a pair of the moiré pack's sheets (PLAN 45a-14).
+
+  The owner, 2026-11-11, after Randomise stopped keeping the sheets of the look
+  before it: "for the sheets - now and then is fine". So a roll lays a pair
+  one time in sixteen, the same share the pack has in the look pickers
+  (lib/lookPick.ts: the pack weighs two looks against thirty-one), and only on
+  a copy that has the pack: the caller asks tierGates, this lib does not.
+
+  The pair is never rolled sheet by sheet. Each is the whole stage of one of
+  the pack's looks, its two designs, their pitch, turn, spin, slide, gap and
+  curl, which were set by hand so the fringes read at the plate's scale: two
+  designs and a density picked independently would land on a pitch that beats
+  into a grey wash or into fringes wider than the dish. A key that look leaves
+  out goes to its default rather than to whatever the plate had.
+
+  And the lamp is the one the sheets are seen by. A sheet is a filter on the
+  lamp's light (plateTransmit): over a look that paints its dye as light on
+  black the bare glass is black and the fringes vanish, so every pack look
+  sets Lamp Ground 1, and a sheet over a dark LED ring draws near black (the
+  trap 45a found under Cell Bloom's violet ring), so the ring goes off, as it
+  is in Classic, the look most of the pack is laid over.
+
+  Both draws are taken on every roll, owned or not, so having the pack does
+  not change any other setting a seeded roll lands on.
+*/
+export const LUCKY_SHEETS_CHANCE = 1 / 16;
+const SHEET_KEYS = ['moireAmount', 'moireSheetA', 'moireSheetB', 'moireAngle', 'moireSpin', 'moireSlide',
+  'moireRatio', 'moireDensity', 'moireGap', 'moireCurl', 'moireFlip'] as const;
+
+const sheetsRoll = (rand: () => number, owned: boolean): Partial<VisualizerSettings> => {
+  const roll = rand(), which = rand();
+  if (!owned || roll >= LUCKY_SHEETS_CHANCE || !MOIRE_LOOKS.length) return {};
+  const stage = MOIRE_LOOKS[Math.floor(which * MOIRE_LOOKS.length)].settings;
+  const out: Partial<VisualizerSettings> = { lampGround: 1, ledPlatform: false };
+  for (const k of SHEET_KEYS) Object.assign(out, { [k]: stage[k] ?? DEFAULT_SETTINGS[k] });
+  return out;
+};
+
 /**
  * One roll of the dice: a complete look, made up on the spot.
  *
@@ -71,6 +111,8 @@ export function luckyLook(
   current: VisualizerSettings,
   ledColors: string[],
   rand: () => number = stream('show.lucky').float,
+  // Whether this copy has the moiré pack (canUseMoirePack): a roll may lay its sheets.
+  moirePack = false,
 ): VisualizerSettings {
   const blendModes: ('screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay')[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
   const ledModes: ('single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk')[] = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'];
@@ -106,10 +148,30 @@ export function luckyLook(
     turingInk: 0,
     // And its drift (PLAN 26d-6) goes with it for the same reason: it is the print's.
     turingDrift: 0,
+    /*
+      The moiré pack's sheets (PLAN 45a) come off, as the comic print does.
+
+      A roll keeps everything it does not name, and it named nothing of the
+      sheets', so once a moiré look had been on the plate (opened on, shuffled
+      to on the phone, brought by a new song) every Randomise after it was a
+      new liquid seen through the same two sheets. The owner's report of
+      2026-11-11, "the randomize button picks the moiré patterns way too
+      frequently", is that: not a roll choosing them, a roll never taking them
+      away. The sheets are a look's choice, made by hand for that look's lamp
+      (the pack's looks set Lamp Ground 1, because a sheet over a dark LED
+      ring draws black), and a rolled lamp and LED ring under them is the trap
+      45a found. Taking the ink off leaves the designs and the turn where they
+      were, so a hand that turns the Moiré Sheets fader up gets the same pair
+      back. And a copy without the pack can never keep sheets this way. A
+      copy with it gets a pair now and then, laid with their lamp (sheetsRoll).
+    */
+    moireAmount: 0,
     // Lamp Ground (PLAN 18b) is kept: a roll is a variation on the look on
     // the plate, and which ground it is seen on is that look's choice.
     // Clear Film (PLAN §20b) is kept as the lamp is: it is liquid on the
     // dish, and a roll that drew it off would fill the lace back in.
+    // The projector lamp's heat (PLAN 36e-2) is played by hand with a hold on the glass, not rolled.
+    heat: 0,
     sensitivity: rand() * 0.8 + 0.2,
     /*
       1 to 2, not 0.5 to 2. No preset sets this — it is an ear setting, so
@@ -257,5 +319,6 @@ export function luckyLook(
     macroEdgeDetail: 0.3 + rand() * 0.7,
     macroRelief: 0.4 + rand() * 0.6,
     simResolution: current.simResolution,
+    ...sheetsRoll(rand, moirePack),
   };
 }

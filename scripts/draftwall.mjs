@@ -35,9 +35,10 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
+import { waitForShow } from './frame.mjs';
 
-const PORT = Number(process.env.DRAFTWALL_PORT ?? 4183);
+const PORT = port(4183, 'DRAFTWALL_PORT');
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35`;
 /** On the Mac, where the app draws: the painted line must see frames rather than say it measured nothing. */
 const FRAMES = process.argv.includes('--frames');
@@ -72,7 +73,25 @@ try {
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForSelector('[data-testid="desk-preview"]', { timeout: 60_000 });
   await page.waitForFunction(() => typeof window.chromaglassSettings === 'function' && typeof window.chromaglassDebug === 'function');
-  await page.waitForTimeout(1500);
+  /*
+    The show, not a fixed second and a half (PLAN.md 19k-16). The hooks are
+    there long before the show's first step: a cold Mac opening steps first
+    13.5 to 14.8 s after load (src/gpu/prepare.ts), and the wall was opened
+    2.8 s after load, onto an engine whose renderer had not started. Its
+    canvas then took the projector's 1920x1080 at once (setStage, before the
+    governor's scale), every frame the projector asked for threw before the
+    mirror, and the 8 s count below ended before the opening did: 0 painted,
+    on 5 of the 54 runs that printed the count (4 of them on trees that
+    changed nothing near the wall), and 16 more that used the whole 8 s.
+    Without frames (Measure's run, software WebGPU off) there is no first
+    step to wait for, and the line it reaches allows nothing painted.
+    waitForShow answers null after its minute rather than throwing; a show
+    that never steps is a dead engine, not an unpainted projector, and must
+    not be read as the line below going red.
+  */
+  if (FRAMES) {
+    if ((await waitForShow(page)) === null) throw new Error('the show never took a step in 60 s, so the wall was not opened');
+  } else await page.waitForTimeout(1500);
 
   const state = () => page.evaluate(() => {
     const vis = (sel) => {
@@ -172,6 +191,7 @@ try {
   */
   const drawnFrom = await page.evaluate(() => window.chromaglassDebug().frames);
   await wall.evaluate(() => { window.__painted = {}; });
+  const paintsFrom = await wall.evaluate(() => window.chromaglassCast?.().paints ?? null).catch(() => null);
   const started = Date.now();
   let painted = {};
   do {
@@ -183,7 +203,23 @@ try {
   const wallSize = await wall.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight, canvases: document.querySelectorAll('canvas').length }));
   const fromWall = painted['liquid-canvas'] ?? 0, fromCopy = painted['liquid-canvas-draft'] ?? 0;
   const anyPainted = fromWall + fromCopy > 0;
-  console.log(`  (in ${seconds.toFixed(1)} s the wall's engine drew ${drawn} frames; the projector window is ${wallSize.w}x${wallSize.h} with ${wallSize.canvases} canvas(es))`);
+  /*
+    What the projector window says of itself, beside the count. On #734's
+    run (GitHub's Mac, 2026-11-08) this line read 0 frames from either
+    canvas while the wall's engine drew 334 in 8.2 s, and on #718's the same
+    day 26 against 121: the count alone cannot say whether the show stopped
+    handing frames over (no mirror hook on the show's window), the window
+    dropped them (a size of 0, so `paint` returns early), or the patched
+    drawImage missed them. PLAN.md 19k-15.
+  */
+  const castSays = await wall.evaluate(() => {
+    let hooked = null;
+    try { hooked = typeof window.opener?.__chromaglassMirror === 'function'; } catch { /* gone */ }
+    const c = window.chromaglassCast?.();
+    return { hooked, ...(c ? { paints: c.paints, stage: c.stage, source: c.source, dark: c.dark, linked: c.linked } : {}) };
+  }).catch(() => null);
+  if (castSays && paintsFrom !== null && typeof castSays.paints === 'number') castSays.paints -= paintsFrom;
+  console.log(`  (in ${seconds.toFixed(1)} s the wall's engine drew ${drawn} frames; the projector window is ${wallSize.w}x${wallSize.h} with ${wallSize.canvases} canvas(es); it says ${JSON.stringify(castSays)})`);
   check(anyPainted ? 'the projector window is painted from the wall\'s canvas, never the copy\'s'
     : `the projector window is painted from the wall's canvas (measured nothing: no frames ran here${FRAMES ? '' : '; on the Mac, --frames requires them'})`,
     FRAMES ? fromWall > 0 && fromCopy === 0 : !anyPainted || (fromWall > 0 && fromCopy === 0),

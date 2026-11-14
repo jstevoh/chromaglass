@@ -13,6 +13,8 @@
 import { SimResolution } from '../types';
 import { PipelineCache } from '../gpu/kit';
 import { QualityGovernor } from '../lib/governor';
+import type { GpuStepParams } from '../gpu/solverTypes';
+import { BOIL_BUOY_PER_KG_M3, T_AMBIENT, waterDensity } from '../gpu/lampBoil';
 
 /**
  * The largest grid a pinned `?sim=` may ask for.
@@ -96,6 +98,12 @@ export function postLevelLabel(governor: QualityGovernor | null | undefined): st
   return level === 1 ? ' · effects ½' : level === 2 ? ' · effects off' : '';
 }
 
+/** The engine readout's label; with a stage it names the share as "of the wall" (PLAN 14c-readout). */
+export function engineLabel({ grid, dpr, post, stage }: { grid: number; dpr: number; post?: string | QualityGovernor | null; stage: unknown }): string {
+  const suffix = typeof post === 'string' ? post : postLevelLabel(post);
+  return `WebGPU · ${grid}² · ${dpr.toFixed(1)}x${stage ? ' of the wall' : ''}${suffix}`;
+}
+
 /**
  * The stage draws the show (docs/webgpu-plan.md): there is one engine.
  */
@@ -140,12 +148,12 @@ export const resolveSimResolution = (setting: SimResolution | undefined, governo
   // A pin is held to what this GPU can actually allocate, so an old saved
   // look or a hand-typed query cannot ask for a texture the device refuses.
   //
-  // And to an even number: the pressure solve colours the grid like a
-  // chessboard and sweeps each colour in a half-sized dispatch (H2), which
-  // only divides evenly if the edge does. Every rung on every ladder is even
-  // already; this is for `?sim=513` and for a saved look that carries one.
-  const held = Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
-  return held - (held % 2);
+  // And to a multiple of 32 (H2c-10): the multigrid's coarse levels and the
+  // chessboard pressure sweeps divide evenly by 32. Every rung on every ladder
+  // is a multiple of 32 already; this is for `?sim=514`, `?sim=1000` and a
+  // saved look that carries one.
+  const cap = Math.floor(Math.min(maxTexture, MAX_PINNED_GRID) / 32) * 32;
+  return Math.max(64, Math.min(Math.round(want / 32) * 32, cap));
 };
 
 // The solver advances at a fixed rate in wall-clock time rather than once per
@@ -222,3 +230,75 @@ export const LOCKSTEP = (() => {
   if (typeof window === 'undefined') return false;
   return new URLSearchParams(window.location.search).get('lockstep') === '1';
 })();
+
+/**
+ * The lasting current on the CPU half-grid (M = S/2): buoyancy from water's
+ * real density (Kell 1975, PLAN §36e-2), warm Gauss-Seidel projection, and
+ * bilinear upsampling into the logical velocity grid.
+ */
+export function stepCurrentCpu(
+  M: number,
+  S: number,
+  cvx: Float32Array,
+  cvy: Float32Array,
+  cpr: Float32Array,
+  cdv: Float32Array,
+  density: Float32Array,
+  temp: Float32Array,
+  vxOut: Float32Array,
+  vyOut: Float32Array,
+  p: GpuStepParams,
+): void {
+  const boiling = (p.heat ?? 0) > 1e-4;
+  for (let j = 1; j < M - 1; j++) {
+    for (let i = 1; i < M - 1; i++) {
+      const k = i + j * M;
+      const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
+      const t = boiling ? 0 : Math.max(0, Math.min(50, temp[q]));
+      const dd = Math.tanh(density[q] - p.meanDensity);
+      const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
+      let fx = p.rockX * dd;
+      let fy = p.rockY * dd + upright * p.currentBuoy * t;
+      const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
+      const r = Math.sqrt(tx * tx + ty * ty);
+      if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
+      let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
+      let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
+      const s = Math.sqrt(vx * vx + vy * vy);
+      if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
+      if (boiling && upright > 0 && p.currentBuoy > 0 && temp[q] > 0) {
+        const dRho = Math.max(0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + temp[q]));
+        vy += upright * p.currentBuoy * (dRho * BOIL_BUOY_PER_KG_M3) * (1 - p.currentDamp);
+      }
+      cvx[k] = vx; cvy[k] = vy;
+    }
+  }
+  for (let i = 0; i < M; i++) { cvx[i] = cvy[i] = cvx[i + (M - 1) * M] = cvy[i + (M - 1) * M] = 0; cvx[i * M] = cvy[i * M] = cvx[M - 1 + i * M] = cvy[M - 1 + i * M] = 0; }
+  for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+    const k = i + j * M;
+    cdv[k] = -0.5 * (cvx[k + 1] - cvx[k - 1] + cvy[k + M] - cvy[k - M]) / M;
+  }
+  for (let it = 0; it < 10; it++) {
+    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+      const k = i + j * M;
+      cpr[k] = (cdv[k] + cpr[k - 1] + cpr[k + 1] + cpr[k - M] + cpr[k + M]) * 0.25;
+    }
+    for (let i = 0; i < M; i++) { cpr[i] = cpr[i + M]; cpr[i + (M - 1) * M] = cpr[i + (M - 2) * M]; cpr[i * M] = cpr[1 + i * M]; cpr[M - 1 + i * M] = cpr[M - 2 + i * M]; }
+  }
+  for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+    const k = i + j * M;
+    cvx[k] -= 0.5 * (cpr[k + 1] - cpr[k - 1]) * M;
+    cvy[k] -= 0.5 * (cpr[k + M] - cpr[k - M]) * M;
+  }
+  for (let j = 1; j < S - 1; j++) {
+    const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = Math.max(0, Math.min(1, y - j0));
+    for (let i = 1; i < S - 1; i++) {
+      const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = Math.max(0, Math.min(1, x - i0));
+      const k = i0 + j0 * M;
+      const ux = (cvx[k] * (1 - fxx) + cvx[k + 1] * fxx) * (1 - fyy) + (cvx[k + M] * (1 - fxx) + cvx[k + M + 1] * fxx) * fyy;
+      const uy = (cvy[k] * (1 - fxx) + cvy[k + 1] * fxx) * (1 - fyy) + (cvy[k + M] * (1 - fxx) + cvy[k + M + 1] * fxx) * fyy;
+      vxOut[i + j * S] += ux;
+      vyOut[i + j * S] += uy;
+    }
+  }
+}

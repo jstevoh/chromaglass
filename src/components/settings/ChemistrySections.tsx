@@ -4,6 +4,7 @@ import { LIT } from '../ui';
 import { ViscosityDrip } from '../ui/Playful';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
+import { COVER_FULL_ML, COVER_GLASS_G } from '../../lib/cover';
 
 /*
   Chemistry: the liquid itself. The squish plate, oil and soap, the ferrofluid and
@@ -100,6 +101,25 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
             settingKey="gapThickness"
           />
         )}
+        {/* The liquid under the cover and the glass on it (PLAN 38r-5): the gap is what they make. */}
+        <Slider
+          label="Liquid"
+          value={settings.liquidMl ?? COVER_FULL_ML}
+          min={9}
+          max={150}
+          step={1}
+          onChange={(v: number) => onUpdate({ liquidMl: v })}
+          settingKey="liquidMl"
+        />
+        <Slider
+          label="Cover Weight"
+          value={settings.coverWeight ?? COVER_GLASS_G}
+          min={0}
+          max={1000}
+          step={5}
+          onChange={(v: number) => onUpdate({ coverWeight: v })}
+          settingKey="coverWeight"
+        />
         <Slider
           label="Press Lift"
           value={settings.plateSpring ?? 0.35}
@@ -194,6 +214,16 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ filmHold: v })}
           settingKey="filmHold"
         />
+        {/* How heavy the oil is against the water (PLAN 27f-9c): it acts on a standing plate (Gravity), where a heavy oil is a lava lamp's wax. */}
+        <Slider
+          label="Oil Weight"
+          value={settings.oilWeight ?? -0.05}
+          min={-1}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilWeight: v })}
+          settingKey="oilWeight"
+        />
         <Slider
           label="Soap Bursts"
           value={settings.surfactantFlow ?? 0}
@@ -202,6 +232,15 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           step={0.05}
           onChange={(v: number) => onUpdate({ surfactantFlow: v })}
           settingKey="surfactantFlow"
+        />
+        <Slider
+          label="Soap Breakdown"
+          value={settings.soapBreakdown ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ soapBreakdown: v })}
+          settingKey="soapBreakdown"
         />
         {/*
           A clear oil film against the glass that tears into lace (PLAN §20b):

@@ -147,6 +147,24 @@ const WHIP_TIME = 0.7;
  */
 const LEAD_SECONDS = 0.6;
 
+/**
+ * How fast Hold answers a hand on the aim, in eases a second: Chase Speed as
+ * a rig's weight. It was `6 + 6 × chase`, which took 0.37 s to cover nine
+ * tenths of an aim jump at 0 and 0.18 s at 1 (`npm run camerahand`): a dial
+ * with a twofold throw, and nothing at all once the aim stopped. Now it runs
+ * from a heavy glide (3 s at 0) through 8.4 at the default 0.4, exactly what
+ * the old line gave there, so a look that left Chase alone moves as it did,
+ * and on up the dial's whole range (to 3, PLAN 27h-1) to a snap, 120 a second
+ * (about 0.02 s). Log-linear on both sides of the default, so each notch is
+ * the same ratio faster.
+ */
+export function holdRate(chase: number): number {
+  const c = clamp(Number.isFinite(chase) ? chase : 0.4, 0, 3);
+  return c <= 0.4
+    ? 0.77 * Math.pow(8.4 / 0.77, c / 0.4)
+    : 8.4 * Math.pow(120 / 8.4, (c - 0.4) / 2.6);
+}
+
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
 export class MacroCamera {
@@ -429,7 +447,7 @@ export class MacroCamera {
     }
     if (first) { this.camX = targetX; this.camY = targetY; }
     // A hand on the aim should be answered at once; a follow eases like a rig.
-    const rate = mode === 'hold' ? 6 + opts.chase * 6 : 1.0 + opts.chase * 5;
+    const rate = mode === 'hold' ? holdRate(opts.chase) : 1.0 + opts.chase * 5;
     const k = 1 - Math.exp(-rate * step);
     this.camX += (targetX - this.camX) * k;
     this.camY += (targetY - this.camY) * k;
@@ -706,4 +724,57 @@ export function holdWhereItIs<T extends { macroCamera?: CameraMode; macroAimX?: 
  */
 export function shotLabel(macroHold: number | undefined): string {
   return `${+Math.max(0.5, macroHold ?? 5).toFixed(1)}s`;
+}
+
+/**
+ * The frame's width as a share of the plate's, as MacroCamera keeps it in
+ * bounds: the longer side of the canvas over one and a half times itself
+ * (`spanX` in the frame loop) is two thirds, whatever the window's shape.
+ */
+const FRAME_SPAN = 2 / 3;
+
+/**
+ * The aim after an arrow key, in plate uv (the closeup's pan for a hand that
+ * has no Alt-drag, and a laptop's only way to move it without the Aim sliders).
+ *
+ * A tap moves a quarter of the frame, Shift a whole frame; a held key repeats
+ * at forty-fifth of a frame each, about three quarters of a frame a second at
+ * the keyboard's usual repeat, which is a slow pan, not a lurch. Sized by the
+ * frame, not the plate, so the same tap is the same distance on the screen at
+ * 2x and at 12x. Held on the plate: the aim never leaves 0..1.
+ */
+export function panAim(
+  from: { x: number; y: number }, dir: { dx: number; dy: number }, zoom: number,
+  how: { repeat?: boolean; big?: boolean } = {},
+): { x: number; y: number } {
+  const frame = FRAME_SPAN / Math.max(1, zoom);
+  const step = frame * (how.big ? 1 : how.repeat ? 1 / 45 : 0.25);
+  return { x: clamp(from.x + dir.dx * step, 0, 1), y: clamp(from.y + dir.dy * step, 0, 1) };
+}
+
+const ARROWS: Record<string, [number, number] | undefined> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+/**
+ * The closeup's keys: + and - zoom, the arrows pan (`panAim`), only with the
+ * closeup in for the arrows. The pan is the aim Alt-drag moves, from where the
+ * camera is looking now, so a Follow or an Auto pans on from its own frame
+ * rather than jumping back to a stale aim. Kept here and not in the app's key
+ * handler, which is at its size ceiling (`npm run sizes`).
+ */
+export function macroKey(
+  e: { key: string; repeat: boolean; shiftKey: boolean; preventDefault(): void },
+  cur: { macroZoom?: number; macroCamera?: CameraMode; macroAimX?: number; macroAimY?: number },
+  view: { macroCentre: () => { x: number; y: number } | null } | null,
+  zoom: (dir: 1 | -1) => void,
+  aim: (x: number, y: number) => void,
+): void {
+  if (e.key === '+' || e.key === '=') zoom(1);
+  if (e.key === '-' || e.key === '_') zoom(-1);
+  const arrow = ARROWS[e.key];
+  if (!arrow || (cur.macroZoom ?? 1) <= 1.05) return;
+  e.preventDefault();
+  const aimed = { x: cur.macroAimX ?? 0.5, y: cur.macroAimY ?? 0.5 };
+  const here = (cur.macroCamera ?? 'hold') === 'hold' ? aimed : view?.macroCentre() ?? aimed;
+  const to = panAim(here, { dx: arrow[0], dy: arrow[1] }, cur.macroZoom ?? 1, { repeat: e.repeat, big: e.shiftKey });
+  aim(to.x, to.y);
 }

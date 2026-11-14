@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DeskLayout } from '../lib/deskLayout';
+import { useCloudSyncReload } from '../lib/cloudSyncApp';
 import {
-  TAB_KEY, addTab, baseLayout, defaultTabs, deleteTab, loadTabId, loadTabs, moveTab, renameTab, saveTabs, setTabLayout,
+  TABS_KEY, TAB_KEY, addTab, baseLayout, defaultTabs, deleteTab, loadTabId, loadTabs, moveTab, renameTab, saveTabs, setTabLayout,
   type DeskTab,
 } from '../lib/deskTabs';
 
@@ -38,6 +39,18 @@ export function useDeskTabs() {
     return next;
   }, []);
 
+  // The account's tabs, written into storage by the cloud (lib/cloudSync.ts): read
+  // again, or the next edit here would save the old list over them, and the scan
+  // would read that as this device overruling the new one. The tab that is up
+  // stays up if the new list still has it, else `current` below picks the first.
+  useCloudSyncReload({
+    [TABS_KEY]: () => {
+      const next = loadTabs();
+      latest.current = next;
+      setTabs(next);
+    },
+  });
+
   // A tab taken away under the one that is up hands over to its neighbour.
   const current = tabs.some(t => t.id === tab) ? tab : tabs[0].id;
   useEffect(() => { try { localStorage.setItem(TAB_KEY, current); } catch { /* private window */ } }, [current]);
@@ -67,6 +80,14 @@ export function useDeskTabs() {
     }
   }, [commit]);
 
+  /**
+   * Any change to the list, committed and saved as an edit is: the owner's
+   * assistant's Undo of a delete or a reset puts what it took back through it
+   * (app/deskNow.ts), so the restored list reaches the account as a person's
+   * edit would.
+   */
+  const restore = useCallback((change: (t: DeskTab[]) => DeskTab[]) => { commit(change); }, [commit]);
+
   const layout = tabs.find(t => t.id === current)!.layout;
-  return { tabs, tab: current, layout, setTab, update, reset, edit };
+  return { tabs, tab: current, layout, setTab, update, reset, edit, restore };
 }

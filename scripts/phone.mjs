@@ -44,13 +44,13 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { coveredControls, legibility } from './layoutProbe.mjs';
 import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
 import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
 import { magnetSizeEnds, MAGNET_SIZE_TOP } from './phoneMagnet.mjs';
 
-const PORT = Number(process.env.PHONE_PORT ?? 4183);
+const PORT = port(4183, 'PHONE_PORT');
 const HEADED = process.argv.includes('--head');
 const NEED_GPU = !!process.env.PHONE_GPU;
 const SHOTS = process.env.PHONE_SHOTS || null;
@@ -1009,7 +1009,7 @@ try {
       // a FAIL that says what the sheet had, not a sixty-second timeout.
       const pressIf = async (testId) => { if (await visible(page, testId)) await tap(page, testId); };
       const plateSays = (st) => `${st.two ? 'Front/Back' : 'one'}${st.add ? ' +add' : ''}${st.off ? ' +off' : ''} (${st.solvers ?? 'no'} solvers)`;
-      for (const [id, plates] of [['lumia', 1], ['classic', 2]]) {
+      for (const [id, plates] of [['roy', 1], ['classic', 2]]) {
         await tap(page, 'phone-open-looks');
         await tap(page, `phone-look-${id}`);
         await page.waitForTimeout(1500);

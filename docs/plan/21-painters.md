@@ -10,9 +10,7 @@ Open:
 
 - **21a. Judge it on the Mac** (docs/judging.md §27): the dots' size on a wall, the
   line's weight, and whether it holds up moving at 60 fps. The lab shows still frames.
-- **21b. The line is drawn round the front plate only.** It needs the dye, and it is
-  drawn from the front plate's; a second plate, the film and the lamps are printed
-  (dots and inks) but not outlined. Roy has one plate, so it does not show there.
+- ~~**21b. The line is drawn round the front plate only.**~~ **Shipped** (`src/gpu/wgsl/plateBenDay.ts`, `npm run benday` line 8: both plates' pools ringed on 180 of 180 rays; story in `docs/plan-shipped.md` §21).
 - **21c. The dots do not grow with the zoom.** The screen is fixed to the picture,
   as a print's is; the owner's accidental dots at 2.8x were about twice the size.
   If a bigger dot is wanted in the closeup, the pitch could follow the zoom.

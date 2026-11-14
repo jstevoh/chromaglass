@@ -51,7 +51,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { readFileSync, statSync, existsSync } from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { CARTOONS } from '../src/lib/cartoons.ts';
 
 const checks = [];
@@ -109,7 +109,7 @@ for (const c of CARTOONS) {
 check('the cartoons together are under 80 MB', total <= 80 * MB, `${(total / MB).toFixed(1)} MB`);
 
 // ── In a browser ───────────────────────────────────────────────────
-const PORT = Number(process.env.CARTOONS_PORT ?? 4191);
+const PORT = port(4191, 'CARTOONS_PORT');
 const notes = [];
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'],
   { stdio: ['ignore', 'pipe', 'pipe'], detached: true });

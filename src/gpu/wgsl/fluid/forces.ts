@@ -9,8 +9,28 @@
 
 import { BILERP_N, HEAD, NOISE_WGSL, W } from './shared';
 import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../lib/turntable';
+import { BOIL_PROPERTIES_WGSL } from '../lampBoil';
 
 export const FORCE_KERNELS: Record<string, string> = {
+  /*
+    A poured soap thins the dye it lies on, once a step (stepLiquids,
+    PLAN 15e-1). This is the multiply `deltaDye` carried, with the same
+    numbers, moved out of the fold of the hand's deltas so that it runs on
+    every step the soap is there and once on each. It erases where a soap
+    should push the dye out of its way; that is PLAN 15e-5's to replace.
+  */
+  soapThin: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let soap = textureLoad(liquids0, p, 0).r;
+  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
+  textureStore(dst, p, capDye(textureLoad(dye, p, 0) * soapMul));
+}`,
+
   liquidForces: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var liquids0: texture_2d<f32>;
@@ -248,7 +268,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The lasting current, at half resolution: A.a.x is 1/M for its own grid.
-  currentForces: `${HEAD}${BILERP_N}
+  currentForces: `${HEAD}${BILERP_N}${BOIL_PROPERTIES_WGSL}
 @group(0) @binding(2) var cur: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
@@ -259,15 +279,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let q = vec2i(id.xy);
   let uv = (vec2f(id.xy) + 0.5) / m;
   var c = textureLoad(cur, q, 0).xy;
-  let temp = bilerpN(vel, uv, S.n).z;
-  /*
-    Buoyancy is linear with temperature (Boussinesq, PLAN §18f), with the tanh
-    removed so plumes have a strength proportional to their heat rather than
-    saturating at once. S.up is gated on upright, so a level plate has no in-plane
-    buoyancy.
-  */
+  let rawTemp = bilerpN(vel, uv, S.n).z;
+  let boiling = A.a.z > 0.0;
+  let temp = select(clamp(rawTemp, 0.0, 50.0), 0.0, boiling);
+  var f = S.up * (S.curBuoy * temp);
   let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  var f = S.up * (S.curBuoy * clamp(temp, 0.0, 50.0));
   f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
@@ -275,6 +291,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   c = c * S.curDamp + f * (1.0 - S.curDamp);
   let s = length(c);
   if (s > S.maxCur) { c *= S.maxCur / s; }
+  /*
+    While the boil model runs (A.a.z > 0), buoyancy comes from water's real
+    density deficit Δρ = ρ(T_ambient) − ρ(T) (Kell 1975, PLAN §18f and §36e-2),
+    converted from kg/m³ to the current's per-kelvin Darcy rise units via
+    BOIL_BUOY_PER_KG_M3 = 1 / |dρ/dT(T_ambient)| and added uncapped by maxCur
+    after the non-thermal current is capped. At Heat = 0, today's exact lines
+    above run byte for byte.
+  */
+  if (boiling && S.curBuoy > 0.0 && rawTemp > 0.0) {
+    let dRho = max(0.0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + rawTemp));
+    c += S.up * (S.curBuoy * (dRho * BOIL_BUOY_PER_KG_M3) * (1.0 - S.curDamp));
+  }
   textureStore(dst, q, select(vec4f(0.0), vec4f(c, 0.0, 0.0), finite2(c)));
 }`,
 

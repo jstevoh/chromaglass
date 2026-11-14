@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -85,6 +85,18 @@
         "Areas that listen (PLAN 25h): the area cords' gate, timed, and every",
         "look's area cords on areas it has and fast readings it really has. The",
         "lab half, the cords on the real solver, runs on the Mac (plate shard)."
+      ]
+    },
+    {
+      "name": "The kick's bloom",
+      "shard": "logic",
+      "run": "npm run kickbloom",
+      "why": [
+        "The droplets each kick throws (Kick Bloom, lib/kickBloom.ts), run on a",
+        "recording sink: the dial scales the dye and the push each alone, and the",
+        "droplets clump rather than sit on one ring (moved from panel.mjs's grep",
+        "when the bloom left the frame loop, 19ai-10); and the music lays no dye",
+        "on a reagent area, Chemical Clock's gel or Red Cabbage's wells (25i-10)."
       ]
     },
     {
@@ -167,12 +179,39 @@
       ]
     },
     {
+      "name": "What the clear controls left, owed",
+      "shard": "logic",
+      "run": "npm run clearleft -- --owed=pace,spin,tray,dimmed",
+      "why": [
+        "PLAN 35a-2, 35d-2, 35f-2, 35g-2 written ahead of their build (scripts/clearleft.mjs):",
+        "the remote's Speed and Evolve Speed draw the snail and hare, Auto Spin and",
+        "Spin Direction are picked from their named answers and not a stepped slider",
+        "(Settings and the remote), the remote's looks and cue strip and the Sequencer's",
+        "stages draw a look's slide mount, and the phone's Show, Evolve and Spin rows",
+        "say off by disabled rather than half opacity. Read from the source, as states",
+        "is. --owed: each line is excused only in main's state; the PR that builds it",
+        "takes its id out. A second, no browser."
+      ]
+    },
+    {
       "name": "The check-change guard",
       "shard": "logic",
       "run": "npm run checkguard",
       "why": [
         "The guard on a check's bars and inputs, against #362's two real cases",
         "and the things it must not fire on (comments, names, prose, printing)."
+      ]
+    },
+    {
+      "name": "Main held red lets only the fix merge",
+      "shard": "logic",
+      "run": "npm run mainhold -- --self-test",
+      "why": [
+        "The rule hold.yml posts on every open PR (PLAN.md 19am): the same job red",
+        "on two finished main deploys running holds main, cancelled runs left out,",
+        "the summary jobs and the runner's plumbing not counted, a green deploy",
+        "lifts it, and a PR labelled fixes-main passes. Against 11-08's deploys",
+        "699 to 738: held after 701 (fifth), lifted by 704."
       ]
     },
     {
@@ -229,7 +268,29 @@
         "a job can arrive: main's push and run by hand taken; a branch, a pull",
         "request, pull_request_target, workflow_run, a schedule, another workflow",
         "on main and another repository refused. And the watchdog's stall rule",
-        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
+        "(scripts/macwatch.mjs) against made-up runs, between two shards included,",
+        "and its busy rule (19ah-9): a shard whose first step found other work on",
+        "the Mac moves the deploy to GitHub's Macs; and that step's own rule",
+        "(scripts/macbusy.sh) against made-up process lists and this machine's own:",
+        "another session's working browser or the app counted; a deploy's own, an",
+        "idle leftover and a vite server alone not. And 19ah-9a (scripts/macdeploy.mjs):",
+        "the mark a shard writes holds a harness's launch while its worker lives and",
+        "for a grace after it ends, never for a shard that gave up or died; macbusy.sh's",
+        "own marks read back; the last step fails when a look between the checks found",
+        "the Mac busy, and the watchdog reads that failure as busy too."
+      ]
+    },
+    {
+      "name": "Two runners on one Mac never share a harness port",
+      "shard": "logic",
+      "run": "npm run ports",
+      "always": true,
+      "why": [
+        "Every harness asks scripts/ports.mjs for its port (PLAN.md 19ah-6), which moves it by its runner's",
+        "block (HARNESS_PORT_SHIFT), so two shards on the owner's Mac at once never meet on one. Reads every",
+        "script, so it runs on every diff: a new harness with a bare port fails it. Holds that the blocks cannot",
+        "overlap or reach macOS's own ports, refuses a mistyped shift, and listens twice on one harness's port",
+        "from two blocks (both serve) and from one (the second is refused, the control)."
       ]
     },
     {
@@ -298,6 +359,25 @@
       ]
     },
     {
+      "name": "Watching a video",
+      "shard": "sound",
+      "run": "npm run watch -- --selftest",
+      "why": [
+        "The watch tool (scripts/watch.mjs, the watch skill) on clips and frames",
+        "whose answers are known by construction: cuts, motion against sound, the",
+        "show's shape; the fetch's picture and sound joined, an audio-only fetch",
+        "refused and ffmpeg handed to yt-dlp as a full path (PLAN.md 47w); the",
+        "design read (palette, colourfulness, edge width, scale, flow lines,",
+        "forms, symmetry, composition, scripts/watchdesign.mjs) and the physics",
+        "read (a slid, a turned, a banded and a pulsing texture, the spectrum's",
+        "slope, the page scan, scripts/watchphysics.mjs), with the real shows'",
+        "ranges beside its bands (47v-3); dissolves found as mixes of their ends,",
+        "and a pour, a spreading dye body and a dimming lamp each turned down by",
+        "its own step (47w-2, scripts/watchcuts.mjs). In the sound shard for its",
+        "ffmpeg. About two minutes."
+      ]
+    },
+    {
       "name": "Following a song",
       "shard": "logic",
       "run": "npm run songfollow",
@@ -322,6 +402,25 @@
         "and by the ear itself, the song's shape counting them, the lock",
         "within the first bars; and the old ear, the smoothed bass crossing",
         "its line, missing the chorus as the Mac did."
+      ]
+    },
+    {
+      "name": "The beat without a kick drum",
+      "shard": "sound",
+      "run": "npm run pulse",
+      "why": [
+        "The beat (src/lib/pulseEar.ts, PLAN.md 30-pulse): a synthetic 78 (banjo,",
+        "tuba, voice and hiss through a recording horn's 170 Hz high-pass, no kick",
+        "drum) at 30 and 60 fps, where the kick alone hears almost none of the",
+        "band's beats and the beat, the beat clock and Kick hit hear 90% or more;",
+        "the same band without the horn, whose low chord fires the kick in runs",
+        "that must not take the beat away; a loop of sixteenth hats under a sparse",
+        "kick, whose beat must not strobe faster than 240 a minute and must stay",
+        "on the quarters; a drummed band, where every beat is a kick to the frame;",
+        "a soft cornet on every off-beat, which must not be taken for the beat (the",
+        "ear entrains to the band's period); a breakdown where the kick lays out and",
+        "comes back; and noise, a held chord and silence, which give no beat.",
+        "About 18 s."
       ]
     },
     {
@@ -425,14 +524,17 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
+      "run": "npm run rungs -- --owed=120hz",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
         "and nothing looked. And the lines written ahead of Wave 4",
         "(scripts/rungs-owed.mjs): 14c-4k, 14c-governor, 14b-120, 14c-readout and",
-        "H2c-10, owed until each ships."
+        "H2c-10, all shipped. And the plate on a 120 Hz screen (46e / 14aa-5,",
+        "scripts/rungs-120.mjs): the real draw gate, step clock and governor",
+        "replayed at 120 Hz; Poster's two lines owed until the build, which",
+        "takes 120hz out of --owed, and the controls green throughout."
       ]
     },
     {
@@ -490,6 +592,21 @@
       ]
     },
     {
+      "name": "Bubbles know their liquid",
+      "shard": "logic",
+      "run": "npm run bubbleliquid",
+      "why": [
+        "PLAN 33f (scripts/bubbleliquid.mjs), written ahead of its build: each pocket",
+        "reads the poured liquid under it from the species field, so its Bretherton",
+        "lead, tilt climb, film drainage, Paterson relaxation, rim emptying and",
+        "dissolving follow its own cell's mu, sigma and rho (alcohol, oil, syrup,",
+        "glycerine, each within 1-5% of the law), two pockets in one field each at",
+        "their own, and nothing poured moves nothing to the bit. --owed: each line",
+        "is excused only in main's state and printed as owed until the PR that",
+        "builds it takes its id out. Node only, a few seconds."
+      ]
+    },
+    {
       "name": "Blow's range",
       "shard": "logic",
       "run": "npm run blowrange",
@@ -529,6 +646,19 @@
       ]
     },
     {
+      "name": "The tank seen through its side",
+      "shard": "logic",
+      "run": "npm run tank",
+      "why": [
+        "The tank's CPU reference (PLAN 47n, src/lib/tank.ts, scripts/tank.mjs):",
+        "a vertical slice of water with heavy dye, held to a still stratified tank,",
+        "Rayleigh-Taylor overturning, a lock exchange's fronts at a real gravity",
+        "current's Froude number (0.38-0.55), a nozzle's jet that is steady, thins",
+        "as gravity speeds it and does nothing without gravity, and no dye made or",
+        "lost. About a minute of float64."
+      ]
+    },
+    {
       "name": "The dish that boils",
       "shard": "logic",
       "run": "npm run boil",
@@ -559,6 +689,44 @@
         "and useGamepad's timers with no pad, the real hook on a stand-in React",
         "(14j-gamepad). Both owed until their builds; the visible fade's line holds",
         "on main and keeps a pump from doubling a fade's writes."
+      ]
+    },
+    {
+      "name": "Hear the set ahead, from files, owed",
+      "shard": "logic",
+      "run": "npm run hearahead -- --owed=files,sections,ahead,loudness,clock,tags",
+      "why": [
+        "Written before the build (scripts/hearahead.mjs, PLAN §17, 2026-11-08): a",
+        "made-up 126 BPM record analysed ahead by the render's own ear, its beat grid",
+        "through a breakdown, its sections on the beat with the drop named, a song",
+        "show's lead in beats, BS.1770 loudness, the player's place in the set and",
+        "the file's tags. --owed: each line is excused only in main's state; the build",
+        "takes its id out and never edits a line. The ear's line and the late line",
+        "(nothing known ahead, a lead fires on the section) hold on main. Node, 4 s."
+      ]
+    },
+    {
+      "name": "The album sheet, its checks written first",
+      "shard": "logic",
+      "run": "npm run album -- --owed=sheet,lineage,builds,seeds",
+      "why": [
+        "PLAN 37x-3's album sheet in node (scripts/album.mjs): the file read on the",
+        "album's clock and as a set list, one palette lineage with bars read from",
+        "the shipped looks' palettes, a quantity that builds at Evolve's pace, and",
+        "track seeds drawn from the album's. All owed until src/lib/albumSheet.ts."
+      ]
+    },
+    {
+      "name": "Three sound builds, their checks written first",
+      "shard": "logic",
+      "run": "npm run soundowed",
+      "why": [
+        "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
+        "notes as voices placed by Melody Walk's scale with an attack, a release",
+        "and a voice cap (24.3), and LFOs and envelopes you set (30b), each a",
+        "library contract named in the script's header. Owed until each build;",
+        "the PR that builds one takes its id out. Two lines hold on main: Bank",
+        "Select stays a CC, and today's LFOs and envelopes stay the defaults."
       ]
     },
     {
@@ -610,6 +778,19 @@
         "scheduler fires it, a cue pinned to a section firing on that section",
         "through a stretched live take, and the nudge putting a late map's cue",
         "back on the song's turn without firing a section's cue twice."
+      ]
+    },
+    {
+      "name": "Listen designs a song's show",
+      "shard": "logic",
+      "run": "npm run listen",
+      "why": [
+        "Listen (PLAN 28h-8): the show designed from a heard song's map plays on",
+        "the song (its cues through the real scheduler, its stages where startAt",
+        "lays them, louder sections fuller against the song's own range), and",
+        "the flow waits for the right map and says when nothing was named; and",
+        "a map heard from halfway in sits on the song's own seconds (28h-9): its",
+        "cues fire on the song's choruses and its fingerprint names the song's place."
       ]
     },
     {
@@ -686,6 +867,15 @@
         "every shipped look with Frame Sway at 0, and sways and pumps with it at",
         "full; a kick's press under the drop no longer throws the lead; a drop on",
         "still paint does not shiver."
+      ]
+    },
+    {
+      "name": "The closeup camera answers a hand",
+      "shard": "logic",
+      "run": "npm run camerahand",
+      "why": [
+        "The closeup camera answers a hand (PLAN.md 27d): Chase Speed's throw in",
+        "Hold, the arrow-key pan, and Music Sync's label, on the real closeup camera."
       ]
     },
     {
@@ -826,6 +1016,52 @@
       "run": "npm run license-worker"
     },
     {
+      "name": "A TV's sign-in by a short code",
+      "shard": "logic",
+      "run": "npm run tvcode",
+      "why": [
+        "The licence Worker's /tv/ routes (server/tv-code.js, PLAN.md 12-tv-signin):",
+        "a TV shows a code, a signed-in phone claims it for an account with Home or",
+        "Pro, and only the TV holding the device code collects a pass, once. Read from",
+        "what the TV and the phone receive: the pass verifies, names the right key,",
+        "is refused by /activate and verifyLicenseKey (a TV takes no Mac seat), stops",
+        "renewing once the key is refunded (or moves to the account's other key),",
+        "a copied pass dies with its original at the next renewal, an account's",
+        "eleventh TV drops its first, and the hourly allowances bite, the poll's",
+        "included. An in-memory KV and generated key pairs, so `logic`."
+      ]
+    },
+    {
+      "name": "The phone's page to link a TV",
+      "shard": "browser",
+      "run": "npm run tvlink",
+      "why": [
+        "The phone page a TV sends the player to (src/components/phone/TvLink.tsx,",
+        "PLAN.md 12-tv-signin), rendered in Chromium at a phone's size with the",
+        "account and the Worker stood in for: a typed code formats as it is typed",
+        "and is sent whole with the account's token; a code that came in a link",
+        "sends nothing on a tap or Enter until the player ticks that the TV in front",
+        "of them shows it (the review found the one-tap phish). No GPU, so `browser`."
+      ]
+    },
+    {
+      "name": "The Apple TV app's sign-in against the Worker",
+      "shard": "logic",
+      "run": "npm run tvswift",
+      "why": [
+        "The tvOS app's core (tvos/, PLAN.md 12-tv-apple), built with Swift and run",
+        "against the licence Worker's own /tv/ handler on a local port: the app links",
+        "by a code (drawing a fresh one when the first runs out), verifies its pass",
+        "offline, renews it to the next generation, and is unlinked when a spent pass",
+        "comes back. The one place the Swift client and the JavaScript server meet, so",
+        "a renamed field or a millisecond read as a second is red here. Then the",
+        "app's receiver against a stand-in relay speaking the /tv page's protocol:",
+        "hello, answer, candidates, a refusal, a drop, a picture that never comes",
+        "and a wrong key, with what the TV sent read on the relay's side. On Linux",
+        "the package builds swift-crypto in place of CryptoKit."
+      ]
+    },
+    {
       "name": "The Mac app's updates",
       "shard": "logic",
       "run": "npm run updates",
@@ -882,6 +1118,23 @@
       ]
     },
     {
+      "name": "The moiré sheets are optics, and off is off",
+      "shard": "lab9",
+      "run": "npm run moire",
+      "why": [
+        "The moiré pack's two printed sheets (PLAN 45a), on the real plate",
+        "shader: every look without them draws byte for byte as a lab built",
+        "with their call taken out; two gratings beat at the difference of",
+        "their frequencies; two sheets pass the product of their",
+        "transmissions; a sheet finer than the pixels is flat grey, no false",
+        "moiré; the gap defocuses the lines and keeps the fringe; the liquid",
+        "bends the lower sheet and not the upper; the spin's clock and the",
+        "Turn are one angle. On SwiftShader, comparing two compiled programs as",
+        "lampzero does. In a part of its own, lab9, since 2026-11-11: lab2 with it",
+        "ran past its 25 minutes on the slow tier twice on #802's deploy (PLAN 19k-18)."
+      ]
+    },
+    {
       "name": "The closeup's bubbles in depth",
       "shard": "lab2",
       "run": "npm run closeupdepth",
@@ -898,7 +1151,7 @@
     {
       "name": "Nothing on the plate makes light",
       "shard": "lab",
-      "run": "npm run nolight",
+      "run": "npm run nolight -- --owed=rim,film",
       "why": [
         "A plate lit from beneath shows transmitted light only (PLAN 38h): the",
         "satellite droplets, Glossiness, the gel and the dish's wall each leave",
@@ -908,7 +1161,10 @@
         "Focus passes the middle; and two times of the clock draw the same",
         "plate (no grain). The lab on SwiftShader, beside lampzero, about two",
         "minutes: the real plate shader on a lab plate, any adapter that",
-        "computes, so it has no need of the Mac."
+        "computes, so it has no need of the Mac. --owed=rim,film: a clear pour's",
+        "and a clear oil drop's rim in focus (PLAN 18e-2) and the camera's bubble",
+        "film by transmission (38h-6), written ahead of their builds; the build",
+        "takes its id out."
       ]
     },
     {
@@ -943,6 +1199,21 @@
       ]
     },
     {
+      "name": "A song's credit in the corner, on the screen and in the stream",
+      "shard": "browser",
+      "run": "npm run caption",
+      "why": [
+        "PLAN 37x-10j: the owner found the poured-ink titles hard to read and asked for a",
+        "1980s music channel's corner caption. In Chromium: the card's lines (artist, the",
+        "song in quotes, album, label) and its fade; drawn on a dark plate, white only in",
+        "the bottom-left corner; on bright cream, a dark drop shadow round the letters (a",
+        "blurred shadow alone left none); streamed through the app's LiveEncoder and",
+        "decoded, the card in the landscape's and the portrait's own bottom-left only",
+        "while it is up; and the wiring (the screen's layer, song-title, the song show's",
+        "and the ear's titles, the MCP, the assistant, the phone). About ten seconds."
+      ]
+    },
+    {
       "name": "The live stream",
       "shard": "lab",
       "run": "npm run live",
@@ -963,7 +1234,7 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2,h2c5,h2c8",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
@@ -973,7 +1244,49 @@
         "sits here rather than in the Mac queue. And the multigrid's own lines",
         "(scripts/encode-solve.mjs): the residual a step leaves, read through the",
         "solver's restriction kernel against main's, which holds on main; and the",
-        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships."
+        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships.",
+        "And two more owed lines (scripts/encode-owed.mjs, 2026-11-07): H2c-5's",
+        "first-order velocity on the open plate (one MacCormack correction and one",
+        "carry fewer) and H2c-8's air only where there are bubbles (no air pass and",
+        "no air texture on a plate that never had one), with a bubble as the control."
+      ]
+    },
+    {
+      "name": "The look kept, against the pull request's base",
+      "shard": "lab5",
+      "run": "node scripts/samelook.mjs",
+      "always": true,
+      "timeout": 22,
+      "why": [
+        "The guard a speed-up is held to (scripts/samelook.mjs, PLAN.md 46-0):",
+        "six shipped looks laid, stepped and drawn by this tree's solver and",
+        "plate shader and by the base's, in the lab, the same pixels after five",
+        "steps and the same picture (colour, detail, histogram) after sixty,",
+        "with controls every run (the same tree twice byte for byte, a",
+        "rounding-sized change passing, a coarser grid, half the pixels and a",
+        "tenth slower flow each failing). It runs only on a pull request",
+        "labelled same-look or titled with a §46 id, since a pull request that",
+        "means to change the look is supposed to fail it; on anything else it",
+        "prints that it was not asked. `always` because its gate is its own:",
+        "the reach of a diff says nothing about whether the look was promised",
+        "kept. About eleven minutes on four cores when it runs, so it has a",
+        "Measure part of its own (lab5), which prints \"not asked\" and ends on",
+        "every other pull request."
+      ]
+    },
+    {
+      "name": "A pinned grid solves as well as the ladder's",
+      "shard": "lab4",
+      "run": "npm run encode -- --grids",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "H2c-10's residual clause (scripts/encode-solve.mjs gridLines): ?sim=514,",
+        "1000, 777 and 100 at the grid the real resolveSimResolution gives, each a",
+        "fresh solver read after four thin steps like the 512² plate it is held",
+        "to within twice of. It holds on main (worst 1.43x, 2026-11-07) and is the",
+        "guard that the multiple-of-32 rounding (the owed line in rungs) solves no",
+        "worse. Five solvers, one 1000², about two minutes under SwiftShader: in",
+        "lab4, the part with the most room, not with encode in lab."
       ]
     },
     {
@@ -992,13 +1305,30 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads",
+      "run": "npm run framereads -- --owed=h2c6,h2c7,h2c9",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",
         "readback is handed out once (PLAN.md 14ab-3, scripts/framereads.mjs); thick",
         "liquid's share reads into one kept buffer to the same number (14ab-9). Logic",
-        "and counts, the same on any adapter that computes."
+        "and counts, the same on any adapter that computes. And three owed lines",
+        "(scripts/framereads-owed.mjs, 2026-11-07), each with controls that hold on",
+        "main: H2c-7's readback straight into its ring, H2c-6's one display target",
+        "with the camera off and H2c-9's pack only after a step, the last two on a",
+        "plate kept across frames (scripts/lab-plateframes.ts). About half a minute",
+        "more under SwiftShader, the kept plate drawn at 72²."
+      ]
+    },
+    {
+      "name": "GPU timings land on the pass that took them",
+      "shard": "logic",
+      "run": "npm run timelabels",
+      "why": [
+        "H2c-labels (scripts/timelabels.mjs): the real GpuProfiler on a stand-in GPU",
+        "whose mappings land 0 to 3 frames late, and once with the ring full, a",
+        "constant time a pass, the camera on at frame 100 and off at 110. The control (every label its own",
+        "time while the passes are unchanged) holds on main; the line that each time",
+        "lands on its own pass when they change is owed until the build."
       ]
     },
     {
@@ -1032,7 +1362,7 @@
     },
     {
       "name": "The oil beads' mask drawn on the GPU",
-      "shard": "lab3",
+      "shard": "lab",
       "run": "npm run beadmask",
       "env": {"PW_WEBGPU":"1"},
       "why": [
@@ -1047,7 +1377,7 @@
     },
     {
       "name": "The slosh dish on the GPU",
-      "shard": "lab3",
+      "shard": "lab",
       "run": "npm run sloshgpu",
       "env": {"PW_WEBGPU":"1"},
       "why": [
@@ -1073,6 +1403,53 @@
       ]
     },
     {
+      "name": "Glitter, the lens and the side lamp",
+      "shard": "lab9",
+      "run": "npm run glint",
+      "timeout": 12,
+      "why": [
+        "PLAN 47e, 47d-1, 47b-1 (gpu/glint.ts, lib/glint.ts): the laws in node (Poiseuille's",
+        "profile, the Jeffery orbit stepped from its equation, Stokes settling, the defocus",
+        "disc and Airy core, the side lamp's falloff, the flake's mirror law); then the real",
+        "shaders in the lab: off is off to the byte with every other lens dial moved; the side",
+        "lamp leaves black black, colours the dye, and lights the half toward it more both ways",
+        "round; glitter darkens a lamp ground in proportion; at 8x and 1024 px the glints",
+        "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
+        "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
+        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
+      ]
+    },
+    {
+      "name": "The tank on the GPU (SwiftShader)",
+      "shard": "lab5",
+      "run": "npm run tankgpu",
+      "why": [
+        "The tank's GPU solver (PLAN 47n, src/gpu/tank.ts) against its CPU",
+        "reference (scripts/tankgpu.mjs): faces and dye cell by cell after two",
+        "steps and the jet's dye after a second, the physics at the app's own",
+        "V-cycles a substep (the lock exchange's fronts, a closed tank's dye kept,",
+        "the jet steady and thinning), and the app's own grid at the heaviest",
+        "settings held finite and divergence-free (where 40 SOR sweeps blew up).",
+        "In a lab part because it opens the lab page",
+        "and asks for a WebGPU adapter; lab5 held one check. About 95 s on",
+        "SwiftShader."
+      ]
+    },
+    {
+      "name": "The soap film on the plate",
+      "shard": "lab3",
+      "run": "npm run soapplate",
+      "why": [
+        "Soap Film draws the frame's own draining film (PLAN 32d, gpu/soapFilmPlate.ts):",
+        "off is the plate to the byte and makes no film; on, the plate's colours follow the",
+        "CPU reference's picture of the film's read-back thickness cell for cell and not",
+        "upside down; the look is lit, not black, and a rainbow (the 2026-11-12 report's",
+        "numbers); the plate's flow moves the film without making or losing any; a drained",
+        "film is drawn again top first; Film Angle follows Snell's law. On the lab's",
+        "software WebGPU, beside the soap film's GPU control."
+      ]
+    },
+    {
       "name": "The dials held in the solver reach their tops",
       "shard": "lab3",
       "run": "npm run widedials",
@@ -1085,6 +1462,22 @@
         "WebGPU (cloud, 2026-10-31), so on Linux's lab shards rather than a Mac's.",
         "In lab3 since #658: its 3:40 in lab put that part past its 25 minutes on",
         "main's merge of #646 (cancelled twice in holeline, after it); lab3 ran 11."
+      ]
+    },
+    {
+      "name": "The dials held in the plate shader reach their tops, owed",
+      "shard": "lab4",
+      "run": "npm run shaderdials -- --owed=droplets,cells,gloss,glow,gate",
+      "timeout": 6,
+      "why": [
+        "PLAN 27h-3 written ahead of its build (scripts/shaderdials.mjs): Micro-Droplets,",
+        "Plate Cells, Glossiness, Boundary Glow and Gate Edge each run to their new top",
+        "(2, 1.4, 2, 2, 2) in the one range, the uniform does not clamp them to the old",
+        "one, no look moves, and in the lab the last quarter of each range still changes",
+        "the picture by a quarter of what the first does (Gate Edge, in the post chain the",
+        "lab does not draw, by its shader's mix held at 1 and its width growing). --owed:",
+        "each line is excused only in main's state; the PR that builds it takes its id",
+        "out. About a minute on SwiftShader (cloud, 2026-11-07), in lab4 beside holeline."
       ]
     },
     {
@@ -1104,8 +1497,23 @@
       ]
     },
     {
+      "name": "The rest of a bubble's air, owed until its builds",
+      "shard": "lab8",
+      "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
+      "why": [
+        "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
+        "scripts/bubbleair.mjs): on bubbledye's plate, the old plate's bubbles",
+        "keep the colour and fill their holes, the species carried alone, the",
+        "oil's mix and the maze's path take the air, the carry empties a bubble",
+        "and fills its hole evenly without airShed, and the app lays no press",
+        "under a bubble while the flow round it stays the same. Each owed id",
+        "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
+        "it: about three and a half minutes, in lab8 (PLAN 19k-11c moved it from lab4)."
+      ]
+    },
+    {
       "name": "No line round a bubble's hole",
-      "shard": "lab",
+      "shard": "lab4",
       "run": "npm run holeline",
       "why": [
         "No line round a bubble's hole in one dye (PLAN.md 33a,",
@@ -1118,7 +1526,11 @@
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
         "with airNear's mask taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
-        "so it sits here beside lampzero rather than in the Mac queue."
+        "so it sits here beside lampzero rather than in the Mac queue.",
+        "In a Measure part of its own, `lab4`, since main's deploys 667 and 670",
+        "(PLAN 19k-11): on GitHub's slow ubuntu tier (videoflow's CPU loop 1.39 ms",
+        "a frame) `lab` reached it at 14:15 and was cancelled at its 25 minutes",
+        "while it ran, every check before it green; it takes 8 to 10.5 minutes alone."
       ]
     },
     {
@@ -1141,7 +1553,7 @@
     {
       "name": "Soap Breakdown keeps a long show bursting",
       "shard": "lab3",
-      "run": "npm run soapbreak -- --owed=law,decay,show,default",
+      "run": "npm run soapbreak",
       "timeout": 8,
       "why": [
         "The Soap Breakdown dial (PLAN 38c-3, scripts/soapbreak.mjs), written ahead of",
@@ -1153,6 +1565,127 @@
         "every look. --owed: each line is excused only in main's state and printed",
         "as owed until the PR that builds it takes its id out. The lab alone, about",
         "four minutes on SwiftShader, beside soap in `lab3` (PLAN 19k-8)."
+      ]
+    },
+    {
+      "name": "Lava Lamp's wax goes round, and keeps going round: up off the warm floor, down from the cool top, minute after minute",
+      "shard": "show",
+      "run": "npm run lavacycle",
+      "timeout": 4,
+      "why": [
+        "With the heat carried (38f-1) Lava Lamp's wax rose and stayed at the top; 27f-9e gave",
+        "the heat a way out, to the cool upper glass at the gap's conduction rate. But the bulb",
+        "was a kick of heat to the wax alone, the water under it left cold: the wax rose once,",
+        "came down to the band's edge and hung there, weightless, from the first minute on, and",
+        "this check, which watched 30 s, was green on it (PLAN 27f-9h). Now the floor's glass is",
+        "warm and heats water and wax alike at the same conduction rate. Two minutes of the look",
+        "on the app's lay: the wax rises and comes down, rises again, and in the second minute",
+        "still falls and rises by a fifth of the height; with the cool glass taken out it stays",
+        "up, with the warm floor or the wax's swelling taken out it never rises (lavawax's",
+        "old third line); and the rate is pi^2 kappa / h^2 at the rest gap, read off the",
+        "solver on the step's real seconds. On the Mac: six minutes of the lamp in four labs",
+        "is half a minute on an M4's Metal, 78 s on the hosted Mac (this PR's first `show` run,",
+        "2026-11-12; the four minutes are three times that) and two hours on SwiftShader, where",
+        "it had Measure's lab10 to itself while it watched 50 s."
+      ]
+    },
+    {
+      "name": "Lava Lamp's wax holds together and is heavy while cold",
+      "shard": "lab8",
+      "run": "npm run lavawax",
+      "timeout": 22,
+      "why": [
+        "Lava Lamp's wax was dye, and dye mixes: sealed in its bottle it filmed red",
+        "wall to wall (PLAN 27f-9c). Now it is the oil with a weight of its own (Oil",
+        "Weight) and a melt. On the look's settings, its own step and the app's lay, each",
+        "line against a run that takes away the one thing it names: laid as dye (the wash),",
+        "Oil Bodies off (the colour in the bodies), Oil Weight 0 (the cold top body sinks).",
+        "That the lamp lifts the wax was its third line, read at 6 s; a lamp that heats",
+        "through its glass has not warmed the wax by then, so that line and its no-swelling",
+        "lab are lavacycle's now, on the Mac (PLAN 27f-9h). It was about ten minutes on",
+        "SwiftShader with that line, about twenty on the slow tier: a part of its own, lab8,",
+        "since lab4 already runs about eleven there."
+      ]
+    },
+    {
+      "name": "A standing plate is a sealed bottle",
+      "shard": "lab7",
+      "run": "npm run sealed",
+      "timeout": 12,
+      "why": [
+        "Lava Lamp's wax poured out over the plate's open rim (PLAN 27f-9): the",
+        "weight on a standing plate is now the closed cell's circulation. With the",
+        "seal held off the plate keeps 68% of its dye in eight seconds; sealed it",
+        "keeps all of it, a lone drop still falls at 95% of its old speed, and the",
+        "lamp's heat lift stays inside and still lifts the wax (0.026 of the plate).",
+        "About six minutes on SwiftShader, in lab7 beside the ink titles."
+      ]
+    },
+    {
+      "name": "A song's title painted as ink, then swept away",
+      "shard": "lab7",
+      "run": "npm run inktitle",
+      "timeout": 14,
+      "why": [
+        "The Live Show's ink titles (PLAN 37x-10, scripts/inktitle.mjs), written ahead",
+        "of their build: the cue (one title a song, the switch, 40 characters), the",
+        "ink (the palette's or a chosen colour), the mask (upright, on the wall, where",
+        "asked, small to the plate's width), and in the solver a title poured with",
+        "pourInk that reads at 0.8 or better half a second after it lands and adds",
+        "the dye it says, still reads at 0.7 at 3 s and at 0.3 or worse by 12 s at the",
+        "default sweep (by 2 s at the top, a drift at 0.01), with its dye still on the",
+        "plate: swept by the flow, never faded. Then the settings (off by default, no",
+        "look sets them) and the wiring (the app pours and washes, no shader draws a",
+        "title, the phone has the switch). --owed: each line is excused only in main's",
+        "state and printed as owed until the PR that builds it takes its id out. On",
+        "main it opens no browser; built, the lab steps 1,200 times, about six minutes",
+        "on SwiftShader, beside soapbreak in lab3. In lab7 since 19k-17: on the slow tier",
+        "lab3 reached it at 17:50 of its 25 (soap 8:14, soapbreak 4:35) and was cancelled",
+        "in it on two pull requests' runs and a re-run on 2026-11-10. Its bound is 14",
+        "minutes, not 9: in lab7 it ran about 7 on a fast runner (#781) and was stopped at",
+        "9:00 on the slow one (H2c-labels the same day), where every lab script runs about",
+        "twice as long as on the fast one (soap 8:14 against 4:09). A bound on wall time,",
+        "not on anything the check measures."
+      ]
+    },
+    {
+      "name": "A song's title stays readable on a busy look's thin gap, then is rinsed away",
+      "shard": "lab6",
+      "run": "npm run inktitle -- --thin",
+      "timeout": 16,
+      "why": [
+        "PLAN 37x-10g and 37x-10e: in the private rehearsal of the first live stream the",
+        "title cards were smeared by the looks' own flow in about a second. On the thin",
+        "gap every look opens on, the title now lands on a pad of thick clear liquid and",
+        "the wash rinses it with clear liquid that fingers through the pad. Through the",
+        "app's own stepInkTitle on the lab's solver: under a lively flow (whose control,",
+        "the title in thin ink, reads under 0.6 at 1 s) it reads 0.7 at 2.5 s and 0.3 or",
+        "worse by 12 s; it lands at 0.8; the rinse takes it by 2 s at the top and leaves",
+        "it at 0.7 at 6 s at 0.01; every arm keeps 90% of its dye; the pad is there. About",
+        "21 s of plate, seven minutes on SwiftShader's fast runner tier and about fourteen on",
+        "the slow one: in lab5, whose samelook says \"not asked\" off the speed hunt's PRs,",
+        "since lab4 with it was cancelled at the 25-minute limit on the slow tier (#778).",
+        "Then lab6, with logomelt: on a pull request the speed hunt's title asks samelook",
+        "for (H2c-labels, 2026-11-10), samelook ran 15:18 and this check was cancelled at",
+        "the limit seven minutes in, twice, on a tree it never touched (PLAN 19k-17)."
+      ]
+    },
+    {
+      "name": "The logo poured at a film's start melts into the plate",
+      "shard": "lab6",
+      "run": "npm run logomelt",
+      "timeout": 10,
+      "why": [
+        "PLAN 37x-11 (scripts/logomelt.mjs): with the Logo melt switch on, the stream going",
+        "live or a Record take pours the intro's wordmark as the title's thick ink. On the",
+        "lab's thin gap under a lively flow, through the app's own queueInkTitle and",
+        "stepInkTitle: it lands at 0.8 or better through pourInk, still reads 0.7 at 2 s,",
+        "is melted to 0.3 or worse by 7 s, keeps 90% of its dye (melted by the liquid,",
+        "never faded), and lies on a pad. Without a browser: off by default and the show's",
+        "key, the cue's edges, and the wiring (no shader names the logo). About 7 s of",
+        "plate, three minutes on SwiftShader's fast tier. In lab5 (11 minutes when samelook",
+        "is not asked): lab4 was cancelled at its 25-minute bound six minutes into this",
+        "check's first, 12 s arm (#780). In lab6 with the thin-gap title since 19k-17."
       ]
     },
     {
@@ -1243,6 +1776,53 @@
       ]
     },
     {
+      "name": "Heat 0 keeps today's current (the plate's boil, 36e-2b)",
+      "shard": "lab2",
+      "run": "npm run plateboil -- --part=zero",
+      "timeout": 6,
+      "why": [
+        "The Heat dial's default, 0, must leave every look as it is today, and the",
+        "first boil build (#718) changed the lasting current at every Heat. The tree's",
+        "currentForces against today's, frozen in scripts/plateboil-today.mjs, in a",
+        "second lab on SwiftShader (lampzero's reason: two compiled programs compared",
+        "byte for byte), and FluidSimulation's stepCurrent against today's body in",
+        "node. Holds on main. About 90 s in a cloud session."
+      ]
+    },
+    {
+      "name": "One args name, one value a step (46r)",
+      "shard": "lab2",
+      "run": "npm run argnames",
+      "timeout": 6,
+      "why": [
+        "A dispatch's numbers live in a buffer the solver keeps under a name, and a",
+        "buffer holds what was written to it last before the submit, so two calls in",
+        "one step under one name with different numbers both read the second's. The",
+        "lasting current, the swirl's projection and the open plate's addCurrent",
+        "shared 'current grid', and on the open plate currentForces read Depth Drag",
+        "as the boil running (scripts/argnames.mjs). The solver's argWrite watched",
+        "from the page on eleven plates, with a planted pair as the control; the",
+        "current after one step the same at Depth Drag 0 and 1.5, bit for bit; and",
+        "the boil's rise read on the open plate at Heat 1. About 50 s here."
+      ]
+    },
+    {
+      "name": "A poured liquid acts on every step (15e-1)",
+      "shard": "lab2",
+      "run": "npm run liquidpush",
+      "timeout": 6,
+      "why": [
+        "A bottle's liquid pushed the flow and thinned the dye only inside the fold of",
+        "a frame's hand-laid deltas, so not at all on a step nothing was laid in (a",
+        "liquid poured after a Clear) and twice on a step folded twice",
+        "(scripts/liquidpush.mjs). A heavy drop and a soap's on a rocked plate, open",
+        "and thin, stepped with no fold, one and two, and after a Clear, each against",
+        "the same plate without the drops: all four do the same. `npm run liquidsgpu`",
+        "holds the liquids' sizes on the Mac; this holds when they act, in a minute,",
+        "on any adapter."
+      ]
+    },
+    {
       "name": "The layout",
       "shard": "browser",
       "run": "npm run layout",
@@ -1252,6 +1832,20 @@
         "mode switch stays put. The same measurements run again inside the show",
         "night on macOS; here they fail in two minutes rather than fifteen, and",
         "before the GPU shards have a chance to hide them behind another step."
+      ]
+    },
+    {
+      "name": "What the desk has that nobody can see, owed",
+      "shard": "browser",
+      "run": "npm run deskreach -- --owed=rides1280,ridemark,deckmark,macro,remote",
+      "why": [
+        "Written before their builds (scripts/deskreach.mjs, 2026-11-08): every ride",
+        "whole at 1280x800 and a mark when the right column or the deck has more than",
+        "it shows (35c-6a, 35c-6b, the deck's Macro panel on the screen at 1440), and",
+        "Laptop remote on the iPad app's full layout (12 step 4a). --owed: each line is",
+        "excused only in main's state and printed as owed; the PR that builds it takes",
+        "its id out and never edits a line. The lines with no id hold on main: no mark",
+        "when nothing is below, no Laptop remote on the website. About a minute."
       ]
     },
     {
@@ -1301,6 +1895,21 @@
         "on a phone in portrait and two landscapes, More → Feedback fits with",
         "nothing covered, 16 px type (13 px was found in every landscape) and",
         "48 px topics; and the phone's Settings strip ends in it too."
+      ]
+    },
+    {
+      "name": "The looks browser: stills and one preview, owed",
+      "shard": "browser",
+      "run": "npm run looksgrid -- --owed=stills,preview",
+      "why": [
+        "PLAN 34b written ahead of its build (scripts/looksgrid.mjs): every shipped",
+        "look's card on the Perform desk's grid, the narrow window's look menu and the",
+        "phone's Looks sheet draws one lazy still of its own, a small WebP from the",
+        "built site, the same file on all three, none flat and no two alike (34b-1);",
+        "and only the hovered or held card holds a preview canvas, one at a time,",
+        "gone once it is left (34b-2). Headless with no WebGPU, so the page answers",
+        "at once; the site \"The load\" just built. --owed: each line is excused only",
+        "in main's state; the PR that builds it takes its id out. About 20 s."
       ]
     },
     {
@@ -1417,6 +2026,23 @@
       ]
     },
     {
+      "name": "The phone controller apps, owed",
+      "shard": "browser2",
+      "run": "npm run controller -- --owed=scan",
+      "why": [
+        "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
+        "the iPhone and Android apps as the Mac's controller. The Mac's set list and",
+        "song shows on the phone's remote, and the laptop's half that sends them and",
+        "acts on a tap (12-ctl-1); Scan the Phone panel's QR code instead of typing",
+        "(12-ctl-2); the Android app as a Capacitor project that may open ws:// to the",
+        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). --owed: each",
+        "line is excused only in main's state and printed as owed; the PR that builds",
+        "it takes its id out and never edits a line. The lines with no id hold on main:",
+        "the looks stay on Controls, the laptop answers a controller, no Scan on the",
+        "website, no Open in Chrome on the iPhone. No plate needed; about a minute."
+      ]
+    },
+    {
       "name": "OSC out reaches a VJ app",
       "shard": "browser2",
       "run": "npm run oscout",
@@ -1448,7 +2074,7 @@
     {
       "name": "The Live Show panel",
       "shard": "browser2",
-      "run": "npm run liveshow",
+      "run": "npm run liveshow -- --owed=narrow",
       "why": [
         "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
         "its sums in node against numbers worked by hand, then the built app",
@@ -1457,7 +2083,8 @@
         "the public, the upload warning, and the phone's Stop. No GPU: the",
         "encoder is WebCodecs' software H.264. Through npm run, which builds",
         "dist/ first and puts esbuild on the PATH (a bare esbuild in the",
-        "shard's shell is not found: exit 127 on the first CI run)."
+        "shard's shell is not found: exit 127 on the first CI run). The narrow",
+        "window's chip (37x-4d-4, scripts/liveshownarrow.mjs) is owed until built."
       ]
     },
     {
@@ -1514,6 +2141,37 @@
       ]
     },
     {
+      "name": "The owner's YouTube connector",
+      "shard": "browser2",
+      "run": "npm run youtube",
+      "why": [
+        "The YouTube MCP server (PLAN 44i; scripts/youtube.mjs): mcp/youtube-mcp.js over stdio",
+        "against a stand-in Google on loopback. The sign-in (state refused, PKCE S256, the key",
+        "file 600 in a 700 folder), a refused access key refreshed, an upload killed mid-file",
+        "and resumed by a second server in the same session, a dropped chunk and a 503 resumed",
+        "from Google's count, the bytes exact, private when no privacy is named (Google's default",
+        "is public since 2026-11-02), the same file twice refused, an update keeping what it did",
+        "not name, no secret in any reply or log. Then fourteen mutants, each of which must fail",
+        "its own line. No GPU, no build, no network; about half a minute."
+      ]
+    },
+    {
+      "name": "The owner's assistant over the internet",
+      "shard": "browser2",
+      "run": "npm run relay",
+      "why": [
+        "The relay Worker (PLAN 44h; scripts/relay.mjs): mcp/tunnel-worker.js in Node,",
+        "signed in to and called as claude.ai drives a remote connector (a 401 naming the",
+        "metadata, DCR, PKCE S256, the code, refresh), the Mac's end (chromaglass-mcp.js",
+        "tunnel) dialled out to it, the real show server and a stand-in display behind. Only",
+        "Claude's callbacks, only the owner's Firebase uid from a fresh sign-in, a code once,",
+        "rotation, theft and the grace, expiry, OWNER_UID changed, nothing raw stored, a flood",
+        "cut off; the same tools as over stdio, the Mac's guard still refusing; only the Mac's",
+        "key opens the tunnel; the switch off closes it. Then eighteen mutants, each of which",
+        "must fail its own line. No GPU, no network; about twenty seconds."
+      ]
+    },
+    {
       "name": "The remote's Draw screen",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/draw.mjs",
@@ -1522,6 +2180,54 @@
         "stand-in laptop on the show server's relay hears every touch, tool,",
         "dye and button a phone and an iPad send, and where a touch lands in",
         "the wall's frame. No GPU; dist/ is the phone step's build."
+      ]
+    },
+    {
+      "name": "The TV app finds the show and pairs by four digits",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tvpair.mjs",
+      "why": [
+        "The Android TV app's network half (scripts/tvpair.mjs, PLAN.md 12-tv-2):",
+        "the real show server's Bonjour advert asked as NsdManager asks and as a",
+        "one-shot question (its port, the TV page's path, the show's id, never",
+        "its key); pairing by four digits over raw sockets from the server's",
+        "network address (Allow, No and the lockout, a phone unable to allow,",
+        "kept keys across a restart, unknown keys never locking out, Forget);",
+        "the built /tv page pairing, keeping its key and joining with it after a",
+        "reload; the laptop's card laid out with the built stylesheet. The app's",
+        "own build and lint are the Android TV app workflow. dist/ is the phone",
+        "step's build. About thirty seconds."
+      ]
+    },
+    {
+      "name": "The TV's remote picks the look",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tvremote.mjs",
+      "why": [
+        "The TV remote picks what the Mac plays (scripts/tvremote.mjs, PLAN.md",
+        "12-tv-remote): the relay's rules (a TV hears only the presets and the",
+        "live one, picks only a listed preset, one every TV_PICK_MS, and nothing",
+        "else it sends reaches the laptop; a phone's or a pairing ask's pick",
+        "reaches nothing) against the real show server and a stand-in laptop;",
+        "the built /tv page's keys as the Android TV app hands them (left, right,",
+        "OK, up, Menu and Back), a TV's own browser's first OK, and the phone's",
+        "tap bar and list inside a phone's screen. dist/ is the phone step's",
+        "build. About twenty seconds."
+      ]
+    },
+    {
+      "name": "A TV at home plays the show's plate",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tv.mjs",
+      "why": [
+        "A TV at home (scripts/tv.mjs, PLAN.md 12-tv): the real show server, the",
+        "built /tv page at the server's network address, and a stand-in laptop",
+        "running the real WebRTC sender over a canvas painted one colour at a",
+        "time. The TV's own pixels follow each change within 700 ms, sharp from",
+        "the first two seconds, H.264 where both ends have it; three TVs and a",
+        "fourth refused, free and wrong key refused, a TV never driving the",
+        "show, films with no show, a frozen plate, the phone. No GPU; dist/ is",
+        "the phone step's build. About forty seconds."
       ]
     },
     {
@@ -1672,6 +2378,26 @@
       ]
     },
     {
+      "name": "The opening waits for fewer pipelines, owed",
+      "shard": "browser2",
+      "run": "node scripts/openingtime.mjs --bar --runs 1 --owed=count",
+      "env": {
+        "PW_WEBGPU": "1"
+      },
+      "why": [
+        "Classic's opening counted (scripts/openingtime.mjs --bar, PLAN.md 46a):",
+        "at most 52 pipelines asked of WebGPU before the first step. Main asks",
+        "for 66 (the app's ledger lists 65; on the owner's Mac, 2026-11-08, they",
+        "built in 13.51 s and the first step came at 15.48 s). A count, not",
+        "seconds, because a cold Mac's opening varies by seconds on one commit",
+        "and the Mac's compiler sets the pace (14v-10), so the seconds follow",
+        "the count; they are printed beside it. The count is the same on any",
+        "GPU, so it runs here on software WebGPU (about ten seconds) rather",
+        "than in the Mac's queue, last in browser2, after the part's builds of",
+        "the site. Owed until 46a ships."
+      ]
+    },
+    {
       "name": "The shaders compile",
       "shard": "show",
       "run": "npm run wgsl",
@@ -1690,6 +2416,22 @@
       ]
     },
     {
+      "name": "The plate boils under a held hand at 60 fps, not under the fan (36e-2b)",
+      "shard": "plate",
+      "run": "npm run plateboil -- --part=boil",
+      "timeout": 15,
+      "why": [
+        "The live plate's own boil (PLAN 36e-2b), which boilgpu's dishes do not reach:",
+        "a dark dish at Heat 1 warmed at the app's longest frame (0.1 s), then stepped",
+        "at 1/60 s, where a half-float temperature loses each step's heat. Under a",
+        "held hand it reaches 100 °C and steams; under the fan it settles over 80 °C",
+        "and under 100; the steam pushes out the liquid its volume displaces; a write",
+        "to the temperature stays written. Heat Decay at the app's 0.98. On Metal",
+        "because it is some 20 000 solver steps (half an hour on SwiftShader). Owed",
+        "until 36e-2: the build takes the ids out of --owed and never edits a line."
+      ]
+    },
+    {
       "name": "The particles",
       "shard": "plate",
       "run": "npm run particles",
@@ -1700,9 +2442,10 @@
     {
       "name": "The relief",
       "shard": "plate",
-      "run": "npm run derive",
+      "run": "npm run derive -- --owed=grad",
       "why": [
-        "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror."
+        "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
+        "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
       ]
     },
     {
@@ -1715,11 +2458,17 @@
     },
     {
       "name": "A drop slumps under its own weight",
-      "shard": "plate",
+      "shard": "tools",
       "run": "npm run slump",
       "why": [
         "A drop of ink on a level plate slumps out along the lower glass as a",
-        "viscous gravity current, its front where Huppert's law puts it (PLAN 18m)."
+        "viscous gravity current, its front where Huppert's law puts it (PLAN 18m).",
+        "On tools since 18m-5a, which runs it with the grid filter on and adds a",
+        "glycerine run without it (55 s on Metal): on #498 plate was killed at its",
+        "20 minutes twice, in ferro.mjs, with every check before it passed, where",
+        "tools ran in 14. 14b (the filter does not move the front) is owed to",
+        "PLAN 18m-5c: in the 2 mm gap main's filter moves the glycerine drop's 2%",
+        "front 0.36 mm in 20 s."
       ]
     },
     {
@@ -1937,7 +2686,7 @@
         "`npm run liquids` laid on the thin gap the looks use, each held to the",
         "stand-in's bar and to its size within a factor of two, with a fold of",
         "the deltas every step and on a still plate, and soap's and silicone's",
-        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-2 to",
         "15e-5 print and do not fail until they pass. Here on Metal, about a",
         "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
         "24 of its 25 minutes before signin without it (#513's first run)."
@@ -2028,6 +2777,32 @@
         "ruptured hole unrefilled and black spreading within 15%, every step",
         "submitting GPU work and every read mapping a buffer, and the CPU",
         "reference absent from the solver's bundle."
+      ]
+    },
+    {
+      "name": "The tank on Metal",
+      "shard": "plate",
+      "run": "npm run tankgpu",
+      "why": [
+        "The tank's GPU solver against its CPU reference on Metal (PLAN 47n,",
+        "scripts/tankgpu.mjs): the same lines as the lab's run, on the compiler",
+        "the show runs on, which may fuse the arithmetic differently."
+      ]
+    },
+    {
+      "name": "The dish that boils on Metal",
+      "shard": "plate",
+      "run": "npm run boilgpu",
+      "why": [
+        "The lamp-boiling dish's GPU solver (src/gpu/lampBoil.ts,",
+        "src/gpu/wgsl/lampBoil.ts) against the CPU reference (src/lib/lampBoil.ts),",
+        "on Metal (PLAN 36e-2, scripts/boilgpu.mjs): all six boil checks (heating",
+        "and Beer-Lambert, forced vs natural convection under a held hand, Kell",
+        "buoyancy and thermal expansion, cavity nucleation and condensation,",
+        "the hand's boil and lift, and Heat = 0 no-op), a single nucleus,",
+        "cell-by-cell agreement with the reference across seven scenes, every step",
+        "submitting GPU work and every read mapping a buffer, the CPU reference",
+        "absent from the solver's bundle, and its step cost at 768²."
       ]
     },
     {
@@ -2261,7 +3036,8 @@
       "why": [
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",
-        "and Newton cooling decays per-second with a tens-of-seconds time constant."
+        "Newton cooling decays per-second with a tens-of-seconds time constant, and on a",
+        "thin gap the heat rides the liquid with its colour (PLAN 38f-1, carryHeat)."
       ]
     },
     {
@@ -2299,6 +3075,32 @@
         "bodies; no oil made or lost, and a lone drop untouched. Two 192²",
         "plates of six seconds and two small ones; in the fifth shard, beside",
         "the rim's oil."
+      ]
+    },
+    {
+      "name": "An oil drop shows its own colour and its edge is no darker than either liquid",
+      "shard": "fifth",
+      "run": "npm run dropcolour",
+      "timeout": 5,
+      "why": [
+        "PLAN 47z-1 (with 28i-7b and 28k-5): a red oil drop laid in cobalt water",
+        "as a look lays it keeps its own colour in the middle, and across its",
+        "edge the light is the two liquids side by side, never darker than the",
+        "darker of them; the edge used to go black. Three 128² plates of one",
+        "second; in the fifth shard, beside the crowd's Film Hold."
+      ]
+    },
+    {
+      "name": "A packed foam's junctions turn to 120°",
+      "shard": "fifth",
+      "run": "npm run foam",
+      "timeout": 8,
+      "why": [
+        "Foam Cells (PLAN 47z-5): a packed emulsion laid pressed at random",
+        "angles holds its cells, and the oil's tension turns its junctions",
+        "toward Plateau's 120° (median off 120° halved, more within 10°),",
+        "with the rust in the water and no oil made or lost. One 384² plate of",
+        "four seconds; in the fifth shard beside Film Hold, which it stands on."
       ]
     },
     {
@@ -2346,7 +3148,23 @@
         "the screen, a pool one flat ink outlined in black, and only Roy prints.",
         "On tools since PLAN 19k: plate ran 19.1 to 20.4 minutes on the PR runs of",
         "2026-10-26 against its 20, and #502's was stopped there with one check left;",
-        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14."
+        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14.",
+        "--owed=back: a second plate's pool outlined as the front's is (PLAN 21b),",
+        "excused only in main's state (the back printed, not outlined); the PR that",
+        "builds it takes the id out"
+      ]
+    },
+    {
+      "name": "The looks browser leaves the plate its steps, owed",
+      "shard": "tools",
+      "run": "npm run looksgrid -- --budget --owed=budget",
+      "why": [
+        "PLAN 34b-2 on Metal (scripts/looksgrid.mjs --budget): a hovered card's",
+        "preview plays, and the show's plate steps meanwhile at 0.95 or more of its",
+        "rate with the grid shut. A real GPU's line: SwiftShader gives the page",
+        "a frame every few seconds, so neither half can be read in Measure.",
+        "--owed=budget is excused only while no card holds a preview; the PR that",
+        "builds it takes the id out. About 40 s."
       ]
     },
     {
@@ -2420,9 +3238,15 @@
       "name": "Preview's copy, with frames",
       "shard": "open",
       "run": "node scripts/draftwall.mjs --frames",
+      "timeout": 3,
       "why": [
         "Preview's copy again (see Measure's), here with frames: the projector",
-        "window is painted from the wall's canvas and never the copy's."
+        "window is painted from the wall's canvas and never the copy's.",
+        "Three minutes (PLAN 19k-14): it runs 25 to 37 s on GitHub's Macs, and",
+        "on #690's second run it hung after 'and the copy stays up for the next",
+        "look' for 12:07, until the job was cancelled and the five checks after",
+        "it never ran. Bounded, a hang is this check red by name and the rest",
+        "of the shard still runs; why it hung is 19k-14's."
       ]
     },
     {
@@ -2540,8 +3364,9 @@
         "The Turing pattern (PLAN 26): one stripe width on every rung, carried",
         "with the colour and healed after a stir, grown only where it is fed,",
         "and Turing Print black on white where the reaction is, not piling up.",
-        "The lab only; five or six minutes on SwiftShader, so on a Mac rather",
-        "than in Measure, and on the fifth shard (PLAN.md 19w; it went to show",
+        "The lab only; about fifteen minutes on SwiftShader (the held-corner",
+        "lines, PLAN 26d-6a), so on a Mac rather than in Measure, and on the",
+        "fifth shard (PLAN.md 19w; it went to show",
         "first, which had the most room then, 13.2 against open's 16.8 on #331's run)."
       ]
     },
@@ -2697,14 +3522,27 @@
     {
       "name": "The Live Show streams the picture",
       "shard": "fifth",
-      "run": "npm run liveshow -- --stack --owed=plate,stack",
+      "run": "npm run liveshow -- --stack --owed=stack",
       "why": [
         "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
         "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
         "mixer and a keystone on the wall, streamed and decoded, against the",
         "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
-        "the Plate source's frames are black today and the Mixer stack source is",
-        "not built; printed as owed until the PR that fixes each takes its id out."
+        "the Mixer stack source is not built; printed as owed until the PR that",
+        "builds it takes its id out (the Plate source's black frames, 37x-4d-6, are fixed)."
+      ]
+    },
+    {
+      "name": "The album's plate carries from song to song",
+      "shard": "fifth",
+      "run": "npm run albumplate -- --owed=carry",
+      "why": [
+        "PLAN 37x-3 (scripts/album.mjs --app): song 2's first half second keeps song",
+        "1's dye (the picture's luma correlated, its spread held) while track 2's",
+        "settings move, and a track marked opensOnBlack opens on black, through the",
+        "window.chromaglassAlbum hook; owed until built. Two control lines hold on",
+        "main: a look taken with Go keeps the plate by the same bars and Clear does",
+        "not. On a Mac because the plate needs WebGPU."
       ]
     },
     {

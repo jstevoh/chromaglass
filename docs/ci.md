@@ -6,7 +6,9 @@ every session; read this when a PR's checks or a deploy need explaining.
 `.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
 deploy:
 
-- **Measure** (ubuntu, seven parts side by side, 6–21 min each): typecheck, every script
+- **Measure** (ubuntu, eight parts side by side, 6–21 min each; GitHub's runners come in
+  speed tiers about 2x apart, so a part sized on a fast one can meet its 25 on a slow one,
+  PLAN 19k-11): typecheck, every script
   parsing, the workflows linted (`actionlint`), the shaders compiling on SwiftShader, and
   the node harnesses. A PR whose diff is only check scripts, manifest entries, the npm
   scripts checks run and documents runs only the Measure checks it reaches (PLAN 19k-4;
@@ -64,6 +66,19 @@ deploy:
   GitHub's after 15 minutes (`Watchdog`); by hand, **Re-run all jobs**, never failed jobs.
   Setup, pausing it for a show, and what a job there can reach: `docs/mac-runner.md`
   (PLAN.md 19ah).
+- `ready.yml` labels an Antigravity PR (or one labelled `review-owed`)
+  `ready-for-review` and comments `READY #<n> <item> head <sha>` when `Checks` goes
+  green on its current head, and takes the label off on the next push or a red run
+  (`docs/handoff.md`, "Ready, review, merge"; PLAN.md 19al).
+- **Main held red** (`hold.yml`, `scripts/mainhold.mjs`, PLAN.md 19am): while the same
+  job (a Mac shard, a Measure part, the build; not the two summary jobs) is red at its
+  newest two results on main, counting only the deploys that ran it (cancelled ones, a
+  docs-only deploy and one with no Mac shards are left out for the jobs they did not
+  run), every open PR carries a red commit status `Main not held red`, and a PR labelled
+  `fixes-main` a green one. The first deploy that runs that job green, or whose PR passed
+  its exact tree, lifts it. It is posted when a deploy finishes and when a PR is opened,
+  pushed, labelled or retargeted. `npm run mainhold` says whether main is held;
+  `-- --history 40` replays the rule over the last 40 deploys.
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured), `pixels.yml` (every

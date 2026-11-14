@@ -3,6 +3,7 @@ import {
   addPasswordToCurrentUser,
   authErrorMessage,
   getAccountMethods,
+  isApplePrivateRelay,
   refreshAccountVerification,
   resendVerificationEmail,
   MIN_PASSWORD_LENGTH,
@@ -144,10 +145,20 @@ const AccountSignInMethods: React.FC<{ onConfirmed: () => Promise<void> }> = ({ 
           </button>
         </div>
         <p data-cg-account-methods-list="" className="mt-1 text-[13px] text-text-2">
-          {[methods.google ? 'Google' : null, methods.passwordProvider ? 'Email (link or password)' : null]
+          {[methods.google ? 'Google' : null, methods.apple ? 'Apple' : null, methods.passwordProvider ? 'Email (link or password)' : null]
             .filter(Boolean)
             .join(' · ') || 'Email'}
         </p>
+        {/* Apple's "Hide My Email" (PLAN 23.15): the account's address is a
+            relay that forwards to the person, and the licence Worker keeps a
+            licence under the address it was bought with, so a buyer who hid
+            their address here sees Free. Saying it here is the one place they
+            will look; joining the two is PLAN 23.15c. */}
+        {isApplePrivateRelay(methods.email) && (
+          <p data-cg-account-apple-relay="" className="mt-1 text-[12px] leading-snug text-muted">
+            Apple is hiding your email from us, so this account's address is an Apple relay. A licence bought under your own email shows up when you sign in with that email (Google, or Email) instead.
+          </p>
+        )}
         {open && (
           <form onSubmit={handleSetPassword} className="mt-2 flex gap-2">
             <div className="relative min-w-0 flex-1">

@@ -41,7 +41,7 @@ import {
   renameTab, sanitizeTabs, saveTabs, setTabLayout, storedForm, tabForStored,
 } from '../src/lib/deskTabs.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/settingsMap.ts';
-import { PINNABLE, DEFAULT_RIDES, DEFAULT_RECIPE } from '../src/lib/deskPins.ts';
+import { PINNABLE, PIN_RANGE, DEFAULT_RIDES, DEFAULT_RECIPE, MAX_PINS, loadPins } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
 import { settingsSource } from './settingsSource.mjs';
@@ -86,9 +86,11 @@ check('the three that ship are Perform, Sequence and Setup, in that order',
   The old chips folded into the three. Every panel that was out in Build, Gig
   or Load-in is on one of them, and so are the two screens (the Sequence
   chip's Songs and Sequences, the Sound chip's player and drone), now panels.
+  The player and drone are the top of Sound since PLAN 35c-7, so Sound
+  stands for them (the merge's own lines are with Sound Mappings' below).
 */
 const onDefaults = new Set(DEFAULT_TABS.flatMap(t => openPanels(t.layout)));
-const wasBehindChips = [...new Set([...LAYOUT_NAMES.flatMap(n => openPanels(SHIPPED[n])), 'songs', 'sequences', 'player'])];
+const wasBehindChips = [...new Set([...LAYOUT_NAMES.flatMap(n => openPanels(SHIPPED[n])), 'songs', 'sequences', 'audio-input'])];
 const lost = wasBehindChips.filter(id => !onDefaults.has(id));
 check('every panel the old chips had out, and the Sequence and Sound screens, is on a shipped tab',
   lost.length === 0, lost.length ? `not on any: ${lost.join(', ')}` : `${wasBehindChips.length} panels`);
@@ -97,8 +99,8 @@ check('Perform is the show: the set list to go to the next look, the bottles, th
   && DEFAULT_TABS[0].layout.plateMode === 'live');
 check('Sequence holds the set, the song shows, the sequences and the score, Live so a sequence reaches the plate',
   ['cues', 'songs', 'sequences', 'score'].every(id => whereIs(DEFAULT_TABS[1].layout, id)) && DEFAULT_TABS[1].layout.plateMode === 'live');
-check('Setup holds the room: the controller, the sound in, the player, the wall and its mapping',
-  ['midi', 'audio-input', 'player', 'projectors', 'mapping'].every(id => whereIs(DEFAULT_TABS[2].layout, id)) && openPanels(DEFAULT_TABS[2].layout).some(isStagePanel));
+check('Setup holds the room: the controller, the sound (its player and drone at the top), the wall and its mapping',
+  ['midi', 'audio-input', 'projectors', 'mapping'].every(id => whereIs(DEFAULT_TABS[2].layout, id)) && openPanels(DEFAULT_TABS[2].layout).some(isStagePanel));
 check('a shipped tab handed out is a copy, not the one that ships',
   (() => { const c = defaultTabs(); c[0].layout.left.push('rides'); c[0].name = 'x'; return DEFAULT_TABS[0].layout.left.length === 1 && DEFAULT_TABS[0].name === 'Perform'; })());
 
@@ -339,7 +341,19 @@ console.log('\n The operations');
   check('and one already out is not drawn twice; a floating one floats as the merged panel',
     both.left.join() === 'physics' && both.deck.length === 0 && both.floating.map(f => f.id).join() === 'audio-input' && placesOf(both).doubled.length === 0,
     `left ${both.left.join()} · deck ${both.deck.join()} · floating ${both.floating.map(f => f.id).join()}`);
-  check('the old ids are not panels any more', !PANEL_BY_ID.has('audio-mappings') && !PANEL_BY_ID.has('heat'));
+  /*
+    And the Music & Drone panel (PLAN 35c-7): the Sound sheet's body, the top
+    of Sound now. Setup as it shipped before had both, side by side: it opens
+    with Sound once, where Sound was, and a layout with Music & Drone alone
+    has Sound in its place, folded if it was.
+  */
+  const setupThen = sanitizeLayout({ left: ['midi', 'audio-input', 'player'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], floating: [], collapsed: [], deckCollapsed: false, plateMode: 'live' }, baseLayout('perform'));
+  const playerOnly = sanitizeLayout({ left: [], right: ['player'], deck: ['recipe'], floating: [], collapsed: ['player'], deckCollapsed: false, plateMode: 'preview' }, baseLayout('perform'));
+  check('a saved Setup with Sound and Music & Drone opens with Sound once; Music & Drone alone opens Sound in its place',
+    setupThen.left.join() === 'midi,audio-input' && placesOf(setupThen).doubled.length === 0
+    && playerOnly.right.join() === 'audio-input' && playerOnly.collapsed.join() === 'audio-input',
+    `Setup left ${setupThen.left.join()} · alone: right ${playerOnly.right.join()}, folded ${playerOnly.collapsed.join()}`);
+  check('the old ids are not panels any more', !PANEL_BY_ID.has('audio-mappings') && !PANEL_BY_ID.has('heat') && !PANEL_BY_ID.has('player'));
 }
 
 // ── One control, one place on a tab ──────────────────────────────────
@@ -388,6 +402,32 @@ console.log('\n The operations');
     rides.every(k => n.get(k)?.join() === 'rides') && recipe.filter(k => !rides.includes(k)).every(k => n.get(k)?.join() === 'recipe')
     && left.get('physics:vorticityConfinement') === 'recipe' && left.get('macro:macroZoom') === 'rides' && left.get('recipe:globalSpeed') === 'rides',
     `Swirl on ${n.get('vorticityConfinement')?.join()}; Zoom on ${n.get('macroZoom')?.join()}; Speed on ${n.get('globalSpeed')?.join()}`);
+  /*
+    The owner (2026-11-07): "the recipe box only has two controls?" The rule
+    above was right and the Recipe still came out as Swirl and Gravity, because
+    six of its eight were rides too. What is drawn on the Recipe on the tab
+    that ships has to be a strip in its own right: at least eight of its own,
+    two full rows of its four-wide knobs. Two (the build before the fix) fails.
+  */
+  // Only keys the desk can draw (a key with no spec counts in the strip and draws nothing).
+  const recipeOwn = recipe.filter(k => PIN_RANGE.has(k) && n.get(k)?.join() === 'recipe');
+  check('on Perform the Recipe draws at least eight controls of its own, not two and a list of where the rest went',
+    recipeOwn.length >= 8, `the Recipe draws ${recipeOwn.length}: ${recipeOwn.join(', ')}`);
+  // A strip that ships full answers Choose with "take one off first": the Recipe at 14 of 14 did (qa's Refraction pick, 2026-11-07).
+  check('each strip that ships leaves room for a pick', DEFAULT_RECIPE.length < MAX_PINS && DEFAULT_RIDES.length < MAX_PINS,
+    `Recipe ${DEFAULT_RECIPE.length}, Rides ${DEFAULT_RIDES.length}, a strip holds ${MAX_PINS}`);
+  // A Recipe stored as the old eight (the default before 2026-11-07) is read as the default, so the new strip reaches it.
+  {
+    const store = new Map();
+    globalThis.localStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
+    store.set('chromaglass-recipe-keys', JSON.stringify(['globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate']));
+    const oldEight = loadPins('design', DEFAULT_RECIPE).map(String);
+    store.set('chromaglass-recipe-keys', JSON.stringify(['globalSpeed', 'bloom']));
+    const chosen = loadPins('design', DEFAULT_RECIPE).map(String);
+    delete globalThis.localStorage;
+    check('and a Recipe saved as the old eight comes up as the new strip, while one somebody chose is kept',
+      oldEight.join() === recipe.join() && chosen.join() === 'globalSpeed,bloom', `old eight → ${oldEight.length}; chosen → ${chosen.join(', ')}`);
+  }
   // Closing the Rides gives the Recipe its whole strip back: nothing was taken off it, only not drawn twice.
   const back = drawn(closePanel(perform, 'rides'));
   check('and with the Rides closed the Recipe draws all of its own again',

@@ -100,6 +100,8 @@ picks it up in its next build. `detectTier()` already reads Electron as the
        fails the packed app only on the Mac's CI (#658: `osc.js`). `npm run desktop`
        (or `checks`) should fail when a relative import of a packed server file is not
        on that list.
+     - ~~**13.5-osc-beats**~~ **Shipped** (2026-11-09): the beat line waits for 12 kicks,
+       not 15 s; story in `docs/plan-shipped.md` §13.5-osc-beats.
      - **13.5-osc-scale.** Every value is 0..1 except `/bpm`; Resolume's tempo input
        wants its own range. Write the range a Resolume BPM shortcut takes into docs/osc.md
        once the owner's sitting has read it.
@@ -151,9 +153,24 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      "DAW". Done when it takes `app` out of `--owed` in `scripts/checks.json` and the
      check is green in `browser2`. The phone rule: the bridge's state and its slot
      bindings in the More sheet.
-   - **13.7b** (the plugin, Antigravity's lane, after 13.7a): `plugin/dawbridge/` in
-     JUCE, `BridgeProtocol.h` and the `DawBridgeSelfTest` target as the contract says;
-     its PR quotes `npm run dawbridge -- --plugin` and `auval` from the owner's Mac.
+   - ~~**13.7b**~~ (shipped 2026-11-07, built by Claude on the owner's Mac): the plugin,
+     `plugin/dawbridge/` in JUCE 8, an AU and VST3 effect with `DawBridgeSelfTest`;
+     `auval` passes and `npm run dawbridge -- --plugin` is 36 of 36 there. Story in
+     `docs/plan-shipped.md` §13.7b.
+   - ~~**13.7b-film**~~ (shipped 2026-11-08): filmed in Ableton Live on the owner's Mac,
+     Slot 4 driving Plate Rock with the tempo locked to Live. Story in
+     `docs/plan-shipped.md` §13.7b. Logic waits for 13.7c's sitting (no Logic on that Mac).
+   - **13.7b-hostfirst** (found filming 13.7b-film, in 13.7a's server on #694): the show
+     server follows the first bridge instance that says hello and ignores every other
+     until that one says bye or goes quiet. A playing Live never goes quiet (hello once a
+     second), so a second instance (the self-test host, a second DAW, a second track) is
+     dropped without a word. Show which instance is followed in the More sheet's bridge
+     row and give a way to switch to another one, on the desk and the phone.
+   - **13.7b-ahead** (found building 13.7b): the transport's `ahead` comes from the host's
+     own host-time stamp, which Live and Logic fill but other hosts may not (it is then
+     0 and the app's clock carries the latency alone). Measure `ahead` and the host's
+     reported latency in Live, Logic and Reaper, and write each host's figure into
+     `docs/dawbridge.md`.
    - **13.7c** (Claude: signing): the macOS runner builds the AU and VST3, signs and
      notarises them with the Mac app's Developer ID, and a Mac shard runs the check
      without `plugin` owed. Then the owner's sitting in Logic and Live.
@@ -249,6 +266,17 @@ network):
   `docs/plan-shipped.md` §13) Story in `docs/plan-shipped.md` §13-update (moved 2026-10-29,
   19m).
   - ~~**13-update-signed**~~ **Shipped** (2026-10-27: the first signed and notarised release, 1.3.692; `MAC_APP_NOTARISED` is true and `npm run updates` asserts it). Story in `docs/plan-shipped.md` §13-update-signed (moved 2026-10-29, 19m-2). Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces it in place.
+  - ~~**13-update-auto**~~ **Shipped** (2026-11-11): Install Updates Automatically, on
+    or off, in the *ChromaGlass* menu and the profile sheet, and never an update in the
+    middle of a show (`npm run updates`). Story in `docs/plan-shipped.md` §13-update-auto.
+    **Owed:** the next Mac release, then the owner's eye on the menu tick and the card's
+    switch.
+  - **13-update-auto-a. A recording counts as a show.** *(S, found building
+    13-update-auto.)* `busy()` knows the projector window and the live stream, both the
+    main process's; a Plate video recording on the laptop alone is the page's, so a
+    Restart to Update clicked mid-recording does not ask first, and the recording ends
+    with the restart. The page could tell the main process it is recording (the
+    preload's updates bridge) so the confirm covers it.
   - ~~**13-first-open**~~ **Shipped**: the release notes, the profile sheet's Mac app card and the landing page say Open Anyway (`npm run updates`). Story in `docs/plan-shipped.md` §13-first-open (moved 2026-10-29, 19m-2).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published

@@ -16,8 +16,13 @@ import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { PIN_RANGE } from '../../lib/deskPins';
+import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
+import { PhoneMoire } from './PhoneMoire';
+import { PhoneInkTitle } from './PhoneInkTitle';
+import { findPreset } from '../../presets';
+import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
@@ -92,7 +97,7 @@ type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs' | 
  * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
  * reordered, added and taken away the same way, each tab's panels stacked in
  * one sheet. A settings section or one of the screens (Songs, Sequences,
- * Music & Drone) is drawn in it whole; the desk's own panels (the bottles,
+ * Sound with its player and drone) is drawn in it whole; the desk's own panels (the bottles,
  * the set list, the rides) were built for a mouse, and the phone has its own
  * of each, so their card opens that sheet instead.
  */
@@ -774,6 +779,15 @@ export function PhoneStage(p: PhoneStageProps) {
           ))}
           {liquid?.description && <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-liquid-description">{liquid.description}</p>}
 
+          {(liquid?.id === 'soap' || (p.mixer?.settings.soapBreakdown ?? 0) > 0.001) && p.mixer && (
+            <div className="mt-3">
+              <Slider label="Soap Breakdown" value={p.mixer.settings.soapBreakdown ?? 0} min={0} max={1} step={0.01}
+                onChange={v => p.mixer!.onSetting({ soapBreakdown: v })}
+                display={readSetting('soapBreakdown', p.mixer.settings.soapBreakdown ?? 0, 0, 1)}
+                touch testId="phone-soap-breakdown" midiKey="setting:soapBreakdown" />
+            </div>
+          )}
+
           <div className="mt-3">
             <Slider label="Clear Film" value={p.film.clearFilm ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
               display={`${Math.round((p.film.clearFilm ?? 0) * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
@@ -905,6 +919,7 @@ export function PhoneStage(p: PhoneStageProps) {
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
+          <PhoneMoire settings={p.mixer.settings} onSetting={p.mixer.onSetting} />
           <div className="mt-3">
             <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
               display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
@@ -914,6 +929,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Projector Focus" value={p.projectorFocus} min={0} max={1} step={0.05} onChange={p.onProjectorFocus}
               display={`${Math.round(p.projectorFocus * 100)}%`} touch testId="phone-projector-focus" midiKey="setting:projectorFocus" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
+          </div>
+          <div className="mt-3">
+            <Slider label="Heat" value={p.mixer.settings.heat ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.mixer.onSetting({ heat: v })}
+              display={`${Math.round((p.mixer.settings.heat ?? 0) * 100)}%`} touch testId="phone-heat" midiKey="setting:heat" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">The projector lamp&apos;s heat in the dish: hold a finger on the glass to block the fan&apos;s air and boil the spot.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">
@@ -951,7 +971,9 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
+                        // A pack's look without the pack opens the account sheet (PLAN 45a).
+                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
                       }}
@@ -1250,6 +1272,16 @@ export function PhoneStage(p: PhoneStageProps) {
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
+          {/*
+            Song titles as ink (PLAN 37x-10): the desk's Logo & Titles switch,
+            on the phone. Above the tiles, not after Record makes where it
+            first went: Songs, Settings, Guide and the rest close this sheet
+            to open their own, so anything below them is a sheet the hand (and
+            `npm run switches`, which walks the sheet in order and found the
+            switch gone by the time it reached it) has to open again. The
+            switch is the one thing here changed mid-set; the tiles lead away.
+          */}
+          {p.mixer && <div className="mb-3"><PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} /></div>}
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
