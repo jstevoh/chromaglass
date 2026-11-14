@@ -32,6 +32,7 @@ import { RhythmSheet, stampedVolume, kickRoom } from '../src/lib/sheet';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
+import { makeDropQueue, queueDrop, stepDrops, dropsLive, dropSchedule, dropImpact } from '../src/lib/dropImpact';
 import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
@@ -82,6 +83,8 @@ let lab: Lab | null = null;
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
 let lastDrop: { n: number; h: Float32Array } | null = null;
+/** The colour drops on their way in (PLAN 18c-2), drained a step at a time by `step` as the app's sim drains its own. */
+const drops = makeDropQueue();
 const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
@@ -325,13 +328,40 @@ const api = {
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
-      l.solver.step(p, flushed && k === 0);
+      /*
+        A colour drop on its way in (PLAN 18c-2): its volume and its dye
+        this step, through lib/dropImpact.ts's stepDrops as the app's sim
+        does it, then flushed into this step.
+      */
+      let dropped = false;
+      if (dropsLive(drops)) {
+        const { L, dyeAdd } = l;
+        stepDrops(drops, L, (x, y, r, share) => l.solver.pour(x, y, r, share, null, true), (i, j, a, cr, cg, cb) => {
+          const ab = dyeAbsorbances(cr, cg, cb), o = (i + j * L) * 4;
+          dyeAdd[o] += a * ab[0]; dyeAdd[o + 1] += a * ab[1]; dyeAdd[o + 2] += a * ab[2]; dyeAdd[o + 3] += a;
+        });
+        api.flush(p.dt);
+        dropped = true;
+      }
+      l.solver.step(p, (flushed && k === 0) || dropped);
       l.magnets = magnetsOnPlate(p);
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
+  /**
+   * A colour drop as the app's sim queues it on a thin gap (PLAN 18c-2,
+   * lib/dropImpact.ts): `amount` of volume at (x, y) in plate units, laying
+   * `dye` (density) of colour `rgb` (0..1, as a bottle's) with it, over the
+   * next steps `step` runs. Returns its schedule.
+   */
+  drop(x: number, y: number, amount: number, rgb: [number, number, number], dye: number) {
+    const L = lab!.L;
+    queueDrop(drops, L, Math.floor(x * L), Math.floor(y * L), amount, dye, rgb[0], rgb[1], rgb[2]);
+    return dropSchedule(amount, L);
+  },
+  dropImpact,
   /**
    * A pour of a shelf bottle (PLAN 18c, 18d), as the app's onDeposit makes it:
    * its liquid into the species field (null if the bottle lays none, the

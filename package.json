@@ -193,6 +193,7 @@
     "clockglass": "node scripts/clockglass.mjs",
     "filmhold": "node scripts/filmhold.mjs",
     "dropcolour": "node scripts/dropcolour.mjs",
+    "dropwindow": "node scripts/dropwindow.mjs",
     "foam": "node scripts/foam.mjs",
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",

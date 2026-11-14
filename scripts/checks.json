@@ -3148,6 +3148,20 @@
       ]
     },
     {
+      "name": "A colour drop pushes the dye aside into a window of its own colour, and splashes only past Cossali's K",
+      "shard": "fifth",
+      "run": "npm run dropwindow",
+      "timeout": 6,
+      "why": [
+        "PLAN 18c-2 and 18c-3: a colour drop on a thin gap is a pour of its",
+        "volume, so it opens a window in a pool of dye, keeps what it pushed in",
+        "a collar, holds it open and fills it with its own colour, where a stamp",
+        "with no volume (the control) does not; and the sim's layDrop throws",
+        "satellites only past Cossali's threshold and lays no ring kick. Two",
+        "192² plates of about two seconds and a node part; beside dropcolour."
+      ]
+    },
+    {
       "name": "A packed foam's junctions turn to 120°",
       "shard": "fifth",
       "run": "npm run foam",
