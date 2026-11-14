@@ -61,6 +61,7 @@ import { SOUND_MUTANTS, soundFullLines, soundPageLines, standInSound } from './a
 import { MEDIA_MUTANTS, mediaDir, mediaFullLines, mediaPageLines, mediaPlayLines, standInMedia } from './assistant-media.mjs';
 import { OUTPUTS_MUTANTS, oscPort, outputsFullLines, outputsPageLines, outputsPlayLines, standInOutputs } from './assistant-outputs.mjs';
 import { PROJECTOR_MUTANTS, projectorFullLines, projectorPageLines, projectorPlayLines, projectorWaitLine, standInProjector } from './assistant-projector.mjs';
+import { notesFrameLine, oscClosesWithSwitchLines, pickSourceLines } from './assistant-safety.mjs';
 import { DESK_MUTANTS, deskFullLines, deskPageLines, deskPlayLines, standInDesk } from './assistant-desk.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -343,6 +344,8 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const noted = await mcp.call('add_note', { note: 'Pink and orange together looked muddy.' });
     const read = await mcp.call('read_notes');
     check('-', 'a note saved is read back', noted.ok && /muddy/.test(read.text), read.text.slice(0, 80));
+    notesFrameLine(read, check);
+    await pickSourceLines(check);
 
     // Off: no switch at all.
     const offTool = await mcp.call('show_state');
@@ -850,6 +853,8 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await outputsFullLines({ mcp, display, check, phone, port });
     await projectorFullLines({ mcp, display, check, phone });
     await deskFullLines({ mcp, display, check, phone });
+    await oscClosesWithSwitchLines({ mcp, check, udp: oscPort(port), setMode });
+    await setMode('full');
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);

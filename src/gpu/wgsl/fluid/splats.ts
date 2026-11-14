@@ -17,15 +17,12 @@ export const SPLAT_KERNELS: Record<string, string> = {
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
 @group(0) @binding(4) var mulT: texture_2d<f32>;
-@group(0) @binding(5) var liquids0: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  let soap = textureLoad(liquids0, p, 0).r;
-  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
-  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r * soapMul + textureLoad(addT, p, 0)));
+  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0)));
 }`,
 
   // vel.xy += add.xy ; temp (vel.z) += add.z

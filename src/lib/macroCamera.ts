@@ -53,6 +53,7 @@
  * 3% from the middle of the frame, where it sat 27% off.
  */
 import { stream, type Rng } from './rng';
+import { clearLanding, newLanding, settledLanding, steerLanding } from './macroLanding';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -119,6 +120,8 @@ export interface MacroCameraOptions {
   /** Where it is aimed, in plate uv (0..1), for hold and follow. */
   aimX?: number;
   aimY?: number;
+  /** Told once where a closeup coming in on bare glass settled, plate uv, to make it the aim (macroLanding.ts). */
+  onLand?: (x: number, y: number) => void;
 }
 
 export interface MacroShot {
@@ -201,6 +204,8 @@ export class MacroCamera {
   private lastAimY = NaN;
   /** The grid the camera last ran on, so `centre` can answer in plate uv. */
   private lastSize = 0;
+  /** Hold and Follow coming in on bare glass go to liquid first (macroLanding.ts, QA-32). */
+  private readonly land = newLanding();
 
   /**
    * The jitter on which drop wins a cut and how long the shot holds. Seeded
@@ -226,6 +231,7 @@ export class MacroCamera {
     this.whipLeft = 0;
     this.lastAimX = NaN;
     this.lastAimY = NaN;
+    clearLanding(this.land, true);
   }
 
   /**
@@ -310,6 +316,9 @@ export class MacroCamera {
     const treble = clamp(opts.treble ?? 0, 0, 1);
 
     const mode = opts.mode ?? 'auto';
+    // Auto finds its own subjects; a later switch to Hold or Follow is a hand
+    // on the camera, not the closeup coming in, so it does not land.
+    if (mode === 'auto') this.land.pending = false;
     if (mode !== 'auto') return this.aimed(field, step, opts, mode, { move, energy, bass, treble });
 
     // ── Stay on the bead ────────────────────────────────────────────
@@ -431,9 +440,20 @@ export class MacroCamera {
     this.punchLeft = Math.max(0, this.punchLeft - step / 0.6);
     if (opts.beat && m.bass > 0.6) this.punchLeft = Math.max(this.punchLeft, (m.bass - 0.6) * 2.5 * m.move);
 
-    let targetX = ax, targetY = ay;
+    // A hand moving the aim during the closeup is where it wants to look,
+    // liquid or not: it is no longer coming in.
+    if (aimMoved && !first) clearLanding(this.land, false);
+    const riding = mode === 'follow' && !first;
+    const landed = steerLanding(this.land, field, ax, ay, opts,
+      riding ? this.beadX : NaN, riding ? this.beadY : NaN, size * EDGE_MARGIN, step);
+    const settled = settledLanding(this.land, size);
+    if (settled) opts.onLand?.(settled.x, settled.y);
+    const wantX = Number.isFinite(this.land.x) ? this.land.x : ax;
+    const wantY = Number.isFinite(this.land.y) ? this.land.y : ay;
+
+    let targetX = wantX, targetY = wantY;
     if (mode === 'follow') {
-      if (aimMoved) this.lockNear(field, ax, ay);
+      if (aimMoved || landed) this.lockNear(field, wantX, wantY);
       const tracked = this.recenter(field);
       // Lost it (it thinned away, or ran into the wall): find what is nearest
       // where it was, rather than cutting across the plate.
@@ -443,9 +463,9 @@ export class MacroCamera {
       this.beadY = clamp(this.beadY, margin, size - margin);
       [targetX, targetY] = this.leadTarget(step, opts.chase);
     } else {
-      this.beadX = ax; this.beadY = ay;
+      this.beadX = wantX; this.beadY = wantY;
     }
-    if (first) { this.camX = targetX; this.camY = targetY; }
+    if (first || landed) { this.camX = targetX; this.camY = targetY; }
     // A hand on the aim should be answered at once; a follow eases like a rig.
     const rate = mode === 'hold' ? holdRate(opts.chase) : 1.0 + opts.chase * 5;
     const k = 1 - Math.exp(-rate * step);

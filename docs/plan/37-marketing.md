@@ -383,6 +383,12 @@ rest is routine and the owner's calls.
     - *The encoder's own keyframes.* OpenH264 (the lab) starts a new group whenever the
       picture changes a lot, on top of the one asked for every two seconds; the check allows
       it. VideoToolbox should not; `npm run live` on the Mac shard says.
+    - *The last mark has no room.* (Open, 37x-4b-1.) The keyframe line builds a mark every
+      two seconds up to the stream's span, so a run whose frames land on exactly 0..30000
+      ms (901 frames, as on #753's lab shard, 2026-11-09) gets a mark at 30000 that is
+      the stream's last frame, with no two frames after it, and goes red with every mark
+      that has room keyed. Count only the marks with a full two-frame window inside the
+      stream (`m + 2 * 1000 / FPS <= lastMs`), and say so above the line.
     - *The app's encoder on GitHub's Mac.* (Open; 37x-4c added the measurement.) On GitHub's macOS runner (a virtual machine with
       no GPU of its own) the packed app encodes 640x360 at 170 ms a frame under every
       WebCodecs hint (`__cgLive.probe()`: no-preference 171, prefer-software 198 ms, hardware

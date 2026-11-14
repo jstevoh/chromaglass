@@ -71,10 +71,11 @@ export function admitMusicFile(raw, folders = musicFolders()) {
 /**
  * Any file the assistant names by its path: inside `folders`, of one of
  * `types` (extension -> served type), a real file. `at` is the address it is
- * served under, `what` names the kind in a refusal, `only` says which folders.
+ * served under, `what` names the kind in a refusal, `only` says which folders,
+ * `refuse` ({ test: RegExp, reason }) a place inside them never opened.
  * Returns its address, its name (no extension) and its type, or why not.
  */
-export function admitFile(raw, { folders, types, at, what, only }) {
+export function admitFile(raw, { folders, types, at, what, only, refuse = null }) {
   if (typeof raw !== 'string' || !raw.trim()) return { reason: 'a file by its full path on this Mac' };
   const asked = raw.trim().replace(/^~(?=$|\/)/, homedir());
   if (!isAbsolute(asked)) return { reason: `a full path (beginning / or ~/), not ${raw}` };
@@ -86,6 +87,8 @@ export function admitFile(raw, { folders, types, at, what, only }) {
   const found = real(asked);
   if (!found) return inside(resolve(asked), folders.map((f) => resolve(f))) || inside(resolve(asked), roots) ? { reason: `no file at ${raw}` } : outside;
   if (!inside(found, roots)) return outside;
+  // Judged where the file really is, links followed: a link in ~/Pictures to a library refused by name is the library.
+  if (refuse && refuse.test.test(found)) return { reason: refuse.reason };
   const type = types.get(extname(found).toLowerCase());
   if (!type) return { reason: `not ${what} (${[...types.keys()].join(' ')}): ${basename(found)}` };
   let file = false;

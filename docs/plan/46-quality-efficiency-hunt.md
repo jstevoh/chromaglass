@@ -102,6 +102,11 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   scatter nobody has measured: at ±0.1 ms main's governor all but passes. A browser keeps a
   frame or two in flight and a ProMotion panel changes its own rate. Record the rAF stamps
   on the owner's 120 Hz screen (`npm run stutter`, 46c) and replay those.
+- **46r-1 · Found (with 46r, 2026-11-13):** the solver's shared `sim` uniform is one buffer
+  written more than once between submits (the step's own write, `rawSim`'s, and
+  `speciesShare`'s in `reads.ts`), the same last-write-wins as an args name given two
+  values. `npm run argnames` watches the names only. Read whether any pair differs in a
+  field a dispatch of the earlier write reads, and watch `sim` the same way if one does.
 - **46e-3 · Found:** other refresh rates are not replayed: at 144 Hz three refreshes are
   20.8 ms, under any 25 ms line, and the step clock does not snap (not a whole ratio).
 - **46-1 · Found:** 19d-lazy (the first load's script, 527 KB gzipped) waits on 14h's precache
