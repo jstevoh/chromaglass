@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
-import { MOIRE_LOOKS } from './presetsMoire';
+import { layMoireLooks } from './presetsMoire';
 import { FOAM_CELLS } from './presetsFoam';
-import { stirCord, stirCordDepth } from './lib/stir';
+import { layStirCords } from './lib/stir';
 
 export interface Preset {
   id: string;
@@ -2346,54 +2346,10 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-/*
-  The moiré pack's looks (PLAN 45a; presetsMoire.ts), each laid over the look
-  it starts from. Its cords are that look's, a sheet's cord in the place of
-  the last: a look carries two or three fast cords (PLAN 28i-3b, `npm run
-  soundpatch`); the sheet's added to the house look's three made four, too
-  many to read on the wall. A pack look laid over a look with areas adds
-  none: its areas' cords are the music there, and a plate-wide one beside
-  them is the redundancy 28i-3b turns away. The plate itself (dyes, pours,
-  dish, areas) is the house look's under the pack look's id (presetPlate.ts).
-*/
-for (const m of MOIRE_LOOKS) {
-  const from = PRESETS.find(p => p.id === m.from);
-  if (!from) continue;
-  const own = m.settings.sceneMappings ?? [];
-  const house = from.settings.sceneMappings ?? [];
-  const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
-  PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
-}
-
-/*
-  The music's stir, on every look (PLAN 38u-4, 38u-5).
-
-  Until the physics audit of 2026-11-13 the solver's step read the analyser
-  itself: the energy multiplied Turbulence's stir by up to two, and mid and
-  treble laid a second curl of noise wherever there was dye. Every look
-  churned with the band by that and no look said so: with its cords all
-  pulled out it still moved to the music, which is the one thing the plate's
-  rule (sound reaches it only through cords and preset patches) says cannot
-  happen. The owner chose to route it through cords. So the step takes no
-  sound, and each look carries what it always did as a cord that can be
-  seen, turned and pulled: the sound's mids on Turbulence, at the depth
-  that puts its stir with a band playing about where the multiplier and the
-  eddies had it for that look's own Turbulence and Sound Drive (lib/stir.ts
-  `stirCordDepth`; `npm run musicstir` holds each look within a quarter over
-  a song).
-
-  Added here, after the looks are written and the pack's are laid over
-  theirs, and not typed into each look: it is one rule with one depth
-  formula, and a look whose Turbulence is retuned keeps the right cord
-  without anyone remembering to. It is beside a look's two or three answers
-  to the drums (PLAN 28i-3b), not one of them: those are what a look does on
-  a hit, written per look, and this is the stir every look had under them
-  all along (`npm run soundpatch` counts them apart).
-*/
-for (const p of PRESETS) {
-  const depth = stirCordDepth(p.settings.turbulenceScale ?? DEFAULT_SETTINGS.turbulenceScale, p.settings.audioImpact ?? DEFAULT_SETTINGS.audioImpact);
-  if (depth > 0) p.settings.sceneMappings = [...(p.settings.sceneMappings ?? []), stirCord(depth)];
-}
+// The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
+// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5). In that order.
+layMoireLooks(PRESETS);
+layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).

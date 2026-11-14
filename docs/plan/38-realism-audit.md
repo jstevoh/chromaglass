@@ -13,6 +13,21 @@ item it says so and names it, rather than taking a new number for the same work.
 Left out on purpose: the macro closeup's 3D beads (their tops, rims and the mask), which
 the "Closer 3D macro view" work owns now (14ab-6, #601).
 
+The music's stir, from the third pass (38u, 2026-11-13; its ranked list is in section 38u,
+which the audit's own PR adds at the foot of this file, and these lines join it there):
+
+- ~~**38u-5. Mid and treble stir the dye directly**~~, and ~~**38u-4**'s multiplier~~ —
+  **Shipped 2026-11-13** (the story is in `docs/plan-shipped.md`). The solver's step takes no
+  sound; every look carries one cord, the sound's mids on Turbulence; `npm run musicstir`.
+  The rest of 38u-4 (the stir as a tool, not curl noise on a clock) stays open.
+- **38u-16. A look saved before 38u-5 has no stir cord** (S; Medium). The built-in looks gain
+  the cord where they are defined; a look the owner saved earlier, a draft, and a look built
+  from the defaults keep their own cords and so stir less with music than they did, until
+  Music Stir is raised (the phone) or the patch is added (Patches). Give a saved look the
+  cord once as it is read (`sanitizeSettings`), with a mark in the saved look that says it
+  has been asked, so a cord the owner pulls stays pulled. Check: `musicstir` gains a saved
+  look from before, read back with its cord, and one with the mark and no cord, left alone.
+
 How it is ranked: what a person would see change on the wall, against what it costs to
 build and what it adds to the frame. S is under a day, M a few days, L a week or more.
 Every item here keeps today's look reachable until the Mac has judged the new one (the

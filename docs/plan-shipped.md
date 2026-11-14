@@ -12497,8 +12497,8 @@ Shipped: `FluidSimulation.step(settings, time, noise2D)` takes no sound and its 
 names the analyser's data; `spin` is gone from `GpuStepParams`, from the forces shader and from
 the CPU grid (the uniform's slot is kept, unused); `stirOf` takes the dial alone; Vibration's
 push is the dial's at 0.65, the middle of its old swing. Every look on the shelf carries one
-more cord, the sound's mids on Turbulence (`lib/stir.ts` `stirCord`, added in `presets.ts` for
-all of them by one rule), at `stirCordDepth` of its own Turbulence and Sound Drive. The mids
+more cord, the sound's mids on Turbulence (`lib/stir.ts` `stirCord`, laid on all of them by
+one rule, `layStirCords`), at `stirCordDepth` of its own Turbulence and Sound Drive. The mids
 and not the energy: the dial's curve is a fourth power, and over three test songs an energy
 cord deep enough to carry the eddies' steady share ran 0.64 to 1.66 of the old stir by song
 and up to 3.4 times at loud moments, where mids ran 0.80 to 1.16 and never over. The depth is

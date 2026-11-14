@@ -13,7 +13,7 @@
  * sound's mids onto this dial (`stirCord`), and the step reads the dial the
  * patch bay folded and nothing else.
  */
-import type { SceneMapping } from '../types';
+import type { SceneMapping, VisualizerSettings } from '../types';
 
 export function stirOf(dial: number): number {
   const t = Math.max(0, Math.min(1, Number.isFinite(dial) ? dial : 0));
@@ -147,4 +147,36 @@ export function withMusicStir(maps: readonly SceneMapping[] | null | undefined, 
   }
   if (!put && d > 0) out.push(stirCord(d));
   return out;
+}
+
+/*
+  The music's stir, on every look (PLAN 38u-4, 38u-5).
+
+  Until the physics audit of 2026-11-13 the solver's step read the analyser
+  itself: the energy multiplied Turbulence's stir by up to two, and mid and
+  treble laid a second curl of noise wherever there was dye. Every look
+  churned with the band by that and no look said so: with its cords all
+  pulled out it still moved to the music, which is the one thing the plate's
+  rule (sound reaches it only through cords and preset patches) says cannot
+  happen. The owner chose to route it through cords. So the step takes no
+  sound, and each look carries what it always did as a cord that can be
+  seen, turned and pulled: the sound's mids on Turbulence, at the depth
+  that puts its stir with a band playing about where the multiplier and the
+  eddies had it for that look's own Turbulence and Sound Drive (lib/stir.ts
+  `stirCordDepth`; `npm run musicstir` holds each look within a quarter over
+  a song).
+
+  Laid by presets.ts after the looks are written and the pack's are laid
+  over theirs, and not typed into each look: it is one rule with one depth
+  formula, and a look whose Turbulence is retuned keeps the right cord
+  without anyone remembering to. It is beside a look's two or three answers
+  to the drums (PLAN 28i-3b), not one of them: those are what a look does on
+  a hit, written per look, and this is the stir every look had under them
+  all along (`npm run soundpatch` counts them apart).
+*/
+export function layStirCords(looks: readonly { settings: Partial<VisualizerSettings> }[], dial: number, drive: number): void {
+  for (const p of looks) {
+    const depth = stirCordDepth(p.settings.turbulenceScale ?? dial, p.settings.audioImpact ?? drive);
+    if (depth > 0) p.settings.sceneMappings = [...(p.settings.sceneMappings ?? []), stirCord(depth)];
+  }
 }
