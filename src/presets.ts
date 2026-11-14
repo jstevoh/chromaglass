@@ -1,6 +1,7 @@
-import { VisualizerSettings } from './types';
-import { MOIRE_LOOKS } from './presetsMoire';
+import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
+import { layMoireLooks } from './presetsMoire';
 import { FOAM_CELLS } from './presetsFoam';
+import { layStirCords } from './lib/stir';
 
 export interface Preset {
   id: string;
@@ -2341,24 +2342,10 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-/*
-  The moiré pack's looks (PLAN 45a; presetsMoire.ts), each laid over the look
-  it starts from. Its cords are that look's, a sheet's cord in the place of
-  the last: a look carries two or three fast cords (PLAN 28i-3b, `npm run
-  soundpatch`); the sheet's added to the house look's three made four, too
-  many to read on the wall. A pack look laid over a look with areas adds
-  none: its areas' cords are the music there, and a plate-wide one beside
-  them is the redundancy 28i-3b turns away. The plate itself (dyes, pours,
-  dish, areas) is the house look's under the pack look's id (presetPlate.ts).
-*/
-for (const m of MOIRE_LOOKS) {
-  const from = PRESETS.find(p => p.id === m.from);
-  if (!from) continue;
-  const own = m.settings.sceneMappings ?? [];
-  const house = from.settings.sceneMappings ?? [];
-  const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
-  PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
-}
+// The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
+// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5). In that order.
+layMoireLooks(PRESETS);
+layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).
