@@ -2783,3 +2783,22 @@ whole dish. Judge from the before and after films (same look, same song, same se
 3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
    swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
    too much in the quiet parts.
+
+## 132. No black lines where two colours meet (PLAN 18e-5)
+
+The check (`npm run holeline`) proves that Boundary Contrast moves no pixel in focus and that a
+seam between two dyes is no darker than the darker dye beside it, on the lab's software WebGPU
+at one frame. Whether the looks read better without the line is only seen here.
+
+1. **Comet River**, a minute in: colours meet and blend where they overlap (orange over violet
+   a dark red, cyan over yellow a green) with no black band between them. Bad: a hard dark
+   line along a boundary, or the colours duller than before.
+2. Any look with two layers (Comet River is one): the back plate's rims are still a little
+   brighter than its dye, as before.
+3. **Macro Zoom** to 4x on Comet River: unchanged by this (PLAN 18e-7). Where two colours
+   meet up close there is still a darker band; that is the closeup's relief reading the colour
+   step, and it goes when the closeup shades from the liquid's own optical path.
+4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
+   Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
+5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
+   at the dye's edges strengthen.
