@@ -120,7 +120,8 @@ Open, found building it:
 - **14ag-7** (S) *The back plate's liquid does not bend the lamp.* With two plates, the video in
   the lamp is bent by the front plate's surface only (`lampBendAt` reads the front plate's optical
   path). The back dish sits in the same light; its liquid should bend it too, once the two dishes
-  have their own heights in the projector's cone (18e-1).
+  have their own heights in the projector's cone (18e-1). With Dish Spread on, the bend is off
+  (its plate uv is `dishToPlate`'s, which `lampBendAt` does not undo); undo that one too.
 - **14ag-4** (S) *The framing's pixels have no check.* `npm run myvideo` holds the controls and
   their settings, not where the frame lands: on software WebGPU the app's plate was still
   rebuilding thirty seconds in, so a corner read there measured nothing. Give the lab a film

@@ -360,7 +360,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     // on the lamp (the video, filtered by the dye), at 0 on its own ground,
     // and a look already on the lamp stays there. Only while a film plays.
     const ground = Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0;
-    const videoLamp = filmOn && pos.film < pos.front ? clamp01(s.filmMix ?? 0.7) : 0;
+    const fm = Number.isFinite(s.filmMix) ? clamp01(s.filmMix as number) : 0.7;
+    const videoLamp = filmOn && pos.film < pos.front ? fm : 0;
     pack.set('lampGround', !photo ? ground + (1 - ground) * videoLamp : 0);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
