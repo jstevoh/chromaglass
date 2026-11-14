@@ -57,6 +57,16 @@ let plateTimer: ReturnType<typeof setInterval> | null = null;
 /** How often the plate was redrawn while streaming, and what went wrong when it was not: the check prints both. */
 let redraws = 0;
 const plateErrors: string[] = [];
+/*
+  When each redraw finished, ms after the last start(), and the timer's
+  period: `npm run live` asks that the plate kept redrawing through the
+  whole stream (no stall) rather than at a rate, because the rate on
+  software WebGPU is the runner's (a redraw's cost crossing a multiple of
+  the timer's period halves it: 21 redraws in 30 s at 1.4 s, 14 at 2.1 s).
+*/
+const redrawTimes: number[] = [];
+let plateStart = 0;
+let platePeriod = 0;
 
 /** The lab's plate, drawn on a 2D canvas the encoder reads: the lab has no presented canvas of its own. */
 async function drawPlate(size: number): Promise<void> {
@@ -117,10 +127,13 @@ const api = {
     encoder = new LiveEncoder({ canvas, audio: silent ? null : stream, transport, outputs: plan.outputs, destinations, fps, audioBitrate: 96000, audioCodec });
     await encoder.start();
     let busy = false;
+    plateStart = performance.now();
+    platePeriod = plateMs;
+    redrawTimes.length = 0;
     plateTimer = setInterval(() => {
       if (busy) return;
       busy = true;
-      lab.step(1).then(() => drawPlate(192)).then(() => { redraws++; }).catch((e) => { plateErrors.push(String(e?.message ?? e)); }).finally(() => { busy = false; });
+      lab.step(1).then(() => drawPlate(192)).then(() => { redraws++; redrawTimes.push(performance.now() - plateStart); }).catch((e) => { plateErrors.push(String(e?.message ?? e)); }).finally(() => { busy = false; });
     }, plateMs);
     return encoder.state();
   },
@@ -167,7 +180,7 @@ const api = {
   events: () => events,
   /** The crop the portrait encode takes of the canvas, for the check to print and test. */
   crop: (cw: number, ch: number, w: number, h: number, fit: 'cover' | 'contain') => liveCrop(cw, ch, w, h, fit),
-  plate: () => ({ redraws, errors: plateErrors.slice(0, 3) }),
+  plate: () => ({ redraws, errors: plateErrors.slice(0, 3), times: redrawTimes.slice(), spanMs: performance.now() - plateStart, periodMs: platePeriod }),
   /**
    * The sound source switched off on air: the tone's track is stopped, which
    * ends the encoder's reader as a source the owner turns off would, and a
