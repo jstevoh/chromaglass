@@ -75,6 +75,17 @@ landed on a red main.
   and the early stop on saved runs, but not the HTTP reading itself (paging, the re-run
   attempt lookup, the GraphQL read of each PR's status). A recorded set of responses
   played through a stub `fetch` would cover it.
+- **19am-6. Shipped (2026-11-12): a 5xx from GitHub no longer leaves every PR without a
+  status.** `hold.yml` got HTTP 502 from `GET actions/runs/<id>/jobs?filter=latest`
+  twice on one PR's run, `call()` threw on the first, and no PR was posted. `call()`
+  now tries a 5xx or a fetch that threw four times (2, 6 and 18 s apart; a 4xx and a
+  403/429 rate limit are not retried), and `deploys()` leaves out, with a line naming
+  the deploy, one whose jobs still cannot be read, as a cancelled deploy is left out.
+  `holdFrom` is untouched, so no deploy is counted green that did not run. Whether a
+  hold survives depends on the unread deploy not being the red one; the next run reads
+  it again. `-- --self-test` plays both through a stub (`fetchRetrying`, `deploys` with
+  an injected `get`), which also covers part of 19am-5 (the jobs and re-run reads fail
+  over; paging and the GraphQL read are still unplayed).
 
 ## 19an. Conflict markers reached main and nothing stopped them (2026-11-11)
 
