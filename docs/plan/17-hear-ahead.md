@@ -70,89 +70,12 @@ are 5.3 s, at 174 BPM 2.8 s.
 
 ## Items
 
-- **17a. A song analysed ahead, by the render's ear.** `analyseSongAhead(pcm,
-  sampleRate): SongAhead` in a new `src/lib/hearAhead.ts`, run in a worker one song
-  at a time. `SongAhead` is `{ durationSec, hits, grid, sections, loudnessLufs }`
-  (more fields are allowed; the 8 KB a minute bound holds). `hits` are exactly the
-  frames where `SongEar` at 60 fps hears a beat (`features.beat.hit`), at `i / 60`
-  s: the render's own ear, not a second beat tracker that could disagree with it.
-  `grid` is the song's beat grid from its first hit to its last, at the song's pace,
-  carried on through a stretch with no beat (a breakdown) and ignoring a hit off the
-  pace (a hat or a fill), following the pace where it changes. Pass (`hearahead`
-  line `files`): on the made-up song (126 BPM, 128 from the drop, off-beat kicks
-  ending the verse), the hits equal `SongEar`'s; a grid beat within 25 ms of every true beat and none more
-  than 25 ms from one; the duration exact; two runs the same JSON; at most 8 KB a
-  minute. *(AG; owed `files`.)*
-- **17b. Sections on the beat, the drums' entrance seen, the drop named.** The
-  analysis's `sections` cover the song end to end, a boundary within one beat of
-  every true change and none more than a beat from one, every boundary on a grid
-  beat (within 25 ms), and exactly one section a `drop` (by `sectionKind`): where
-  the beat comes back after eight or more beats without one. Today's segmenter does not do this: on the
-  check's song it gives `0.0–92.0 chorus, 92.0–122.0 bridge, 122.0–140.0 outro`,
-  merging the intro, the drums coming in (15.2 s), the verse and the chorus's chord
-  change (45.7 s), and rounding to whole seconds, because it reads ~1 s super-frames
-  of harmony and brightness only. The throwaway build passed with three rules over
-  the grid (the first hit, a stretch without hits and the beat's return) plus a
-  harmony novelty over eight beats either side, snapped to the bar. Pass
-  (`sections`). Only `drop` is owed by name: the other sections may be labelled
-  anything, so on a file a lead on `chorus` or `verse` does not fire until
-  **17b-2** names them by recurrence (the same harmony coming back is the same kind
-  of section), and the desk says so beside such a lead; `drop` and `any` work from
-  17b. The live listen's own map (`songMapWorker.ts`) keeps today's
-  segmenter until a later item moves it to this one. *(AG; owed `sections`.)*
-- **17c. A lead on a *when*.** `ActionWhen`'s section trigger takes `beatsAhead?:
-  number` (whole beats, 1–64), and a new `{ at: 'last-beat'; beatsAhead?: number }`.
-  `SongClock` takes `ahead?: { grid: number[]; sections } | null`, the song's
-  `SongAhead` when it is known. With it, `dueActions` fires a lead once per matching
-  section (keyed by that section's index, `nth` counted over `ahead.sections`), on
-  the first tick at or after the grid beat `beatsAhead` before the first grid beat
-  at or after the section's start (the grid's first beat if that is before it), while
-  the clock still reads the section before; a last-beat action fires on the last
-  grid beat, or `beatsAhead` before it. Without it (a first live listen), a lead
-  fires on the section itself, late but never lost, and a last-beat action not at
-  all. `parseSongAction` keeps the lead (a file, the assistant, PLAN 44f) and
-  `describeWhen` says it ("4 beats before every drop", "8 beats before the last
-  beat", "On the last beat"). A cached live song map has sections but no grid: its
-  `ahead` gives the lead in seconds from the beat clock's period (`beatClock`), a
-  later item, 17c-2. Pass (`ahead`, three lines: on a hand-made song with an
-  uneven grid, so a lead in seconds is caught; on the made-up song with its own
-  analysis as `ahead`, so the two shapes are one; and the file and words; `late`
-  holds on main). *(AG; owed
-  `ahead`.)*
-- **17d. The song's loudness, from the file.** `songLoudness(pcm, sampleRate)`:
-  ITU-R BS.1770 on the mono mix the ear hears (K-weighting, 400 ms blocks
-  overlapping 75%, the −70 LUFS absolute gate and the −10 LU relative gate). The
-  show puts `clamp(−14 − loudness, −12, +12)` dB of gain on the analyser's branch
-  only, never on the speakers: the plate hears every song at one loudness from its
-  first second, and the room hears the record as it was mastered. Any sample rate
-  (the filter's coefficients from its analogue prototype), though `decodeSong`
-  hands it 48 kHz. Measured, not read
-  from a ReplayGain tag: the analysis runs anyway, and a tag may be ReplayGain 1 or 2
-  and of the stereo file, not the mono mix. Pass (`loudness`): a 1 kHz sine at −20
-  dBFS reads −23.0 LUFS (±0.1), at 60 Hz −26.60 and at 10 kHz −19.66 (the
-  K-weighting, which a plain RMS misses: at 1 kHz alone it passes), and −23.0 at 1
-  kHz at 44.1 kHz; the analysis's `loudnessLufs` is this reading; the song 12 dB down reads 12.0 lower (±0.05); thirty
-  seconds of silence after it move it under 0.1, and thirty seconds of pad 25 dB down
-  under 0.5. *(AG; owed `loudness`.)*
-- **17e. The show plays the set, and knows where it is.** One `AudioContext`; each
-  song an `AudioBufferSourceNode` started at a scheduled context time, gapless or
-  with the set's gap; its output to the speakers and through the 17d gain to the
-  analyser the plate already reads. `setPosition(durations, gapSec, elapsedSec)` is
-  the place in the set, `{ index, t }`, `t` negative in the gap before a song (a
-  count-in a show can read), null after the last; elapsed is `ctx.currentTime` minus
-  the set's start, so it is to the sample. The song show's `positionNow` reads it,
-  and the fingerprint (`fingerprint.ts`) and boundary guess (`songBoundary.ts`) stand
-  down while the player plays. Pass (`clock`) for the arithmetic; the player itself
-  with 17g. *(AG; owed `clock`.)*
-- **17f. The file's own tags.** `readSongTags(bytes)` → `{ isrc?, title?, artist?,
-  cover?: { mime, bytes } }` (the front cover, picture type 3, where there are
-  several) from ID3v2.4 (synchsafe sizes), ID3v2.3 (UTF-16 text) and a FLAC's Vorbis
-  comment and PICTURE block; the ISRC normalised to its twelve characters (hyphens
-  dropped, upper case, two letters, three letters or digits, seven digits),
-  anything else no ISRC; no tags an empty object; a truncated
-  tag never throws. The ISRC attaches a per-song show exactly (`songRef.ts`); the
-  cover is a source of the song's dyes (a later item). MP4/M4A tags (`covr`, the iTunes ISRC
-  atom) are 17f-2. Pass (`tags`). *(AG; owed `tags`.)*
+- **17a. A song analysed ahead, by the render's ear.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* `analyseSongAhead` in `src/lib/hearAhead.ts` + `src/lib/hearAheadWorker.ts`.
+- **17b. Sections on the beat, the drums' entrance seen, the drop named.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* **17b-2** (chorus/verse labels by recurrence) remains open; `songMapWorker.ts` keeps today's segmenter.
+- **17c. A lead on a *when*.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* `beatsAhead`, `last-beat`, `SongClock.ahead`, `aheadMoments` in `src/lib/songShows.ts` and `src/lib/songScore.ts`. **17c-2** (cached live song maps without a grid) remains open.
+- **17d. The song's loudness, from the file.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* `songLoudness` in `src/lib/hearAhead.ts`.
+- **17e. The show plays the set, and knows where it is.** `setPosition` arithmetic *(shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md))*. The Web Audio set player (`AudioContext`, scheduled `AudioBufferSourceNode`s, gain into the analyser, `positionNow`, standing down `fingerprint.ts` and `songBoundary.ts`) ships with **17g**.
+- **17f. The file's own tags.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* `readSongTags` in `src/lib/hearAhead.ts`. **17f-2** (MP4/M4A `covr` and ISRC atom) remains open.
 - **17g. Load a set on the desk and the phone.** Drop a folder or files on the
   Perform desk (and the Mac app's window): the set list (`setList.ts`) gains an item
   per file in name order, each with its analysis's progress and, once ready, its

@@ -631,7 +631,7 @@
     {
       "name": "Hear the set ahead, from files, owed",
       "shard": "logic",
-      "run": "npm run hearahead -- --owed=files,sections,ahead,loudness,clock,tags",
+      "run": "npm run hearahead",
       "why": [
         "Written before the build (scripts/hearahead.mjs, PLAN §17, 2026-11-08): a",
         "made-up 126 BPM record analysed ahead by the render's own ear, its beat grid",

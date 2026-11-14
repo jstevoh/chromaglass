@@ -259,7 +259,7 @@ style (§31).
   its check shipped 2026-11-07; then 13.7a the app's half, ~~13.7b~~ the plugin (shipped 2026-11-07), 13.7c signing; its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
-- **7.4** **§17** hear the set ahead (after 1.7): the spec and its owed check `hearahead` written 2026-11-08; **17a–17f** one Antigravity brief, then **17g** (its desk and phone check first), **17h**. **R6** watching a real rig. **H4**, **H5**.
+- **7.4** **§17** hear the set ahead (after 1.7): **17a–17f** shipped (2026-11-14; `npm run hearahead`, no `--owed`; `17e`'s Web Audio player waits with **17g**), then **17g** (its desk and phone check first), **17h**. **R6** watching a real rig. **H4**, **H5**.
 - **7.5** Accounts first (the owner, 2026-10-11, ahead of Wave 1): **23.9** and **23.13**
   *(owner)*, **23.10**, then **23.14** (after #380), **23.12**, **23.11**, **23.15**.
   Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
