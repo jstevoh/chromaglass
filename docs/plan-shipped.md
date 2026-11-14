@@ -4616,6 +4616,17 @@ the largest (Metal's compiler orders the two kernels' arithmetic its own way, an
 species feeds the flow back through the drag over 30 steps).
 Under the maze's flow the colour moves in sixths, so the species there still has its own
 stage (18d-11b).
+**18d-11c** (2026-11-14): `npm run thick`'s "carried both ways" compares one carry, not
+thirty steps. Main was held red on the owner's Mac (deploys 827 and 828: 1.29e-3 in the
+colour, 1.77e-3 in the species, against a bar of 1/1024 of the largest) with no carry
+wrong. The second run carried apart from the first step, so the check compared the plate's
+dynamics too: Rain Drip's heavy pool falling through the thin liquid grows a last bit
+(software: colour laid one half-float place lighter reads 4.9e-4 after one step, 2.3e-3
+after thirty, about 4.6 times), and the pool now falls twelve cells where the bar was set
+on three. GitHub's Mac had crept to 7.2e-4 and 9.9e-4. Now both runs share the first 29
+steps, are asked to reach the last on the same plate to the bit, and are held to the same
+bar after one step each way; a carry missed would read 0.28 (software), over ten of the
+bar's places. The thirty-step reading is printed beside it.
 **18d-12** (2026-10-05): each liquid pours its own colour, and a dye picked for it tints it
 (`npm run natural`, `npm run bottles`). The owner: "Some of the liquids don't carry color.
 Let's make them by default the correct color, but allow them to have color as well." Each
@@ -5145,6 +5156,31 @@ prints each cell's distance from the hand with its mean change past mean drift, 
 first, so the footprint is in every log. The control on a Mac: revert the derive pass's
 mirror fix (`npm run derive` pins it) and the line goes red at the mirror across the
 middle line, row 2, column 5.
+
+### 19ah-9b. Startup waits for the half behind the show as long as it is building (2026-11-14)
+
+The Mac `open` shard's "every pipeline it asked for ahead was built ahead ... nothing built
+behind it" went red on 13 of 154 runs of 10 to 14 November (`npm run flakes -- --days 4
+--check 'every pipeline it asked for ahead'`), six on 11-14 across five branches, each on an
+opening of 12.6 s or more. `startup` waited a fixed 45 s for the record of the half built
+behind the show, and that half, grown to 113 builds one at a time beside a running show,
+took 28 to 46 s on GitHub's Macs (42.84 s, 0.38 s a build, on run 43570470863, against
+0.13 s a build for the opening's 67 three at a time). Every red still had builds arriving.
+
+Built: `gpu/prepare.ts` keeps `prepareProgress`, each prepare's builds settled so far, its
+last settle and its cap on one build (PREPARE_TIMEOUT_MS), handed to harnesses with the rest
+by `pipelinesSeen` (`chromaglassDebug().pipelines().progress`). `scripts/startupbehind.mjs`
+(beside startup.mjs, which is over 100 KB) waits while that progress moves: it ends on the
+half's record, on no build settled for the app's cap and 5 s, on a half that never began in
+the old 45 s, or at 180 s in all, a bound only against holding a runner for good. The line
+now says how far an unfinished half got instead of "nothing built behind it", and prints
+the half's pace (ms a build) beside the opening's. And the half builds two at a time
+(LATER_LANES), one render pipeline among them at most: how long it takes is how long a look
+changed to can build on the frame (19ah-9c). The 45 s wait had been, in effect, the only
+thing that made a slow half red, so the line now holds the half's pace instead, to the
+runner's own: at most six times the opening's ms a build (BEHIND_PACE_MAX; it read 2.9x one
+at a time), and both halves must have asked for something (a record missing its fields had
+passed as `undefined === undefined`).
 
 ### 19ai-6. The solver's kernels, one file a pass (2026-10-28)
 
