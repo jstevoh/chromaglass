@@ -447,55 +447,48 @@ fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
 /*
-  No line is drawn where two dyes meet (PLAN 18e-5).
+  No line is drawn where two dyes meet, on the wall or in a photographed
+  look (PLAN 18e-5).
 
-  One was, from the first plate: Boundary Contrast, 0.35 in every look and up
-  to 0.9 in some, read the lit colour on a cross of four taps 1.65 cells out
-  and drew a line where it changed (gated, since 2026-10-19, to where the
-  dye's hue changes and not only its depth, so a bubble's hole drew none). It
-  began as a bright seam. When the light was put under the glass (38h-2) the
-  line became a deflection, the colour step bending the lamp's light by 1.1
-  of the line's strength in radians, and so a dark band where the aperture
-  lost it: 78% of the light gone at the dial's upper half, over the four or
-  five cells the taps span. The owner, on Comet River (the dial at 0.6): "I
-  don't really like the super thick black lines around things. Where does
-  this even come from?" (2026-11-13). In the lab, the same plate with the dial
-  at 0 had none of them and every colour as it was.
+  One was: Boundary Contrast, 0.35 in every look and up to 0.9 in some, read the lit colour on a cross of four taps 1.65 cells out
+  and drew a line where it changed. It began as a bright seam. When the light
+  was put under the glass (38h-2) the line became a deflection, the colour
+  step bending the lamp's light out of the aperture: a dark band, 78% of the
+  light gone at the dial's upper half, over the four or five cells the taps
+  span. The owner, on Comet River (the dial at 0.6): "I don't really like the
+  super thick black lines around things. Where does this even come from?"
+  (2026-11-13).
 
   Two dyes in one liquid do not bend light where they meet. A dye at these
   strengths moves water's index in the fourth decimal place, the two liquids
   mix, and there is no surface between them to slope: no step in index and no
-  meniscus, so nothing for the aperture to lose. What a boundary between two
-  dyes does do is absorb with both where they overlap (Beer-Lambert, the sum
-  of the two absorbances, which decodeFluid already draws: orange over violet
-  is a dark red, cyan over yellow a green). A dark rim is real only where the
-  index steps: oil in water, glycerine poured clear, an air pocket's wall.
-  Those are drawn from the surface's slope (refractionOptics, meniscus) and,
-  out of focus, from the optical path (defocusShadow); the oil's own in-focus
-  rim from its index step is 18e-2.
+  meniscus, so nothing for the aperture to lose. What the boundary does is
+  absorb with both dyes where they overlap (Beer-Lambert, which decodeFluid
+  already draws: orange over violet is a dark red). A dark rim is real only
+  where the index steps (oil in water, a clear pour, an air pocket's wall),
+  drawn from the surface's slope (refractionOptics, meniscus) and, out of
+  focus, from the optical path (defocusShadow); 18e-2 is the oil's own rim.
+  A thinner or fainter line is not here either: at any width it is a line
+  the liquid does not make. npm run holeline asks that the dial moves nothing
+  in focus.
 
-  A thinner or fainter line was the obvious thing and is not here: at any
-  width it would be a line the liquid does not make. The dial is kept for
-  what else it scaled (the optical path's contrast out of focus, the back
-  plate's rim), and npm run holeline asks that it moves nothing in focus on
-  the wall or in a photographed look.
+  boundaryDiff stays for one reader, the closeup's relief. The derive pass's
+  camera branch hands the colour step to the closeup in .z, and the
+  closeup's shadowgraph (camShadow, 38h-7) reads it as the optical path's
+  curvature, which it is not: up close a seam between two dyes is still
+  shaded darker, and that is all the depth Macro Relief draws where there
+  are no cells. Two replacements were tried. Nothing in .z left the closeup
+  flat (npm run macroview's relief 0 on every look). The path's own nine-tap
+  Laplacian blew up to 17% of a closeup frame to flat white on the Mac round
+  a cluster of bubbles (air's index step is a spike at that scale, and
+  camShadow may brighten 2.5 times) and drew a doublet 119 levels darker and
+  99 brighter at a step in the dye's depth. So the closeup is main's, to the
+  byte, until PLAN 18e-7 reads the path at the lens's scale.
 
-  One reader of the colour step is left, and it is why boundaryDiff is still
-  below: the closeup's relief. The derive pass's camera branch hands the
-  step's strength to the closeup in .z, and the closeup's shadowgraph
-  (camShadow, 38h-7) reads it as the optical path's curvature, which it is
-  not: so up close a boundary between two dyes is still shaded darker, and
-  that shading is all the depth Macro Relief gives a closeup with no cells
-  (npm run macroview's relief reads 0 without it). Taking it out here would
-  leave the closeup flat, and the path's own Laplacian in its place was
-  tried and failed on the Mac (the derive pass's camera branch says how), so
-  the closeup keeps what main drew, to the byte, until PLAN 18e-7 gives it
-  the path read at the lens's scale. The hue gate and its reasons, as they
-  were written for the line (2026-10-19, npm run holeline's first lines):
-  the step is asked where the dye's colour changes, not its depth, so a
-  bubble's hole in one dye, or a pool thinning into clear water, reads as no
-  step. The colour per unit of dye ("unit" in decodeFluid) is left by the
-  decode of each tap in dyeUnit rather than sampled again.
+  The step is asked where the dye's colour changes, not its depth (33a,
+  2026-10-19: a bubble's hole in one dye read as two colours and wore a "+"
+  of the four taps). The colour per unit of dye ("unit" in decodeFluid) is
+  the same wherever one dye lies and differs where two meet.
 */
 const HUE_LO: f32 = 0.03;
 const HUE_HI: f32 = 0.12;
@@ -1337,23 +1330,9 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
-  /*
-    The camera's views keep their own slope, the lit colour's, for their
-    rims. In .z a photographed look carries nothing since 18e-5 (it was the
-    two-dye line's strength, and the line is gone). The closeup still
-    carries it, because its relief reads .z over .w as the optical path's
-    curvature (camShadow, 38h-7) and has only ever been given this colour
-    step: a darker band where two dyes meet, and the only depth Macro Relief
-    draws on a plate with no cells. Two replacements were tried and neither
-    is here. Nothing in .z left the closeup flat (npm run macroview's relief
-    0 on every look). The path and its nine-tap Laplacian, as the wall's
-    branch writes them, blew up to 17% of a closeup frame to flat white on
-    the Mac round a cluster of bubbles on pink dye (the air's index step is
-    a spike at that scale, and camShadow may brighten 2.5 times), and in the
-    lab drew a doublet 119 levels darker and 99 brighter at a step in the
-    dye's depth, from the dye's stand-in index. So the closeup is main's, to
-    the byte, until PLAN 18e-7 reads the path at the lens's scale.
-  */
+  // The camera's views keep their own slope. In .z the closeup alone still
+  // carries the two-dye colour step, for its relief (the comment over
+  // boundaryDiff says why, and PLAN 18e-7); a photographed look carries none.
   if (isCamera) {
     var diff = 0.0;
     if (closeup && U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
