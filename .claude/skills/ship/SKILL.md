@@ -14,6 +14,12 @@ description: Merge a green ChromaGlass PR, confirm the Firebase deploy, report i
   the deploy publishes on that run instead of running the Mac checks a second
   time (`scripts/deploygate.sh`), where a flaky check would hold every merge
   behind it.
+- The PR's `Main not held red` status is green (`scripts/mainhold.mjs`, PLAN.md 19am).
+  Red means the same check is red on main's last two deploys: only a PR labelled
+  `fixes-main` merges until a deploy is green, and that label goes only on the fix.
+  This holds even under the standing rule that known runner-flake reds do not block.
+  No status at all is not a pass: run `workflow_dispatch` on `hold.yml` (Main hold) and
+  read it again.
 - The user has said to merge (in this conversation, or a standing instruction).
 - The PR body describes what is in it, in plain words, including anything added
   since it was opened.

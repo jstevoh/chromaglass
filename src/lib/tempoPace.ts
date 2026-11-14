@@ -1,5 +1,4 @@
 import type { VisualizerSettings } from '../types';
-import { macroZoomOf } from '../sim/constants';
 
 /**
  * The plate's speed, matched to the music.
@@ -41,8 +40,7 @@ export function lookSpeed(s: Pick<VisualizerSettings, 'globalSpeed' | 'platePres
   let m = (Number.isFinite(s.globalSpeed) ? s.globalSpeed : 0.05) / 0.05;
   if (m < 1) m *= m;
   d *= m;
-  // The zoom the frame is drawn at (a closeup look with no zoom of its own is at 4).
-  const zoom = macroZoomOf(s);
+  const zoom = s.macroMode ? Math.max(1, s.macroZoom ?? 1) : 1;
   return Math.max(1e-6, d * Math.max(0.05, s.advection ?? 0.5) * zoom);
 }
 

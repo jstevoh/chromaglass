@@ -62,21 +62,7 @@ is live after the third track); `npm run music` with a `finalizeListen` that thr
   three quarters of a beat off. (Start and a clock dropout are 14e's.) 14-bit pairs and
   NRPN (CC 99/98/6/38) are not decoded either, so learn and auto-map bind the coarse
   byte or the parameter number.
-- *Program Change is dropped* (**14t-pc**, from §30). `parseMidi` (`midi.ts`) returns
-  CC and note on/off and nothing else, so a 0xC0 message never reaches learn. AUM's
-  MIDI matrix, the Elektron boxes and most hardware sequencers send Program Change (and
-  Bank Select, CC 0/32) when the pattern changes, and Imaginando's VS switches patches
-  on it. A `program` binding kind in `MidiTarget`, bound either to set-list item n or
-  to a named preset, played with the item's own fade. On the phone, the bindings are
-  listed on its MIDI page. *Measure:* beside `npm run desk`'s MIDI lines, a recorded
-  run of Program Change messages lands on the bound look every time, none doubled,
-  with the item's fade. *Check written first (2026-11-07):* `npm run soundowed`, id `pc` (three lines,
-  owed): `parseMidi` reads 0xC0 as `{ kind: 'program' }`, a map keeps a program bound to
-  a look and to a `{ kind: 'setlist', index }` item, and a recorded run of twelve Program
-  Changes with Bank Select and clock between lands each on its one binding through
-  `liveBindings(map, source, bank)` and `pressedBy(event)`, both moved out of `useMidi`'s
-  handler into midi.ts. The hook's `setlist` case playing the item's own fade is the
-  review's. Brief: `/mnt/project-files/antigravity/` (shared files).
+- ~~*Program Change is dropped* (**14t-pc**, from §30).~~ **Shipped** (`npm run soundowed`, id `pc` out of `--owed`; story in `docs/plan-shipped.md` §14t-pc).
 - *The decks already know the bar* (*proposed*). Pioneer's Pro DJ Link (a CDJ's beat
   packets carry the beat within the bar and the tempo) and Denon's StageLinQ are on the
   network the show server already listens on for OSC and Art-Net. They give the true
@@ -270,6 +256,11 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
+- ~~**14y-2** The Mac app keeps System audio across a relaunch or an update.~~ **Shipped**
+  2026-11-10 (the owner: "I shouldn't have to click the system audio ever"). Only System audio,
+  only in the Mac app; every other source still opens on Off. `npm run opensource` (3 new lines).
+  Story in `docs/plan-shipped.md` §14y-2. The owner was asked on a card whether every source
+  should be kept instead; the default (System audio only) shipped while that waits.
 
 ## 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 
@@ -305,6 +296,10 @@ Open, found doing it:
 - **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
   `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
   the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.
+  Its check is written (46e, `npm run rungs -- --owed=120hz`): measured, it is Poster's
+  sixty given up late or never at 120 Hz. Not necessarily via `drawGate.refreshMs`: once
+  every frame steps and takes two refreshes, that median reads the loop's pace (16.7 ms),
+  not the screen's.
 - **14aa-6** (open): `npm run stutter` runs by hand on the Mac (the watcher). Whether it joins
   a Mac shard depends on what the CI runner's GPU makes of Poster, which no run has asked yet.
 

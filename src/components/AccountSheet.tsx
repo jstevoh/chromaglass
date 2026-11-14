@@ -3,6 +3,8 @@ import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
 import CloudSyncCard from './CloudSyncCard';
 import { MacAppCard } from './MacAppCard';
+import { MoirePackBuy } from './MoirePackBuy';
+import { isDesktopApp } from '../lib/platform';
 import { cloudSync } from '../lib/cloudSyncApp';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
 import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
@@ -253,6 +255,9 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
   };
 
   const currentTier = licenseInfo.valid ? licenseInfo.tier : effectiveTier;
+  // "computer" said nothing on a phone and too little in the Mac app.
+  const here = isDesktopApp() ? 'Mac' : 'browser';
+  const onHere = isDesktopApp() ? 'on this Mac' : 'in this browser';
   const checkoutEmail = (signedIn && email) || licenseInfo.email;
   // An account key this app could not use: said once, plainly, with who to ask.
   const keyTrouble =
@@ -293,42 +298,56 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
-          {/* ── 1. Who you are ─────────────────────────────────── */}
-          {ACCOUNTS_ON && !signedIn ? (
-            <div data-cg-signin="" data-cg-account-signedout="">
-              <p className="text-[14px] font-medium text-text">You're not signed in</p>
-              <p className="mb-3 mt-0.5 text-[12px] leading-snug text-muted">
-                Sign in to bring your licence and your saved shows to this browser. The show keeps playing while you do.
+          {/* ── 1. Who you are, and what this machine has ──────── */}
+          {/* Always drawn, signed in or not. Before 2026-11-11 a signed-out
+              sheet showed only the sign-in, so a Mac with a Pro key read "You're
+              not signed in" with no word of the Pro it was running on, and the
+              key showed up only as grey placeholder text in an empty box with
+              Activate beside it (the owner's screenshot of 1.3.1276: "the screen
+              is really cluttered and disorganized"). The plan is a fact about
+              this machine's key as much as the account, so it leads. */}
+          <div data-cg-account-status={signedIn ? 'signed-in' : 'signed-out'} className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-elevated text-[15px] font-medium text-text-2">
+              {signedIn && checkoutEmail ? checkoutEmail.slice(0, 1).toUpperCase() : <User size={18} />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[14px] font-medium text-text">
+                {signedIn ? checkoutEmail || 'Signed in' : ACCOUNTS_ON ? 'Not signed in' : `This ${here}`}
+              </div>
+              <div data-cg-account-plan="" className="text-[12px] text-muted">
+                {licenseInfo.valid
+                  ? `${TIER_NAME[licenseInfo.tier]} licence found ${onHere}.`
+                  : currentTier === 'pro'
+                    ? 'Everything is unlocked.'
+                    : currentTier === 'home'
+                      ? 'Home features are unlocked.'
+                      : 'The free plan.'}
+              </div>
+            </div>
+            <span
+              data-cg-license-tier={currentTier}
+              className={`shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-medium uppercase tracking-wider ${
+                currentTier === 'free'
+                  ? 'border border-border-strong text-muted'
+                  : 'border border-accent-border bg-accent-bg text-accent-text'
+              }`}
+            >
+              {TIER_NAME[currentTier]}
+            </span>
+          </div>
+
+          {ACCOUNTS_ON && !signedIn && (
+            <div data-cg-signin="" data-cg-account-signedout="" className={section}>
+              <p className="mb-3 text-[12px] leading-snug text-muted">
+                {licenseInfo.valid
+                  ? `Your licence works without an account. Sign in to sync your looks and join your running shows.`
+                  : `Sign in to bring your licence and your saved shows to this ${here}. The show keeps playing while you do.`}
               </p>
               {LazySignInForm && (
                 <Suspense fallback={<div className="h-[152px]" />}>
-                  <LazySignInForm onSignedIn={onSignedIn} />
+                  <LazySignInForm onSignedIn={onSignedIn} compact />
                 </Suspense>
               )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-elevated text-[15px] font-medium text-text-2">
-                {checkoutEmail ? checkoutEmail.slice(0, 1).toUpperCase() : <User size={18} />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] font-medium text-text">
-                  {checkoutEmail || (ACCOUNTS_ON ? 'Signed in' : 'This computer')}
-                </div>
-                <div className="text-[12px] text-muted">
-                  {currentTier === 'pro' ? 'Everything is unlocked.' : currentTier === 'home' ? 'Home features are unlocked.' : 'The free plan.'}
-                </div>
-              </div>
-              <span
-                data-cg-license-tier={currentTier}
-                className={`shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-medium uppercase tracking-wider ${
-                  currentTier === 'free'
-                    ? 'border border-border-strong text-muted'
-                    : 'border border-accent-border bg-accent-bg text-accent-text'
-                }`}
-              >
-                {TIER_NAME[currentTier]}
-              </span>
             </div>
           )}
 
@@ -410,37 +429,54 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                   </a>
                 </div>
               )}
+              <MoirePackBuy tier={currentTier} email={checkoutEmail} />
             </div>
           )}
 
-          <div className={currentTier === 'pro' ? section : ''}>
+          {/* The key on this machine: a plain line when one is active, the box
+              only when there is something to paste (no key yet, or Home with
+              room for Pro or a pack key). A placeholder that said "Pro key
+              active" inside an empty box, with Activate lit beside it, read as
+              a key not yet entered. */}
+          <div className={currentTier === 'pro' || licenseInfo.valid ? section : ''} data-cg-account-key="">
             <div className="flex items-center justify-between">
               <span className={label}>Licence key</span>
               {licenseInfo.valid && (
                 <button type="button" data-cg-license-deactivate="" disabled={licenseBusy} onClick={handleDeactivateKey} className={textBtn}>
-                  Remove from this computer
+                  Remove from this {here}
                 </button>
               )}
             </div>
-            <form onSubmit={handleActivateKey} className="mt-2 flex gap-2">
-              <input
-                type="text"
-                data-cg-license-input=""
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                placeholder={licenseInfo.valid ? `${TIER_NAME[licenseInfo.tier]} key active` : 'Paste a key (cg1…)'}
-                aria-label="Licence key"
-                className="min-h-10 pointer-coarse:min-h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-bg px-3 font-mono text-[12px] text-text placeholder-dim focus:border-accent focus:outline-none"
-              />
-              <button
-                type="submit"
-                data-cg-license-activate=""
-                disabled={licenseBusy || !keyInput.trim()}
-                className={ghostBtn}
-              >
-                Activate
-              </button>
-            </form>
+            {licenseInfo.valid && (
+              <p data-cg-license-active={licenseInfo.tier} className="mt-1.5 flex items-center gap-2 text-[13px] text-text-2">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-ok" />
+                <span>
+                  {TIER_NAME[licenseInfo.tier]} key active {onHere}
+                  {licenseInfo.email ? <span className="text-muted"> · {licenseInfo.email}</span> : null}
+                </span>
+              </p>
+            )}
+            {licenseInfo.tier !== 'pro' || !licenseInfo.valid ? (
+              <form onSubmit={handleActivateKey} className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  data-cg-license-input=""
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  placeholder={licenseInfo.valid ? 'Paste a Pro or pack key (cg1…)' : 'Paste a key (cg1…)'}
+                  aria-label="Licence key"
+                  className="min-h-10 pointer-coarse:min-h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-bg px-3 font-mono text-[12px] text-text placeholder-dim focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  data-cg-license-activate=""
+                  disabled={licenseBusy || !keyInput.trim()}
+                  className={ghostBtn}
+                >
+                  Activate
+                </button>
+              </form>
+            ) : null}
             {licenseError && (
               <p data-cg-license-error="" className="mt-2 text-[12px] text-live">
                 {licenseError}

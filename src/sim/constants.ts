@@ -26,21 +26,9 @@ export const MACRO_FULL_ZOOM = 2.0;
 export const MACRO_PRESET_ZOOM = 4.0;
 
 /** The zoom the frame is asked for: the slider's, or a macro look's own. */
-export function macroZoomOf(s: Pick<VisualizerSettings, 'macroMode' | 'macroZoom'>): number {
+export function macroZoomOf(s: VisualizerSettings): number {
   const setZoom = s.macroZoom ?? 1;
   return s.macroMode === true ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM) : Math.max(1, setZoom);
-}
-
-/**
- * The one press in and out of the closeup: the desk's Close-up button, the M
- * key, a pad. In by the zoom, as the slider and the pinch go in, with the flag
- * riding along; out to the plate with both. The button used to flip the flag
- * alone, so the plate went to 4x while the Macro Zoom knob beside it still
- * read 1.00x (the owner's screenshot, 2026-10-29), and a look carrying a zoom
- * with the flag off was in the closeup with the button unlit.
- */
-export function closeupToggle(s: VisualizerSettings): Pick<VisualizerSettings, 'macroMode' | 'macroZoom'> {
-  return macroZoomOf(s) > 1.05 ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: MACRO_PRESET_ZOOM };
 }
 
 /**

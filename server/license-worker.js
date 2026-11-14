@@ -23,6 +23,9 @@ import {
   verifyLicenseKey,
 } from './license-key.js';
 import { SYNC_PATH, handleSync } from './cloud-sync.js';
+import { TV_PREFIX, handleTv } from './tv-code.js';
+import { addPack, packFields, packForProduct, removePack } from './license-packs.js';
+import { ipKey, takeMemoryTurn } from './turns.js';
 
 const ALLOWED_ORIGINS = [
   /^https:\/\/(www\.)?chromaglass\.art$/,
@@ -66,6 +69,20 @@ export default {
       }
       if (url.pathname === SYNC_PATH) {
         return await handleSync(request, env, cors, verifyFirebaseIdToken);
+      }
+      if (url.pathname.startsWith(TV_PREFIX)) {
+        // A TV's sign-in by a short code (server/tv-code.js, PLAN.md 12-tv-signin).
+        return await handleTv(request, env, url, {
+          cors,
+          json,
+          readCapped,
+          verifyFirebaseIdToken,
+          readEmailKeys,
+          readKeyById,
+          addressOf: () => addressOf(request),
+          takeTurn: (kind, who, limit, fallback) => takeActivateTurn(request, env, kind, who, limit, fallback),
+          tooMany: (seconds) => tooMany(seconds, cors),
+        });
       }
       if (url.pathname === '/keys') {
         if (request.method !== 'GET') return json({ error: 'GET only' }, 405, cors);
@@ -149,10 +166,15 @@ async function handleWebhook(request, env, cors) {
         ? 'pro'
         : productIdIn(env.LS_HOME_PRODUCT_IDS, lsProductId, [1450525, 1479217])
           ? 'home'
-          : 'unknown';
+          : packForProduct(env, lsProductId)
+            ? 'pack'
+            : 'unknown';
+  // An art pack (PLAN.md 45a-2, server/license-packs.js) signs the buyer's Home key again with
+  // the pack in it, as an Upgrade signs it again as Pro; its order is filed as `order_pack`.
+  const pack = productKind === 'pack' ? packForProduct(env, lsProductId) : null;
   const rawEvent = String(body.event || body.meta?.event_name || '');
   const isLsUpgrade = rawEvent === 'order_created' && productKind === 'upgrade';
-  const event = isLsUpgrade ? 'order_upgraded' : rawEvent;
+  const event = isLsUpgrade ? 'order_upgraded' : rawEvent === 'order_created' && pack ? 'order_pack' : rawEvent;
 
   const rawEmail = body.email || lsAttr.user_email || body.meta?.custom_data?.email || '';
   const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
@@ -185,7 +207,7 @@ async function handleWebhook(request, env, cors) {
   // security audit, finding 6). A held order files nothing; the owner sees it in KV under
   // `held:<order>` and in the Worker's log, and a paid order Lemon Squeezy re-sends files its
   // key as normal.
-  if (isLs && (event === 'order_created' || event === 'order_upgraded')) {
+  if (isLs && (event === 'order_created' || event === 'order_upgraded' || event === 'order_pack')) {
     if (productKind === 'unknown') {
       return await holdOrder(env, cors, keyId, { reason: 'unknown product', email, productId: lsProductId, status: lsStatus });
     }
@@ -236,6 +258,15 @@ async function handleWebhook(request, env, cors) {
     return json({ ok: true, id: keyId, tier }, 200, cors);
   }
 
+  if (event === 'order_pack') {
+    // Only a store order names its pack (by product); our own JSON cannot say which.
+    if (!pack) return json({ error: 'unknown pack' }, 400, cors);
+    if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
+    const done = await addPack({ env, email, orderId: orderId || keyId, pack, privateJwk, readEmailKeys });
+    if (done.held) return await holdOrder(env, cors, keyId, { reason: done.held, email, productId: lsProductId, status: lsStatus, pack });
+    return json({ ok: true, id: done.record.id, tier: done.record.tier, packs: done.record.packs ?? [] }, 200, cors);
+  }
+
   if (event === 'order_upgraded') {
     if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
     const existing = await readEmailKeys(env, email);
@@ -266,6 +297,9 @@ async function handleWebhook(request, env, cors) {
         updatesUntil,
         maxMachines,
         ...(target ? { upgradeFrom: target.id } : {}),
+        // The packs bought on the Home go on with it (Pro includes them anyway, but a refund of
+        // the upgrade alone gives the Home back, packs and all: `replaces` below).
+        ...(packFields(target).packs ? { packs: packFields(target).packs } : {}),
       },
       privateJwk,
     );
@@ -279,6 +313,7 @@ async function handleWebhook(request, env, cors) {
       updatesUntil,
       maxMachines,
       upgradeFrom: target?.id ?? null,
+      ...packFields(target),
       // What the upgrade overwrote, for a refund of just the upgrade to put
       // back (PLAN.md 23.17i). The Home record shares the Pro key's id, so
       // nothing else in KV remembers it.
@@ -290,6 +325,7 @@ async function handleWebhook(request, env, cors) {
               issuedAt: target.issuedAt,
               updatesUntil: target.updatesUntil,
               maxMachines: target.maxMachines,
+              ...packFields(target),
             },
           }
         : {}),
@@ -316,6 +352,10 @@ async function handleWebhook(request, env, cors) {
     // Remembered so the same order's `order_created`, delivered again, is not filed (see the
     // gate above). Written for the owner's direct refund too; only a Lemon Squeezy order reads it.
     if (orderId) await env.LICENSE_KV.put(`refunded:${orderId}`, JSON.stringify({ at: Date.now() }));
+    // A pack's own order refunded takes the pack off the key it is on and leaves the key
+    // (PLAN.md 45a-2); its order id is no key's, so the lines below would revoke nothing.
+    const unpacked = await removePack({ env, email, orderId, privateJwk, readEmailKeys });
+    if (unpacked) return json({ ok: true, unpacked: unpacked.pack, id: unpacked.record.id }, 200, cors);
     let targetEmail = email;
     let targetId = typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : orderId ? `key_${orderId}` : '';
 
@@ -383,8 +423,10 @@ async function refileHome(env, pro, upgradeOrderId, privateJwk) {
   const issuedAt = typeof was.issuedAt === 'number' ? was.issuedAt : pro.issuedAt;
   const updatesUntil = typeof was.updatesUntil === 'number' ? was.updatesUntil : pro.updatesUntil;
   const maxMachines = typeof was.maxMachines === 'number' ? was.maxMachines : pro.maxMachines;
+  // The packs the Home carried before the upgrade come back with it (PLAN.md 45a-2).
+  const packs = packFields(was);
   const token = await signLicenseKey(
-    { id, tier: 'home', email: pro.email, issuedAt, updatesUntil, maxMachines },
+    { id, tier: 'home', email: pro.email, issuedAt, updatesUntil, maxMachines, ...(packs.packs ? { packs: packs.packs } : {}) },
     privateJwk,
   );
   return {
@@ -396,6 +438,7 @@ async function refileHome(env, pro, upgradeOrderId, privateJwk) {
     issuedAt,
     updatesUntil,
     maxMachines,
+    ...packs,
     revoked: false,
   };
 }
@@ -421,6 +464,9 @@ async function handleGetKeys(request, env, cors) {
       issuedAt: k.issuedAt,
       updatesUntil: k.updatesUntil,
       maxMachines: k.maxMachines,
+      // The packs the token carries, so the app can see a key it already holds was signed
+      // again with a pack (PLAN.md 45a-2) without opening every token.
+      ...(Array.isArray(k.packs) && k.packs.length ? { packs: k.packs } : {}),
     }));
 
   let marketingOptIn = null;
@@ -609,7 +655,12 @@ async function verifyFirebaseIdToken(idToken, env) {
   if (typeof payload.iat !== 'number' || payload.iat > nowSec + 300) return null;
   if (typeof payload.sub !== 'string' || !payload.sub) return null;
   if (typeof payload.email !== 'string' || !payload.email.includes('@')) return null;
-  if (payload.email_verified === false) return null;
+  // Only an address the token says was proved. This read `=== false`, so a token with no such
+  // claim passed; Google, Apple and password sign-ins always carry it, so nothing reached the
+  // hole, but /keys, /tv/claim and /sync hand out by email and this line is all that keeps a
+  // buyer's keys from an account that merely typed their address (firebase-token.js already
+  // asks for `=== true`; the security review of 2026-11-13).
+  if (payload.email_verified !== true) return null;
 
   const expectedAud = env.FIREBASE_PROJECT_ID || 'chromaglass';
   if (payload.aud && payload.aud !== expectedAud && payload.aud !== 'demo-chromaglass') {
@@ -711,21 +762,48 @@ async function getGoogleJwks(env, kid) {
   return jwksInFlight;
 }
 
-// The address Cloudflare saw the request come from; none outside Cloudflare (the local checks),
-// where there is nobody to count.
+// The address Cloudflare saw the request come from, IPv6 cut to its /64 (server/turns.js);
+// none outside Cloudflare (the local checks), where there is nobody to count.
 function addressOf(request) {
-  return request.headers.get('CF-Connecting-IP') || '';
+  return ipKey(request.headers.get('CF-Connecting-IP') || '');
 }
 
+// The two allowances only a caller holding something can spend, so they stay exact, in KV:
+// a signed key's own asks (`key`, counted after its signature is good) and a signed-in
+// account's wrong TV codes (`tvclaim`). Every other kind is an address's, which anyone can
+// spend, so it is counted in the isolate's memory and writes nothing (server/turns.js, the
+// security review of 2026-11-13: a KV counter on those let one script spend the account's
+// whole day of KV writes and stop the webhook, activations and TV links with it).
+const KV_COUNTED_TURNS = new Set(['key', 'tvclaim']);
+
 /**
- * Takes one of `who`'s asks this hour from the Worker's KV, or returns the seconds until the
- * next hour when they are spent. KV is eventually consistent and takes no atomic add, so two
- * asks in the same instant can both read the same count: the limit is a brake on a script that
- * sends hundreds, not an exact meter. The counter dies with its hour (`expirationTtl`).
+ * Takes one of `who`'s asks this hour, or returns the seconds until the next hour when they
+ * are spent. An address's kinds go to `takeMemoryTurn`; /tv/code, the one of them that files a
+ * record for a stranger, also asks Cloudflare's Rate Limiting binding when the deploy binds one
+ * as `TV_CODE_LIMITER`, which counts across isolates and writes no KV (a binding that throws
+ * leaves the memory count standing rather than shutting the route).
+ *
+ * The KV kinds: KV is eventually consistent and takes no atomic add, so two asks in the same
+ * instant can both read the same count: the limit is a brake on a script that sends hundreds,
+ * not an exact meter. The counter dies with its hour (`expirationTtl`).
  */
 async function takeActivateTurn(request, env, kind, who, limitSetting, fallback) {
   if (!who) return 0;
   const limit = Number(limitSetting) > 0 ? Number(limitSetting) : fallback;
+  if (!KV_COUNTED_TURNS.has(kind)) {
+    const wait = takeMemoryTurn(kind, who, limit);
+    if (wait) return wait;
+    const limiter = kind === 'tvcode' ? env.TV_CODE_LIMITER : null;
+    if (limiter && typeof limiter.limit === 'function') {
+      try {
+        const { success } = await limiter.limit({ key: `${kind}:${who}` });
+        if (!success) return 60;
+      } catch {
+        // The binding is out of reach: the isolate's own count above still holds.
+      }
+    }
+    return 0;
+  }
   const hour = Math.floor(Date.now() / 3_600_000);
   const k = `rl:activate:${kind}:${who}:${hour}`;
   const used = Number(await env.LICENSE_KV.get(k)) || 0;

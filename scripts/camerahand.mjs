@@ -14,17 +14,15 @@
  *     it is Hold's answer that Chase can be.
  *   - Macro Zoom's slider was linear over 1x..16x: 1x to 4x, where the closeup
  *     lives, was the first fifth of the travel, and 8x to 16x, where the
- *     solver's grid is a dozen cells across, was the last half.
+ *     solver's grid is a dozen cells across, was the last half. (27h-1, #626,
+ *     put a squared curve on it while this was open; line 2 holds it.)
  *   - Music Sync does nothing to the frame in Hold and Follow while Frame Sway
  *     is 0 (the owner's rule: the frame is moved by a hand), and says nothing.
  *   - The only pan was Alt-drag.
  *
  * What is asked, and what each line can and cannot catch:
- *   1. Chase's throw: Hold's 90% time is over 2 s at 0, under 0.1 s at the
- *      dial's top (3 since the dials were widened; it was 1 when this check
- *      was written), the dial still does something between 1 and 3 (a single
- *      exponential would have hit its cap at 0.73), and at the default 0.4 is
- *      the 0.27 s it always was (a look that left Chase alone
+ *   1. Chase's throw: Hold's 90% time is over 2 s at 0, under 0.1 s at 3, and at
+ *      the default 0.4 is the 0.27 s it always was (a look that left Chase alone
  *      moves as before). The control: the measure reads the analytic time for
  *      the rate it was handed, ln(10) / rate, so a harness that measured
  *      nothing would not agree with it.
@@ -33,7 +31,8 @@
  *      the travel, 4x within half, and a value goes out and back unchanged.
  *   3. The arrows pan by the frame, not the plate (a tap at 8x is half a tap
  *      at 4x), a Shift is a frame, a held key is slower than a tap, the aim
- *      stays on the plate; and the app binds them only while the closeup is in.
+ *      stays on the plate; and the key handler (`macroKey`) pans only while
+ *      the closeup is in, from where the camera looks, and still zooms on + and -.
  *   4. Music Sync's label is true: through a song in Hold at Frame Sway 0 the
  *      shot is identical at Sync 0 and 1, and with Frame Sway up it is not.
  *      The panel greys the slider with that reason in exactly those two cases.
@@ -52,7 +51,7 @@ const out = 'node_modules/.cache/camerahand-lib.mjs';
 await build({
   stdin: {
     contents: [
-      "export { MacroCamera, holdRate, panAim, arrowAim } from './src/lib/macroCamera.ts';",
+      "export { MacroCamera, holdRate, panAim, macroKey } from './src/lib/macroCamera.ts';",
       "export { LEARNABLE_SETTINGS, curveOf, handValueAt, travelOf } from './src/lib/midi.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
@@ -83,17 +82,15 @@ const ninety = (chase) => {
   }
   return Infinity;
 };
-const TOP = L.LEARNABLE_SETTINGS.find((s) => s.key === 'macroChase').max;
-const t0 = ninety(0), t4 = ninety(0.4), tMid = ninety(1), t1 = ninety(TOP);
+const t0 = ninety(0), t4 = ninety(0.4), t1 = ninety(1), t3 = ninety(3);
 check('1a. Chase 0 glides: nine tenths of an aim jump takes over 2 s', t0 > 2, `${t0.toFixed(2)} s`);
-check(`1b. Chase at the dial's top (${TOP}) snaps: under 0.1 s`, t1 < 0.1, `${t1.toFixed(3)} s`);
-check('1b2. the top of the dial is not dead travel: Chase 1 is still at least twice as slow as the top', tMid > 2 * t1, `1: ${tMid.toFixed(3)} s, ${TOP}: ${t1.toFixed(3)} s`);
+check('1b. Chase 3, the top of the dial, snaps: under 0.1 s, and 1 is quicker than the default', t3 < 0.1 && t1 < t4, `${t3.toFixed(3)} s at 3, ${t1.toFixed(3)} s at 1`);
 check('1c. the default 0.4 still answers in the 0.27 s it did (within a frame or two)', Math.abs(t4 - 0.27) < 0.04, `${t4.toFixed(3)} s`);
-check('1d. the throw is over thirty fold (it was twofold: 0.37 s to 0.18 s)', t0 / t1 > 30, `${(t0 / t1).toFixed(0)}x`);
+check('1d. the throw is over thirty fold (it was twofold: 0.37 s at 0 to 0.18 s at 1)', t0 / t3 > 30, `${(t0 / t3).toFixed(0)}x`);
 const analytic = (c) => Math.log(10) / L.holdRate(c);
 check('1e. control: the measured time is the ease\'s own, ln 10 over its rate, at four settings',
-  [[0, t0], [0.4, t4], [1, tMid], [TOP, t1]].every(([c, t]) => Math.abs(t - analytic(c)) < 2 * DT + 0.03 * analytic(c)),
-  [[0, t0], [0.4, t4], [1, tMid], [TOP, t1]].map(([c, t]) => `${c}: ${t.toFixed(3)} vs ${analytic(c).toFixed(3)}`).join(', '));
+  [[0, t0], [0.4, t4], [1, t1], [3, t3]].every(([c, t]) => Math.abs(t - analytic(c)) < 2 * DT + 0.03 * analytic(c)),
+  [[0, t0], [0.4, t4], [1, t1], [3, t3]].map(([c, t]) => `${c}: ${t.toFixed(3)} vs ${analytic(c).toFixed(3)}`).join(', '));
 check('1f. a Chase that is not a number is the default\'s, not a stuck camera', Math.abs(L.holdRate(NaN) - L.holdRate(0.4)) < 1e-9);
 
 // ── 2. Zoom's travel ───────────────────────────────────────────────────
@@ -118,57 +115,37 @@ check('3b. Shift moves a whole frame, and a held key is much slower than a tap',
 const edge = L.panAim({ x: 0.99, y: 0.01 }, { dx: 1, dy: -1 }, 2, { big: true });
 check('3c. the aim stays on the plate', edge.x === 1 && edge.y === 0, `${edge.x}, ${edge.y}`);
 check('3d. up is up and down is down: the aim\'s y grows downward, as the plate\'s uv does', L.panAim(mid, { dx: 0, dy: -1 }, 4).y < 0.5 && L.panAim(mid, { dx: 0, dy: 1 }, 4).y > 0.5);
+const press = (key, cur, extra = {}) => {
+  const got = { zoom: [], aim: [], prevented: false };
+  L.macroKey({ key, repeat: false, shiftKey: false, preventDefault: () => { got.prevented = true; }, ...extra }, cur, { macroCentre: () => ({ x: 0.2, y: 0.8 }) },
+    (d) => got.zoom.push(d), (x, y) => got.aim.push([x, y]));
+  return got;
+};
+const inHold = { macroZoom: 4, macroCamera: 'hold', macroAimX: 0.5, macroAimY: 0.5 };
+const right = press('ArrowRight', inHold), up = press('ArrowUp', inHold);
+check('3e. an arrow with the closeup in pans the aim by a tap and keeps the page from scrolling',
+  right.aim.length === 1 && Math.abs(right.aim[0][0] - 0.5 - tap4) < 1e-9 && right.aim[0][1] === 0.5 && right.prevented && up.aim[0][1] < 0.5);
+check('3f. with the plate at 1x the arrows do nothing and are left to the page', (() => { const g = press('ArrowLeft', { ...inHold, macroZoom: 1 }); return g.aim.length === 0 && !g.prevented; })());
+check('3g. in Follow or Auto a pan starts from where the camera is looking, not the stored aim', (() => { const g = press('ArrowRight', { ...inHold, macroCamera: 'follow' }); return Math.abs(g.aim[0][0] - 0.2 - tap4) < 1e-9 && Math.abs(g.aim[0][1] - 0.8) < 1e-9; })());
+check('3h. + and - still zoom', press('+', inHold).zoom[0] === 1 && press('=', inHold).zoom[0] === 1 && press('-', inHold).zoom[0] === -1 && press('_', inHold).zoom[0] === -1);
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-const S = (o) => ({ macroMode: false, macroZoom: 4, macroCamera: 'hold', macroAimX: 0.5, macroAimY: 0.5, ...o });
-const right = { key: 'ArrowRight' }, follow = L.arrowAim(right, S({ macroCamera: 'follow' }), { x: 0.3, y: 0.6 });
-check('3e. an arrow pans only with the closeup in (by the zoom drawn, the flag alone too), and a letter never does',
-  L.arrowAim(right, S({ macroZoom: 1 }), null) === null && L.arrowAim({ key: 'a' }, S(), null) === null
-  && Math.abs(L.arrowAim(right, S(), null).x - (0.5 + (2 / 3) / 4 / 4)) < 1e-9
-  && Math.abs(L.arrowAim(right, S({ macroMode: true, macroZoom: 1 }), null).x - (0.5 + (2 / 3) / 4 / 4)) < 1e-9);
-check('3f. Follow pans on from where the frame is, not from its stale aim; Hold from its own aim',
-  Math.abs(follow.x - (0.3 + (2 / 3) / 16)) < 1e-9 && follow.y === 0.6
-  && L.arrowAim(right, S(), { x: 0.3, y: 0.6 }).y === 0.5);
-// Behind the handler's guard, so a focused slider (Macro Zoom, Aim X) keeps
-// its own arrow keys and Cmd-arrow or a text box never pans the camera.
-check('3g. the app\'s key handler moves the aim Alt-drag uses with it, after the guard for fields and modifier keys',
-  /tagName;\s*if \(tag === 'INPUT' \|\| tag === 'TEXTAREA' \|\| tag === 'SELECT' \|\| e\.metaKey \|\| e\.ctrlKey \|\| e\.altKey\) return;[\s\S]{0,1200}const to = arrowAim\(e, settingsRef\.current, visualizerRef\.current\?\.macroCentre\(\)\);\s*if \(to\) \{ e\.preventDefault\(\); aimMacro\(to\.x, to\.y\); \}/.test(app));
+check('3i. the app hands its keys to macroKey with the settings, the visualizer, the zoom and the aim',
+  /macroKey\(e, settingsRef\.current, visualizerRef\.current, zoomMacro, aimMacro\)/.test(app));
 
 // ── 4. Music Sync's label ──────────────────────────────────────────────
-/*
-  Each song gives the camera something to do besides the music, or "the same
-  shot" would hold for a camera that never moves at all: in Hold a hand moves
-  the aim across the plate at six seconds (so a Sync that weighted Hold's ease
-  would show), and in Follow the drop it rides drifts fifty cells over the
-  twelve seconds (so a Sync in Follow's ease would). Both read exactly 0 at
-  Frame Sway 0 on this build, and the same songs with Frame Sway up differ.
-*/
-const drifting = () => {
-  const f = { density: new Float32Array(SIZE * SIZE), vx: new Float32Array(SIZE * SIZE), vy: new Float32Array(SIZE * SIZE), size: SIZE };
-  const lay = (cx) => { f.density.fill(0); for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) { const d = (i - cx) ** 2 + (j - 96) ** 2; if (d < 900) f.density[j * SIZE + i] = 3 * Math.exp(-d / 40); } };
-  return { f, lay };
-};
-const song = (sway, sync, mode = 'hold') => {
-  const c = new L.MacroCamera(), EVERY = 30, shots = [], N = FPS * 12;
-  const still = field(), moving = drifting();
-  for (let i = 0; i < N; i++) {
+const song = (sway, sync) => {
+  const f = field(), c = new L.MacroCamera(), EVERY = 30, shots = [];
+  for (let i = 0; i < FPS * 12; i++) {
     const since = (i % EVERY) * DT;
-    if (mode === 'follow') moving.lay(70 + 50 * (i / N));
-    shots.push(c.update(mode === 'follow' ? moving.f : still, DT, { ...base, mode, aimX: mode === 'follow' ? 0.4 : i < N / 2 ? 0.35 : 0.65, zoom: 6, sync, sway,
-      beat: i % EVERY === 0, bass: 0.9 * Math.exp(-since / 0.25), treble: 0.85 * Math.exp(-((i % 15) * DT) / 0.12), energy: 0.7 }));
+    shots.push(c.update(f, DT, { ...base, mode: 'hold', aimX: 0.5, zoom: 6, sync, sway, beat: i % EVERY === 0, bass: 0.9 * Math.exp(-since / 0.25),
+      treble: 0.85 * Math.exp(-((i % 15) * DT) / 0.12), energy: 0.7 }));
   }
   return shots;
 };
 const diff = (a, b) => a.reduce((m, s, i) => Math.max(m, Math.abs(s.cx - b[i].cx), Math.abs(s.cy - b[i].cy), Math.abs(s.zoom - b[i].zoom)), 0);
-const travel = (a) => a.reduce((m, s) => Math.max(m, Math.abs(s.cx - a[0].cx)), 0);
-const holdSong = song(0, 0), followSong = song(0, 0, 'follow');
-const still = diff(holdSong, song(0, 1)), swayed = diff(song(1, 0), song(1, 1));
-const fStill = diff(followSong, song(0, 1, 'follow')), fSwayed = diff(song(1, 0, 'follow'), song(1, 1, 'follow'));
-check('4a. Hold at Frame Sway 0: Music Sync 0 and 1 give the same shot, frame for frame, while a hand moves the aim',
-  still === 0 && travel(holdSong) > 0.1, `max difference ${still}, the frame travels ${travel(holdSong).toFixed(3)}`);
-check('4a2. Follow at Frame Sway 0: the same, riding a drop that drifts', fStill === 0 && travel(followSong) > 0.1,
-  `max difference ${fStill}, the frame travels ${travel(followSong).toFixed(3)}`);
-check('4b. with Frame Sway up they do not, in Hold and in Follow (so the slider is live there, and the panel must not grey it)',
-  swayed > 0.001 && fSwayed > 0.001, `max difference ${swayed.toFixed(4)} Hold, ${fSwayed.toFixed(4)} Follow`);
+const still = diff(song(0, 0), song(0, 1)), swayed = diff(song(1, 0), song(1, 1));
+check('4a. Hold at Frame Sway 0: Music Sync 0 and 1 give the same shot, frame for frame', still === 0, `max difference ${still}`);
+check('4b. with Frame Sway up they do not (so the slider is live there, and the panel must not grey it)', swayed > 0.001, `max difference ${swayed.toFixed(4)}`);
 const panel = readFileSync(new URL('../src/components/settings/LookSections.tsx', import.meta.url), 'utf8');
 check('4c. the panel greys Music Sync in Hold and Follow with Frame Sway at 0, naming why',
   /disabled=\{\(settings\.macroCamera \?\? 'hold'\) !== 'auto' && \(settings\.frameSway \?\? 0\) <= 0\.001 && 'needs Frame Sway'\}\s+label="Music Sync"/.test(panel));

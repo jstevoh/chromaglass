@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself
 
-This section is in 3 files, cut between items: `19-checks-build-plan.md`, `19-checks-build-plan-2.md`, `19-checks-build-plan-3.md`.
+This section is in 4 files, cut between items: `19-checks-build-plan.md`, `19-checks-build-plan-2.md`, `19-checks-build-plan-3.md`, `19-checks-build-plan-4.md`.
 
 Found 2026-09-28 by reading `.github/workflows/`, `scripts/` and the build, and by
 reading 14 recent `Checks` runs and 96 `gallery.yml` runs through the Actions API.
@@ -272,6 +272,13 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
     `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
     checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
     #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
+- **19k-11c, shipped 2026-11-13** (E, S). **`lab4` over its 25 minutes on the slow tier.**
+  `glint` (47e, #833) and `bubbleair` had joined `holeline`, `encode --grids` and `shaderdials`
+  in `lab4`, and on GitHub's slow ubuntu tier it was cancelled at the limit on two of the day's
+  four PR runs (#842 and #835), no check failing: about 15 minutes of checks ahead of
+  holeline's 11. `glint` moved to `lab9` (3:50 that day) and `bubbleair` to `lab8` (4:24);
+  no bar, timeout or check body changed, only each check's shard in `scripts/checks.json`
+  and the comment above `timeout-minutes` in `checks.yml`. The bound stays 25.
 - **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
   slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
   0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
@@ -280,15 +287,43 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   1.40 ms over the next merges: split any that would pass 21 there. Each part draws its own
   runner, so only `lab`, which runs videoflow, knows its tier today: on deploy 670 `lab2` and
   `lab3` ran 11:38 and 11:49 as jobs on runners whose tier nothing printed.
-- **19k-13, open** (E, S). **The Mac's plate shard at its 20 minutes.** On #690's run the
-  plate shard's 41 checks took 19:08 after 46 s of setup on a GitHub Mac, and the job was
-  cancelled about a second past its bound, every check green (green on re-run); on main's
-  deploy 671 it ran 18:07. The slowest: Areas that listen 1:42, A drop slumps 1:05, the
-  Finger drags 0:58, the physics 0:56. Every other Mac shard ran 15:49 to 16:49 on that run,
-  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way. On
-  2026-11-07 18m-5a moved `npm run slump` (now about 2:00, with its added filter-off run)
-  from plate to tools, which held it at 15.7 minutes on #498's runs; read both shards'
-  times on the next deploys before moving anything else.
+- **19k-13** (E, S): **shipped**, the Mac jobs' bound 20 → 25 minutes, and a shard's checks past
+  18 minutes (a Measure part's past 21) a warning on the run's page, the room line `ROOM` in
+  `scripts/checks.mjs`. Story in `docs/plan-shipped.md` §19k-13. Open: read the warnings over
+  the next deploys, and rebalance (or add a sixth shard) when one shard keeps warning. The
+  same day 18m-5a moved `npm run slump` (now about 2:00) from plate to tools; read both shards'
+  warnings before moving anything else.
+- **19k-14, open** (E, S). **`draftwall --frames` hangs on a Mac.** On #690's second run the
+  Mac's open shard ran `node scripts/draftwall.mjs --frames`, printed every line up to "and
+  the copy stays up for the next look" (17 s in), then nothing for 12:07, until the job was
+  cancelled at its bound with the five checks after it never run; green on the re-run, and
+  25 to 37 s on the other nine attempts of 2026-11-07. Since 19k-13 the entry has a 3-minute
+  timeout, so a hang is this check red by name and the shard goes on. What hung is not known:
+  the next calls are a `page.evaluate` of the settings and a `clear`, a 300 ms wait, another
+  `page.evaluate`, and a click on Live (`scripts/draftwall.mjs` after that line), and an
+  evaluate has no timeout of its own, so a page whose main thread stops would hold it. Next:
+  print a line before each of those calls under `CI`, so the next hang names its call, then
+  find why that call can stop (D671's same-check red, "the dimmer still reaches the wall", is
+  19aa's and may share the cause).
+- **19k-15** (E, S): **shipped**, `ears`'s covered line holds each tick to the wall's ask
+  before it (more than 250 ms after, EAR_ASK_HOLD_MS) rather than wanting none; red on GitHub's
+  Macs on #718 and #734 at one tick each. Story in `docs/plan-shipped.md` §19k-15.
+- **19k-16, shipped** (E, S): `draftwall --frames` opened the wall before the show's first step, so its 8 s count of painted frames could end before the opening did (0 painted on 5 of 54 runs); it waits for the show now (docs/plan-shipped.md, 19k-16).
+- **19k-16a, open** (E, S). **A projector opened during a cold start is asked for frames the show cannot draw.** Found
+  with 19k-16: until the wall engine's renderer starts (`startWith`), the projector's rAF asks
+  `askFrame` (`src/components/LiquidVisualizer.tsx`, grep `const askFrame`) for a frame sixty times a
+  second; each one counts a frame and throws on the governor (`governorRef.current!` null) before the
+  mirror, and the canvas has already taken the projector's size before the governor's scale. A real
+  projector opened while a Mac opening builds its pipelines (13.5 to 14.8 s cold) gets that throw
+  storm and a false frame count. The fix is `if (!renderer) return;` at the top of `askFrame` (tried in
+  a scratch copy: 0 frames and 0 throws before the start, then a clean start at 672x378), but
+  LiquidVisualizer.tsx may not grow by a byte (`npm run sizes`), so the ask moves to a module of its
+  own first (19ai-10). Since 19k-16 no line opens a projector before the show's first step, so the
+  fix comes with a check of its own: open the wall while `stepIndex` is 0, then expect no throw from
+  `askFrame` and frames painted once the show starts.
+- **19k-19, open** (E, S): **the Mac's five parts have no room.** `show`, `tools`, `plate`, `open` and `fifth` run 16 to 23 of their 25 minutes on a GitHub Mac (read off #820's run, 2026-11-12), and a GPU check too long for SwiftShader has nowhere else to go: Lava Lamp's cycle (`lavacycle`, six minutes of the lamp, two hours on SwiftShader, a couple of minutes on Metal) went on `show`, the lightest. The next one will not fit. Wanted: a sixth Mac part, or the five rebalanced by measured minutes (`npm run checks` could print each part's last times), weighed against the Mac queue a sixth part lengthens (docs/ci.md).
+- **19k-18, shipped** (E, S): `lab2` over its 25 minutes on #802's deploy, twice, every check green; the moiré sheets' check moved to a part of its own, `lab9` (docs/plan-shipped.md, 19k-18).
+- **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6`, and `inktitle` from `lab3` to `lab7` (docs/plan-shipped.md, 19k-17).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

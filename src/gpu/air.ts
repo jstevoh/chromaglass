@@ -18,12 +18,15 @@
  * the way the thing it describes does.
  */
 
-import { AIR_SPLAT_WGSL } from './wgsl/air';
+import { AIR_BOIL_WGSL, AIR_LOOK_SPAN, AIR_SPLAT_WGSL } from './wgsl/air';
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { groupOf, viewOf } from './groupCache';
 
 /** x, y, radius (all as a fraction of the grid) and opacity. */
 const STRIDE = 4 * 4;
+
+/** The bubbles as the field was last stamped from them (38h-15): discs (x, y, r, opacity) and rims (fingering, count, phase, film). */
+export type AirGeo = { readonly discs: GPUBuffer; readonly rims: GPUBuffer };
 
 /**
  * The splat's pipeline, apart from the class so `WebGPUAir.prepare` builds
@@ -63,6 +66,32 @@ function splatRecipe(device: GPUDevice): RenderRecipe {
   });
 }
 
+function boilRecipe(device: GPUDevice): RenderRecipe {
+  return (module) => ({
+    label: 'air boil',
+    layout: device.createPipelineLayout({
+      label: 'air boil',
+      bindGroupLayouts: [device.createBindGroupLayout({
+        label: 'air boil',
+        entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } }],
+      })],
+    }),
+    vertex: { module: module(AIR_BOIL_WGSL), entryPoint: 'vs' },
+    fragment: {
+      module: module(AIR_BOIL_WGSL),
+      entryPoint: 'fs',
+      targets: [{
+        format: 'rgba16float' as GPUTextureFormat,
+        blend: {
+          color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+          alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+        },
+      }],
+    },
+    primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+  });
+}
+
 export class WebGPUAir {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
@@ -81,8 +110,11 @@ export class WebGPUAir {
     nowhere else the previous one survives.
   */
   private readonly fields: [GPUTexture, GPUTexture];
+  /** The bubbles as the field was last stamped from them, for the plate. */
+  readonly geo: AirGeo;
   private which = 0;
   private live = 0;
+  private boilTex: GPUTexture | null = null;
   /** The list as last handed over, for the coverage the source needs. */
   private packed = new Float32Array(0);
   private disposed = false;
@@ -97,13 +129,26 @@ export class WebGPUAir {
     this.buffer = this.disposer.track(device.createBuffer({
       label: 'air discs',
       size: Math.max(1, capacity) * STRIDE,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     }));
     this.fingers = this.disposer.track(device.createBuffer({
       label: 'air fingers',
       size: Math.max(1, capacity) * STRIDE,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    }));
+    /*
+      The list as the field was last stamped from it, for the plate to draw
+      each bubble from its own disc (PLAN 38h-15, wgsl/bubbleShape.ts). A copy
+      taken in the splat's own encoder, not the list as last handed over: a
+      frame the solver does not step draws last step's field, and the list
+      handed over since may have lost a bubble and moved every index after it.
+    */
+    if (capacity > AIR_LOOK_SPAN) throw new Error(`WebGPUAir: room for ${capacity} bubbles, and the field's index holds ${AIR_LOOK_SPAN}`);
+    const geo = (label: string) => this.disposer.track(device.createBuffer({
+      label, size: Math.max(1, capacity) * STRIDE,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }));
+    this.geo = { discs: geo('air discs stamped'), rims: geo('air rims stamped') };
     this.uniform = this.disposer.track(device.createBuffer({
       label: 'air uniforms',
       size: 16,
@@ -156,11 +201,16 @@ export class WebGPUAir {
       this.device.queue.writeBuffer(this.fingers, 0, f, 0, this.live * 4);
     }
     this.device.queue.writeBuffer(this.uniform, 0, new Uint32Array([this.live]));
-    this.device.queue.writeBuffer(this.uniform, 4, new Float32Array([soft, 0, 0]));
+    this.device.queue.writeBuffer(this.uniform, 4, new Float32Array([soft, this.grid, 0]));
   }
 
   /** Whether anything would be drawn — the caller skips the exclusion without it. */
-  get any(): boolean { return this.live > 0; }
+  get any(): boolean { return this.live > 0 || this.boilTex !== null; }
+
+  /** Attach or clear the plate's boiling vapour fraction texture (`rg32float`, PLAN §36e-2). */
+  setBoilAlpha(tex: GPUTexture | null): void {
+    this.boilTex = tex;
+  }
 
   /**
    * What fraction of the plate is air, from the list rather than the field.
@@ -193,6 +243,10 @@ export class WebGPUAir {
     // Into the one that is not current, which then becomes current: what was
     // there is last frame's air, which is what the push differences against.
     this.which = 1 - this.which;
+    if (this.live > 0) {
+      enc.copyBufferToBuffer(this.buffer, 0, this.geo.discs, 0, this.live * STRIDE);
+      enc.copyBufferToBuffer(this.fingers, 0, this.geo.rims, 0, this.live * STRIDE);
+    }
     const pass = enc.beginRenderPass({
       label: 'air splat',
       colorAttachments: [{
@@ -207,6 +261,14 @@ export class WebGPUAir {
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, groupOf(this.device, pipeline, [this.uniform, this.buffer, this.fingers]));
       pass.draw(4, this.live);
+    }
+    if (this.boilTex) {
+      const boilPipe = this.pipelines.renderPipeline('air boil', boilRecipe(this.device));
+      if (boilPipe) {
+        pass.setPipeline(boilPipe);
+        pass.setBindGroup(0, groupOf(this.device, boilPipe, [this.boilTex]));
+        pass.draw(3);
+      }
     }
     pass.end();
   }

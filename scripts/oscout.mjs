@@ -409,14 +409,45 @@ try {
     await page.evaluate(() => window.chromaglassAction?.('seed'));
     const kicks = () => page.evaluate(() => window.chromaglassDebug?.().kicks?.() ?? null);
     await sleep(5000);   // the simulated music under way and the clock locked
+    /*
+      The line waits for a number of kicks, not for a length of time. It
+      counted the kicks in a fixed fifteen seconds of wall time against a
+      floor of ten, and on #772's fifth shard went red twice (8 kicks, then
+      5) while the one-for-one it is there to prove held both times (8 sent
+      for 8, 4 for 5): both shards ran slow, and a slow hosted Mac lands
+      fewer kicks a second because the ear hears on frames. How many kicks a
+      second the plate lands is the ear's business (`npm run music`), not
+      OSC out's; what this line proves is that every kick the plate does
+      land reaches the VJ app's socket as it lands. So it waits for twelve,
+      up to a minute (a Mac at speed takes about as long as before, the
+      slowest run seen would take about forty seconds), and the floor still
+      fails a plate that presses on no beat at all. The pairing is read at
+      the moment the twelfth kick is seen, but the beats are counted 400 ms
+      later: a fixed window ended at a random point, usually a second after
+      the last kick, while this loop stops within 200 ms of one, and the
+      page sends that kick's beat on its own next animation frame, which on a
+      slow runner can be hundreds of milliseconds away. Counted at once, the
+      last beat would often still be on its way and, with one lost at the
+      start edge as well, the pairing would read two short with nothing
+      broken. Kicks land half a second or more apart, so the wait catches
+      the late beat and at most one more, which the ±1 allows.
+    */
+    const KICKS = 12;
     const k0 = await kicks();
     got.length = 0;
-    await sleep(15_000);
-    const k1 = await kicks();
+    const t0 = Date.now();
+    let k1 = k0;
+    while (typeof k0 === 'number' && Date.now() - t0 < 60_000) {
+      await sleep(200);
+      k1 = await kicks();
+      if (typeof k1 !== 'number' || k1 - k0 >= KICKS) break;
+    }
+    const took = ((Date.now() - t0) / 1000).toFixed(1);
+    await sleep(400);
     const ones = got.filter((g) => !g.bundle && g.messages[0].address === '/chromaglass/out/beat' && g.messages[0].args[0] === 1).length;
     const plate = typeof k0 === 'number' && typeof k1 === 'number' ? k1 - k0 : NaN;
-    check('each beat the plate presses on reaches the VJ app, one for one', plate >= 10 && Math.abs(ones - plate) <= 1,
-      `${ones} beats sent, ${plate} kicks on the plate in 15 s`);
+    check('each beat the plate presses on reaches the VJ app, one for one', plate >= KICKS && Math.abs(ones - plate) <= 1,
+      `${ones} beats sent, ${plate} kicks on the plate in ${took} s (waits for ${KICKS}, up to 60 s)`);
   } else {
     console.log('skip  the plate\'s own beats to the VJ app — no plate presses on a kick without a GPU (the Mac, or OSCOUT_PLATE=1)');
   }

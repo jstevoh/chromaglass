@@ -23,11 +23,10 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - ~~**QA-31** The closeup is "even bouncier and twitchier than before": it punches, pumps
   and shivers with the music at Frame Sway 0 (the owner, 2026-10-11).~~ Shipped; story in
   `docs/plan-shipped.md` §QA-31 (moved 2026-10-29, 19m).
-
 - ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
-  black/empty" (the owner, 2026-10-29, with a screenshot).~~ **Fixed, #575**: the closeup
-  comes in on the nearest liquid when its aim shows none (`npm run closeupland`). Story in
-  `docs/plan-shipped.md` §QA-32.
+  black/empty" (the owner, 2026-10-29, with a screenshot; asked again 2026-11-14).~~
+  **Fixed**: the closeup comes in on the nearest liquid when its aim shows none
+  (`npm run closeupland`). Story in `docs/plan-shipped.md` §QA-32.
 - **QA-32a** A held closeup whose frame empties while it is in (the pool flows out of it,
   Evolve thins it, a finger sweeps it) stays on the glass: Hold holds, by design, and only
   coming in lands (QA-32). Follow rides the liquid instead. Whether Hold should step to the

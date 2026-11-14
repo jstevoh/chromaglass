@@ -17,6 +17,7 @@
 
 import { Disposer, PipelineCache, type Prep, layoutEntries, layoutFromWgsl, type RenderRecipe } from './kit';
 import type { Opening } from './opening';
+import type { AirGeo } from './air';
 import { UniformPack } from './uniforms';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
@@ -26,6 +27,11 @@ import { groupOf, viewOf } from './groupCache';
 import { DROP_KERNELS } from './wgsl/ferroDrop';
 import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
+import { BEAD_FLOATS } from '../lib/beadPack';
+import { soapFilmLut } from '../lib/soapFilm';
+import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
+import { drawTank } from './tankDraw';
+import type { TankPlateField } from './tankPlate';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -123,6 +129,8 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
 
 export class WebGPUPlate {
   private readonly disposer = new Disposer();
+  // Hands a buffer a draw makes to the disposer (the tank's arguments, tankDraw.ts): one function, not one a frame.
+  private readonly trackBuf = (b: GPUBuffer): GPUBuffer => this.disposer.track(b);
   private readonly pipelines: PipelineCache;
   private readonly sampler: GPUSampler;
   private readonly uniformBuffer: GPUBuffer;
@@ -134,6 +142,8 @@ export class WebGPUPlate {
   readonly drop: FerroDrop;
   /** The oil beads' mask, drawn here from their list rather than uploaded as a picture (PLAN 14ab-6). */
   readonly beads: BeadMask;
+  /** Glitter in the liquid, the lens photographing it, the side lamp (PLAN 47e, 47d, 47b-side): a pass after the display, when asked for. */
+  readonly glint: PlateGlint;
 
   private layers: LayerTargets[] = [];
   private sources = new Map<string, Source>();
@@ -154,6 +164,19 @@ export class WebGPUPlate {
   private readonly blank: GPUTexture;
   /** The same, for the packed view (unsigned integers). */
   private readonly blankU: GPUTexture;
+  /**
+   * The frame's soap film (PLAN 32d): a 16-byte stand-in bound where no layer
+   * holds a film (the shader reads its length, 4, and draws nothing), and the
+   * film's reflected colour by thickness (soapFilmLut), made the first time a
+   * film is drawn. Storage buffers, not textures: the display pass already
+   * samples WebGPU's sixteen.
+   */
+  private readonly blankStore: GPUBuffer;
+  private soapLut: GPUBuffer | null = null;
+  private readonly blankList: GPUBuffer;
+  /** No bead list: args with S 0 (the plate reads the beads' picture), and one empty bead to bind. */
+  private readonly blankBeadArgs: GPUBuffer;
+  private readonly blankBeads: GPUBuffer;
   /** The same, for the species field (rgba32float). */
   private readonly blankSpecies: GPUTexture;
 
@@ -171,9 +194,14 @@ export class WebGPUPlate {
       // in this order, and it is the longest compile of the show's opening
       // (`gpu/prepare.ts`).
       cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
-      ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
+      ...(['packDye', 'packDyeBodies', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
+      // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
+      ...PlateGlint.prepare(cache, device, format, picture),
+      // And the display it draws under, flipped into its half-float picture (unless that is one of the two below).
+      ...(format === GLINT_SCENE_FORMAT || picture === GLINT_SCENE_FORMAT ? []
+        : [cache.renderPrep(displayName(GLINT_SCENE_FORMAT, true), displayRecipe(device, GLINT_SCENE_FORMAT, true), true)]),
       // Into a texture rather than the canvas: the camera's, in the canvas's
       // format, and the film stock's picture.
       ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
@@ -186,6 +214,7 @@ export class WebGPUPlate {
     this.pack = new UniformPack(PLATE_LAYOUT);
     this.drop = new FerroDrop(device, this.pipelines, this.disposer);
     this.beads = new BeadMask(device, this.pipelines, this.disposer);
+    this.glint = new PlateGlint(device, this.pipelines, this.disposer);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
@@ -203,11 +232,16 @@ export class WebGPUPlate {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     }));
     device.queue.writeTexture({ texture: this.blank }, new Uint8Array(4), { bytesPerRow: 4 }, [1, 1]);
+    // No bubbles: an empty list the plate's bubble lookup never indexes (no texel of a blank field names one).
+    this.blankList = this.disposer.track(device.createBuffer({ label: 'blank list', size: 16, usage: GPUBufferUsage.STORAGE }));
+    this.blankBeadArgs = this.disposer.track(device.createBuffer({ label: 'blank bead args', size: 16, usage: GPUBufferUsage.UNIFORM }));
+    this.blankBeads = this.disposer.track(device.createBuffer({ label: 'blank beads', size: BEAD_FLOATS * 4, usage: GPUBufferUsage.STORAGE }));
     this.blankU = this.disposer.track(device.createTexture({
       label: 'blank u', size: [1, 1], format: 'rgba32uint',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     }));
     device.queue.writeTexture({ texture: this.blankU }, new Uint32Array(4), { bytesPerRow: 16 }, [1, 1]);
+    this.blankStore = this.disposer.track(device.createBuffer({ label: 'plate blank store', size: 16, usage: GPUBufferUsage.STORAGE }));
     this.blankSpecies = this.disposer.track(device.createTexture({
       label: 'blank species', size: [1, 1], format: 'rgba32float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
@@ -319,7 +353,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -335,7 +369,23 @@ export class WebGPUPlate {
     const grid = fields[0].dye.width;
     this.ensureLayers(fields.length, grid);
     this.drawBeads(encoder);
+    /*
+      The lens pass (gpu/glint.ts), when Glitter or Side Light is up and its
+      pipelines and the flipped display's are there: the display then draws
+      into the pass's own picture without its finish, and the pass lays the
+      finish (lensFinish, which fillPlateUniforms sets to what the display's
+      would have been). Otherwise not a byte of this frame differs.
+    */
+    const wanted = PlateGlint.wanted(this.pack);
+    const lensOn = wanted
+      && this.glint.ready(format, toTexture, this.pack.get('glitter')[0] > 0.001)
+      && !!this.pipelines.renderPipeline(displayName(GLINT_SCENE_FORMAT, true), displayRecipe(this.device, GLINT_SCENE_FORMAT, true));
+    // Both dials back at 0: the pass's pictures and flakes go (a 4K frame's two are about 100 MB).
+    if (!wanted && this.glint.holding) this.glint.release();
+    const finish = this.pack.get('finishInMain')[0];
+    if (lensOn) this.pack.set('finishInMain', 0);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
+    if (lensOn) this.pack.set('finishInMain', finish);
     // The pack's one number is the grid, which changes with a rung and not
     // with a frame: written when it does, not sixty times a second (14ab-5).
     if (grid !== this.packGrid) {
@@ -366,10 +416,22 @@ export class WebGPUPlate {
       }
     }
     for (let i = 0; i < fields.length; i++) {
-      const pipeDye = this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
+      /*
+        Where the oil carries its own colour (Oil Bodies), a cell part oil
+        and part water lets through the two liquids' light side by side, not
+        one through the other (packDyeBodies, PLAN 47z-1). The oil's share
+        and the mix are on the dye's grid (bodyPartition reads all three).
+      */
+      const { oilDye, mix } = fields[i];
+      const bodies = !!oilDye && !!mix && oilDye.width === fields[i].dye.width && mix.width === fields[i].dye.width;
+      const pipeDye = bodies
+        ? this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies)
+        : this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
       if (pipeDye) {
         packPass.setPipeline(pipeDye);
-        packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, this.layers[i].dye]));
+        packPass.setBindGroup(0, groupOf(this.device, pipeDye, bodies
+          ? [this.packArgs, fields[i].dye, oilDye!, mix!, this.layers[i].dye]
+          : [this.packArgs, fields[i].dye, this.layers[i].dye]));
         packPass.dispatchWorkgroups(groups, groups);
       }
       if (i === 0 && height) continue;
@@ -412,6 +474,13 @@ export class WebGPUPlate {
       this.auxSize = [size.width, size.height];
     }
 
+    // The tank's side view (PLAN 47n) draws in the plate's place when its look is up.
+    if (drawTank(this.device, this.pipelines, encoder, target, viewOf(this.aux), fields[0]?.tank, size, timestamps, toTexture, format, this.trackBuf)) return;
+    if (lensOn) {
+      this.display(encoder, this.glint.sceneView(size.width, size.height), viewOf(this.aux), this.uniformBuffer, fields, timestamps, true, GLINT_SCENE_FORMAT);
+      this.glint.run(encoder, target, toTexture, format, this.pack, this.uniformBuffer, this.sampler, this.aux, this.layers[0].vel, this.source('mark'));
+      return;
+    }
     this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, fields, timestamps, toTexture, format);
   }
 
@@ -442,7 +511,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -457,7 +526,9 @@ export class WebGPUPlate {
       }));
       this.sourceAuxSize = [size.width, size.height];
     }
-    this.display(encoder, target, viewOf(this.sourceAux), set.buffer, fields, timestamps, true, format);
+    if (!drawTank(this.device, this.pipelines, encoder, target, viewOf(this.sourceAux), fields[0]?.tank, size, timestamps, true, format, this.trackBuf)) {
+      this.display(encoder, target, viewOf(this.sourceAux), set.buffer, fields, timestamps, true, format);
+    }
   }
 
   /** Let go of the sources no projector shows any more (their buffers are small; the aux is not). */
@@ -473,7 +544,7 @@ export class WebGPUPlate {
     target: GPUTextureView,
     auxView: GPUTextureView,
     uniforms: GPUBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -492,6 +563,12 @@ export class WebGPUPlate {
     const air = (i: number) => fields[i]?.air ?? this.blank;
     // The front plate's physics, packed (packView), or zeros before a step has run.
     const view = (i: number) => fields[i]?.view ?? this.blankU;
+    const soap = fields[0]?.soapFilm?.h ?? null;
+    if (soap && !this.soapLut) {
+      const lut = soapFilmLut();
+      this.soapLut = this.disposer.track(this.device.createBuffer({ label: 'soap film colour', size: lut.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
+      this.device.queue.writeBuffer(this.soapLut, 0, lut);
+    }
     const pass = encoder.beginRenderPass({
       label: 'plate',
       colorAttachments: [
@@ -503,12 +580,18 @@ export class WebGPUPlate {
       timestampWrites: timestamps,
     });
     pass.setPipeline(display);
+    const rings = this.beads.rings;
     pass.setBindGroup(0, groupOf(this.device, display, [
       uniforms, this.sampler,
       one.dye, two.dye, one.derived, two.derived, one.vel, two.vel,
       grain(0), grain(1),
       this.source('film'), this.source('mark'), this.source('beads'),
       parts(0), parts(1), air(0), air(1), view(0),
+      soap ?? this.blankStore, (soap && this.soapLut) || this.blankStore,
+      // The lead plate's bubbles as its air was stamped (38h-15); the back plate carries none.
+      fields[0].airGeo?.discs ?? this.blankList, fields[0].airGeo?.rims ?? this.blankList,
+      // The rings' list the beads' mask was drawn from, read at the screen's resolution (38h-17).
+      rings?.args ?? this.blankBeadArgs, rings?.beads ?? this.blankBeads, rings?.tiles ?? this.blankList,
     ]));
     pass.draw(6);
     pass.end();

@@ -2,7 +2,6 @@ import type { VisualizerSettings } from '../types';
 import type { SongSection } from './songShape';
 import { THEMES, moveTargets } from './drift';
 import { stream } from './rng';
-import { macroZoomOf } from '../sim/constants';
 
 /**
  * Evolve's timing: one slow move at a time, steered by the song over minutes.
@@ -339,7 +338,7 @@ export class SlowEvolve {
         }
         seconds *= (1.15 - 0.3 * PACE_PIVOT) * (0.88 + 0.24 * this.rand());
         const move: EvolveMove = { theme: t.name, to, seconds: pace * clamp(seconds, GLIDE_MIN, GLIDE_MAX), lean: this.lean, cue };
-        if (macroZoomOf(current) > 1.05 && (current.macroCamera ?? 'hold') !== 'auto') {
+        if ((current.macroZoom ?? 1) > 1.05 && (current.macroCamera ?? 'hold') !== 'auto') {
           /*
             The camera never goes faster than at the default, however fast the
             dial: a quick move is a shorter step of the aim over a shorter
