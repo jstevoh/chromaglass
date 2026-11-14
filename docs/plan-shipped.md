@@ -13824,6 +13824,39 @@ Garden read as scattered specks at this size and is left off too.
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
 
+## 12-tv-2f. The TV's samples are the channel's films, and the logo on its loading screen (2026-11-14)
+
+Asked by the owner on 2026-11-14: "Let's add the logo to the loading screen for the
+app. Also, I don't like the visuals that we have as samples. Can we play the YouTube
+videos as samples? If not YouTube, let's get much better and longer samples."
+
+The samples were the press page's two clips (twenty seconds each of Neon Coral Reef
+and Ferro Paint to Kevin MacLeod, cut on 2026-10-29). They are now the channel's six
+films of 1920s records (PLAN 34a-6), each a look playing a whole record, about nineteen
+minutes round, in the Android TV app's "Watch a sample film" and on the `/tv` page
+while the show is off. Not YouTube's player: inside a TV app's WebView it may refuse
+to play an embed or put an advert first, and this app's WebView loads only the Mac's
+page. The files are the channel's own masters, copied with their index first and no
+re-encode by `npm run tvfilms` on the Mac that rendered them, into a pre-release of the
+repository (`tv-films-1`, never "latest", so the Mac app's updater never reads it); the
+site's `/films/<id>.mp4` redirects there (firebase.json), and the app and page name only
+the site's address, so the films can move with one line and no new TV app.
+`src/lib/tvFilms.ts` is the list, `Sample.java` the app's copy, which `npm run
+presskit` holds the same. A film that will not play is skipped, and when all six fail
+(no internet) the app says so and the page shows the logo.
+
+The logo is the brand's own mark (`res/drawable-nodpi/logo.png`, the same file as
+`public/brand/chromaglass-logo-512.png`): it heads the app's list while it looks for a
+Mac, covers the screen while the show's page or a sample film loads (the WebView and the
+player are black until their first frame), and heads the `/tv` page's pairing digits
+and its line at the bottom. The screen's colour is the logo square's own blue.
+
+Checks: `npm run tv` (the page asks for the site's first film and plays it, answered
+in the harness with a real MP4; the show server serves the logo), `npm run presskit`
+(the app's list is the page's, the redirect is there and nothing in public/ shadows
+it), `npm run tvfilms -- --probe` (the live site serves all six, index first), and the
+TV app's unit tests (six films, each from the site, each saying what it plays).
+
 ## 12-tv-signin. A TV signs in by a short code (2026-11-08)
 
 A TV receiver (12-tv route 2, 12-tv-apple) has no keyboard worth typing a password
