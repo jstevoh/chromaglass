@@ -425,16 +425,29 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   GitHub's Macs at once (`npm run macguard`). Recovery that night: the deploy run by hand
   with `hosted`. **19ah-9a** built below. **19ah-9b** shipped 2026-11-14
   (`docs/plan-shipped.md`): startup waits for the half behind the show while the app says
-  its builds still come in, and that half builds two at a time. Open: **19ah-9c**, below.
+  its builds still come in. Its two build lanes behind the show went back to one the same
+  day (19ah-9d). Open: **19ah-9c** and **19ah-9d**, below.
 - **19ah-9c. Open: a look changed to while the half behind the show is building.** That
   half is 113 builds now (it was fifty-odd in October), and until it is done a look that
   needs one of them builds it on the frame, the freeze `gpu/prepare.ts` exists to take
-  away. On GitHub's Macs it took 28 to 46 s one at a time; 19ah-9b builds it two at a
-  time. No check changes look inside that window: startup's "no pipeline was built on a
+  away. On GitHub's Macs it took 28 to 46 s one at a time (23 to 30 s two at a time, before
+  19ah-9d took that back). No check changes look inside that window: startup's "no pipeline was built on a
   frame" changes looks only once the half is done. Wanted: the half's time on the owner's
   Mac after 19ah-9b (startup's line prints its pace against the opening's), a look change
   at a few seconds into the half to see what it costs, and whether the half should be
   asked in the order looks are likeliest to need it (the set list's next look first).
+- **19ah-9d. Open: two looks' first seconds tip the slosh dish their opening never waits
+  for.** On main's deploy 835 (run 43637957389, the owner's Mac), with the half behind the
+  show built two at a time (#861), startup's "every look opens on only what the show waited
+  for" went red: Fractal Dream and Velvet Underground each asked, inside their first three
+  seconds, for `slosh/sloshOil`, `sloshRest`, `sloshStep`, `sloshOut` and
+  `fluid/addSlosh:rgba16float`. `openingOf`'s `slosh` is false for both (their settings do
+  not tip the dish), so the five sit on the behind list; the dish waits for them, so nothing
+  built on a frame, but the faster half finished them inside the window. The same race as
+  18a-13i (Bass Drop, #571). LATER_LANES went back to 1 the same day to keep main green.
+  Wanted: find what tips the dish in those looks' first seconds (a cord, a patch on the
+  kick, a sway) and name it in `openingOf`, so each look's opening covers what it drives;
+  then two lanes again (`gpu/prepare.ts` LATER_LANES), with startup's frame line watching.
 - **19ah-9a. Built: work begun mid-shard waits for the deploy, or hands it back.** Main's
   deploy of 2026-11-08 began its Mac shards at 18:16Z, each past its first look, and then
   sessions began GPU work on the Mac: filming the hero, `lampzero.mjs`, `renders.mjs` in

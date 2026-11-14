@@ -39,7 +39,7 @@
  * three, so waiting for every look's opening would have saved almost
  * nothing either. So the show waits for what its own look opens with (the
  * forty-three and what `gpu/opening.ts` says the look turns on) and builds
- * the rest behind it, two at a time (LATER_LANES), once it is up. Behind the show a
+ * the rest behind it, one at a time (LATER_LANES), once it is up. Behind the show a
  * compile should cost frames rather than stop them, as it did the starting
  * frame; `npm run startup` watches the first ten seconds of steps to see.
  *
@@ -202,7 +202,7 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
  * wait for a frame anywhere in the opening was 0.67 s, under the 2 s an
  * audience would see. Three is the next step toward all at once's 0.12 s,
  * still waiting behind no more than three compiles (about 0.7 s). The half
- * built behind the show takes two (LATER_LANES, below).
+ * built behind the show takes one (LATER_LANES, below).
  *
  * `?lanes=N` (1 to 8) changes it, from the query string alone, so a machine
  * can be timed both ways: `?lanes=1` is the old opening.
@@ -214,8 +214,9 @@ const OPENING_LANES = (() => {
 })();
 
 /**
- * How many of the half built behind the show are in flight at once: two,
- * one render pipeline among them at most (`renderBusy` in `buildInTurn`).
+ * How many of the half built behind the show are in flight at once: one
+ * (with more, one render pipeline among them at most: `renderBusy` in
+ * `buildInTurn`).
  *
  * It was one, on the reasoning that a compile there costs the running show
  * frames and nobody is waiting. But somebody is: a look changed to before
@@ -225,16 +226,25 @@ const OPENING_LANES = (() => {
  * Macs, 10 to 14 November): the half has grown to 113 builds, and one at a
  * time it took 28 to 46 s, about 0.38 s a build (42.84 s on run
  * 43570470863), against 0.13 s a build for the opening's 67 three at a
- * time on the same runner (8.91 s). Two at a time cut the opening's own
- * time by a fifth (above), and a compute compile is answered off the GPU
- * process's main thread (Dawn's async pipelines), so a second one in hand
- * keeps the compiler busy while the page waits on the first's answer
- * without holding the frames; the one render pipeline at a time stays,
- * since those do queue in the GPU process (`buildInTurn`). Whether it
- * costs frames is startup's to say: its "no stop ... while the rest was
- * built behind it" watches every build of this half.
+ * time on the same runner (8.91 s).
+ *
+ * So it was two at a time for a day (#861): 23 to 30 s on GitHub's Macs,
+ * 13.5 s on the owner's, with no stop behind the show. And back to one,
+ * because a faster half shows looks asking for what their opening never
+ * waited for. On main's deploy 835 (run 43637957389, the owner's Mac)
+ * startup's "every look opens on only what the show waited for" went red:
+ * Fractal Dream and Velvet Underground each asked, in their first three
+ * seconds, for the slosh dish's four kernels and `fluid/addSlosh`. Neither
+ * look's settings tip the dish at opening (`openingOf`'s `slosh`), so the
+ * kernels sit on this half's list; the dish waits for them, so nothing was
+ * built on a frame, but with two lanes they were built inside the window
+ * and the dish, tipped by something in those looks' first seconds, started
+ * and asked. That is 18a-13i's race again (Bass Drop, #571): the lists are
+ * short of what a look's first seconds drive, and how fast this half runs
+ * only decides whether startup sees it. Two lanes come back once those
+ * looks' openings name what tips their dish (PLAN 19ah-9d), not before.
  */
-const LATER_LANES = 2;
+const LATER_LANES = 1;
 
 /**
  * `builds`, `lanes` at a time (above), until they are done, the device is

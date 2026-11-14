@@ -73,7 +73,7 @@ export function waitBehind(page) {
   the runner's own pace and not to a clock, which a slower runner moved the
   red past. What was read: one at a time the half took 0.38 s a build
   against the opening's 0.13 s three at a time (2.9x, run 43570470863);
-  two at a time (LATER_LANES) it should take less. Six times catches a half
+  two at a time (LATER_LANES, for a day) 1.1 to 1.5x. Six times catches a half
   held behind something it should not be (a lane serialised behind the
   frames, a compile per frame) with room for a runner's noise.
 */

@@ -5184,9 +5184,9 @@ by `pipelinesSeen` (`chromaglassDebug().pipelines().progress`). `scripts/startup
 half's record, on no build settled for the app's cap and 5 s, on a half that never began in
 the old 45 s, or at 180 s in all, a bound only against holding a runner for good. The line
 now says how far an unfinished half got instead of "nothing built behind it", and prints
-the half's pace (ms a build) beside the opening's. And the half builds two at a time
-(LATER_LANES), one render pipeline among them at most: how long it takes is how long a look
-changed to can build on the frame (19ah-9c). The 45 s wait had been, in effect, the only
+the half's pace (ms a build) beside the opening's. And the half built two at a time
+(LATER_LANES) for a day, 23 to 30 s on GitHub's Macs: back to one when a faster half showed
+two looks asking for slosh kernels their opening never waited for (19ah-9d, deploy 835). The 45 s wait had been, in effect, the only
 thing that made a slow half red, so the line now holds the half's pace instead, to the
 runner's own: at most six times the opening's ms a build (BEHIND_PACE_MAX; it read 2.9x one
 at a time), and both halves must have asked for something (a record missing its fields had
