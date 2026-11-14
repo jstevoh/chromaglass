@@ -13,7 +13,7 @@
   How hard it lands is the height it fell (Drop Height, `dropHeight`): the
   crater it presses, and whether it splashes at all. A splash, a crown that
   throws satellites, needs K = We·Oh^−0.4 past Cossali's threshold, a fall of
-  about a quarter of a metre (`dropImpact`); below it, nothing is thrown.
+  about 0.2 m for a 5 mm drop (`dropImpact`); below it, nothing is thrown.
   Before, any drop with an impact over 0.02 threw a random handful.
 
   And the ring of outward velocity the splash added round the drop is gone:

@@ -29,7 +29,8 @@
  *      falls to under WINDOW of what it was
  *   3. what left the window was pushed, not deleted: the dish's whole red is
  *      kept to KEEP, and the pool's mean r² (its red's) grows by R², within
- *      PUSH. Between two glasses a volume πR²h poured at the middle moves
+ *      PUSH, past what the control's grows (which must be under CALM R²:
+ *      the carry's spreading and the dye's ceiling are not a push). Between two glasses a volume πR²h poured at the middle moves
  *      every circle of the liquid round it from r to √(r² + R²), so every
  *      bit of the pool's r² grows by exactly R² (as `npm run flush`'s ring
  *      does). A collar's gain over a fixed ring does not measure it: on an
@@ -42,18 +43,22 @@
  *      before) leaves the pool's red at the middle over CONTROL of what it
  *      was, so 2 to 5 are the volume's doing. Not 1: a stamp this heavy
  *      meets the dye's ceiling, which takes a little off every channel
- *      (0.86 measured), but it opens no window (the drop's is 0.05).
+ *      (0.86 measured), but it opens no window (the drop's is 0.05). And
+ *      the other way round: a clear drop (volume, no dye) through the same
+ *      queue opens the window to under WINDOW as well, so it is the volume.
  *
  * And in node, on the sim's own layDrop with a stand-in plate:
  *
- *   7. a drop from 15 cm (Drop Height 0.5) throws nothing (K under Cossali's
- *      threshold) and lays no velocity at all (the ring kick is gone); from
- *      30 cm (Drop Height 1) twenty drops throw satellites
- *   8. the crown's fingers (Bhola and Chandra) number 12 to 16 at 10 cm and
- *      19 to 25 at 20 cm, the reference's about 20 between
- *   9. a queued drop delivers its whole volume: the shares × r² it pours
- *      sum to the drop's W to 0.1%; and the music's trickle falls as one
- *      drop when it has a drop's worth (Tate), not every frame
+ *   7. a drop of amount 5 (5.1 mm) from Drop Height 0.66 throws nothing (K
+ *      under Cossali's threshold, 0.673 by hand) and lays no velocity at all
+ *      (the ring kick is gone); from 0.69 twenty drops throw satellites
+ *   8. the crown's fingers (Bhola and Chandra) for that drop, worked by hand
+ *      (We 138.7 and Re 7130 at 10 cm: 15.6; We 277 and Re 10080 at 20 cm:
+ *      24.1), are 15 to 17 and 23 to 25, the reference's about 20 between
+ *   9. a queued drop is poured in its schedule's steps, each its share, and
+ *      lays the stamp's whole dye, at the middle and against the plate's
+ *      edge alike; and the music's trickle falls as one drop when it has a
+ *      drop's worth (Tate), not every frame
  *
  * Measured (SwiftShader, 2026-11-14): see the commit that added it.
  */
@@ -71,7 +76,7 @@ const AMOUNT = 30;            // a big drop, so its window is cells across on a 
 const POOL = [1.8, 0.3, 0.1]; // cyan: absorbances, taking red
 const DROP = [1, 1, 0.1];     // yellow: a bottle's rgb, taking blue
 const SETTLE = 12, HOLD_STEPS = 90;
-const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], HOLD = 0.35, OWN = 0.4, CONTROL = 0.6;
+const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, OWN = 0.4, CONTROL = 0.6;
 
 // ── 7–9, in node, first: quick, and they need no adapter ──
 {
@@ -96,7 +101,8 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], HOLD = 0.35, OWN = 0.4, CON
     return p;
   };
   const thrown = (p, x, y, reach) => p.laid.filter(([i, j]) => Math.hypot(i - x, j - y) > reach).length;
-  const low = plate(0.5), high = plate(1);
+  const LOW = 0.66, HIGH = 0.69;
+  const low = plate(LOW), high = plate(HIGH);
   let lowThrown = 0, highThrown = 0;
   for (let k = 0; k < 20; k++) {
     D.layDrop(low, 96, 96, 5, 1, 1, 0.1, 1, true);
@@ -105,25 +111,32 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], HOLD = 0.35, OWN = 0.4, CON
   // The drop's own disc (and its contact patch) is inside 1.4 of its widest radius; a satellite lands past it.
   const reach = 1.4 * Math.round(3 * 1.5 * (1 + 0.6 * 1.5));
   lowThrown = thrown(low, 96, 96, reach); highThrown = thrown(high, 96, 96, reach);
-  const iL = D.dropImpact(5, 0.5), iH = D.dropImpact(5, 1);
-  check('7. a drop from 15 cm throws nothing and lays no velocity; from 30 cm it splashes',
+  const iL = D.dropImpact(5, LOW), iH = D.dropImpact(5, HIGH);
+  check(`7. a drop from Drop Height ${LOW} throws nothing and lays no velocity; from ${HIGH} it splashes`,
     !iL.splashes && lowThrown === 0 && low.vel === 0 && iH.splashes && highThrown > 0,
-    `15 cm: K ${iL.K.toFixed(0)} against ${iL.Kc.toFixed(0)}, ${lowThrown} cells thrown, ${low.vel} velocity writes; 30 cm: K ${iH.K.toFixed(0)}, ${highThrown} cells thrown`);
+    `${LOW}: K ${iL.K.toFixed(0)} against ${iL.Kc.toFixed(0)}, ${lowThrown} cells thrown, ${low.vel} velocity writes; ${HIGH}: K ${iH.K.toFixed(0)}, ${highThrown} cells thrown`);
   const f10 = D.dropImpact(5, 0.1 / D.DROP_HEIGHT_METRES).fingers, f20 = D.dropImpact(5, 0.2 / D.DROP_HEIGHT_METRES).fingers;
-  check('8. the crown has 12 to 16 fingers at 10 cm and 19 to 25 at 20 cm (Bhola and Chandra)',
-    f10 >= 12 && f10 <= 16 && f20 >= 19 && f20 <= 25, `${f10} and ${f20}`);
-  const q = plate(0);
-  D.layDrop(q, 96, 96, AMOUNT, 1, 1, 0.1, 1, true);
-  let guard = 0;
-  while (D.dropsLive(q.drops) && guard++ < 50) D.stepPlateDrops(q);
-  const W = (AMOUNT / D.DROP_AMOUNT) * D.DROP_DISC * D.DROP_DISC;
-  const got = q.pours.reduce((s, p) => s + p.share * p.r * p.r, 0);
+  check('8. the crown has 15 to 17 fingers at 10 cm and 23 to 25 at 20 cm (Bhola and Chandra, by hand 15.6 and 24.1)',
+    f10 >= 15 && f10 <= 17 && f20 >= 23 && f20 <= 25, `${f10} and ${f20}`);
+  // The dye the stamp laid: (1 − d/R)² over 3 · GRID_SCALE cells, amount at its middle.
+  const R0 = Math.round(3 * 1.5);
+  let m0 = 0; for (let j = -R0; j <= R0; j++) for (let i = -R0; i <= R0; i++) { const dd = Math.hypot(i, j); if (dd <= R0) m0 += (1 - dd / R0) ** 2; }
+  const sch = D.dropSchedule(AMOUNT, 192);
+  const pourAt = (x) => {
+    const q = plate(0);
+    D.layDrop(q, x, 96, AMOUNT, 1, 1, 0.1, 1, true);
+    let guard = 0;
+    while (D.dropsLive(q.drops) && guard++ < 50) D.stepPlateDrops(q);
+    return { n: q.pours.length, shares: q.pours.every((p) => Math.abs(p.share - sch.share) < 1e-6 && Math.abs(p.r - sch.radius) < 1e-6), dye: q.laid.reduce((s, l) => s + l[2], 0) };
+  };
+  const mid = pourAt(96), edge = pourAt(2), want = m0 * AMOUNT;
   const t = plate(0);
   let firstFall = -1;
   for (let k = 0; k < 200 && firstFall < 0; k++) { D.layDrop(t, 96, 96, 0.05, 1, 1, 0.1, 1, true); if (D.dropsLive(t.drops)) firstFall = k; }
-  check('9. a drop pours its whole volume, and the trickle falls as one drop when it has a drop\'s worth',
-    Math.abs(got / W - 1) < 1e-3 && q.pours.length >= D.DROP_STEPS_MIN && firstFall > 0 && Math.abs((firstFall + 1) * 0.05 - D.DROP_TATE) < 0.051,
-    `poured ${(got / W).toFixed(4)} of W over ${q.pours.length} steps; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE})`);
+  check('9. a drop pours in its schedule and lays all its dye, middle and edge, and the trickle falls as one drop when it has a drop\'s worth',
+    mid.n === sch.steps && mid.shares && edge.n === sch.steps && Math.abs(mid.dye / want - 1) < 1e-3 && Math.abs(edge.dye / want - 1) < 1e-3
+      && firstFall > 0 && Math.abs((firstFall + 1) * 0.05 - D.DROP_TATE) < 0.051,
+    `${mid.n} pours of ${sch.share.toFixed(3)} (schedule ${sch.steps}); dye laid ${(mid.dye / want).toFixed(4)} of the stamp's at the middle, ${(edge.dye / want).toFixed(4)} at the edge; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE})`);
 }
 
 // ── 1–6, on the solver ──
@@ -150,9 +163,9 @@ try {
     let m = 0; for (let j = -R0; j <= R0; j++) for (let i = -R0; i <= R0; i++) { const dd = Math.hypot(i, j); if (dd <= R0) m += (1 - dd / R0) ** 2; }
     const mass = m * AMOUNT;
     await pool();
-    const R = Math.sqrt((AMOUNT / 5) * (4.5 / 192) ** 2 / 2);
-    const before = await read(R);
     const s = lab.drop(0.5, 0.5, AMOUNT, DROP, mass);
+    const R = s.window;
+    const before = await read(R);
     await lab.step(s.steps + SETTLE, STILL);
     const after = await read(R);
     await lab.step(HOLD_STEPS, STILL);
@@ -173,23 +186,31 @@ try {
     lab.addDye(ctl); lab.flush();
     await lab.step(s.steps + SETTLE, STILL);
     const cAfter = await read(R);
-    return { s, R, before, after, held, own, cBefore, cAfter };
+    // A clear drop: the same volume through the same queue, no dye.
+    await pool();
+    const kBefore = await read(R);
+    lab.drop(0.5, 0.5, AMOUNT, DROP, 0);
+    await lab.step(s.steps + SETTLE, STILL);
+    const kAfter = await read(R);
+    return { s, R, before, after, held, own, cBefore, cAfter, kBefore, kAfter };
   }, { N, AMOUNT, POOL, DROP, SETTLE, HOLD_STEPS });
-  const { s, R, before, after, held, own, cBefore, cAfter } = r;
+  const { s, R, before, after, held, own, cBefore, cAfter, kBefore, kAfter } = r;
   const f = (v, d = 3) => v.toFixed(d);
   console.log(`   the drop: ${s.steps} steps of ${f(s.share)} through ${f(s.radius * N, 1)} cells; its window ${f(R * N, 1)} cells`);
   check('1. the pool is laid', before.mid > 1, `red ${f(before.mid)} at the middle`);
   check(`2. the window opens: the pool's red in its middle under ${WINDOW} of what it was`, after.mid < WINDOW * before.mid,
     `${f(before.mid)} → ${f(after.mid)} (${f(after.mid / before.mid)})`);
-  const grew = (after.r2 - before.r2) / (R * R);
-  check(`3. pushed, not deleted: the dish's red kept to ${KEEP * 100}%, the pool's mean r² grows by R² (${PUSH[0]} to ${PUSH[1]})`,
-    Math.abs(after.tot / before.tot - 1) < KEEP && grew >= PUSH[0] && grew <= PUSH[1],
-    `dish ${f(after.tot / before.tot, 4)}; mean r² grew by ${f(grew)} R²`);
+  const calm = (cAfter.r2 - cBefore.r2) / (R * R);
+  const grew = (after.r2 - before.r2) / (R * R) - calm;
+  check(`3. pushed, not deleted: the dish's red kept to ${KEEP * 100}%, the pool's mean r² grows by R² (${PUSH[0]} to ${PUSH[1]}) past the control's (under ${CALM})`,
+    Math.abs(after.tot / before.tot - 1) < KEEP && grew >= PUSH[0] && grew <= PUSH[1] && Math.abs(calm) < CALM,
+    `dish ${f(after.tot / before.tot, 4)}; mean r² grew by ${f(grew)} R² past the control's ${f(calm)}`);
   check(`4. it holds: ${HOLD_STEPS} steps later the middle is under ${HOLD}`, held.mid < HOLD * before.mid, `${f(held.mid)} (${f(held.mid / before.mid)})`);
   check(`5. the middle is the drop's colour: its blue at least ${OWN} of the drop's own, and more than the pool's red there`,
     after.midB >= OWN * own && after.midB > after.mid, `blue ${f(after.midB)} against the drop's ${f(own)} (${f(after.midB / own)}); red ${f(after.mid)}`);
-  check(`6. the control fails: the same dye stamped with no volume leaves the pool's red over ${CONTROL}`, cAfter.mid > CONTROL * cBefore.mid,
-    `${f(cBefore.mid)} → ${f(cAfter.mid)} (${f(cAfter.mid / cBefore.mid)})`);
+  check(`6. the volume does it: the same dye stamped with no volume leaves the pool's red over ${CONTROL}, a clear drop opens it under ${WINDOW}`,
+    cAfter.mid > CONTROL * cBefore.mid && kAfter.mid < WINDOW * kBefore.mid,
+    `stamp ${f(cBefore.mid)} → ${f(cAfter.mid)} (${f(cAfter.mid / cBefore.mid)}); clear drop ${f(kBefore.mid)} → ${f(kAfter.mid)} (${f(kAfter.mid / kBefore.mid)})`);
 } finally {
   await close();
 }

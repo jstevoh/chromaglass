@@ -42,10 +42,11 @@
   drop on a film of depth h splashes (throws a crown and satellites) or only
   spreads is Cossali, Coghe and Marengo's 1997 threshold on K = We·Oh^−0.4:
   above 2100 + 5880 (h/D)^1.44 it splashes, below it does not. For a 5 mm
-  water drop on 2 mm that is a fall of about a quarter of a metre: a dropper
-  held 10 to 20 cm over the dish, as in the reference, throws nothing. The
-  crown's fingers number √We·Re^¼/(4√3) (Bhola and Chandra 1999), 14 at
-  10 cm and 22 at 20 cm, against the reference's about 20.
+  water drop (amount 5) on 2 mm that is a fall of about 0.2 m, Drop Height
+  0.67: a dropper held 10 to 15 cm over the dish, as in the reference,
+  throws nothing. The crown's fingers number √We·Re^¼/(4√3) (Bhola and
+  Chandra 1999), 16 at 10 cm and 24 at 20 cm for that drop, against the
+  reference's about 20.
 
   Pure, so the sim (src/sim/fluidSimulation.ts), the lab
   (scripts/lab-entry.ts) and `npm run dropwindow` run the same numbers.
@@ -192,12 +193,17 @@ export function stepDrops(
     const dye = q[o + 5];
     if (dye > 0) {
       const rc = rp * N, R = Math.ceil(rc);
+      // Normalised over the cells it can land on, so a drop at the plate's
+      // edge lays all its dye rather than losing the part past the edge.
+      const cx = Math.round(x), cy = Math.round(y);
       let sum = 0;
-      for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) { const w = 1 - (i * i + j * j) / (rc * rc); if (w > 0) sum += w; }
       for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
-        const w = 1 - (i * i + j * j) / (rc * rc);
-        const px = Math.round(x) + i, py = Math.round(y) + j;
-        if (w > 0 && px > 0 && py > 0 && px < N - 1 && py < N - 1) lay(px, py, dye * w / sum, q[o + 6], q[o + 7], q[o + 8]);
+        const w = 1 - (i * i + j * j) / (rc * rc), px = cx + i, py = cy + j;
+        if (w > 0 && px > 0 && py > 0 && px < N - 1 && py < N - 1) sum += w;
+      }
+      for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+        const w = 1 - (i * i + j * j) / (rc * rc), px = cx + i, py = cy + j;
+        if (w > 0 && sum > 0 && px > 0 && py > 0 && px < N - 1 && py < N - 1) lay(px, py, dye * w / sum, q[o + 6], q[o + 7], q[o + 8]);
       }
     }
     q[o + 4]--;
