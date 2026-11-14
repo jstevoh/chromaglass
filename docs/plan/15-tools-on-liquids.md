@@ -240,20 +240,18 @@ Left, each its own plan item:
   the bead and rim drawing in the open bubble-outline work (38h-15, 38h-17) and at
   `depositBubbleRims`.
 
-- **15g-16 A gale blows the pool over the rim, and no check holds its colour on the way.**
-  At Amount 2.5 the jet's plume reaches the dish's rim from the middle of the plate, the
-  rim is open (what is carried past it leaves, `src/gpu/wgsl/fluid/dye.ts`), and a 1.5 s
-  stroke sent 36.17% of a pool's colour over it (`npm run airblow`, software; the disc's
-  gale moved the pool 14.6% and kept it all). That is the plate as built, and a real gale
-  does empty a dish, but `npm run airblow` check 6 could ask the gale to keep its colour
-  only while it stayed on the plate, and now asks only that it makes none. So a breath
-  that strong losing colour on the plate itself would go unseen. Two things to do: (a) a
-  lab plate with a wall at the rim, or a count of what the trough takes, so the gale's
-  colour is held to 0.5% again; (b) decide with the owner whether a breath should empty
-  the plate at all at the top of the Amount, or the rim should hold the liquid back as a
-  dish's wall does (the film piles there, 15g-3). Also seen and not looked into: under
-  the same default breath a pool with ferrofluid in it went 23.96% of the plate (the
-  ferrofluid 29.89%) where the colour alone went 13.07%.
+- **15g-16 A gale blows the pool over the rim.** At Amount 2.5 the jet's plume reaches the
+  dish's rim from the middle of the plate, the rim is open (what is carried past it
+  leaves, `src/gpu/wgsl/fluid/dye.ts`), and a 1.5 s stroke from the middle sent 36.17% of
+  a pool's colour over it (`npm run airblow`, software; the disc's gale moved the pool
+  14.6% and kept it all). The breath itself keeps the colour: the same gale started 0.2
+  of the plate along moved the pool 37.06% and kept it to 0.00%, which is what check 6
+  now holds. So this is the plate as built, and a real gale does empty a dish. For the
+  owner to decide: whether a breath should empty the plate at the top of the Amount, or
+  the rim should hold the liquid back as a dish's wall does (the film piles there,
+  15g-3). Also seen and not looked into: under the same default breath a pool with
+  ferrofluid in it went 23.96% of the plate (the ferrofluid 29.89%) where the colour
+  alone went 13.07%.
 
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 

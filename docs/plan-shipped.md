@@ -3194,9 +3194,12 @@ held breath 19.62 → 31.84 mm/s (0.37 → 0.61 of τh/2μ: the plume's liquid h
 back round, so the middle runs nearer the speed its own gap gives); a palm on 0.12 → 8.82
 mm/s, as far behind 0.12 → 0.86; a 1.5 s stroke across a pool moved its middle 2.72% →
 13.07% of the plate, colour kept (+0.00%). Check 1's band moved with the share
-(0.28–0.47 → 0.46–0.76, still a quarter either side); check 6's gale is now held against
-the stroke's own length, and no longer to keeping its colour, since it blows 36.17% of the
-pool over the dish's open rim (15g-16); check 7 is new (the plume ahead, not behind).
+(0.28–0.47 → 0.46–0.76, still a quarter either side) and its held Press is sixteen
+footprints, not eight, so the whole plume blows on pressed film (1.17 → 1.08 of what the
+gap gives); check 6's gale is held against the stroke's own length and starts 0.2 of the
+plate along, where it moved the pool 37.06% and kept its colour (from the middle it blew
+36.17% of the pool over the dish's open rim, 15g-16); check 7 is new (the plume ahead,
+not behind).
 
 On the Mac (the app, Metal, Foam Cells, the same hands before and after: two holds, three
 strokes, six quick presses, two short drags held): before, 160 straw steps and 265 of wind

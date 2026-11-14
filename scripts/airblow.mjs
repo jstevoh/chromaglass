@@ -321,8 +321,9 @@ try {
       and the flow it drives, goes as its square (PLAN.md QA-20). Measured
       in software along this stroke since the breath is a jet (PLAN.md
       15g-11): Amount 0.25 moved the pool 0.27% of the plate, 1 13.07% and
-      2.5 30.90% (0.085%, 2.72% and 14.6% while the stress landed in a disc
-      under the hand). The stroke is 16% long. So a gentle breath has to
+      2.5 37.06%, its colour kept (+0.00%), from where the gale starts
+      (0.085%, 2.72% and 14.6% while the stress landed in a disc under the
+      hand; a gale from the middle 30.90% with 36.17% gone over the rim). The stroke is 16% long. So a gentle breath has to
       move the pool under a tenth of what a firm one does; a firm one moves
       it, but less far than the hand went; and a gale sends it on ahead of
       the hand, further than the whole stroke and at least half as far
