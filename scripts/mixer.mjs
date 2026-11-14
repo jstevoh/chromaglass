@@ -31,7 +31,8 @@
  *      and the gel's and the lumia's do nothing while only the other is on
  *   5. the stack's own rules, without a GPU: a saved order that is garbage or
  *      short comes back as the six, nothing goes under the front plate but
- *      the lamp's three (the LED ring, the gel, the lumia), an order saved
+ *      the lamp's four (the LED ring, the gel, the lumia and, since PLAN
+ *      14ag-3, the video: `npm run videolamp` asks what it does there), an order saved
  *      before the gel and the lumia were rows keeps them in the lamp, and a
  *      pad that raises a source walks it through every place it can go and
  *      back to where it began
@@ -149,7 +150,9 @@ const check = (name, ok, detail = '') => {
 // ── 5. The stack's rules ────────────────────────────────────────────
 {
   const HOME = 'led gel lumia front back film mark';
-  const lamp = new Set(['led', 'gel', 'lumia']);
+  // The video joined the lamp's three (PLAN 14ag-3): a picture in the lamp
+  // house, the light panel a show sets its dish on (lib/mixer.ts).
+  const lamp = new Set(['led', 'gel', 'lumia', 'film']);
   const six = (o) => [...o].sort().join() === [...MIX_MOVERS].sort().join();
   const odd = ['', 'nonsense', 'film film film', 'mark, film > led', 42, null, 'back front led film mark', 'led back film mark'];
   check('a saved order that is garbage, short or repeated comes back as the six',
@@ -180,22 +183,23 @@ const check = (name, ok, detail = '') => {
     const st = mixStack(o);
     return st.indexOf(m) === st.indexOf('front') + 1 ? null : `${m}: ${st.join(' ')}`;
   }).filter(Boolean);
-  check('nothing but the LED ring, the gel and the lumia goes under the front plate', stuck.length === 0, stuck.join(' · '));
-  const passes = ['led', 'gel', 'lumia'].map(m => {
+  check('nothing but the LED ring, the gel, the lumia and the video goes under the front plate', stuck.length === 0, stuck.join(' · '));
+  const passes = ['led', 'gel', 'lumia', 'film'].map(m => {
     // Raised until it is just over the glass: one press past the front plate.
     // Bounded: a move that stopped moving would otherwise spin until the
-    // shard's timeout, and print nothing.
-    let o = HOME;
+    // shard's timeout, and print nothing. The film starts in the lamp,
+    // at its top, where the video's switch puts it; the others are there in HOME.
+    let o = m === 'film' ? 'led gel lumia film front back mark' : HOME;
     for (let k = 0; k < 7 && mixStack(o).indexOf(m) < mixStack(o).indexOf('front') - 1; k++) o = moveInMix(o, m, 1);
     const st = mixStack(moveInMix(o, m, 1));
     return st.indexOf(m) === st.indexOf('front') + 1 ? null : `${m}: ${st.join(' ')}`;
   }).filter(Boolean);
-  check('each of the lamp\'s three passes the front plate, out of the lamp', passes.length === 0, passes.join(' · '));
+  check('each of the lamp\'s four passes the front plate, out of the lamp', passes.length === 0, passes.join(' · '));
   check('and nothing moves off the top or the bottom',
     moveInMix(HOME, 'mark', 1) === HOME && moveInMix(HOME, 'led', -1) === HOME);
   // Pressed until the order comes back round: every row it can reach, then home.
-  // With the lamp's three under the glass the others have the three rows above
-  // the front plate; each of the lamp's three has all seven.
+  // The back plate and the logo have the three rows above the front plate;
+  // each of the lamp's four has all seven.
   const walks = MIX_MOVERS.map(m => {
     let o = HOME, presses = 0;
     const rows = new Set();

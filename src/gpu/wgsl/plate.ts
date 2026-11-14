@@ -36,6 +36,7 @@ import { BEAD_SHAPE_WGSL } from './beadShape';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
 import { FILM_FRAME_WGSL } from './plateFilm';
+import { LAMP_MIX_WGSL } from './plateLamp';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 
 /** Bindings every plate shader shares. */
@@ -2001,37 +2002,11 @@ fn lumiaLight(uv: vec2f) -> vec3f {
 }
 
 ${FILM_FRAME_WGSL}
+${LAMP_MIX_WGSL}
 
 /** Light laid over light: screened, so it adds and cannot clip past white. */
 fn screenOver(c: vec3f, light: vec3f) -> vec3f {
   return 1.0 - (1.0 - c) * (1.0 - clamp(light, vec3f(0.0), vec3f(1.0)));
-}
-
-/**
- * The rows under the front plate, bottom up: the lamp the glass is lit by.
- * The LED ring replaces what is under it by its level, as the platform always
- * did; the gel filters what is under it (gelFilter: it makes no light, so
- * over a dark lamp it shows nothing, PLAN 38h); the lumia adds its light.
- */
-fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
-  var c = bg;
-  for (var p = 0; p < 7; p++) {
-    let fp = f32(p);
-    if (fp >= U.mixPos2.z) { break; }
-    if (U.ledPlatform != 0 && U.mixPos.x == fp) {
-      let m = mixBlendOf(U.mixBlend.x);
-      if (m == 0) { c = mixLevelled(c, ledLight(uv), U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
-    }
-    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) {
-      let m = mixBlendOf(U.mixBlend.y);
-      if (m == 0) { c *= gelFilter(uv); } else { c = blendRow(c, gelColor(uv), U.gelWheel, m); }
-    }
-    if (U.lumia > 0.001 && U.mixPos2.y == fp) {
-      let m = mixBlendOf(U.mixBlend.z);
-      if (m == 0) { c += lumiaLight(uv) * U.lumia; } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
-    }
-  }
-  return c;
 }
 
 /**
@@ -2300,9 +2275,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // stack has under the front plate, bottom up. Anything of the three that is
   // higher is laid over the glass (mixSourcesAt), and the glass is lit without it.
   bgColor = mixLamp(bgColor, uv);
-  // And the lamp ground (lampBg): the same rows over the lamp at full. The
-  // hot-spot (lampField.ts) never lifts a point above it, so nothing divides it.
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2522,6 +2494,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     fluid0 = mix(fluid0, detail0, macroAmt);
   }
 
+  // The lamp ground (lampBg): the same rows over the lamp at full, here once
+  // the surface is known, since a video in the lamp is seen through it
+  // (lampBend, plateLamp.ts). The hot-spot (lampField.ts) never lifts a point above it.
+  if (U.lampGround > 0.001) {
+    if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5) { lampBend = lampBendAt(fuv0, c0, s0); }
+    lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; }
+  }
   // ── Substrate grain + contact shadow ──────────────────────────────
   // Keep the screen's lamp before the front plate's contact shadow darkens
   // lampBg: a second projector's beam (PLAN 18b-10) meets the screen's fibre

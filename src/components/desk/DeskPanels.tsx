@@ -741,7 +741,7 @@ function DyesBody({ p }: { p: DeskProps }) {
       {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
           <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
-          <VideoShelf {...p.video} prefix="dyes-" />
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
         </div>
       )}
     </div>
