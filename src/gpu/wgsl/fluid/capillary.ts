@@ -57,83 +57,6 @@ export const RIM_SAMPLES = 1024;
   the solve's p' = p − Φ held at zero on the rim is p held at φ there.
   Everywhere short of the band the force is untouched, to the bit.
 */
-/*
-  The second curvature of a body of revolution (PLAN 27f-9q (b)).
-
-  What was reported: on the Mac the Lava Lamp's laid wax rises as heads on
-  stalks and folds into sheets, where a lamp's wax goes up as round balls and
-  a stalk, when one is drawn, thins and lets go. Measured (27f-9m's films and
-  the lab on the app's step): an area-weighted roundness 4πA/P² of 0.3 to 0.6.
-
-  The capillary force here is σκ∇c̃ with κ the curve of the edge in the plate,
-  which is all the curvature there is for a liquid between two glasses: the
-  edge across the gap is a meniscus of curvature 2/h, the same everywhere,
-  and a constant pressure moves nothing. A lamp is not two glasses. It is a
-  bottle, and its wax a body of revolution; the plate draws a slice through
-  it. A surface of revolution has two principal curvatures, the one the
-  slice shows and the one round the body's own axis, and the Laplace
-  pressure is σ(κ₁ + κ₂). For a ball the second equals the first, 1/R, so a
-  ball holds itself round twice as hard as a disc. For a stalk of width w it
-  is 2/w round the stalk, and nothing in the slice: a straight strip in a
-  plane is at rest, a cylinder is not. Its pressure is above its head's
-  (2/w against the head's 2/D), so it drains into the head, and any waist
-  in it is at a still higher pressure and drains faster, which is the
-  Rayleigh–Plateau instability that pinches a real stalk off into a ball.
-  Without κ₂ the plate had no such instability, so its stalks lasted, and
-  with buoyancy against a tension held at a cap (OIL_CELLS) the rising wax
-  could only finger.
-
-  κ₂ at an edge cell is taken as a round body's is: twice over the chord of
-  the body along the edge's normal (the line from the edge through the
-  oil to its other side, the soft oil's half level at each end, found
-  between samples a cell apart). For a ball that chord is the diameter
-  whatever the point, so κ₂ = 1/R exactly; for a stalk it is the width, so
-  κ₂ = 2/w. A body longer than ROUND_REACH along the normal reads it as
-  ROUND_REACH: past that κ₂ is flat, and a flat κ₂ times ∇c̃ is a gradient
-  the pressure takes. The chord is held to at least ROUND_LEAST cells, the
-  edge's own width, under which the field draws no body.
-
-  The shortcut, named (27f-9q): the body is read as round about the edge's
-  own tangent, a tube along it, which is right for a ball and a stalk and
-  wrong for a body of revolution seen down its axis (a disc's flat face has
-  no κ₂, here it gets one from its thickness). A real body of revolution
-  knows its axis; a slice does not. Weighted by how far the plate stands
-  (Plate Upright), as the engine's standing plate is its sealed bottle
-  (PLAN 27f-9, wgsl/fluid/seal.ts); a flat dish's oil between two glasses is
-  a pancake whose second curvature is the meniscus's and gets none.
-*/
-export const ROUND_REACH = 48;
-export const ROUND_LEAST = 3;
-const ROUND_WGSL = /* wgsl */ `
-// The soft oil between its four cells, q in cells (a cell's middle at its index).
-fn csAt(q: vec2f, n: f32) -> f32 {
-  let a = floor(q);
-  let f = q - a;
-  let i = vec2i(a);
-  let b0 = cs(i, n) + (cs(i + vec2i(1, 0), n) - cs(i, n)) * f.x;
-  let b1 = cs(i + vec2i(0, 1), n) + (cs(i + vec2i(1, 1), n) - cs(i + vec2i(0, 1), n)) * f.x;
-  return b0 + (b1 - b0) * f.y;
-}
-// κ₂ at an edge cell: 2 over the body's chord along u (into the oil), 0 where no body is on the line.
-fn roundCurve(p: vec2i, u: vec2f, n: f32) -> f32 {
-  let o = vec2f(p);
-  var s0 = -4.0;
-  var c0 = csAt(o + u * s0, n);
-  var entry = select(1e9, s0, c0 >= 0.5);
-  for (var k = -3; k <= ${ROUND_REACH}; k++) {
-    let s = f32(k);
-    let c = csAt(o + u * s, n);
-    if (entry > 1e8) {
-      if (c >= 0.5) { entry = s0 + (0.5 - c0) / max(c - c0, 1e-6); }
-    } else if (c < 0.5) {
-      let exit = s0 + (c0 - 0.5) / max(c0 - c, 1e-6);
-      return 2.0 / max(exit - entry, ${ROUND_LEAST.toFixed(1)});
-    }
-    s0 = s; c0 = c;
-  }
-  return select(0.0, 2.0 / max(f32(${ROUND_REACH}) - entry, ${ROUND_LEAST.toFixed(1)}), entry < 1e8);
-}
-`;
 const CAPILLARY = /* wgsl */ `
 fn cs(p: vec2i, n: f32) -> f32 { return textureLoad(soft, clampP(p, n), 0).r; }
 fn grad(p: vec2i, n: f32) -> vec2f {
@@ -146,17 +69,12 @@ fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g
 // grid out of it.
 fn capillaryAt(p: vec2i, n: f32) -> vec2f {
   let g = grad(p, n);
-  var kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
-  // The bottle's second curvature (ROUND_WGSL says why): only on a standing plate, |A.b.xy| its upright.
-  let upright = length(A.b.xy);
-  let edge = length(g);
-  if (upright > 0.0 && edge > 0.01) { kappa += upright * roundCurve(p, g / edge, n); }
+  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
   var f = A.a.x * kappa * g;
   let l = length(f);
   if (l > A.a.y) { f *= A.a.y / l; }
   return f;
 }
-${ROUND_WGSL}
 // The ring rimLaplace integrates along: two cells inside the rim, inside
 // every cell the solve holds (the rim's and the grid's edge, hsPrep).
 fn rimRing(n: f32) -> f32 { return ${OPEN_RIM.toFixed(2)} - 2.0 / n; }
