@@ -2491,7 +2491,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // the surface is known, since a video in the lamp is seen through it
   // (lampBend, plateLamp.ts). The hot-spot (lampField.ts) never lifts a point above it.
   if (U.lampGround > 0.001) {
-    if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5) { lampBend = lampBendAt(fuv0, c0, s0); }
+    if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5 && U.dishSpread <= 0.001) { lampBend = lampBendAt(fuv0, c0, s0); }
     lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; }
   }
   /*

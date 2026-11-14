@@ -46,7 +46,9 @@ export const LAMP_MIX_WGSL = /* wgsl */ `
 
   The bend is in the dish's uv; the picture is laid in the screen's, so it is
   turned back through uvToFluid's rotation and scale. Off (0) on the
-  photographed views, whose derived field carries no optical path.
+  photographed views, whose derived field carries no optical path, and with
+  the dishes spread (Dish Spread), whose fuv0 comes from dishToPlate and not
+  uvToFluid, so the turn back would be the wrong size (PLAN 14ag-7 notes it).
 */
 var<private> lampBend: vec2f = vec2f(0.0);
 
