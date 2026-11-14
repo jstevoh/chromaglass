@@ -640,11 +640,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
   /** Told when a captured window is taken away from the browser's side. */
   const filmEndedRef = useRef<(() => void) | null>(null);
-  /** Frames the plate's loop found a poured video ready to read, for `npm run cartoons`. */
+  /** Frames the plate's loop found a poured video ready to read, for `npm run myvideo`. */
   const videoPourReadsRef = useRef(0);
   /*
     What the plate holds as its pour and its film, under `?debug`, so
-    `npm run cartoons` can ask whether the video it watched play is the one the
+    `npm run myvideo` can ask whether the video it watched play is the one the
     plate reads, not only that some video played. Set apart from
     `chromaglassDebug` (which waits for the GPU) because the hand-over is the
     same with or without one.
@@ -654,7 +654,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     stopped in the GL effect's cleanup, which also runs on a rebuild (a lost
     device, a resolution change: `glEpoch`), so a loop, the camera or a
     window went dark on the projector while the panel still said it was
-    playing. Found by `npm run cartoons` on software WebGPU (PW_WEBGPU=1):
+    playing. Found by the cartoons check on software WebGPU (PW_WEBGPU=1):
     a second and a half after Film the projector held no film and the video
     had been reset; with the stop moved here, it plays on (16/16).
   */

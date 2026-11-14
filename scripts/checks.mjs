@@ -737,7 +737,7 @@ async function selftest() {
   const read = man.checks.find((c) => trace(entryFiles(c.run, scripts)).has('docs/handoff.md') && man.shards.measure.includes(c.shard));
   say(!read || mpick(['docs/handoff.md']).names.includes(read.name), `a document a check reads selects that check${read ? ` (docs/handoff.md: ${read.name})` : ''}`);
   say(mpick(['src/gpu/fluid.ts']).all, 'a source file runs Measure in full');
-  say(mpick(['public/video/cartoons/SOURCES.md']).all, 'and a Markdown file of the site\'s own does too');
+  say(mpick(['public/press/MEDIA.md']).all, 'and a Markdown file of the site\'s own does too');
   say(mpick(['scripts/tools.mjs', 'src/presets.ts']).all, 'a check script with a source file does');
   say(mpick(['scripts/frame.mjs']).all && mpick(['scripts/checks.mjs']).all, 'a shared helper, and this file, do');
   say(mpick(['scripts/nothing-reads-this.mjs']).all, 'a script no check traces does');

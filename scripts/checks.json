@@ -1819,14 +1819,15 @@
       ]
     },
     {
-      "name": "The cartoons",
+      "name": "Your own video",
       "shard": "browser",
-      "run": "npm run cartoons",
+      "run": "npm run myvideo",
       "why": [
-        "The cartoons that ship (PLAN 14ac): small, silent, recorded in",
-        "SOURCES.md, and on a phone page they pour without the pour pausing",
-        "every frame (14ab-1), loop, are what the plate and the projector hold,",
-        "and stop. No GPU needed: the hand-over is the same without a plate."
+        "A video of one's own (PLAN 14ag), loaded through the file chooser on a",
+        "phone and on the desk: it pours without pausing every frame (14ab-1),",
+        "plays as the film from the same row, the film sense reads a pour with",
+        "no film, and Video Zoom, Across and Up frame it; no demo loop or cartoon",
+        "ships. No GPU needed but for the framing's pixels, which the Mac asks."
       ]
     },
     {
