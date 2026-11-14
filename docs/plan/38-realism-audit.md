@@ -744,7 +744,7 @@ On in many looks:
   the pull; the weak ones (Classic 0.15, Stardust Collapse, Home Movie 0.1) now streak only when
   tipped. A plate rocked by a hand has its own weight in the rock's term. `npm run forces` 7. Open
   for the owner's eye: the tilt turns on the buoyancy and the lamp's heat a standing plate has
-  (docs/judging.md §131), and the thick (non-thin-gap) path still runs along -y, not Tilt Direction.
+  (docs/judging.md §132), and the thick (non-thin-gap) path still runs along -y, not Tilt Direction.
 - **38u-13. Kicks make air from nowhere** (S–M; Medium). On an onset 2 to 4 bubbles appear at
   random places (`LiquidVisualizer.tsx:4549-4562`). Air enters under a drop that lands
   (Oguz–Prosperetti) or through the straw. Tie the births to the drops the music pours. 38b-3
