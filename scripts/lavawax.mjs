@@ -59,7 +59,8 @@
  * the stirring), not the lab's defaults.
  *
  * No canvas, so it runs on any adapter that computes (PW_WEBGPU=1 on Linux).
- * One lab and 15 seconds of the plate, in a measure part of its own (lab8):
+ * One lab and 15 seconds of the plate, in the measure part lab8 (its own until
+ * bubbleair joined it, PLAN 19k-11c):
  * it was two labs and 27 seconds, about ten minutes on SwiftShader, while it
  * carried the lamp's line.
  */

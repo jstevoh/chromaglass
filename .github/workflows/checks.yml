@@ -208,6 +208,12 @@ jobs:
     # #688 had meanwhile moved sloshgpu, soapgpu and beadmask to lab3 (19k-11a);
     # with holeline gone, sloshgpu and beadmask came back, leaving lab about
     # 13:20, lab3 about 15:20 and lab4 about 11 on the slow tier.
+    # lab4 then filled again: by 2026-11-13 encode's grids, glint, shaderdials and
+    # bubbleair ran ahead of holeline, 15 minutes on the slow tier before a check
+    # that needs 11 there, and the part was cancelled in holeline at the limit on
+    # two pull requests that day (one of them twice), every check green. glint
+    # went to lab9 beside moire and bubbleair to lab8 beside lavawax (PLAN
+    # 19k-11c): lab4 about 17 on the slow tier, lab8 and lab9 about 12.
     timeout-minutes: 25
     strategy:
       fail-fast: false

@@ -10863,6 +10863,22 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   moves; the required names are unchanged, as in 19k-6. Still open: 19k-11b (the tier in the
   job summary, and every part read against it).
 
+#### 19k-11c. lab4 filled again: glint and bubbleair move out
+
+- **19k-11c** (E, S): **shipped 2026-11-13**, with 38u-1 to 38u-3. `lab4` was cut out for holeline
+  alone (19k-11, about 11 minutes on the slow tier) and had since taken `encode -- --grids`,
+  `glint`, `shaderdials` and `bubbleair`. On 2026-11-13 it was cancelled at 25 minutes inside
+  holeline on the closeup pull request (twice, the second a re-run of that job alone) and on the
+  fine-detail one, every check before it green and no line red: before holeline 14:51 and 15:27,
+  holeline stopped 9:59 and 9:24 in, its first marker at 277 s and 290 s. The same day on faster
+  runners the part ran 20:33 (the closeup pull request's previous head, the same shader change),
+  17:19 and, on main's deploy, 12:48, holeline's first marker at 220 s, 188 s and 141 s: the
+  runner tiers of 19k-11, not a check grown slow. `glint` (5:17 on the slow tier) went to `lab9`
+  beside `moire` (the part ran 3:50) and `bubbleair` (5:16) to `lab8` beside `lavawax` (4:24),
+  which leaves lab4 about 17 minutes on the slow tier. The timeout stays 25, no bar or input
+  moves and the required names are unchanged. Still open: 19k-11b, which would have printed the
+  part at 26 minutes on the slow tier before it was cancelled.
+
 #### 19k-13. Room in the Mac jobs' bound, and a line where slowness is read
 
 - **19k-13** (E, S): **shipped**. On GitHub's Macs on 2026-11-07 (main's deploys 668 to 673

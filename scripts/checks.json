@@ -1407,7 +1407,7 @@
     },
     {
       "name": "Glitter, the lens and the side lamp",
-      "shard": "lab4",
+      "shard": "lab9",
       "run": "npm run glint",
       "timeout": 12,
       "why": [
@@ -1419,7 +1419,8 @@
         "round; glitter darkens a lamp ground in proportion; at 8x and 1024 px the glints",
         "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
         "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
-        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
+        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye.",
+        "In lab9 beside moire since 2026-11-13 (PLAN 19k-11c), for the room holeline needs in lab4."
       ]
     },
     {
@@ -1501,7 +1502,7 @@
     },
     {
       "name": "The rest of a bubble's air, owed until its builds",
-      "shard": "lab4",
+      "shard": "lab8",
       "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
       "why": [
         "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
@@ -1511,7 +1512,9 @@
         "and fills its hole evenly without airShed, and the app lays no press",
         "under a bubble while the flow round it stays the same. Each owed id",
         "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
-        "it: about three and a half minutes, in lab4, which has the room."
+        "it: about three and a half minutes, five on the slow tier. In lab8 beside lavawax",
+        "since 2026-11-13 (PLAN 19k-11c): lab4, where it was, reached holeline 15 minutes in",
+        "on the slow tier and was cancelled in it at the limit, with every check green."
       ]
     },
     {
@@ -1607,7 +1610,8 @@
         "through its glass has not warmed the wax by then, so that line and its no-swelling",
         "lab are lavacycle's now, on the Mac (PLAN 27f-9h). It was about ten minutes on",
         "SwiftShader with that line, about twenty on the slow tier: a part of its own, lab8,",
-        "since lab4 already runs about eleven there."
+        "since lab4 already ran about eleven there. At 15 seconds of the plate it has the room",
+        "and bubbleair runs beside it (PLAN 19k-11c)."
       ]
     },
     {
