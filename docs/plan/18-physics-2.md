@@ -110,6 +110,8 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   the species' bytes (its density and index channels are carried but read by nothing
   yet, 18d-3 and 18d-9: hold them until those land, or pack them) or carrying it at
   half the grid (its own carry again, and hsPrep reading it up a level).
+- ~~**18d-11c**~~ shipped: `npm run thick` compares the two carries over one step from the
+  same plate, not thirty steps that grow a last bit (story in `docs/plan-shipped.md`).
 - **18d-11b** The same pairing for the other carries that ride one flow: Oil Bodies
   carries the colour and the oil's share of it in two passes through the same faces
   (`advect dye`, bodiesOn), and under the maze's flow the species still takes a stage of

@@ -4616,6 +4616,17 @@ the largest (Metal's compiler orders the two kernels' arithmetic its own way, an
 species feeds the flow back through the drag over 30 steps).
 Under the maze's flow the colour moves in sixths, so the species there still has its own
 stage (18d-11b).
+**18d-11c** (2026-11-14): `npm run thick`'s "carried both ways" compares one carry, not
+thirty steps. Main was held red on the owner's Mac (deploys 827 and 828: 1.29e-3 in the
+colour, 1.77e-3 in the species, against a bar of 1/1024 of the largest) with no carry
+wrong. The second run carried apart from the first step, so the check compared the plate's
+dynamics too: Rain Drip's heavy pool falling through the thin liquid grows a last bit
+(software: colour laid one half-float place lighter reads 4.9e-4 after one step, 2.3e-3
+after thirty, about 4.6 times), and the pool now falls twelve cells where the bar was set
+on three. GitHub's Mac had crept to 7.2e-4 and 9.9e-4. Now both runs share the first 29
+steps, are asked to reach the last on the same plate to the bit, and are held to the same
+bar after one step each way; a carry missed would read 0.28 (software), over ten of the
+bar's places. The thirty-step reading is printed beside it.
 **18d-12** (2026-10-05): each liquid pours its own colour, and a dye picked for it tints it
 (`npm run natural`, `npm run bottles`). The owner: "Some of the liquids don't carry color.
 Let's make them by default the correct color, but allow them to have color as well." Each
