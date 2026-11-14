@@ -4616,6 +4616,17 @@ the largest (Metal's compiler orders the two kernels' arithmetic its own way, an
 species feeds the flow back through the drag over 30 steps).
 Under the maze's flow the colour moves in sixths, so the species there still has its own
 stage (18d-11b).
+**18d-11c** (2026-11-14): `npm run thick`'s "carried both ways" compares one carry, not
+thirty steps. Main was held red on the owner's Mac (deploys 827 and 828: 1.29e-3 in the
+colour, 1.77e-3 in the species, against a bar of 1/1024 of the largest) with no carry
+wrong. The second run carried apart from the first step, so the check compared the plate's
+dynamics too: Rain Drip's heavy pool falling through the thin liquid grows a last bit
+(software: colour laid one half-float place lighter reads 4.9e-4 after one step, 2.3e-3
+after thirty, about 4.6 times), and the pool now falls twelve cells where the bar was set
+on three. GitHub's Mac had crept to 7.2e-4 and 9.9e-4. Now both runs share the first 29
+steps, are asked to reach the last on the same plate to the bit, and are held to the same
+bar after one step each way; a carry missed would read 0.28 (software), over ten of the
+bar's places. The thirty-step reading is printed beside it.
 **18d-12** (2026-10-05): each liquid pours its own colour, and a dye picked for it tints it
 (`npm run natural`, `npm run bottles`). The owner: "Some of the liquids don't carry color.
 Let's make them by default the correct color, but allow them to have color as well." Each
@@ -5145,6 +5156,31 @@ prints each cell's distance from the hand with its mean change past mean drift, 
 first, so the footprint is in every log. The control on a Mac: revert the derive pass's
 mirror fix (`npm run derive` pins it) and the line goes red at the mirror across the
 middle line, row 2, column 5.
+
+### 19ah-9b. Startup waits for the half behind the show as long as it is building (2026-11-14)
+
+The Mac `open` shard's "every pipeline it asked for ahead was built ahead ... nothing built
+behind it" went red on 13 of 154 runs of 10 to 14 November (`npm run flakes -- --days 4
+--check 'every pipeline it asked for ahead'`), six on 11-14 across five branches, each on an
+opening of 12.6 s or more. `startup` waited a fixed 45 s for the record of the half built
+behind the show, and that half, grown to 113 builds one at a time beside a running show,
+took 28 to 46 s on GitHub's Macs (42.84 s, 0.38 s a build, on run 43570470863, against
+0.13 s a build for the opening's 67 three at a time). Every red still had builds arriving.
+
+Built: `gpu/prepare.ts` keeps `prepareProgress`, each prepare's builds settled so far, its
+last settle and its cap on one build (PREPARE_TIMEOUT_MS), handed to harnesses with the rest
+by `pipelinesSeen` (`chromaglassDebug().pipelines().progress`). `scripts/startupbehind.mjs`
+(beside startup.mjs, which is over 100 KB) waits while that progress moves: it ends on the
+half's record, on no build settled for the app's cap and 5 s, on a half that never began in
+the old 45 s, or at 180 s in all, a bound only against holding a runner for good. The line
+now says how far an unfinished half got instead of "nothing built behind it", and prints
+the half's pace (ms a build) beside the opening's. And the half builds two at a time
+(LATER_LANES), one render pipeline among them at most: how long it takes is how long a look
+changed to can build on the frame (19ah-9c). The 45 s wait had been, in effect, the only
+thing that made a slow half red, so the line now holds the half's pace instead, to the
+runner's own: at most six times the opening's ms a build (BEHIND_PACE_MAX; it read 2.9x one
+at a time), and both halves must have asked for something (a record missing its fields had
+passed as `undefined === undefined`).
 
 ### 19ai-6. The solver's kernels, one file a pass (2026-10-28)
 
@@ -9231,6 +9267,33 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   four are 0 now: the song's hand on the frame is 0.000% at Frame Sway 0 in every mode on
   all 70 looks and show stages, the same press moves the frame 0.17% a frame with it and
   without, a cut lands on the drop's middle, and a drop on still paint moves 0.
+
+- ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
+  black/empty" (the owner, 2026-10-29, with a screenshot of the Recipe panel; built in
+  #575, which closed unmerged, and asked again 2026-11-14).~~ **Fixed** (`npm run
+  closeupland`): the closeup's camera is Hold by default, aimed at the middle of the
+  plate, and Hold sat on its aim and nowhere else, so on a plate whose middle was bare (a
+  look that pours in pools, a middle a finger had swept, a plate between pours) every way
+  in (the button, M, the zoom, the phone's pinch and Zoom) was a 4x view of nothing: the
+  exposure stays under what the frame holds, and the frame held nothing. In the app on
+  software WebGPU, classic cleared to one pool at (0.22, 0.30): the 4x frame's mean 1.4 of
+  255 and no pixel lit, for as long as it was in. Coming in, Hold and Follow now check
+  their aim (`src/lib/macroLanding.ts`, beside the camera, which is near the size the repo
+  warns at); if its frame holds under a tenth of the plate's average dye, they go to the
+  nearest frame holding at least half what the plate's fullest does, centred on the dye in
+  it, and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
+  and lands on the first pour; a hand moving the aim during the closeup is obeyed onto
+  glass, and a mode switch mid-closeup is not a landing (`npm run holdjump`). It stops
+  asking once fully in or after 1.5 s (a pinch let go at 1.5x otherwise cut across the
+  plate when its pool later drained), and where it settles is handed back as the aim, so
+  the arrows, the Aim sliders and Evolve pan on from the pool and not from the bare
+  middle (one arrow tap had taken it back there). The camera half on today's main: 5 of
+  13 lines before, 16 of 16 after; the app on software WebGPU, the report's plate: 0.543
+  of the 4x frame lit, the pool 0.015 of a half-frame off its middle. And the desk's
+  button flipped `macroMode` alone, so the plate went to 4x while the Macro Zoom knob
+  beside it read 1.00x; it is now the M key's press (`closeupToggle`), in by the zoom and
+  out with both, and so are the phone's Zoom, the remote's Closeup switch and the
+  command palette's, whose lit states and a pad's light read `closeupIn`.
 
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and

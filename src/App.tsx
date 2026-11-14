@@ -8,6 +8,7 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
+import { closeupToggle } from './lib/macroLanding';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
@@ -1795,8 +1796,7 @@ export default function App() {
         // A pad still wants one press in and one press out. It moves the zoom,
         // because that is the control; the flag rides along for the looks that
         // still read it.
-        const inNow = (settingsRef.current.macroZoom ?? 1) > 1.05;
-        updateSettings(inNow ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: 4 });
+        updateSettings(closeupToggle(settingsRef.current));
         break;
       }
       case 'seq-play-pause':  if (sequencer.status.running) sequencer.pause(); else sequencer.play(); break;
