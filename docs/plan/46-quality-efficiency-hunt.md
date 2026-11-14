@@ -102,6 +102,11 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   scatter nobody has measured: at ±0.1 ms main's governor all but passes. A browser keeps a
   frame or two in flight and a ProMotion panel changes its own rate. Record the rAF stamps
   on the owner's 120 Hz screen (`npm run stutter`, 46c) and replay those.
+- **46r-1 · Found (with 46r, 2026-11-13):** the solver's shared `sim` uniform is one buffer
+  written more than once between submits (the step's own write, `rawSim`'s, and
+  `speciesShare`'s in `reads.ts`), the same last-write-wins as an args name given two
+  values. `npm run argnames` watches the names only. Read whether any pair differs in a
+  field a dispatch of the earlier write reads, and watch `sim` the same way if one does.
 - **46e-3 · Found:** other refresh rates are not replayed: at 144 Hz three refreshes are
   20.8 ms, under any 25 ms line, and the step clock does not snap (not a whole ratio).
 - **46-1 · Found:** 19d-lazy (the first load's script, 527 KB gzipped) waits on 14h's precache
@@ -134,7 +139,8 @@ again ten times a second for three meters and a percentage.
   (**shipped**, `npm run encode`: a thin-gap step 400 dispatches, direct and indirect, → 334,
   the open plate 500 → 494, and a liquid poured brings its carries back; `physics`,
   `liquids`; with it 14ab-11's first parts, the uploads of a step with bubbles or music
-  1.33 MB → 0.04 to 0.24; story in `docs/plan-shipped.md`).
+  1.33 MB → 0.04 to 0.24, and the liquids' step asking for no flush at all; story in
+  `docs/plan-shipped.md`).
 - **46h · A ride and a fade still render the whole shell** (M; 14u names the fade). A MIDI
   fader tells React ten times a second and a Go fade thirty, each a render of every desk
   panel: 14.3 ms on the owner's Mac, more than half of it the commit (React 19 updates every
@@ -197,10 +203,9 @@ again ten times a second for three meters and a percentage.
   whole window though it is framed in the hole (2.2 times the hole's area at 1440×900), and
   takes and streams record that canvas; the recorder asks for VP9 before hardware H.264 at
   sixty frames of the full canvas.
-- **46r · Found, a bug and not a saving (the physics audit's):** three writes in one step
-  share the args name `'current grid'` with different values (`fluid/passes.ts`'s boil and
-  thin-gap calls, `fluid.ts`'s open plate), so on the open plate `currentForces` reads Depth
-  Drag as "boiling" whenever Depth Drag is above zero. Fixing it changes the picture there.
+- ~~**46r · Three writes in one step shared the args name `'current grid'`**~~ (**shipped**
+  with 15e-1, `npm run argnames`; story in `docs/plan-shipped.md`, "15e-1 (met again as
+  14ab-16) and 46r"). 46r-1, above, was found with it.
 - **46s · The lamp's heat is carried on every thin-gap step, heated or not** (S to M; found
   2026-11-13 re-basing `encode`'s bars). `carryHeat` (38f-1, `src/gpu/fluid/passes.ts`) packs
   the temperature, carries it through the colour's substeps and unpacks it on every thin

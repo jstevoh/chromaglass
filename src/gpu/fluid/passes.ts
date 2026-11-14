@@ -327,6 +327,60 @@ export class FluidPasses extends FluidFields {
   }
 
   /**
+   * What a step runs in passes of their own before the air is drawn: what
+   * the poured liquids do, then the plate's boil. `step` calls this where it
+   * called the boil alone.
+   */
+  protected stepAhead(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    this.stepLiquids(enc);
+    this.stepPlateBoil(enc, p);
+  }
+
+  /**
+   * What a bottle's liquid does to the plate, once a step, every step it is
+   * on the plate (PLAN 15e-1; 14ab-16 is the same fault met again).
+   *
+   * The soap thins the dye it lies on (`soapThin`) and the liquids push the
+   * flow (`liquidForces`: the soap's pull down its own gradient, a thick
+   * liquid's drag, a heavy one's slide down a rocked plate, an oil keeping
+   * to itself). Both ran inside the fold of the frame's hand-laid deltas
+   * (`foldDeltas`: the thinning in `deltaDye`, the forces after `deltaVel`),
+   * and a step nothing was laid in has no fold. A force a liquid puts on
+   * the liquid round it is there every instant the liquid is, whoever else
+   * touches the plate. The app folded on every step by accident: the CPU's
+   * copy of the liquids marked the deltas written while it held any, and it
+   * held the first pour forever, since it stops being stepped once the GPU
+   * has the liquids (liquidPhase.ts, gpuNative). A Clear empties that copy
+   * and nothing fills it again, so a liquid poured after a Clear was carried
+   * and drawn and did nothing until a hand, a kick or a bubble wrote a
+   * delta. Measured on a 64² plate rocked for six steps, a heavy drop and a
+   * soap's (`npm run liquidpush`): with no fold the slide under the heavy
+   * drop was 0 and the soap thinned no dye, where one fold a step gave
+   * 3.4e-2 and 8.3%; and with two folds a step (a frame that also read the
+   * plate back, pullStateFromGpu) 1.86 and 1.92 times that.
+   *
+   * Here, first in the step and in this order, they meet the plate exactly
+   * as one fold before the step left it for them, so a show that did fold
+   * every step sees the same arithmetic. That includes where a thin gap
+   * meets them: before it keeps the flow it had ('thin gap keep'), so there
+   * the push is momentum the gap's drag has within the step and not a
+   * drive, and what is left under the heavy drop is two thousandths of the
+   * flow beside it. Making it a drive in the thin solve's own units is PLAN
+   * 15e-10, and the thinning being an erasure and not a push is 15e-5.
+   *
+   * Nothing runs on a plate no bottle was poured on (`liquidsLive`).
+   */
+  protected stepLiquids(enc: GPUCommandEncoder): void {
+    if (!this.liquidsLive) return;
+    const pass = enc.beginComputePass({ label: 'liquids', timestampWrites: this.profiler.pass('liquids') });
+    this.run(pass, 'soapThin', this.dye.write, [this.dye.read, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
+    this.dye.swap();
+    this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
+    this.vel.swap();
+    pass.end();
+  }
+
+  /**
    * Step the plate's thermal and two-phase boil model (PLAN §36e-2, PLATE_BOIL_WGSL)
    * when the Heat dial is up or cooling down after it was turned off. At Heat = 0
    * (every look's default), nothing here allocates or runs. Runs before `air.splat`
@@ -718,7 +772,8 @@ export class FluidPasses extends FluidFields {
       it keeps its own projection.
     */
     if (thin) return;
-    const m = this.arg('current grid', [0, this.M, 0, 0]);
+    // A name of its own: the current's passes and the open plate's addCurrent run in this same step with other numbers (PLAN 46r, stepCurrent).
+    const m = this.arg('swirl grid', [0, this.M, 0, 0]);
     this.run(pass, 'curDivergence', this.swirlDiv, [this.swirl.read], m, this.M);
     for (let k = 0; k < CURRENT_ITERS; k++) {
       this.run(pass, 'curPressure', this.swirlP.write, [this.swirlP.read, this.swirlDiv], m, this.M);
@@ -1045,9 +1100,26 @@ export class FluidPasses extends FluidFields {
     smooth(l, MG_SWEEPS);
   }
 
-  /** The lasting current: forces, then its own projection, on the M grid. */
+  /**
+   * The lasting current: forces, then its own projection, on the M grid.
+   *
+   * Its args are under a name nothing else in a step writes (PLAN 46r). They
+   * were under 'current grid', which the swirl's projection and the open
+   * plate's addCurrent also wrote, each with its own numbers: z here is
+   * whether the boil runs (currentForces takes the boil's density rise for
+   * the clamped linear one), z there is Depth Drag's exponent. A buffer holds
+   * what was written to it last before the submit (`arg`), and on the open
+   * plate that was addCurrent's, so currentForces read Depth Drag as the
+   * boil. Measured on a 64² open plate, upright, a 30 K spot, one step
+   * (`npm run argnames`): at Depth Drag 1.5 and Heat 0 the current came to
+   * 0.33 against the 0.0094 it has at Depth Drag 0, the boil's uncapped rise
+   * with no boil; and at Heat 1 and Depth Drag 0 a 70 K spot's current sat
+   * at its cap, the boil's rise not read at all. A thin gap's addCurrent
+   * already had a name of its own ('current grid thin'), so the looks, which
+   * all open thin, never showed it.
+   */
   protected stepCurrent(pass: GPUComputePassEncoder): void {
-    const m = this.arg('current grid', [0, this.M, this.boilLive ? 1 : 0, 0]);
+    const m = this.arg('current step', [0, this.M, this.boilLive ? 1 : 0, 0]);
     this.run(pass, 'currentForces', this.cur.write, [this.cur.read, this.vel.read, this.dye.read], m, this.M);
     this.cur.swap();
     this.run(pass, 'curDivergence', this.curDiv, [this.cur.read], m, this.M);
@@ -1075,9 +1147,8 @@ export class FluidPasses extends FluidFields {
    * zeros, and skipping it leaves the same zeros in whichever half of the
    * pair is read. Nothing else reads the carry's side effects: airGive's
    * shares are worked out again, from the air, before every carry that takes
-   * them. Kept running unchanged: liquidForces in the fold, whose zero
-   * branch still puts the velocity through safeVel. The gate is the one
-   * chemLive already is for the reaction's grid. `npm run encode` holds
+   * them. The gate is the one stepLiquids has for the liquids' forces
+   * (15e-1) and chemLive is for the reaction's grid. `npm run encode` holds
    * both ways of it: no carry on a plate never poured on or cleared, and
    * the carries back, open plate and thin gap, after one drop.
    */

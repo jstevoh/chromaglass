@@ -275,6 +275,8 @@ From a reading of the code, not from a report.
   expire; only the KV index has its 40-day TTL. `digestDays` does one KV `get` per
   report, so a window of more than about a thousand reports is over the per-call limit,
   and `/digest` and the cron fail on exactly the day there are most crashes to read.
+  *Done in PLAN 23.20 (2026-11-13): the limit by /64, counted in memory so it writes no
+  KV, an everyone cap, and the 1 MB body; the lifecycle rule and the aggregate are open.*
   **Do:** the limit per /64 on IPv6; a body cap near what a report is (10 kB and a JPEG
   of up to 150 kB, above: 1 MB rather than 4); an R2 lifecycle rule beside the KV TTL; a
   per-day aggregate written with each report, which the digest reads instead of every

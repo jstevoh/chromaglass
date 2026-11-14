@@ -33,13 +33,6 @@ export class FluidCore {
   public readonly activeMat: PingPong;
   public chemLive = false;
   /**
-   * Whether the poured liquids' two fields (liquids0, liquids1) may hold
-   * anything: set by addLiquidDrop, their one writer, and cleared where both
-   * halves of each pair are filled with zeros. While false the step does not
-   * carry them (carryLiquids, and why).
-   */
-  protected liquidsLive = false;
-  /**
    * The plate's dye while a print is drawn: the dye in the solver with the
    * print laid over it (depositChem). Separate from the dye so the print is a
    * picture of the reaction as it stands, never a thing the flow carries or
@@ -122,6 +115,15 @@ export class FluidCore {
   protected readonly boilUniF = new Float32Array(this.boilUniData);
   protected readonly boilUniU = new Uint32Array(this.boilUniData);
   protected boilLive = false;
+  /**
+   * A bottle's liquid has been poured since the last clear (addLiquidDrop),
+   * so `liquids0` and `liquids1` hold something for a step to act on
+   * (stepLiquids, PLAN 15e-1). False on a plate of plain dye, which then
+   * runs neither of that pass's two dispatches, and does not carry the two
+   * fields either (carryLiquids, PLAN 46g): addLiquidDrop is their one
+   * writer, and it is cleared where both halves of each pair are zeroed.
+   */
+  protected liquidsLive = false;
   protected boilFresh = false;
   protected boilTail = 0;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */

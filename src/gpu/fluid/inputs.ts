@@ -450,16 +450,21 @@ export class FluidInputs extends FluidPasses {
       od.swap();
     }
     this.oilLayPending = false;
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
+    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
   }
 
-  /** Dye, velocity and the plate gap take up whatever is in the delta fields, and with `sheet` the rhythm sheet's change. */
+  /**
+   * Dye, velocity and the plate gap take up whatever is in the delta fields, and with `sheet` the rhythm sheet's change.
+   *
+   * What a poured liquid does to the plate is not here any more (PLAN 15e-1):
+   * it ran in this fold, so only on a step something else had written deltas
+   * for, and twice on a step folded twice. It is the step's own now
+   * (`stepLiquids`, passes.ts, which says what was measured).
+   */
   private foldDeltas(pass: GPUComputePassEncoder, sheet = false): void {
     this.foldDye(pass);
     this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
-    this.vel.swap();
-    this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
     this.vel.swap();
     if (sheet) this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.sheetTex!], this.arg('squeeze delta sheet', [1, this.thinLive ? 1 : 0, 1, 0]));
     else this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
@@ -730,9 +735,9 @@ export class FluidInputs extends FluidPasses {
     this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
       this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
     this.liquids1.swap();
-    this.liquidsLive = true;
     pass.end();
     this.submit(enc);
+    this.liquidsLive = true;
   }
 
   addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {

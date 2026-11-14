@@ -160,7 +160,7 @@ const sample = (page) => page.evaluate(() => {
   return {
     rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0, offered: window.__offered ?? 0,
     t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN, whoAt: window.__who?.length ?? 0, lost: window.__lost ?? 0,
-    work: window.__work ?? NaN, levelMoves: window.__levelMoves ?? 0,
+    work: window.__work ?? NaN, workApp: window.__workApp ?? NaN, levelMoves: window.__levelMoves ?? 0,
     reads: r.frame + r.ask + r.tick, published: c.ear?.published ?? 0,
     frames: h.frames, fresh: h.fresh, ownFrame: h.ownFrame ?? 0,
   };
@@ -248,9 +248,25 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
       const cls = typeof el?.className === 'string' ? el.className.split(' ')[0] : '';
       return `{${keys || 'no props'}}<${h?.type ?? '?'}${testId ? ` ${testId}` : cls ? `.${cls}` : ''}>`;
     };
+    /*
+      The count is kept in two: the components that ran in a commit the App
+      itself rendered in, and those that ran in any other. On the Mac, with
+      a plate drawing, the App renders now and then for reasons of its own
+      (0.3 to 0.7 a second in CI's first run of this PR, inside what its
+      own lines allow), and one App render is every panel of the desk, about
+      530 components on the laptop: one of those in a three-second window
+      read 177 a second and failed a bar of 10 that the ear and the clock
+      had not come near (1.0 a second in the window beside it). The App's
+      renders are held by their own lines; what the work lines hold is what
+      runs when the App does not, which is where the ear's leaves and the
+      clock now are, and where a leaf grown into a shell would show.
+    */
+    window.__workApp = 0;
+    let appSeen = 0;
     const tops = (root) => {
       const now = new Set();
       const out = [];
+      let n = 0;
       const stack = [[root.current.child, false]];
       while (stack.length) {
         const [first, under] = stack.pop();
@@ -260,12 +276,16 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
           // Every one, not only the topmost: what a commit cost is how many
           // components ran, and a count of commits cannot tell one leaf from
           // the whole shell (PLAN 46f; `work` below).
-          if (worked) window.__work++;
+          if (worked) n++;
           if (worked && !under) out.push(label(f));
           if (f.child) stack.push([f.child, under || worked]);
         }
       }
       seen = now;
+      let app = appSeen;
+      try { app = window.chromaglassCastState?.().appRenders ?? appSeen; } catch { /* before the App's first render */ }
+      if (app !== appSeen) window.__workApp += n; else window.__work += n;
+      appSeen = app;
       // A commit whose only work was a mount, or a render that bailed out, names no one, and says so.
       return out.length ? out : ['(no component re-rendered: a mount or a bail-out)'];
     };
@@ -382,6 +402,7 @@ async function measure(page) {
       published: (b3.published - a.published) / s3,
       deskMoves: (b3.deskMoves - a.deskMoves) / s3,
       work: (b3.work - a.work) / s3,
+      workApp: (b3.workApp - a.workApp) / s3,
       levelMoves: (b3.levelMoves - a.levelMoves) / s3,
       reads: (b.reads - a.reads) / s,
       frames: b.frames - a.frames,
@@ -489,10 +510,10 @@ try {
         // so a counter the devtools hook stopped feeding (React swallows its
         // own errors injecting it) reads 0 and must not pass as "nothing".
         w.every(x => x.commits >= 0.9 * x.levelMoves && x.commits <= x.published + CLOCK + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.levelMoves)} moves of the level`).join(', ') + whoFor(w));
-      check(`${screen.name}, the band: at most ${WORK_HEARING} components render a second`,
+      check(`${screen.name}, the band: at most ${WORK_HEARING} components render a second outside the App's own renders`,
         // And a floor where the level is shown: the leaf that shows it renders for each move, so a
         // work counter that died (a fiber flag renamed, the walk throwing) reads 0 and is not "nothing rendered".
-        w.every(x => x.work <= WORK_HEARING && Number.isFinite(x.work) && x.work >= 0.9 * x.levelMoves), w.map(x => `${f(x.work)}/s for ${f(x.levelMoves)} moves of the level`).join(', '));
+        w.every(x => x.work <= WORK_HEARING && Number.isFinite(x.work) && x.work >= 0.9 * x.levelMoves), w.map(x => `${f(x.work)}/s for ${f(x.levelMoves)} moves of the level (${f(x.workApp)}/s in the App's ${f(x.renders)} renders/s)`).join(', '));
       const hears = `${screen.name}, the band: the plate hears a new reading on four frames in five, nine in ten taken on that frame`;
       if (PLATE) {
         check(hears, w.every(x => x.frames >= FRAMES_ASKED && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
@@ -549,8 +570,8 @@ try {
       check(`${screen.name}, a fader: the App renders for those, at most ${ALLOWED_EXTRA} a second besides, and each render commits`,
         // The commits' floor is what says the devtools hook is fed on this page (it was the band's line that said so, when the App rendered for the ear).
         // And the work counter's own floor on both screens (the phone shows no level for the band's line to hold it by): an App render is a component that rendered.
-        w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits >= 0.9 * x.renders && x.commits <= x.deskMoves + CLOCK + ALLOWED_EXTRA && x.work >= 0.9 * x.renders),
-        w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s, ${f(x.work)} components/s for ${f(x.deskMoves)}`).join(', '));
+        w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits >= 0.9 * x.renders && x.commits <= x.deskMoves + CLOCK + ALLOWED_EXTRA && x.workApp >= 0.9 * x.renders),
+        w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s, ${f(x.workApp)} components/s in them, for ${f(x.deskMoves)}`).join(', '));
       /*
         On nine frames in ten that were offered a new value the plate draws
         it, and a quarter more often than React is told, at least: at sixty
@@ -629,9 +650,9 @@ try {
       const tickLine = `${screen.name}, no sound, the Perform desk: the desk's clock moves on`;
       if (screen.touch) skip(tickLine, 'the phone has no desk and no clock');
       else check(tickLine, /^\d+:\d\d$/.test(clock0 ?? '') && /^\d+:\d\d$/.test(clock1 ?? '') && clock0 !== clock1, `${clock0} then ${clock1}`);
-      check(`${screen.name}, no sound, the Perform desk: at most ${WORK_QUIET} components render a second`,
+      check(`${screen.name}, no sound, the Perform desk: at most ${WORK_QUIET} components render a second outside the App's own renders`,
         // The floor is the clock's own leaf where the clock is shown (0.6 a second, as its commits' floor): the work counter alive on this page too.
-        w.every(x => x.work <= WORK_QUIET && Number.isFinite(x.work) && (screen.touch || x.work >= 0.6)), w.map(x => `${x.work.toFixed(1)}/s`).join(', '));
+        w.every(x => x.work <= WORK_QUIET && Number.isFinite(x.work) && (screen.touch || x.work >= 0.6)), w.map(x => `${x.work.toFixed(1)}/s (${x.workApp.toFixed(1)}/s in the App's ${x.renders.toFixed(1)} renders/s)`).join(', '));
       await ctx.close();
     }
     {

@@ -14153,7 +14153,11 @@ What changed: the ear's ten-a-second reading is a store (`hooks/useEarView.ts`: 
 its own tick (`components/desk/LiveFor.tsx`). The hooks that took the reading as state take
 the ear's `live` ref or a boolean selected from the view (`useMusicIntelligence`,
 `app/useCastFeed.ts`). The plate's components are handed no reading (they read `hear()` on
-their own frame, as since §14f). The performance clock is told only when its second changes.
+their own frame, as since §14f). The performance clock is told only when its second changes. The plate's own copy of
+the reading between frames (while the show is still opening, or behind a covered window) had
+been refreshed by each of those renders; it is refreshed at each reading the store publishes
+(`heardNews`), which CI's Mac found missing on the PR's first run: `npm run ears` read no
+level at all four seconds in, before the plate's first step.
 
 Measured, `npm run renders` (a cloud session; its bars re-aimed, named in the PR): components
 rendered a second with the band 5,840 → 11 on the laptop and 714 → 0 on the phone; with no
@@ -14181,15 +14185,19 @@ dry cells hold). A field of zeros comes out zeros, and skipping the carry leaves
 zeros in whichever half of the pair is read, so the plate is the same bits. The fields have
 one writer, `addLiquidDrop`, and three places that zero both halves; `liquidsLive` is set by
 the one and cleared by the three, and `carryLiquids` (`src/gpu/fluid/passes.ts`) is the four
-carries behind it, as `chemLive` already gates the reaction's grid. `liquidForces` in the fold
-runs as before. `src/gpu/fluid.ts` is smaller by the four call sites.
+carries behind it, as `chemLive` already gates the reaction's grid. The liquids' forces
+(`stepLiquids`, 15e-1) wait behind the same flag. `src/gpu/fluid.ts` is smaller by the four
+call sites.
 
 Measured, `npm run encode` (a cloud session, 512², the lab): a thin-gap step 272 dispatches
 and 128 indirect → 270 and 64 (400 → 334); the open plate 500 → 494. Its lines: a plate no
 liquid was poured on carries the dye and the grain only (one correction and three carries
-where main made three and seven), and the control, one drop of a liquid and both fields are
-carried again, six dispatches more, so a gate that never opened is red. H2c-5 is now read
-from the poured plate, where every field is carried, at its old numbers; H2c-1, -2 and -3's
+where main made three and seven), and the controls: one drop of a liquid and both fields are
+carried again (eight dispatches more on the open plate, 68 in the thin gap, 15e-1's two
+passes among them, and at least that many binding the liquids' own textures), and a cleared
+plate carries none until it is poured on again, so a gate that never opened is red. H2c-5 is now read
+from the poured plate, where every field is carried, at its old carries and two dispatches
+under what main's poured step now makes (at most 500, was 498, 15e-1's two passes); H2c-1, -2 and -3's
 base moved from 269 and 96 (read 2026-11-01; main had grown to 272 and 128 by 2026-11-13,
 the lamp's heat being one more field carried since 38f-1, with the bars left behind) to 270 and 64,
 each bar the same removal as before taken off the new total (at most 239, 320 and 184, were
@@ -14198,5 +14206,61 @@ and `npm run physics` pour and read the plate with it.
 
 With it, 14ab-11's first parts (`npm run frameuploads`): a press, a lift, a bubble's press, a
 kick's hold and the bass's hand send the rows they wrote, 1.327 MB a step → 0.04 to 0.24 MB;
-the liquids' step with the GPU holding the liquids asks for the fold with no rows, 1.327 MB a
-step → 0.
+the liquids' step with the GPU holding the liquids asks for no flush at all, 1.327 MB a step
+→ 0 and no fold. (It first asked for the fold with no rows, while the liquids' forces ran in
+the fold; 15e-1 merged the same day and moved them into the solver's step, so the fold went.)
+
+## 15e-1 (met again as 14ab-16) and 46r. A poured liquid acts on every step, and the lasting current's args have a name of their own (shipped 2026-11-13)
+
+Two faults of the solver's plumbing, each with a check written red first.
+
+**46r.** A dispatch's eight numbers live in a uniform buffer kept under a name (`arg`), and a
+buffer holds what was written to it last before the submit. Three calls in one step shared
+'current grid' with different numbers: the lasting current's forces and projection (z = the
+boil is running), the swirl's projection (z = 0) and the open plate's `addCurrent` (z = Depth
+Drag, w = the swirl's scale). On the open plate (Thin Gap off) `addCurrent` wrote last, so
+`currentForces` read Depth Drag as the boil: at Depth Drag above 0 the lamp's lift left the
+clamped linear rise for the boil's uncapped density rise with no boil running, and at Heat
+above 0 with Depth Drag 0 the boil's plate got the clamped one. A thin gap's `addCurrent`
+already had its own name, so no shipped look showed it (all open thin) and `plateboil` (thin,
+or Depth Drag 0) did not see it. Each call has its own name now ('current step', 'swirl
+grid', 'add current'). `npm run argnames` watches the solver's `argWrite` from the lab's page
+on eleven plates (a planted pair is its control) and asks the current after one step to be
+the same at Depth Drag 0 and 1.5, bit for bit. Before: 'current grid' given two values on
+five of the eleven; the current at Depth Drag 1.5 different in 1121 values, by up to 0.33
+against its own 0.0094 (64², upright, a 30 K spot, the lab's Buoyancy 0.45); a 70 K spot's
+current at Heat 1 at its cap (1.9e-3), the boil's rise unread. After: no clash, none
+different, and the boil's rise read (1.07 against a cap of 0.002 at the lab's numbers).
+
+What it changes in the app, measured on a 128² open plate at the app's own numbers
+(Buoyancy 0.45 × 0.3, its cap of three quarters of a cell a step, upright): at Heat 0 almost
+nothing, since the unheated plate's warmth is hundredths of a degree and there the two rises
+agree (the current's fastest after 30 steps at Depth Drag 1.5 was 4.51e-2 against 4.28e-2 at
+Depth Drag 0, and is 4.28e-2 now). At Heat 1 with Depth Drag 0, a plate 60 K over the room
+under a held hand: the current's mean after 30 steps 0.268 → 0.463 and after 120 steps
+0.139 → 0.178, its fastest on the first step 0.135 → 0.329, and by 240 steps the two are
+within a tenth. So a boiling open plate's plume starts about 1.7 times as fast as it did.
+Pictures in the project's files (`open-plate-46r/before-after.png`). No shipped look runs the
+open plate. Seen in both pictures and left as 36e-5: bands in the dye at the floor.
+
+**15e-1.** What a bottle's liquid does to the plate (`liquidForces`, and the soap's thinning
+inside `deltaDye`) ran in the fold of a frame's hand-laid deltas, so only on a step something
+else wrote deltas for. The app folded every step by accident: the CPU's copy of the liquids
+marked the deltas written while it held any, and held its first pour forever (15e-11). After a
+Clear that copy stays empty, so a liquid poured then was carried and drawn and did nothing
+until a hand, a kick or a bubble wrote a delta; and a step folded twice (a frame that read
+the plate back) pushed twice. The step runs both itself now, in a pass of their own first in
+the step, in the fold's order (`stepLiquids`; the thinning is its own kernel, `soapThin`, the
+same arithmetic), only on a plate a bottle was poured on (`liquidsLive`), so a show that did
+fold every step sees the same numbers. `npm run liquidpush` (a heavy drop and a soap's on a
+rocked plate, open and thin, each against the plate without them): before, with no fold and
+after a Clear the slide and the thinning were 0 where one fold a step gave 3.4e-2 and 8.3%,
+and two folds gave 1.86× and 1.92×; after, all four ways give the same to three places.
+`npm run liquidsgpu`'s five "a still plate" lines owed to 15e-1 pass and gate (soap leaves
+89.3% at its spot at half a second and 71.7% at two, what the fold-every-step plate leaves;
+silicone 61.7% in its middle), three more lose 15e-1 from what they are owed to, and a new
+line asks milk's held edge on a still plate to be the fold-every-step plate's (effect 0.00106
+both ways): 27 gate, 11 owed.
+
+Found on the way: on a thin gap the push is read as momentum and the drag has it within the
+step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).

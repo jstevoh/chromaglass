@@ -217,7 +217,7 @@ export class FluidSimulation {
   private rows = new DeltaRows(GRID_SIZE);
   private get dirty() { return this.rows.any; }
   private set dirty(v: boolean) { if (v) this.rows.whole(); else this.rows.clear(); }
-  /** A flush with no rows is due: video frames (pourVideoFrame), the liquids' fold (stepLiquid). */
+  /** A flush with no rows is due: video frames (pourVideoFrame). */
   private foldDue = false;
   private mul: Float32Array;        // multiplicative dye change (a carry's take; the show's own puffs thin by 0.8)
   /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
@@ -1218,8 +1218,8 @@ export class FluidSimulation {
       }
     }
     this.liquid.step(this.readVx, this.readVy, disp, dt);
-    // The GPU's own liquids want its fold, not 192 rows of zeros (lib/deltaRows.ts, 14ab-11).
-    if (this.liquid.gpuNative) this.foldDue = true; else this.dirty = true;
+    // With the GPU holding the liquids nothing was written here and its step moves them itself (15e-1): no flush (14ab-11).
+    if (!this.liquid.gpuNative) this.dirty = true;
   }
 
   /**

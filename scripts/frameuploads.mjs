@@ -246,12 +246,14 @@ check('on a thin gap a bubble\'s rim and its popped hole write nothing', thinRim
   writes nothing there (LiquidField.apply and .step stand down), but the
   first pour on a layer lands on the CPU too, since `gpuNative` is set only
   by a step, and from then on every step said `dirty = true`: the whole
-  grid, 1.33 MB of zeros a step until the plate is cleared. The flush itself
-  is not nothing: the solver's fold (foldDeltas) is where its liquidForces
-  and the soap's thinning of the dye run, and they run on a step that
-  flushes and on no other. So the step still asks for the fold, as a video
-  frame does, and hands no rows. The solver here takes addLiquidDrop, as
-  the real one does, so the field knows the GPU holds the liquid.
+  grid, 1.33 MB of zeros a step until the plate is cleared. That flush was
+  once not nothing: the solver's liquidForces and the soap's thinning of
+  the dye ran in its fold and on no other step, so this line first asked
+  for the fold with no rows. Since 15e-1 they run in the solver's own step
+  (stepLiquids, held by `npm run liquidsgpu`), nothing of the liquids' is
+  left in the fold, and the line is turned: the step asks for no flush at
+  all. The solver here takes addLiquidDrop, as the real one does, so the
+  field knows the GPU holds the liquid.
 */
 const liq = new FluidSimulation(L, 0, 0, 0.1);
 const liqGpu = keeper();
@@ -270,20 +272,20 @@ for (let k = 0; k < 4; k++) {
   liqSteps.push({ due, rows: said ? said.reduce((n, v) => n + v, 0) : L, written, bytes: liqGpu.bytes - before });
 }
 /*
-  The loop above acts the step's own test out (`dirty || foldDue`), so it
-  would pass with `foldDue` dropped from FluidSimulation.step, where the
-  fold would then never run in the app (the check-skeptic, 2026-11-13). The
-  step itself needs a whole show's settings to call, so its test is read
-  from the source: the flag it flushes on and what it tells the solver.
+  The loop above acts the step's own test out (`dirty || foldDue`), and a
+  video pour's fold (14ab-2) rides the same test: with `foldDue` dropped
+  from FluidSimulation.step the fold would never run in the app and the
+  lines here would not see it (the check-skeptic, 2026-11-13). The step
+  itself needs a whole show's settings to call, so its test is read from
+  the source: the flag it flushes on and what it tells the solver.
 */
 const stepSrc = (await import('node:fs')).readFileSync(new URL('../src/sim/fluidSimulation.ts', import.meta.url), 'utf8');
 check('the step flushes on a fold that is due as on rows written, and tells the solver it did',
   /const applied = this\.dirty \|\| this\.foldDue;\s*if \(applied\) this\.flushDeltas\(p\.dt\);[\s\S]{0,120}this\.gpu\.step\(p, applied\);/.test(stepSrc),
   'FluidSimulation.step: `applied = this.dirty || this.foldDue`, flushDeltas on it, gpu.step(p, applied)');
-check('the liquids\' step with the GPU holding them still asks for the fold, and hands it no rows',
-  // The first step re-sends the rows the attach's whole flush held (rowsToWrite); from the second, nothing.
-  liqSteps.every((s, k) => s.due && s.rows === 0 && s.written === 0 && (k === 0 || s.bytes === 0)),
-  liqSteps.map((s, k) => `step ${k + 1}: ${s.due ? 'fold' : 'no fold'}, ${s.rows} rows, ${MB(s.bytes)}`).join('; '));
+check('the liquids\' step with the GPU holding them asks for no flush: nothing due, no rows, no bytes',
+  liqSteps.length === 4 && liqSteps.every((s) => !s.due && s.rows === 0 && s.written === 0 && s.bytes === 0),
+  liqSteps.map((s, k) => `step ${k + 1}: ${s.due ? 'a flush due' : 'no flush'}, ${s.rows} rows, ${MB(s.bytes)}`).join('; '));
 
 // Controls.
 const sneak = new FluidSimulation(L, 0, 0, 0.1);

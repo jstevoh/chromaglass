@@ -52,16 +52,17 @@
   3 and 7 unchanged, the step two dispatches lighter. Air on a plate with
   no bubble: one pass a step and two textures alive.
 */
-const MAIN_OPEN = 500;
+const MAIN_OPEN = 502;
 const MAIN_REST_CORRECTIONS = 3; // the dye's and the two liquids'
 const MAIN_REST_CARRIES = 7; // two for each of those, one for the grain
 /*
   46g (2026-11-13): the two liquids' fields are carried only once a liquid
   has been poured (carryLiquids in src/gpu/fluid/passes.ts), so the plate
   encode leaves, a dye drop and no liquid, carries the dye and the grain and
-  nothing else: one correction and three carries, the step six dispatches
-  lighter (494). Main's numbers above are still what a step makes once
-  something is poured, so the open plate is counted twice: as encode leaves
+  nothing else: one correction and three carries, 494 dispatches. Main's
+  numbers above are still what a step makes once something is poured (with
+  15e-1's two passes, soapThin and liquidForces, which the same flag gates
+  and which made main's poured step 502 where it was 500), so the open plate is counted twice: as encode leaves
   it, for 46g's own line, and again after one drop of a liquid, the control
   that the gate opens (a gate that never opened would pass 46g's line and
   leave every poured liquid standing still on a moving plate) and the plate
@@ -70,7 +71,7 @@ const MAIN_REST_CARRIES = 7; // two for each of those, one for the grain
   The open plate's count alone would leave the thin gap's half of the gate
   unseen (the check-skeptic, 2026-11-13: a thin branch that carried nothing
   was green), and a clear followed by a pour unrun, so both are stepped
-  too: the thin step with a liquid poured makes 66 more dispatches than
+  too: the thin step with a liquid poured makes 68 more dispatches than
   without, at least that many of them binding the liquids' own textures,
   and a cleared plate carries none until it is poured on again. Not held
   here, and written into PLAN 46t: that the poured liquid then moves as far
@@ -79,8 +80,8 @@ const MAIN_REST_CARRIES = 7; // two for each of those, one for the grain
 */
 const BARE_REST_CORRECTIONS = 1; // the dye's
 const BARE_REST_CARRIES = 3; // the dye's two, the grain's one
-const LIQUIDS_DISPATCHES = 6; // a correction and two carries for each of the two fields
-const LIQUIDS_THIN = 66; // in the thin gap: a dispatch and 32 substeps (indirect) for each of the two
+const LIQUIDS_DISPATCHES = 8; // a correction and two carries for each of the two fields, and stepLiquids' two (15e-1)
+const LIQUIDS_THIN = 68; // in the thin gap: a dispatch and 32 substeps (indirect) for each of the two, and stepLiquids' two
 
 export const ENCODE_OWED = ['h2c5', 'h2c8'];
 

@@ -2185,7 +2185,7 @@ export default function App() {
       <LiquidVisualizer
         ref={wallEngineRef}
         onBackLookCleared={backLookCleared}
-        audioData={null} hear={hear}
+        audioData={null} hear={hear} heardNews={earOwn.subscribe}
         settings={walled ? wallSettings : effectiveSettings} ride={ridePlate.wall}
         seedCount={wallLook ? wallLook.seedCount : seedCount} spinFlick={wallLook ? wallLook.spinFlick : spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer}
@@ -2232,7 +2232,7 @@ export default function App() {
           key="draft"
           ref={visualizerRef}
           draft
-          audioData={null} hear={hear} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
+          audioData={null} hear={hear} heardNews={earOwn.subscribe} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
           selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
           onAim={aimMacro}
           toolAmount={toolAmount}

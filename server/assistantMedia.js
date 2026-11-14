@@ -50,11 +50,17 @@ export const mediaFolders = (env = process.env) => (env.CHROMAGLASS_MEDIA_DIR
   every personal photo the owner has, and an assistant steered by somebody's
   words could put one up as the mark, which goes to every cast and relay
   receiver too (found in review). A path through any .photoslibrary is
-  refused before it is looked at.
+  refused before it is looked at, and judged again where the file really is
+  (the security review of 2026-11-13: the test read only the typed path, so a
+  link or alias in ~/Pictures pointing into the library passed, and Photo
+  Booth's library, also in ~/Pictures and every bit as personal, was never
+  named).
 */
-const admit = (raw, types, what) => (typeof raw === 'string' && /\.photoslibrary(\/|$)/i.test(raw)
-  ? { reason: 'the assistant never opens the Photos library: export the picture to ~/Pictures or ~/Movies first' }
-  : admitFile(raw, { folders: mediaFolders(), types, at: MEDIA_PATH, what, only: 'the assistant opens films and pictures from the media folders only' }));
+const PRIVATE_LIBRARY = /(\.photoslibrary|Photo Booth Library)(\/|$)/i;
+const NO_LIBRARY = 'the assistant never opens the Photos or Photo Booth library: export the picture to ~/Pictures or ~/Movies first';
+const admit = (raw, types, what) => (typeof raw === 'string' && PRIVATE_LIBRARY.test(raw)
+  ? { reason: NO_LIBRARY }
+  : admitFile(raw, { folders: mediaFolders(), types, at: MEDIA_PATH, what, only: 'the assistant opens films and pictures from the media folders only', refuse: { test: PRIVATE_LIBRARY, reason: NO_LIBRARY } }));
 
 /** The guard's copy of the display's `media`: the cameras' names and the shelf's cartoons. */
 export function mediaOf(m) {
