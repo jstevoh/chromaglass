@@ -351,6 +351,13 @@ fn chemOnGround(c: vec3f, painted: vec3f, tint: vec3f, w: f32) -> vec3f {
 
 /** The blur the gooey edge is made of, and the decode every plate goes through. */
 const DECODE = /* wgsl */ `
+const W5 = array<f32, 25>(
+  0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902,
+  0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
+  0.02193823, 0.09832033, 0.16210282, 0.09832033, 0.02193823,
+  0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
+  0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902
+);
 ${BLUR_ALPHA_WGSL}
 ${LIT_STAGE_WGSL}
 

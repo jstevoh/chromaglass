@@ -1,16 +1,9 @@
 /**
- * The 5x5 Gaussian kernel and `blurAlpha` helper for the gooey edge decode,
- * moved out of `plate.ts` so `plate.ts` stays under its size budget.
+ * The `blurAlpha` helper for the gooey edge decode, moved out of `plate.ts`
+ * so `plate.ts` stays under its size budget (reads `W5` defined right above
+ * `${BLUR_ALPHA_WGSL}` in `plate.ts`).
  */
 export const BLUR_ALPHA_WGSL = /* wgsl */ `
-const W5 = array<f32, 25>(
-  0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902,
-  0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
-  0.02193823, 0.09832033, 0.16210282, 0.09832033, 0.02193823,
-  0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
-  0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902
-);
-
 fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
   if (U.derivedOn > 0.5 && blurFluid * U.gridSize < 0.5) {
     let d = blurFluid * 1.554;
