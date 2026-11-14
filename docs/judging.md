@@ -2783,3 +2783,13 @@ whole dish. Judge from the before and after films (same look, same song, same se
 3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
    swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
    too much in the quiet parts.
+
+## 132. A network display over https (PLAN 14m-https)
+
+Start the show on the Mac (`npm run remote` or the Mac app) and open the network display address
+it prints, `https://<laptop-ip>:3443/?cast=true&key=…`, on a second computer, a tablet or a
+TV's browser on the same Wi-Fi. The browser should warn once that the connection is not
+private; choose Advanced, then Proceed (Safari: Show Details, then visit this website). The
+plate should then come up and follow the laptop, as a projector on HDMI does. Say which
+browsers took it, and whether the warning came back on a later visit (it should not on the same
+device, unless the laptop's Wi-Fi address changed).

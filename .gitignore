@@ -54,3 +54,6 @@ server/.show-key
 server/.assistant
 server/.tvs.json
 server/.license.json
+
+# The show server's https certificate (PLAN 14m-https), made on its first launch.
+server/.tls/

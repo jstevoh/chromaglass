@@ -1,5 +1,6 @@
 import { Info } from './Info';
 import type { RelayInfo, RemoteMessage } from '../lib/remoteProtocol';
+import { NetworkDisplayAddresses } from './NetworkDisplayAddresses';
 
 /**
  * The cast menu's two network entries: a network display, which runs its own
@@ -79,24 +80,7 @@ export function CastNetworkItems({ relay, mirrorCount, tv }: { relay: RelayInfo 
       <div className="px-3 py-2.5 rounded-lg" data-testid="cast-network">
         <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
         {relay ? (
-          <>
-            <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
-            {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-              <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-            ))}
-            {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
-              <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-            )}
-            <div className="mt-2">
-              <Info label="">
-                Open one of these on a projector, a TV or a tablet and it shows the
-                show. Across buildings or other access points: run{' '}
-                <span className="font-mono">npm run tunnel</span> and use the https
-                address it prints, with the same{' '}
-                <span className="font-mono">?cast=true&amp;key=…</span>.
-              </Info>
-            </div>
-          </>
+          <NetworkDisplayAddresses relay={relay} />
         ) : (
           <div className="text-[11px] opacity-50 leading-snug mt-0.5">
             Needs the show server: run <span className="font-mono">npm run remote</span>.

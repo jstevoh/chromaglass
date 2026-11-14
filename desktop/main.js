@@ -833,6 +833,9 @@ async function start() {
   process.env.CHROMAGLASS_TV_FILE ??= join(app.getPath('userData'), 'tvs.json');
   process.env.OSC_PORT = String(show.oscMode === 'off' ? 0 : show.osc);
   process.env.OSC_BIND = OSC_BINDS[show.oscMode] ?? OSC_BINDS.local;
+  // The https certificate for network displays (PLAN 14m-https) lives with the
+  // app's own data: the server's folder is inside the app, which is read-only.
+  process.env.TLS_DIR ??= join(app.getPath('userData'), 'tls');
   const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
   const licenseMgr = createServerLicenseManager({ filePath: licenseFile });
   await licenseMgr.initFromEnv();

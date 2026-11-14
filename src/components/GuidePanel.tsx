@@ -507,8 +507,9 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Second display</Em> opens a window on a projector that mirrors this canvas pixel
           for pixel — one render, at the projector's own resolution, with the laptop
-          keeping the controls. <Em>Network display</Em> gives an address any browser on the
-          same Wi-Fi can open. <Em>Chromecast</Em> uses Chrome's own picker.
+          keeping the controls. <Em>Network display</Em> gives an https address any browser on
+          the same Wi-Fi can open; its browser warns once that the connection is not private
+          (Advanced, then Proceed), since the GPU runs only on a secure page. <Em>Chromecast</Em> uses Chrome's own picker.
         </P>
       </>
     ),
