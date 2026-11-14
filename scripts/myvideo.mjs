@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * `npm run myvideo`: a video of one's own plays, pours, is read, and is
- * framed (PLAN 14ag). It replaces `npm run cartoons`, whose shelf is gone.
+ * framed (PLAN 14ag). It replaces the cartoons check, whose shelf is gone.
  *
  * What the owner reported (2026-11-13): "if I load my own background video I
  * can't 'pour' it, only load it to play. Let's just get rid of the demo videos

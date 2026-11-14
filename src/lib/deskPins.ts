@@ -150,6 +150,8 @@ const SECTION_OF: Record<string, string> = {
   moireSpin: 'moire',
   beatLead: 'audio-input',
   filmDrive: 'film',
+  // The video's framing (PLAN 14ag), learnable in midi.ts, drawn in Video.
+  filmZoom: 'film', filmX: 'film', filmY: 'film',
   // The four masters, with the patch bay they pull down.
   filmImpact: 'film',
   soundImpact: 'audio-input',
@@ -248,9 +250,6 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'exposure', label: "Exposure", min: 0, max: 1, section: 'lamp' },
   { key: 'filmMix', label: "Film Mix", min: 0, max: 1, section: 'film' },
   { key: 'filmKey', label: "Film Key", min: 0, max: 0.9, section: 'film' },
-  { key: 'filmZoom', label: "Video Zoom", min: 0.25, max: 4, section: 'film' },
-  { key: 'filmX', label: "Video Across", min: -1, max: 1, section: 'film' },
-  { key: 'filmY', label: "Video Up", min: -1, max: 1, section: 'film' },
   { key: 'macroHold', label: "Shot Length", min: 1, max: 60, section: 'macro', wanderSpan: 14 },
   { key: 'macroAimX', label: "Macro Aim Across", min: 0, max: 1, section: 'macro' },
   { key: 'macroAimY', label: "Macro Aim Up", min: 0, max: 1, section: 'macro' },
