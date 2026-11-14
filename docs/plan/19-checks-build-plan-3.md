@@ -423,11 +423,18 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   own (no runner worker among its ancestors), waits two minutes, then
   fails listing it; the watchdog reads that step's failure and moves the deploy to
   GitHub's Macs at once (`npm run macguard`). Recovery that night: the deploy run by hand
-  with `hosted`. **19ah-9a** built below; open: **19ah-9b**, `startup` prints "nothing built
-  behind it" when its 45 s wait for the half behind the show ran out with it still
-  building, which read as the show asking for nothing (the script is over 100 KB, so the
-  wording waits for its split); and the 45 s wait has 7 s to spare on GitHub's Macs
-  (38.45 s behind on deploy 671).
+  with `hosted`. **19ah-9a** built below. **19ah-9b** shipped 2026-11-14
+  (`docs/plan-shipped.md`): startup waits for the half behind the show while the app says
+  its builds still come in, and that half builds two at a time. Open: **19ah-9c**, below.
+- **19ah-9c. Open: a look changed to while the half behind the show is building.** That
+  half is 113 builds now (it was fifty-odd in October), and until it is done a look that
+  needs one of them builds it on the frame, the freeze `gpu/prepare.ts` exists to take
+  away. On GitHub's Macs it took 28 to 46 s one at a time; 19ah-9b builds it two at a
+  time. No check changes look inside that window: startup's "no pipeline was built on a
+  frame" changes looks only once the half is done. Wanted: the half's time on the owner's
+  Mac after 19ah-9b (startup's line prints its pace against the opening's), a look change
+  at a few seconds into the half to see what it costs, and whether the half should be
+  asked in the order looks are likeliest to need it (the set list's next look first).
 - **19ah-9a. Built: work begun mid-shard waits for the deploy, or hands it back.** Main's
   deploy of 2026-11-08 began its Mac shards at 18:16Z, each past its first look, and then
   sessions began GPU work on the Mac: filming the hero, `lampzero.mjs`, `renders.mjs` in
