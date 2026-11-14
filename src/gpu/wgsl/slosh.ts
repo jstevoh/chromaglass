@@ -39,6 +39,8 @@ struct Slosh {
   b: vec4f,
   // n, rest depth, lens thickness, the oil share's grid (0 for no oil)
   c: vec4f,
+  // the dish's spin Ω (rad/s), its change Ω̇ (rad/s²), 0, 0: the turning frame's forces (lib/slosh.ts SloshDish.spin, PLAN 22n)
+  s: vec4f,
   // the presses (lib/slosh.ts SLOSH_PRESSES): x, y, radius, depth (plate units, 0..1 across; plate widths of head)
   p: array<vec4f, 6>,
 };
@@ -92,7 +94,7 @@ fn base(i: i32, j: i32) -> vec4f {
   let px = (f32(i) + 0.5) / n;
   let py = (f32(j) + 0.5) / n;
   let p = pressAt(px, py);
-  let z = -(S.a.y * x + S.a.z * y) / S.b.x + S.b.y * h1 + p;
+  let z = -(S.a.y * x + S.a.z * y) / S.b.x - 0.5 * S.s.x * S.s.x * (x * x + y * y) / S.b.x + S.b.y * h1 + p;
   let h = depth(w);
   var u = 0.0;
   var v = 0.0;
@@ -250,6 +252,17 @@ const STEP = /* wgsl */ `${HEAD}${SCHEME}
     if (o.y > 0.0) { if (wd) { adv += o.y * (o.xy - od); } } else { if (wu) { adv += o.y * (ou - o.xy); } }
     dox = -g * gx - adv.x / dx;
     doy = -g * gy - adv.y / dx;
+  }
+  // The turning frame's Euler and Coriolis forces (lib/slosh.ts frameForces): zero unless the dish spins.
+  if (S.s.x != 0.0 || S.s.y != 0.0) {
+    let xc = (f32(i) + 0.5) / f32(n) - 0.5;
+    let yc = (f32(j) + 0.5) / f32(n) - 0.5;
+    dqx += hc * S.s.y * yc + 2.0 * S.s.x * w.z;
+    dqy += -hc * S.s.y * xc - 2.0 * S.s.x * w.y;
+    if (o.z > 0.0) {
+      dox += S.s.y * yc + 2.0 * S.s.x * o.y;
+      doy += -S.s.y * xc - 2.0 * S.s.x * o.x;
+    }
   }
   var W = vec4f(w.x + dt * dh, w.y + dt * dqx, w.z + dt * dqy, 0.0);
   var O = vec4f(o.x + dt * dox, o.y + dt * doy, o.z, 0.0);

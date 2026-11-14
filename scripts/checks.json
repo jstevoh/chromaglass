@@ -158,6 +158,18 @@
       ]
     },
     {
+      "name": "The spun dish",
+      "shard": "logic",
+      "run": "npm run spinslosh",
+      "why": [
+        "The open dish solved in the frame that turns with the glass (PLAN 22n): spun, the",
+        "liquid heaps into the paraboloid and dye on a ring goes out to the radius its water",
+        "asks; spun up it is left behind and catches up at the floor's drag; stopped hard it",
+        "carries on past the glass; slow motors do not wake it; the hand's top speed holds.",
+        "About two minutes."
+      ]
+    },
+    {
       "name": "The panel",
       "shard": "logic",
       "run": "npm run panel",
@@ -857,6 +869,19 @@
         "order across the plate, none from a kick or a snare, a harder note a",
         "bigger drop, and a drop waiting for its pitch to settle is on the note",
         "where one placed on the onset is on the note before."
+      ]
+    },
+    {
+      "name": "The closeup comes in on liquid",
+      "shard": "logic",
+      "run": "npm run closeupland -- --node",
+      "why": [
+        "The closeup comes in on liquid, never on bare glass (PLAN.md QA-32): the",
+        "real closeup camera at 4x on made-up plates. Hold and Follow coming in on",
+        "a plate whose middle is bare frame the nearest pool from the first frame",
+        "(the control: the frame on the aim is bare); with liquid on the aim Hold",
+        "does not move; a hand's aim is obeyed; an empty plate lands on the first",
+        "pour; and the Close-up press goes in by the zoom and out with both."
       ]
     },
     {
@@ -3520,6 +3545,19 @@
         "And the liquid in the bottle, from every tool that lays one: Pour,",
         "Spray, Splat and Streak laid only its colour, so a Ferrofluid Pour",
         "was black dye the Magnet could not move (scripts/bottles.mjs)."
+      ]
+    },
+    {
+      "name": "The Close-up button lands on liquid",
+      "shard": "tools",
+      "run": "npm run closeupland",
+      "timeout": 4,
+      "why": [
+        "The desk's Close-up button on a plate cleared to one pool off the middle",
+        "(PLAN.md QA-32, the owner's blank plate): the 4x frame is lit, the",
+        "button lights and the knob reads 4x, and it comes out to the plate. The",
+        "controls: at 1x the pool is drawn, and the frame on the aim is bare glass.",
+        "On the Mac: the app's frames; a cloud session runs it with PW_WEBGPU=1."
       ]
     },
     {
