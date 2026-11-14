@@ -8,7 +8,7 @@ the component.
 
 ## Start here
 
-- `fluidSimulation.ts` (194 KB, grep it): `FluidSimulation`, one layer: its seeding
+- `fluidSimulation.ts` (165 KB, grep it): `FluidSimulation`, one layer: its seeding
   (`seedPreset`; `addOilDensity` lays a colour as the oil's own, PLAN 47z-1), pours and doses, and the hand-off to the GPU solver (`attachGpu`,
   `dropGpu`, `syncFromGpu`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
