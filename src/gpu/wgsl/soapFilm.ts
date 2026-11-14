@@ -78,6 +78,11 @@ const SETUP = /* wgsl */ `${ARGS}
 @group(0) @binding(5) var<storage, read_write> rhs: array<f32>;
 @group(0) @binding(6) var<storage, read_write> ruptured: array<u32>;
 @group(0) @binding(7) var<storage, read_write> stats: array<f32>;
+// What pushes the film from outside, on its faces in m/s: the (nx + 1) * ny
+// horizontal faces first, then the nx * (ny + 1) vertical ones. Zero unless a
+// caller writes it (the plate's air, src/gpu/soapFilmPlate.ts, 32d); the walls'
+// faces are never read, so the frame stays shut whatever is written there.
+@group(0) @binding(8) var<storage, read> ext: array<f32>;
 
 var<workgroup> wgScratch: array<vec2f, 256>;
 var<workgroup> wgMeans: vec2f;
@@ -118,18 +123,34 @@ var<workgroup> wgMaxStar: f32;
   let g = U.step.z;
   let scale = U.phys.x;
   let nVf = nx * (ny + 1u);
+  let nUf = (nx + 1u) * ny;
   var localMaxStar = 0.0;
   for (var idx = t; idx < nVf; idx += 256u) {
     let j = idx / nx;
     let i = idx % nx;
     var vStar = 0.0;
-    if (g != 0.0 && n > 1u && j > 0u && j < ny) {
-      let hFace = 0.5 * (h[(j - 1u) * nx + i] + h[j * nx + i]);
-      vStar = scale * (hFace - hbar);
+    if (j > 0u && j < ny) {
+      if (g != 0.0 && n > 1u) {
+        let hFace = 0.5 * (h[(j - 1u) * nx + i] + h[j * nx + i]);
+        vStar = scale * (hFace - hbar);
+      }
+      vStar += ext[nUf + idx];
       let av = abs(vStar);
       if (av > localMaxStar) { localMaxStar = av; }
     }
     vf[idx] = vStar;
+  }
+  // The outside push across the film (the interior horizontal faces); the
+  // buoyancy has none, so with nothing written these stay the zeros they were.
+  for (var idx = t; idx < nUf; idx += 256u) {
+    let i = idx % (nx + 1u);
+    var uStar = 0.0;
+    if (i > 0u && i < nx) {
+      uStar = ext[idx];
+      let au = abs(uStar);
+      if (au > localMaxStar) { localMaxStar = au; }
+    }
+    uf[idx] = uStar;
   }
   wgScratch[t] = vec2f(localMaxStar, 0.0);
   storageBarrier();
@@ -145,13 +166,12 @@ var<workgroup> wgMaxStar: f32;
   workgroupBarrier();
   let maxStar = workgroupUniformLoad(&wgMaxStar);
 
-  let nUf = (nx + 1u) * ny;
-  for (var idx = t; idx < nUf; idx += 256u) {
-    uf[idx] = 0.0;
-  }
   if (maxStar <= 1e-18) {
     for (var idx = t; idx < nVf; idx += 256u) {
       vf[idx] = 0.0;
+    }
+    for (var idx = t; idx < nUf; idx += 256u) {
+      uf[idx] = 0.0;
     }
     for (var c = t; c < n; c += 256u) {
       rhs[c] = 0.0;
@@ -163,7 +183,9 @@ var<workgroup> wgMaxStar: f32;
       let i = c % nx;
       let vSouth = select(0.0, vf[(j + 1u) * nx + i], j < ny - 1u);
       let vNorth = select(0.0, vf[j * nx + i], j > 0u);
-      rhs[c] = vSouth - vNorth;
+      let uEast = select(0.0, uf[j * (nx + 1u) + i + 1u], i < nx - 1u);
+      let uWest = select(0.0, uf[j * (nx + 1u) + i], i > 0u);
+      rhs[c] = vSouth - vNorth + uEast - uWest;
       if (resetP != 0u) {
         p[c] = 0.0;
       } else {
@@ -243,7 +265,7 @@ var<workgroup> wgMaxStar: f32;
     var val = 0.0;
     if (i > 0u && i < nx) {
       let row = j * nx;
-      val = -(p[row + i] - p[row + i - 1u]);
+      val = uf[idx] - (p[row + i] - p[row + i - 1u]);
       let a = abs(val);
       if (a > localUMax) { localUMax = a; }
     }

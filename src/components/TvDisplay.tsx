@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import { useWakeLock } from '../hooks/useWakeLock';
-import type { RemoteMessage, TvSignal } from '../lib/remoteProtocol';
+import { showKeyFromUrl, type RemoteMessage, type TvSignal } from '../lib/remoteProtocol';
+import { forgetTvKey, keepTvKey, keptTvKey } from '../lib/tvKey';
+import type { TvLook } from '../lib/tvLooks';
+import TvRemote from './TvRemote';
 
 /**
  * A TV at home (PLAN 12-tv, route 2): the laptop's plate, played as video.
@@ -26,9 +29,15 @@ import type { RemoteMessage, TvSignal } from '../lib/remoteProtocol';
  * What it says, in a line at the bottom that fades after a few seconds: that
  * it is live, that the show is off, or why it was turned away (a wrong key,
  * three TVs already, or a copy without Home or Pro). No pointer and no
- * controls: a TV is driven by a remote with no cursor, and the phone remote
- * already drives the show it shows. Enter, Space, F or a tap asks for full
- * screen.
+ * controls on the picture: a TV is driven by a remote with no cursor. The
+ * remote picks the look the Mac plays (PLAN 12-tv-remote, TvRemote.tsx says
+ * which keys); the phone remote still drives everything else. F or a tap
+ * asks for full screen, and so does the first OK in a TV's own browser.
+ *
+ * With no key at all (the Android TV app opening a Mac for the first time, or
+ * `/tv` typed bare), it asks the relay to pair (PLAN 12-tv-2): four digits fill
+ * the screen over the films, the laptop shows the same four with Allow, and
+ * the key the relay then hands over is kept (lib/tvKey.ts) for next time.
  */
 
 /** The films played while there is no show: the plate's own, shipped with the site. */
@@ -43,7 +52,11 @@ export const TV_CONNECT_MS = 10_000;
 /** The jitter buffer the TV asks for, in ms: a frame or so of slack on Wi-Fi, without the half second a default player holds. */
 export const TV_JITTER_MS = 50;
 
-type TvState = 'looking' | 'live' | 'films' | 'tier' | 'full' | 'denied' | 'locked' | 'lost';
+type TvState = 'looking' | 'live' | 'films' | 'tier' | 'full' | 'denied' | 'locked' | 'lost' | 'pairing' | 'refused' | 'busy' | 'again';
+/** The refusals pairing explains itself, which the link's bare `denied` must not write over. */
+const PAIR_SAYS: ReadonlySet<TvState> = new Set(['pairing', 'refused', 'busy', 'again']);
+/** How long a TV turned away because four others were asking waits before asking again. */
+export const TV_BUSY_MS = 30_000;
 
 const SAYS: Record<TvState, string> = {
   looking: 'Looking for the show…',
@@ -54,12 +67,31 @@ const SAYS: Record<TvState, string> = {
   denied: 'This address has the wrong show key: copy the TV address again from the computer running the show',
   locked: 'Too many wrong keys from this network: trying again in a few minutes',
   lost: 'The picture did not arrive: starting over',
+  pairing: 'Waiting for the computer running the show to allow this TV',
+  refused: 'The computer running the show said no to this TV',
+  busy: 'Too many TVs are asking to join at once: asking again in a moment',
+  again: 'Asking the show again…',
 };
+
+/**
+ * Start again without the key that failed: a reload, with the URL's key taken
+ * off when it was a TV's own (the Android app puts the kept one there), so
+ * the fresh page asks to pair. A show key in the URL is the person's, left as it is.
+ */
+function startOver() {
+  const url = new URL(window.location.href);
+  if (/^tv-/.test(url.searchParams.get('key') ?? '')) url.searchParams.delete('key');
+  window.location.replace(url.toString());
+}
 
 export default function TvDisplay() {
   const [state, setState] = useState<TvState>('looking');
   const [says, setSays] = useState(true);
   const [film, setFilm] = useState(0);
+  const [code, setCode] = useState<string | null>(null);
+  const [looks, setLooks] = useState<{ presets: TvLook[]; active: string | null }>({ presets: [], active: null });
+  // A URL's key wins; else the one kept from pairing; else this TV pairs.
+  const [kept] = useState(() => (showKeyFromUrl() ? null : keptTvKey()));
   const liveRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const sendRef = useRef<(m: RemoteMessage) => void>(() => {});
@@ -131,18 +163,44 @@ export default function TvDisplay() {
 
   const link = useRemoteLink({
     role: 'tv',
+    keptKey: kept,
+    pair: true,
     onMessage: (m) => {
-      if (m.type === 'tv-show') {
+      if (m.type === 'tv-code') {
+        setCode(m.code);
+        setState('pairing');
+      } else if (m.type === 'tv-key') {
+        keepTvKey(m.key);
+        setCode(null);
+        setState('looking');
+      } else if (m.type === 'denied' && m.reason === 'unpaired') {
+        // The Mac forgot this TV (or it is another Mac): pair again.
+        forgetTvKey();
+        setState('again');
+        setTimeout(startOver, 1500);
+      } else if (m.type === 'denied' && m.reason === 'expired') {
+        setCode(null);
+        setState('again');
+        setTimeout(startOver, 1500);
+      } else if (m.type === 'denied' && m.reason === 'busy') {
+        setState('busy');
+        setTimeout(startOver, TV_BUSY_MS);
+      } else if (m.type === 'denied' && m.reason === 'refused') {
+        setCode(null);
+        setState('refused');
+      } else if (m.type === 'tv-show') {
         if (m.here) { setState((s) => (s === 'live' ? s : 'looking')); armStuck(); }
         else { hangUp(); setState('films'); }
       } else if (m.type === 'tv-signal') {
         onSignal(m.signal);
+      } else if (m.type === 'tv-looks') {
+        setLooks({ presets: Array.isArray(m.presets) ? m.presets : [], active: m.active ?? null });
       }
     },
   });
   sendRef.current = link.send;
   useEffect(() => {
-    if (link.status === 'denied') { hangUp(); setState('denied'); }
+    if (link.status === 'denied') { hangUp(); setState((s) => (PAIR_SAYS.has(s) ? s : 'denied')); }
     else if (link.status === 'locked') { hangUp(); setState('locked'); }
     // No relay here at all (the site itself, or the laptop gone): films.
     else if (link.status === 'offline' || link.status === 'connecting') { hangUp(); setState((s) => (s === 'looking' || s === 'live' ? 'films' : s)); }
@@ -168,7 +226,7 @@ export default function TvDisplay() {
   // A refusal stays, since it is the only thing on the screen worth reading.
   useEffect(() => {
     setSays(true);
-    if (state !== 'live' && state !== 'films') return;
+    if (state !== 'live' && state !== 'films') return;   // pairing's line stays too
     const t = setTimeout(() => setSays(false), 6000);
     return () => clearTimeout(t);
   }, [state]);
@@ -177,10 +235,18 @@ export default function TvDisplay() {
     if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => { /* the TV app is full screen already */ });
   }, []);
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'f' || e.key === 'F') fullScreen(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'f' || e.key === 'F') fullScreen(); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [fullScreen]);
+  // OK in a TV's own browser goes full screen first, as it did before the
+  // remote picked looks; in the TV app (full screen already) it is Random at once.
+  const fullScreenFirst = useCallback(() => {
+    if (window.ChromaglassTv || document.fullscreenElement || !document.documentElement.requestFullscreen) return false;
+    fullScreen();
+    return true;
+  }, [fullScreen]);
+  const pickLook = useCallback((presetId: string) => link.send({ type: 'tv-pick', presetId }), [link]);
 
   const live = state === 'live';
   const films = !live;
@@ -213,9 +279,23 @@ export default function TvDisplay() {
           onError={() => setFilm((f) => f + 1)}
         />
       )}
+      {state === 'pairing' && code && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-white text-center px-[6vw]" data-testid="tv-pair">
+          <div className="opacity-80" style={{ fontSize: 'clamp(16px, 2.4vw, 40px)' }}>To show ChromaGlass on this TV, allow it on the computer running the show</div>
+          <div className="font-mono font-semibold tracking-[0.3em] my-[4vh]" style={{ fontSize: 'clamp(56px, 14vw, 240px)' }} data-testid="tv-pair-code">{code}</div>
+          <div className="opacity-60" style={{ fontSize: 'clamp(13px, 1.6vw, 26px)' }}>It shows there as “A TV wants to join” with these four digits: press Allow.</div>
+        </div>
+      )}
+      <TvRemote
+        presets={looks.presets}
+        active={looks.active}
+        enabled={looks.presets.length > 0 && (state === 'live' || state === 'looking')}
+        pick={pickLook}
+        fullScreenFirst={fullScreenFirst}
+      />
       <div
         data-testid="tv-says"
-        className="absolute left-0 right-0 bottom-0 px-[4vw] pb-[4vh] pt-[8vh] text-white/85 transition-opacity duration-1000"
+        className="absolute left-0 right-0 bottom-0 px-[4vw] pb-[4vh] pt-[8vh] text-white/85 transition-opacity duration-1000 pointer-events-none"
         style={{
           opacity: says ? 1 : 0,
           fontSize: 'clamp(14px, 1.8vw, 28px)',

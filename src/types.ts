@@ -1,5 +1,6 @@
 import type { SourceName } from './lib/audioFeatures';
 import type { HitFeature } from './lib/hitSource';
+import type { NoteFeature } from './lib/noteVoices';
 
 export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
@@ -207,7 +208,7 @@ export type SceneFeature =
  * (`lib/hitSource.ts`). Its own source because its features are its own
  * names, and Sound Impact is its master too.
  */
-export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape';
+export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'notes' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -236,7 +237,7 @@ export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
   /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName | HitFeature;
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature | NoteFeature;
   /**
    * Any numeric setting — the same list a MIDI fader can learn — or, on a
    * cord aimed at an area, what the hand does there (`AreaTarget`).
@@ -329,6 +330,14 @@ export interface VisualizerSettings {
   inkTitleSize: number;
   inkTitleY: number;
   inkTitleSweep: number;
+  /*
+    The logo melted at the start of a film or a stream (PLAN 37x-11,
+    lib/logoMelt.ts): when the Live Show goes on air or the Record button
+    starts a take, the ChromaGlass wordmark is poured big across the plate as
+    thick ink, held for a couple of seconds, then rinsed through and stirred
+    until it melts into the show's first colour. Off keeps today's films.
+  */
+  logoMelt: boolean;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -509,6 +518,16 @@ export interface VisualizerSettings {
     two drops merge the moment their edges meet.
   */
   filmHold: number;
+  /**
+    Oil Weight (PLAN 27f-9c): the oil's density against the water when cold,
+    −1 to 1. Below 0 it is lighter and floats up a standing plate (−0.05 is
+    the light mineral oil every oil look had); above 0 it is heavier and
+    sinks, as a lava lamp's wax does. Every oil swells with heat more than
+    water, so a warmed body of heavy oil turns light and rises
+    (gpu/fluid/constants.ts OIL_RHO, OIL_EXPAND). Needs Oil Tension, and a
+    standing plate (Gravity) for the weight to act.
+  */
+  oilWeight: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
@@ -592,6 +611,8 @@ export interface VisualizerSettings {
     exists is reachable through Buoyancy, and boiling is unbuilt.
   */
   evaporationRate: number;
+  /** The projector lamp's thermal power (PLAN 36e-2): 0 is off (every look opens as today); up to 1 heats the dish under the lamp so a held finger blocking the fan's air boils the spot. */
+  heat?: number;
   
   // Manual/Interaction
   airVelocity: number;
@@ -915,6 +936,20 @@ export interface VisualizerSettings {
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
+  soapFilm: number;           // the frame's draining soap film over the plate, its reflection 0 (off) to 1 (PLAN 32d)
+  soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
+  soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
+  glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
+  lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
+  sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
+  sideLightHue: number;       // the side lamp's colour as a hue, degrees (30 amber, 0 red, 320 magenta)
+  sideLightAngle: number;     // where round the dish the side lamp stands, degrees from the right, counter-clockwise
+  tank: number;               // a tank of water seen through its side instead of the dish: 0 off, else the dye's glow (PLAN 47n)
+  tankFeed: number;           // the nozzle's speed, cm/s: how fast dye is fed in at the surface (47n)
+  tankWeight: number;         // how much heavier the dye is than water, %: what gravity pulls it down with (47n)
+  tankNozzle: number;         // where the nozzle sits across the tank, 0..1 (a held finger carries it too) (47n)
+  tankDrain: number;          // the share of the fed water drained through the floor, 0..1; the rest raises the level and the dye pools (47n)
+  tankHue: number;            // the dye's glow, degrees of hue (47n)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -995,6 +1030,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleSize: 0.5,
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
+  logoMelt: false,
   beatPrediction: 0.7,
   beatLead: 80,
   /*
@@ -1055,6 +1091,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
+  oilWeight: -0.05,         // the light mineral oil every oil look had: it floats up a standing plate
   surfactantFlow: 0,
   soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
@@ -1128,6 +1165,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
+  heat: 0,                  // off: every look opens as today, byte for byte (PLAN 36e-2)
   cometSpeed: 0.0,
   cometAngle: 0.0,
   // Enough to be felt without the plate ever looking like it is pulsing to a
@@ -1181,6 +1219,20 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   microDroplets: 0,
   thinFilm: 0,
   filmPhysics: 0,           // the rainbow: the film every look was made with
+  soapFilm: 0,              // no film in the frame: every look but Soap Film
+  soapFilmRate: 1,
+  soapFilmAngle: 0,
+  glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
+  lensStop: 4,
+  sideLight: 0,
+  sideLightHue: 30,
+  sideLightAngle: 160,
+  tank: 0,                  // the dish from above: every look but the tank's
+  tankFeed: 1.5,
+  tankWeight: 0.5,
+  tankNozzle: 0.5,
+  tankDrain: 1,
+  tankHue: 205,
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,

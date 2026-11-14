@@ -11,6 +11,7 @@ import type { SetItem, SetList } from '../lib/setList';
 import type { ShowSequence } from '../lib/sequencer';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { MixSource } from '../lib/mixer';
+import { setGoDoor } from './setNow';
 
 /**
  * Taking a look to the stage over a fade, without a clear: Go on the armed
@@ -268,6 +269,36 @@ export function useLookFades({
     fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
+
+  /*
+    The owner's assistant arms and Goes through the desk's own callbacks
+    (app/setNow.ts, PLAN 44k-3): an item armed by number is what a click on
+    its row arms, a Go now is the palette's, the back plate's three are the
+    Mixer's. Each says why not where the desk would do nothing in silence (an
+    item whose look has gone, a look not in the library, a sequence armed for
+    the back plate), so the assistant hears it rather than reporting a Go
+    that never happened.
+  */
+  useEffect(() => {
+    const items = () => setListRef.current.items;
+    const gone = (i: number) => `item ${i + 1}'s look or sequence is not here any more`;
+    const known = (id: string) => (isUserPresetId(id) ? userPresetsRef.current.some(p => p.id === id) : !!findPreset(id));
+    setGoDoor({
+      // A fade named with the arm is that Go's own, as an item's own fade is (`sendLook` reads it first).
+      arm: (i, seconds) => { const look = items()[i] ? lookOfItem(items()[i]) : null; if (!look) return gone(i); setCued(seconds === undefined ? look : { ...look, fade: seconds }); return null; },
+      goItem: (i, seconds) => { const look = items()[i] ? lookOfItem(items()[i]) : null; if (!look) return gone(i); sendLook(look, seconds ?? look.fade ?? fadeSeconds); return null; },
+      goLook: (id, seconds) => { if (!known(id)) return `no look ${id} in the library`; goLookNow(id, seconds); return null; },
+      backArmed: (seconds) => {
+        if (!cued) return 'nothing is armed';
+        if (cued.sequence) return 'a sequence is a whole show, not a dish: it has no back plate';
+        goBackPlate(seconds);
+        return null;
+      },
+      backLook: (id, seconds) => { if (!known(id)) return `no look ${id} in the library`; backLookNow(id, seconds); return null; },
+      backFollow: () => { backFollowsFront(); return null; },
+    });
+    return () => setGoDoor(null);
+  }, [lookOfItem, sendLook, goLookNow, goBackPlate, backLookNow, backFollowsFront, cued, fadeSeconds]);
 
   useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
 

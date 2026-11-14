@@ -54,6 +54,7 @@ function labelFor(key: string, presets: { id: string; name: string }[]): { name:
     const c = PALETTE[Number(id)];
     return { name: c?.name ?? `Dye ${id}`, swatch: c?.hex };
   }
+  if (kind === 'voices') return { name: `Notes as voices (${id || 'dropper'})` };
   return { name: key };
 }
 

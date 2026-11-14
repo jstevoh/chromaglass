@@ -13,6 +13,21 @@ item it says so and names it, rather than taking a new number for the same work.
 Left out on purpose: the macro closeup's 3D beads (their tops, rims and the mask), which
 the "Closer 3D macro view" work owns now (14ab-6, #601).
 
+The music's stir, from the third pass (38u, 2026-11-13; its ranked list is in section 38u,
+which the audit's own PR adds at the foot of this file, and these lines join it there):
+
+- ~~**38u-5. Mid and treble stir the dye directly**~~, and ~~**38u-4**'s multiplier~~ —
+  **Shipped 2026-11-13** (the story is in `docs/plan-shipped.md`). The solver's step takes no
+  sound; every look carries one cord, the sound's mids on Turbulence; `npm run musicstir`.
+  The rest of 38u-4 (the stir as a tool, not curl noise on a clock) stays open.
+- **38u-16. A look saved before 38u-5 has no stir cord** (S; Medium). The built-in looks gain
+  the cord where they are defined; a look the owner saved earlier, a draft, and a look built
+  from the defaults keep their own cords and so stir less with music than they did, until
+  Music Stir is raised (the phone) or the patch is added (Patches). Give a saved look the
+  cord once as it is read (`sanitizeSettings`), with a mark in the saved look that says it
+  has been asked, so a cord the owner pulls stays pulled. Check: `musicstir` gains a saved
+  look from before, read back with its cord, and one with the mark and no cord, left alone.
+
 How it is ranked: what a person would see change on the wall, against what it costs to
 build and what it adds to the frame. S is under a day, M a few days, L a week or more.
 Every item here keeps today's look reachable until the Mac has judged the new one (the
@@ -146,11 +161,17 @@ written first. Line numbers are as read on main at d07ac31.
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
   *Found reading it for the build (2026-10-30), before any of it was built:*
-  - **The heat is not carried on a thin gap.** The temperature lives in the velocity's z,
-    and a thin gap skips the self-advection (`fluid.ts`, step 2's `if (thin) return`), so
-    the lamp's heat stays where it was laid while the flow it drives moves the colour out
-    from under it: a warm patch cannot rise as a thermal, it pushes from a fixed place.
-    The build starts here: carry h·T with the gap's flow, as the dye's amount is carried.
+  - ~~**The heat is not carried on a thin gap.**~~ **Shipped** (38f-1, 2026-11-11): the heat
+    rides the liquid as the colour does, h·T beside h through the thin solve's faces
+    (`carryHeat`, heatPack in `wgsl/fluid/dye.ts`). Story in `docs/plan-shipped.md` §38f-1.
+  - ~~**38f-2. The oil's free energy let a smear of it rest.**~~ **Shipped** (2026-11-11, with
+    38f-1): mixMu's double well is a deep quench, its spinodal 0.05 from either pure liquid
+    (`OIL_SPINODAL`) instead of the quartic's 0.21, so the haze the carried heat's plumes
+    left behind comes apart into the bodies. Story in `docs/plan-shipped.md` §38f-2.
+  - ~~**A standing lamp's cool top.**~~ **Shipped** (27f-9e, 2026-11-12): under a standing
+    plate's lamp the heat crosses the gap to the cool upper glass at π²κ/h² on real seconds
+    (`lampCoolOf`, mixForce), so Lava Lamp's wax cycles. Every other look still cools by
+    Heat Decay on the look's clock (below). Story in `docs/plan-shipped.md` §27f-9e.
   - **The heat runs on the look's clock.** `decayVel` heats at `lampHeat·S.dt` and cools
     at `heatDecay^(4·S.dt)`, and S.dt is the look's step (Speed × 0.2), not seconds. On
     Classic's clock (0.0018 a step against a sixtieth) the default 0.98 is about 115 s in
@@ -278,6 +299,43 @@ written first. Line numbers are as read on main at d07ac31.
     look it was written as and named so. Owner's call on the looks. *Measure:* `npm run
     nolight` line 15 prints the projector's number beside the camera's; ask it under
     line 15's bar when this ships.
+  - ~~**38h-15**~~ *shipped 2026-11-11.* A bubble's outline drawn from its own disc at the
+    screen's resolution, not from the air field's texels (`wgsl/bubbleShape.ts`): the owner's
+    "they look like a old computer drew them". `npm run bubbleround`. Story in
+    `docs/plan-shipped.md` §38.
+  - **38h-16. The plate still reads the grid's hole round a bubble** (S–M, nil). Found doing
+    38h-15. The solver cuts the dye out under a bubble on its grid, so the dye the plate
+    decodes is thinned over a texel and a half inside each rim and, through the bicubic
+    read, a texel or two outside it. 38h-15 draws the rim from the disc and the camera's
+    view through the wall reads past the ramp outside the rim (`airLiquid`). Inside the rim
+    the camera still reads the field's thinned hole, and `npm run airlens`'s closeup line
+    (the camera's light through a small ball's wall 0.85 to 1.05 of the liquid round it)
+    leans on that: read as clear air, with `airColumn` putting back the liquid above and
+    below, it is 2.09, so that line wants re-deriving from a ray traced through a ball
+    (two refractions, where `2ρ·tan(turn)` lands short of the rim) before the hole is made
+    sharp there. And the projector's band is
+    `outColor` times a tenth, and `outColor` is the main decode at the pixel: on the dark
+    ground a dim ring of thinned dye inside every band, its inner edge the grid's; between
+    two bubbles closer than about two cells the grid leaves no dye at all, where the liquid
+    is a thin bridge; and `airNear` flattens the relief over the field's coarse coverage.
+    The fix is the same sharp hole at the main decode (`decodeFluidParts` at `fuv0`): inside
+    a rim no liquid, in the ramp past it the liquid radially out where the grid's hole ends,
+    for one more gather a pixel while bubbles are on (perf §46 to measure it on the Mac).
+    *Measure:* `npm run bubbleround` with a line for the pair at one cell apart, the dye
+    between them read against the dye round them.
+    Tried building 38h-17 (2026-11-11), both kept out: (a) the main decode moved past the
+    ramp (`fuv0` taken radially out to the hole's end) drew radial streaks in the liquid
+    between two bubbles a few cells apart, where each pixel's nearest bubble flips and the
+    stretched read lands in the other's hole; it wants the pair's own rule. (b) The camera's
+    read inside the rim taken as the liquid round it put `npm run airlens`'s closeup line at
+    0.50 (as clear air it was 2.09; the field's hole gives about 1): the wall's light then
+    crosses the liquid twice (`airColumn` adds it above and below), so the line's re-derivation
+    from a traced ray comes first. The owner's "dark-cored holes with serrated rims" in Macro
+    Bead's closeup are this item: the ring between a bubble's dark core and its round rim is
+    that inside read, its edge the grid's at a dozen screen pixels a texel.
+  - ~~**38h-17**~~ *shipped 2026-11-11.* The oil beads' rings read at the screen's resolution
+    from their list, not the 512² eight-bit mask (`wgsl/beadShape.ts`). `npm run beadround`.
+    Story in `docs/plan-shipped.md` §38.
   - ~~**38h-4**~~ *shipped 2026-10-31.* The back plate's lamp takes the pigment's grain as
     dye, T^grain (`lampGrain1`), as the front's does. `npm run grainedge` line 4. Story in
     `docs/plan-shipped.md` §38.

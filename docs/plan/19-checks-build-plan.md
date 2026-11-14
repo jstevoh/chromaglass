@@ -272,6 +272,13 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
     `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
     checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
     #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
+- **19k-11c, shipped 2026-11-13** (E, S). **`lab4` over its 25 minutes on the slow tier.**
+  `glint` (47e, #833) and `bubbleair` had joined `holeline`, `encode --grids` and `shaderdials`
+  in `lab4`, and on GitHub's slow ubuntu tier it was cancelled at the limit on two of the day's
+  four PR runs (#842 and #835), no check failing: about 15 minutes of checks ahead of
+  holeline's 11. `glint` moved to `lab9` (3:50 that day) and `bubbleair` to `lab8` (4:24);
+  no bar, timeout or check body changed, only each check's shard in `scripts/checks.json`
+  and the comment above `timeout-minutes` in `checks.yml`. The bound stays 25.
 - **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
   slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
   0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
@@ -301,22 +308,23 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-15** (E, S): **shipped**, `ears`'s covered line holds each tick to the wall's ask
   before it (more than 250 ms after, EAR_ASK_HOLD_MS) rather than wanting none; red on GitHub's
   Macs on #718 and #734 at one tick each. Story in `docs/plan-shipped.md` §19k-15.
-- **19k-16, open** (E, S). **`draftwall --frames` reads 0 painted frames on a GitHub Mac.** On
-  #734's run (2026-11-08) "the projector window is painted from the wall's canvas" counted 0
-  frames from either canvas over 8.2 s while the wall's engine drew 334; #718's the same day
-  counted 26 against 121 and passed. Once, on a PR that does not touch the wall. Not known
-  whether the show stopped handing frames over, the window dropped them (a size of 0 returns
-  early in `CastDisplay`'s `paint`) or the patched drawImage missed them; since 19k-15's PR the
-  line prints what the window says of itself (mirror hooked, its own `paints` over the window,
-  stage and source sizes, dark). Next: read that on the next red, then fix the side it names.
-  The bar stays.
-- **19k-17** (E, S): **shipped**, `ears`'s windows last until the runner has offered enough
-  (30 frames drawn, asks, page turns or level samples; at least 2 s, at most 15 s) rather than
-  a fixed 2 s, bars unchanged, and the covered line counts asks against frames drawn without
-  the ticks (which draw nothing), each passed-over ask found by its time; the tick line is held
-  to half the page's turns and "uncovered" to every frame. Red three times on 2026-11-09 on GitHub's Macs, a different
-  line each time. `--slow=N` and `--busy=MS` put a cloud session where those runners are.
-  Story in `docs/plan-shipped.md` §19k-17.
+- **19k-20, shipped** (E, S): `ears`'s windows last until the runner has offered enough (30 frames, asks, page turns or level samples; 2 to 15 s), bars unchanged; the covered line counts asks against frames drawn without the ticks. Story in `docs/plan-shipped.md` §19k-20
+- **19k-16, shipped** (E, S): `draftwall --frames` opened the wall before the show's first step, so its 8 s count of painted frames could end before the opening did (0 painted on 5 of 54 runs); it waits for the show now (docs/plan-shipped.md, 19k-16).
+- **19k-16a, open** (E, S). **A projector opened during a cold start is asked for frames the show cannot draw.** Found
+  with 19k-16: until the wall engine's renderer starts (`startWith`), the projector's rAF asks
+  `askFrame` (`src/components/LiquidVisualizer.tsx`, grep `const askFrame`) for a frame sixty times a
+  second; each one counts a frame and throws on the governor (`governorRef.current!` null) before the
+  mirror, and the canvas has already taken the projector's size before the governor's scale. A real
+  projector opened while a Mac opening builds its pipelines (13.5 to 14.8 s cold) gets that throw
+  storm and a false frame count. The fix is `if (!renderer) return;` at the top of `askFrame` (tried in
+  a scratch copy: 0 frames and 0 throws before the start, then a clean start at 672x378), but
+  LiquidVisualizer.tsx may not grow by a byte (`npm run sizes`), so the ask moves to a module of its
+  own first (19ai-10). Since 19k-16 no line opens a projector before the show's first step, so the
+  fix comes with a check of its own: open the wall while `stepIndex` is 0, then expect no throw from
+  `askFrame` and frames painted once the show starts.
+- **19k-19, open** (E, S): **the Mac's five parts have no room.** `show`, `tools`, `plate`, `open` and `fifth` run 16 to 23 of their 25 minutes on a GitHub Mac (read off #820's run, 2026-11-12), and a GPU check too long for SwiftShader has nowhere else to go: Lava Lamp's cycle (`lavacycle`, six minutes of the lamp, two hours on SwiftShader, a couple of minutes on Metal) went on `show`, the lightest. The next one will not fit. Wanted: a sixth Mac part, or the five rebalanced by measured minutes (`npm run checks` could print each part's last times), weighed against the Mac queue a sixth part lengthens (docs/ci.md).
+- **19k-18, shipped** (E, S): `lab2` over its 25 minutes on #802's deploy, twice, every check green; the moiré sheets' check moved to a part of its own, `lab9` (docs/plan-shipped.md, 19k-18).
+- **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6`, and `inktitle` from `lab3` to `lab7` (docs/plan-shipped.md, 19k-17).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

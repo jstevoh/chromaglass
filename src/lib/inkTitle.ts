@@ -123,6 +123,10 @@ function inkCells(mask: Float32Array, n: number): [number, number, number, numbe
   return x1 < 0 ? null : [x0, y0, x1, y1];
 }
 
+/** A mask's extent and an n × n canvas to draw one on, for the melted logo's picture (`logoMelt.ts`, PLAN 37x-11). */
+export const inkBox = inkCells;
+export const inkCanvas = (n: number): Ctx | null => canvasOf(n)?.g ?? null;
+
 /**
  * Rows of words rasterised once into a mask (`inkTitleMask`): coverage 0..1, n × n, row 0
  * at the plate's bottom as the solver's grid has it. `size` 0..1 is small
@@ -339,3 +343,144 @@ export function inkTitleWash(seconds: number, since: number, dial: number, box: 
   }
   return [y0, y1];
 }
+
+/*
+  The ink's own liquid (PLAN 37x-10g). In the private rehearsal of the
+  first live stream (2026-11-09) every title card poured and was smeared by
+  the look's own flow in about a second, before anyone could read it, and
+  before the wash had even begun: the ink was dye in the plate's own liquid,
+  as thin as what it lay in, so every eddy the music stirred carried its
+  letters off at the eddy's own speed. Nothing about that was wrong; it is
+  what dye in water does. A sign painter's answer is the real one: make the
+  ink up thick. So the title lands on a pad of the plate's own liquid
+  thickened INK_TITLE_THICK times (a gum's share of a percent does that and
+  leaves the liquid's refractive index where it was, so the pad is clear and
+  draws no rim of its own), laid into the species field under the letters
+  (hsPrep reads its viscosity into the thin gap's drag and mobility, PLAN
+  18d), and the plate's flow has to go round it.
+
+  Why a pad and not thick letters alone, which was tried first: a thin
+  stroke lying across the flow cannot be gone round, only pushed, so thick
+  strokes in clear gaps were swept along nearly as fast as thin ones and the
+  title was still torn apart, letter from letter (lab, a lively flow of
+  cells an eighth of the plate across: thin ink read 0.53 a second after it
+  landed, thick strokes at 10 and 40 times the plate's viscosity 0.76 and
+  0.74, against the 0.7 a title needs). A pad under the whole of each line
+  is one wide body: Darcy's law makes the flow inside a body of a twentieth
+  of the mobility round it nearly uniform and a small share of the flow
+  outside, so it slides and turns slowly and keeps its letters (the same
+  flow: 0.90 at 1 s and 0.80 at 3 s, where the thin ink was gone).
+
+  The pad is the letters' mask blurred over a tenth of the title's height
+  and raised three times, so it fills the gaps between letters and between
+  the two lines and ends a few cells past the outermost stroke on a soft
+  edge.
+*/
+/** The pad's viscosity over the plate's liquid. */
+export const INK_TITLE_THICK = 20;
+const PAD_GAIN = 3, PAD_SPAN = 0.1;
+
+/**
+ * The ink's pad (PLAN 37x-10g): the title's mask (n × n) blurred and raised
+ * so it lies under the whole of each line, 0..1, for the solver's
+ * `pourInk(…, carrier)`. `box` is the mask's own box (inkTitleMask's).
+ */
+export function inkTitlePad(mask: Float32Array, n: number, box: readonly number[]): Float32Array {
+  const r = Math.max(2, Math.round(PAD_SPAN * (box[3] - box[1]) * n));
+  const a = Float32Array.from(mask), b = new Float32Array(n * n), w = 2 * r + 1;
+  // Two passes of a box blur (running sums), across then up: near enough a Gaussian, in O(n²).
+  for (let pass = 0; pass < 2; pass++) {
+    for (let j = 0; j < n; j++) {
+      const row = j * n;
+      let acc = 0;
+      for (let i = 0; i < Math.min(n, r); i++) acc += a[row + i];
+      for (let i = 0; i < n; i++) {
+        if (i + r < n) acc += a[row + i + r];
+        if (i - r - 1 >= 0) acc -= a[row + i - r - 1];
+        b[row + i] = acc / w;
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      let acc = 0;
+      for (let j = 0; j < Math.min(n, r); j++) acc += b[i + j * n];
+      for (let j = 0; j < n; j++) {
+        if (j + r < n) acc += b[i + (j + r) * n];
+        if (j - r - 1 >= 0) acc -= b[i + (j - r - 1) * n];
+        a[i + j * n] = acc / w;
+      }
+    }
+  }
+  for (let k = 0; k < n * n; k++) a[k] = Math.min(1, a[k] * PAD_GAIN);
+  return a;
+}
+
+/**
+ * The pad's liquid as the species field takes it: the plate's own
+ * (`plateNu`, m²/s, its Thickness's) times INK_TITLE_THICK, as
+ * ln(ν/ν_water), and water's index, since a gum's share of a percent moves
+ * it by nothing a projector shows.
+ */
+export const inkTitleCarrier = (plateNu: number, mask: Float32Array) =>
+  ({ share: 1, lnNu: Math.log(Math.max(1e-7, plateNu) * INK_TITLE_THICK / 1e-6), index: 1.333, mask });
+
+/*
+  The rinse (PLAN 37x-10g): what takes a thick title away. The pad holds its
+  letters against the wash's stirring as it does against the look's flow,
+  since a push is a push to it (the default wash left a padded title at
+  0.60 after 12 s, its bar 0.3). A painter cleans a thick ink off glass
+  with a wash bottle, and between two glasses that is a real and well known
+  experiment: thin liquid driven into thick fingers through it
+  (Saffman–Taylor), splitting it into branches. So when the wash comes in,
+  clear liquid is squirted into the pad at twelve points, two rows of six
+  across the title's box, as pours of the plate's own liquid with their
+  volume (the thin solve's source, PLAN 18c), which the pressure drives out
+  through the pad and over the rim; what the fingers split, the stirring
+  then mixes. Measured on the thin gap (`npm run inktitle -- --thin`,
+  SwiftShader, 2026-11-09) under a lively flow, with the wash at its
+  default: the title read 0.816 at 2.5 s and 0.801 at 3 s, 0.544 half a
+  second after the rinse came in, 0.293 two seconds after, and 0.26 to 0.28
+  to the end of 12 s (its bar 0.3), 96% of its dye still on the plate. A
+  prototype with four points at half the rate left it at 0.47, and a rinse
+  of 1.5 s instead of 2 came within 0.01 of the bar for the rest of the arm.
+
+  RINSE_TAKE is the share of a rinse point's dome (RINSE_R across) a step of
+  a 60th of a second adds at the default dial, about 0.3 mL a second a
+  point; the rate goes as √sweep, as the drift does, and it runs for RINSE
+  seconds once the stirring is in, so a title's rinse is about 8 mL at the
+  default, an eighth of the dish's liquid, which leaves over the rim as a
+  wash bottle's does.
+*/
+const RINSE_TAKE = 0.1, RINSE_R = 0.02, RINSE = 2, RINSE_ROWS = 2, RINSE_COLS = 6;
+/** The most rinse points a step pours (inkTitleRinse's `out` holds three numbers a point). */
+export const INK_TITLE_RINSE_POINTS = RINSE_ROWS * RINSE_COLS;
+
+/**
+ * The rinse's pours over a step of `seconds`, `since` seconds after the
+ * title landed, at `dial`: up to INK_TITLE_RINSE_POINTS of (x, y, take)
+ * into `out`, plate fractions and the share of a dome RINSE_R across, for
+ * the solver's `pour(x, y, inkTitleRinseRadius, take, null, true)`. Gives
+ * back how many; 0 before the wash comes in and after the rinse. No
+ * allocation.
+ */
+export function inkTitleRinse(seconds: number, since: number, dial: number, box: readonly number[], out: Float32Array): number {
+  const s = inkTitleSweep(dial);
+  if (!(s > 0) || !(seconds > 0) || box.length < 4) return 0;
+  const hold = HOLD * (1 - Math.min(1, dial));
+  const rise = 0.4 + (RISE - 0.4) * (1 - Math.min(1, dial));
+  const t = since - hold;
+  if (t <= 0 || t >= rise + RINSE) return 0;
+  const smooth = (u: number) => { const v = Math.min(1, Math.max(0, u)); return v * v * (3 - 2 * v); };
+  // In over the stirring's rise, out over its last half second.
+  const take = RINSE_TAKE * Math.sqrt(s / 0.25) * smooth(t / rise) * smooth((rise + RINSE - t) / 0.5) * seconds * 60;
+  if (!(take > 0)) return 0;
+  let k = 0;
+  for (let row = 0; row < RINSE_ROWS; row++) for (let col = 0; col < RINSE_COLS; col++) {
+    out[k * 3] = box[0] + (box[2] - box[0]) * (col + 0.5) / RINSE_COLS;
+    out[k * 3 + 1] = box[1] + (box[3] - box[1]) * (row + 0.5) / RINSE_ROWS;
+    out[k * 3 + 2] = Math.min(1, take);
+    k++;
+  }
+  return k;
+}
+/** A rinse point's radius, in plate widths. */
+export const inkTitleRinseRadius = RINSE_R;

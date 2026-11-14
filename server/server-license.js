@@ -91,7 +91,7 @@ function readJsonBody(req) {
  * the checks, a script on this Mac) is not a page and is let through, since
  * anything on the laptop could read the licence file anyway.
  */
-function fromAnotherSite(req) {
+export function fromAnotherSite(req) {
   const site = req.headers['sec-fetch-site'];
   if (site !== undefined && site !== 'same-origin' && site !== 'none') return true;
   const origin = req.headers.origin;
@@ -104,7 +104,7 @@ function fromAnotherSite(req) {
 }
 
 /** A body that is JSON, said so: a cross-site form or a plain fetch cannot send that without asking first. */
-const saysJson = (req) => /^application\/json\b/i.test(String(req.headers['content-type'] ?? ''));
+export const saysJson = (req) => /^application\/json\b/i.test(String(req.headers['content-type'] ?? ''));
 
 function sendJson(res, status, payload) {
   res.writeHead(status, {

@@ -135,6 +135,11 @@ const NOT_THE_LOOK = new Set([
   // tear a look's crowd of drops into a few blobs for good, and up adds
   // nothing to a look without one. The look's own number, held.
   'filmHold',
+  // Oil Weight (PLAN 27f-9c): a lava lamp's wax runs its cycle only while it
+  // is heavier than the liquid cold and lighter warm; a wander would float it
+  // to the top of the bottle or sink it for good with nobody touching it. The
+  // look's own number, held.
+  'oilWeight',
   // Soap Breakdown (PLAN 38c-3): 0 is conservation, and turning it up lets
   // soap clear off the plate at a chosen half-life; Evolve must not start a
   // loss by itself.
@@ -150,6 +155,8 @@ const NOT_THE_LOOK = new Set([
   // ones written for it. A wander would switch the notes on in a look that
   // has no line for them, and walk the two that do off their size.
   'melodyWalk',
+  // The projector lamp's heat (PLAN 36e-2): played by hand with a hold on the glass, not drifted by Evolve.
+  'heat',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*
@@ -168,6 +175,33 @@ const NOT_THE_LOOK = new Set([
   'clearFilm',
   // And its dye (PLAN 20b-13): a dye dissolved in the oil does not thin or deepen by itself.
   'clearFilmDye',
+  /*
+    The frame's soap film (PLAN 32d) keeps its own clock: it drains, goes
+    black and is dipped again on the film's physics, and that cycle is its
+    evolving. Soap Film is whether a frame hangs in front of the plate at all
+    (a wander would fade the frame out of a look built on it), Film Angle is
+    the hand holding the frame, and Drain Rate is the film's clock. Joining
+    the pool also moved which dials Evolve reached for, as Kick Bloom's did:
+    `npm run slowevolve`'s full-speed pace read 5.69 %/s with these three in
+    it (a granulation glide drawn the length of its reach in 6 s) and 4.20
+    without (PLAN 10-8d-3).
+  */
+  'soapFilm', 'soapFilmRate', 'soapFilmAngle',
+  /*
+    The glitter, the lens and the side lamp (PLAN 47e, 47d, 47b-side) are the
+    photographer's: what is in the dish, the stop the lens is set to, and a
+    lamp put down beside it. A wander would pour glitter in and out of a look
+    or walk a lamp round the dish under nobody's hand, and leaving them out
+    keeps the pool, and so Evolve's pace, as it was (PLAN 10-8d-3).
+  */
+  'glitter', 'lensStop', 'sideLight', 'sideLightHue', 'sideLightAngle',
+  /*
+    The tank's side view (PLAN 47n) for the same reason: Tank is whether the
+    picture is a tank at all, and its nozzle, feed and dye are the
+    performer's hand on it. Left out of the pool, Evolve reaches for the
+    dials it reached for before (they were not in it, being new).
+  */
+  'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),
