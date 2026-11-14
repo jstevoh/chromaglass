@@ -1211,20 +1211,17 @@
     {
       "name": "Looks on a lit stage",
       "shard": "browser",
-      "run": "npm run litstage -- --controls",
+      "run": "npm run litstage",
       "why": [
         "A look keeps its contrast over a projector's black lifted by a stage",
         "wash (PLAN 36a): every look over a floor of 5 and 10% of white added",
         "as light, its dye against the field behind it held with Lit stage on,",
-        "and byte for byte the plate without the grade at 0. Written before",
-        "the build, so only its controls run until 36a lands (the measure, the",
-        "floor's cost with nothing done); the build's PR drops `--controls`.",
-        "On SwiftShader for lampzero's reason (b3 compares two compiled",
-        "programs, which is the CPU rasteriser's to judge), but in `browser`,",
-        "not beside it in `lab`: the lab part already runs 23-24 of its 25",
-        "minutes on a slow runner, and this PR's lab part was cancelled at",
-        "the limit twice with this check in it (2026-10-27). About a minute",
-        "here, three to four in full: the build's PR weighs where it fits."
+        "and byte for byte the plate without the grade at 0. On SwiftShader for",
+        "lampzero's reason (b3 compares two compiled programs, which is the CPU",
+        "rasteriser's to judge). Placed in `browser`, where before #517 `lab` ran",
+        "near its 25-minute limit; #517 split the lab part into `lab` and `lab2`,",
+        "so either now has room if `browser` ever fills up. About three to four",
+        "minutes in full."
       ]
     },
     {

@@ -165,6 +165,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'moireCurl', type: 'f32', note: 'the shape dial the designs share' },
   { name: 'moireFlip', type: 'f32', note: '1 when the upper sheet is laid face down (mirrored)' },
   { name: 'projectorFocus', type: 'f32', note: 'projector lens focus plane (0..1, 0.5 = in-focus, defocus shifts Becke lines)' },
+  { name: 'litStage', type: 'f32', note: "the Wall's Lit stage amount, 0-1 (PLAN 36a)" },
   /* The lens pass after the display (gpu/glint.ts, lib/glint.ts; PLAN 47e, 47d, 47b-side). Read only there; the display ignores them. */
   { name: 'glitter', type: 'f32', note: 'how much of SPECK_MAX glitter is suspended in the liquid, 0 none' },
   { name: 'lensStop', type: 'f32', note: "the lens's f-number: the specks' defocus discs shrink and their diffraction spikes grow as it rises" },

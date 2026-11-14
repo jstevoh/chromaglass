@@ -35,6 +35,8 @@ import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
 import { BEAD_SHAPE_WGSL } from './beadShape';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
+import { BLUR_ALPHA_WGSL } from './plateBlur';
+import { LIT_STAGE_WGSL } from './litStage';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 
 /** Bindings every plate shader shares. */
@@ -356,31 +358,8 @@ const W5 = array<f32, 25>(
   0.01330621, 0.05963430, 0.09832033, 0.05963430, 0.01330621,
   0.00296902, 0.01330621, 0.02193823, 0.01330621, 0.00296902
 );
-
-fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
-  if (U.derivedOn > 0.5 && blurFluid * U.gridSize < 0.5) {
-    let d = blurFluid * 1.554;
-    let k = vec3f(0.19138, 0.61724, 0.19138);
-    var acc = 0.0;
-    for (var j = 0; j < 3; j++) {
-      for (var i = 0; i < 3; i++) {
-        acc += k[i] * k[j] * tex2(t, fuv + vec2f(f32(i - 1), f32(j - 1)) * d).a;
-      }
-    }
-    return acc;
-  }
-  var result = 0.0;
-  for (var j = -2; j <= 2; j++) {
-    for (var i = -2; i <= 2; i++) {
-      let offset = vec2f(f32(i), f32(j)) * blurFluid;
-      // Plain bilinear here, not the bicubic: twenty-five taps whose whole
-      // purpose is to blur.
-      let a = tex2(t, fuv + offset).a;
-      result += a * W5[(j + 2) * 5 + (i + 2)];
-    }
-  }
-  return result;
-}
+${BLUR_ALPHA_WGSL}
+${LIT_STAGE_WGSL}
 
 fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
@@ -427,6 +406,9 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
     let l = dot(lt, vec3f(0.299, 0.587, 0.114));
     ltBody = clamp(vec3f(l) + (lt - vec3f(l)) * (1.0 + 0.8 * body), vec3f(0.0), vec3f(1.0));
   }
+  /* lit stage { */
+  if (U.litStage > 0.0) { return litFluid(ltBody, thickness, unit, amount, m); }
+  /* } lit stage */
 
   return vec4f(ltBody, alpha);
 }
@@ -1043,6 +1025,9 @@ fn decodeFluidRaw(raw: vec4f) -> vec4f {
   let amount = mix(totalDensity * 2.8, max(0.0, totalDensity - U.filmLevel) * U.filmGain, clamp(U.macroOn, 0.0, 1.0));
   if (U.lampGround > 0.001) { dyeThrough = lampThrough(unit, amount * gapScale); }
   let thickness = amount * (1.0 + darkness * 1.7) * filmWater;
+  /* lit stage { */
+  if (U.litStage > 0.0) { return litFluid(c, thickness, unit, amount * gapScale, clamp(U.macroOn, 0.0, 1.0)); }
+  /* } lit stage */
   return vec4f(c, min(mix(0.95, 0.995, clamp(U.macroOn, 0.0, 1.0)), 1.0 - exp(-thickness)));
 }
 

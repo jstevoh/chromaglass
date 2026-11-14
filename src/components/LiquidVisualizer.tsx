@@ -263,16 +263,13 @@ interface LiquidVisualizerProps {
 }
 
 import type { LiquidVisualizerHandle } from './visualizerHandle';
-import { rgbToHex } from './layerSwatch';
+import { c01, rgbToHex } from './layerSwatch';
 import { NeedsWebGpu } from './NeedsWebGpu';
 
-/** Held to 0..1 (a score of the frame loop's dials). */
-const c01 = (v: number) => Math.max(0, Math.min(1, v));
 export type { LiquidVisualizerHandle };
 
 
 // ─── React Component ─────────────────────────────────────────────────
-
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, hear, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
@@ -5230,6 +5227,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           bubbles: bubbleDebugRef.current,
           bubblePack: { packed: bubblesRef.current.packed, shape: bubblesRef.current.packedShape },
           dimmerGain: flashGainRef.current * paceNowRef.current.dim,
+          litStage: rendering ? 0 : outputCfgRef.current.litStage,
           filmLevel: filmLevelRef.current,
           filmGain: filmGainRef.current,
           mark: markRef.current,

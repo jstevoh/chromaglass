@@ -142,6 +142,8 @@ export interface FrameView {
   bubblePack: { packed: Float32Array; shape: Float32Array };
   /** The flash guard's gain, from the luminance the last frame read back, times a paced scene's light (lib/scenePacing.ts). */
   dimmerGain: number;
+  /** How lit the stage is (0-1, from the Wall's OutputConfig, or 0 on a song render which uses DEFAULT_OUTPUT; PLAN 36a). */
+  litStage?: number;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
