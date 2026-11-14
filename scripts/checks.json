@@ -1912,6 +1912,22 @@
       ]
     },
     {
+      "name": "A heavy bottle slides down a rocked thin gap at Hele-Shaw's speed (15e-10)",
+      "shard": "lab4",
+      "run": "npm run liquidfall",
+      "timeout": 6,
+      "why": [
+        "On a thin gap a poured liquid's push met the flow before the gap kept it, so",
+        "its drag took it within the step: a heavy drop's slide was two thousandths of",
+        "the flow beside it and against the rock's way, and a light bottle's weight was",
+        "floored to nothing by the carry (scripts/liquidfall.mjs). Each line against",
+        "the law worked out in SI: a drop at half Darcy's w g sinθ h²/12ν to 10%, a",
+        "light one rising at the same, none on a level plate, a thicker plate as a",
+        "force per unit of drag, glycerine crawling, and an oil's weight counted once",
+        "with its lift. About 45 s here."
+      ]
+    },
+    {
       "name": "The layout",
       "shard": "browser",
       "run": "npm run layout",
