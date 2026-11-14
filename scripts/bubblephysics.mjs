@@ -85,34 +85,48 @@ const GAP = DISH_GAP_METRES;   // the rest gap, metres (lib/turntable.ts, PLAN 3
     `drift ${drift.toFixed(5)} cells over 2 seconds`);
 }
 
-// ── 3. Saffman-Taylor finger wavelength scaling on Straw ─────────────
+// ── 3. The straw's fingers are Paterson's fastest mode at the plate's gap ──
 {
-  const runBlow = (strength) => {
+  /*
+    A straw's bubble is air driven into the liquid between two plates, and
+    its rim breaks into the fastest-growing number of fingers, Paterson's
+    (1981) n = √((1 + 12 Ca R²/b²)/3), with b the gap (lib/bubbles.ts,
+    strawFingers; PLAN.md 15g-12). This section used to ask that the default
+    liquid's bubble carried 6 to 18 lobes in the ratio R·√Ca: that count was
+    worked at a gap 21 times thinner than the plate's, and the owner saw it
+    as flower-like bubbles. At the real 2 mm the default liquid's count is
+    under one finger, so its bubble is round, and the rim fingers where the
+    liquid is thick enough for two or more. So: with the Thickness dial at
+    its top, a firm breath and one twice as hard each draw the bubble with
+    the count's own number of lobes (worked here from the last step's
+    growth, not by calling the code's function), more for the harder one;
+    and in the default liquid neither fingers at all.
+  */
+  const runBlow = (strength, liquid) => {
     const f = new BubbleField(N);
     const still = () => [0, 0];
+    let r0 = 0, n = 0, b = null;
     for (let t = 0; t < 60; t++) {
+      f.liquid(liquid);
       f.blow(96, 96, dt, strength);
       f.step(dt, still, 0, 0, 0);
+      b = f.bubbles.find((q) => q.straw);
+      const uMps = ((b.r - r0) / dt) * (0.2 / N); r0 = b.r;
+      const Ca = (f.liquidMu * uMps) / f.liquidSigma, rOverGap = b.r * (0.2 / N) / f.gapMetres;
+      n = Math.sqrt((1 + 12 * Ca * rOverGap * rOverGap) / 3);
     }
-    const b = f.bubbles.find((q) => q.straw);
-    const speed = (b.r - Math.max(1, N * 0.008)) / 1.0;
-    const uMps = speed * (0.2 / N);
-    const Ca = Math.max(1e-4, (f.liquidMu * uMps) / f.liquidSigma);
-    return { b, lobes: b.lobes, r: b.r, Ca, sqrtCa: Math.sqrt(Ca) };
+    return { lobes: b.lobes, fing: b.fing, n };
   };
 
-  const moderate = runBlow(1.0);
-  const fast = runBlow(2.0);
+  const THICK = { thinGap: 1, gapThickness: 1 };
+  const moderate = runBlow(1.0, THICK), fast = runBlow(2.0, THICK);
+  const oil = runBlow(1.0, {}), oilFast = runBlow(2.0, {});
 
-  // Both lobe counts must sit strictly between clamps (6 and 18)
-  const insideClamps = moderate.lobes > 6 && moderate.lobes < 18 && fast.lobes > 6 && fast.lobes < 18;
-  const actualRatio = fast.lobes / moderate.lobes;
-  const theoreticalRatio = (fast.r * fast.sqrtCa) / (moderate.r * moderate.sqrtCa);
-  const matchesScaling = Math.abs(actualRatio - theoreticalRatio) < 0.15;
-
-  check('straw finger lobes follow Saffman-Taylor m ∝ R·√Ca between clamps',
-    insideClamps && matchesScaling,
-    `lobes ${moderate.lobes} vs ${fast.lobes} (ratio ${actualRatio.toFixed(3)} matches theoretical ${theoreticalRatio.toFixed(3)})`);
+  check('straw finger lobes are Paterson\'s fastest mode at the plate\'s gap: the count\'s own number where the liquid is thick, none in the default liquid',
+    moderate.n >= 2 && fast.n > moderate.n + 1 && moderate.lobes === Math.round(moderate.n) && fast.lobes === Math.round(fast.n) && fast.lobes > moderate.lobes &&
+      moderate.fing > 0.2 && fast.fing > moderate.fing &&
+      oil.n < 1 && oilFast.n < 1 && oil.fing === 0 && oilFast.fing === 0,
+    `Thickness at its top: ${moderate.n.toFixed(2)} and ${fast.n.toFixed(2)} fingers, drawn with ${moderate.lobes} and ${fast.lobes} lobes (fingering ${moderate.fing.toFixed(2)}, ${fast.fing.toFixed(2)}); the default liquid ${oil.n.toFixed(2)} and ${oilFast.n.toFixed(2)}, fingering ${oil.fing.toFixed(3)}, ${oilFast.fing.toFixed(3)}`);
 }
 
 // ── 4. Film drainage merge ───────────────────────────────────────────
