@@ -31,6 +31,8 @@ import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
+import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
+import { BEAD_SHAPE_WGSL } from './beadShape';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
@@ -1703,22 +1705,8 @@ fn dropHalfGap(uv: vec2f) -> f32 {
   let g = viewAt(uv).gap;
   return DROP_HALF_GAP * select(1.0, clamp(g / 0.03, 0.3, 3.0), g > 0.001);
 }
-fn beadWide() -> bool {
-  let d = textureDimensions(beadTex);
-  return d.x > d.y;
-}
-/** Plate uv to the mask's own. Wide, the read is kept off the seam, where a
-    bilinear tap would pick up the colour half's first column as a drop. */
-fn beadAt(uv: vec2f) -> vec4f {
-  if (!beadWide()) { return tex2(beadTex, uv); }
-  let w = f32(textureDimensions(beadTex).x);
-  return tex2(beadTex, vec2f(clamp(uv.x * 0.5, 0.5 / w, 0.5 - 1.0 / w), uv.y));
-}
-/** The drop's colour at uv, as seen lit; only a wide mask has one. */
-fn beadColour(uv: vec2f) -> vec3f {
-  let w = f32(textureDimensions(beadTex).x);
-  return tex2(beadTex, vec2f(clamp(0.5 + uv.x * 0.5, 0.5 + 1.0 / w, 1.0 - 0.5 / w), uv.y)).rgb;
-}
+// The beads, read at the screen's resolution where a list is bound (38h-17).
+${BEAD_SHAPE_WGSL}
 /** How much of a drop of radius R (plate uv) is flat on top, for half the
     gap rho: none for a ball (R under rho), and all but its half-round edge,
     rho wide, for a pancake. */
@@ -1732,6 +1720,7 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
   return clamp((r - f) / (1.0 - f), 0.0, 1.0);
 }
 ${TRANSMIT_WGSL}
+${BUBBLE_SHAPE_WGSL}
 ${FILM_DYE_WGSL}
 ${DROP_LENS_WGSL}
 ${THIN_FILM_WGSL}
@@ -3165,55 +3154,32 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     and it is why the lens mix below now has less to do than it did.
   */
   if (U.bubbleStrength > 0.001) {
-    let airC = textureSampleLevel(air0, samp, fuvBase, 0.0);
-    let aC = airC.r;
-    if (aC > 0.02) {
+    // A screen pixel in plate uv (uvToFluid, above).
+    let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
+    // Each bubble from its own disc, its rim a screen pixel wide (bubbleShape.ts).
+    let bub = airHere(fuvBase, textureGather(3, air0, samp, fuvBase), textureSampleLevel(air0, samp, fuvBase, 0.0), spx, dropCam);
+    if (bub.opac > 0.0) {
       /*
-        Each bubble drawn as the one it is.
-
-        The air field carries, besides the coverage, where in its bubble each
-        texel is (g, b) and the bubble's size, film age and a number of its
-        own (a) — see wgsl/air.ts. With only the coverage,
-        which is flat inside a bubble, every bubble was drawn alike: the same
-        dark ring and the same dot, at an assumed radius (reported: "not
+        Each bubble drawn as the one it is: its shape a dome lit from the
+        lamp, its clarity, film colour and highlight its own (reported: "not
         varied enough ... either transparency differences, or light shining
-        off them, or color"). Now its shape is a dome lit from the lamp, its
-        clarity, its film colour and its highlight are its own, and its film
-        drains and thins as it ages the way a soap film does.
+        off them, or color").
       */
-      // Where in its bubble (wgsl/air.ts).
-      let p0 = clamp((airC.gb / max(aC, 1e-3) - vec2f(0.5)) * 2.0, vec2f(-1.0), vec2f(1.0));
-      /*
-        Its size, film and number: packed whole, so read unfiltered —
-        and from the largest of the four texels round the point, since just
-        past a small bubble's rim the filtered coverage is still there while
-        the nearest texel is already empty, and read from that the rim was
-        drawn as a different, tiny bubble: a square halo round each one.
-      */
-      let looks = textureGather(3, air0, samp, fuvBase);
-      let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
-      // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
-      let Rq = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
-      // To the camera, its true centre and radius (camBubble).
-      var geo = vec3f(fuvBase - p0 * Rq, Rq);
-      if (dropCam > 0.001) { geo = mix(geo, camBubble(fuvBase, p0, Rq), dropCam); }
+      let geo = bub.geo;
       let R = geo.z;
       let p = (fuvBase - geo.xy) / R;
       let rr = min(1.0, length(p));
       let h = sqrt(max(0.0, 1.0 - rr * rr));
       let outward = select(vec2f(1.0, 0.0), p / max(rr, 1e-4), rr > 1e-3);
-      // A screen pixel in plate uv (uvToFluid, above).
-      let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
-      let film = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
-      let id = (floor(look) - floor(look / 8.0) * 8.0 + 0.5) / 8.0;
+      let film = bub.film;
+      let id = bub.id;
       let k1 = fract(id * 7.13 + 0.17);
       let k2 = fract(id * 13.71 + 0.53);
       let k3 = fract(id * 23.37 + 0.91);
       let bestD = p;
       // Pressed between two plates it is a lens, flatter than a sphere.
       let n = normalize(vec3f(p * 0.85, h + 0.15));
-      // The camera's edge: one pixel wide, on the rim.
-      let opac = mix(smoothstep(0.02, 0.28, aC), clamp(0.5 + (1.0 - length(p)) * R / spx, 0.0, 1.0), dropCam);
+      let opac = bub.opac;
       /*
         The liquid round it: its light and colour, averaged over a ring just
         outside the rim, so one bubble has one tint. It used to be read
@@ -3253,7 +3219,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // tenth of the wetting film's hue, as the projector's (38h-7: it was a
       // mix, by eye, toward a dimmed tint that left a bubble's middle darker
       // than the liquid round it, which a pocket of air never is).
-      var c = onGround(bgColor, decodeFluid(layer0, lensUv, 0.0, false), dyeThrough) * mix(vec3f(1.0), tint, 0.1 * k1);
+      var c = onGround(bgColor, airLiquid(lensUv, bub), dyeThrough) * mix(vec3f(1.0), tint, 0.1 * k1);
 
       // The film: interference colour, strongest at a glancing angle (the
       // rim), as thick as the pocket's own speed laid it (Bretherton,

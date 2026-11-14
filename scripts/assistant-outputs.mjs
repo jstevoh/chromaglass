@@ -194,6 +194,8 @@ export async function outputsPageLines(page, say) {
 }
 
 export const OUTPUTS_MUTANTS = [
+  { rule: 'osc-off-switch', file: 'remote-server.js', find: "if (mode === 'off' && assistantOpenedOsc !== null) {", replace: 'if (false) {' },
+  { rule: 'osc-off-switch', file: 'remote-server.js', find: "else if (oscBefore !== 'network' && assistantOpenedOsc === null) assistantOpenedOsc = oscBefore;", replace: '' },
   { rule: 'outputs-full', file: 'assistant.js', find: "if (type === 'assistant-outputs') {\n        const why = needs(mode, 'full') ?? paced('patch', mode, t);", replace: "if (type === 'assistant-outputs') {\n        const why = paced('patch', mode, t);" },
   { rule: 'outputs-relay-full', file: 'assistantOutputs.js', find: "if (d === 'status') return { ok: true, outputs: hook.state() };\n  const why = full(", replace: "if (d === 'status') return { ok: true, outputs: hook.state() };\n  const why = null && full(" },
   { rule: 'outputs-target', file: 'assistantOutputs.js', find: 'return { out: { do: d, on: message.on, target } };', replace: 'return { out: { do: d, on: message.on, target: message.target } };' },

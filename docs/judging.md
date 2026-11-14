@@ -2768,6 +2768,8 @@ only seen here.
 
 ## 130. The closeup with nothing drawn over it (PLAN 38u-1, 38u-2, 38u-3)
 
+**Judged 2026-11-13.** The owner watched the before and after films from their Mac (Macro Bead, Cell Bloom, Classic at 5x) the same day: "looks good". Seen in both films and older than this change: the beads' scalloped rims (38h-17) and grid steps where dye is freshly poured at 5x (the fine detail's, section 47).
+
 The check (`npm run stillcloseup`) proves a still plate draws a still closeup, that no shadow
 falls to one side of a pool and that Depth / Focus only defocuses, in the lab at one frame.
 Whether the closeup still reads as deep and wet without the drawn shadow is only seen here.
@@ -2782,7 +2784,25 @@ Whether the closeup still reads as deep and wet without the drawn shadow is only
 3. A bubble in the closeup at Iridescence 1, the plate left alone: its colours hold. Stir
    beside it: they shift as it moves.
 
-## 131. Three physics fixes: Rain Drip needs a tilt, the clear drop's lens, colours push apart (PLAN 38u-7, 38u-12, 38u-14)
+## 131. The music stirs the liquid through a cord (PLAN 38u-4, 38u-5)
+
+The solver no longer reads the sound: each look carries a patch from the sound's Mid onto
+Turbulence instead, set so its stir with music is about what it was. The numbers hold each
+look within a quarter (`npm run musicstir`); what they cannot hold is the picture, because
+the old eddies were one scale and only under the dye, and Turbulence is three scales over the
+whole dish. Judge from the before and after films (same look, same song, same seconds):
+
+1. Does each look still move with the music about as much as before? Good: the same amount
+   of churn in the loud passages, calm in the quiet ones. Bad: plainly calmer, or the whole
+   dish swimming where before only the colour stirred.
+2. Settings → Patches: the patch "Sound · Mid → Turbulence" is there on every built-in look.
+   Pull it (or Music Stir to 0 on the phone) with music playing: the stir should fall to the
+   look's own Turbulence and stop following the band.
+3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
+   swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
+   too much in the quiet parts.
+
+## 132. Three physics fixes: Rain Drip needs a tilt, the clear drop's lens, colours push apart (PLAN 38u-7, 38u-12, 38u-14)
 
 Looks change here on purpose. Judge from the film (before and after, same looks).
 

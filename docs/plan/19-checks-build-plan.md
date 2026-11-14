@@ -272,6 +272,13 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
     `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
     checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
     #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
+- **19k-11c, shipped 2026-11-13** (E, S). **`lab4` over its 25 minutes on the slow tier.**
+  `glint` (47e, #833) and `bubbleair` had joined `holeline`, `encode --grids` and `shaderdials`
+  in `lab4`, and on GitHub's slow ubuntu tier it was cancelled at the limit on two of the day's
+  four PR runs (#842 and #835), no check failing: about 15 minutes of checks ahead of
+  holeline's 11. `glint` moved to `lab9` (3:50 that day) and `bubbleair` to `lab8` (4:24);
+  no bar, timeout or check body changed, only each check's shard in `scripts/checks.json`
+  and the comment above `timeout-minutes` in `checks.yml`. The bound stays 25.
 - **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
   slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
   0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
@@ -314,8 +321,8 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   own first (19ai-10). Since 19k-16 no line opens a projector before the show's first step, so the
   fix comes with a check of its own: open the wall while `stepIndex` is 0, then expect no throw from
   `askFrame` and frames painted once the show starts.
+- **19k-20, open** (E, S): **the phone's held Drop reads its dye against a baseline its own drop displaces.** `scripts/phone.mjs`, "a finger holding Drop with Drop Height up lets go of a drop as it lands and one every ten steps after": red once on the Mac's `show` shard on 2026-11-13 (the closeup pull request, 38u), green on the head before with the same source and green on its one re-run. The count it is named for was right (3 drops over 27 steps, 3 wanted); its second half read `-206 dye under it against 0/0/0/-0`. The line before it leaves a pool under the same finger ("A 206 under it"), `dropBefore` is snapped with that pool there, and a drop from Drop Height 0.9 lands with a push: minus 206 is the whole pool out of one disk and none of the three drops' dye inside it 700 ms after the finger lifts, on a plate that stepped 29 times in 1063 ms. The feature is "the drops reach the plate", not "the disk under the finger gained". *Do:* clear the plate before `dropBefore` (or hold a cell no earlier line has used), and read the dye nearest the finger as the two-finger line above it does (within three disks), keeping the mirrors as the control. *Measure:* the line's printed dye over twenty Mac runs has no negative reading and its least is several times the bar of 5; a build that counts drops and hands the solver none is still red.
 - **19k-19, open** (E, S): **the Mac's five parts have no room.** `show`, `tools`, `plate`, `open` and `fifth` run 16 to 23 of their 25 minutes on a GitHub Mac (read off #820's run, 2026-11-12), and a GPU check too long for SwiftShader has nowhere else to go: Lava Lamp's cycle (`lavacycle`, six minutes of the lamp, two hours on SwiftShader, a couple of minutes on Metal) went on `show`, the lightest. The next one will not fit. Wanted: a sixth Mac part, or the five rebalanced by measured minutes (`npm run checks` could print each part's last times), weighed against the Mac queue a sixth part lengthens (docs/ci.md).
-- **19k-11c, shipped 2026-11-13** (E, S): `lab4` over its 25 minutes on the slow tier again, cancelled in holeline with every check green on two pull requests in one day; `glint` moved to `lab9` and `bubbleair` to `lab8`, no bar or timeout touched (docs/plan-shipped.md, 19k-11c). 19k-11b (print the tier, hold every part to 21 minutes on the slow one) would have shown it before it was red, and is still open.
 - **19k-18, shipped** (E, S): `lab2` over its 25 minutes on #802's deploy, twice, every check green; the moiré sheets' check moved to a part of its own, `lab9` (docs/plan-shipped.md, 19k-18).
 - **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6`, and `inktitle` from `lab3` to `lab7` (docs/plan-shipped.md, 19k-17).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,

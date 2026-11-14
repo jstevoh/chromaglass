@@ -18,7 +18,9 @@
  *    shows. Learning a control stays the person's: it needs a hand on the
  *    controller, and an assistant that "learned" one would be guessing.
  *  - OSC in is the show server's socket and, in the Mac app, the Show menu's
- *    choice (desktop/main.js `setOscMode`, kept in show.json), so `osc-in` is
+ *    choice (desktop/main.js `setOscMode`, kept in show.json, except network
+ *    opened by the assistant, which remote-server.js closes when the switch
+ *    goes off: the security review of 2026-11-13), so `osc-in` is
  *    answered by the relay at once, through the Mac app's hook when it handed
  *    one (`setAppOutputs`), else through the server's own socket (a show run
  *    from a terminal, where nothing keeps the choice past a restart).

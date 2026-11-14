@@ -39,7 +39,6 @@ try {
       time: NaN,
       visc: NaN,
       turbScale: NaN,
-      spin: NaN,
       immiscibility: NaN,
       vibIntensity: NaN,
       vibFrequency: NaN,
