@@ -15,6 +15,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | the tank (`src/lib/tank.ts`, `src/gpu/tank.ts`, `src/gpu/wgsl/tank.ts`, `src/gpu/tankPlate.ts`, `src/gpu/tankDraw.ts`, PLAN 47n) | `tank` (the reference's physics, about a minute), `tankgpu` (`PW_WEBGPU=1`; the GPU against the reference, about 95 s on SwiftShader), `panel`, `desk` for its settings |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords; the indicator's pH, `src/lib/phIndicator.ts`; the hit's regulator, `hitRoomOf` in `src/lib/dyeTarget.ts`) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
+| Velvet Underground's settings or areas, Turbulence (`turbulenceScale`, `forcesB`'s curl noise) | `pools` (Mac: the app's GPU solver; three pools keep 85% over a minute, the old stir as control) |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser; `deskreach` (the Rides at 1280, the scrollers' marks, the deck's Macro panel, the iPad app's Laptop remote; owed until 35c-6a, 35c-6b and 12 step 4a) |
 | the Tip pad (`src/components/ui/TipPad.tsx`, `src/lib/tipPad.ts`, the Tools panel in `DeskPanels.tsx`, Tilt & Rock, the phone's Motion sheet) | `tippad`, `phone`, `layout` |
 | Preview's copy (`drafting`, `wallRef` in `src/app/useWallLook.ts`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
