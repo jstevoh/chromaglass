@@ -275,6 +275,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('analyserAngle', ((((an % 180) + 180) % 180) * Math.PI) / 180);
   pack.set('quarterWave', Number.isFinite(s.quarterWave) ? clamp01(s.quarterWave) : 1);
   pack.set('birefringence', Math.max(0, Number.isFinite(s.birefringence) ? s.birefringence : 0.3) * BIREF_NM_PER_STRAIN);
+  // The dish's frozen stress (PLAN 31p-3; lib/polarDish.ts): 0, the dish retarding nothing, for every look saved before it.
+  pack.set('dishStress', Math.max(0, Number.isFinite(s.dishStress) ? s.dishStress : 0));
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));

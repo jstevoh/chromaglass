@@ -202,13 +202,23 @@ liquid that lights where its flow stretches it ("Let's do it!").*
   sets), and take the retardation and axis from its anisotropy. A solver field, so it lives
   in `src/gpu/fluid` and the plate reads it. *Measure:* a stir stopped dead keeps its colour
   for about the relaxation time and then goes dark, in the lab; a check in `npm run polar`.
-- **31p-3. Stressed solids on the plate: dishes and cellophane.** The owner's photograph is
-  of moulded dishes with stress frozen round the injection gate (radial and hoop axes, so a
-  pinwheel crossed with plane sheets and rings with the plates in) and cellophane is the
-  classic light-show retarder (a fixed retardation per layer, stacked to climb the orders).
-  Retarders in series with different axes combine by Jones matrices, which needs the third
-  table term 31p-1 already carries. *Measure:* a dish's gate shows a four-armed cross with
-  Quarter Wave at 0 and none at 1; two cellophane layers at the same axis add.
+~~**31p-3** Dish Stress: the moulded dish's own stress in series with the liquid~~ (shipped;
+story in `docs/plan-shipped.md` §31p-3; `npm run polar`).
+
+- **31p-3a. The dish warms and its stress relaxes.** 31p-3's dish is the frozen stress of
+  moulding, fixed in the plastic. A real dish under a hot projector lamp also carries
+  thermal stress (the middle warmer than the rim, so the base pulls in hoop tension that
+  shifts the rings as it warms) and, near its glass transition, creeps. Carry the dish's
+  temperature from the lamp (the plate's lamp power and on-time), add the thermal hoop stress
+  (E alpha dT over 2, the plane-stress disc) to the moulded one, and let the rings drift as
+  it warms. *Measure:* with the lamp on, the rings move outward over minutes in the lab and
+  stop when the temperature does.
+- **31p-3b. Cellophane: a third retarder of fixed retardation.** The classic light-show
+  retarder, a sheet of cellophane laid on the plate (about 400 nm a layer, slow axis along
+  its roll), stacked to climb the orders, turned to swing the colours. A third rotation in
+  `polarSeries` (lib/polarDish.ts's series law takes any number: the Stokes vector through
+  each retarder in turn), its layers and angle as settings. *Measure:* two layers at the same
+  axis add to one of twice the retardation; crossed, they cancel to dark.
 - **31p-4. The second plate's liquid.** 31p-1 reads the lead plate's flow (`vel0`); a
   two-plate look's back plate retards too. Two retarders in series at different axes are
   not one retarder; for small retardations the doubled-angle vectors add, and exactly they

@@ -208,7 +208,7 @@ const NOT_THE_LOOK = new Set([
     would black the plate out under nobody's hand (crossed, a still plate
     is dark); left out, the pool and Evolve's pace are as they were.
   */
-  'polariser', 'analyserAngle', 'quarterWave', 'birefringence',
+  'polariser', 'analyserAngle', 'quarterWave', 'birefringence', 'dishStress',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

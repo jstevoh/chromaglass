@@ -117,6 +117,7 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['analyserAngle', 5],
   ['quarterWave', 0.05],
   ['birefringence', 0.05],
+  ['dishStress', 0.05],
   ['tank', 0.05],
   ['tankFeed', 0.1],
   ['tankWeight', 0.05],

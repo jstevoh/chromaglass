@@ -2893,3 +2893,22 @@ here.
 4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
    pinks and greens. The default 0.3 should feel like the photograph.
 5. Polarisers at 0 on any look: the look exactly as before.
+
+## 136. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
+
+The check (`npm run polar`) proves the two-retarder law against Jones matrices, that each
+ring of a still dish is the law's colour at its radius, the dark cross between plane sheets,
+and that crossed plus parallel still add up with the dish in, on the lab's software WebGPU.
+How the rings read with a moving liquid at sixty frames is only seen here.
+
+1. Any look on a lamp ground, Settings → Lamp & Light → **Polarisers** 1, then **Dish
+   Stress** up from 0. Good: coloured rings round the plate's middle, tight near the middle
+   and broad toward the rim, a thin pale rim at the dish's wall, like the photograph's dishes.
+   Bad: a flat tint, rings that slide with the liquid, a hard edge at the gate.
+2. **Quarter Wave** to 0: a dark four-armed cross along the screen's axes, the rings lit on
+   the diagonals (the photograph's pinwheel); back to 1, the cross goes and the rings stay.
+3. Stir the liquid (Turbulence or the music): the rings wobble and change colour where the
+   liquid flows, and stay put where it is calm. Bad: rings that do not react, or that move
+   with still liquid.
+4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
+5. Dish Stress at 0: the look exactly as before.
