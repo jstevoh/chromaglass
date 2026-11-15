@@ -103,6 +103,7 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { engineQuery } from './frame.mjs';
 import { heldStretches, selfCheck } from './pagehold.mjs';
+import { buildsIn } from './compilestop.mjs';
 import { behindSaid, halvesWhole, waitBehind } from './startupbehind.mjs';
 
 const checks = [];
@@ -1264,12 +1265,9 @@ const waitOf = (x, oldWay) => {
     // end of Chromium's requests at the earliest, so a first step built
     // inside the device's own hold is not counted twice, and only to the
     // frames' return, the quarter second to the next counted step being the
-    // page's own on both sides. A build sits in the stop that holds it, or,
-    // held by none, in one begun within the second after it (the frame it
-    // was asked for in may close before the GPU stops the next); a stop no
-    // build sat in is not the compile, however long or near the builds, so
-    // a runner's stall is not priced as compile. What is left of a stop
-    // under a quarter second, the steps' own resolution, is not one.
+    // page's own on both sides. Which stops a build sat in, and why:
+    // scripts/compilestop.mjs (19aa-7d). What is left of a stop under a
+    // quarter second, the steps' own resolution, is not one.
     //
     // On this PR's own first Mac run (run 37171671783) the control's frames
     // stopped through Chromium's handover of the device with its first
@@ -1322,12 +1320,7 @@ const waitOf = (x, oldWay) => {
     const builds = (x.ledger?.onFrame ?? []).filter((e) => e.at / 1000 <= steady);
     const built = builds.map((e) => e.at / 1000);
     const raw = (x.frameStopsRaw ?? []).filter(([from]) => from < steady);
-    const holds = raw.map(() => 0);
-    for (const t of built) {
-      let i = raw.findIndex(([from, len]) => t >= from && t <= from + len);
-      if (i < 0) i = raw.findIndex(([from]) => from > t && from <= t + 1);
-      if (i >= 0) holds[i]++;
-    }
+    const { holds, lead } = buildsIn(raw, built, x.ticks ?? [], (x.raw?.frames ?? []).map((t) => t / 1000), { freeS: TICK_FREE_MS / 1000, maxGapS: MAX_GAP_S });
     // The ledger names a pipeline scope/label, a submit's work by its label
     // (a draw as "draw label"); each build's first submit, [handed, done].
     const labels = new Set(builds.map((e) => e.name.slice(e.name.indexOf('/') + 1)));
@@ -1370,7 +1363,7 @@ const waitOf = (x, oldWay) => {
     });
     let compiling = -Infinity;
     stops = raw.map(([s, len], i) => {
-      const from = Math.max(s, end);
+      const from = Math.max(lead[i]?.at ?? s, end);
       const n = Math.max(0, Math.min(s + len, steady) - from);
       const follows = holds[i] === 0 && s - compiling <= 1;
       const taken = (holds[i] > 0 || follows || waited[i] > 0) && n >= 0.25;
@@ -1385,7 +1378,7 @@ const waitOf = (x, oldWay) => {
         and 1b judged a stall. #257's run still prices its 18.29 s.
       */
       if (holds[i] > 0 && n >= 0.25) compiling = s + len;
-      return { from: from - t0, len: n, builds: holds[i], follows, waited: waited[i], ...why[i], taken };
+      return { from: from - t0, len: n, builds: holds[i], lead: lead[i] && { gap: s - lead[i].at, run: lead[i].run }, follows, waited: waited[i], ...why[i], taken };
     });
     for (const st of stops.filter((st) => st.taken)) {
       compile += st.len;
@@ -1426,7 +1419,7 @@ const sayWait = (w) => (w == null ? 'never moving for good'
   : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`
     + (w.leftOver ? ` (neither Chromium's nor a build's: ${w.leftOver.total.toFixed(2)} s in ${w.leftOver.pieces} stretches, ${w.leftOver.free.toFixed(2)} s of it with the page's timer ticking on time${w.leftOver.longest ? `, the longest ${w.leftOver.longest[1].toFixed(2)} s from ${w.leftOver.longest[0].toFixed(2)} s` : ''})` : '')
     // Every stop its frames made, so a pick that is wrong reads off the log.
-    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it, ${st.waited} first used before it and done as it ended (${st.last === undefined ? 'none out as it began' : st.last === null ? 'one out as it began never done' : `the last out as it began done ${st.last.toFixed(2)} s from its end`}, the page's timer silent at most ${st.silent.toFixed(2)} s)${st.taken ? `${st.follows ? ' (the compile going on from the stop before)' : ''}, priced` : ''}`).join('; ') : 'never'}]` : ''));
+    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it${st.lead ? ` (held into it from them ${st.lead.gap.toFixed(2)} s before, the page running at most ${st.lead.run.toFixed(2)} s at a time)` : ''}, ${st.waited} first used before it and done as it ended (${st.last === undefined ? 'none out as it began' : st.last === null ? 'one out as it began never done' : `the last out as it began done ${st.last.toFixed(2)} s from its end`}, the page's timer silent at most ${st.silent.toFixed(2)} s)${st.taken ? `${st.follows ? ' (the compile going on from the stop before)' : ''}, priced` : ''}`).join('; ') : 'never'}]` : ''));
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, held = null) => {
   // Whether the page's own thread was busy through a gap (a long task
