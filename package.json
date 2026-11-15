@@ -341,6 +341,7 @@
     "soundpatch": "esbuild scripts/soundpatch.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundpatch.mjs && node node_modules/.cache/soundpatch.mjs",
     "melody": "esbuild scripts/melody.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/melody.mjs && node node_modules/.cache/melody.mjs",
     "holeline": "node scripts/holeline.mjs",
+    "camrelief": "node scripts/camrelief.mjs",
     "bubbledye": "node scripts/bubbledye.mjs",
     "bubbleair": "node scripts/bubbleair.mjs",
     "bubblelook": "node scripts/bubblelook.mjs",
