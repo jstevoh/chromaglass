@@ -528,7 +528,9 @@ const M = (source, depth, key = 'turbulenceScale') => {
   const actions = Object.keys(ACTION_LABELS);
   const toggles = actions.filter(a => a.endsWith('-toggle') || a === 'seq-play-pause');
   const letThrough = toggles.filter(a => triggerable(a));
-  check('no toggle can be pressed by the music', toggles.length >= 9 && letThrough.length === 0,
+  // Eight since Macro (`macro-toggle`) went with the Close-up press (PLAN QA-32c): the floor
+  // is the list as it stands, so a list that emptied could not pass.
+  check('no toggle can be pressed by the music', toggles.length >= 8 && letThrough.length === 0,
     `${toggles.length} toggles refused${letThrough.length ? `; let through: ${letThrough.join(', ')}` : ''}; a trigger may press ${actions.filter(triggerable).join(', ')}`);
 
   // The same rule for a setting as the patch bay's, both ways.

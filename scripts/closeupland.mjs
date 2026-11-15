@@ -58,15 +58,15 @@
  * through the debug hook; at 1x the pool is drawn (the control: a black frame
  * is also what a frame that could not be read gives); the readback's dye in
  * the 4x frame on the aim is under BARE of the plate's (the control for the
- * zoom); the Macro Zoom pushed to 4x (the patch the Settings slider writes):
- * the zoom chip reads 4.0x, over LIT_SHARE of the frame's pixels lit with the
+ * zoom); the zoom pushed in by + seven times (to 4.3x, the app's own zoom
+ * code): the zoom chip reads it, over LIT_SHARE of the frame's pixels lit with the
  * shot on the pool and the aim moved onto it; the chip's − pressed until it
  * goes, out at 1x.
  */
 import { MacroCamera } from '../src/lib/macroCamera.ts';
 import { stream } from '../src/lib/rng.ts';
 import { BARE_SHARE, LAND_FULL_ZOOM } from '../src/lib/macroLanding.ts';
-import { macroZoomOf, MACRO_FULL_ZOOM } from '../src/sim/constants.ts';
+import { macroZoomOf, MACRO_FULL_ZOOM, MACRO_PRESET_ZOOM } from '../src/sim/constants.ts';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => { if (ok) passed++; else failed++; console.log(`${ok ? ' ok ' : ' FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`); };
@@ -266,9 +266,22 @@ if (process.argv.includes('--node')) {
     const { PRESETS } = await import('../src/presets.ts');
     const flagged = PRESETS.filter((p) => p.settings.macroMode === true);
     const bare = flagged.filter((p) => !((p.settings.macroZoom ?? 1) > 1.05)).map((p) => p.id);
-    check('the frame\'s zoom is the Macro Zoom on every flag, and every closeup look carries its own',
-      wrong === 0 && flagAtOne === 1 && flagged.length > 0 && bare.length === 0,
-      `${wrong} of ${cases} flag and zoom pairs read otherwise${off.length ? ` (${off.join(', ')})` : ''}; macroMode on at 1x reads ${flagAtOne}x (1 wanted: it was 4); ${flagged.length} shipped closeup looks, ${bare.length ? `with no zoom: ${bare.join(', ')}` : 'each with a zoom past 1.05'}`);
+    // A look saved as it is drawn: a zoom from the remote or a fader comes
+    // without the flag, and saving it at 3x must not bring it back at the plate
+    // (cleanSettings' rule for looks from before the zoom was the control).
+    const { makeUserPreset } = await import('../src/lib/userPresets.ts');
+    const { DEFAULT_SETTINGS } = await import('../src/types.ts');
+    const saved = makeUserPreset('z', '', { ...DEFAULT_SETTINGS, macroZoom: 3, macroMode: false }, null, null).settings;
+    const savedFlat = makeUserPreset('p', '', { ...DEFAULT_SETTINGS, macroZoom: 1, macroMode: true }, null, null).settings;
+    // A show's stage that says Closeup with no zoom of its own glides the zoom.
+    const { stageCloseup, STAGE_CLOSEUP_ZOOM } = await import('../src/lib/sequencer.ts');
+    const on = {}, kept = { macroZoom: 6 }, offStage = { macroZoom: 6 };
+    stageCloseup(on, true); stageCloseup(kept, true); stageCloseup(offStage, false);
+    check('the frame\'s zoom is the Macro Zoom on every flag, every closeup look carries its own, a save keeps it and a stage moves it',
+      wrong === 0 && flagAtOne === 1 && flagged.length > 0 && bare.length === 0
+      && macroZoomOf(saved) === 3 && macroZoomOf(savedFlat) === 1
+      && on.macroZoom === MACRO_PRESET_ZOOM && STAGE_CLOSEUP_ZOOM === MACRO_PRESET_ZOOM && kept.macroZoom === 6 && offStage.macroZoom === 1,
+      `${wrong} of ${cases} flag and zoom pairs read otherwise${off.length ? ` (${off.join(', ')})` : ''}; macroMode on at 1x reads ${flagAtOne}x (1 wanted: it was 4); ${flagged.length} shipped closeup looks, ${bare.length ? `with no zoom: ${bare.join(', ')}` : 'each with a zoom past 1.05'}; saved at 3x with the flag off it reads ${macroZoomOf(saved)}x (3 wanted), at 1x with it on ${macroZoomOf(savedFlat)}x (1 wanted); a stage's Closeup on ${on.macroZoom}x (${MACRO_PRESET_ZOOM} wanted), on over 6x ${kept.macroZoom}x, off ${offStage.macroZoom}x`);
   }
 
   // 9. The landing's full zoom is the solver's, and no Close-up press is left in src/.
@@ -292,9 +305,21 @@ if (process.argv.includes('--node')) {
     const hits = [];
     for (const f of files) {
       const rel = relative(root, f).split('\\').join('/');
-      readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
-        if (/^\s*(\/\/|\*|\{\/\*)/.test(line)) return;
-        if (/closeupToggle|'macro-toggle'|"macro-toggle"|macro-button|macroMode:\s*!/.test(line)) hits.push(`${rel}:${i + 1}`);
+      // Comments out, line count kept: what they say about the old press is history, not a hand.
+      const code = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+      code.split('\n').forEach((line, i) => {
+        if (/^\s*\/\//.test(line)) return;
+        /*
+          The names a press went by, and the shapes a new one would take
+          whatever it is called: a two-valued zoom (a ternary between the
+          plate and a closeup, written as a patch or handed to onZoom), and a
+          flip of the flag. The zoom's own steps (+ and −, the slider, the
+          pinch) are a value along it, never one of two.
+        */
+        if (/closeupToggle|(macro|closeup)-toggle|macro-button|macroMode:\s*!/.test(line)
+          || /macroZoom:\s*[^,}]*\?[^:]*:/.test(line)
+          || /\?\s*\{\s*macroZoom:\s*1\b/.test(line)
+          || /onZoom\([^)]*\?/.test(line)) hits.push(`${rel}:${i + 1}`);
       });
     }
     check('the landing\'s full zoom is the solver\'s, and no Close-up press is left in the app',
@@ -386,9 +411,11 @@ if (process.argv.includes('--node')) {
       `${flat === null ? 'no frame read' : fx(flat)} of the frame lit, its brightest pixel ${Math.round(lit.top ?? 0)} of 255 (over 0.005 wanted: a frame that could not be read is black too)`);
     check('the control: the frame on the aim is bare glass', before.onAim < BARE,
       `the 4x frame on the aim holds ${fx(before.onAim)} of the plate's average dye (under ${BARE} wanted)`);
-    // In by the Macro Zoom, the closeup's one control: the patch its Settings
-    // slider writes (LookSections' Macro Zoom), to 4x.
-    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 4, macroMode: true }));
+    // In by the zoom, the closeup's one control, as a hand does: + seven
+    // times from the plate (1.2x a step from 1.2, to 4.3x), the app's own
+    // zoom code (zoomMacro, the − / + chip's and the wheel's too).
+    await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur());
+    for (let k = 0; k < 7; k++) { await page.keyboard.press('+'); await page.waitForTimeout(50); }
     await settlePlate(page, 1500);
     const inside = await state();
     const chip = await page.locator('[data-testid="macro-zoom-value"]').textContent().catch(() => null);
@@ -401,8 +428,8 @@ if (process.argv.includes('--node')) {
     check('the zoom pushed in lands on the liquid, not on bare glass, and the aim says where',
       close !== null && close > LIT_SHARE && inside.off < 1 / 3 && aimToPool < 0.05,
       `${close === null ? 'no frame read' : fx(close)} of the 4x frame lit (over ${LIT_SHARE} wanted), the pool ${fx(inside.off)} of a half-frame off its middle (under 0.333 wanted), the aim at ${fx(inside.aimX)}, ${fx(inside.aimY)}, ${fx(aimToPool)} of the plate from the pool (under 0.05 wanted)`);
-    check('and the zoom chip reads 4x with the frame there', chip?.trim() === '4.0×' && inside.macroZoom === 4 && inside.zoom > 3,
-      `the chip reads ${chip ?? 'nothing'}, Macro Zoom ${inside.macroZoom}, the frame at ${fx(inside.zoom)}x`);
+    check('and the zoom chip reads the zoom, the frame there', chip?.trim() === `${(inside.macroZoom ?? 1).toFixed(1)}×` && inside.macroZoom > 4 && inside.zoom > 3,
+      `the chip reads ${chip ?? 'nothing'}, Macro Zoom ${inside.macroZoom} (past 4 wanted), the frame at ${fx(inside.zoom)}x`);
     // Out by the zoom too: the chip's − (the − key's step) until it is gone,
     // with no switch to find. Clicked in the page: a software plate's frames
     // outlast Playwright's own wait after a click.

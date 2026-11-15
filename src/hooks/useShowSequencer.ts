@@ -13,11 +13,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VisualizerSettings } from '../types';
 import { PRESETS, livePresetId, type Preset } from '../presets';
 import { lookOf } from '../lib/lookFade';
-import { MACRO_PRESET_ZOOM } from '../sim/constants';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
 import {
   ShowSequence, ShowStage, SequencerStatus,
-  builtInSequences, loadUserSequences, SEQUENCES_KEY, saveUserSequences, lerpSettings, stageAtOffset,
+  builtInSequences, loadUserSequences, SEQUENCES_KEY, saveUserSequences, lerpSettings, stageAtOffset, stageCloseup,
 } from '../lib/sequencer';
 import { useCloudSyncReload } from '../lib/cloudSyncApp';
 import {
@@ -176,17 +175,8 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     // the stage's own settings over it. A stage with no look is a set of
     // changes to the one already playing, and glides only those.
     const target: Partial<VisualizerSettings> = { ...(preset ? lookOf(preset.settings) : {}), ...(stage.settings ?? {}) };
-    /*
-      A stage's Closeup on or off moves the zoom, the closeup's one control
-      (PLAN QA-32c): on glides to the stage's own zoom or the look's, or to
-      MACRO_PRESET_ZOOM when neither is in; off glides back to the plate. The
-      flag alone did nothing to the frame since the zoom became all it reads.
-    */
-    if (stage.macro !== undefined) {
-      target.macroMode = stage.macro;
-      if (!stage.macro) target.macroZoom = 1;
-      else if (!((target.macroZoom ?? 1) > 1.05)) target.macroZoom = MACRO_PRESET_ZOOM;
-    }
+    // Closeup on or off glides the zoom, the closeup's one control (PLAN QA-32c).
+    if (stage.macro !== undefined) stageCloseup(target, stage.macro);
     const current = a.getSettings();
     const from: Partial<VisualizerSettings> = {};
     for (const key of Object.keys(target) as (keyof VisualizerSettings)[]) (from as Record<string, unknown>)[key] = current[key];
