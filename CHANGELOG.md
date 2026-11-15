@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the glass still and the dye smooth unless someone moves them (PLAN 38u-8, 38u-11)
+
+- **Granulation** rests at 0 in every look (it was 0.5): a dye in solution has no grain. The
+  dial stays, on the sheet, the desks and MIDI.
+- **Glass Smear** rests at 0 (it was 0.3): the cover glass is still until a hand or a cord
+  moves it. The 22 looks that slid it all the time carry the slide as a cord, LFO 1 on Glass
+  Smear, whose top is the look's old speed; the phone's Sound sheet has a **Glass Slide**
+  slider for it, and Glass Smear is now MIDI-learnable.
+
 ### Removed — what the closeup drew over the liquid (PLAN 38u-1, 38u-2, 38u-3)
 
 - **Edge Detail** is gone (Settings → Macro, the desks, the phone). It read the closeup through

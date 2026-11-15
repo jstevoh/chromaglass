@@ -37,7 +37,9 @@
  *      take from the analyser with no cord at all, now listed where it can
  *      be turned and pulled. A look has at most one, and `npm run musicstir`
  *      holds its depth; the two or three here are the look's own answers to
- *      the drums and the notes, as they were.
+ *      the drums and the notes, as they were. The glass's slow slide (LFO 1
+ *      on Glass Smear, PLAN 38u-11) is counted apart the same way, at most
+ *      one, held by `npm run glassstill`.
  *   3. The hits (lib/hitSource.ts), on a song whose drums are known to the
  *      sample (`scripts/arrangement.mjs`, as `npm run shape` uses), heard the
  *      way the show's loop hears them:
@@ -66,6 +68,7 @@ import { parseMidiMap, serializeMidiMap, MIDI_FORMAT, MUSIC_SOURCES } from '../s
 import { MODULATOR_FEATURES } from '../src/lib/modulators.ts';
 import { FRAME_MOTION } from '../src/lib/drift.ts';
 import { isStirCord } from '../src/lib/stir.ts';
+import { isSlideCord } from '../src/lib/glassSlide.ts';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { arrange, SR } from './arrangement.mjs';
@@ -150,8 +153,17 @@ for (const p of PRESETS) for (const m of p.settings.sceneMappings ?? []) {
   const src = m.source ?? 'room';
   if (!FAST.has(src) && !NOT_SOUND.has(src)) slow.push(`${p.id} ${src}:${m.feature}`);
 }
-// A look's own answers: its cords less the music's stir, which every look carries and `npm run musicstir` holds.
-const answers = (p) => (p?.settings.sceneMappings ?? []).filter((m) => !isStirCord(m));
+/*
+  A look's own answers: its cords less the music's stir, which every look
+  carries and `npm run musicstir` holds, and less the glass's slow slide
+  (PLAN 38u-11), which is not an answer to the sound at all: it is the
+  constant slide twenty-two looks used to give the cover glass with no cord,
+  handed to LFO 1 so it can be seen and pulled, and `npm run glassstill`
+  holds its depth and its speed. Counting it here would make Cyberpunk and
+  Aurora Borealis four-cord looks and call an LFO a sound patch, though
+  neither look's answer to the drums and the notes changed.
+*/
+const answers = (p) => (p?.settings.sceneMappings ?? []).filter((m) => !isStirCord(m) && !isSlideCord(m));
 const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp', 'poster-1969'];
 const pattern = PATTERN.map((id) => {
   const ms = answers(PRESETS.find((p) => p.id === id));
@@ -173,6 +185,8 @@ for (const p of PRESETS) {
   const areas = plateAreas(p.id);
   const stirs = (p.settings.sceneMappings ?? []).filter(isStirCord).length;
   if (stirs > 1) missing28i.push(`${p.id}: ${stirs} cords for the music's stir`);
+  const slides = (p.settings.sceneMappings ?? []).filter(isSlideCord).length;
+  if (slides > 1) missing28i.push(`${p.id}: ${slides} cords for the glass's slide`);
   const sm = answers(p).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
   const platePatches = sm.filter((m) => !isAreaCord(m) && isFastReading(m) && !FRAME_MOTION.has(m.setting));
   const areaCords = sm.filter((m) => isAreaCord(m) && Boolean(areas?.[m.area]) && isFastReading(m));
@@ -185,7 +199,7 @@ for (const p of PRESETS) {
     if (FRAME_MOTION.has(m.setting)) missing28i.push(`${p.id}: ${m.setting} moves the frame`);
   }
 }
-check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only, and at most one cord for the music\'s stir beside them (PLAN 28i-3b, 38u-5)',
+check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only, and at most one cord for the music\'s stir and one for the glass\'s slide beside them (PLAN 28i-3b, 38u-5, 38u-11)',
   missing28i.length === 0, missing28i.join('; ') || `${PRESETS.length - REBUILT_25H.size} looks checked (+ 3 from 25h)`);
 
 // ── 3. The hits ─────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
 import { layMoireLooks } from './presetsMoire';
 import { FOAM_CELLS } from './presetsFoam';
 import { layStirCords } from './lib/stir';
+import { laySlideCords } from './lib/glassSlide';
 
 export interface Preset {
   id: string;
@@ -1281,7 +1282,6 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.5,
       rotationSpeed: 0.095,
       centerGravity: 0.05,
-      granulation: 0.5,
       diffusionRate: 0.00012,
       buoyancy: 0.45,
       advection: 0.6,
@@ -2356,10 +2356,11 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-// The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
-// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5). In that order.
+// In order: the moiré pack, then on every look the music's stir (38u-5) and the glass's slide from
+// its old 0.3 (38u-11).
 layMoireLooks(PRESETS);
 layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
+laySlideCords(PRESETS, 0.3);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).

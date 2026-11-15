@@ -12771,6 +12771,44 @@ judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music stil
 slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
 saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
+## 38u-8, 38u-11. The glass still and the dye smooth unless someone moves them (2026-11-15)
+
+Found by the third physics pass (38u, 2026-11-13). Two dials did something on every plate
+that nobody had asked for. Glass Smear, the cover glass sliding over the liquid (a thin-gap
+Couette drag at half the glass's speed, `thinProject`), defaulted to 0.3, and 22 of the 41
+looks slid it all the time with no hand on it; a real cover glass is still until the
+performer pushes it. Granulation laid a value-noise speckle in the dye's depth, 0.5 on every
+look; a dye in solution has no grain (a pigment like India ink flocculates, and the real
+thing is a concentration the solver would carry below the grid, 47a). The owner chose
+(2026-11-14, the recommended option on each card) both defaults at 0, Granulation's dial kept,
+and the drift the 22 looks were built around kept where the performer can see and pull it.
+
+What changed: both defaults are 0 and no look writes either above it. The slide is a cord,
+LFO 1 (a sine over eight bars, 0..1) on Glass Smear, laid by presets.ts over the written
+looks like the music's stir (`laySlideCords`, lib/glassSlide.ts), at the look's old dial over
+the dial's travel of 3, rounded down to hundredths: the top of each wave is the old constant
+speed, never faster (rounded to the nearest, soap-film's top would have been 3% over), and
+the glass comes to rest at the foot. An LFO and not the sound, because the slide was never
+the music's: the beat clock falls back to a steady tempo in silence, so the look breathes
+with nothing playing. bass-drop keeps its own hats cords on the glass. Evolve never wanders
+either dial (`NOT_THE_LOOK`), Lucky rolls the slide as a cord no deeper than a third, and the
+phone's mixer has a Glass Slide slider beside Music Stir. `SceneMapping.feature` now names
+the LFOs and envelopes (`ModulatorFeature`), which the 'shape' source always read.
+
+Measured (`npm run glassstill`, 27 lines, node, the real patch bay, LFOs and solver): every
+look rests both dials at 0; the 22 carry one cord each; folded through 16 s of silence the
+glass's derived speed peaks at 0.943 to 1.000 of the old constant speed (never over) and
+falls to 0.000; with the cord pulled, or the LFOs' share at 0, it is 0; the 18 others stay
+still. `npm run grainedge` now asks every look at 0.5 where it ships with none, since
+asking only the looks with grain would ask none. `npm run soundpatch` counts the slide cord apart
+from a look's answers to the sound, as it counts the stir. Taking the two dials out of
+Evolve changed what its seeded dice drew, and `npm run slowevolve`'s "no dial faster than
+5 % a second at full" went from 4.20 to 5.24 %: the planner had never promised that bar, it
+had passed by luck. Evolve now lengthens a glide too short for its longest step
+(`DIAL_SPEED_MAX`, 4.5 % a second, slowEvolve.ts), and the same run measures 4.49 %. The check-skeptic found that one seed's peak would only catch the cap going missing on half of seeds (6 of 12 red without it), so `npm run slowevolve` now also holds the cap for every move on eight seeds: 582 moves, fastest planned 4.50 %, red at 6.05 % with the cap removed. Filmed before and after on the owner's Mac.
+Left open: 38u-17 (the glass's direction is still a noise path) and 38u-18 (a look saved
+before this still slides all the time).
+
 ## 38f-2. Wax and water mix like immiscible liquids (2026-11-11)
 
 Found shipping 38f-1: with the heat carried, Lava Lamp's rising plumes left their trailing edges

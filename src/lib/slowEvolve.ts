@@ -1,6 +1,7 @@
 import type { VisualizerSettings } from '../types';
 import type { SongSection } from './songShape';
 import { THEMES, moveTargets } from './drift';
+import { PIN_RANGE } from './deskPins';
 import { stream } from './rng';
 
 /**
@@ -120,6 +121,22 @@ export const MIN_REST = 6;
 export const REST_FLOOR = 2;
 /** Seconds of silence before Evolve stops listening for sections and runs on its clock. */
 const DEAF_AFTER = 12;
+
+/**
+ * The fastest any dial may glide, as a share of its travel a second, at the
+ * middle of the eased glide where it is fastest (1.5 times the average).
+ *
+ * At full Evolve Speed a glide is an eighth as long, and a dial's step can be
+ * most of the two-fifths window `dialWindow` gives it, so the speed was
+ * whatever the dice gave: `npm run slowevolve` held it under 5 % a second
+ * on one seeded path, and that path passed at 4.2 % only by luck. When the
+ * glass and the grain left Evolve (PLAN 38u-8, 38u-11) the same seed drew
+ * Magnet Height a long step in seven seconds, 5.2 %. Nothing about the
+ * planner had promised the bar; now this does: a glide too short for its
+ * longest step is lengthened until that step is at this speed, a little
+ * under the check's 5 % so the check sees a margin and not a tie.
+ */
+export const DIAL_SPEED_MAX = 0.045;
 
 /** How far the closeup's aim may wander in one move, each way, as a share of the plate. */
 export const AIM_STEP = 0.08;
@@ -337,7 +354,13 @@ export class SlowEvolve {
           seconds = 50 + 35 * this.rand();
         }
         seconds *= (1.15 - 0.3 * PACE_PIVOT) * (0.88 + 0.24 * this.rand());
-        const move: EvolveMove = { theme: t.name, to, seconds: pace * clamp(seconds, GLIDE_MIN, GLIDE_MAX), lean: this.lean, cue };
+        let longest = 0;
+        for (const [k, v] of Object.entries(to)) {
+          const r = PIN_RANGE.get(k), c = (current as unknown as Record<string, unknown>)[k];
+          if (typeof c === 'number') longest = Math.max(longest, Math.abs(v - c) / (r ? r.max - r.min : 1));
+        }
+        const glide = Math.max(pace * clamp(seconds, GLIDE_MIN, GLIDE_MAX), 1.5 * longest / DIAL_SPEED_MAX);
+        const move: EvolveMove = { theme: t.name, to, seconds: glide, lean: this.lean, cue };
         if ((current.macroZoom ?? 1) > 1.05 && (current.macroCamera ?? 'hold') !== 'auto') {
           /*
             The camera never goes faster than at the default, however fast the
