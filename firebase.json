@@ -6,6 +6,13 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "redirects": [
+      {
+        "source": "/loops/:file",
+        "destination": "https://github.com/jstevoh/chromaglass/releases/download/tv-loops-1/:file",
+        "type": 302
+      }
+    ],
     "rewrites": [
       {
         "source": "/pro",

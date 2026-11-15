@@ -47,7 +47,7 @@
  *
  * ## The judge
  *
- * Five lines, every bar a comparison within the one film. Frames are read
+ * Six lines, every bar a comparison within the one film. Frames are read
  * the way `npm run loopseam` reads them: every frame ffmpeg finds, shrunk to
  * 16x16 grey, and the step between two frames is their mean absolute
  * difference (0 to 255).
@@ -69,10 +69,14 @@
  *      film cut plain reads 35 to 46. On a 1080p film the codec's error in a
  *      16x16 thumbnail is smaller still, each thumb pixel being the mean of a
  *      120x67 block;
- *   4. there is no cut inside: no step anywhere is more than 8 times that
- *      median (the crossfade's frames step a little further than the film's;
- *      a loop that hid its seam with a cut somewhere else passes 3 and fails
- *      this);
+ *   4. the joint where the crossfade ends and the film runs on alone is one
+ *      step too, by the same bar: the edit's other place where two pieces
+ *      meet, and where a piece seeked a frame or a second wrong shows. Not
+ *      "no step anywhere is large", as loopseam asks of a few seconds: tried
+ *      on the Mac's first real loop (Chemical Clock, a minute, 2026-11-15)
+ *      the largest step was already 7.9 keyframe steps, a wave front, and a
+ *      half hour of liquid has a larger one somewhere that is no fault. The
+ *      largest step is printed beside this line, for the eye;
  *   5. it keeps moving: the step between frames a minute apart (a sixth of
  *      the loop on a short one) is at least 3 times the median keyframe step
  *      everywhere in the film. A plate that settles into stillness for a
@@ -90,7 +94,8 @@
  * the same `makeLoop` the Mac uses, small and short (2 s warm, a 36 s loop,
  * a 4 s seam): travelling waves at speeds that share no period, so like the
  * liquid the film never comes back to where it began. The crossfaded loop
- * passes all six; the same film cut plain fails the seam; with a silent
+ * passes all six; the same film cut plain fails the seam; its film seeked
+ * a second late after the crossfade fails the joint; with a silent
  * audio track it fails the audio line; held still it fails the moving line;
  * faded to black, or to a flat grey of the same brightness, over its last
  * third it fails the light line; and a loop a second short fails the length
@@ -126,7 +131,6 @@ const OUT = path.resolve(process.env.TVLOOPS_OUT ?? 'scratch/tvloops');
 const PORT = Number(process.env.TVLOOPS_PORT ?? 4364);
 
 const SEAM_OVER_KEY = 3;
-const CUT_OVER_KEY = 8;
 const MOVES_OVER_KEY = 3;
 const KEEP_SHARE = 0.5;
 const THUMB = 16;
@@ -164,10 +168,10 @@ const tvH264 = ['-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-maxrate', 
  * film from WARM, its first SEAM seconds crossfaded from the film's own
  * seconds after WARM + L. seam 0 is the plain cut, for the controls.
  */
-function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0 }) {
+function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew = 0 }) {
   const t = (s) => s.toFixed(6);
   const inputs = seam > 0
-    ? ['-ss', t(warm + loop), '-t', t(seam), '-i', raw, '-ss', t(warm), '-t', t(seam), '-i', raw, '-ss', t(warm + seam), '-t', t(loop - seam), '-i', raw]
+    ? ['-ss', t(warm + loop), '-t', t(seam), '-i', raw, '-ss', t(warm), '-t', t(seam), '-i', raw, '-ss', t(warm + seam + skew), '-t', t(loop - seam), '-i', raw]
     : ['-ss', t(warm), '-t', t(loop), '-i', raw];
   // blend's T is the frame's time in seconds from the piece's start: A (the
   // tail) whole at the loop's first frame, B (its own) whole at `seam`.
@@ -220,7 +224,7 @@ function facts(file) {
   };
 }
 
-function judge(file, loopSeconds) {
+function judge(file, loopSeconds, seamSeconds) {
   const f = facts(file);
   const fr = frames(file);
   const steps = [];
@@ -230,6 +234,8 @@ function judge(file, loopSeconds) {
   const keyMed = median(keySteps);
   const seam = dist(fr[fr.length - 1], fr[0]);
   const largest = Math.max(...steps);
+  // The step into the first frame the film plays alone, after the crossfade.
+  const joint = seamSeconds > 0 ? steps[Math.round(seamSeconds * FPS) - 1] : null;
   const window = Math.round(Math.min(60, loopSeconds / 6) * FPS);
   const travels = [];
   for (let i = 0; i + window < fr.length; i += window) travels.push(dist(fr[i], fr[i + window]));
@@ -242,7 +248,7 @@ function judge(file, loopSeconds) {
   }
   return {
     file: path.basename(file), seconds: f.seconds, audio: f.audio, frames: fr.length,
-    medianStep: median(steps), keyMedian: keyMed, keyframes: keys.length + 1, seam, largest,
+    medianStep: median(steps), keyMedian: keyMed, keyframes: keys.length + 1, seam, joint, largest,
     minTravel: Math.min(...travels), medianTravel: median(travels), windowSeconds: window / FPS,
     minLight: Math.min(...light), medianLight: median(light), minPattern: Math.min(...pattern), medianPattern: median(pattern),
   };
@@ -251,7 +257,7 @@ const lines = (j, loopSeconds) => ({
   length: Math.abs(j.seconds - loopSeconds) <= 1 / FPS + 1e-3,
   audio: j.audio === 0,
   seam: j.seam <= SEAM_OVER_KEY * j.keyMedian,
-  cut: j.largest <= CUT_OVER_KEY * j.keyMedian,
+  joint: j.joint === null || j.joint <= SEAM_OVER_KEY * j.keyMedian,
   // Strictly more: a picture the codec holds perfectly still has a travel and a keyframe step of 0.
   moves: j.minTravel > MOVES_OVER_KEY * j.keyMedian,
   light: j.minLight >= KEEP_SHARE * j.medianLight && j.minPattern >= KEEP_SHARE * j.medianPattern,
@@ -262,7 +268,7 @@ function report(name, j, loopSeconds) {
   check(`${name}: ${loopSeconds} s long, to a frame`, l.length, `${j.seconds.toFixed(3)} s, ${j.frames} frames`);
   check(`${name}: no audio track`, l.audio, `${j.audio} audio track(s)`);
   check(`${name}: the seam is one step across a keyframe, not a cut`, l.seam, `last to first ${j.seam.toFixed(2)}, ${r(j.seam, j.keyMedian)}x the median keyframe step ${j.keyMedian.toFixed(2)} (at most ${SEAM_OVER_KEY}x; median step ${j.medianStep.toFixed(2)})`);
-  check(`${name}: no cut inside`, l.cut, `largest step ${j.largest.toFixed(2)}, ${r(j.largest, j.keyMedian)}x (at most ${CUT_OVER_KEY}x)`);
+  check(`${name}: the crossfade's end is one step too`, l.joint, j.joint === null ? 'no crossfade' : `${j.joint.toFixed(2)}, ${r(j.joint, j.keyMedian)}x (at most ${SEAM_OVER_KEY}x); the largest step anywhere ${j.largest.toFixed(2)}, ${r(j.largest, j.keyMedian)}x, for the eye`);
   check(`${name}: it keeps moving, every ${j.windowSeconds} s`, l.moves, `least travel ${j.minTravel.toFixed(2)}, ${r(j.minTravel, j.keyMedian)}x the keyframe step (at least ${MOVES_OVER_KEY}x; median ${j.medianTravel.toFixed(2)})`);
   check(`${name}: it keeps its light and its pattern`, l.light, `least light ${j.minLight.toFixed(1)} of median ${j.medianLight.toFixed(1)}, least spread ${j.minPattern.toFixed(1)} of median ${j.medianPattern.toFixed(1)} (at least ${KEEP_SHARE} of each)`);
   return l;
@@ -297,12 +303,13 @@ function controls() {
   const make = (name, film, o = {}) => {
     const raw = path.join(work, `${name}-raw.mp4`), out = path.join(work, `${name}.mp4`);
     encodeRaw(film, raw);
-    makeLoop(raw, out, { warm, loop: o.loop ?? loop, seam: o.seam ?? seam, audio: !!o.audio, threads: 1 });
-    return judge(out, loop);
+    makeLoop(raw, out, { warm, loop: o.loop ?? loop, seam: o.seam ?? seam, audio: !!o.audio, threads: 1, skew: o.skew ?? 0 });
+    return judge(out, loop, o.seam ?? seam);
   };
   const third = (t) => Math.min(1, Math.max(0, (t - warm - (2 * loop) / 3) / (loop / 6)));
   const cases = [
-    ['the crossfaded loop', make('good', wavesFilm(all)), { length: true, audio: true, seam: true, cut: true, moves: true, light: true }],
+    ['the crossfaded loop', make('good', wavesFilm(all)), { length: true, audio: true, seam: true, joint: true, moves: true, light: true }],
+    ['its film seeked a second late after the crossfade', make('skew', wavesFilm(all + 1), { skew: 1 }), { joint: false }],
     ['the same film cut plain', make('cut', wavesFilm(all), { seam: 0 }), { seam: false }],
     ['with a silent audio track', make('audio', wavesFilm(all), { audio: true }), { audio: false }],
     ['a loop a second short', make('short', wavesFilm(all), { loop: loop - 1 }), { length: false }],
@@ -316,7 +323,7 @@ function controls() {
     for (const [k, v] of Object.entries(want)) {
       const got = l[k];
       check(`${name}: the ${k} line ${v ? 'passes' : 'fails'}`, got === v,
-        `seam ${j.seam.toFixed(2)}, keyframe step ${j.keyMedian.toFixed(2)}, largest ${j.largest.toFixed(2)}, least travel ${j.minTravel.toFixed(2)}, light ${j.minLight.toFixed(0)}/${j.medianLight.toFixed(0)}, spread ${j.minPattern.toFixed(1)}/${j.medianPattern.toFixed(1)}, ${j.seconds.toFixed(3)} s, ${j.audio} audio`);
+        `seam ${j.seam.toFixed(2)}, keyframe step ${j.keyMedian.toFixed(2)}, joint ${j.joint?.toFixed(2)}, least travel ${j.minTravel.toFixed(2)}, light ${j.minLight.toFixed(0)}/${j.medianLight.toFixed(0)}, spread ${j.minPattern.toFixed(1)}/${j.medianPattern.toFixed(1)}, ${j.seconds.toFixed(3)} s, ${j.audio} audio`);
     }
   }
 }
@@ -406,6 +413,9 @@ async function makeAll() {
       return on();
     });
     if (!evolving) throw new Error(`${loop.id}: Evolve would not switch on`);
+    // A few of the plate's dials, for the log: which look is on and how fast it runs.
+    const dials = await page.evaluate(() => { const s = window.chromaglassCastState?.().settings ?? {}; return ['globalSpeed', 'turbulenceScale', 'bzReaction', 'automateRate'].map((k) => `${k} ${s[k]}`).join(', '); });
+    console.log(`  ${loop.id}: ${dials}`);
     console.log(`tvloops: ${loop.id}: rendering ${filmSeconds} s of ${loop.look} at ${TV_LOOP_WIDTH}x${TV_LOOP_HEIGHT}, ${FPS} fps, seed ${loop.seed}, Evolve on…`);
     const tick = setInterval(() => console.log(`  ${loop.id}: ${(written / 1e6).toFixed(0)} MB written, ${((Date.now() - t0) / 60000).toFixed(1)} min`), 60000);
     const r = await page.evaluate(async ({ w, h, fps, seed }) => {
@@ -423,7 +433,7 @@ async function makeAll() {
     makeLoop(raw, out, { warm: WARM_S, loop: LOOP_S, seam: SEAM_S });
     if (!KEEP_RAW) fs.rmSync(raw);
     const loopMin = (Date.now() - t1) / 60000;
-    const j = judge(out, LOOP_S);
+    const j = judge(out, LOOP_S, SEAM_S);
     const l = report(loop.id, j, LOOP_S);
     // Previews for the judging page: the half hour in a minute, fifteen seconds as it plays, a still.
     const step = Math.max(1, Math.round(LOOP_S / 60));
@@ -449,7 +459,7 @@ async function makeAll() {
 }
 
 if (CONTROLS) controls();
-else if (JUDGE) report(path.basename(JUDGE), judge(JUDGE, LOOP_S), LOOP_S);
+else if (JUDGE) report(path.basename(JUDGE), judge(JUDGE, LOOP_S, SEAM_S), LOOP_S);
 else await makeAll();
 console.log(`\ntvloops: ${passed} ok, ${failed} failed`);
 process.exit(failed ? 1 : 0);

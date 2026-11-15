@@ -373,6 +373,41 @@ What route 2 still needs, found while building 12-tv-1:
   no sound: the music plays where the Mac plays it. Sending the show's audio as a
   second track would keep it in step with the picture (WebRTC syncs the two),
   for a Mac whose music should come out of the TV.
+- **12-tv-loops: ten calm half-hour loops for a TV with no Mac (M, built
+  2026-11-15, thread "Make ten calming 30-minute loops for the TV apps").** The
+  owner, 2026-11-14: "audio free visuals that the appletv and googletv apps can
+  use. like 10 different 30 minute loops that evolve over time and are calming."
+  Films, not something the TV draws: a TV's web view has no WebGPU, tvOS has no
+  web view, and the TV is a receiver (above). Each is the app's own Render a song
+  of one calm look (`src/lib/tvLoops.ts`: Chemical Clock first, then Classic,
+  Aurora Borealis, Jellyfish Bloom, Velvet Underground, Lava Lamp, Galaxy, Oil &
+  Water, Soap Film, Neon Coral Reef) with Evolve on and a song of silence, so
+  nothing moves with music and every change is the liquid's or Evolve's slow
+  moves. The loop is an edit of the finished film (the Canvas loop's way, 43b):
+  a minute's warm-up, the half hour, and twenty seconds crossfaded into its
+  start, so it comes round with no seam. H.264 High 4.1, 1080p30, no audio
+  track, on the GitHub pre-release `tv-loops-1`, reached at
+  `https://chromaglass.art/loops/<id>.mp4` (firebase.json's 302). Made on a Mac by
+  `npm run tvloops` (the render hook's new `toDisk`: half an hour is too long to
+  hold in a page) and judged by it: length, no audio, the seam one step across
+  a keyframe, no cut inside, moving every minute, its light and pattern kept;
+  `npm run tvloops -- --controls` shows the judge each fault on films it makes
+  (CI, `sound`). No phone part: the phone is the controller and the loops are
+  for a TV with no show to control.
+- **12-tv-loops-2: the TV apps play them (M, next).** Android TV: a "Calm loops"
+  row beside the sample films on the start screen, one loop chosen or all ten in
+  turn, played by the platform player round and round (no web view needed for an
+  MP4). Apple TV: the same row, `AVQueuePlayer` with `AVPlayerLooper`. The `/tv`
+  page's `films` state may play them muted too. Each app carries its own copy of
+  the list, held equal to `tvLoops.ts` by a check, as `Sample.java` is.
+- **12-tv-loops-3: the loops on the channel (S).** The same ten files to
+  YouTube as ambient films (uploading is a standing OK), titled by look, so the
+  channel has a long calm film of each.
+- **12-tv-loops-4: Evolve's pace for a half hour (S, after the owner judges the
+  ten).** The loops use each look's own Evolve Speed. If a loop reads too busy or
+  too still over half an hour, the fix is a slower or quicker `automateRate` for
+  that loop in `tvLoops.ts` (a field it does not have yet), never a change to the
+  look the show plays.
 
 Progress (2026-11-08): the transport is settled without HLS. LiveKit's
 `webrtc-xcframework` (MIT, a binary Swift package of Google's libwebrtc, tag

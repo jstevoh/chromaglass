@@ -536,6 +536,21 @@
       ]
     },
     {
+      "name": "The TV's calm loops: their judge",
+      "shard": "sound",
+      "run": "npm run tvloops -- --controls",
+      "why": [
+        "The TV's half-hour loops (PLAN 12-tv-loops) are made on a Mac by the",
+        "app's own render and cut into a loop by ffmpeg; this shows the judge",
+        "that holds them, through the same makeLoop, each fault on films it",
+        "makes itself: a plain cut fails the seam, a silent audio track the",
+        "audio line, a body seeked a second late the joint line, a still",
+        "picture the moving line, a fade to black or to",
+        "a flat grey the light line, a short loop the length line, and the",
+        "crossfaded loop passes all six. Needs ffmpeg (installed above)."
+      ]
+    },
+    {
       "name": "The ladder's shape",
       "shard": "logic",
       "run": "npm run rungs -- --owed=120hz",
