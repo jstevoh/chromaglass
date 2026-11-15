@@ -1144,15 +1144,13 @@ export class WebGPUFluid extends FluidCover {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv, undefined, thinAt);
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv, undefined, thinAt);
+        this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
         return;
       }
       if (!bodiesOn) { 
         this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
-        this.macCormack(pass, this.liquids0, this.velForced, disp, 'dye'); 
-        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye');
+        this.carryLiquids(pass, 'mac', null, disp);
         if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
         return; 
       }
@@ -1182,8 +1180,7 @@ export class WebGPUFluid extends FluidCover {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv, undefined, thinAt);
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv, undefined, thinAt);
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv, undefined, thinAt);
+        this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
         return;
       }
@@ -1192,10 +1189,7 @@ export class WebGPUFluid extends FluidCover {
       this.dye.swap();
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
       od.swap();
-      this.runPressed(pass, 'bodyAdvect', this.liquids0.write, [this.liquids0.read, this.velForced], adv);
-      this.liquids0.swap();
-      this.runPressed(pass, 'bodyAdvect', this.liquids1.write, [this.liquids1.read, this.velForced], adv);
-      this.liquids1.swap();
+      this.carryLiquids(pass, 'pressed', adv);
       if (this.chemLive) {
         this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);
         this.chem.swap();
