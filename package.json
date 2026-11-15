@@ -352,6 +352,7 @@
     "logomelt": "PW_WEBGPU=1 node scripts/logomelt.mjs",
     "presskit": "node scripts/presskit.mjs",
     "loopseam": "node --experimental-strip-types scripts/loopseam.mjs",
+    "tvloops": "node --experimental-strip-types scripts/tvloops.mjs",
     "tvvideo": "node scripts/tvvideo.mjs"
   },
   "dependencies": {
