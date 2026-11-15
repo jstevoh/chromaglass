@@ -1,0 +1,105 @@
+<!doctype html>
+<!--
+  The TV's sample: the channel's song films, played full length from YouTube
+  (PLAN 12-tv-2h). The owner asked for the YouTube films first; 12-tv-2f made
+  the same films, whole, play from the site, and they are this page's fallback.
+
+  Loaded by MainActivity.startFilms() with loadDataWithBaseURL on
+  https://chromaglass.art/, never from the network: the list of films is
+  Sample.FILMS, put in for the placeholder below by Sample.page(), so the
+  app (and its unit test) owns what plays. The https base is what YouTube's
+  embedded player reads as the page that embeds it (its Referer); a page with
+  no origin gets "video player configuration error" instead of a film.
+
+  It tells the app two things through window.ChromaglassSample:
+    playing()      a film is playing (the app stops its start-up timer)
+    failed(why)    the player could not play (the app falls back to the
+                   same films from the site, Sample.CLIPS)
+  Nothing else: no keys, no links. Back is the app's (MainActivity.onKeyDown).
+
+  The check is `npm run tvyoutube` (scripts/tvyoutube.mjs), against a stand-in
+  YouTube API that plays, ends and fails on cue.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #player, #player iframe { position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0; }
+  /* Over the player, out of its way: the film's own name and the record's,
+     then how to leave. Faded after a few seconds, back with each new film. */
+  #caption {
+    position: fixed; left: 4vw; bottom: 5vh; max-width: 70vw;
+    font: 500 2.1vh/1.45 system-ui, sans-serif; color: rgba(255,255,255,.88);
+    text-shadow: 0 .2vh .6vh #000, 0 0 1.4vh #000;
+    transition: opacity 1.2s; pointer-events: none;
+  }
+  #caption b { font-weight: 600; font-size: 2.6vh; }
+  #caption.quiet { opacity: 0; }
+</style>
+</head>
+<body>
+<div id="player"></div>
+<div id="caption"></div>
+<script>
+  var FILMS = FILMS_JSON;
+  var app = window.ChromaglassSample || { playing: function () {}, failed: function () {} };
+  var at = Math.floor(Math.random() * FILMS.length);
+  var player = null;
+  var told = false;
+  var quietTimer = 0;
+
+  function fail(why) {
+    if (told) return;
+    told = true;
+    app.failed(String(why));
+  }
+
+  function caption(f) {
+    var c = document.getElementById('caption');
+    c.innerHTML = '';
+    var b = document.createElement('b');
+    b.textContent = f.look;
+    c.appendChild(b);
+    c.appendChild(document.createElement('br'));
+    c.appendChild(document.createTextNode('“' + f.title + '” · ' + f.performer + ', ' + f.year));
+    c.appendChild(document.createElement('br'));
+    c.appendChild(document.createTextNode('Sample film · Back to look for your Mac'));
+    c.className = '';
+    clearTimeout(quietTimer);
+    quietTimer = setTimeout(function () { c.className = 'quiet'; }, 8000);
+  }
+
+  function play(i) {
+    at = (i + FILMS.length) % FILMS.length;
+    caption(FILMS[at]);
+    player.loadVideoById(FILMS[at].id);
+  }
+
+  // The API calls this once its script has loaded.
+  window.onYouTubeIframeAPIReady = function () {
+    player = new YT.Player('player', {
+      host: 'https://www.youtube-nocookie.com',
+      width: '100%', height: '100%',
+      playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0 },
+      events: {
+        onReady: function () { play(at); },
+        onStateChange: function (e) {
+          if (e.data === YT.PlayerState.PLAYING) app.playing();
+          if (e.data === YT.PlayerState.ENDED) play(at + 1);
+        },
+        // 2 bad id, 5 HTML5 player error, 100 gone or private, 101/150 not
+        // embeddable, 152/153 refused here: none of them is mended by waiting.
+        onError: function (e) { fail('youtube ' + e.data); }
+      }
+    });
+  };
+
+  var api = document.createElement('script');
+  api.src = 'https://www.youtube.com/iframe_api';
+  api.onerror = function () { fail('no api'); };
+  document.head.appendChild(api);
+</script>
+</body>
+</html>

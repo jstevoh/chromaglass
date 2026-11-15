@@ -63,8 +63,9 @@ function setControl(p: DeskProps, key: keyof VisualizerSettings, n: number) {
 /**
  * One control, drawn as the hardware it is ridden on.
  *
- * A CC learned to a fader is a slider, full width, above the knobs; an
- * encoder, or nothing learned, is a knob. Re-learn a control and it redraws
+ * A CC learned to a known controller's fader is a slider, full width, above
+ * the knobs; a knob, an encoder, a CC on a board with no profile (8d-1), or
+ * nothing learned, is a knob. Re-learn a control and it redraws
  * in place. The value is the settings' own, so a fader, the mouse and the
  * phone are three ways to move one number.
  */

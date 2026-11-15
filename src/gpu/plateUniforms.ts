@@ -431,7 +431,6 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('macroCellScale', s.macroCellScale ?? 0.5);
   pack.set('macroLacing', s.macroLacing ?? 0);
   pack.set('macroDepth', s.macroDepth ?? 0.5);
-  pack.set('macroEdge', s.macroEdgeDetail ?? 0.6);
   pack.set('macroRelief', s.macroRelief ?? 0.7);
   pack.set('flowRate', view.flowRate);
   pack.set('cellClock', view.cellClock);
