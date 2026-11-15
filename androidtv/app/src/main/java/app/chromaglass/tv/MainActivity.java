@@ -67,6 +67,14 @@ import java.util.Map;
  * 12-tv-2h), and from the site when YouTube will not play (Sample.CLIPS),
  * while the app keeps looking; a Mac that turns up takes over.
  *
+ * "Watch a calm loop" plays the calm loops (PLAN 12-tv-loops-2, Loops.java):
+ * six silent half-hour films, one look each, each round and round with no
+ * seam until Back; Left and Right step to another. Unlike the sample, a Mac
+ * that turns up does not take over: the loops are something to watch for
+ * their own sake, often with the Mac in the same house doing something else,
+ * and a TV that jumped to the show halfway through a calm half hour would be
+ * the opposite of calm. Back returns to the list, where the Mac is waiting.
+ *
  * The logo (the owner, 2026-11-14: "add the logo to the loading screen") is
  * the brand's own mark, res/drawable-nodpi/logo.png, the same file as
  * public/brand/chromaglass-logo-512.png. It heads the list while the app
@@ -123,6 +131,16 @@ public class MainActivity extends Activity {
     private int sampleAt = 0;
     /** Films that would not play one after another; the sample stops when every one has failed (no internet). */
     private int sampleFailed = 0;
+    private Button loopsButton;
+    /** The calm loops (startLoops), or null while they are not playing. */
+    private FrameLayout loopsLayer;
+    private VideoView loopsVideo;
+    private TextView loopsCaption;
+    private ImageView loopsLogo;
+    private int loopAt = 0;
+    /** Loops that would not play one after another; the loops stop when every one has failed (no internet). */
+    private int loopsFailed = 0;
+    private final Runnable loopsQuiet = () -> { if (loopsCaption != null) loopsCaption.animate().alpha(0f).setDuration(1200); };
     /** The logo over the show's page until the page has loaded (open()). */
     private View opening;
 
@@ -145,6 +163,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         stopSample(null);
+        stopLoops(null);
         stopLooking();
         super.onPause();
     }
@@ -198,14 +217,32 @@ public class MainActivity extends Activity {
         sampleButton.setFocusable(true);
         sampleButton.setBackground(rowBackground());
         sampleButton.setOnClickListener(v -> startFilms());
-        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(dp(520), dp(56));
-        slp.topMargin = dp(12);
-        picker.addView(sampleButton, slp);
+
+        // The sample and the calm loops side by side (12-tv-loops-2), in the one row the sample had:
+        // a second row under it would push the help off a TV's 540 dp once a Mac is listed.
+        LinearLayout watch = new LinearLayout(this);
+        watch.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(dp(520), dp(56));
+        wlp.topMargin = dp(12);
+        picker.addView(watch, wlp);
+        watch.addView(sampleButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+
+        loopsButton = new Button(this);
+        loopsButton.setText("Watch a calm loop");
+        loopsButton.setAllCaps(false);
+        loopsButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        loopsButton.setTextColor(Color.argb(220, 255, 255, 255));
+        loopsButton.setFocusable(true);
+        loopsButton.setBackground(rowBackground());
+        loopsButton.setOnClickListener(v -> startLoops());
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        llp.leftMargin = dp(12);
+        watch.addView(loopsButton, llp);
 
         TextView help = new TextView(this);
         help.setText("Open the ChromaGlass app on your Mac, on the same Wi-Fi as this TV, and start the show. "
                 + "The first time, the TV shows four digits: press Allow on the Mac. "
-                + "No Mac yet? The sample film shows what the TV will play.");
+                + "No Mac yet? The sample film shows what the TV will play; the calm loops play with no Mac at all.");
         help.setTextColor(Color.argb(140, 255, 255, 255));
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         help.setGravity(Gravity.CENTER);
@@ -392,7 +429,8 @@ public class MainActivity extends Activity {
     }
 
     private void maybeOpen() {
-        if (playing != null) return;
+        // A calm loop playing is not interrupted by a Mac (the class comment): Back shows the list.
+        if (playing != null || loopsLayer != null) return;
         Shows.Show s = Shows.autoOpen(new ArrayList<>(found.values()), prefs.getString("last", null), settled);
         if (s != null) open(s);
     }
@@ -403,6 +441,7 @@ public class MainActivity extends Activity {
     private void open(Shows.Show show) {
         // A Mac found while the sample plays takes over: the show is what the sample stood in for.
         stopSample(null);
+        stopLoops(null);
         stopLooking();
         playing = show;
         prefs.edit().putString("last", show.id).apply();
@@ -481,6 +520,17 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (loopsLayer != null) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) { stopLoops(null); return true; }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                loopsFailed = 0;
+                playLoop(Loops.step(loopAt, keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1));
+                return true;
+            }
+            // Any other key brings the line back, so a person who has forgotten how to change the loop can see.
+            showLoopCaption();
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && sampleLayer != null) {
             stopSample(null);
             return true;
@@ -651,6 +701,100 @@ public class MainActivity extends Activity {
             picker.setVisibility(View.VISIBLE);
             showList();
             if (says != null) status.setText(says);
+        }
+    }
+
+    // ── The calm loops ──────────────────────────────────────────────────
+
+    /**
+     * The calm loops (Loops.java), full screen over the list, the one played
+     * last first. Looking goes on underneath, so the list is current when
+     * Back comes, but a Mac found does not open (maybeOpen). VideoView, as
+     * for the site's films: the platform player plays the loops' H.264 on
+     * every TV this app runs on, follows the website's redirect, and its
+     * setLooping comes round on the file's own seam. The window already keeps
+     * the screen on (onCreate), so a silent half hour never meets the TV's
+     * screensaver.
+     */
+    private void startLoops() {
+        if (loopsLayer != null || sampleLayer != null || playing != null) return;
+        loopsLayer = new FrameLayout(this);
+        loopsLayer.setBackgroundColor(Color.BLACK);
+        loopsVideo = new VideoView(this);
+        loopsVideo.setFocusable(false);
+        loopsLayer.addView(loopsVideo, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        // Over the loop until its first frame: half an hour from the site takes a moment to start.
+        loopsLogo = logo();
+        loopsLayer.addView(loopsLogo, new FrameLayout.LayoutParams(dp(LOGO_DP), dp(LOGO_DP), Gravity.CENTER));
+        loopsCaption = new TextView(this);
+        loopsCaption.setTextColor(Color.argb(200, 255, 255, 255));
+        loopsCaption.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        loopsCaption.setShadowLayer(dp(3), 0, dp(1), Color.BLACK);
+        loopsCaption.setPadding(dp(32), 0, dp(32), dp(24));
+        loopsLayer.addView(loopsCaption, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START));
+        loopsVideo.setOnPreparedListener(mp -> {
+            // Round and round on the file's own seam (Loops.java), and no sound: the files have none.
+            mp.setLooping(true);
+            mp.start();
+        });
+        loopsVideo.setOnInfoListener((mp, what, extra) -> {
+            if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                loopsFailed = 0;
+                if (loopsLogo != null) loopsLogo.setVisibility(View.GONE);
+            }
+            return false;
+        });
+        // One loop that will not play is skipped; all of them in a row is no internet.
+        loopsVideo.setOnErrorListener((mp, what, extra) -> {
+            if (++loopsFailed >= Loops.LOOPS.length) stopLoops("Could not play the calm loops. Is this TV on the internet?");
+            else main.post(() -> playLoop(Loops.step(loopAt, 1)));
+            return true;
+        });
+        root.addView(loopsLayer, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        picker.setVisibility(View.GONE);
+        loopsFailed = 0;
+        playLoop(Loops.indexOf(prefs.getString("loop", null)));
+    }
+
+    private void playLoop(int i) {
+        if (loopsVideo == null) return;
+        loopAt = i;
+        prefs.edit().putString("loop", Loops.LOOPS[i].id).apply();
+        if (loopsLogo != null) loopsLogo.setVisibility(View.VISIBLE);
+        showLoopCaption();
+        loopsVideo.setVideoURI(Uri.parse(Loops.LOOPS[i].url));
+    }
+
+    /** The loop's name and the keys, faded after a few seconds: nothing stays over a calm picture. */
+    private void showLoopCaption() {
+        if (loopsCaption == null) return;
+        loopsCaption.setText(Loops.caption(loopAt));
+        loopsCaption.animate().cancel();
+        loopsCaption.setAlpha(1f);
+        main.removeCallbacks(loopsQuiet);
+        main.postDelayed(loopsQuiet, LOOP_CAPTION_MS);
+    }
+
+    /** How long the loop's name stays up. */
+    static final long LOOP_CAPTION_MS = 8000;
+
+    private void stopLoops(String says) {
+        if (loopsLayer == null) return;
+        main.removeCallbacks(loopsQuiet);
+        if (loopsVideo != null) loopsVideo.stopPlayback();
+        root.removeView(loopsLayer);
+        loopsLayer = null;
+        loopsVideo = null;
+        loopsCaption = null;
+        loopsLogo = null;
+        if (playing == null) {
+            picker.setVisibility(View.VISIBLE);
+            showList();
+            if (says != null) status.setText(says);
+            // Back to the row the person left, unless a Mac turned up meanwhile: then the Mac (showList).
+            if (found.isEmpty()) loopsButton.requestFocus();
         }
     }
 

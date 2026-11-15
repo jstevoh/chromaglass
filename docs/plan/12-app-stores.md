@@ -432,12 +432,30 @@ What route 2 still needs, found while building 12-tv-1:
   `npm run tvloops -- --controls` shows the judge each fault on films it makes
   (CI, `sound`). No phone part: the phone is the controller and the loops are
   for a TV with no show to control.
-- **12-tv-loops-2: the TV apps play them (M, next; 12-tv-2f's films are in since #871).** Android TV: a "Calm loops"
-  row beside the sample films on the start screen, one loop chosen or all six in
-  turn, played by the platform player round and round (no web view needed for an
-  MP4). Apple TV: the same row, `AVQueuePlayer` with `AVPlayerLooper`. The `/tv`
-  page's `films` state may play them muted too. Each app carries its own copy of
-  the list, held equal to `tvLoops.ts` by a check, as `Sample.java` is.
+- **12-tv-loops-2: the TV apps play them (M, built 2026-11-15, thread "Ship the
+  calm loops in the TV apps").** The owner approved the six, 2026-11-15: "The loops
+  are fine. Ship them." Android TV: "Watch a calm loop" beside "Watch a sample film"
+  on the start screen (one row, so a listed Mac never pushes the help off 540 dp);
+  `Loops.java` is the app's copy of the list, `MainActivity.startLoops()` plays the
+  one played last (the Chemical Clock the first time) in a `VideoView` with
+  `setLooping`, round and round on the file's own crossfaded seam; Left and Right
+  step to another, any key brings the name back, Back is the list. A Mac that turns
+  up does not take over, unlike the sample: a TV that jumped to the show halfway
+  through a calm half hour is not calm, and Back shows the Mac waiting. One loop
+  round and round, not the six in turn: a cut from one liquid to another every half
+  hour is the opposite of what was asked. Apple TV: "Watch a calm loop" on the
+  sign-in and address screens, with no pass (the loops are the website's free
+  films, not the show), `CalmLoops.swift`: `AVQueuePlayer` with `AVPlayerLooper`,
+  muted, the idle timer off while it plays, the same keys (Menu back). That is also
+  12-tv-apple-9's "something for App Review to see". `npm run presskit` holds both
+  copies to `tvLoops.ts` (ids, titles, order, the address) and the site's `/loops/`
+  redirect to the release; `LoopsTest` holds the stepping and the caption. No phone
+  part: the phone is the controller, and the loops are for a TV with no show to
+  control. Not seen yet on a real TV: Android TV build to Play's Internal testing,
+  the Apple TV build goes up with 12-tv-apple-7's TestFlight recipe.
+- **12-tv-loops-2b: the `/tv` page plays them too (S).** Found building 12-tv-loops-2:
+  a browser or a TV's web view on `/tv` with no show still plays the sample films
+  only; its `films` state could offer the loops, muted, from the same list.
 - **12-tv-loops-3: the loops on the channel (S).** The same six files to
   YouTube as ambient films (uploading is a standing OK), titled by look, so the
   channel has a long calm film of each.
