@@ -80,7 +80,6 @@ const GATES: readonly Gate[] = [
   { test: 'U.beads > 0.001', may: above('beads'), corded: ['beads'] },
   { test: 'U.beadDrops > 0.001', may: above('beadDrops'), corded: ['beadDrops'] },
   { test: 'U.photo > 0.5', may: (s) => val(s, 'renderStyle') === 'photo', corded: [] },
-  { test: 'U.macroDepth > 0.005', may: above('macroDepth'), corded: ['macroDepth'] },
   { test: 'U.dishSpread > 0.001', may: above('dishSpread'), corded: ['dishSpread'] },
   { test: 'U.gelWheel > 0.001', may: above('gelWheel'), corded: ['gelWheel'] },
   { test: 'U.lampWarmth > 0.001', may: above('lampWarmth'), corded: ['lampWarmth'] },

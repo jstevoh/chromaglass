@@ -2460,9 +2460,10 @@ before the measured one (untested, and #396's warm in the same page did not help
   the lumia 0.23 ...). A first try with WGSL overrides (`(CG_X && TEST)`) gained little,
   4.0 to 4.6 s with every gate off: `false && TEST` is not a constant expression, so the
   branch stays compiled. Written `false` it goes.
-  - `src/gpu/displayLean.ts`: 31 gates, each a uniform test as the shader writes it and the
+  - `src/gpu/displayLean.ts`: 30 gates (31 until 38u took Macro Depth's own branch out of
+    the shader, which `leandisplay`'s first line caught), each a uniform test as the shader writes it and the
     settings (and cords) a look reaches it by. The opening builds the display with the
-    tests its look cannot reach written `false` (Classic keeps 7 of 31; every look 4 to 9)
+    tests its look cannot reach written `false` (Classic keeps 6; every look 4 to 9)
     and the whole display first behind the show (`later` sorted render first). The frame
     (`WebGPUPlate.displayFor`) draws lean while the draw's own uniform bytes need nothing
     it left out, whole otherwise; while the whole one is still building the lean one goes
