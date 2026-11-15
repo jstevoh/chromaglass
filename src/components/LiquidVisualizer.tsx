@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
-import { airTaken, spawnsOf, strawFlow, WIND_SPAWNS_PER_SECOND } from '../lib/breath';
+import { strawFlow } from '../lib/breath';
+import { BLOW_LEASH, blowStep, blowGoing, blowHeld, blowAim, type BlowDir } from '../lib/blowAim';
 import { BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -74,7 +75,7 @@ import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
@@ -1179,23 +1180,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     switch (g.tool) {
       case 'blow':
-        // The wind moves the colour and the oil, as the mouse's does
-        // (blowWind's carries, PLAN.md §15c; a remote's wind is not yet
-        // air on the film, 15g-5); a directed one erased 15% a step at
-        // its middle, a puff 20% everywhere under it.
+        // The wind is the mouse's: air on the film on a thin gap, held
+        // between this hand's messages (blowWind, PLAN.md 15g-5), and the
+        // carries off one. A puff with no direction keeps the carries (15g-2).
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
-          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy, false);
+          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy, true);
           af.blowPhase(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
         } else {
           af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
           af.blowPhase(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
         }
-        // The air it tears in, as the mouse's (lib/breath.ts, airTaken): 0.15 a message at the default, none from a gentle breath.
-        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
-          const taken = airTaken(amt);
-          const n = taken > 0 ? spawnsOf(0.15 * taken, DICE.hands.float()) : 0;
-          if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
-        }
+        // It lays no bubbles, as the mouse's wind lays none (lib/breath.ts).
         break;
       case 'drop': {
         const liq = selectedLiquidRef.current;
@@ -3319,90 +3314,42 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 /*
-                  Held still on the lead plate, the Blow is a straw: one
-                  bubble on the end of it, growing while the breath goes on,
-                  its rim breaking into fingers and shedding a ring of small
-                  ones (bubbles.ts, blow). Moving, it is the wind it was.
-                */
-                // One straw (bubbles.ts keeps a single straw bubble), so the
-                // first finger blows it and any other finger is the wind.
-                const still = Math.hypot(strokeDx, strokeDy) < 0.75;
-                /*
-                  And the ferrofluid, held or moved, straw or wind (PLAN.md
-                  §9n). Moved, it pushes along the way the hand last went
-                  (BlowDir): the stroke is nothing on every step after a
-                  frame's first, and on a frame the pointer did not move, and
-                  read afresh each step a slow drag swept then puffed then
-                  swept, leaving a trench of holes and not a pushed tongue.
+                  A press held and never moved, on the lead plate, is a
+                  straw: one round bubble on the end of it, growing while
+                  the breath goes on (bubbles.ts, blow). A hand that has
+                  moved is the wind, a jet along the surface the way the
+                  hand has come (lib/blowAim.ts; lib/breath.ts),
+                  for as long as it is down. One straw (bubbles.ts keeps a
+                  single straw bubble), so the first finger blows it.
                 */
                 const now = performance.now();
-                // The press counts as a move, with no direction (BLOW_STRAW_FRAMES).
-                // The press step starts the frame count at 0 rather than counting itself.
-                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now, still: 0, moved: true };
-                else if (!hand.blowDir) hand.blowDir = { x: 0, y: 0, at: now, still: 0, moved: false };
-                else if (simStep === 0) hand.blowDir.still++;
-                const going = now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
-                const held = !going && hand.blowDir.still >= BLOW_STRAW_FRAMES;
-                af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
-                /*
-                  The straw only when the hand is held, not moved, by the same
-                  clock the ferrofluid goes by and a few frames with no move
-                  (BLOW_STRAW_FRAMES). Asked of `still` (no move this step), a
-                  drag blew the straw on every step after a frame's first and
-                  on every frame the pointer did not report a move, which is
-                  most of them: a drag left a string of straw bubbles and ran
-                  the wind a step a frame at best, so the wind's carry
-                  (PLAN.md §15c) waited on the rare step that was both a wind
-                  step and a fresh reading of the dye.
-                */
-                if (activeLayerRef.current === 0 && held && primary) {
+                const dir = hand.blowDir = blowStep(hand.blowDir, x, y, strokeDx, strokeDy, now, simStep === 0, BLOW_LEASH * GRID_SCALE);
+                const aim = blowAim(dir, now, af.thinGap);
+                // The ferrofluid, straw or wind (PLAN.md §9n): along the hand's way while the wind has one (and for the hold's moment after, off a thin gap), a hole under a breath with none.
+                const way = aim || blowGoing(dir, now);
+                af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, way ? dir.x : 0, way ? dir.y : 0);
+                if (activeLayerRef.current === 0 && primary && blowHeld(dir, now)) {
                   // A volume a second through the straw, as the breath's speed (lib/breath.ts, strawFlow), not its stress.
                   bubblesRef.current.blow(x, y, simStepS, strawFlow(k));
                   blowStepsRef.current.straw++;
-                  // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
-                  if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
+                  // Before the hand's first move: a press held (tools.mjs).
+                  blowStepsRef.current.strawFirst++;
                 } else {
-                  // The wind: moving on a thin gap, the breath's air on the
-                  // film, whose flow takes the colour, the oil and the
-                  // ferrofluid the way the hand last went (PLAN.md §15g);
-                  // held still, or off a thin gap, it carries them (§15c).
-                  // It used to erase them.
                   /*
-                    Along the way the hand last went until the hand is held,
-                    not only for the 150 ms the ferrofluid's push keeps it
-                    (BLOW_DIR_HOLD_MS). Between the two the wind was a puff,
-                    and a puff carries the colour under the hand out onto a
-                    ring a palm and more across: on a runner whose moves came
-                    120 ms apart, a stroke's three or four puffs moved 80 to
-                    106 of a pool of 210 to 244 out round the hand, which
-                    near the pool's leading edge is backwards, and the
-                    stroke out to the left moved the pool -0.26% against the
-                    air's push (`npm run tools` on #300). A pointer that is
-                    late is not a hand that stopped; a hand that stopped is
-                    held within BLOW_STRAW_FRAMES and blows the straw, or on
-                    a plate that is not the lead, the puff.
+                    The wind. On a thin gap it is the breath's air on the
+                    film, whose flow takes the colour, the oil and the
+                    ferrofluid (PLAN.md §15g), and it lays no bubbles: air
+                    over a film this thin pushes it aside and folds none in
+                    (lib/breath.ts). With no way to blow (a press not yet
+                    the straw, a second finger held still) it is a puff,
+                    which on a thin gap waits on the jet's dimple (15g-2).
                   */
-                  const aim = going ?? (hand.blowDir.moved && hand.blowDir.still < BLOW_STRAW_FRAMES ? hand.blowDir : null);
-                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, aim ? aim.x : 0, aim ? aim.y : 0);
+                  const carried = aim || !af.thinGap ? af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, aim ? dir.x : 0, aim ? dir.y : 0) : 0;
                   blowStepsRef.current.carried += carried;
                   blowStepsRef.current.wind++;
-                  if (going) blowStepsRef.current.directed++;
+                  if (aim) blowStepsRef.current.directed++;
                   if (carried > 0) blowStepsRef.current.carries++;
-                  // On a thin gap the moving wind is air on the film and carries nothing by hand (PLAN.md §15g).
                   if (af.lastBlowAired) blowStepsRef.current.aired++;
-                  /*
-                    The air the breath tears into the liquid: none below the
-                    speed the surface holds against (a gentle breath), as
-                    often as it always was at the default, more in a gale,
-                    and so many a second, not a count every sixth step
-                    whatever the Amount (PLAN.md QA-20; lib/breath.ts,
-                    airTaken, has the physics and the numbers).
-                  */
-                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
-                    const taken = airTaken(k);
-                    const n = taken > 0 ? spawnsOf(WIND_SPAWNS_PER_SECOND * taken * simStepS, DICE.hands.float()) : 0;
-                    if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
-                  }
                 }
 
               } else if (tool === 'finger') {
