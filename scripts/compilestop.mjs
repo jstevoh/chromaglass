@@ -225,7 +225,11 @@ export function selfCheck(freeS = 0.25, maxGapS = 2) {
   return { cases: SELF.length, wrong };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run as its own script only. Not `import.meta.url === argv[1]`: `npm run
+// startup` bundles this file into its own, where the two are the same file,
+// and on #878's first Mac run that ran this block inside startup and exited
+// it green after the self-check, 7 s in, with the opening never measured.
+if (/(^|[\\/])compilestop\.mjs$/.test(process.argv[1] ?? '')) {
   const { cases, wrong } = selfCheck();
   console.log(`${wrong.length ? ' FAIL' : ' ok  '} which frame stops the control's builds sat in, on ${cases} made-up openings (scripts/compilestop.mjs, PLAN.md 19aa-7d) — ${wrong.length ? wrong.join('; ') : `${cases} of ${cases}`}`);
   process.exit(wrong.length ? 1 : 0);
