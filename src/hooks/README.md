@@ -4,16 +4,16 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 
 ## Start here
 
-- `useAudioAnalyzer.ts`: `useAudioAnalyzer`, `AudioData`, `Ear`: the show's ear.
+- `useAudioAnalyzer.ts`: `useAudioAnalyzer`, `AudioData`, `Ear`: the show's ear. `Ear.view` is its ten-a-second reading as a store, not state (PLAN 46f): `useEarView.ts` has `EarView` (`get`, `subscribe`), `createEarView` and `useEarView(view, select)`, which renders the component that calls it only when what it selects changes. `Ear.live` is every reading, for readers on their own clock. Nothing above a readout renders for a reading: a new reader of the level is a leaf with `useEarView`, never state in `App()`.
 - `useMidi.ts` (37 KB, grep it): `useMidi`, `MidiHost` (`playSetItem`), `MidiDevice`, controller maps, clock and timecode. Its result's `open` (PLAN 44k-14) says Web MIDI answered, what the assistant's MIDI switch waits for.
-- `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances. `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms). `listenNow()` asks the song ID to try at once, and `state.heardMap` keeps the map a first listen made after its song ends (Listen, PLAN 28h-8).
+- `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances. Its second argument is the ear's `live` ref, read on the hook's own timers (it was the ear's state, PLAN 46f). `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms). `listenNow()` asks the song ID to try at once, and `state.heardMap` keeps the map a first listen made after its song ends (Listen, PLAN 28h-8).
 - `useShowSequencer.ts`: transport over a `ShowSequence`'s stages.
 - `useProjector.ts`: `useProjector`, `pickProjector`, `ProjectorMode`.
 
 ## Contracts
 
 - Imports `src/lib`, `src/types`, `presets`, `constants`, React. No components (`useSongRender` takes `FrameDigest`, `VisualizerRender` from `sim/frameTypes.ts`, types only). Never `src/gpu`.
-- Called from `App.tsx` and from the hooks in `src/app/` (several name the hook file they wrap in their headers). Components take `useEscape`, `useMidiTouch`, `useRemoteLink`, `useGamepad`, `useWakeLock` and the types `TabEdit`, `MidiController`, `Recorder`, `SongRenderState`, `SongShowStatus`.
+- Called from `App.tsx` and from the hooks in `src/app/` (several name the hook file they wrap in their headers). Components take `useEarView` and `EarView` (`components/EarLeaves.tsx`: `EarPercent`, `EarMeters`; `settings/SoundSection.tsx`'s room readout), `useEscape`, `useMidiTouch`, `useRemoteLink`, `useGamepad`, `useWakeLock` and the types `TabEdit`, `MidiController`, `Recorder`, `SongRenderState`, `SongShowStatus`.
 - `lib/sceneMap`, `lib/songTrack`, `constants.ts` and `sim/` take the type `AudioData` from `useAudioAnalyzer`.
 
 ## Files
@@ -24,6 +24,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useDeviceTilt.ts`: phone tilt as Gravity.
 - `useEscape.ts`: Esc closes.
 - `useMoirePreview.ts`: whether the moiré pack's controls move here, and a copy without it a minute's try (the desk's Moiré Sheets section and the phone's Looks sheet both call it; PLAN 45a).
+- `useEarView.ts`: the ear's view as a store, and the hook a readout subscribes with.
 - `useFilmSense.ts`: the film, read back.
 - `useGamepad.ts`: game controller as a hand.
 - `useMidiTouch.ts`: flash on a controller touch.

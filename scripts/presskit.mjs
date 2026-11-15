@@ -243,13 +243,29 @@ const TV_SHOTS = 'docs/brand/store/tv';
 const tvShots = fs.existsSync(TV_SHOTS) ? fs.readdirSync(TV_SHOTS).filter((f) => f.endsWith('.jpg')) : [];
 const badShots = tvShots.filter((f) => { const j = jpegSize(fs.readFileSync(path.join(TV_SHOTS, f))); return !j || j.w !== 1920 || j.h !== 1080; });
 check('the TV listing has 1 to 8 screenshots, each a 1920×1080 JPEG', tvShots.length >= 1 && tvShots.length <= 8 && badShots.length === 0, `${tvShots.length} found${badShots.length ? `; wrong size: ${badShots.join(', ')}` : ''}`);
-// The TV app's sample films (androidtv/…/Sample.java) are the press clips,
-// fetched from the website: a clip renamed or dropped here would leave every
-// TV's sample, and Play's TV review, on an error.
+// The TV app's sample films (androidtv/…/Sample.java, PLAN 12-tv-2f) are the
+// channel's six 1920s films, the same list the TV page plays (src/lib/tvFilms.ts):
+// a film named differently in the two would play on one screen and not the
+// other, and a TV app cannot be fixed without a new release through Play. Each
+// is fetched from the site's /films/ address, which firebase.json redirects to
+// the films' release of the repository; without that redirect every TV's
+// sample, and Play's TV review, would be an error. The files themselves are
+// not in the repository, so whether the release holds them is `npm run
+// tvfilms -- --probe` (a request to the live site), run when they are uploaded.
 const sampleJava = fs.readFileSync('androidtv/app/src/main/java/app/chromaglass/tv/Sample.java', 'utf8');
-const samplePaths = [...sampleJava.matchAll(/new Clip\("([^"]+)"/g)].map((m) => m[1]);
-const missingSamples = samplePaths.filter((u) => !fs.existsSync(pub(u)));
-check('the TV app\'s sample films are files the website serves', samplePaths.length > 0 && missingSamples.length === 0, samplePaths.length ? missingSamples.join(', ') : 'no clips found in Sample.java');
+const javaFilms = [...sampleJava.matchAll(/new Clip\("([^"]+)", "([^"]+)", "([^"]+)", "([^"]+)", (\d+)\)/g)]
+  .map((m) => [m[1], m[2], m[3], m[4], Number(m[5])].join(' | '));
+const { TV_FILMS, TV_FILMS_RELEASE, TV_FILMS_PATH } = await import('../src/lib/tvFilms.ts');
+const pageFilms = TV_FILMS.map((f) => [f.id, f.look, f.title, f.performer, f.year].join(' | '));
+const unmatched = [...javaFilms.filter((f) => !pageFilms.includes(f)), ...pageFilms.filter((f) => !javaFilms.includes(f))];
+check('the TV app\'s sample films are the TV page\'s films, in the same order', javaFilms.length >= 6 && javaFilms.join('\n') === pageFilms.join('\n'),
+  `${javaFilms.length} in Sample.java, ${pageFilms.length} in tvFilms.ts${unmatched.length ? `; in one only: ${unmatched.join('; ')}` : ''}`);
+const hostingConf = JSON.parse(fs.readFileSync('firebase.json', 'utf8')).hosting;
+const filmsRedirect = (hostingConf.redirects ?? []).find((r) => r.source === `${TV_FILMS_PATH}:file`);
+check('the site redirects /films/ to the films\' release', filmsRedirect?.destination === `https://github.com/jstevoh/chromaglass/releases/download/${TV_FILMS_RELEASE}/:file` && filmsRedirect.type === 302,
+  JSON.stringify(filmsRedirect ?? null));
+const shadowed = TV_FILMS.filter((f) => fs.existsSync(pub(`${TV_FILMS_PATH}${f.id}.mp4`)));
+check('no file under public/films/ stands in front of the redirect', shadowed.length === 0, shadowed.map((f) => f.id).join(', '));
 
 // 6. The page in a browser, served from public/ as Hosting serves it.
 // Fonts and anything else off-site are refused so the check is the same with

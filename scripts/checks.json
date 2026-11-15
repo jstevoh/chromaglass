@@ -137,12 +137,14 @@
     {
       "name": "The glass gap, one number",
       "shard": "logic",
-      "run": "npm run gap",
+      "run": "npm run gap -- --owed=puddle,settle,lift,pinch",
       "why": [
         "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
         "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
         "cover's shear, the sheet's film, a finger's edge, the ferrofluid's room)",
-        "held to its physics worked out in SI from the millimetres alone."
+        "held to its physics worked out in SI from the millimetres alone. Lines",
+        "19-23 are PLAN 38r-16's pinch and air edge, written before the build:",
+        "each owed id comes out of --owed in the PR that builds it."
       ]
     },
     {
@@ -155,6 +157,18 @@
         "a held tilt, damp at the drag's rate, break into bores at Stoker's speed,",
         "float an oil lens and ring out from a press, and stay bounded. Four",
         "processes side by side, about five minutes."
+      ]
+    },
+    {
+      "name": "The spun dish",
+      "shard": "logic",
+      "run": "npm run spinslosh",
+      "why": [
+        "The open dish solved in the frame that turns with the glass (PLAN 22n): spun, the",
+        "liquid heaps into the paraboloid and dye on a ring goes out to the radius its water",
+        "asks; spun up it is left behind and catches up at the floor's drag; stopped hard it",
+        "carries on past the glass; slow motors do not wake it; the hand's top speed holds.",
+        "About two minutes."
       ]
     },
     {
@@ -1554,6 +1568,20 @@
       ]
     },
     {
+      "name": "The air edge's fingers, owed until 38r-16 is built",
+      "shard": "lab3",
+      "run": "npm run airedge -- --owed=rim,front,fingers",
+      "why": [
+        "Written before the build (PLAN 38r-16; scripts/airedge.mjs): a lift past",
+        "the rim's bead draws air in at the rim only once the bead is empty, the",
+        "field's air is the ledger's A - wet, and the front fingers as",
+        "Saffman-Taylor in a lifted cell (n_max from the pull, not the viscosity).",
+        "Its finger counter's control runs on main; the GPU lines wait for",
+        "readWet, so on main it takes about two seconds. Lab, so SwiftShader",
+        "runs it once built (four runs at 192 squared, a few hundred steps)."
+      ]
+    },
+    {
       "name": "The rest of a bubble's air, owed until its builds",
       "shard": "lab8",
       "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
@@ -1576,10 +1604,14 @@
         "No line round a bubble's hole in one dye (PLAN.md 33a,",
         "scripts/holeline.mjs). The owner saw bubbles drawn with a blocky dark",
         "outline: the edge line between two dyes fired on the depth step at a",
-        "hole's rim, sampled on the solver's cell grid. The line now waits for",
-        "the dye's colour to change, and this check builds a second lab with",
-        "that gate cut out, so the halo it measures away is found again in the",
-        "same run, and the line between two real dyes is still drawn. It also",
+        "hole's rim, sampled on the solver's cell grid. Since PLAN.md 18e-5 that",
+        "line is drawn nowhere (the owner, on Comet River: thick black lines",
+        "round things; two dyes in one liquid bend no light where they meet), so",
+        "this asks that Boundary Contrast at 0.35, 1 and 2 moves no pixel in focus",
+        "round a hole, at a pool's rim or across two dyes meeting, on the wall and",
+        "photographed, that the seam is no darker than the darker dye beside it,",
+        "and that the dial is live out of focus so nothing moving is the shader's",
+        "answer. It also",
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
         "with airNear's mask taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
@@ -2257,6 +2289,21 @@
       ]
     },
     {
+      "name": "The TV app's sample plays the channel's films, and says when YouTube will not",
+      "shard": "browser2",
+      "run": "node scripts/tvyoutube.mjs",
+      "why": [
+        "The Android TV app's sample films page (androidtv/app/src/main/assets/films.html,",
+        "PLAN 12-tv-2h) with the films list read from Sample.java, against a stand-in",
+        "YouTube API: a film from the list through the no-cookie host with no controls,",
+        "the caption naming the look, the record and Back, PLAYING told to the app, each",
+        "ending starting the next round the whole list, an error told once with its",
+        "code, and YouTube's script not loading told too (the app then plays the press",
+        "clips). The real YouTube cannot be asked from CI (it refuses cloud machines).",
+        "About ten seconds."
+      ]
+    },
+    {
       "name": "The TV's remote picks the look",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/tvremote.mjs",
@@ -2308,10 +2355,13 @@
       "run": "node scripts/renders.mjs",
       "why": [
         "The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md",
-        "§14f): with the band playing the App renders at most five times a",
-        "second more than the ear tells it (ten), and the plate still hears a",
-        "new reading nearly every frame; on a quiet page, at most one and a",
-        "half. On a laptop page and a phone.",
+        "§14f and 46f): with the band playing the ear's view is told ten times",
+        "a second and the App renders for none of them (at most four a second,",
+        "for the song line), the desk's level still moves, at most sixty",
+        "components render a second (main: 5,840), and the plate still hears a",
+        "new reading nearly every frame; on a quiet page the App does not",
+        "render and the desk's clock ticks in its own component. On a laptop",
+        "page and a phone.",
         "The counts need no GPU; the plate's own line (a new reading nearly",
         "every frame) needs a plate that draws and is held on the Mac's open",
         "shard below. On the dist/ the phone's step built, like the Mixer."
@@ -3174,6 +3224,21 @@
       ]
     },
     {
+      "name": "Velvet Underground's pools stay pools",
+      "shard": "open",
+      "run": "npm run pools",
+      "timeout": 11,
+      "why": [
+        "PLAN 28i-7c (scripts/pools.mjs): the look's three areas each keep 85% of",
+        "their dye over a minute of show in the app on Metal; the same look with",
+        "the old curl-noise stir (Turbulence 0.5) must drain one, as the control;",
+        "and the pools must rearrange 1.5x as much as the plate frozen (Advection",
+        "0). Each minute begins once the dish has settled from its seed (the",
+        "regulator's trim; 28i-7h). Needs the app's GPU solver: a Mac shard, three",
+        "runs of about 75 s plus up to 75 s each of settling."
+      ]
+    },
+    {
       "name": "A clear film that tears",
       "shard": "open",
       "run": "npm run lace",
@@ -3414,6 +3479,21 @@
       ]
     },
     {
+      "name": "The closeup of a still plate is still, and lit from beneath",
+      "shard": "open",
+      "run": "npm run stillcloseup",
+      "timeout": 8,
+      "why": [
+        "Nothing drawn over the closeup moves or lights it (PLAN 38u-1 to 38u-3):",
+        "a plate that is not stepped draws the same picture ten seconds on, a",
+        "still bubble keeps its colours, the ground round a pool is as bright",
+        "on every side (no lamp above the plate), and Depth / Focus changes",
+        "nothing where the camera is in focus. Each line has a control that",
+        "must read over its bar. The lab only; it runs on the runner's own",
+        "adapter, and the step carries a timeout of its own."
+      ]
+    },
+    {
       "name": "The Turing pattern and its print",
       "shard": "fifth",
       "run": "npm run turing",
@@ -3446,7 +3526,8 @@
       "run": "node scripts/renders.mjs",
       "why": [
         "The plate hears a new reading nearly every frame while the App renders",
-        "ten times a second (scripts/renders.mjs, PLAN.md §14f): the line the",
+        "for none of the ear's ten a second (scripts/renders.mjs, PLAN.md §14f,",
+        "46f): the line the",
         "Measure job skips, because there no plate draws. About forty seconds."
       ]
     },

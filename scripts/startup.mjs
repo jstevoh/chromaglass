@@ -103,6 +103,7 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { engineQuery } from './frame.mjs';
 import { heldStretches, selfCheck } from './pagehold.mjs';
+import { behindSaid, halvesWhole, waitBehind } from './startupbehind.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -775,17 +776,11 @@ async function open(query, looks) {
       any look is changed to: a change is a mid-show ask, and what that
       measures is whether the lists hold everything a show can ask for once
       they have been built, not a race between a look change and the builds.
+      For as long as the app says its builds still come in, not a fixed
+      time: `startupbehind.mjs` on why.
     */
-    const behind = query.includes('prepare=0') ? null : await page.evaluate(async () => {
-      const t0 = performance.now();
-      const later = () => {
-        const all = window.chromaglassDebug?.()?.pipelines?.()?.prepares ?? [];
-        const first = all.find((p) => p.stage === 'opening');
-        return first ? all.find((p) => p.stage === 'later' && p.device === first.device) ?? null : null;
-      };
-      while (!later() && performance.now() - t0 < 45000) await new Promise((r) => setTimeout(r, 100));
-      return later();
-    });
+    const behindWait = query.includes('prepare=0') ? null : await waitBehind(page);
+    const behind = behindWait?.done ?? null;
     /*
       Never shorter than the wait above for the plate to be running. On run
       36306624796 the control's freeze (12.83 s, on a runner whose adapter
@@ -1019,7 +1014,7 @@ async function open(query, looks) {
       }
       return { ledger, direct: window.__startupDirect.map(([t, l]) => [+(t / 1000).toFixed(2), l]) };
     });
-    return { cache, running, watch, ...opening, ...after, behind, slow };
+    return { cache, running, watch, ...opening, ...after, behind, behindWait, slow };
   } finally { await browser.close(); }
 }
 
@@ -1575,10 +1570,10 @@ try {
     rate == null ? `nothing to compare${cDevices === 1 ? '' : ` (the control had ${cDevices} devices)`}` : `${oWait.compile.toFixed(2)} s building ${oWait.shared} of the ${oldWay.length} ahead, against ${cWait.compile.toFixed(2)} s stopped for them: ${rate.toFixed(2)}×`);
   const notWaited = p ? oldWay.filter((k) => !p.keys.includes(k)) : oldWay;
   check('every pipeline it asked for ahead was built ahead, before it opened and behind it, on the device it opened on',
-    !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && p.ready === p.asked && !p.timedOut && b.ready === b.asked && !b.timedOut,
+    !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && halvesWhole(p, b),
     !p ? 'nothing was prepared (no `pipelines` in chromaglassDebug)'
       : `${p.ready} of ${p.asked} before it opened in ${(p.ms / 1000).toFixed(2)} s${p.timedOut ? ', and it stopped waiting' : ''}; `
-        + (b ? `${b.ready} of ${b.asked} behind it in ${(b.ms / 1000).toFixed(2)} s${b.timedOut ? ', and it stopped waiting' : ''}` : 'nothing built behind it')
+        + behindSaid(b, p, o.behindWait)
         + `; waited for ${oldWay.length - notWaited.length} of the ${oldWay.length} the old way built on its frames`
         + (notWaited.length ? ` (not: ${notWaited.join(', ')})` : ''));
   const late = o.ledger?.onFrame ?? [];

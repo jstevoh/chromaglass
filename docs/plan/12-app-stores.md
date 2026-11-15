@@ -338,14 +338,50 @@ What route 2 still needs, found while building 12-tv-1:
   could send each bundle to the internal track itself with the Play Developer API
   (a Google Cloud service account the owner adds in Play Console → Users and
   permissions, its JSON as a secret). Shared with 12-ctl-ship's upload job.
+- **12-tv-2h: the films through YouTube first, the splash, and the website's QR
+  code (S, built 2026-11-14).** The owner asked first for "the YouTube videos as
+  samples", then "if not YouTube, much better and longer samples"; 12-tv-2f
+  answered the second (the films, whole, from the site). This answers the first
+  on top of it: the logo on the launch screen behind Android's own splash (whose
+  colour is now the logo square's blue), and **Watch a sample film** plays the channel's six song films, each
+  a whole public-domain record, through YouTube's embedded player on a page of the
+  app's own (`assets/films.html`, loaded on a chromaglass.art base so YouTube sees
+  an origin), one after another with the film's look and record named on screen;
+  when YouTube will not play (an error, or nothing for 20 s) 12-tv-2f's films play
+  from the site instead, and the logo covers the page until YouTube says a film
+  plays. Check `npm run tvyoutube` (the page against a stand-in YouTube: the list,
+  the caption, PLAYING, the order round, an error told once, no script); the films
+  list and the page's escaping are unit tests. Asked of the real player from the
+  owner's Chrome on a chromaglass.art page, all six played; from a cloud session
+  YouTube answers 150 to nearly every video, so that cannot be a CI check. Unseen:
+  YouTube in a TV's WebView (whether it plays, and whether it shows ads before a
+  film), judged with 12-tv-2c. Also in it, the owner the same day: point people to
+  the website, "just point them to the webpage to try more free chromaglass.art
+  visuals", not to a purchase. The start screen's bottom-right corner says "Try
+  more free visuals at chromaglass.art" beside a QR code for https://chromaglass.art
+  (`res/drawable-nodpi/site_qr.png`, version 2, level M; read back with zxing to
+  that address), since Android TV has no browser to open a link; it takes no
+  focus. Worded as free visuals, it is no call to buy outside Play billing.
+  Released 1.0.8 (without these) went to Production review 2026-11-14.
 - **12-tv-2c: judged on a real TV (S, the owner's eyes).** Side-load the
   workflow's APK on a Google TV, pair it with the Mac app, watch an evening.
   Unseen so far: NsdManager against the advert on a real network, the advert
   beside the Mac's own mDNSResponder (both on udp 5353; it works on Linux in
   the check, and Node Bonjour libraries share the port the same way on macOS),
   and the WebView's WebRTC decode on a TV box. `docs/judging.md` §125; the
-  sample film (12-tv-2b) on the TV too: Back returns to the list, and a Mac
-  starting its show replaces it.
+  sample film (12-tv-2b) on the TV too: the YouTube films play (12-tv-2h), or the
+  site's do when YouTube will not, Back returns to the list, and a Mac starting
+  its show replaces it.
+- ~~**12-tv-2f: the samples are the channel's films; the logo on the loading screen.**~~
+  (shipped 2026-11-14; story in `docs/plan-shipped.md` §12-tv-2f.)
+- **12-tv-2g: the films on storage made for streaming (S, if needed).** 12-tv-2f
+  serves the six films from a release of the repository behind the site's
+  `/films/` redirect: free, but a release is for downloads, not for streaming to
+  every TV that installs the app. If it is ever slow or refused, the redirect points
+  at a bucket with free egress (Cloudflare R2, on the account the Workers use) and
+  `npm run tvfilms` uploads there; no TV app changes. A TV that had no internet
+  when the films failed shows the logo until the show comes back; it could try the
+  films again after a minute.
 - **12-tv-2d: the newer NSD calls (S).** `resolveService` is deprecated from
   Android 14 for `registerServiceInfoCallback`, which also follows a Mac whose
   address changes while the TV watches; the app uses the old call on every
