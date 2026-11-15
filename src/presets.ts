@@ -1,6 +1,7 @@
-import { VisualizerSettings } from './types';
-import { MOIRE_LOOKS } from './presetsMoire';
+import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
+import { layMoireLooks } from './presetsMoire';
 import { FOAM_CELLS } from './presetsFoam';
+import { layStirCords } from './lib/stir';
 
 export interface Preset {
   id: string;
@@ -709,6 +710,20 @@ export const PRESETS: Preset[] = [
       blendMode: 'overlay',
       gooeyEffect: 0.55,
       rotationSpeed: 0.27,       // 28i-2: above lookMotorRate's 0.1 vertex (~0.086 rad/s, ~1.2 min/turn) so the three pools clear M >= 0.02 at 20 and 40 s
+      /*
+        No hand stirring the dish (PLAN 28i-7c). The look never named
+        Turbulence, so it ran the default 0.5: a curl noise added to the flow
+        everywhere, every step (forcesB), which no liquid between two glasses
+        2 mm apart does by itself (its Reynolds number is far under one; the
+        gap's drag stops any flow nothing drives within milliseconds). It
+        stirred the three pools into a veil between them: on the owner's Mac
+        the glycerine kept 38% of its dye in 90 s, the soap 71%, and the dish
+        never lost any (0.43 to 0.42), so no dye, exposure or lamp brought
+        them back. Off, they keep 97%, 96% and 95%, and what moves them is
+        what really would: the motor, the rock and each area's paddle on its
+        own band (`npm run pools`).
+      */
+      turbulenceScale: 0,
       // Flat: a concave dish slid all three pools into one in the middle. The
       // pools are its areas of the dish now (lib/plateAreas.ts).
       centerGravity: 0.0,
@@ -1053,7 +1068,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.45,
       macroLacing: 0,
       macroDepth: 0.6,
-      macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
       beads: 0.7,             // each a lens on the colour under it
       globalSpeed: 0.06,
@@ -1125,7 +1139,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.6,
       macroLacing: 0,
       macroDepth: 0.5,           // 28i-7: at 0.7 the shallow focus blurred the pools' edges
-      macroEdgeDetail: 0.75,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
       globalSpeed: 0.045,
       surge: 0.5,
@@ -1197,7 +1210,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.55,
       macroLacing: 1.0,          // lacing is the subject here
       macroDepth: 0.6,
-      macroEdgeDetail: 0.9,      // maximum silhouette crinkle
       macroRelief: 0.65,
       globalSpeed: 0.07,
       surge: 0.6,         // quick — this one rushes
@@ -2086,7 +2098,6 @@ export const PRESETS: Preset[] = [
       macroCells: 0,
       macroLacing: 0,
       macroDepth: 0,
-      macroEdgeDetail: 0,
       macroRelief: 0,
       /*
         Flat comic inks in the dish, with no beads or gloss (PLAN 28i-3b):
@@ -2345,24 +2356,10 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-/*
-  The moiré pack's looks (PLAN 45a; presetsMoire.ts), each laid over the look
-  it starts from. Its cords are that look's, a sheet's cord in the place of
-  the last: a look carries two or three fast cords (PLAN 28i-3b, `npm run
-  soundpatch`); the sheet's added to the house look's three made four, too
-  many to read on the wall. A pack look laid over a look with areas adds
-  none: its areas' cords are the music there, and a plate-wide one beside
-  them is the redundancy 28i-3b turns away. The plate itself (dyes, pours,
-  dish, areas) is the house look's under the pack look's id (presetPlate.ts).
-*/
-for (const m of MOIRE_LOOKS) {
-  const from = PRESETS.find(p => p.id === m.from);
-  if (!from) continue;
-  const own = m.settings.sceneMappings ?? [];
-  const house = from.settings.sceneMappings ?? [];
-  const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
-  PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
-}
+// The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
+// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5). In that order.
+layMoireLooks(PRESETS);
+layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).

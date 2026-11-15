@@ -1223,6 +1223,15 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
 - In a thick look it should move much less. Does that read as the liquid being thick,
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.
+- Since 15g-11 the breath is a jet: drag a short way and hold. Does the liquid keep
+  streaming the way you dragged, a tongue running on a palm ahead of the pointer, for
+  as long as you hold? Does a slanted stroke blow along the slant, without wavering?
+  If the plume reads too long, too short or too wide, say which: its core and spread
+  are textbook numbers for a jet, not a measurement of a breath over this dish.
+- Since 15g-12 wind lays no bubbles and a press that never moves is the straw: one
+  round bubble that grows while you hold. Is anything left of the flower-like ring
+  round floating bubbles after a Blow (PLAN 15g-15)? If you miss the wind's bubbles,
+  say so: they were a stand-in, and what would be real is foam at a dish's edge.
 
 
 ## 46. Turing Print (PLAN 26d)
@@ -2765,3 +2774,58 @@ only seen here.
    on every speck alike.
 5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
 6. Glitter and Side Light at 0 on any look: the look exactly as before.
+
+## 130. The closeup with nothing drawn over it (PLAN 38u-1, 38u-2, 38u-3)
+
+**Judged 2026-11-13.** The owner watched the before and after films from their Mac (Macro Bead, Cell Bloom, Classic at 5x) the same day: "looks good". Seen in both films and older than this change: the beads' scalloped rims (38h-17) and grid steps where dye is freshly poured at 5x (the fine detail's, section 47).
+
+The check (`npm run stillcloseup`) proves a still plate draws a still closeup, that no shadow
+falls to one side of a pool and that Depth / Focus only defocuses, in the lab at one frame.
+Whether the closeup still reads as deep and wet without the drawn shadow is only seen here.
+
+1. Macro Bead, Cell Bloom and any look with Close-up on, at 4x to 6x. Good: pool and drop
+   edges are smooth curves that hold still when the liquid does; the clear ground is an even
+   light with no paper grain; depth reads from the soft surround and the relief's light and
+   dark along slopes. Bad: the closeup reads flat, like a sticker, with nothing to say which
+   liquid is over which.
+2. Before 38h-17 merges, the oil beads' own outline is still scalloped (their mask's grid);
+   that is its PR's, not this one's.
+3. A bubble in the closeup at Iridescence 1, the plate left alone: its colours hold. Stir
+   beside it: they shift as it moves.
+
+## 131. The music stirs the liquid through a cord (PLAN 38u-4, 38u-5)
+
+The solver no longer reads the sound: each look carries a patch from the sound's Mid onto
+Turbulence instead, set so its stir with music is about what it was. The numbers hold each
+look within a quarter (`npm run musicstir`); what they cannot hold is the picture, because
+the old eddies were one scale and only under the dye, and Turbulence is three scales over the
+whole dish. Judge from the before and after films (same look, same song, same seconds):
+
+1. Does each look still move with the music about as much as before? Good: the same amount
+   of churn in the loud passages, calm in the quiet ones. Bad: plainly calmer, or the whole
+   dish swimming where before only the colour stirred.
+2. Settings → Patches: the patch "Sound · Mid → Turbulence" is there on every built-in look.
+   Pull it (or Music Stir to 0 on the phone) with music playing: the stir should fall to the
+   look's own Turbulence and stop following the band.
+3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
+   swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
+   too much in the quiet parts.
+
+## 132. No black lines where two colours meet (PLAN 18e-5)
+
+The check (`npm run holeline`) proves that Boundary Contrast moves no pixel in focus and that a
+seam between two dyes is no darker than the darker dye beside it, on the lab's software WebGPU
+at one frame. Whether the looks read better without the line is only seen here.
+
+1. **Comet River**, a minute in: colours meet and blend where they overlap (orange over violet
+   a dark red, cyan over yellow a green) with no black band between them. Bad: a hard dark
+   line along a boundary, or the colours duller than before.
+2. Any look with two layers (Comet River is one): the back plate's rims are still a little
+   brighter than its dye, as before.
+3. **Macro Zoom** to 4x on Comet River: unchanged by this (PLAN 18e-7). Where two colours
+   meet up close there is still a darker band; that is the closeup's relief reading the colour
+   step, and it goes when the closeup shades from the liquid's own optical path.
+4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
+   Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
+5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
+   at the dye's edges strengthen.
