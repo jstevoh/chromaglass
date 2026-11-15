@@ -25,6 +25,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.VideoView;
@@ -57,8 +58,19 @@ import java.util.Map;
  * through `ChromaglassTv.paired`, kept by the show's id from the advert, not
  * by its address, which a router may change any evening.
  *
- * With no Mac to be found, "Watch a sample film" plays the press page's clips
- * (Sample.java) while the app keeps looking; a Mac that turns up takes over.
+ * With no Mac to be found, "Watch a sample film" plays the channel's films,
+ * whole (Sample.java), while the app keeps looking; a Mac that turns up takes
+ * over.
+ *
+ * The logo (the owner, 2026-11-14: "add the logo to the loading screen") is
+ * the brand's own mark, res/drawable-nodpi/logo.png, the same file as
+ * public/brand/chromaglass-logo-512.png. It heads the list while the app
+ * looks for a Mac, and covers the screen while the show's page or a sample
+ * film is still loading, which is the only time a TV would otherwise show a
+ * black screen: the WebView is black until the page draws, and the platform
+ * player is black until its first frame, which for a film streamed from the
+ * site is a second or two on a TV's Wi-Fi. Its square's own dark blue is the
+ * screen's, so it sits in the screen rather than on it.
  *
  * Back from the show or the sample returns to the list; Back from the list
  * leaves the app.
@@ -99,7 +111,12 @@ public class MainActivity extends Activity {
     private FrameLayout sampleLayer;
     private VideoView sampleVideo;
     private TextView sampleCredit;
+    private ImageView sampleLogo;
     private int sampleAt = 0;
+    /** Films that would not play one after another; the sample stops when every one has failed (no internet). */
+    private int sampleFailed = 0;
+    /** The logo over the show's page until the page has loaded (open()). */
+    private View opening;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -138,13 +155,15 @@ public class MainActivity extends Activity {
 
     private void buildViews() {
         root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(8, 20, 32));
+        root.setBackgroundColor(BACKGROUND);
 
         picker = new LinearLayout(this);
         picker.setOrientation(LinearLayout.VERTICAL);
         picker.setGravity(Gravity.CENTER_HORIZONTAL);
         picker.setPadding(dp(64), dp(48), dp(64), dp(48));
 
+        // Smaller over the list than while loading: the list, its button and its help share a TV's 540 dp.
+        picker.addView(logo(), new LinearLayout.LayoutParams(dp(LIST_LOGO_DP), dp(LIST_LOGO_DP)));
         TextView title = new TextView(this);
         title.setText("ChromaGlass");
         title.setTextColor(Color.WHITE);
@@ -188,6 +207,37 @@ public class MainActivity extends Activity {
         root.addView(picker, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
         showList();
+    }
+
+    /** The screen's colour: the logo square's own dark blue (its edge pixels), so the square melts into it. */
+    static final int BACKGROUND = Color.rgb(2, 16, 31);
+    /** The logo's size while loading, about a third of a TV's height, and over the list. */
+    static final int LOGO_DP = 168;
+    static final int LIST_LOGO_DP = 112;
+
+    private ImageView logo() {
+        ImageView v = new ImageView(this);
+        v.setImageResource(R.drawable.logo);
+        v.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        v.setContentDescription("ChromaGlass");
+        return v;
+    }
+
+    /** The logo and a line under it, centred on the brand's blue: what a TV shows while something loads. */
+    private View loadingScreen(String says) {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setGravity(Gravity.CENTER);
+        l.setBackgroundColor(BACKGROUND);
+        l.addView(logo(), new LinearLayout.LayoutParams(dp(LOGO_DP), dp(LOGO_DP)));
+        TextView t = new TextView(this);
+        t.setText(says);
+        t.setTextColor(Color.argb(200, 255, 255, 255));
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(0, dp(20), 0, 0);
+        l.addView(t);
+        return l;
     }
 
     private void showList() {
@@ -326,17 +376,30 @@ public class MainActivity extends Activity {
             @Override public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
                 if (req.isForMainFrame()) main.post(() -> closeShow("Lost the show on " + Shows.label(show.service) + ". Looking again…"));
             }
+            @Override public void onPageFinished(WebView view, String url) {
+                // The page draws its own screen from here (the show, its films or the four digits).
+                main.post(() -> hideOpening());
+            }
         });
         // Only the show's page is ever loaded (above), so only it can call these.
         web.addJavascriptInterface(new Bridge(show.id), "ChromaglassTv");
         root.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        opening = loadingScreen("Opening the show on " + Shows.label(show.service) + "\u2026");
+        root.addView(opening, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         picker.setVisibility(View.GONE);
         web.requestFocus();
         web.loadUrl(Shows.url(show, prefs.getString("key:" + show.id, null)));
     }
 
+    private void hideOpening() {
+        if (opening == null) return;
+        root.removeView(opening);
+        opening = null;
+    }
+
     private void closeShow(String says) {
         menuOpen = false;
+        hideOpening();
         if (web != null) {
             root.removeView(web);
             web.destroy();
@@ -388,7 +451,7 @@ public class MainActivity extends Activity {
     // ── The sample film ─────────────────────────────────────────────────
 
     /**
-     * The press clips, one after another until Back, over the list. Looking
+     * The channel's films, one after another until Back, over the list. Looking
      * goes on underneath (discovery is not stopped), so a Mac starting its
      * show replaces the sample through open(). VideoView rather than the
      * WebView: the WebView only ever loads the Mac's own page (open()), and
@@ -401,20 +464,33 @@ public class MainActivity extends Activity {
         sampleVideo = new VideoView(this);
         sampleLayer.addView(sampleVideo, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        // Over the film until its first frame: a film streamed from the site takes a moment to start.
+        sampleLogo = logo();
+        sampleLayer.addView(sampleLogo, new FrameLayout.LayoutParams(dp(LOGO_DP), dp(LOGO_DP), Gravity.CENTER));
         sampleCredit = new TextView(this);
         sampleCredit.setTextColor(Color.argb(200, 255, 255, 255));
-        sampleCredit.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        sampleCredit.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         sampleCredit.setShadowLayer(dp(3), 0, dp(1), Color.BLACK);
         sampleCredit.setPadding(dp(32), 0, dp(32), dp(24));
         sampleLayer.addView(sampleCredit, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START));
         sampleVideo.setOnCompletionListener(mp -> playClip(Sample.next(sampleAt)));
+        sampleVideo.setOnInfoListener((mp, what, extra) -> {
+            if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                sampleFailed = 0;
+                if (sampleLogo != null) sampleLogo.setVisibility(View.GONE);
+            }
+            return false;
+        });
+        // One film that will not play is skipped; all of them in a row is no internet.
         sampleVideo.setOnErrorListener((mp, what, extra) -> {
-            stopSample("Could not play the sample film. Is this TV on the internet?");
+            if (++sampleFailed >= Sample.CLIPS.length) stopSample("Could not play the sample films. Is this TV on the internet?");
+            else main.post(() -> playClip(Sample.next(sampleAt)));
             return true;
         });
         root.addView(sampleLayer, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         picker.setVisibility(View.GONE);
+        sampleFailed = 0;
         playClip(sampleAt);
     }
 
@@ -422,7 +498,8 @@ public class MainActivity extends Activity {
         if (sampleVideo == null) return;
         sampleAt = i;
         Sample.Clip c = Sample.CLIPS[i];
-        sampleCredit.setText("Sample film: " + c.look + " \u00b7 " + c.credit
+        if (sampleLogo != null) sampleLogo.setVisibility(View.VISIBLE);
+        sampleCredit.setText("Sample film: " + c.look + " plays " + c.credit
                 + "\nBack to look for your Mac");
         sampleVideo.setVideoURI(Uri.parse(c.url));
         sampleVideo.setOnPreparedListener(MediaPlayer::start);
@@ -435,6 +512,7 @@ public class MainActivity extends Activity {
         sampleLayer = null;
         sampleVideo = null;
         sampleCredit = null;
+        sampleLogo = null;
         if (playing == null) {
             picker.setVisibility(View.VISIBLE);
             showList();

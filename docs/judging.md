@@ -1223,6 +1223,15 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
 - In a thick look it should move much less. Does that read as the liquid being thick,
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.
+- Since 15g-11 the breath is a jet: drag a short way and hold. Does the liquid keep
+  streaming the way you dragged, a tongue running on a palm ahead of the pointer, for
+  as long as you hold? Does a slanted stroke blow along the slant, without wavering?
+  If the plume reads too long, too short or too wide, say which: its core and spread
+  are textbook numbers for a jet, not a measurement of a breath over this dish.
+- Since 15g-12 wind lays no bubbles and a press that never moves is the straw: one
+  round bubble that grows while you hold. Is anything left of the flower-like ring
+  round floating bubbles after a Blow (PLAN 15g-15)? If you miss the wind's bubbles,
+  say so: they were a stand-in, and what would be real is foam at a dish's edge.
 
 
 ## 46. Turing Print (PLAN 26d)
