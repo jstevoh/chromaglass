@@ -53,6 +53,15 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   look's settings to a step lives inside `LiquidVisualizer.tsx` and the lab cannot call it.
   Moving that mapping into an exported lib function (an export between domains: the
   owner's call) would let the guard step every look exactly as the app does.
+- **46-4 · samelook's bundle control is red on a src/ change the lab never bundles** (S;
+  found by 38u-16, 2026-11-14). The control "the two trees' bundles differ exactly when src/
+  does" reads src/ changed from `git diff --name-only -- src`, but the lab's bundle holds only
+  what the lab imports: a PR that changes `lib/userPresets.ts` (not in the lab's graph) and adds
+  an export to `lib/stir.ts` that nothing in the lab calls (tree-shaken) leaves both bundles at
+  the same hash (`5328e19f31a19ab4`), and the control fails although every look is byte for
+  byte the same (every other line green, run in the cloud by hand). CI's lab5 was green on
+  that PR. The fix is to compare against the bundle's own inputs (esbuild's metafile) rather
+  than all of src/; it edits the instrument, so its own PR.
 - **46-3 · Known gaps of the opening's bar:** it counts, it does not time. A fused kernel
   could in principle cost more to compile than the two it replaced; the 46a PR quotes
   startup's first step on CI's Mac before and after, and startup's "no later than the old

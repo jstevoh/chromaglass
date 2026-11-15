@@ -13,6 +13,7 @@
 import { PALETTE } from '../constants';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { sanitizePatch } from './sanitizeSettings.ts';
+import { withStirCordOnce } from './stir.ts';
 import type { ShowSequence, ShowStage } from './sequencer';
 import { parseSongRef, type SongRef } from './songRef';
 import { PACE_MOMENTS, type PaceMoment, type StagePace } from './scenePacing';
@@ -36,7 +37,21 @@ export const USER_PRESETS_KEY = 'chromaglass-user-presets';
   from version 2 on keeps whatever it was saved with, off included, since
   off was then a choice.
 */
-export const PRESET_VERSION = 2;
+export const PRESET_VERSION = 3;
+/*
+  And 3 since the music stirs the liquid only through a cord (PLAN 38u-5,
+  the owner's pick of 2026-11-13; this is 38u-16).
+
+  Until then the solver's step read the analyser itself and stirred every
+  look harder with the band; now each built-in look carries a cord, the
+  sound's mids on Turbulence, and the step takes no sound. A look saved
+  before has no such cord, so it came back stirring less to the music than
+  it had. Read before version 3, a saved look gains the cord its own dials
+  call for (lib/stir.ts `withStirCordOnce`); read from version 3 on, it keeps
+  the cords it was saved with, none included, since by then a look without
+  the cord is one the owner pulled it out of. The version is written as the
+  look is read, so the cord is asked for once and not every time.
+*/
 
 export interface UserPreset {
   format: typeof PRESET_FORMAT;
@@ -124,8 +139,21 @@ export function serializePreset(p: UserPreset): string {
  * (a set list's): nothing else about it changes, its id included.
  */
 export function upgradeSaved(p: UserPreset): UserPreset {
-  const old = !(Number(p.version) >= 2) && p.settings?.thinGap === 0;
-  return { ...p, version: PRESET_VERSION, settings: old ? { ...p.settings, thinGap: 1 } : p.settings };
+  return { ...p, version: PRESET_VERSION, settings: readAsNow(p.version, p.settings) };
+}
+
+/**
+ * A saved look's settings as this version plays them, from the version it
+ * was saved at (PRESET_VERSION says why each step): Thin Gap on if it was
+ * off only as the old default, and the music's stir cord if it was saved
+ * before there was one. A look saved at this version comes back untouched.
+ */
+function readAsNow(version: unknown, settings: VisualizerSettings): VisualizerSettings {
+  const v = Number(version);
+  let s = settings;
+  if (!(v >= 2) && s?.thinGap === 0) s = { ...s, thinGap: 1 };
+  if (!(v >= 3) && s && typeof s === 'object') s = withStirCordOnce(s, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
+  return s;
 }
 
 export function parsePresetFile(text: string): UserPreset {
@@ -135,9 +163,8 @@ export function parsePresetFile(text: string): UserPreset {
   if (!o || typeof o !== 'object' || o.format !== PRESET_FORMAT) throw new Error('That is not a ChromaGlass preset file.');
   if (!o.settings || typeof o.settings !== 'object') throw new Error('The preset file has no settings block.');
   const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim() : 'Untitled preset';
-  const settings = cleanSettings(o.settings);
-  // Off as the old default, not as a choice (PRESET_VERSION says why).
-  if (!(Number(o.version) >= 2) && settings.thinGap === 0) settings.thinGap = 1;
+  // Thin Gap off as the old default, and no stir cord because there was none (PRESET_VERSION says why).
+  const settings = readAsNow(o.version, cleanSettings(o.settings));
   return {
     format: PRESET_FORMAT,
     version: PRESET_VERSION,
