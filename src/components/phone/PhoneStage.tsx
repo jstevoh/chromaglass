@@ -39,6 +39,7 @@ import { TabStrip } from '../desk/TabStrip';
 import type { TabEdit } from '../../hooks/useDeskLayout';
 import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
+import { SiteLink } from '../SiteLink';
 import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 
 /**
@@ -1325,6 +1326,8 @@ export function PhoneStage(p: PhoneStageProps) {
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
           </div>
+          {/* The website's free visuals, in the apps only (SiteLink.tsx renders nothing on the site). */}
+          <div className="mt-3"><SiteLink look="sheet" /></div>
           {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
           <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
             <SectionLabel>Record makes</SectionLabel>

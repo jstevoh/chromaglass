@@ -13963,6 +13963,34 @@ in the harness with a real MP4; the show server serves the logo), `npm run press
 it), `npm run tvfilms -- --probe` (the live site serves all six, index first), and the
 TV app's unit tests (six films, each from the site, each saying what it plays).
 
+## 12-tv-2h. The TV's films through YouTube first, a launch splash, and a QR code for the website (2026-11-15)
+
+The owner asked first for "the YouTube videos as
+samples", then "if not YouTube, much better and longer samples"; 12-tv-2f
+answered the second (the films, whole, from the site). This answers the first
+on top of it: the logo on the launch screen behind Android's own splash (whose
+colour is now the logo square's blue), and **Watch a sample film** plays the channel's six song films, each
+a whole public-domain record, through YouTube's embedded player on a page of the
+app's own (`assets/films.html`, loaded on a chromaglass.art base so YouTube sees
+an origin), one after another with the film's look and record named on screen;
+when YouTube will not play (an error, or nothing for 20 s) 12-tv-2f's films play
+from the site instead, and the logo covers the page until YouTube says a film
+plays. Check `npm run tvyoutube` (the page against a stand-in YouTube: the list,
+the caption, PLAYING, the order round, an error told once, no script); the films
+list and the page's escaping are unit tests. Asked of the real player from the
+owner's Chrome on a chromaglass.art page, all six played; from a cloud session
+YouTube answers 150 to nearly every video, so that cannot be a CI check. Unseen:
+YouTube in a TV's WebView (whether it plays, and whether it shows ads before a
+film), judged with 12-tv-2c. Also in it, the owner the same day: point people to
+the website, "just point them to the webpage to try more free chromaglass.art
+visuals", not to a purchase. The start screen's bottom-right corner says "Try
+more free visuals at chromaglass.art" beside a QR code for https://chromaglass.art
+(`res/drawable-nodpi/site_qr.png`, version 2, level M; read back with zxing to
+that address), since Android TV has no browser to open a link; it takes no
+focus. Worded as free visuals, it is no call to buy outside Play billing.
+Released 1.0.8 (without these) went to Production review 2026-11-14.
+Merged 2026-11-15 (#871); the next TV release carries it.
+
 ## 12-tv-signin. A TV signs in by a short code (2026-11-08)
 
 A TV receiver (12-tv route 2, 12-tv-apple) has no keyboard worth typing a password
