@@ -2490,10 +2490,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // The lamp ground (lampBg): the same rows over the lamp at full, here once
   // the surface is known, since a video in the lamp is seen through it
   // (lampBend, plateLamp.ts). The hot-spot (lampField.ts) never lifts a point above it.
-  if (U.lampGround > 0.001) {
-    if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5 && U.dishSpread <= 0.001) { lampBend = lampBendAt(fuv0, c0, s0); }
-    lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; }
-  }
+  // One line each, as scripts/lampcontrol.mjs finds them (a video in the lamp
+  // always has a lamp ground, plateUniforms.ts, so its bend needs no test of it).
+  if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5 && U.dishSpread <= 0.001) { lampBend = lampBendAt(fuv0, c0, s0); }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
   /*
     No substrate grain and no contact shadow (PLAN 38u-2). Until 2026-11-13
     the closeup laid a paper's fibre over the ground (value noise at 230
