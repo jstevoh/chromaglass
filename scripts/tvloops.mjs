@@ -3,7 +3,7 @@
  * The TV's calm loops (PLAN 12-tv-loops): made on a Mac, judged anywhere.
  *
  *   npm run tvloops -- --controls                  the judge, shown its controls (cloud, CI)
- *   npm run tvloops                                render, loop and judge all ten (a Mac)
+ *   npm run tvloops                                render, loop and judge them all (a Mac)
  *   npm run tvloops -- --only=chemical-clock --seconds=60    one, short, to try a look
  *   npm run tvloops -- --upload                    and put each on the tv-loops-1 pre-release
  *   npm run tvloops -- --upload --clean            and delete each loop here once it is up
