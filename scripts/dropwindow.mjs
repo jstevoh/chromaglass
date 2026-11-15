@@ -61,7 +61,10 @@
  *      drop's worth (Tate), not every frame; and forty drops on a plate that
  *      takes no steps (Freeze the liquid) lay nothing on it until it does:
  *      a full queue lets a drop go rather than stamping it (`npm run moving`
- *      found the stamps ending its freeze early)
+ *      found the stamps ending its freeze early); and while the pour's kernel
+ *      is still building behind the show, a drop is the stamp it was, its
+ *      whole dye and no pour (asking sooner compiled it in the opening:
+ *      `npm run startup` read it as the show's own wait)
  *
  * Measured (SwiftShader, 2026-11-14): see the commit that added it.
  */
@@ -94,8 +97,8 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
   const plate = (dropHeight) => {
     const p = {
       size: 192, dropHeight, dropFingering: 0.5, thinGap: true, drops: D.makeDropQueue(),
-      laid: [], vel: 0, squish: 0, pours: [],
-      gpu: { pour: (x, y, r, share) => p.pours.push({ x, y, r, share }) },
+      laid: [], vel: 0, squish: 0, pours: [], ready: true,
+      gpu: { pour: (x, y, r, share) => p.pours.push({ x, y, r, share }), pourReady: () => p.ready },
       rng: { float: rand, angle: () => rand() * Math.PI * 2 },
       addDensity(x, y, a) { p.laid.push([x, y, a]); },
       addVelocity() { p.vel++; },
@@ -136,13 +139,19 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
   // A frozen plate (no steps) dropped on forty times: nothing reaches it until it steps (moving's freeze).
   const frozen = plate(0);
   for (let k = 0; k < 40; k++) D.layDrop(frozen, 96, 96, 5, 1, 1, 0.1, 1, true);
+  // A plate whose pour kernel is still building behind the show: the drop is the stamp, whole, and nothing is queued to pour.
+  const cold = plate(0);
+  cold.ready = false;
+  D.layDrop(cold, 96, 96, AMOUNT, 1, 1, 0.1, 1, true);
+  const coldDye = cold.laid.reduce((s, l) => s + l[2], 0);
   const t = plate(0);
   let firstFall = -1;
   for (let k = 0; k < 200 && firstFall < 0; k++) { D.layDrop(t, 96, 96, 0.05, 1, 1, 0.1, 1, true); if (D.dropsLive(t.drops)) firstFall = k; }
   check('9. a drop pours in its schedule and lays all its dye, middle and edge, and the trickle falls as one drop when it has a drop\'s worth',
     mid.n === sch.steps && mid.shares && edge.n === sch.steps && Math.abs(mid.dye / want - 1) < 1e-3 && Math.abs(edge.dye / want - 1) < 1e-3
-      && firstFall > 0 && Math.abs((firstFall + 1) * 0.05 - D.DROP_TATE) < 0.051 && frozen.laid.length === 0,
-    `${mid.n} pours of ${sch.share.toFixed(3)} (schedule ${sch.steps}); dye laid ${(mid.dye / want).toFixed(4)} of the stamp's at the middle, ${(edge.dye / want).toFixed(4)} at the edge; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE}); forty drops on a frozen plate laid ${frozen.laid.length} cells`);
+      && firstFall > 0 && Math.abs((firstFall + 1) * 0.05 - D.DROP_TATE) < 0.051 && frozen.laid.length === 0
+      && !D.dropsLive(cold.drops) && cold.pours.length === 0 && Math.abs(coldDye / want - 1) < 1e-3,
+    `${mid.n} pours of ${sch.share.toFixed(3)} (schedule ${sch.steps}); dye laid ${(mid.dye / want).toFixed(4)} of the stamp's at the middle, ${(edge.dye / want).toFixed(4)} at the edge; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE}); forty drops on a frozen plate laid ${frozen.laid.length} cells; with the pour not yet built, ${cold.pours.length} pours and the stamp's ${(coldDye / want).toFixed(4)}`);
 }
 
 // ── 1–6, on the solver ──

@@ -67,7 +67,9 @@ export function layDrop(sim: FluidSimulation, x: number, y: number, amount: numb
   // A drop from higher spreads thinner as it lands: a wider disc, the same dye.
   const spread = 1 + 0.6 * e;
   const dropR = Math.round(3 * k * spread);
-  const pours = volume && sim.thinGap && !!sim.gpu?.pour && amount > 0;
+  // Until the pour's kernel is built (behind the show), a drop is the stamp:
+  // asking for it sooner compiles it on that frame, in the opening (pourReady).
+  const pours = volume && sim.thinGap && !!sim.gpu?.pour && (sim.gpu.pourReady?.() ?? true) && amount > 0;
   if (!pours) {
     stamp(sim, x, y, dropR, amount * dye / (spread * spread), r, g, b);
   } else if (amount < DROP_TRICKLE) {
