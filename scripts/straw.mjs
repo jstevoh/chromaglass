@@ -4,12 +4,17 @@
  *
  *   npm run straw      (the list in node, the air field in the lab: any adapter that computes and renders)
  *
- * Held still, the Blow is a straw: one bubble on the end of it, growing while
- * the breath goes on, its rim breaking into fingers the faster it grows and
- * shedding a ring of small bubbles, and rounding off once let go. The list
- * is checked on its own (bubbles.ts); the fingers are checked where they
- * have to land, in the air field the solver takes the liquid out of and the
- * plate draws the bubble from.
+ * Held still and never moved, the Blow is a straw: one bubble on the end of
+ * it, growing while the breath goes on. It is round and it sheds nothing
+ * (PLAN.md 15g-12): it used to break into six to eighteen fingers and throw
+ * a ring of small bubbles off its rim, the "flower like things around the
+ * floating bubbles" the owner reported (2026-11-13), with a finger count
+ * that put a gap a twenty-first of the plate's into Paterson's formula. At
+ * the plate's own gap the count is under one, and a front that does not
+ * finger pinches nothing off (src/lib/bubbles.ts, blow). The count is still
+ * Paterson's, so a liquid thick enough does finger, and that is held here
+ * too, on the list and where the fingers have to land: in the air field the
+ * solver takes the liquid out of and the plate draws the bubble from.
  */
 import { build } from 'esbuild';
 import { openLab } from './lab.mjs';
@@ -24,29 +29,59 @@ const check = (name, ok, detail = '') => {
 {
   const out = 'node_modules/.cache/straw-bubbles.mjs';
   await build({ entryPoints: ['src/lib/bubbles.ts'], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-  const { BubbleField } = await import(`../${out}`);
+  const { BubbleField, strawFingers, DISH_METRES } = await import(`../${out}`);
   const N = 192, dt = 1 / 60;
-  const f = new BubbleField(N);
   const still = () => [0, 0];
-  let growingFing = 0, sats = 0;
   const at = { x: 110, y: 80 };
-  for (let t = 0; t < 180; t++) {           // three seconds of breath
-    f.blow(at.x, at.y, dt, 1);
-    f.step(dt, still, 0, 0, 0);
-    const b = f.bubbles.find((q) => q.straw);
-    if (t === 60) growingFing = b?.fing ?? 0;
-  }
+  /*
+    Three seconds of breath on a fresh plate whose liquid is `thick` times
+    the default oil's viscosity: the most its rim fingered, Paterson's count
+    at its fastest and at its end, and what is on the plate after.
+  */
+  const breathe = (liquid) => {
+    const f = new BubbleField(N);
+    f.liquid(liquid);
+    const mu = f.liquidMu;
+    let fing = 0, count = 0, last = 0, r0 = 0;
+    for (let t = 0; t < 180; t++) {           // three seconds of breath
+      f.liquid(liquid);
+      f.blow(at.x, at.y, dt, 1);
+      f.step(dt, still, 0, 0, 0);
+      const b = f.bubbles.find((q) => q.straw);
+      if (!b) continue;
+      fing = Math.max(fing, b.fing);
+      const speed = (b.r - r0) / dt; r0 = b.r;
+      if (t > 0) { last = strawFingers(mu * speed * (DISH_METRES / N) / f.liquidSigma, b.r * (DISH_METRES / N) / f.gapMetres); count = Math.max(count, last); }
+    }
+    return { f, fing, count, last, mu };
+  };
+  const oil = breathe({});
+  const f = oil.f;
   const blown = f.bubbles.filter((q) => q.straw);
   const big = blown.reduce((m, q) => (q.r > (m?.r ?? 0) ? q : m), null);
-  sats = f.bubbles.length - blown.length;
+  const sats = f.bubbles.length - blown.length;
   check('held still, one bubble grows on the end of the straw', blown.length === 1 && big && big.r > N * 0.05,
     big ? `${blown.length} blown, radius ${(big.r / N).toFixed(3)} of the plate` : 'none');
   check('and stays at the straw', big && Math.hypot(big.x - at.x, big.y - at.y) < 1, big ? `${Math.hypot(big.x - at.x, big.y - at.y).toFixed(2)} cells off` : '');
-  check('its rim breaks into fingers while it grows fast', growingFing > 0.25, `fingering ${growingFing.toFixed(2)} a second in`);
-  check('and it sheds a ring of small ones', sats >= 3, `${sats} satellites`);
+  check('it stays round while it grows: in the plate\'s oil at the plate\'s gap Paterson\'s count never reaches two fingers',
+    oil.fing === 0 && oil.count > 0.5 && oil.count < 2, `fingering ${oil.fing.toFixed(3)} at most, ${oil.count.toFixed(2)} fingers at its fastest (μ ${oil.mu.toFixed(3)} Pa·s)`);
+  check('and it sheds nothing: the one bubble is all there is on the plate', sats === 0 && f.bubbles.length === 1, `${sats} others after three seconds of breath (it shed about five a second)`);
+  /*
+    The count is alive, not a constant: with the Thickness dial at its top
+    (a liquid the app can have; the first version of this line took one 300
+    times as thick as the default, about 5.8 Pa·s, which no dial reaches)
+    the same breath's front does finger. And the bubble is drawn with the
+    count's own number of lobes, not the number it was laid with (a
+    bubble is laid with 10 to 14, so a range would pass on any bubble).
+  */
+  const thick = breathe({ thinGap: 1, gapThickness: 1 });
+  const tb = thick.f.bubbles.find((q) => q.straw);
+  check('with Thickness at its top the same breath does finger, and the bubble is drawn with as many lobes as the count gives',
+    thick.count >= 2 && thick.fing > 0.2 && thick.last >= 2 && tb && tb.lobes === Math.min(18, Math.round(thick.last)) && thick.f.bubbles.length === 1,
+    `${thick.count.toFixed(1)} fingers at its fastest, fingering ${thick.fing.toFixed(2)}, ${thick.last.toFixed(1)} at the last step and drawn with ${tb?.lobes} lobes (μ ${thick.mu.toFixed(3)} Pa·s)`);
   for (let t = 0; t < 240; t++) f.step(dt, still, 0, 0, 0);   // let go for four seconds
   const after = f.bubbles.find((q) => q.straw && q.r > N * 0.04);
-  check('let go, it stays on the plate and rounds off', after && after.fing < 0.1, after ? `fingering ${after.fing.toFixed(3)}` : 'gone');
+  check('let go, it stays on the plate, round', after && after.fing < 0.1, after ? `fingering ${after.fing.toFixed(3)}` : 'gone');
   f.clearLooks();
   check('a look with no bubbles of its own keeps it', f.bubbles.some((q) => q.straw) && f.anyBlown);
   f.blow(40, 150, dt, 1); f.step(dt, still, 0, 0, 0);
