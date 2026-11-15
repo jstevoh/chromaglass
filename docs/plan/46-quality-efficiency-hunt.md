@@ -167,11 +167,12 @@ again ten times a second for three meters and a percentage.
   object built every frame to be compared, a projector source's copy of all 251 settings a
   frame. Each is the same arithmetic into memory kept; the check for each is `eargc`'s
   pattern (heap bytes a call, old against new, the result bit for bit).
-- **46k · `dyeDisperse` runs as an exact no-op where diffusion is zero** (S; Classic and
-  thirteen other looks): its gate passes whenever the plate moves, and with `dm = 0` and
-  `kappaT = 0` every flux is ±0. One full-grid dispatch a step, 25 loads of the rgba32f dye
-  a cell; the file's own comment puts it near 0.4 ms. Skip it for that case (not oil bodies
-  until read); `samelook`, `physics`, `encode`.
+- ~~**46k · `dyeDisperse` runs as an exact no-op where diffusion is zero**~~ (**shipped**,
+  `disperseDye` and `disperseWanted` in `src/gpu/fluid/passes.ts`: gated on `bodies || dm > 0
+  || (kappaT > 0 && dispCells > 0)` so Classic and the other looks with Diffusion Rate at 0
+  and no Oil Bodies skip the full-grid dispatch; Oil Bodies stays outside the gate because
+  `bodyUnspread` clamps `dye` against `oilDye` after `slump` and `decayDye`; `samelook`,
+  `physics`, `encode`; story in `docs/plan-shipped.md`).
 - **46l · Taps the display takes and throws away** (S each): the milk's five taps a layer
   where the lamp ground is off (ten a pixel on Classic); the ferrofluid dome's curvature
   loading again the four neighbours it holds; the projector's `scene` sample overwritten
