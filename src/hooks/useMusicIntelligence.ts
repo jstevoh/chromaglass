@@ -147,7 +147,13 @@ export interface MusicIntelResult {
 
 export function useMusicIntelligence(
   stream: MediaStream | null,
-  audioData: AudioData | null,
+  /**
+   * The ear's latest reading, read when this hook's own timers ask (the ear's
+   * `live`). It was the ear's ten-a-second state, copied into a ref by an
+   * effect, which made this hook one of the reasons the reading had to be
+   * state on the App at all (PLAN.md 46f).
+   */
+  heard: { readonly current: AudioData | null },
   music: MusicSettings,
   baseSettings: VisualizerSettings,
   /** Every reading of the ear as it is made (hooks/useAudioAnalyzer.ts `onReading`), for the follower. */
@@ -183,7 +189,6 @@ export function useMusicIntelligence(
   const lyricsRef = useRef<LyricsResult | null>(null);
   const trackStateRef = useRef<TrackEvolutionState | null>(null);
   const musicRef = useRef(music);
-  const audioRef = useRef<AudioData | null>(null);
   const lastLoudMsRef = useRef(performance.now());
   const listenStartMsRef = useRef(0);
   // When the first listen's recorder really started: after the awaits in adoptTrack, so a little after listenStartMsRef.
@@ -241,7 +246,6 @@ export function useMusicIntelligence(
   const busyRef = useRef(false);
 
   useEffect(() => { musicRef.current = music; }, [music]);
-  useEffect(() => { audioRef.current = audioData; }, [audioData]);
   useEffect(() => { trackRef.current = track; }, [track]);
   useEffect(() => { songMapRef.current = songMap; }, [songMap]);
 
@@ -318,7 +322,7 @@ export function useMusicIntelligence(
     // Pick (or recall) this track's visualizer preset — deterministic per
     // ISRC, biased by the live audio profile at first identification.
     if (!state.presetId) {
-      const a = audioRef.current;
+      const a = heard.current;
       const profile = a ? {
         energy: Math.min(1, a.energy),
         bass: Math.min(1, a.bass / 70),
@@ -410,7 +414,7 @@ export function useMusicIntelligence(
 
     const tick = window.setInterval(async () => {
       const now = performance.now();
-      const audio = audioRef.current;
+      const audio = heard.current;
       const currentTrack = trackRef.current;
 
       // Silence tracking

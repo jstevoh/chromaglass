@@ -338,14 +338,46 @@ What route 2 still needs, found while building 12-tv-1:
   could send each bundle to the internal track itself with the Play Developer API
   (a Google Cloud service account the owner adds in Play Console → Users and
   permissions, its JSON as a secret). Shared with 12-ctl-ship's upload job.
+- ~~**12-tv-2h: the films through YouTube first, the splash, and the website's QR code.**~~
+  (shipped 2026-11-15; story in `docs/plan-shipped.md` §12-tv-2h.)
+- **12-promo-1: the website in every app (S, built 2026-11-15).** The owner,
+  2026-11-14: "put sufficient advertisements into all of the apps period tv, phone,
+  whatever", pointing at the website "to try more free chromaglass.art visuals", and
+  "Don't point them to purchase". One sentence in all of them, "Try more free visuals
+  at chromaglass.art", with no price, tier or call to buy (which also keeps the store
+  apps clear of steering to purchases outside them). The Google TV app had it from
+  12-tv-2h (start screen, QR corner). The Apple TV app now has it too
+  (`tvos/App/Sources/SiteCorner.swift`): the words beside a QR code for
+  https://chromaglass.art drawn by CoreImage, on the address screen and over the
+  black screen while it looks for the Mac, never over the live picture and not on
+  the sign-in screen, whose own big code would be confused with it. The iPhone and
+  Android phone apps have a tappable link (`src/components/SiteLink.tsx`) in More,
+  on the laptop form and in the app bar over the remote, which Capacitor opens in
+  the system browser (no `allowNavigation` hosts); the website shows none. Check:
+  `npm run applink` (the words, nothing that sells, the TVs' copies the same, the
+  Apple TV corner kept off the live picture; the link in all three places in the
+  app, leaving for the site; none on the website). Unseen: the Apple TV corner on a
+  screen (the tvOS build in `tvos.yml` compiles it), the link opening Safari or
+  Chrome on a real phone (`docs/judging.md` §16).
 - **12-tv-2c: judged on a real TV (S, the owner's eyes).** Side-load the
   workflow's APK on a Google TV, pair it with the Mac app, watch an evening.
   Unseen so far: NsdManager against the advert on a real network, the advert
   beside the Mac's own mDNSResponder (both on udp 5353; it works on Linux in
   the check, and Node Bonjour libraries share the port the same way on macOS),
   and the WebView's WebRTC decode on a TV box. `docs/judging.md` §125; the
-  sample film (12-tv-2b) on the TV too: Back returns to the list, and a Mac
-  starting its show replaces it.
+  sample film (12-tv-2b) on the TV too: the YouTube films play (12-tv-2h), or the
+  site's do when YouTube will not, Back returns to the list, and a Mac starting
+  its show replaces it.
+- ~~**12-tv-2f: the samples are the channel's films; the logo on the loading screen.**~~
+  (shipped 2026-11-14; story in `docs/plan-shipped.md` §12-tv-2f.)
+- **12-tv-2g: the films on storage made for streaming (S, if needed).** 12-tv-2f
+  serves the six films from a release of the repository behind the site's
+  `/films/` redirect: free, but a release is for downloads, not for streaming to
+  every TV that installs the app. If it is ever slow or refused, the redirect points
+  at a bucket with free egress (Cloudflare R2, on the account the Workers use) and
+  `npm run tvfilms` uploads there; no TV app changes. A TV that had no internet
+  when the films failed shows the logo until the show comes back; it could try the
+  films again after a minute.
 - **12-tv-2d: the newer NSD calls (S).** `resolveService` is deprecated from
   Android 14 for `registerServiceInfoCallback`, which also follows a Mac whose
   address changes while the TV watches; the app uses the old call on every
