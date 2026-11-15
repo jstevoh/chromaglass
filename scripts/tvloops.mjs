@@ -72,12 +72,12 @@
  *      16x16 thumbnail is smaller still, each thumb pixel being the mean of a
  *      120x67 block;
  *   4. the joint where the crossfade ends and the film runs on alone is one
- *      step too: at most 3 times the larger of the keyframe step and the
- *      fade's own median step. The fade's own because a crossfade moves every
- *      frame by a share of the difference between the tail and the film, so
- *      on a slow look whose last minutes are far from its first the fade's
- *      every step is larger than the film's, the one into the film included;
- *      a cut there is larger than both. Not
+ *      step too: at most 3 times the median keyframe step. The fade's weight
+ *      is eased and rounded (EASED_FADE), so its last frames are the film's
+ *      own and the step into the film alone is the film's step; the straight
+ *      ramp xfade truncates read 0.63 there against the film's 0.06 and
+ *      failed Aurora Borealis. A seek apart there, or a fade that stops
+ *      short, is a jump. Not
  *      "no step anywhere is large", as loopseam asks of a few seconds: tried
  *      on the Mac's first real loop (Chemical Clock, a minute, 2026-11-15)
  *      the largest step was already 7.9 keyframe steps, a wave front, and a
@@ -178,21 +178,27 @@ const tvH264 = ['-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-maxrate', 
  * seconds after WARM + L. seam 0 is the plain cut, for the controls.
  */
 /*
-  The crossfade's weight eased (smoothstep, 3P² − 2P³ of the tail at progress
-  P, which xfade runs from 1 at the loop's first frame to 0), not the straight
-  ramp of xfade's own "fade". Measured on the owner's Mac with the straight
-  ramp (Classic, a 5 s fade on 2026-11-15, losslessly against the raw): every
-  frame of the fade steps by the film's motion plus 1/150 of the difference
-  between the tail and the film, about 0.3 against the film's own 0.06; the
-  step out of the fade into the film alone read 0.65, two of those shares,
-  and on Aurora Borealis's half hour 3.8 times the fade's median step, which
-  the joint line failed. However many shares the ramp's last frame is short
-  by, a step of a share is there at the joint, because the ramp's slope does
-  not go to nothing at its end. The eased weight's slope is nothing at both
-  ends, so the fade leaves the film as smoothly as it leaves the tail at the
-  seam, and a frame's error at the end is (k/N)² of the difference, not k/N.
+  The crossfade written out as xfade's custom expression, for two reasons
+  found on the owner's Mac (2026-11-15), where Aurora Borealis's half hour
+  failed the joint line at 3.8 times the fade's median step.
+
+  The cause was half a grey level. xfade's frames are integers made from a
+  sum of floats, and its own "fade" (and a custom expression left bare)
+  truncates that sum, so every frame of the fade is on average half a level
+  darker than the film it is made of, and the step out of the fade into the
+  film alone is that half level coming back all at once. Read on Classic's
+  5 s test fade against its raw film: the fade's last frames, the tail's
+  weight there a ten-thousandth, sat 0.63 from the raw's same frames in a
+  16x16 grey thumb, the frame after the fade 0.04, and the step between
+  them 0.63 where the film steps 0.06. With +0.5, so the sum rounds, the
+  fade's last frames sit 0.03 from the raw and the joint's step is 0.05.
+
+  And the weight is eased (smoothstep, 3P² − 2P³ of the tail at progress P,
+  which xfade runs from 1 at the loop's first frame to 0), whose slope is
+  nothing at both ends, so the fade leaves the tail at the seam and joins
+  the film at its end without the straight ramp's corner.
 */
-const EASED_FADE = "transition=custom:expr='st(0,P*P*(3-2*P));A*ld(0)+B*(1-ld(0))'";
+const EASED_FADE = "transition=custom:expr='st(0,P*P*(3-2*P));A*ld(0)+B*(1-ld(0))+0.5'";
 
 function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew = 0 }) {
   const t = (s) => s.toFixed(6);
@@ -279,11 +285,6 @@ function judge(file, loopSeconds, seamSeconds) {
   // The step into the first frame the film plays alone, after the crossfade.
   const fadeFrames = Math.round(seamSeconds * FPS);
   const joint = seamSeconds > 0 ? steps[fadeFrames - 1] : null;
-  // The crossfade's own step: each of its frames moves by the film's motion
-  // plus a 1/fadeFrames share of the difference between the tail and the
-  // film, which on a slow look whose tail is far from its start is several
-  // keyframe steps every frame of the fade, and so at its end too.
-  const fadeMedian = seamSeconds > 0 ? median(steps.slice(0, fadeFrames - 1)) : null;
   const window = Math.round(Math.min(60, loopSeconds / 6) * FPS);
   const travels = [];
   for (let i = 0; i + window < fr.length; i += window) travels.push(dist(fr[i], fr[i + window]));
@@ -296,7 +297,7 @@ function judge(file, loopSeconds, seamSeconds) {
   }
   return {
     file: path.basename(file), seconds: f.seconds, audio: f.audio, frames: fr.length,
-    medianStep: median(steps), keyMedian: keyMed, keyframes: keys.length + 1, seam, joint, fadeMedian, largest,
+    medianStep: median(steps), keyMedian: keyMed, keyframes: keys.length + 1, seam, joint, largest,
     minTravel: Math.min(...travels), medianTravel: median(travels), windowSeconds: window / FPS,
     minLight: Math.min(...light), medianLight: median(light), minPattern: Math.min(...pattern), medianPattern: median(pattern),
   };
@@ -305,7 +306,7 @@ const lines = (j, loopSeconds) => ({
   length: Math.abs(j.seconds - loopSeconds) <= 1 / FPS + 1e-3,
   audio: j.audio === 0,
   seam: j.seam <= SEAM_OVER_KEY * j.keyMedian,
-  joint: j.joint === null || j.joint <= SEAM_OVER_KEY * Math.max(j.keyMedian, j.fadeMedian),
+  joint: j.joint === null || j.joint <= SEAM_OVER_KEY * j.keyMedian,
   // Strictly more: a picture the codec holds perfectly still has a travel and a keyframe step of 0.
   moves: j.minTravel > MOVES_OVER_KEY * j.keyMedian,
   light: j.minLight >= KEEP_SHARE * j.medianLight && j.minPattern >= KEEP_SHARE * j.medianPattern,
@@ -316,7 +317,7 @@ function report(name, j, loopSeconds) {
   check(`${name}: ${loopSeconds} s long, to a frame`, l.length, `${j.seconds.toFixed(3)} s, ${j.frames} frames`);
   check(`${name}: no audio track`, l.audio, `${j.audio} audio track(s)`);
   check(`${name}: the seam is one step across a keyframe, not a cut`, l.seam, `last to first ${j.seam.toFixed(2)}, ${r(j.seam, j.keyMedian)}x the median keyframe step ${j.keyMedian.toFixed(2)} (at most ${SEAM_OVER_KEY}x; median step ${j.medianStep.toFixed(2)})`);
-  check(`${name}: the crossfade's end is one step too`, l.joint, j.joint === null ? 'no crossfade' : `${j.joint.toFixed(2)}, ${r(j.joint, Math.max(j.keyMedian, j.fadeMedian))}x the larger of the keyframe step and the fade's own median step ${j.fadeMedian.toFixed(2)} (at most ${SEAM_OVER_KEY}x); the largest step anywhere ${j.largest.toFixed(2)}, ${r(j.largest, j.keyMedian)}x, for the eye`);
+  check(`${name}: the crossfade's end is one step too`, l.joint, j.joint === null ? 'no crossfade' : `${j.joint.toFixed(2)}, ${r(j.joint, j.keyMedian)}x the median keyframe step (at most ${SEAM_OVER_KEY}x); the largest step anywhere ${j.largest.toFixed(2)}, ${r(j.largest, j.keyMedian)}x, for the eye`);
   check(`${name}: it keeps moving, every ${j.windowSeconds} s`, l.moves, `least travel ${j.minTravel.toFixed(2)}, ${r(j.minTravel, j.keyMedian)}x the keyframe step (at least ${MOVES_OVER_KEY}x; median ${j.medianTravel.toFixed(2)})`);
   check(`${name}: it keeps its light and its pattern`, l.light, `least light ${j.minLight.toFixed(1)} of median ${j.medianLight.toFixed(1)}, least spread ${j.minPattern.toFixed(1)} of median ${j.medianPattern.toFixed(1)} (at least ${KEEP_SHARE} of each)`);
   return l;
