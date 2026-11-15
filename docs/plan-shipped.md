@@ -2448,6 +2448,54 @@ before the measured one (untested, and #396's warm in the same page did not help
   render compile (on software WebGPU that stretch was the first uses' wait, 9.05 to
   9.19 s; on the Mac it is the kernels too), 9 and 9b red. Cold, the mark is now still for the whole wait and fades
   as the plate's first step comes; the phone opens through the same code.
+- **Shipped, 14v-12: the opening compiles a display for its own look, and the intro says
+  what it is waiting for** (2026-11-14). What was reported (the owner): "Things take like
+  30 seconds to get loaded and started on mobile web ... we should have the loading state
+  present if there are no visuals and some kind of loading updates." What was measured, on
+  software WebGPU (all CPU, the nearest a cloud session has to a phone's compiler; `npm run
+  openingtime`): the plate's display, one fragment shader holding every look's effects, was
+  7.63 s of a 9.61 s opening, the other 66 pipelines running beside it. Compiled alone with
+  the effects' uniform tests written `false` it took 0.9 s against 5 s whole, and no one
+  effect was most of it (the second plate 0.34 s alone, the bubbles 0.25, the lacing 0.24,
+  the lumia 0.23 ...). A first try with WGSL overrides (`(CG_X && TEST)`) gained little,
+  4.0 to 4.6 s with every gate off: `false && TEST` is not a constant expression, so the
+  branch stays compiled. Written `false` it goes.
+  - `src/gpu/displayLean.ts`: 30 gates (31 until 38u took Macro Depth's own branch out of
+    the shader, which `leandisplay`'s first line caught), each a uniform test as the shader writes it and the
+    settings (and cords) a look reaches it by. The opening builds the display with the
+    tests its look cannot reach written `false` (Classic keeps 6; every look 4 to 9)
+    and the whole display first behind the show (`later` sorted render first). The frame
+    (`WebGPUPlate.displayFor`) draws lean while the draw's own uniform bytes need nothing
+    it left out, whole otherwise; while the whole one is still building the lean one goes
+    on drawing and the whole one is asked for, so the Mac's `startup` sees a look whose
+    first steps reach past its opening. `?lean=0` opens whole. A look that opens through
+    the camera or the film stock (Home Movie, Song Groove) draws its display flipped into
+    their picture, so it waits for no canvas display and builds the whole one behind: the
+    Mac's first `startup` run named their lean display as waited for and asked for by
+    none. `startup` prices the lean display as the old way's display
+    (`scripts/startuplean.mjs`): on that run its 1.78 s compile read as the page's own
+    wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner. And the
+    line says nothing at the start of the builds: its "0 of 67" changed the picture as the
+    opening began waiting for the page's frames, and the Mac asked its first compile 1.12 s
+    after the device (0.06 s on main).
+  - Every look the same bytes: `npm run leandisplay` (new, lab9) draws all 41 looks lean
+    and whole, plate and close-up, 85/85 (also with five steps each, before the switch
+    to literal `false`), with controls (a gate the look uses taken out differs by 1329
+    bytes; Classic with Lacing up falls back to whole and matches).
+  - Numbers, Classic, three openings each, interleaved, one build: first step 8.11 s
+    (`lean=0`) → 5.57 s median; the display 6.18–6.62 s → 3.00–3.31 s; the opening now
+    ends on its compute kernels.
+  - The loading line: under the intro's mark, "Loading", "Starting the graphics",
+    "Compiling shaders n of N", "Pouring the first frame", each with the seconds, over a
+    stepped bar (`introStage`, `introQuiet`; `Quiet.progress`). Its words change only
+    when no render pipeline is compiling (`prepareProgress.rendering`): a new picture
+    then waits in the GPU process on a Mac. `npm run intro` 9c holds it (in order, counted
+    to the last, 0 changes in the render compiles, 45 settles held back). The plain
+    loading screen behind the intro (`main.tsx`'s `Loading`, what a slow download shows
+    once the intro gives way at 8 s) now carries the mark too (the owner, same day: "add
+    the logo to the loading screen").
+  Open: 14v-13 (the phone's own numbers), 14v-14 (lean flipped displays), 14v-15 (a slow
+  network), 14v-16 (moiré tests every look passes), 14v-17 ("rebuilding the plate…").
 
 ### 14m. Anyone on the venue's network can drive the show
 
