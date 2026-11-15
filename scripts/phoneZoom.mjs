@@ -21,7 +21,9 @@ export async function phoneZoomIn(page, tap, check) {
   const input = page.getByTestId('phone-zoom-slider').locator('input');
   const shown = (await input.count()) === 1;
   if (!shown) { check('the microscope opens the Macro Zoom', false, 'no Macro Zoom slider on the phone'); return; }
-  await input.fill(String(travelOfKey('macroZoom', 4)));
+  // On the slider's own 0.001 grid: a range input snaps any other value to it,
+  // and Playwright's fill calls the snapped value malformed (the Mac's first run).
+  await input.fill(travelOfKey('macroZoom', 4).toFixed(3));
   await page.waitForTimeout(300);
   const zoom = await page.evaluate(() => window.chromaglassDebug?.().settings?.macroZoom ?? null);
   // Focus back off the slider, so the fingers that follow are the plate's.
