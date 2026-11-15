@@ -1272,13 +1272,25 @@ const KNOB_CCS: Record<FactoryMapId, (s: MidiSource) => boolean> = {
  * The hardware comes from the map's own device first (a map made from a
  * factory map keeps its name, and a learn on top of it is on the same board),
  * then the port it is playing from. An endless encoder is a knob whatever the
- * board. On a board this does not know, an absolute CC stays a fader, which
- * is what every CC drew as before profiles named their knobs.
+ * board, and so is any CC on a board this does not know (PLAN 8d-1).
+ *
+ * That last rule was the other way round: an unknown board's absolute CCs
+ * drew as faders, because that is what every CC drew as before profiles named
+ * their knobs. The owner, 2026-11-14: Iridescence, learned to CC 16 on a board
+ * with no profile here, sat as a full-width slider above the Recipe's knob row
+ * while every control beside it was a knob, and read as the wrong kind of
+ * control. A binding cannot tell a pot from a fader, so on such a board the
+ * slider was a guess, and the guess that costs least is the panel's own
+ * control: a knob sits in the row with its neighbours, while a wrong slider
+ * takes a row of its own at the top of the panel. A fader is drawn as a slider
+ * only where a profile knows it is one. The Rides strip is unaffected: it
+ * draws every control as a fader whatever it is learned to.
  */
 export function controlKindOf(map: MidiMap | null | undefined, key: keyof VisualizerSettings, inputName?: string | null): 'fader' | 'encoder' | null {
   const b = map?.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);
   if (!b || b.source.kind !== 'cc') return null;
   if (b.mode === 'relative') return 'encoder';
   const board = factoryFor(map?.device) ?? factoryFor(inputName);
-  return board && KNOB_CCS[board.id](b.source) ? 'encoder' : 'fader';
+  if (!board) return 'encoder';
+  return KNOB_CCS[board.id](b.source) ? 'encoder' : 'fader';
 }
