@@ -119,7 +119,9 @@ export class FluidCore {
    * A bottle's liquid has been poured since the last clear (addLiquidDrop),
    * so `liquids0` and `liquids1` hold something for a step to act on
    * (stepLiquids, PLAN 15e-1). False on a plate of plain dye, which then
-   * runs neither of that pass's two dispatches.
+   * runs neither of that pass's two dispatches, and does not carry the two
+   * fields either (carryLiquids, PLAN 46g): addLiquidDrop is their one
+   * writer, and it is cleared where both halves of each pair are zeroed.
    */
   protected liquidsLive = false;
   protected boilFresh = false;
