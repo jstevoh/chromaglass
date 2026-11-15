@@ -11,7 +11,7 @@ import type { OutputConfig, WallTest } from '../../lib/outputConfig';
 import type { TempoLabel, TempoReading } from '../../lib/tempo';
 import type { OscOutLabel } from '../../lib/oscOut';
 import type { CartoonShelfProps } from '../CartoonShelf';
-import type { RoomCalibration } from '../../lib/audioCalibration';
+import type { EarView } from '../../hooks/useEarView';
 import type { EngineStatus } from '../../lib/platform';
 
 /*
@@ -35,8 +35,8 @@ export interface SettingsPanelProps {
   songDetection?: boolean;
   onSongDetection?: (on: boolean) => void;
   onUpdate: (settings: Partial<VisualizerSettings>) => void;
-  /** Live room-calibration readout, null when auto-calibration is off. */
-  calibration?: RoomCalibration | null;
+  /** The ear's ten-a-second view, for the room calibration's readout, which subscribes to it itself (PLAN.md 46f). */
+  earView?: EarView;
   onRecalibrate?: () => void;
   /** Flick a plate: spin it up and let the bed it rests on slow it down. */
   onFlickPlate?: (layer: number) => void;
@@ -175,7 +175,7 @@ export interface SettingsPanelProps {
   cartoons?: CartoonShelfProps;
 }
 
-export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'soundSources' | 'onFlickPlate' | 'cartoons'>
+export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'earView' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'soundSources' | 'onFlickPlate' | 'cartoons'>
   & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'pourName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
   & {
     filmInputRef: React.RefObject<HTMLInputElement | null>;
