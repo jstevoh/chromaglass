@@ -9464,7 +9464,10 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   dials once in; the side rail's Macro became a Macro Zoom slider in its place
   (`RailZoom.tsx`; without it the rail ended a Layers button in half at 430px, which `npm run
   layout` caught); the landing on the nearest liquid (QA-32) is on every zoom in, as it
-  already was for the slider and the pinch. The scan and the reading on today's main: 14
+  already was for the slider and the pinch, and now asks again at each press of + (it stood
+  at the first frame past 2x, so a pool at the 2.07x frame's edge kept it on the aim and the
+  4.3x frame was bare glass: `LAND_HOLD`, half a second held still past 2x; `npm run
+  closeupland -- --node` line 6d, 17/19 before, 19/19 after). The scan and the reading on today's main: 14
   of 16 lines (the flag at 1x read 4x; 16 Close-up presses in src/), 16 of 16 after. It
   also supersedes QA-32b (#707, the rail's Macro made the one press, and the readers that
   took 1x on a 4x flag look): the button is gone and the reading has no 4x left to miss.

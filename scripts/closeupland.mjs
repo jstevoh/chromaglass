@@ -188,6 +188,44 @@ if (process.argv.includes('--node')) {
       `the pool ${fx(r.off)} of a half-frame off the middle (under 0.333 wanted), the frame ${fx(r.share)} of the fullest's dye (0.5 wanted); at ${fx(shot.cx)}, ${fx(shot.cy)}`);
   }
 
+  // 6d. In by +, as the app's keys and the chip come in now the Close-up
+  // button is gone (QA-32c): 1.2x a press, three frames apart, to 4.3x. The
+  // pool sits a fifth of the plate from the aim, so the 2.07x frame still
+  // shows its edge and the 4.3x frame is bare: the landing that stood at
+  // the first frame past 2x stayed on the aim (the Mac's app half, 0.000 of
+  // the frame lit). And the control: the same presses stopped at 2.07x, the
+  // pool in that frame, stay on the aim, since there it is not bare.
+  {
+    const steps = (n) => Array.from({ length: n }, (_, k) => 1.2 ** (k + 1));
+    const edge = plate();
+    pour(edge, 0.3, 0.5);
+    const frameOn = (z) => {
+      const ex = spanX / z * 0.5 * SIZE, ey = spanY / z * 0.5 * SIZE;
+      let s = 0, n = 0;
+      for (let j = Math.floor(SIZE / 2 - ey); j <= Math.ceil(SIZE / 2 + ey); j++) for (let i = Math.floor(SIZE / 2 - ex); i <= Math.ceil(SIZE / 2 + ex); i++) { s += edge.density[j * SIZE + i]; n++; }
+      return s / n / plateMean(edge);
+    };
+    const at207 = frameOn(1.2 ** 4), at43 = frameOn(1.2 ** 7);
+    const press = (zooms, mode) => {
+      const cam = new MacroCamera(stream('plate.macro'));
+      let shot;
+      for (const z of zooms) for (let t = 0; t < 3; t++) shot = cam.update(edge, DT, { ...opts(mode), zoom: z });
+      for (let t = 0; t < 60; t++) shot = cam.update(edge, DT, { ...opts(mode), zoom: zooms[zooms.length - 1] });
+      return shot;
+    };
+    for (const mode of ['hold', 'follow']) {
+      const shot = press(steps(7), mode);
+      const r = read(edge, shot, 0.3, 0.5);
+      check(`${mode}, a zoom pressed in by + to 4.3x lands on the pool its 2.07x frame still showed`,
+        at207 >= BARE && at43 < BARE && r.off < 1 / 3,
+        `the frame on the aim holds ${fx(at207)} of the plate's average at 2.07x (${BARE} or more wanted: not bare) and ${fx(at43)} at 4.3x (under ${BARE}: bare); the pool ${fx(r.off)} of a 4x half-frame off the middle (under 0.333 wanted); at ${fx(shot.cx)}, ${fx(shot.cy)}`);
+    }
+    const stopped = press(steps(4), 'hold');
+    const miss = Math.hypot(stopped.cx - 0.5, stopped.cy - 0.5);
+    check('the control: the same presses stopped at 2.07x, the pool in the frame, stay on the aim', miss < 1e-6,
+      `the frame ${miss.toExponential(1)} of the plate from the aim (under 1e-6 wanted), the pool showing ${fx(at207)} of the plate's average there`);
+  }
+
   // 6c. A switch from Auto to Hold during the closeup is a hand on the
   // camera, not the closeup coming in: Hold goes to its aim, glass or not
   // (App writes the camera's centre into the aim as it switches, QA-12, so

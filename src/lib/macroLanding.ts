@@ -51,9 +51,23 @@ export const LAND_FULL_ZOOM = 2;
  * whenever its pool later flowed out of the frame, a cut in the middle of a
  * held shot minutes on (the review of this port measured it: Hold at 1.5x on
  * the middle for ten seconds, then across the plate in one frame). Long enough
- * for the zoom's own ease in, which is most of a second.
+ * for the zoom's own ease in, which is most of a second. Counted from the
+ * zoom's last rise, so a slow hand on the slider is not cut off half way in.
  */
 export const LAND_SECONDS = 1.5;
+/**
+ * How long a zoom past LAND_FULL_ZOOM must stop coming in before the landing
+ * stands, in seconds of liquid on the plate. With the Close-up button gone
+ * (PLAN QA-32c) the zoom is the only way in, and + comes in by steps of 1.2x
+ * (1.2, 1.44, 1.73, 2.07, 2.49, 2.99, 3.58, 4.3). The landing used to stand on
+ * the first frame at 2x or more, so at 2.07x a pool a sixth of the plate from
+ * the aim still showed at the frame's edge, the aim was not bare, and it
+ * stood: two presses on, the 2.99x frame was bare glass and stayed so to 4.3x
+ * (the Mac's `npm run closeupland` caught it, the frame 0.000 lit and the aim
+ * on 0.5, 0.5). Each rise of the zoom asks again; a zoom that has held still
+ * this long, a hand's pause between presses and more, has its answer.
+ */
+export const LAND_HOLD = 0.5;
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -161,18 +175,19 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
  * A closeup's landing: whether it still has to check that its aim shows any
  * liquid (`pending`, set as it comes in), and where it landed instead when it
  * did not (grid cells, NaN while it sits on its aim); how long it has asked
- * (`age`, seconds), and whether the place it settled on has been handed back
- * as the aim (`told`). Owned by the camera.
+ * since the zoom last came in further (`age`, seconds) and the zoom it asked
+ * at (`zoom`), and whether the place it settled on has been handed back as
+ * the aim (`told`). Owned by the camera.
  */
-export interface Landing { pending: boolean; x: number; y: number; age: number; told: boolean; out: { x: number; y: number } }
+export interface Landing { pending: boolean; x: number; y: number; age: number; zoom: number; told: boolean; out: { x: number; y: number } }
 
 export function newLanding(): Landing {
-  return { pending: true, x: NaN, y: NaN, age: 0, told: false, out: { x: 0, y: 0 } };
+  return { pending: true, x: NaN, y: NaN, age: 0, zoom: NaN, told: false, out: { x: 0, y: 0 } };
 }
 
 /** Coming in again (`pending` true), or a hand on the camera (false): either way, back on the aim. */
 export function clearLanding(l: Landing, pending: boolean): void {
-  l.pending = pending; l.x = NaN; l.y = NaN; l.age = 0; l.told = false;
+  l.pending = pending; l.x = NaN; l.y = NaN; l.age = 0; l.zoom = NaN; l.told = false;
 }
 
 /**
@@ -209,7 +224,9 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
   const plate = plateMean(field, margin);
   // An empty plate waits on the aim, still pending, for the first pour.
   if (!(plate > EMPTY_PLATE)) return false;
-  l.age += step;
+  // A zoom still coming in (the slider's ramp, + after +) is asked afresh.
+  if (!(frame.zoom <= l.zoom + 1e-3)) l.age = 0; else l.age += step;
+  l.zoom = frame.zoom;
   const { size } = field;
   const hx = clamp(frame.spanX / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
   const hy = clamp(frame.spanY / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
@@ -218,9 +235,10 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
     slider comes in from 1x a notch at a time, and at 1.01x the frame is nearly
     the whole plate and holds the plate's average: asked only then, it was
     never asked again, and the pinch went on into the bare middle (a ramp from
-    1.01x to 4x over a second ended on 0.5, 0.5). Fully in, the answer stands.
+    1.01x to 4x over a second ended on 0.5, 0.5). Fully in and held there
+    (LAND_HOLD), or parked short of it (LAND_SECONDS), the answer stands.
   */
-  if (frame.zoom >= LAND_FULL_ZOOM || l.age >= LAND_SECONDS) l.pending = false;
+  if (l.age >= (frame.zoom >= LAND_FULL_ZOOM ? LAND_HOLD : LAND_SECONDS)) l.pending = false;
   const had = Number.isFinite(l.x);
   const atX = Number.isFinite(followX) ? followX : had ? l.x : ax;
   const atY = Number.isFinite(followY) ? followY : had ? l.y : ay;
