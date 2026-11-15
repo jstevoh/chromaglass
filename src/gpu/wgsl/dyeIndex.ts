@@ -36,6 +36,19 @@ export const DYE_INDEX_WGSL = /* wgsl */ `
   Shortcut, named: one dn/dc for every dye, tartrazine's, scaled by each
   dye's absorbance; one index for all wavelengths, though near its band a dye
   bends red and blue differently (anomalous dispersion). PLAN 38u-17.
+
+  Stored past half floats (PLAN 38u-18). The derive pass writes the path
+  into .w of a half-float target, less clear water's 1.333, not the path
+  itself. A half float's step near 1.333 is about 1e-3, and a real dye
+  raises the path by about 1e-4: stored whole, a dye's edge rounded to
+  nothing on one texel and to a whole step, ten times its real size, on the
+  next, so at Dye Index Boost ×1 the wall out of focus saw a dye ten times
+  stronger than it is, in stairs (the check skeptic's reading: 0.44% of the
+  light at Focus 1, where the real index makes 0.04%). Near 0 a half float
+  steps by under 1e-7, so the dye's own rise is kept to a fraction of a
+  percent. Both readers are blind to the offset: defocusShadow takes a
+  Laplacian of .w, which a constant does not move, and the closeup divides
+  by max(1, .w) only on the camera's views, which write 0 there.
 */
 const DYE_DN_PER_ABSORBANCE: f32 = 1.78e-5;
 

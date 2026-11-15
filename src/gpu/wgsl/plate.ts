@@ -1268,7 +1268,7 @@ export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 */
 @group(0) @binding(4) var speciesSrc: texture_2d<f32>;
 
-// The plate's clear liquid: water, n 1.333 at 589 nm and room temperature.
+// Water, n 1.333 (589 nm, room temperature); .w holds the path less it (38u-18).
 const N_CLEAR: f32 = 1.333;
 
 fn viewProps(uv: vec2f) -> vec3f {
@@ -1392,20 +1392,6 @@ fn oplAt(dyeN: f32, uv: vec2f) -> f32 {
 
   let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
 
-  /*
-    .w carries the path less clear water's (PLAN 38u-18), not the path itself.
-    The texture is half floats, whose step near 1.333 is about 1e-3, and a
-    real dye raises the path by about 1e-4 (38u-10): stored whole, a dye's
-    edge rounded to nothing on one texel and to a whole step, ten times its
-    real size, on the next, so at Dye Index Boost ×1 the wall out of focus
-    saw a dye ten times stronger than it is, in stairs (the skeptic's
-    reading: 0.44% of the light at Focus 1, where the dye's real index makes
-    0.04%). Near 0 a half float steps by under 1e-7, so the dye's own rise
-    is kept to a fraction of a percent. Both readers are blind to the offset:
-    defocusShadow takes a Laplacian of .w, which a constant does not move,
-    and the closeup divides by max(1, .w) only on the camera's views, which
-    write 0 here (the branch above).
-  */
   return vec4f(g, lap, oC - N_CLEAR);
 }
 `;
