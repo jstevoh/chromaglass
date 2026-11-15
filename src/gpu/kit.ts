@@ -879,7 +879,25 @@ export class GpuProfiler {
   private readonly resolve: GPUBuffer | null;
   private readonly ring: ReadbackRing | null;
   private labels: string[] = [];
-  private pending: { buf: GPUBuffer; labels: string[] } | null = null;
+  private pending: GPUBuffer | null = null;
+  /**
+   * Each ring copy's pass labels, keyed by `ReadbackRing.issued` when the copy
+   * was encoded and read back against `ReadbackRing.landed` (H2c-labels).
+   *
+   * What was wrong: `afterSubmit` set `lastLabels` to the frame it had just
+   * handed to `collect`, while `ring.latest` held a copy that had landed one
+   * to three frames earlier. When the frame's pass list changed (camera,
+   * particles, finish, output, a projector's source), every pass after the
+   * change read its neighbour's timestamps for as long as the ring lagged, and
+   * `gpuFrameMs` jumped on the frame of the change rather than when the frame
+   * that ran the new pass came back (`npm run timelabels`, 133 readings off
+   * their pass across the five lag/stall runs, `gpuFrameMs` +30.0 % on the
+   * frame the camera turned on). Keyed by the copy's sequence number rather
+   * than the ring slot because `resolveInto` reuses a newly freed slot at the
+   * end of encoding before `afterSubmit` reads the data that slot just landed.
+   * Frames the ring dropped (`copyFrom` null) are simply untimed.
+   */
+  private readonly labelsBySeq = new Map<number, string[]>();
   /** Smoothed milliseconds per label. */
   readonly ms = new Map<string, number>();
   constructor(private readonly device: GPUDevice, disposer: Disposer, readonly enabled: boolean, readonly capacity = 32) {
@@ -909,18 +927,24 @@ export class GpuProfiler {
     if (!this.query || !this.resolve || !this.ring || !this.labels.length) { this.labels = []; return; }
     encoder.resolveQuerySet(this.query, 0, this.labels.length * 2, this.resolve, 0);
     const buf = this.ring.copyFrom(encoder, this.resolve);
-    this.pending = buf ? { buf, labels: this.labels } : null;
+    if (buf) this.labelsBySeq.set(this.ring.issued, this.labels);
+    this.pending = buf;
     this.labels = [];
   }
 
   /** After the submit: start the read, and fold in whatever frame last came back. */
   afterSubmit(): void {
-    if (this.pending && this.ring) { this.ring.collect(this.pending.buf); this.lastLabels = this.pending.labels; this.pending = null; }
+    if (this.pending && this.ring) { this.ring.collect(this.pending); this.pending = null; }
     const data = this.ring?.latest;
-    if (!data || !this.lastLabels.length) return;
+    const landed = this.ring?.landed ?? -1;
+    const labels = this.labelsBySeq.get(landed);
+    if (!data || !labels) return;
+    for (const seq of this.labelsBySeq.keys()) {
+      if (seq < landed) this.labelsBySeq.delete(seq);
+    }
     const t = new BigInt64Array(data);
     const seen = new Set<string>();
-    this.lastLabels.forEach((label, i) => {
+    labels.forEach((label, i) => {
       seen.add(label);
       const ms = Number(t[i * 2 + 1] - t[i * 2]) / 1e6;
       if (!(ms >= 0 && ms < 1000)) return;
@@ -947,7 +971,6 @@ export class GpuProfiler {
       if (!seen.has(label)) this.ms.set(label, prev * 0.9);
     }
   }
-  private lastLabels: string[] = [];
 }
 
 // ── Errors ───────────────────────────────────────────────────────────

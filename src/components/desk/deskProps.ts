@@ -56,7 +56,7 @@ export interface DeskProps {
    * The three that were screens of their own, as panels (`Sheet embed`):
    * the song shows, the sequences, and the music player with the drone.
    */
-  screens: { songs: ReactNode; sequences: ReactNode; player: ReactNode };
+  screens: { songs: ReactNode; sequences: ReactNode };
   /**
    * A settings section drawn whole, for a panel (`SettingsPanel embed`).
    * Not drawn while `sheetOpen`: the sheet has every section in the page, and

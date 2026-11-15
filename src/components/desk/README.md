@@ -32,3 +32,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 ## Checks
 
 `npm run panel` and `npm run desk`, layout at 1440, 1280 and 1024 wide in a browser, and `desklayout` (layouts and tabs, in node). The mixer's panel: `mixer`, `rowfade`. A new or changed setting: `panel`, `desk` and the `setting-auditor` agent. Every desk feature ships its phone version in the same PR.
+
+`DeskProps.screens` holds `songs` and `sequences`. The `player` screen (Music & Drone) is
+the top of the Sound section since PLAN 35c-7, and its id is in `MERGED_SECTIONS`
+(`lib/settingsMap.ts`), so a saved layout with it opens Sound.

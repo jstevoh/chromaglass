@@ -106,6 +106,9 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
         if (VALID_ROW_BLEND.has(value)) (out as Record<string, unknown>)[key] = value;
       } else if (key === 'paperA' || key === 'paperB' || key === 'ledColor' || key === 'clearFilmDyeColor') {
         if (HEX_COLOR_REGEX.test(value)) (out as Record<string, unknown>)[key] = value;
+      } else if (key === 'inkTitleColor') {
+        // '' is the look's own first colour (PLAN 37x-10), else a colour.
+        if (value === '' || HEX_COLOR_REGEX.test(value)) out.inkTitleColor = value;
       } else if (key === 'mixOrder') {
         if (value.length <= 64 && /^[a-z ]+$/.test(value)) out.mixOrder = value;
       } else if (key === 'renderStyle') {

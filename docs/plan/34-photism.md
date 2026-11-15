@@ -134,6 +134,12 @@ a grid of generic stock thumbnails: ours are the plate itself.
     another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
     Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
+- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
+  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
+  - **34a-8a. The films themselves on the page.** The link sends a visitor away to watch; the six
+    public films (PR #729's ids in `siteFilms`) could play on the page itself, a card per look, once
+    #679's cards are on main. Until then the channel link is the only way to see a look move.
+
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

@@ -1,0 +1,94 @@
+name: Apple TV app
+
+# The Apple TV app (PLAN.md 12-tv-apple, tvos/): its video link over real WebRTC, and the
+# app itself built for the tvOS simulator, unsigned.
+#
+# `npm run tvswift` (the core: sign-in against the Worker, the receiver's rules) runs on
+# Linux in Measure's logic shard. What is here needs a Mac: LiveKit's WebRTC comes as an
+# xcframework, which only Apple's linker takes, and the app needs Xcode's tvOS SDK.
+#
+# Its own workflow, not a shard of checks.yml, for the reason ios.yml gives: deploy.yml
+# calls checks.yml, and the website should not wait on, or be stopped by, a TV app's
+# build. It runs only when something the TV app is made from changes. The WebRTC binary
+# is 686 MB; the cache below keeps it between runs, keyed on the version pinned in
+# tvos/Video/Package.resolved.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tvos/**'
+      - 'scripts/tvvideo.mjs'
+      - 'scripts/chromium.mjs'
+      - '.github/workflows/tvos.yml'
+
+concurrency:
+  group: tvos-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  video:
+    name: Apple TV video link (WebRTC)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: tvos-swiftpm-${{ hashFiles('tvos/Video/Package.resolved') }}
+      # SwiftPM's own download of the 686 MB zip ran at a few hundred KB a second on the
+      # owner's Mac and stalled more than once; curl with retries fetched the same file in
+      # under two minutes. The resolve is tried three times, as ios.yml tries its own.
+      - name: Resolve the video link's packages
+        working-directory: tvos/Video
+        run: |
+          for attempt in 1 2 3; do
+            if swift package resolve; then exit 0; fi
+            echo "::warning::Swift packages failed to resolve (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
+      - run: npm run tvvideo
+
+  app:
+    name: Apple TV app (simulator build)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/spm-cache
+          key: tvos-app-spm-${{ hashFiles('tvos/Video/Package.resolved', 'tvos/Package.resolved') }}
+      # Xcode 15 and later ship the tvOS platform as a separate download; an image that
+      # has Xcode without it gets it here, rather than failing inside xcodebuild.
+      - name: tvOS SDK
+        run: |
+          xcodebuild -version
+          if ! xcodebuild -showsdks | grep -q appletvsimulator; then
+            xcodebuild -downloadPlatform tvOS
+          fi
+          xcodebuild -showsdks | grep appletv
+      - name: Make the Xcode project
+        working-directory: tvos/App
+        run: |
+          brew install xcodegen
+          cp Local.xcconfig.example Local.xcconfig
+          xcodegen generate
+      - name: Build the app
+        working-directory: tvos/App
+        run: >
+          xcodebuild -project ChromaGlassTV.xcodeproj -scheme ChromaGlassTV
+          -configuration Debug -destination 'generic/platform=tvOS Simulator'
+          -packageCachePath "$RUNNER_TEMP/spm-cache"
+          CODE_SIGNING_ALLOWED=NO build

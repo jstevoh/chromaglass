@@ -217,6 +217,23 @@ const report = (fatalMsg, extra = {}) => ({
   check(`one address gets ${RATE_PER_HOUR} an hour, then 429`, oks === RATE_PER_HOUR && statuses.slice(RATE_PER_HOUR).every((s) => s === 429), statuses.join(','));
   check('another address is not held up by it', (await post(env, report('x', { screenshot: null }), { ip: '203.0.113.10' })).status === 200);
 }
+// The limit by /64 and at no cost in KV writes (docs/crash-plan.md; the security review of 2026-11-13):
+// a sender walking the low bits of one IPv6 block had no limit, and the counter's own KV write spent
+// the account's 1000 a day, shared with the licence Worker. So: a rotating /64 is one sender, the
+// writes are only each kept report's own index entry, and a 1.5 MB body is refused.
+{
+  const env = makeEnv();
+  let writes = 0;
+  const put = env.REPORT_INDEX.put.bind(env.REPORT_INDEX);
+  env.REPORT_INDEX.put = async (k, ...rest) => { writes++; if (!k.startsWith('idx:')) writes += 1000; return put(k, ...rest); };
+  const statuses = [];
+  for (let i = 0; i < RATE_PER_HOUR + 5; i++) statuses.push((await post(env, report('x', { screenshot: null }), { ip: `2001:db8:5:6:${(i + 1).toString(16)}::1` })).status);
+  const oks = statuses.filter((s) => s === 200).length;
+  const big = await post(env, report('x', { pad: 'x'.repeat(1536 * 1024) }), { ip: '203.0.113.77' });
+  check(`addresses walking one /64 share its ${RATE_PER_HOUR} an hour, a kept report writes only its index entry, and a 1.5 MB body is refused`,
+    oks === RATE_PER_HOUR && statuses.slice(RATE_PER_HOUR).every((s) => s === 429) && writes === oks && big.status === 413,
+    `${oks} kept, then ${[...new Set(statuses.slice(RATE_PER_HOUR))].join(',')}; ${writes} KV writes; 1.5 MB ${big.status}`);
+}
 
 // ── 6. The cron ──
 {

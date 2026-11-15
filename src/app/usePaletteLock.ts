@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, type RefObject } from 'react';
 import { COLOR_HARMONIES } from '../constants';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
+import { publishPalette, setPaletteDoor } from './deskNow';
 
 /**
  * The palette lock: a colour harmony held across looks and the sequencer, so
@@ -35,6 +36,10 @@ export function usePaletteLock({
     if (paletteLock != null) visualizerRef.current?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The owner's assistant locks it through the same call as the palette picker (PLAN 44k-16, app/deskNow.ts).
+  useEffect(() => { publishPalette(paletteLock); }, [paletteLock]);
+  useEffect(() => { setPaletteDoor(selectPalette); return () => setPaletteDoor(null); }, [selectPalette]);
 
   return {
     paletteLock, selectPalette,

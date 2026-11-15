@@ -19,6 +19,8 @@
  *      upward buoyancy on an upright plate while heavy wax sinks, and level plate has zero
  *   8. Per-channel spectral absorption: dark dye absorbs significantly more heat than pale dye
  *      of equal volume/density (Beer-Lambert decode via lampThrough)
+ *   9. The heat rides the liquid on a thin gap (PLAN 38f): a warm heavy blob sinking down a
+ *      standing plate takes its heat with its colour (carryHeat)
  */
 import { openLab } from './lab.mjs';
 
@@ -291,6 +293,64 @@ try {
     `dark dye ${spectralHeating.tempDark.toFixed(4)} K, pale dye ${spectralHeating.tempPale.toFixed(4)} K, ratio ${spectralHeating.ratio.toFixed(2)} (total density alone would give 1.00x)`
   );
 
+  // ── 9: The heat rides the liquid on a thin gap (PLAN 38f) ──
+  /*
+    A thin gap never self-advects the velocity, and the temperature lives in
+    its z, so until 38f the lamp's heat stayed in the cell it was laid in
+    while the flow moved the liquid out from under it: Lava Lamp's warmed wax
+    rose out of its own heat. Here a heavy dyed blob, a little warm, sinks
+    down a standing plate by its own weight, and its heat has to go down
+    with it, as far: the line asks the heat's centre to follow the colour's
+    to within a fifth of the distance, where without the carry the heat
+    stays where it was laid (a shift of 0). No lamp and no cooling, so the
+    heat in the dish is kept too: Heat Decay 1, the lamp dimmed, and the blob
+    laid in the lower half (0.40, its top at 0.48), where a standing plate's
+    glass rides the warm liquid, not in the upper half, whose cool glass
+    takes the heat (PLAN 27f-9e: laid at 0.62 it kept 69.6% of its heat
+    there, the cooling working, not the carry failing). The blob is barely warm (half a unit), so
+    its heat's lift is small beside its colour's weight. Measured with the
+    carry switched off: colour -2.82 cells, heat 0.00.
+  */
+  const rides = await page.evaluate(async () => {
+    const N = 128;
+    const over = { thinGap: 1, gapThickness: 0.45, plateUpright: 1, gravityX: 0, gravityY: -1, solutalBuoyancy: 0.5,
+      dimmer: 0, heatDecay: 1, currentBuoy: 0, dt: 1 / 60 };
+    const inDish = (i, j) => ((i + 0.5) / N - 0.5) ** 2 + ((j + 0.5) / N - 0.5) ** 2 < 0.45 * 0.45;
+    const gapAt = (sq, i, j) => sq.gap[Math.floor(j * sq.n / N) * sq.n + Math.floor(i * sq.n / N)];
+    const heatOf = (v, sq) => {
+      let h = 0, hy = 0;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        if (!inDish(i, j)) continue;
+        const t = v[(j * N + i) * 4 + 2] * gapAt(sq, i, j);
+        h += t; hy += t * (j + 0.5) / N;
+      }
+      return { h, y: hy / Math.max(h, 1e-9) };
+    };
+    const dyeY = (d) => {
+      let a = 0, ay = 0;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const w = d[(j * N + i) * 4 + 3]; a += w; ay += w * (j + 0.5) / N; }
+      return ay / Math.max(a, 1e-9);
+    };
+    // The sealed bottle's kernels first, as the app builds them before a standing plate (PLAN 27f-9).
+    await lab.create(N, N);
+    for (let k = 0; k < 40 && !lab.solver().sealReady(); k++) await new Promise((q) => setTimeout(q, 250));
+    lab.dye(0.5, 0.40, 0.08, [1, 1, 1], 1.0);
+    lab.vel(0.5, 0.40, 0.08, [0, 0, 0.5, 0]);
+    lab.flush();
+    await lab.step(1, over);
+    const dye0 = dyeY(await lab.field('dye'));
+    const heat0 = heatOf(await lab.field('vel'), await lab.squeeze());
+    await lab.step(90, over);
+    const dye1 = dyeY(await lab.field('dye'));
+    const heat1 = heatOf(await lab.field('vel'), await lab.squeeze());
+    return { dyeShift: (dye1 - dye0) * N, heatShift: (heat1.y - heat0.y) * N, kept: heat1.h / heat0.h };
+  });
+
+  check(
+    'the heat rides the liquid on a thin gap: a sinking warm blob takes its heat down with its colour (PLAN 38f)',
+    rides.dyeShift < -1 && rides.heatShift < 0.8 * rides.dyeShift && rides.heatShift > 1.2 * rides.dyeShift && Math.abs(rides.kept - 1) < 0.03,
+    `colour moved ${rides.dyeShift.toFixed(2)} cells, heat ${rides.heatShift.toFixed(2)} (0 without the carry), heat kept ${(rides.kept * 100).toFixed(1)}%`
+  );
   check('no GPU pass failed validation', gpuErrors.length === 0, gpuErrors.join(', '));
 } finally {
   await close();

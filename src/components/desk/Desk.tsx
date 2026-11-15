@@ -47,7 +47,7 @@ import type { DeskProps } from './deskProps';
  */
 const DECK_H = { knobs: 268, other: 236 } as const;
 const STRIP_H = 36;
-const SCREENS = new Set(['songs', 'sequences', 'player']);
+const SCREENS = new Set(['songs', 'sequences']);
 const COLUMN_W = { left: LEFT_WIDTH, right: RIDES_WIDTH } as const;
 /**
  * A side column: as wide as the widest panel in it asks (`columnWidth`), at

@@ -89,6 +89,15 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     Check written first (2026-11-08): `npm run deskreach` lines `deckmark` (the deck's mark at its
     right edge, 1280 px past it on main at 1440) and `macro` (the Macro panel wholly on the screen at
     1440×900, unscrolled; main draws it at x 1874), owed.
+- ~~**35c-7** One page for sound.~~ **Shipped** 2026-11-10 (the owner: "I don't understand why
+  there are two sound settings pages - can we put these all together and simplify things?"). The
+  Sound sheet (the desk's Music & Drone panel) is the top of Settings → Sound: the sources, the Mic's
+  input under the Mic, the shelf, the player and the drone, then what the sound does to the plate,
+  the beat and the songs. No sheet, no second panel, no "Change in Sound…". Story in
+  `docs/plan-shipped.md` §35c-7. Left from it:
+  - **35c-7a** The phone's Sound sheet has no System audio tile and no Input picker: on a phone
+    neither exists to pick (a tab picker, one microphone), but an iPad on a USB interface has
+    inputs. Judge on a tablet whether its Sound sheet wants the Input picker.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

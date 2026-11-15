@@ -31,6 +31,13 @@
  *      `bands`, `hits`), and the three looks written as the pattern for the
  *      rest (Cyberpunk, Aurora Borealis, Lava Lamp) each have two or three,
  *      into the liquid and never onto a dial that moves the whole frame.
+ *      The music's stir is counted apart (PLAN 38u-4, 38u-5): every look
+ *      also carries one cord from the sound's mids onto Turbulence, which is
+ *      not a new answer on the wall but the stir the solver's step used to
+ *      take from the analyser with no cord at all, now listed where it can
+ *      be turned and pulled. A look has at most one, and `npm run musicstir`
+ *      holds its depth; the two or three here are the look's own answers to
+ *      the drums and the notes, as they were.
  *   3. The hits (lib/hitSource.ts), on a song whose drums are known to the
  *      sample (`scripts/arrangement.mjs`, as `npm run shape` uses), heard the
  *      way the show's loop hears them:
@@ -58,6 +65,7 @@ import { SoundLearn } from '../src/lib/soundLearn.ts';
 import { parseMidiMap, serializeMidiMap, MIDI_FORMAT, MUSIC_SOURCES } from '../src/lib/midi.ts';
 import { MODULATOR_FEATURES } from '../src/lib/modulators.ts';
 import { FRAME_MOTION } from '../src/lib/drift.ts';
+import { isStirCord } from '../src/lib/stir.ts';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { arrange, SR } from './arrangement.mjs';
@@ -142,9 +150,11 @@ for (const p of PRESETS) for (const m of p.settings.sceneMappings ?? []) {
   const src = m.source ?? 'room';
   if (!FAST.has(src) && !NOT_SOUND.has(src)) slow.push(`${p.id} ${src}:${m.feature}`);
 }
+// A look's own answers: its cords less the music's stir, which every look carries and `npm run musicstir` holds.
+const answers = (p) => (p?.settings.sceneMappings ?? []).filter((m) => !isStirCord(m));
 const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp', 'poster-1969'];
 const pattern = PATTERN.map((id) => {
-  const ms = PRESETS.find((p) => p.id === id)?.settings.sceneMappings ?? [];
+  const ms = answers(PRESETS.find((p) => p.id === id));
   return { id, n: ms.length, ok: ms.length >= 2 && ms.length <= 3 && ms.every((m) => FAST.has(m.source) && !FRAME_MOTION.has(m.setting)),
     says: ms.map((m) => `${m.source}:${m.feature} on ${m.setting} ${m.depth}`).join(', ') };
 });
@@ -161,7 +171,9 @@ const missing28i = [];
 for (const p of PRESETS) {
   if (REBUILT_25H.has(p.id)) continue;
   const areas = plateAreas(p.id);
-  const sm = (p.settings.sceneMappings ?? []).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
+  const stirs = (p.settings.sceneMappings ?? []).filter(isStirCord).length;
+  if (stirs > 1) missing28i.push(`${p.id}: ${stirs} cords for the music's stir`);
+  const sm = answers(p).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
   const platePatches = sm.filter((m) => !isAreaCord(m) && isFastReading(m) && !FRAME_MOTION.has(m.setting));
   const areaCords = sm.filter((m) => isAreaCord(m) && Boolean(areas?.[m.area]) && isFastReading(m));
   const total = platePatches.length + areaCords.length;
@@ -173,7 +185,7 @@ for (const p of PRESETS) {
     if (FRAME_MOTION.has(m.setting)) missing28i.push(`${p.id}: ${m.setting} moves the frame`);
   }
 }
-check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only (PLAN 28i-3b)',
+check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only, and at most one cord for the music\'s stir beside them (PLAN 28i-3b, 38u-5)',
   missing28i.length === 0, missing28i.join('; ') || `${PRESETS.length - REBUILT_25H.size} looks checked (+ 3 from 25h)`);
 
 // ── 3. The hits ─────────────────────────────────────────────────────────────

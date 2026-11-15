@@ -146,21 +146,36 @@ Marangoni plug flow: transport the surfactant's surface concentration Γ and let
 push the film, which is what makes the film inextensible in the first place. Stiff (wave speed
 about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carries it.
 
-## 32d. On the plate
+## ~~32d. On the plate~~ — **Shipped** (the look Soap Film, settings `soapFilm`, `soapFilmRate`, `soapFilmAngle`; `src/gpu/soapFilmPlate.ts`, `src/gpu/soapFrame.ts`, `src/gpu/wgsl/soapFilmPlate.ts`, `soapFilmOver` in `src/gpu/wgsl/plateThinFilm.ts`; `npm run soapplate` 13/13; story in `docs/plan-shipped.md` §32d)
 
-A "Soap Film" look: the film's reflected colour on a dark ground, a time-compression rate
-(named shortcut b) and a viewing angle, all settings with MIDI and the desks, default off
-so every existing preset looks as it did today (`setting-auditor`). The film hangs under
-its own gravity only: the sound may brighten or push it by its fast readings (hits, bands,
-onsets) but never move it as a whole (frameSway stays 0), and the preset's sound patch uses
-no song shape. *Measure:* `panel`, `desk`, `lampzero`, a `look` render against the
-photograph, and a new lab check that the setting at 0 is the plate to the bit.
+- **32d-1. The film's air is the plate's flow (named shortcut).** The film is dragged by the
+  air over it in the overdamped limit (wgsl/soapFilmPlate.ts says why that is the law), and the
+  air is taken to be the plate's own flow, `velForced`: there is no air solver over the frame.
+  The honest form is an air layer of its own, stirred by Blow, the hands and the sound, whose
+  drag on the film's two faces (ζ_air from the air's boundary layer) is the push. *Measure:*
+  `soapplate`'s air lines with the air layer in place of the plate's flow.
+- **32d-2. The re-dip lays a profile, not a pull.** A drained film (mean under 160 nm) is
+  drawn again top first over two seconds with Mysels' √z profile from 350 to 750 nm and
+  patches 6 mm across. A real dip bursts the old film first, and the fresh film's thickness is
+  Frankel's at the speed the frame is pulled (1.34 ℓ_c Ca^(2/3)), thinning by gravity as it
+  rises. Make the pull speed the dial and the profile its result; a burst (the black film's
+  rupture opening from a spot, Culick's rim at √(2σ/ρh)) before it. *Measure:* `soapplate`'s
+  re-dip lines, and the profile against Frankel at two pull speeds.
+- **32d-3. The sound reaches the film only through the plate's flow.** Kicks open soap on the
+  plate (the look's `surfactantFlow` patch), whose Marangoni flow is the film's air. A drop of
+  solution landing on the film (thickening it where it lands, the way soap-film painters
+  work) would be the film's own answer to a hit. *Measure:* a kick thickens the film where it
+  lands, and the film's total grows by the drop.
+- **32d-4. The film's cost on Metal.** The solver's setup, projection and transport are single
+  workgroups over the film's 128² (2.4 ms a step at 256² on Metal, 32c); one film step per
+  solver step. Measure it on the Mac (`npm run soapplate` prints nothing of the Mac's) and,
+  if it shows in the frame, split those passes across workgroups (H2c's pattern).
+- **32d-5. The plate's dye under the film is the old look's.** Soap Film still seeds and pours
+  a faint dye (Dye Budget 0.3) that shows through the film's black and its thin orders. A real
+  frame has nothing behind it but the dark ground; decide with the owner whether the dye stays
+  as a colour under the film or goes.
 
-## 32e. The phone
-
-Every feature ships its phone version in the same PR as the feature: 32d's controls on the
-phone and the iPad, the film on the wall through Send to wall. *Measure:* `phone`,
-`draftwall`, `layout`.
+## ~~32e. The phone~~ — **Shipped with 32d** (Soap Film, Drain Rate and Film Angle on the phone's remote, `RemoteControl.tsx`, as on the desk; `npm run phone` 366/366, `layout` 86/86)
 
 *Not doing now:* a thickness that follows the dye (the film is its own medium; mixing it
 with the pigment's opacity is 18k's old shortcut, and the reason for this section), Marangoni

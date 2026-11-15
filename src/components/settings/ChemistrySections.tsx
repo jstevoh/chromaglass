@@ -214,6 +214,16 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ filmHold: v })}
           settingKey="filmHold"
         />
+        {/* How heavy the oil is against the water (PLAN 27f-9c): it acts on a standing plate (Gravity), where a heavy oil is a lava lamp's wax. */}
+        <Slider
+          label="Oil Weight"
+          value={settings.oilWeight ?? -0.05}
+          min={-1}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilWeight: v })}
+          settingKey="oilWeight"
+        />
         <Slider
           label="Soap Bursts"
           value={settings.surfactantFlow ?? 0}

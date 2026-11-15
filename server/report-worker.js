@@ -21,7 +21,6 @@
 //                      digests/YYYY-MM-DD.json        the cron's output
 //   KV  REPORT_INDEX   idx:YYYY-MM-DD:<id>   a few hundred bytes per report: when,
 //                                           where, which browser, the line, the note
-//                      rl:<ip>:<hour>        the rate limit's counter
 //
 // The index is what makes a digest cheap: grouping a day reads one small KV
 // value per report instead of every report's 10–150 kB from R2.
@@ -46,10 +45,18 @@ const ALLOWED_ORIGINS = [
 ];
 
 const KIND = 'chromaglass-crash-report';
-/** A report is ~10 kB without the picture and the JPEG is 25–150 kB as base64. */
-export const MAX_BYTES = 4 * 1024 * 1024;
+import { ipKey, takeMemoryTurn } from './turns.js';
+
+/**
+ * A report is ~10 kB without the picture and the JPEG is 25–150 kB as base64. 1 MB, not 4
+ * (docs/crash-plan.md, the security review of 2026-11-13): every byte past that was R2
+ * storage a stranger could fill.
+ */
+export const MAX_BYTES = 1024 * 1024;
 /** Reports per IP per hour. A person who crashes thirty times an hour has told us already. */
 export const RATE_PER_HOUR = 30;
+/** Reports an hour from everyone, per isolate: a spread-out flood's ceiling (see underLimit). */
+export const ALL_PER_HOUR = 120;
 /** How far back /digest will look. */
 const MAX_DAYS = 31;
 /** Index records live a little longer than the longest digest. */
@@ -293,19 +300,23 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-/**
- * A counter per IP per clock hour, in KV with a TTL. KV is eventually
- * consistent, so a burst from one address can get a few past the limit before
- * the count catches up; that is fine for what this is for — keeping a script
- * from filling the bucket — and it costs one read and one write a report.
- */
+/*
+  The hourly limit, in the isolate's memory (server/turns.js), by /64 for IPv6.
+  It was a KV counter per full address (docs/crash-plan.md, the security review
+  of 2026-11-13): an IPv6 sender rotating its low bits had no limit at all, and
+  the counter's own write spent the Cloudflare account's KV writes, 1000 a day
+  on the free plan and shared with the licence Worker, so about 500 junk posts
+  stopped every report and every paid order's filing for the rest of the day.
+  Counted in memory it writes nothing, and the everyone-cap bounds a sender
+  spread over many blocks to what one isolate takes in an hour. The price,
+  accepted: four or so /64s sending junk fill that cap, and real reports
+  reaching the same isolate are refused (429) for the rest of the hour. The
+  page keeps a refused report to send again, and a crash is rarely so urgent
+  that an hour matters; R2 filling without end was the worse outcome.
+*/
 async function underLimit(env, ip) {
-  const hour = Math.floor(Date.now() / 3600000);
-  const key = `rl:${ip}:${hour}`;
-  const n = Number(await env.REPORT_INDEX.get(key)) || 0;
-  if (n >= RATE_PER_HOUR) return false;
-  await env.REPORT_INDEX.put(key, String(n + 1), { expirationTtl: 3700 });
-  return true;
+  if (takeMemoryTurn('report', ipKey(ip), RATE_PER_HOUR)) return false;
+  return !takeMemoryTurn('report-all', 'all', Number(env.ALL_PER_HOUR) || ALL_PER_HOUR);
 }
 
 /** The body as text, or null the moment it passes `max` bytes. */
