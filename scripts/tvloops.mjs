@@ -177,6 +177,23 @@ const tvH264 = ['-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-maxrate', 
  * film from WARM, its first SEAM seconds crossfaded from the film's own
  * seconds after WARM + L. seam 0 is the plain cut, for the controls.
  */
+/*
+  The crossfade's weight eased (smoothstep, 3P² − 2P³ of the tail at progress
+  P, which xfade runs from 1 at the loop's first frame to 0), not the straight
+  ramp of xfade's own "fade". Measured on the owner's Mac with the straight
+  ramp (Classic, a 5 s fade on 2026-11-15, losslessly against the raw): every
+  frame of the fade steps by the film's motion plus 1/150 of the difference
+  between the tail and the film, about 0.3 against the film's own 0.06; the
+  step out of the fade into the film alone read 0.65, two of those shares,
+  and on Aurora Borealis's half hour 3.8 times the fade's median step, which
+  the joint line failed. However many shares the ramp's last frame is short
+  by, a step of a share is there at the joint, because the ramp's slope does
+  not go to nothing at its end. The eased weight's slope is nothing at both
+  ends, so the fade leaves the film as smoothly as it leaves the tail at the
+  seam, and a frame's error at the end is (k/N)² of the difference, not k/N.
+*/
+const EASED_FADE = "transition=custom:expr='st(0,P*P*(3-2*P));A*ld(0)+B*(1-ld(0))'";
+
 function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew = 0 }) {
   const t = (s) => s.toFixed(6);
   const n = (s) => Math.round(s * FPS);
@@ -187,7 +204,7 @@ function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew
   /*
     ffmpeg's own crossfade, xfade, over the film's tail (input 0) and the film
     from WARM (input 1): the tail whole at the loop's first frame, the film
-    whole from frame SEAM·fps on, a straight ramp between. Not blend with a
+    whole from frame SEAM·fps on, an eased ramp between (EASED_FADE). Not blend with a
     weight written by hand: on the owner's Mac (Classic, 2026-11-15) blend
     weighted by T/seam left the fade's last frames still carrying the tail
     and the step out of the fade read 4 to 10 keyframe steps on four of the
@@ -207,10 +224,10 @@ function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew
   } else if (skew) {
     inputs.push('-ss', t(warm), '-t', t(seam), '-i', raw, '-ss', t(warm + seam + skew), '-t', t(loop - seam), '-i', raw);
     graph = `${piece(0, n(seam), 'a')};${piece(1, n(seam), 'b')};${piece(2, n(loop - seam), 'c')};[b][c]concat=n=2:v=1:a=0,setpts=N/${FPS}/TB,settb=1/${FPS}[h];` +
-      `[a][h]xfade=transition=fade:duration=${seam}:offset=0,format=yuv420p[v]`;
+      `[a][h]xfade=${EASED_FADE}:duration=${seam}:offset=0,format=yuv420p[v]`;
   } else {
     inputs.push('-ss', t(warm), '-t', t(loop), '-i', raw);
-    graph = `${piece(0, n(seam), 'a')};${piece(1, n(loop), 'h')};[a][h]xfade=transition=fade:duration=${seam}:offset=0,format=yuv420p[v]`;
+    graph = `${piece(0, n(seam), 'a')};${piece(1, n(loop), 'h')};[a][h]xfade=${EASED_FADE}:duration=${seam}:offset=0,format=yuv420p[v]`;
   }
   const inputCount = inputs.filter((x) => x === '-i').length;
   const a = audio ? ['-f', 'lavfi', '-t', t(loop), '-i', 'anullsrc=r=48000:cl=stereo'] : [];
@@ -474,10 +491,14 @@ async function makeAll() {
 
     const t1 = Date.now();
     makeLoop(raw, out, { warm: WARM_S, loop: LOOP_S, seam: SEAM_S });
-    if (!KEEP_RAW && !FROM_RAW) fs.rmSync(raw);
     const loopMin = (Date.now() - t1) / 60000;
     const j = judge(out, LOOP_S, SEAM_S);
     const l = report(loop.id, j, LOOP_S);
+    // The render is the half hour's cost and the cut is minutes, so a loop the
+    // judge fails keeps its render (cut again with --from-raw once the cut is
+    // fixed); on 2026-11-15 four renders were lost to a cut's fault this way.
+    if (!KEEP_RAW && !FROM_RAW && Object.values(l).every(Boolean)) fs.rmSync(raw);
+    else if (!FROM_RAW) console.log(`  ${loop.id}: the render is kept at ${raw}`);
     // Previews for the judging page: the half hour in a minute, fifteen seconds as it plays, a still.
     const step = Math.max(1, Math.round(LOOP_S / 60));
     ff(['-i', out, '-vf', `select='not(mod(n\\,${step * FPS}))',setpts=N/${FPS}/TB,scale=960:540:flags=lanczos`, '-an', '-c:v', 'libx264', '-crf', '24', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path.join(OUT, `${loop.id}-preview.mp4`)]);
