@@ -2775,19 +2775,23 @@ only seen here.
 5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
 6. Glitter and Side Light at 0 on any look: the look exactly as before.
 
-## 130. Your own video: played, poured, read and framed (PLAN 14ag)
+## 130. The closeup with nothing drawn over it (PLAN 38u-1, 38u-2, 38u-3)
 
-Load a video of your own in the Video panel (on the Perform tab's deck, or Settings → Video):
-Video file. Its row shows Play and Pour.
+**Judged 2026-11-13.** The owner watched the before and after films from their Mac (Macro Bead, Cell Bloom, Classic at 5x) the same day: "looks good". Seen in both films and older than this change: the beads' scalloped rims (38h-17) and grid steps where dye is freshly poured at 5x (the fine detail's, section 47).
 
-1. **Pour** while it plays: both lit, the picture through the dye and poured into it at once.
-2. **Video Zoom** at 0.5 with a 16:9 clip: the whole frame, smaller, with no picture round it
-   and no smeared edge. At 2, pushed in. **Across** and **Up** slide it; **Fit** puts it back.
-   Try a portrait phone clip and a 4:3 reel: can you frame each where it reads?
-3. **Film Drive** at about 0.5 with the film off and only the pour running: does the poured
-   footage stir the dish it pours into?
-4. Bad: Play or Pour that does not start, a zoomed-out frame with a stretched border, a drive
-   that does nothing with only the pour on.
+The check (`npm run stillcloseup`) proves a still plate draws a still closeup, that no shadow
+falls to one side of a pool and that Depth / Focus only defocuses, in the lab at one frame.
+Whether the closeup still reads as deep and wet without the drawn shadow is only seen here.
+
+1. Macro Bead, Cell Bloom and any look with Close-up on, at 4x to 6x. Good: pool and drop
+   edges are smooth curves that hold still when the liquid does; the clear ground is an even
+   light with no paper grain; depth reads from the soft surround and the relief's light and
+   dark along slopes. Bad: the closeup reads flat, like a sticker, with nothing to say which
+   liquid is over which.
+2. Before 38h-17 merges, the oil beads' own outline is still scalloped (their mask's grid);
+   that is its PR's, not this one's.
+3. A bubble in the closeup at Iridescence 1, the plate left alone: its colours hold. Stir
+   beside it: they shift as it moves.
 
 ## 131. The music stirs the liquid through a cord (PLAN 38u-4, 38u-5)
 
@@ -2825,3 +2829,17 @@ at one frame. Whether the looks read better without the line is only seen here.
    Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
 5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
    at the dye's edges strengthen.
+
+## 133. Your own video: played, poured, read and framed (PLAN 14ag)
+
+Load a video of your own in the Video panel (on the Perform tab's deck, or Settings → Video):
+Video file. Its row shows Play and Pour.
+
+1. **Pour** while it plays: both lit, the picture through the dye and poured into it at once.
+2. **Video Zoom** at 0.5 with a 16:9 clip: the whole frame, smaller, with no picture round it
+   and no smeared edge. At 2, pushed in. **Across** and **Up** slide it; **Fit** puts it back.
+   Try a portrait phone clip and a 4:3 reel: can you frame each where it reads?
+3. **Film Drive** at about 0.5 with the film off and only the pour running: does the poured
+   footage stir the dish it pours into?
+4. Bad: Play or Pour that does not start, a zoomed-out frame with a stretched border, a drive
+   that does nothing with only the pour on.

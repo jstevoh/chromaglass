@@ -27,7 +27,8 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 - `RecordControls.tsx`: the one Record button.
 - `SaveLookSheet.tsx`: save a look, tied to a song.
 - `tools.ts`: `DESK_TOOLS`, tools and their letters.
-- `Desk.tsx`, `deskProps.ts`, `DeskPanels.tsx`, `DeskHeader.tsx`, `TabStrip.tsx`: above.
+- `LiveFor.tsx`: `LiveFor`, the plate bar's "live for m:ss" clock on its own one-second tick (`DeskProps.liveSince`; PLAN 46f: it was a string from `App()`, which rendered once a second for it).
+- `Desk.tsx`, `deskProps.ts`, `DeskPanels.tsx`, `DeskHeader.tsx`, `TabStrip.tsx`: above. `DeskProps.status.audio` is a node, not a string: the level in it is `EarPercent`, which renders itself.
 
 ## Checks
 
