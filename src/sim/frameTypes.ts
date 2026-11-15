@@ -131,6 +131,8 @@ export interface FrameView {
   /** The magnets the lead plate was last stepped with: what stands the ferrofluid up into spikes. */
   magnets: readonly { x: number; y: number; height: number; strength: number; radius: number }[];
   gelAngle: number;
+  /** The upper moiré sheet's spin, in turns (lib/stageClocks.ts). */
+  moireTurn?: number;
   kaleidoPhase: number;
   /** The second plate's throw: how magnified, and how far it has drifted. */
   layer1: { zoom: number; dx: number; dy: number };

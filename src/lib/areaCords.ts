@@ -150,6 +150,27 @@ const REAGENTS: ReadonlySet<string> = new Set(DEFAULT_LIQUID_TYPES
   .filter(l => (l.behaviour?.acid ?? 0) !== 0 || (l.behaviour?.bz ?? 0) > 0).map(l => l.id));
 /** Whether an area's pour is a drop of its reagent rather than its dye. */
 export const reagentArea = (a: PlateArea): boolean => REAGENTS.has(a.liquid);
+/*
+  The share of the music's own colour that lands in an area: none in an area
+  of a reagent, all of it anywhere else (PLAN 25i-10). The cords above were
+  made reagent-only in 25i; the visualizer's own hands on the music were not.
+  On an area look every band's pour lands in an area in that area's dye: the
+  kick's bloom (5 to 11 droplets a kick, lib/kickBloom.ts), the bass's pulse
+  in its middle, the mid's stream, the treble's sparks, the energy's swell,
+  and the automation's drops. Chemical Clock's three places are all activator
+  and all on the bass, so every kick threw a cluster of droplets of a pool's
+  dye onto the gel at one of them; a gel stands still (Global Speed 0.024,
+  Thick), so nothing carried them off, and kick after kick they piled into
+  dark green and teal clusters at the places (the owner, on the live stream,
+  2026-11-10: "flower like bubble things", in the upper right where the
+  second place is). A projectionist touching a BZ dish with a wire or a drop
+  of bromous acid adds no colour: the ring that runs out is the ferroin
+  turning blue. Red Cabbage's wells had the same fault, painted pink and
+  green over the indicator's. So the hands still land where they did, with
+  the same splash and push and the same drop of the reagent (`doseArea`),
+  and only the colour they carried is taken off.
+*/
+export const musicDyeIn = (a: PlateArea | null): number => (a && reagentArea(a) ? 0 : 1);
 
 /** How much of an act lands at distance `d` from an area's middle, of radius `r`: whole inside AREA_CORE, eased to 0 at the rim. */
 export function areaWeight(d: number, r: number): number {

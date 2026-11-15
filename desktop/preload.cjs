@@ -13,9 +13,9 @@
  *
  * `updates` is the profile sheet's view of what the app's updater found
  * (desktop/updates.js): `state()` asks, `act()` does what the menu item does
- * (open the new download, or restart into the one that has arrived), and
- * `onChange(fn)` hears each change. Only those three calls cross, never
- * ipcRenderer itself.
+ * (open the new download, or restart into the one that has arrived),
+ * `setAuto(on)` is Install Updates Automatically, and `onChange(fn)` hears
+ * each change. Only those four calls cross, never ipcRenderer itself.
  *
  * CommonJS, because a sandboxed preload cannot be an ES module.
  */
@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   // A sign-in that must finish in the real browser (PLAN.md 23.17d): main.js
   // opens only this app's own address.
   openInBrowser: (url) => ipcRenderer.invoke('chromaglass:open-browser', String(url)),
+  // And back again: the window comes to the front when the sign-in it sent to
+  // the browser comes back (PLAN.md 23.17f-3; lib/macApp.ts bringAppToFront).
+  bringToFront: () => ipcRenderer.invoke('chromaglass:bring-to-front'),
   // The laptop's "Make it full screen" for the projector window this show
   // opened (main.js `fillProjector`): no gesture needed from this side.
   fillProjector: () => ipcRenderer.invoke('chromaglass:fill-projector'),
@@ -102,6 +105,7 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   updates: {
     state: () => ipcRenderer.invoke('chromaglass:update-state'),
     act: () => ipcRenderer.invoke('chromaglass:update-act'),
+    setAuto: (on) => ipcRenderer.invoke('chromaglass:update-auto', on === true),
     onChange: (fn) => {
       const listener = (_e, state) => { try { fn(state); } catch { /* the page's own error */ } };
       ipcRenderer.on('chromaglass:update', listener);

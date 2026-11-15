@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { TempoSource, type TempoLabel } from '../lib/tempo';
+import { publishTempo, setTempoDoor } from './tempoNow';
 
 /**
  * Where the beat clock's tempo comes from: Ableton Link, a MIDI clock, taps, a
@@ -93,6 +94,14 @@ export function useTempo() {
   const tempoPanel = useMemo(() => ({
     tempo: tempoLabel, onTap: tapTempo, onTempoClear: clearTempo, onTempoBpm: setTempoBpm, onLink: setLinkOn, onLinkTransport: setLinkTransport,
   }), [tempoLabel, tapTempo, clearTempo, setTempoBpm, setLinkOn, setLinkTransport]);
+
+  // The owner's assistant reads the tempo and sets it through the same
+  // callbacks as the desk (app/tempoNow.ts, PLAN 44k-7): one owner, here.
+  useEffect(() => { publishTempo(tempoLabel); }, [tempoLabel]);
+  useEffect(() => {
+    setTempoDoor({ bpm: setTempoBpm, tap: tapTempo, heard: clearTempo, link: setLinkOn, transport: setLinkTransport });
+    return () => setTempoDoor(null);
+  }, [setTempoBpm, tapTempo, clearTempo, setLinkOn, setLinkTransport]);
 
   /** The phone's two Link switches, as one spread (App.tsx is at its size ceiling). */
   const linkProps = useMemo(() => ({ onLink: setLinkOn, onLinkTransport: setLinkTransport }), [setLinkOn, setLinkTransport]);

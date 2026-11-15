@@ -261,7 +261,7 @@ export function rockSwing(rock: { x: number; y: number }, R: number, swayX: numb
   one's when the same hand rocks it.
 */
 export type CoverGlass = { x: number; y: number; vx: number; vy: number };
-import { DISH_GAP_METRES, thicknessViscosity } from './turntable';
+import { DISH_METRES, DISH_GAP_METRES, thicknessViscosity } from './turntable';
 /** The cover's mass per area, kg/m²: 2 mm of glass at 2,500 kg/m³. */
 export const COVER_KG_M2 = 5;
 /*
@@ -307,9 +307,16 @@ export function rockStep(holdX: number, holdY: number, swingX: number, swingY: n
   return { rockX: plateSin(holdX, swingX), rockY: plateSin(holdY, swingY), rockGain: gain };
 }
 const G = 9.81;
-/** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (DISH_GAP_METRES in the middle). */
-export function coverDrag(thickness: number, density = 1000): number {
-  return (density * thicknessViscosity(thickness)) / (COVER_KG_M2 * DISH_GAP_METRES);
+/**
+ * The film's shear drag on the cover, 1/τ (per second), μ/(m h), for the
+ * look's Thickness: at the cover's live gap and its own mass a square metre
+ * (PLAN 38r-5: Cover Weight in grams over its area), the rest gap and a 2 mm
+ * float glass when not given.
+ */
+export function coverDrag(thickness: number, density = 1000, grams?: number, gap = DISH_GAP_METRES): number {
+  // A gram at the least: a weightless glass has no inertia to drag, so it simply rides the film.
+  const m = Number.isFinite(grams) ? Math.max(1, grams!) / 1000 / (Math.PI * (DISH_METRES / 2) ** 2) : COVER_KG_M2;
+  return (density * thicknessViscosity(thickness)) / (m * Math.max(1e-5, gap));
 }
 /**
  * One step of `dt` seconds: the plate tipped by `tiltX`, `tiltY` (the sinθ

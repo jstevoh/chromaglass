@@ -11,6 +11,7 @@
  */
 import { DEFAULT_LIQUID_TYPES } from './types';
 import type { PhasePourShape } from './lib/phasePour';
+import { MOIRE_LOOKS } from './presetsMoire';
 
 // ─── Palette contracts ───────────────────────────────────────────────
 // Each preset names the palette indices it may use; seeding, automation,
@@ -56,20 +57,19 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 
 export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
-  'comet':              [18, 20, 23, 7, 16, 2],
-  'galaxy':             [7, 18, 20, 17, 23, 8],  // ice-blue arms, ultramarine, magenta knots, an amber core's glow; it was six blues and violets, one hue on the wall
-  'cyberpunk':          [2, 20, 6, 16, 1, 18],
-  'acid-trip':          [18, 20, 2, 21, 17, 6],
+  'comet':              [17, 21, 20, 18, 16, 7],  // amber head, coral, magenta, ultramarine, teal and icy tail (28i-7: one pink hue on black)
+  'galaxy':             [7, 17, 18, 21, 20, 8],  // an ice-blue arm and a gold one (the seed's two arms are the first two), ultramarine, coral, magenta; 28i-7: blue-violet wisps read as Jellyfish Bloom
+  'cyberpunk':          [2, 20, 10, 18, 7],       // hot pink, magenta, purple, ultramarine, ice: one neon arc (28i-7: lime and orange summed it to grey-teal)
+  'acid-trip':          [18, 20, 2, 21, 6, 10],   // no amber: its one amber body was Solar Flare's look (28i-7)
   'bass-drop':          [4, 11, 20, 18, 9, 7],
-  'microscopic-chaos':  [20, 2, 10, 23, 18, 8],
-  'aurora-borealis':    [19, 5, 6, 16, 7, 23, 10], // greens through ice to a violet, as the sky has
+  'microscopic-chaos':  [20, 2, 17, 0, 10],      // a counterstain: amber and yellow beside the violets, as picric acid is in Van Gieson's (28i-7: all purple)
+  'aurora-borealis':    [19, 6, 16, 23, 20],      // oxygen's green low, nitrogen's violet and pink on the top edge; 28i-7: seven dyes kept the violet out of the window
   'solar-flare':        [17, 0, 1, 21, 3, 4],
   'jellyfish-bloom':    [20, 2, 23, 10, 16, 7],
   'fractal-dream':      [17, 21, 20, 10, 16, 19],
   'velvet-underground': [18, 20, 11, 23, 21, 10],   // ultramarine, magenta, raspberry; then each pool's second: lavender, coral, purple (PLAN 25h)
   'neon-coral-reef':    [21, 2, 17, 0, 16, 7],
   'stardust-collapse':  [17, 21, 20, 7, 16, 2],
-  'lumia':              [10, 7, 1],
   'turing-print':       [16, 17, 20, 8, 2],       // teal, amber, magenta, blue and hot pink pools for the print to carve through
   'poster-1969':        [1, 21, 17, 18, 10],
   'fillmore-wash':      [5, 10, 9],
@@ -82,12 +82,17 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // Ferroin's red and blue fronts turn the plate as the waves sweep across it.
   'chemical-clock':     [16, 20, 19, 8, 3],   // teal, magenta, emerald, ultramarine and red indicator pools under the ferroin waves
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
-  'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
+  'ferro-paint':        [0, 17, 21, 2, 20],   // yellow, amber, coral, hot pink, magenta: neighbours, so no mud (28i-7: amber over teal was brown-green)
   'lava-lamp':          [4, 1, 20, 17, 21, 11],  // the wax: crimson, orange, magenta, amber, coral, raspberry
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
-  'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
-  'splodascope':        [9, 0, 6, 3, 2],        // cobalt water; yellow, green, red and hot pink oil, as the owner's photograph (the first is the water; cobalt under yellow is the photograph's green)
+  'clock-glass':        [10, 3, 17, 9, 21, 16], // purple water; red, amber, cobalt, coral and teal oil (the seed lays the first as the water; 28i-7: a second family)
+  'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 47z-1: cobalt filmed on the Mac 2026-11-13 read darker, colourfulness 62 against 131, the frame 0.40 near black: vivid colour wants a bright ground)
+  'foam-cells':         [12, 7, 17, 23],           // rust water (sienna) in the films; pale icy blue, amber and lavender cells (47z-5)
+  // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
+  // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
+  // under a yellow film laid an olive-black blot in the lab.
+  'saffron-lace':       [23, 9, 21, 7],
   // Fully saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye. The three
@@ -95,14 +100,18 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // ground and its own family, so the three read as three.
   'macro-bead':         [16, 17, 20, 1, 18, 2],
   'cell-bloom':         [20, 23, 18, 17],
-  'lace-run':           [17, 16, 2, 18, 0, 20],
+  'lace-run':           [17, 4, 1, 3, 0, 11],     // amber over crimson, as its description: 28i-7, the blues and pinks screened to one lilac sheet
   // Six dyes of six families rather than one: the point of this one is that
   // a person gets a colour of their own.
   'crowd-plate':        [17, 20, 16, 21, 18, 6],
   // The three built on the liquids. Food colouring for the marbling dish,
   // interference hues for the film, and slow deep dyes for the shear.
   'milk-marble':        [0, 17, 2, 20, 8, 16, 6],
-  'soap-film':          [23, 20, 10, 7, 16, 17],
+  'soap-film':          [21, 17, 20, 2, 23, 16], // 28i-7: warmer until 28i-4 (was violet strands on black)
+  // Two moiré looks with dyes of their own (28i-7), so a pair laid on one house
+  // look stops reading as one: Waves goes to the sea, Ripple to a pond.
+  'moire-waves':        [7, 16, 9, 19, 18, 23], // ice, teal, cobalt, jade, ultramarine, lavender
+  'moire-ripple':       [16, 7, 2, 0],          // teal water; ice, hot pink and yellow oil
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
@@ -122,7 +131,6 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'stardust-collapse':  ['spray', 'splatter'],
   // These three had no entry and were quietly taking the 'drop' default —
   // found by `npm run plate`, which is the whole reason it exists.
-  'lumia':              ['pour'],                 // nothing on this plate arrives suddenly
   'turing-print':       ['drop'],                 // each drop of reagent a place a pattern grows from
   'poster-1969':        ['pour', 'drop'],
   'crowd-plate':        ['drop', 'pour'],
@@ -141,6 +149,8 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
   'splodascope':        ['drop'],                 // a drop at a time into the crowd, as an eyedropper does
+  'foam-cells':         ['drop'],                 // a drop into the foam presses its neighbours aside
+  'saffron-lace':       ['drop'],                 // an eyedropper's drops: each one a hole in the film, or more film
 };
 
 /**
@@ -198,7 +208,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // ── The light-show and photographic looks ────────────────────────
   // Wilfred's plate is nearly clear; what moves it is thickness, not dye.
   // And soap, for the one of its three areas whose veil spreads and opens (lib/plateAreas.ts).
-  'lumia':              ['water', 'glycerine', 'soap'],
   // Boyle put reactions on the platen — cells growing, then carried off.
   // The reagent is what the reaction grows from (26c); water is the dish's own.
   'turing-print':       ['reagent', 'water'],
@@ -237,6 +246,12 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'clock-glass':        ['oil', 'water', 'oil', 'syrup'],
   // More oil into the crowd, and now and then the soapy water that holds the films.
   'splodascope':        ['oil', 'oil', 'water'],
+  // More oil presses a new cell in among the others; the water wets the films.
+  'foam-cells':         ['oil', 'water'],
+  // Oil poured onto a clear film joins it (it thickens where it lands, and tears again);
+  // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
+  // is the lavender wash's body, which holds its place under the film.
+  'saffron-lace':       ['glycerine', 'soap', 'oil', 'alcohol'],
 };
 
 /**
@@ -270,3 +285,33 @@ export const LIQUIDS_BY_ID = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l]));
  * of a real one and is scaled again by whatever headroom the plate has left.
  */
 export const AUTO_DOSE = 0.35;
+
+/*
+  A look of the moiré pack (presetsMoire.ts, PLAN 45a) is a house look with
+  two printed sheets on the stage: the sheets are on the lamp's side of the
+  glass, and the plate under them is the house look's, poured the same way.
+  So its dyes, its pours, its dish and its ferrofluid's pour are its house
+  look's, entered here under its own id, because every reader (the seed, the
+  automation, the bottles, `npm run plate`) looks a look up by the id it has.
+  Copied rather than written out again so the two cannot drift: retune Clock
+  Glass's oils and Moiré Ripple's follow.
+*/
+const MOIRE_BASE: ReadonlyMap<string, string> = new Map(MOIRE_LOOKS.map(m => [m.id, m.from]));
+/*
+  28i-7: a pack look may name its own dyes above its house look's (the film of
+  2026-11-11 found Star and Waves the same rainbow grid, both Classic's dyes):
+  an entry already in a table is kept, and the seed lays it (seedPreset reads
+  the look's own contract).
+*/
+for (const [id, from] of MOIRE_BASE) {
+  for (const table of [PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR] as Record<string, unknown>[]) {
+    if (table[from] !== undefined && table[id] === undefined) table[id] = table[from];
+  }
+}
+
+/**
+ * The look whose plate a look lays: its house look for one of the moiré pack,
+ * otherwise itself. The dye's seed (seedPreset) is written per house look, a
+ * case for each, so a pack's look seeds as its house look does.
+ */
+export const plateLook = (id: string): string => MOIRE_BASE.get(id) ?? id;

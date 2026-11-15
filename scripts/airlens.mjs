@@ -69,15 +69,12 @@ const FADE_NEAR = 0.05;
 // Screen pixels to a plate unit, as uvToFluid in plate.ts maps them.
 const PER_UNIT = S * 1.5 * ZOOM;
 /*
-  The size the plate reads: the air field packs it in sixteen steps on a log
-  scale from 0.004 to 0.16 of the plate (wgsl/air.ts, sizeQ), and the band
-  of a pancake is placed from that, while where in the bubble a point is
-  comes from its laid radius. So a 12-cell bubble is read as 11.5 cells.
+  The size the plate reads: its own, since PLAN 38h-15 (wgsl/bubbleShape.ts
+  draws each bubble from its disc in the list). It was the air field's
+  packing, sixteen steps on a log scale from 0.004 to 0.16 of the plate, so
+  a 12-cell bubble's band was placed for 11.5 cells.
 */
-const sizeRead = (r) => {
-  const q = Math.floor(Math.min(1, Math.max(0, Math.log2(Math.max(r, 1e-4) / 0.004) / 5.321928)) * 15 + 0.5);
-  return 0.004 * 2 ** (q / 15 * 5.321928);
-};
+const sizeRead = (r) => r;
 // Where, as a fraction of the laid radius, the brightness is half the middle's.
 const halfPoint = (r, rho) => {
   const R = sizeRead(r);

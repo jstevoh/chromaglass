@@ -22,8 +22,11 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 - `AreaPicker.tsx`: area picked on a plate thumbnail.
 - `BandStrip.tsx`: the band, dragged on a spectrum.
 - `PhonePlay.tsx`: Play.
+- `PhoneInkTitle.tsx`: `PhoneInkTitle`, the Title switch and its Sweep (PLAN 37x-10), on the More sheet and the remote's Controls.
+- `PhoneMoire.tsx`: `PhoneMoire`, the moiré pack's sheets on the Looks sheet (the desk's lists and try-it rule, PLAN 45a).
 - `PhoneStage.tsx`: the stage.
+- `TvLink.tsx`: the `?tvlink` page: sign in, then type the code a TV shows, to link it to the account's Home or Pro (PLAN 12-tv-signin). `main.tsx` routes it before the show, like the remote; it loads no engine.
 
 ## Checks
 
-`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Cartoons: `cartoons`. Feedback: `feedbackpane`, `feedback-worker`. Areas and cords: `areacords`.
+`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Cartoons: `cartoons`. Feedback: `feedbackpane`, `feedback-worker`. Areas and cords: `areacords`. Linking a TV: `tvcode` (the Worker's routes and `lib/tvCode.ts`'s code format).

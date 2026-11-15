@@ -7,7 +7,7 @@ import {
   Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
-  Crosshair, LayoutGrid, Plus,
+  Crosshair, LayoutGrid, Plus, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
@@ -15,15 +15,22 @@ import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
+import { musicStirOf, withMusicStir } from '../../lib/stir';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
+import { PhoneMoire } from './PhoneMoire';
+import { PhoneInkTitle } from './PhoneInkTitle';
+import { findPreset } from '../../presets';
+import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { canShareClip, shareClip } from '../../lib/shareClip';
+import type { ClipShape } from '../../lib/clipFrame';
 import { OscOutRow } from '../ui/OscOutRow';
 import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -93,7 +100,7 @@ type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs' | 
  * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
  * reordered, added and taken away the same way, each tab's panels stacked in
  * one sheet. A settings section or one of the screens (Songs, Sequences,
- * Music & Drone) is drawn in it whole; the desk's own panels (the bottles,
+ * Sound with its player and drone) is drawn in it whole; the desk's own panels (the bottles,
  * the set list, the rides) were built for a mouse, and the phone has its own
  * of each, so their card opens that sheet instead.
  */
@@ -353,7 +360,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
-  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
+  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void; shape: ClipShape; onShape: (s: ClipShape) => void; take: { blob: Blob; filename: string; url: string } | null };
   onHide: () => void;
   onFullLayout: () => void;
   /** The desk's tabs, on the phone (More → Tabs). */
@@ -915,6 +922,7 @@ export function PhoneStage(p: PhoneStageProps) {
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
+          <PhoneMoire settings={p.mixer.settings} onSetting={p.mixer.onSetting} />
           <div className="mt-3">
             <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
               display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
@@ -924,6 +932,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Projector Focus" value={p.projectorFocus} min={0} max={1} step={0.05} onChange={p.onProjectorFocus}
               display={`${Math.round(p.projectorFocus * 100)}%`} touch testId="phone-projector-focus" midiKey="setting:projectorFocus" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
+          </div>
+          <div className="mt-3">
+            <Slider label="Heat" value={p.mixer.settings.heat ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.mixer.onSetting({ heat: v })}
+              display={`${Math.round((p.mixer.settings.heat ?? 0) * 100)}%`} touch testId="phone-heat" midiKey="setting:heat" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">The projector lamp&apos;s heat in the dish: hold a finger on the glass to block the fan&apos;s air and boil the spot.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">
@@ -961,7 +974,9 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
+                        // A pack's look without the pack opens the account sheet (PLAN 45a).
+                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
                       }}
@@ -1102,6 +1117,25 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
           </div>
+          {/*
+            Music Stir: the depth of the look's cord from the sound's mids
+            onto Turbulence, which is how the music stirs the liquid since
+            the solver stopped reading the analyser itself (PLAN 38u-4,
+            38u-5). The desk has it in Patches, as the cord it is, where its
+            depth is set and it is pulled like any other; the phone has no
+            patch bay, so this slider is that cord's control here
+            (lib/stir.ts `musicStirOf`, `withMusicStir`, on the settings and
+            setter the sheets already share as `mixer`). At 0 the cord is
+            pulled and the band stirs nothing; raised on a look saved
+            before the cord existed, it puts one in.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Music Stir" value={musicStirOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
+                onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicStir(p.mixer!.settings.sceneMappings, v) })}
+                display={`${Math.round(musicStirOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-stir" />
+            </div>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}
@@ -1260,6 +1294,16 @@ export function PhoneStage(p: PhoneStageProps) {
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
+          {/*
+            Song titles as ink (PLAN 37x-10): the desk's Logo & Titles switch,
+            on the phone. Above the tiles, not after Record makes where it
+            first went: Songs, Settings, Guide and the rest close this sheet
+            to open their own, so anything below them is a sheet the hand (and
+            `npm run switches`, which walks the sheet in order and found the
+            switch gone by the time it reached it) has to open again. The
+            switch is the one thing here changed mid-set; the tiles lead away.
+          */}
+          {p.mixer && <div className="mb-3"><PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} /></div>}
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
@@ -1295,6 +1339,31 @@ export function PhoneStage(p: PhoneStageProps) {
               testId="phone-record-makes-segmented"
             />
             <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
+            {/* The clip's frame (lib/clipFrame.ts, PLAN 34f): 9:16 to post, or the screen as it is. */}
+            <SectionLabel>Clip frame</SectionLabel>
+            <Segmented
+              value={p.recording.shape}
+              options={[['portrait', 'Portrait 9:16'], ['plate', 'Screen as it is']] as const}
+              onChange={p.recording.onShape}
+              height={44}
+              fill
+              testId="phone-record-shape"
+            />
+            <p className="text-[12px] text-dim">
+              {p.recording.shape === 'portrait'
+                ? 'The middle 9:16 of the screen, with sound, as an MP4 where this phone can write one: ready for Reels and TikTok.'
+                : 'The whole screen, as it is.'}
+            </p>
+            {p.recording.take && !p.recording.on && canShareClip(p.recording.take) && (
+              <button
+                type="button"
+                onClick={() => { void shareClip(p.recording.take!); }}
+                data-testid="phone-share-clip"
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-[14px] font-medium text-text active:bg-hover"
+              >
+                <Share2 size={16} />Share the last clip
+              </button>
+            )}
           </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">

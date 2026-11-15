@@ -55,6 +55,29 @@ Mac is free, and on GitHub's machines as before when it is not.
   reads the run's jobs; when a shard has been queued for the owner's Mac for 15 minutes with
   none running, it starts `deploy.yml` again with `hosted` set (every shard on GitHub's
   Macs) and cancels the stalled run, which the new one replaces in the queue.
+- **The same move for a Mac busy with other work** (PLAN.md 19ah-9). The probe can only see
+  whether the runner is idle, not whether a session, a build queue or the ChromaGlass app
+  is drawing with the GPU; two deploys of 2026-11-08 ran beside such work three times
+  slower than the Mac alone and went red. So each shard's first step on the Mac
+  (`scripts/macbusy.sh`) looks for another test browser or the app at work (5% of a core or
+  more) that is not a deploy's own, waits up to two minutes for it to end, and then fails,
+  listing it; the
+  watchdog reads that failure and moves the deploy to GitHub's Macs at once. The owner's
+  own Chrome, editors and an idle Antigravity do not count. The ChromaGlass app always
+  does while it is open (it never throttles, even hidden): close it, or every deploy moves
+  to GitHub's Macs.
+- **And for work that starts after that first look** (PLAN.md 19ah-9a). From its first line
+  that step marks the Mac held (`~/.chromaglass-runner/deploy-<runner>.json`), and the
+  shard's last step marks it ended. A harness a session or a build queue starts on the Mac
+  meanwhile (anything that launches its browser through `scripts/chromium.mjs`, and `npm
+  run desktop`) waits while a shard holds it and for two minutes after one ends, for the
+  next shard (`scripts/macdeploy.mjs`; `node scripts/macdeploy.mjs` says what holds it
+  now). A mark whose runner worker has exited holds nothing. What does not read the mark
+  (a session's own script, the app opened by hand) the shard looks for again before each
+  check and after the last; still there after two minutes, or there at all right after a
+  red check, the shard stops, its last step "The owner's Mac stayed free of other work"
+  fails, and the watchdog moves the deploy to GitHub's Macs as for the first step. So the
+  watchdog now watches until every Mac shard has finished.
 
 ## Setting it up (at the Mac, once)
 
@@ -86,6 +109,10 @@ Never **Re-run failed jobs**: it keeps the probe's old answer and sends the shar
 sleeping Mac again.
 
 ## For a show, or anything else that wants the GPU
+
+A shard now hands itself back when it finds the app or another harness running (above),
+but only at its start: work begun in the middle of a shard still shares the GPU with it.
+For a session of hours, stop the runner:
 
 ```bash
 for d in ~/actions-runner ~/actions-runner-[23]; do [ -d "$d" ] && (cd "$d" && ./svc.sh stop); done

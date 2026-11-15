@@ -72,6 +72,8 @@ interface IntroRecord {
   still?: [number, number | null][];
   /** Each wait for the page's frames before the first compile, [from, to, what ended it] (`introStill`). */
   stillWait?: [number, number, StillDone][];
+  /** What the loading line said and when, [at, stage, done, of] (`introStage`). */
+  stages?: [number, IntroStage, number, number][];
 }
 
 /**
@@ -152,6 +154,8 @@ export function adoptIntro(slot: HTMLElement | null): void {
     if (t !== undefined) a.currentTime = t;
   }
   record.adopted = performance.now();
+  // In the frame the app mounts in, a new picture already (`introStage`).
+  introStage('gpu');
 }
 
 /** Fade out and then leave the page. Once; every later call is nothing. */
@@ -245,6 +249,61 @@ export function introMove(): void {
   const last = record.still?.[record.still.length - 1];
   if (last && last[1] === null) last[1] = performance.now();
 }
+
+/**
+ * The loading line under the mark: what the show is waiting for, and how
+ * far along (PLAN.md 14v-12). What was asked (the owner, 2026-11-14): on a
+ * phone the web app took about thirty seconds to start, with nothing on the
+ * screen to say it was getting anywhere; whenever there are no visuals yet,
+ * show that it is loading, with updates.
+ *
+ * Four stages, each where the wait is: `load`, the app's chunks coming down
+ * (the page's own markup says it from the first paint, before any script);
+ * `gpu`, the app up and the GPU starting (said in the frame the app mounts
+ * in, which is a new picture anyway); `build`, the opening's pipelines,
+ * counted as they settle (`prepareProgress`); `first`, built, and the plate
+ * stepping toward its first frame, on which the intro leaves. The seconds
+ * since the page started go beside each, so a slow phone says where its
+ * time went, and `window.__cgIntro.stages` keeps them for a harness.
+ *
+ * Words change only when the page may draw something new without stopping:
+ * never while a render pipeline compiles or makes its first draw, when a new
+ * picture waits in the GPU process behind it and the frame after waits for
+ * that (`Quiet` in `gpu/prepare.ts` has what was measured; the caller holds
+ * its updates while `prepareProgress.rendering` is up). The bar moves in
+ * steps, without a transition: a transition is a new picture on every frame.
+ */
+export type IntroStage = 'load' | 'gpu' | 'build' | 'first';
+const WORDS: Record<IntroStage, string> = { load: 'Loading', gpu: 'Starting the graphics', build: 'Compiling shaders', first: 'Pouring the first frame' };
+let said = '';
+
+export function introStage(stage: IntroStage, done = 0, of = 0): void {
+  if (out) return;
+  const el = node();
+  const line = el?.querySelector<HTMLElement>('.cg-sub');
+  if (!el || !line) return;
+  const words = stage === 'build' && of > 0 ? `${WORDS.build} ${Math.min(done, of)} of ${of}` : WORDS[stage];
+  const text = `${words} · ${Math.round(performance.now() / 1000)} s`;
+  if (text === said) return;
+  said = text;
+  line.textContent = text;
+  const share = stage === 'load' ? 0.04 : stage === 'gpu' ? 0.12 : stage === 'build' ? 0.15 + 0.8 * (of > 0 ? Math.min(1, done / of) : 0) : 0.97;
+  el.querySelector<HTMLElement>('.cg-bar > i')?.style.setProperty('transform', `scaleX(${share.toFixed(3)})`);
+  const stages = (record.stages ??= []);
+  if (stages.length < 400) stages.push([Math.round(performance.now()), stage, done, of]);
+}
+
+/**
+ * What the opening is handed (`Quiet` in `gpu/prepare.ts`): hold still while
+ * it builds, count its builds on the loading line while no render pipeline
+ * is compiling, and once it is built, move again and say the first frame is
+ * coming.
+ */
+export const introQuiet = {
+  still: introStill,
+  go(): void { introMove(); introStage('first'); },
+  progress(settled: number, asked: number, rendering: number): void { if (rendering === 0) introStage('build', settled, asked); },
+};
 
 /** Whether the intro is still up (not yet leaving). */
 export function introUp(): boolean {

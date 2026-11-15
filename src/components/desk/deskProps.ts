@@ -56,7 +56,7 @@ export interface DeskProps {
    * The three that were screens of their own, as panels (`Sheet embed`):
    * the song shows, the sequences, and the music player with the drone.
    */
-  screens: { songs: ReactNode; sequences: ReactNode; player: ReactNode };
+  screens: { songs: ReactNode; sequences: ReactNode };
   /**
    * A settings section drawn whole, for a panel (`SettingsPanel embed`).
    * Not drawn while `sheetOpen`: the sheet has every section in the page, and
@@ -81,7 +81,7 @@ export interface DeskProps {
   onOpenSettings: () => void;
   onOpenAccount?: () => void;
   /** `song`: following a known song's map by ear, and how sure (lib/followedPlace.ts `followLine`; PLAN.md 28g-2). */
-  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null };
+  status: { audio: ReactNode; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null };
   onBlackout: () => void;
   blackout: boolean;
 
@@ -89,7 +89,8 @@ export interface DeskProps {
   plateRef: Ref<HTMLDivElement>;
   /** The look on the wall (Gig), and how long it has been up. */
   liveName: string | null;
-  liveFor: string;
+  /** When that look went up, in `Date.now()`'s milliseconds; the bar's clock counts from it on its own tick (`LiveFor`). */
+  liveSince: number;
   /** The look being built (Build), and whether it has changes. */
   lookName: string | null;
   edited: boolean;
