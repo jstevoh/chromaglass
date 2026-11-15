@@ -79,7 +79,14 @@ try {
       await buf.mapAsync(GPUMapMode.READ);
       const halves = new Uint16Array(buf.getMappedRange().slice(0));
       buf.unmap();
-      return { w, h, at: (x, y, c) => half(halves[y * (row / 2) + x * 4 + c]) };
+      /*
+        .w stores the path less clear water's 1.333 (PLAN 38u-18: a half float
+        near 1.333 steps by 1e-3, ten times a real dye's rise), so at() adds
+        it back and every line below reads the path itself; raw() is what the
+        texture holds, which is what the plate's shadowgraph samples.
+      */
+      const raw = (x, y, c) => half(halves[y * (row / 2) + x * 4 + c]);
+      return { w, h, raw, at: (x, y, c) => raw(x, y, c) + (c === 3 ? 1.333 : 0) };
     };
     /*
       The dye's index (PLAN 38u-10) is real by default, too small to draw a
@@ -272,6 +279,38 @@ try {
     const zPeak = (f) => { let m = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) m = Math.max(m, Math.abs(f.at(x, y, 2))); return m; };
     const pathPeak = (f) => { let m = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) m = Math.max(m, f.at(x, y, 3)); return m; };
     const clearPath = (f) => f.at(Math.floor(w * 0.2), Math.floor(h * 0.8), 3);
+    /*
+      What the dye at ×1 does to the light on the wall, worked out the way
+      the plate does it (wgsl/plateTransmit.ts defocusShadow), from the .w
+      the texture really holds: at Projector Focus 1 (Δz 0.75) the disc's
+      radius is four of the pass's spacings (3 cells of the 192 grid), its
+      Laplacian the difference of a ring of sixteen bilinear taps at R and
+      eight at R/3, and the light exp(-Δz · ∇² / 1.333 · gain), with the gain
+      at Boundary Contrast 1's 2. Read from .z, which is taken in full floats
+      before it is stored, this passed on a .w that drew the dye ten times
+      too strong in stairs (the skeptic, 0.44% against 0.04%).
+    */
+    const shadowDim = (f) => {
+      const e = 3 * w / 192, R = e * 4, dz = 0.75;
+      const tap = (fx, fy) => {
+        const cx = Math.min(Math.max(fx - 0.5, 0), w - 1), cy = Math.min(Math.max(fy - 0.5, 0), h - 1);
+        const x0 = Math.min(Math.floor(cx), w - 2), y0 = Math.min(Math.floor(cy), h - 2), ax = cx - x0, ay = cy - y0;
+        return (f.raw(x0, y0, 3) * (1 - ax) + f.raw(x0 + 1, y0, 3) * ax) * (1 - ay)
+          + (f.raw(x0, y0 + 1, 3) * (1 - ax) + f.raw(x0 + 1, y0 + 1, 3) * ax) * ay;
+      };
+      let worst = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let outer = 0, inner = 0;
+        for (let k = 0; k < 16; k++) {
+          const c = Math.cos(k * 0.3926991), sn = Math.sin(k * 0.3926991);
+          outer += tap(x + 0.5 + c * R, y + 0.5 + sn * R);
+          if (k % 2 === 1) inner += tap(x + 0.5 + c * R / 3, y + 0.5 + sn * R / 3);
+        }
+        const lap = (outer / 16 - inner / 8) * 4 / (R * R * (8 / 9)) * 50 * e * e;
+        worst = Math.max(worst, Math.abs(Math.exp(-dz * (lap / 1.333) * 2) - 1));
+      }
+      return worst;
+    };
     plate.pack.set('dyeIndexBoost', 1);
     const real = await derived(plain);
     plate.pack.set('dyeIndexBoost', 1000);
@@ -280,7 +319,9 @@ try {
     const index = {
       predicted: dyeIndexPeak,
       read: (pathPeak(big) - clearPath(big)) / 1000,
+      readReal: pathPeak(real) - clearPath(real),
       clear: clearPath(real),
+      dimReal: shadowDim(real), dimBig: shadowDim(big),
       zReal: zPeak(real), zBig: zPeak(big),
     };
 
@@ -320,10 +361,19 @@ try {
     const ix = r.index;
     const err = Math.abs(ix.read / Math.max(1e-12, ix.predicted) - 1);
     const lin = Math.abs(ix.zReal * 1000 / Math.max(1e-12, ix.zBig) - 1);
-    const dim = ix.zReal * 0.75 / 1.333;
+    const errReal = Math.abs(ix.readReal / Math.max(1e-12, ix.predicted) - 1);
+    const dim = ix.dimReal;
     check('38u-10: the dye raises the path by its measured index (tartrazine\'s dn/dc × its summed absorbance, within 5%), linear in Dye Index Boost, and real is too faint to see',
-      ix.predicted > 1e-5 && err < 0.05 && Math.abs(ix.clear - 1.333) < 0.002 && ix.zBig > 0 && lin < 0.05 && dim < 1 / 255,
-      `index rise over the dye ${ix.read.toExponential(3)} against ${ix.predicted.toExponential(3)} predicted (${(err * 100).toFixed(1)}% off); clear water ${ix.clear.toFixed(4)}; .z peak ${ix.zReal.toExponential(3)} at 1, ${ix.zBig.toFixed(4)} at 1000 (${(lin * 100).toFixed(1)}% from linear); real changes the light by ${(dim * 100).toFixed(3)}% at full defocus`);
+      ix.predicted > 1e-5 && err < 0.05 && Math.abs(ix.clear - 1.333) < 0.002 && ix.zBig > 0 && lin < 0.05 && dim < 1 / 255 && ix.dimBig > 0.04,
+      `index rise over the dye ${ix.read.toExponential(3)} against ${ix.predicted.toExponential(3)} predicted (${(err * 100).toFixed(1)}% off); clear water ${ix.clear.toFixed(4)}; .z peak ${ix.zReal.toExponential(3)} at 1, ${ix.zBig.toFixed(4)} at 1000 (${(lin * 100).toFixed(1)}% from linear); the wall's shadowgraph on the stored path at Focus 1 changes the light by ${(dim * 100).toFixed(3)}% at 1, ${(ix.dimBig * 100).toFixed(1)}% at 1000`);
+    /*
+      PLAN 38u-18: the stored path keeps a real dye. At ×1 the path over the
+      dye's peak less clear water's, read straight from .w, is the measured
+      rise within 5%. With .w holding the whole path (about 1.333 in a half
+      float), this read 9.77e-4 against 1.0e-4, one rounding step.
+    */
+    check('38u-18: the stored path keeps a real dye\'s rise at Dye Index Boost ×1 (within 5%)', errReal < 0.05,
+      `rise read from .w at ×1 ${ix.readReal.toExponential(3)} against ${ix.predicted.toExponential(3)} predicted (${(errReal * 100).toFixed(1)}% off)`);
   }
   const worst = Math.max(...r.paths.map((p) => Math.abs(p.read - p.expected)));
   check('optical path is each liquid\'s own index times its depth (glycerine, syrup, water)', worst < 0.005,

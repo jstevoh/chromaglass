@@ -35,13 +35,8 @@ at the foot of this file):
   defocused edge. Measured dn/dc for the palette's dyes (food dyes, ink) and an index per
   channel carried through the derive pass (it writes one path today). Check: `derive` asks two
   dyes of equal absorbance to step the path by their own ratio. none.
-- **38u-18. The derived path is stored in half floats, so a real dye's step rounds away** (S;
-  Low, found doing 38u-10). The derive pass writes the path to `.w` of an rgba16float texture,
-  whose step near 1.33 is about 1e-3; a real dye's 2e-5 rounds to nothing there, so below a
-  boost of about ×50 the shadowgraph out of focus (`defocusShadow`, which reads `.w`) sees no
-  dye at all, and just above it sees steps. The Laplacian in `.z` is taken in f32 first and is
-  right at ×1. Store the path less its clear-water base (a delta near 0 has steps of 1e-8), or
-  give `.w` a 32-bit texture. Check: `derive` reads the path's rise at ×1 within 5%. none.
+- ~~**38u-18. The derived path is stored in half floats, so a real dye's step rounds away**~~ shipped
+  2026-11-14 with 38u-10: `.w` holds the path less clear water's. `npm run derive`'s 38u-18 line.
 
 How it is ranked: what a person would see change on the wall, against what it costs to
 build and what it adds to the frame. S is under a day, M a few days, L a week or more.
@@ -799,7 +794,7 @@ On in every look, or nearly:
   boost", in every look). The dye raises the path by tartrazine's measured dn/dc over its
   summed absorbance (`wgsl/dyeIndex.ts`, 2e-5 for a dye that takes 96% of a channel), and
   **Dye Index Boost** (×1 real to ×1000) is the dial that says it is past real; Boundary
-  Contrast no longer scales it. `npm run derive`'s 38u-10 line. Left: **38u-17**, **38u-18**.
+  Contrast no longer scales it. `npm run derive`'s 38u-10 line. Left: **38u-17**.
 - **38u-11. Glass Smear slides the cover glass along a noise path, always** (S; Medium).
   `fluidSimulation.ts:3129-3133`, noise2D(0.3 t), Glass Smear 0.3 by default and in 17 looks;
   uniform, so the liquid leaves by the rim on one side and comes back on the other (18a-2).
