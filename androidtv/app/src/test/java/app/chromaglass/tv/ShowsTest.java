@@ -82,6 +82,37 @@ public class ShowsTest {
         }
     }
 
+    // The YouTube films (Sample.FILMS, 12-tv-2h): each a real YouTube id, no
+    // film twice, and each named on screen by its look and its record, which
+    // must be one old enough to be public domain (published before 1926).
+    @Test public void everyFilmIsAYouTubeIdWithItsRecordNamed() {
+        assertEquals(true, Sample.FILMS.length >= 4);
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (Sample.Film f : Sample.FILMS) {
+            assertEquals(f.id, true, f.id.matches("[A-Za-z0-9_-]{11}"));
+            assertEquals(f.id, true, ids.add(f.id));
+            assertEquals(f.id, false, f.look.isEmpty() || f.title.isEmpty() || f.performer.isEmpty());
+            assertEquals(f.id, true, f.year >= 1890 && f.year < 1926);
+        }
+        assertEquals(true, Sample.FILMS_BASE.startsWith("https://chromaglass.art/"));
+    }
+
+    // The page gets the list as JSON where FILMS_JSON stood, every film in it,
+    // and nothing in a name can end the script it sits in.
+    @Test public void thePageGetsTheListAndNoNameCanBreakOutOfIt() {
+        String page = Sample.page("<script>var FILMS = FILMS_JSON;</script>");
+        assertEquals(false, page.contains("FILMS_JSON"));
+        // Every field under the name films.html reads it by (f.look, f.title, ...):
+        // a renamed key would leave the TV's caption saying "undefined".
+        for (Sample.Film f : Sample.FILMS) {
+            String one = "{\"id\":" + Sample.json(f.id) + ",\"look\":" + Sample.json(f.look)
+                + ",\"title\":" + Sample.json(f.title) + ",\"performer\":" + Sample.json(f.performer)
+                + ",\"year\":" + f.year + "}";
+            assertEquals(f.id, true, page.contains(one));
+        }
+        assertEquals("\"a\\\"b\\u003c/script>\"", Sample.json("a\"b</script>"));
+    }
+
     @Test public void theSampleGoesRoundAndRound() {
         int i = 0;
         for (int n = 0; n < Sample.CLIPS.length; n++) i = Sample.next(i);
