@@ -389,7 +389,7 @@ What route 2 still needs, found while building 12-tv-1:
   use. like 10 different 30 minute loops that evolve over time and are calming."
   Films, not something the TV draws: a TV's web view has no WebGPU, tvOS has no
   web view, and the TV is a receiver (above). Each is the app's own Render a song
-  of one calm look (`src/lib/tvLoops.ts`: Chemical Clock first, then Classic,
+  of one calm look (`src/lib/tvLoops.ts`: Chemical Clock first, then Clock Glass,
   Aurora Borealis, Jellyfish Bloom, Velvet Underground, Lava Lamp, Galaxy, Oil &
   Water, Soap Film, Neon Coral Reef) with Evolve on and a song of silence, so
   nothing moves with music and every change is the liquid's or Evolve's slow

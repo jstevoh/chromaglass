@@ -70,16 +70,20 @@ export const TV_LOOP_ORIGIN = 'https://chromaglass.art/loops/';
  * The ten, chosen for calm: looks whose liquid moves slowly on its own and
  * keeps changing without music. The Chemical Clock first, because the owner
  * loves it; the reaction looks (Chemical Clock, Neon Coral Reef) keep
- * remaking themselves, the oil looks (Classic, Velvet Underground, Oil &
+ * remaking themselves, the oil looks (Clock Glass, Velvet Underground, Oil &
  * Water, Lava Lamp) fold and drift, and the rest are light through moving
- * liquid. Left out on purpose: the looks made to hit with a band (Bass Drop,
+ * liquid. Classic was in the first list and came out after its film: with
+ * nothing heard its dye drains, and over the half hour the light per minute
+ * fell from 86 to 9 of 255, a black screen by the end (the judge's light line
+ * caught it). Clock Glass, cells of oil drifting in water, took its place.
+ * Left out on purpose: the looks made to hit with a band (Bass Drop,
  * Solar Flare, Cyberpunk Neon, Comet River, Acid Trip), the ones that move
  * the whole picture (Fractal Dream's mirror, Macro Bead's chasing camera),
  * and the flat pop ones (Poster, Roy).
  */
 export const TV_LOOPS: readonly TvLoop[] = [
   { id: 'chemical-clock', look: 'chemical-clock', title: 'Chemical Clock', seed: 1101 },
-  { id: 'classic', look: 'classic', title: 'Classic Light Show', seed: 1102 },
+  { id: 'clock-glass', look: 'clock-glass', title: 'Clock Glass', seed: 1102 },
   { id: 'aurora-borealis', look: 'aurora-borealis', title: 'Aurora Borealis', seed: 1103 },
   { id: 'jellyfish-bloom', look: 'jellyfish-bloom', title: 'Jellyfish Bloom', seed: 1104 },
   { id: 'velvet-underground', look: 'velvet-underground', title: 'Velvet Underground', seed: 1105 },
