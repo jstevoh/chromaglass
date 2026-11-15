@@ -1182,6 +1182,17 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
               display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
           </div>
+          {/*
+            The desk's two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a hand's tip of
+            the flat plate that stays where it is put, for a phone on a stand. Not the
+            phone's own Tilt, which stands the plate up (Gravity), so both can be on.
+          */}
+          <div className="mt-3">
+            <Slider label="Tilt left/right" value={p.mixer.settings.plateTiltX ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltX: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltX ?? 0) * 100)}%`} touch testId="phone-tilt-x" midiKey="setting:plateTiltX" />
+            <Slider label="Tilt up/down" value={p.mixer.settings.plateTiltY ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltY: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltY ?? 0) * 100)}%`} touch testId="phone-tilt-y" midiKey="setting:plateTiltY" />
+          </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>

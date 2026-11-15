@@ -93,6 +93,8 @@ const SECTION_OF: Record<string, string> = {
   plateRock: 'tilt',
   frameSway: 'look',
   slosh: 'tilt',
+  plateTiltX: 'tilt',
+  plateTiltY: 'tilt',
   beatSqueeze: 'show',
   kickBloom: 'show',
   melodyWalk: 'show',
