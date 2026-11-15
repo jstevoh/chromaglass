@@ -28,6 +28,22 @@ at the foot of this file):
   has been asked, so a cord the owner pulls stays pulled. Check: `musicstir` gains a saved
   look from before, read back with its cord, and one with the mark and no cord, left alone.
 
+The glass and the grain at rest (38u-8, 38u-11, shipped 2026-11-15) left two:
+
+- **38u-17. The glass's direction is a noise path** (S; Medium). Glass Smear is now a speed a
+  hand or a cord sets, but the way the glass goes is still `noise2D(0.3 t)` in `deriveStep`, a
+  wander nobody chose, and uniform over the plate, so the liquid leaves by the rim on one side
+  and comes back on the other (18a-2). A hand pushing the glass chooses the direction: give
+  the slide a direction the performer sets (a second dial, or the hand's drag on the phone),
+  and a cord that can carry it. Check: `glassstill` gains a direction held across a run.
+- **38u-18. A look saved before 38u-11 still slides its glass all the time** (S; Medium). The
+  built-in looks are laid out where they are defined; a look the owner saved with Glass Smear
+  above 0, or with none written (the old default of 0.3 filled in when it was made), reads
+  back sliding constantly, or not at all where none was written. Like 38u-16: hand a saved
+  look the slide cord once as it is read (`sanitizeSettings`, lib/glassSlide.ts
+  `laySlideCords`), with a mark so a cord the owner pulls stays pulled. Check: `glassstill`
+  gains a saved look read back with its cord and its dial at rest.
+
 How it is ranked: what a person would see change on the wall, against what it costs to
 build and what it adds to the frame. S is under a day, M a few days, L a week or more.
 Every item here keeps today's look reachable until the Mac has judged the new one (the
@@ -772,21 +788,17 @@ On in every look, or nearly:
   under −0.5: there it pulls unlike colours together, the backward diffusion that had the
   fingering push removed. Polarity 0.5 in every look. Drop the noise now; the force itself is
   **18d-6**'s (dyes in water mix, only oil and water hold a line).
-- **38u-8. Granulation is value noise** (M; High, the owner's call). `plate.ts` grainAt and
-  pigmentGrain: the solver carries the speckle's coordinates, so it moves rightly, but the
-  speckle is invented and scales the dye's depth at every pixel. Granulation 0.5 by default,
-  on in every look. A dye in solution has no grain; a pigment (India ink) flocculates. The
-  real thing is a concentration the solver carries below the grid (the particles, the fine
-  dye of 47a). Until then the choice is the owner's: default 0, or keep it named as a
-  shortcut. 38h-9 holds only its scale at zoom. none.
+- ~~**38u-8. Granulation is value noise**~~ — **Shipped 2026-11-15** (the story is in
+  `docs/plan-shipped.md`). The owner's call: default 0 in every look, the dial kept;
+  `npm run glassstill`. The real grain (a concentration carried below the grid) stays 47a's.
 - **38u-10. The dye's refractive index is three times a stand-in** (S; Medium, changes the
   Becke lines on every dye-only look). calcOpl adds d·0.015·max(1, 3·Boundary Contrast). A
   few percent of dye raises water's index by about 1e-3 (dn/dc near 0.15 mL/g). A measured
   dn/dc for each dye, and any boost a dial that says so. none (beside 18e-2).
-- **38u-11. Glass Smear slides the cover glass along a noise path, always** (S; Medium).
-  `fluidSimulation.ts:3129-3133`, noise2D(0.3 t), Glass Smear 0.3 by default and in 17 looks;
-  uniform, so the liquid leaves by the rim on one side and comes back on the other (18a-2).
-  The glass moves when a hand or a cord moves it; default 0. 27a-3 holds only its units.
+- ~~**38u-11. Glass Smear slides the cover glass along a noise path, always**~~ — **Shipped
+  2026-11-15** (the story is in `docs/plan-shipped.md`). Default 0; the 22 looks that slid
+  carry the slide as an LFO 1 cord whose top is their old speed; `npm run glassstill`. The
+  direction is still a noise path (**38u-17**).
 - Ranked here, held elsewhere: the black ground paints dye as light (**18b-2**, 23 of 35
   looks); the line between two dyes is a colour difference fed to the pupil (**18e-2**,
   **18e-1**); the gooey contrast curve decides where every edge falls (**18b-4**, the lit
