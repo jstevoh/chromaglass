@@ -123,6 +123,13 @@ Open from Desk v2, each its own thread (the UI lane):
   `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
 - ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
   XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
+  - ~~**8d-1** A CC on a board with no profile is a knob~~ (the owner, 2026-11-14:
+    Iridescence, learned to CC 16, sat as a full-width slider above the Recipe's knob
+    row). **Shipped**: `controlKindOf` draws an unknown board's absolute CCs as knobs; a
+    slider only where a profile knows the fader. Rides still draws every control as a
+    fader. Check `npm run desk`.
+  - **8d-2** (S) Profiles for more boards, or a per-control "knob / slider" choice in
+    MIDI learn, so a real fader on an unprofiled board can draw as one again.
 - ~~**8e** Load-in's Wall panel: the test pattern and Identify, and Output's Gain and Gamma
   as knobs~~ (shipped; checks `npm run wallpattern`, `npm run map`, `npm run layout`).
   - **8e-1** (S) The wall test from the phone. The remote has no Load-in at all (no
