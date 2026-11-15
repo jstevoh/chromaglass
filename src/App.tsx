@@ -6,7 +6,6 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
-import { closeupToggle } from './lib/macroLanding';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
@@ -1599,8 +1598,9 @@ export default function App() {
   }, []);
   // ── Macro zoom at will ──
   // + and − (and the wheel over the plate, and the chip) move the closeup's
-  // magnification a step at a time; + with the closeup off turns it on at a
-  // gentle 2×, and − never turns it off (the Macro button does that).
+  // magnification a step at a time, as the Macro Zoom slider does in one
+  // drag: + from the plate comes in gently, and − all the way down is the
+  // whole plate again. They are the zoom, the closeup's one control.
   // (settingsRef is declared above.)
   const zoomMacro = useCallback((dir: 1 | -1, amount = 1) => {
     const cur = settingsRef.current;
@@ -1786,13 +1786,6 @@ export default function App() {
       case 'play-toggle':     setIsActive(v => !v); break;
       case 'automate-toggle': setIsAutomated(v => !v); break;
       case 'overlays-toggle': if (overlaysVisible) hideOverlays(); else setOverlaysVisible(true); break;
-      case 'macro-toggle': {
-        // A pad still wants one press in and one press out. It moves the zoom,
-        // because that is the control; the flag rides along for the looks that
-        // still read it.
-        updateSettings(closeupToggle(settingsRef.current));
-        break;
-      }
       case 'seq-play-pause':  if (sequencer.status.running) sequencer.pause(); else sequencer.play(); break;
       case 'seq-next':        sequencer.next(); break;
       case 'seq-prev':        sequencer.prev(); break;
@@ -2806,18 +2799,8 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* Macro closeup */}
-                <button
-                  aria-pressed={!!settings.macroMode}
-                  onClick={() => updateSettings({ macroMode: !settings.macroMode })}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    settings.macroMode ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title="Macro closeup — magnify the plate and chase a single bead of liquid"
-                >
-                  <Microscope size={16} className={settings.macroMode ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Macro</span>
-                </button>
+                {/* The rail's Macro button, the closeup's on/off, is gone with
+                    the desk's Close-up (PLAN QA-32c): the Macro Zoom is the way in. */}
 
                 {/* Settings */}
                 <button
@@ -3121,7 +3104,7 @@ export default function App() {
             spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, bpm: tempoLabel.source ? tempoLabel.bpm : heardBpm, onChange: updateSettings }}
             onLucky={triggerLucky}
             zoom={settings.macroZoom ?? 1}
-            onZoom={() => runAction('macro-toggle')}
+            onZoom={pinchZoom}
             camera={settings.macroCamera ?? 'hold'}
             cameraShot={shotLabel(settings.macroHold)}
             onCamera={(c) => updateSettings({ macroCamera: c })}

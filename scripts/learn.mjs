@@ -483,7 +483,8 @@ const M = (source, depth, key = 'turbulenceScale') => {
     // NOT_ON_A_BEAT). The other three toggles the first version let through.
     { id: 'x7', source: 'kick', target: { kind: 'action', action: 'blackout-toggle' } },
     { id: 'x8', source: 'snare', target: { kind: 'action', action: 'automate-toggle' } },
-    { id: 'x9', source: 'bar', target: { kind: 'action', action: 'macro-toggle' } },
+    // (x9 was Macro, a toggle until the Close-up press was taken out, PLAN QA-32c.)
+    { id: 'x9', source: 'bar', target: { kind: 'action', action: 'overlays-toggle' } },
     { id: 'x10', source: 'beat', target: { kind: 'action', action: 'seq-play-pause' } },
     // A master: learnable on a fader, but the patch bay refuses it as a
     // target, so as a mapping it would load, do nothing, and light Sound Impact.

@@ -3,8 +3,9 @@
  *
  * What was reported (the owner, 2026-10-29, again 2026-11-14): "this closeup
  * button doesn't seem to do anything besides make the canvas black/empty".
- * The Close-up button, the M key, the zoom and the phone's pinch all bring the
- * closeup in on the camera's mode, and the default mode is Hold, aimed at the
+ * The zoom (the Macro Zoom slider, + and −, the wheel, the phone's pinch and
+ * zoom; the Close-up button that also did, until the owner asked for it gone
+ * on 2026-11-14, PLAN QA-32c) brings the closeup in on the camera's mode, and the default mode is Hold, aimed at the
  * middle of the plate. Hold sat on its aim and nowhere else, so on a plate
  * whose middle was bare (a look that pours in pools, a middle a finger had
  * swept, a plate between pours) the frame was four times the size of nothing:
@@ -26,7 +27,6 @@
  * summed-area table is kept between calls so those frames make no new arrays.
  */
 import type { MacroField } from './macroCamera';
-import type { VisualizerSettings } from '../types';
 
 /**
  * A held frame is bare glass when the dye in it is under this share of the
@@ -54,8 +54,6 @@ export const LAND_FULL_ZOOM = 2;
  * for the zoom's own ease in, which is most of a second.
  */
 export const LAND_SECONDS = 1.5;
-/** The zoom the Close-up press goes to (`MACRO_PRESET_ZOOM`, checked the same way). */
-export const CLOSEUP_PRESS_ZOOM = 4;
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -237,23 +235,4 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
   landing(field, ax, ay, hx, hy, margin, l.out);
   l.x = l.out.x; l.y = l.out.y;
   return !had;
-}
-
-/** Whether the closeup is in: the same reading as `macroZoomOf(s) > 1.05` (src/sim/constants.ts). */
-export function closeupIn(s: { macroMode?: boolean; macroZoom?: number }): boolean {
-  return s.macroMode === true || (s.macroZoom ?? 1) > 1.05;
-}
-
-/**
- * The one press in and out of the closeup: the desk's Close-up button, the M
- * key, a pad, the phone's Zoom. In by the zoom, as the slider and the pinch go
- * in, with the flag riding along; out to the plate with both. The desk button
- * used to flip the flag alone, so the plate went to 4x while the Macro Zoom
- * knob beside it still read 1.00x (the owner's screenshot, 2026-10-29), and a
- * look carrying a zoom with the flag off was in the closeup with the button
- * unlit; the M key read the zoom alone, so a look that set the flag was in
- * with M pressing it further in.
- */
-export function closeupToggle(s: { macroMode?: boolean; macroZoom?: number }): Pick<VisualizerSettings, 'macroMode' | 'macroZoom'> {
-  return closeupIn(s) ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: CLOSEUP_PRESS_ZOOM };
 }

@@ -2,8 +2,8 @@
 /**
  * The closeup comes in on liquid, never on bare glass.
  *
- *   npm run closeupland -- --node  the camera and the button's press (CI: logic)
- *   npm run closeupland           the app: the desk's Close-up button on a plate
+ *   npm run closeupland -- --node  the camera and the zoom's reading (CI: logic)
+ *   npm run closeupland           the app: the Macro Zoom pushed in on a plate
  *                                 whose middle is bare (CI: the Mac's tools
  *                                 shard; PW_WEBGPU=1 in a cloud session)
  *
@@ -36,12 +36,17 @@
  *      in Hold and in Follow; a zoom ramped in from 1.01x (the pinch, the
  *      slider) lands too; a switch from Auto to Hold mid-closeup does not
  *   7. out and in again lands again, whatever a hand did last time
- *   8. the button's press (`closeupToggle`, the M key's too) goes in by the
- *      zoom, to 4x, and comes out to the plate with both settings; a look
- *      carrying a zoom with the flag off is read as in
- *   9. the landing's copies of the solver's zooms agree with src/sim/constants
- *      (src/lib does not import src/sim), and the button's lit state
- *      (`closeupIn`) is `macroZoomOf(s) > 1.05` on every flag and zoom
+ *   8. the Macro Zoom is the closeup's one control (the owner, 2026-11-14:
+ *      "lets get rid of the close-up button. The macro zoom control should be
+ *      used for zooming in/out always", PLAN QA-32c): the frame's zoom
+ *      (`macroZoomOf`) is the Macro Zoom on every flag and zoom, so a look
+ *      with `macroMode` on and the zoom at 1 is at the plate (it was at 4x
+ *      under a knob reading 1.0x), and every shipped look that sets the flag
+ *      carries a zoom of its own past 1.05 (or it would now open at the plate)
+ *   9. the landing's copy of the solver's full zoom agrees with
+ *      src/sim/constants (src/lib does not import src/sim), and no hand in
+ *      src/ is a Close-up press any more: no `closeupToggle`, no
+ *      `macro-toggle` action, no `macro-button`, no flip of `macroMode`
  *  10. a zoom parked short of 2x (a pinch let go at 1.5x) stops asking after
  *      LAND_SECONDS: Hold on a full middle for ten seconds, the middle then
  *      drained, does not cut across the plate (it did, in one frame)
@@ -53,14 +58,15 @@
  * through the debug hook; at 1x the pool is drawn (the control: a black frame
  * is also what a frame that could not be read gives); the readback's dye in
  * the 4x frame on the aim is under BARE of the plate's (the control for the
- * press); the desk's Close-up button pressed: lit, the knob at 4x, over
- * LIT_SHARE of the frame's pixels lit with the shot on the pool and the aim
- * moved onto it; pressed again, out at 1x.
+ * zoom); the Macro Zoom pushed to 4x (the patch the Settings slider writes):
+ * the zoom chip reads 4.0x, over LIT_SHARE of the frame's pixels lit with the
+ * shot on the pool and the aim moved onto it; the chip's − pressed until it
+ * goes, out at 1x.
  */
 import { MacroCamera } from '../src/lib/macroCamera.ts';
 import { stream } from '../src/lib/rng.ts';
-import { closeupToggle, closeupIn, BARE_SHARE, LAND_FULL_ZOOM, CLOSEUP_PRESS_ZOOM } from '../src/lib/macroLanding.ts';
-import { macroZoomOf, MACRO_FULL_ZOOM, MACRO_PRESET_ZOOM } from '../src/sim/constants.ts';
+import { BARE_SHARE, LAND_FULL_ZOOM } from '../src/lib/macroLanding.ts';
+import { macroZoomOf, MACRO_FULL_ZOOM } from '../src/sim/constants.ts';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => { if (ok) passed++; else failed++; console.log(`${ok ? ' ok ' : ' FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`); };
@@ -243,29 +249,57 @@ if (process.argv.includes('--node')) {
       `told ${told.length} time(s) (1 wanted), at ${told.map(([x, y]) => `${fx(x)}, ${fx(y)}`).join('; ') || 'nowhere'}, the pool ${fx(toldOff)} of a half-frame off it (under 0.333 wanted); nudged, the frame ${fx(strayed)} of the plate from the new aim (under 0.005 wanted) with the pool ${fx(r.off)} of a half-frame off its middle (in the frame, under 1, wanted)`);
   }
 
+  // 8. The Macro Zoom is the closeup's one control.
   {
-    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-    const inFromPlate = closeupToggle({ macroMode: false, macroZoom: 1 });
-    const outOfFlag = closeupToggle({ macroMode: true, macroZoom: 1 });
-    const outOfZoom = closeupToggle({ macroMode: false, macroZoom: 2.1 });
-    const outOfBoth = closeupToggle({ macroMode: true, macroZoom: 6 });
-    check('the Close-up press goes in by the zoom and out with both settings',
-      same(inFromPlate, { macroMode: true, macroZoom: 4 }) && same(outOfFlag, { macroMode: false, macroZoom: 1 })
-      && same(outOfZoom, { macroMode: false, macroZoom: 1 }) && same(outOfBoth, { macroMode: false, macroZoom: 1 }),
-      `in ${JSON.stringify(inFromPlate)}; out of a flag-only look ${JSON.stringify(outOfFlag)}, of a zoom-only look ${JSON.stringify(outOfZoom)}`);
-  }
-
-  {
-    let disagree = 0, cases = 0;
+    let wrong = 0, cases = 0;
+    const off = [];
     for (const macroMode of [undefined, false, true]) {
       for (const macroZoom of [undefined, 0.5, 1, 1.04, 1.05, 1.06, 2, 4, 12]) {
         cases++;
-        if (closeupIn({ macroMode, macroZoom }) !== (macroZoomOf({ macroMode, macroZoom }) > 1.05)) disagree++;
+        const want = Math.max(1, macroZoom ?? 1);
+        if (macroZoomOf({ macroMode, macroZoom }) !== want) { wrong++; off.push(`${macroMode}/${macroZoom} → ${macroZoomOf({ macroMode, macroZoom })}`); }
       }
     }
-    check('the landing\'s zooms are the solver\'s, and the button is lit exactly when the closeup is in',
-      LAND_FULL_ZOOM === MACRO_FULL_ZOOM && CLOSEUP_PRESS_ZOOM === MACRO_PRESET_ZOOM && disagree === 0,
-      `full ${LAND_FULL_ZOOM} vs ${MACRO_FULL_ZOOM}, press ${CLOSEUP_PRESS_ZOOM} vs ${MACRO_PRESET_ZOOM}; lit state wrong on ${disagree} of ${cases} settings`);
+    // The flag-on look at 1x is the case the old reading drew at 4x: asked by name, so a
+    // grid that lost it could not pass.
+    const flagAtOne = macroZoomOf({ macroMode: true, macroZoom: 1 });
+    const { PRESETS } = await import('../src/presets.ts');
+    const flagged = PRESETS.filter((p) => p.settings.macroMode === true);
+    const bare = flagged.filter((p) => !((p.settings.macroZoom ?? 1) > 1.05)).map((p) => p.id);
+    check('the frame\'s zoom is the Macro Zoom on every flag, and every closeup look carries its own',
+      wrong === 0 && flagAtOne === 1 && flagged.length > 0 && bare.length === 0,
+      `${wrong} of ${cases} flag and zoom pairs read otherwise${off.length ? ` (${off.join(', ')})` : ''}; macroMode on at 1x reads ${flagAtOne}x (1 wanted: it was 4); ${flagged.length} shipped closeup looks, ${bare.length ? `with no zoom: ${bare.join(', ')}` : 'each with a zoom past 1.05'}`);
+  }
+
+  // 9. The landing's full zoom is the solver's, and no Close-up press is left in src/.
+  {
+    /*
+      The owner asked for the Close-up button gone everywhere (2026-11-14):
+      the desk's Recipe panel, the side rail's Macro, the phone's Zoom toggle,
+      the remote's Closeup switch, the palette's "Macro closeup", the Macro
+      pad action on MIDI, the gamepad and the controllers' maps. Each was a
+      press to 4x and back beside the zoom; a scan of the source is how a
+      hand that comes back would be seen, since none of them has a check of
+      its own any more to fail. A write of `macroMode` is only `true`,
+      `false`, a zoom compared to 1.05 or a stage's own boolean; never `!`.
+    */
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join, relative } = await import('node:path');
+    const root = join(process.cwd(), 'src');
+    const files = [];
+    const walk = (d) => { for (const n of readdirSync(d)) { const f = join(d, n); if (statSync(f).isDirectory()) walk(f); else if (/\.tsx?$/.test(n)) files.push(f); } };
+    walk(root);
+    const hits = [];
+    for (const f of files) {
+      const rel = relative(root, f).split('\\').join('/');
+      readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+        if (/^\s*(\/\/|\*|\{\/\*)/.test(line)) return;
+        if (/closeupToggle|'macro-toggle'|"macro-toggle"|macro-button|macroMode:\s*!/.test(line)) hits.push(`${rel}:${i + 1}`);
+      });
+    }
+    check('the landing\'s full zoom is the solver\'s, and no Close-up press is left in the app',
+      LAND_FULL_ZOOM === MACRO_FULL_ZOOM && files.length > 100 && hits.length === 0,
+      `full ${LAND_FULL_ZOOM} vs ${MACRO_FULL_ZOOM}; ${files.length} source files, a Close-up press at ${hits.join(', ') || 'none'}`);
   }
 } else {
   const { chromium } = await import('playwright');
@@ -352,28 +386,37 @@ if (process.argv.includes('--node')) {
       `${flat === null ? 'no frame read' : fx(flat)} of the frame lit, its brightest pixel ${Math.round(lit.top ?? 0)} of 255 (over 0.005 wanted: a frame that could not be read is black too)`);
     check('the control: the frame on the aim is bare glass', before.onAim < BARE,
       `the 4x frame on the aim holds ${fx(before.onAim)} of the plate's average dye (under ${BARE} wanted)`);
-    const button = page.locator('[data-testid="macro-button"]');
-    // Clicked in the page: a software plate's frames outlast Playwright's own wait after a click.
-    await button.evaluate((b) => b.click());
+    // In by the Macro Zoom, the closeup's one control: the patch its Settings
+    // slider writes (LookSections' Macro Zoom), to 4x.
+    await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 4, macroMode: true }));
     await settlePlate(page, 1500);
     const inside = await state();
-    const pressed = await button.getAttribute('aria-pressed');
+    const chip = await page.locator('[data-testid="macro-zoom-value"]').textContent().catch(() => null);
     const close = await lit();
     // Lit, and lit by the pool: the shot on it, and the aim moved there from
     // the bare middle (the landing is handed back as the aim, `onLand`). The
     // old camera never wrote the aim, so a look that poured into the middle
     // meanwhile cannot pass this for it.
     const aimToPool = Math.hypot(inside.aimX - POOL[0], inside.aimY - POOL[1]);
-    check('Close-up lands on the liquid, not on bare glass, and the aim says where',
+    check('the zoom pushed in lands on the liquid, not on bare glass, and the aim says where',
       close !== null && close > LIT_SHARE && inside.off < 1 / 3 && aimToPool < 0.05,
       `${close === null ? 'no frame read' : fx(close)} of the 4x frame lit (over ${LIT_SHARE} wanted), the pool ${fx(inside.off)} of a half-frame off its middle (under 0.333 wanted), the aim at ${fx(inside.aimX)}, ${fx(inside.aimY)}, ${fx(aimToPool)} of the plate from the pool (under 0.05 wanted)`);
-    check('and the button lights and the zoom reads 4x', pressed === 'true' && inside.macroZoom === 4 && inside.zoom > 3,
-      `aria-pressed ${pressed}, Macro Zoom ${inside.macroZoom}, the frame at ${fx(inside.zoom)}x`);
-    await button.evaluate((b) => b.click());
+    check('and the zoom chip reads 4x with the frame there', chip?.trim() === '4.0×' && inside.macroZoom === 4 && inside.zoom > 3,
+      `the chip reads ${chip ?? 'nothing'}, Macro Zoom ${inside.macroZoom}, the frame at ${fx(inside.zoom)}x`);
+    // Out by the zoom too: the chip's − (the − key's step) until it is gone,
+    // with no switch to find. Clicked in the page: a software plate's frames
+    // outlast Playwright's own wait after a click.
+    let presses = 0;
+    for (; presses < 20; presses++) {
+      const minus = page.locator('[data-testid="macro-zoom-out"]');
+      if (!(await minus.count())) break;
+      await minus.evaluate((b) => b.click());
+      await page.waitForTimeout(50);
+    }
     await settlePlate(page, 1000);
     const out = await state();
-    check('pressed again, it is out at the plate', out.macroMode === false && out.macroZoom === 1,
-      `macroMode ${out.macroMode}, Macro Zoom ${out.macroZoom}`);
+    check('the zoom brought down is out at the plate, the flag with it', out.macroMode === false && out.macroZoom === 1 && out.zoom < 1.05,
+      `after ${presses} presses of −: macroMode ${out.macroMode}, Macro Zoom ${out.macroZoom}, the frame at ${fx(out.zoom)}x`);
   } finally {
     await browser.close();
     stop();

@@ -95,7 +95,7 @@ export interface PhonePlayProps {
   onDye: (hex: string) => void;
   /** The app's hand: Play sets it from the tray and from the touch itself. */
   onTool: (t: PhoneTool) => void;
-  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom' | 'macroMode'>;
+  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
@@ -114,11 +114,8 @@ export interface PhonePlayProps {
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-/** The zoom the plate is drawn at, as LiquidVisualizer's macroZoomOf reads the look (a closeup look with no zoom of its own is at 4). */
-const zoomOf = (s: PhonePlayProps['settings']) => {
-  const z = s.macroZoom ?? 1;
-  return s.macroMode === true ? (z > 1.05 ? z : 4) : Math.max(1, z);
-};
+/** The zoom the plate is drawn at: the Macro Zoom alone, as LiquidVisualizer's macroZoomOf reads it (PLAN QA-32c). */
+const zoomOf = (s: PhonePlayProps['settings']) => Math.max(1, s.macroZoom ?? 1);
 
 /** A 36-tall glass pill in a 48 px target: lit while pressed, or solid red when what it holds is live (recording). */
 function Pill({ onPress, label, testId, children, pressed, live = false }: { onPress: () => void; label: string; testId: string; children: ReactNode; pressed?: boolean; live?: boolean }) {

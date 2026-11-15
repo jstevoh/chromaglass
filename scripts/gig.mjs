@@ -144,7 +144,16 @@ const actions = [
     return `kaleido ${s.kaleidoscope}, macro ${s.macroMode} x${(s.macroZoom ?? 1).toFixed(1)}, ${s.renderStyle}`;
   } },
   { weight: 1, name: 'desk action', run: async (page) => {
-    const a = pick(['seed', 'automate-toggle', 'spin-front', 'macro-toggle']);
+    const a = pick(['seed', 'automate-toggle', 'spin-front', 'zoom']);
+    // The closeup in and out by its one control, the Macro Zoom (it was the
+    // Macro pad action until the Close-up press was taken out, PLAN QA-32c).
+    if (a === 'zoom') {
+      return page.evaluate(() => {
+        const zin = !((window.chromaglassDebug().settings.macroZoom ?? 1) > 1.05);
+        window.chromaglassSettings?.(zin ? { macroZoom: 4, macroMode: true } : { macroZoom: 1, macroMode: false });
+        return zin ? 'zoom in' : 'zoom out';
+      });
+    }
     await page.evaluate((x) => window.chromaglassAction?.(x), a);
     return a;
   } },

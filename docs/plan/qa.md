@@ -27,6 +27,9 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   black/empty" (the owner, 2026-10-29, with a screenshot; asked again 2026-11-14).~~
   **Fixed**: the closeup comes in on the nearest liquid when its aim shows none
   (`npm run closeupland`). Story in `docs/plan-shipped.md` §QA-32.
+- ~~**QA-32c** Get rid of the Close-up button; the Macro Zoom is the way in and out,
+  always (the owner, 2026-11-14).~~ **Shipped** (`npm run closeupland`). Story in
+  `docs/plan-shipped.md` §QA-32c.
 - **QA-32a** A held closeup whose frame empties while it is in (the pool flows out of it,
   Evolve thins it, a finger sweeps it) stays on the glass: Hold holds, by design, and only
   coming in lands (QA-32). Follow rides the liquid instead. Whether Hold should step to the
