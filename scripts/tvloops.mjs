@@ -8,6 +8,7 @@
  *   npm run tvloops -- --upload                    and put each on the tv-loops-1 pre-release
  *   npm run tvloops -- --upload --clean            and delete each loop here once it is up
  *   npm run tvloops -- --judge=out/galaxy.mp4      the judge alone, on any loop
+ *   npm run tvloops -- --only=classic --from-raw=f.mp4   cut, judge and preview a film already rendered
  *
  * The owner, 2026-11-14: "audio free visuals that the appletv and googletv
  * apps can use. like 10 different 30 minute loops that evolve over time and
@@ -126,6 +127,7 @@ const ONLY = typeof opt('only') === 'string' ? opt('only').split(',') : null;
 const UPLOAD = !!opt('upload');
 const KEEP_RAW = !!opt('keep-raw');
 const CLEAN = !!opt('clean');
+const FROM_RAW = typeof opt('from-raw') === 'string' ? path.resolve(opt('from-raw')) : null;
 const LOOP_S = Number(opt('seconds') ?? TV_LOOP_SECONDS);
 const WARM_S = Number(opt('warm') ?? TV_LOOP_WARM_S);
 const SEAM_S = Number(opt('seam') ?? TV_LOOP_SEAM_S);
@@ -176,8 +178,13 @@ function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew
   const inputs = seam > 0
     ? ['-ss', t(warm + loop), '-t', t(seam), '-i', raw, '-ss', t(warm), '-t', t(seam), '-i', raw, '-ss', t(warm + seam + skew), '-t', t(loop - seam), '-i', raw]
     : ['-ss', t(warm), '-t', t(loop), '-i', raw];
-  // blend's T is the frame's time in seconds from the piece's start: A (the
-  // tail) whole at the loop's first frame, B (its own) whole at `seam`.
+  // The weights by frame number, never by blend's T: A (the tail) whole at
+  // the loop's first frame, B (its own) whole at the crossfade's last, so the
+  // step from there into the film's next frame is the film's own. Measured on
+  // the owner's Mac (Classic, 2026-11-15): weighted by T/seam the fade's last
+  // frames still carried the tail, its ramp a few frames short of whole, and
+  // the step out of the fade read 4 to 10 keyframe steps on four of the first
+  // six loops while the films' own steps beside it read one.
   //
   // Every piece is cut to its count of frames and its frames numbered afresh
   // (setpts=N/fps), never left to its timestamps: measured on the controls,
@@ -189,7 +196,7 @@ function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew
   const piece = (i, frames, name) => `[${i}:v]trim=end_frame=${frames},setpts=N/${FPS}/TB[${name}]`;
   const graph = seam > 0
     ? `${piece(0, n(seam), 'a')};${piece(1, n(seam), 'b')};${piece(2, n(loop - seam), 'c')};` +
-      `[a][b]blend=all_expr='A*(1-T/${seam})+B*(T/${seam})'[f];[f][c]concat=n=2:v=1:a=0,setpts=N/${FPS}/TB,format=yuv420p[v]`
+      `[a][b]blend=all_expr='A*(1-N/${n(seam) - 1})+B*(N/${n(seam) - 1})'[f];[f][c]concat=n=2:v=1:a=0,setpts=N/${FPS}/TB,format=yuv420p[v]`
     : `${piece(0, n(loop), 'c')};[c]format=yuv420p[v]`;
   const a = audio ? ['-f', 'lavfi', '-t', t(loop), '-i', 'anullsrc=r=48000:cl=stereo'] : [];
   const maps = audio ? ['-map', '[v]', '-map', `${seam > 0 ? 3 : 1}:a`, '-c:a', 'aac'] : ['-map', '[v]', '-an'];
@@ -350,95 +357,103 @@ async function makeAll() {
   const loops = TV_LOOPS.filter((l) => !ONLY || ONLY.includes(l.id));
   if (!loops.length) throw new Error(`no loop called ${ONLY}`);
   fs.mkdirSync(OUT, { recursive: true });
-  const DIST = path.join(OUT, 'dist');
-  // No sign-in in the build: a Mac with the owner's Firebase settings in .env
-  // would otherwise ask for one (see scripts/sitefilms.mjs).
-  console.log('tvloops: building the site with no sign-in…');
-  execFileSync('npx', ['vite', 'build', '--outDir', DIST, '--emptyOutDir'], {
-    stdio: ['ignore', 'ignore', 'inherit'],
-    env: { ...process.env, VITE_FIREBASE_API_KEY: '', VITE_FIREBASE_AUTH_DOMAIN: '', VITE_FIREBASE_PROJECT_ID: '', VITE_FIREBASE_APP_ID: '', VITE_FIREBASE_HOSTED_SITE: '' },
-  });
-  const server = spawn('./node_modules/.bin/vite', ['preview', '--outDir', DIST, '--port', String(PORT), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
-  const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* gone */ } };
-  process.on('exit', stop);
-  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(); process.exit(130); });
-  await new Promise((r) => setTimeout(r, 2500));
-  const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
+  let browser = null;
+  if (!FROM_RAW) {
+    const DIST = path.join(OUT, 'dist');
+    // No sign-in in the build: a Mac with the owner's Firebase settings in .env
+    // would otherwise ask for one (see scripts/sitefilms.mjs).
+    console.log('tvloops: building the site with no sign-in…');
+    execFileSync('npx', ['vite', 'build', '--outDir', DIST, '--emptyOutDir'], {
+      stdio: ['ignore', 'ignore', 'inherit'],
+      env: { ...process.env, VITE_FIREBASE_API_KEY: '', VITE_FIREBASE_AUTH_DOMAIN: '', VITE_FIREBASE_PROJECT_ID: '', VITE_FIREBASE_APP_ID: '', VITE_FIREBASE_HOSTED_SITE: '' },
+    });
+    const server = spawn('./node_modules/.bin/vite', ['preview', '--outDir', DIST, '--port', String(PORT), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
+    const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* gone */ } };
+    process.on('exit', stop);
+    for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(); process.exit(130); });
+    await new Promise((r) => setTimeout(r, 2500));
+    browser = await launchChromium(chromium, { args: [AUTOPLAY] });
+  }
   const filmSeconds = WARM_S + LOOP_S + SEAM_S;
   const silence = silenceWav(filmSeconds + 1);
   const manifestPath = path.join(OUT, 'tvloops.json');
   const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
 
   for (const loop of loops) {
-    const raw = path.join(OUT, `${loop.id}-raw.mp4`), out = path.join(OUT, `${loop.id}.mp4`);
+    const raw = FROM_RAW ?? path.join(OUT, `${loop.id}-raw.mp4`), out = path.join(OUT, `${loop.id}.mp4`);
     // Room for the render (about 1.4 GB) and the loop (up to 1.4 GB) beside
     // it: a disk that fills halfway through a render loses the half hour.
     const free = (() => { try { const f = fs.statfsSync(OUT); return f.bavail * f.bsize; } catch { return Infinity; } })();
     if (free < 4e9) throw new Error(`${loop.id}: ${(free / 1e9).toFixed(1)} GB free here, and a loop needs about 3 GB while it is made; stopping`);
-    const t0 = Date.now();
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-    // The save picker, stood in for: each positioned write lands in `raw`.
-    let fd = null, written = 0, closed = false;
-    await page.exposeFunction('__tvloopOpen', () => { fd = fs.openSync(raw, 'w'); written = 0; });
-    await page.exposeFunction('__tvloopWrite', (position, b64) => { const b = Buffer.from(b64, 'base64'); fs.writeSync(fd, b, 0, b.length, position); written += b.length; });
-    await page.exposeFunction('__tvloopClose', () => { fs.closeSync(fd); closed = true; });
-    await page.exposeFunction('__tvloopAbort', () => { if (fd !== null && !closed) { fs.closeSync(fd); closed = true; } });
-    await page.addInitScript(() => {
-      const b64 = (u) => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
-      window.showSaveFilePicker = async (o) => {
-        await window.__tvloopOpen();
-        return {
-          name: o?.suggestedName ?? 'film.mp4',
-          remove: async () => window.__tvloopAbort(),
-          createWritable: async () => ({
-            write: async (p) => {
-              const d = p.data instanceof Uint8Array ? p.data : new Uint8Array(p.data.buffer ?? p.data, p.data.byteOffset ?? 0, p.data.byteLength);
-              await window.__tvloopWrite(p.position, b64(d));
-            },
-            close: async () => window.__tvloopClose(),
-            abort: async () => window.__tvloopAbort(),
-          }),
+    let renderMin = 0;
+    if (FROM_RAW) {
+      if (loops.length !== 1) throw new Error('--from-raw cuts one loop: name it with --only');
+    } else {
+      const t0 = Date.now();
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
+      // The save picker, stood in for: each positioned write lands in `raw`.
+      let fd = null, written = 0, closed = false;
+      await page.exposeFunction('__tvloopOpen', () => { fd = fs.openSync(raw, 'w'); written = 0; });
+      await page.exposeFunction('__tvloopWrite', (position, b64) => { const b = Buffer.from(b64, 'base64'); fs.writeSync(fd, b, 0, b.length, position); written += b.length; });
+      await page.exposeFunction('__tvloopClose', () => { fs.closeSync(fd); closed = true; });
+      await page.exposeFunction('__tvloopAbort', () => { if (fd !== null && !closed) { fs.closeSync(fd); closed = true; } });
+      await page.addInitScript(() => {
+        const b64 = (u) => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
+        window.showSaveFilePicker = async (o) => {
+          await window.__tvloopOpen();
+          return {
+            name: o?.suggestedName ?? 'film.mp4',
+            remove: async () => window.__tvloopAbort(),
+            createWritable: async () => ({
+              write: async (p) => {
+                const d = p.data instanceof Uint8Array ? p.data : new Uint8Array(p.data.buffer ?? p.data, p.data.byteOffset ?? 0, p.data.byteLength);
+                await window.__tvloopWrite(p.position, b64(d));
+              },
+              close: async () => window.__tvloopClose(),
+              abort: async () => window.__tvloopAbort(),
+            }),
+          };
         };
-      };
-    });
-    await page.route('**/__tvloops/silence.wav', (r) => r.fulfill({ status: 200, contentType: 'audio/wav', body: silence }));
-    await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=${loop.look}&seed=${loop.seed}`, { waitUntil: 'load' });
-    let engine = null;
-    for (let i = 0; i < 60 && !isGpuEngine(engine); i++) {
-      await page.waitForTimeout(1000);
-      engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+      });
+      await page.route('**/__tvloops/silence.wav', (r) => r.fulfill({ status: 200, contentType: 'audio/wav', body: silence }));
+      await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=${loop.look}&seed=${loop.seed}`, { waitUntil: 'load' });
+      let engine = null;
+      for (let i = 0; i < 60 && !isGpuEngine(engine); i++) {
+        await page.waitForTimeout(1000);
+        engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+      }
+      if (!isGpuEngine(engine)) throw new Error(`${loop.id}: the GPU solver never came up (${engine ?? 'no debug hook'}); this needs a Mac`);
+      const up = await untilRunning(page);
+      if (!up.ok) throw new Error(`${loop.id}: the show's loop never ran steadily`);
+      // Evolve on, as the desk's Evolve button: the look's slow moves over the half hour.
+      const evolving = await page.evaluate(async () => {
+        const on = () => !!window.chromaglassCastState?.().isAutomated;
+        if (!on()) window.chromaglassAction?.('automate-toggle');
+        for (let i = 0; i < 20 && !on(); i++) await new Promise((r) => setTimeout(r, 100));
+        return on();
+      });
+      if (!evolving) throw new Error(`${loop.id}: Evolve would not switch on`);
+      // A few of the plate's dials, for the log: which look is on and how fast it runs.
+      const dials = await page.evaluate(() => { const s = window.chromaglassCastState?.().settings ?? {}; return ['globalSpeed', 'turbulenceScale', 'bzReaction', 'automateRate'].map((k) => `${k} ${s[k]}`).join(', '); });
+      console.log(`  ${loop.id}: ${dials}`);
+      console.log(`tvloops: ${loop.id}: rendering ${filmSeconds} s of ${loop.look} at ${TV_LOOP_WIDTH}x${TV_LOOP_HEIGHT}, ${FPS} fps, seed ${loop.seed}, Evolve on…`);
+      const tick = setInterval(() => console.log(`  ${loop.id}: ${(written / 1e6).toFixed(0)} MB written, ${((Date.now() - t0) / 60000).toFixed(1)} min`), 60000);
+      const r = await page.evaluate(async ({ w, h, fps, seed }) => {
+        const song = await (await fetch('/__tvloops/silence.wav')).arrayBuffer();
+        const x = await window.chromaglassRender({ song, width: w, height: h, fps, seed, toDisk: true, hashFrames: false });
+        return { phase: x.phase, message: x.message, format: x.format };
+      }, { w: TV_LOOP_WIDTH, h: TV_LOOP_HEIGHT, fps: FPS, seed: loop.seed });
+      clearInterval(tick);
+      await page.close();
+      renderMin = (Date.now() - t0) / 60000;
+      if (r.phase !== 'done' || !closed) throw new Error(`${loop.id}: the render ended ${r.phase}: ${r.message}`);
+      console.log(`  ${loop.id}: ${r.format}; ${(written / 1e6).toFixed(0)} MB in ${renderMin.toFixed(1)} min`);
     }
-    if (!isGpuEngine(engine)) throw new Error(`${loop.id}: the GPU solver never came up (${engine ?? 'no debug hook'}); this needs a Mac`);
-    const up = await untilRunning(page);
-    if (!up.ok) throw new Error(`${loop.id}: the show's loop never ran steadily`);
-    // Evolve on, as the desk's Evolve button: the look's slow moves over the half hour.
-    const evolving = await page.evaluate(async () => {
-      const on = () => !!window.chromaglassCastState?.().isAutomated;
-      if (!on()) window.chromaglassAction?.('automate-toggle');
-      for (let i = 0; i < 20 && !on(); i++) await new Promise((r) => setTimeout(r, 100));
-      return on();
-    });
-    if (!evolving) throw new Error(`${loop.id}: Evolve would not switch on`);
-    // A few of the plate's dials, for the log: which look is on and how fast it runs.
-    const dials = await page.evaluate(() => { const s = window.chromaglassCastState?.().settings ?? {}; return ['globalSpeed', 'turbulenceScale', 'bzReaction', 'automateRate'].map((k) => `${k} ${s[k]}`).join(', '); });
-    console.log(`  ${loop.id}: ${dials}`);
-    console.log(`tvloops: ${loop.id}: rendering ${filmSeconds} s of ${loop.look} at ${TV_LOOP_WIDTH}x${TV_LOOP_HEIGHT}, ${FPS} fps, seed ${loop.seed}, Evolve on…`);
-    const tick = setInterval(() => console.log(`  ${loop.id}: ${(written / 1e6).toFixed(0)} MB written, ${((Date.now() - t0) / 60000).toFixed(1)} min`), 60000);
-    const r = await page.evaluate(async ({ w, h, fps, seed }) => {
-      const song = await (await fetch('/__tvloops/silence.wav')).arrayBuffer();
-      const x = await window.chromaglassRender({ song, width: w, height: h, fps, seed, toDisk: true, hashFrames: false });
-      return { phase: x.phase, message: x.message, format: x.format };
-    }, { w: TV_LOOP_WIDTH, h: TV_LOOP_HEIGHT, fps: FPS, seed: loop.seed });
-    clearInterval(tick);
-    await page.close();
-    const renderMin = (Date.now() - t0) / 60000;
-    if (r.phase !== 'done' || !closed) throw new Error(`${loop.id}: the render ended ${r.phase}: ${r.message}`);
-    console.log(`  ${loop.id}: ${r.format}; ${(written / 1e6).toFixed(0)} MB in ${renderMin.toFixed(1)} min`);
 
     const t1 = Date.now();
     makeLoop(raw, out, { warm: WARM_S, loop: LOOP_S, seam: SEAM_S });
-    if (!KEEP_RAW) fs.rmSync(raw);
+    if (!KEEP_RAW && !FROM_RAW) fs.rmSync(raw);
     const loopMin = (Date.now() - t1) / 60000;
     const j = judge(out, LOOP_S, SEAM_S);
     const l = report(loop.id, j, LOOP_S);
@@ -469,7 +484,7 @@ async function makeAll() {
     }
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   }
-  await browser.close();
+  await browser?.close();
 }
 
 if (CONTROLS) controls();
