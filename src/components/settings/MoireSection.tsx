@@ -2,6 +2,7 @@ import { Grid3x3 } from 'lucide-react';
 import { groupOf } from '../../lib/settingsMap';
 import { MOIRE_SHEETS } from '../../lib/moire';
 import { useMoirePreview } from '../../hooks/useMoirePreview';
+import { openAccountSheet } from '../../lib/tierGates';
 import { Info } from '../Info';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
@@ -55,6 +56,11 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
           {pack.secondsLeft <= 0 && (
             <button type="button" onClick={pack.start} className="rounded-full bg-white/10 px-3 py-1 text-white/85 hover:bg-white/20" data-testid="moire-try">
               Try for a minute
+            </button>
+          )}
+          {pack.secondsLeft <= 0 && (
+            <button type="button" onClick={openAccountSheet} className="rounded-full bg-white/10 px-3 py-1 text-white/85 hover:bg-white/20" data-testid="moire-get">
+              Get it
             </button>
           )}
         </div>

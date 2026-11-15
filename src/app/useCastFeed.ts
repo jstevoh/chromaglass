@@ -11,6 +11,9 @@ import type { VisualizerSettings } from '../types';
 import type { OutputConfig } from '../lib/outputConfig';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { SongChange } from '../hooks/useSongChange';
+import { useEarView } from '../hooks/useEarView';
+import { publishRoom } from './earNow';
+import { publishMedia, setMediaDoor } from './mediaNow';
 
 /**
  * Keeping a receiver in step: the cast window, the mirror and the network
@@ -46,21 +49,24 @@ interface CastFeedDeps {
   isCasting: boolean;
   ear: Ear;
   hear: () => AudioData | null;
-  audioData: AudioData | null;
   songChange: SongChange | null;
   stageRef: RefObject<{ width: number; height: number; } | null>;
   settingsRef: RefObject<VisualizerSettings>;
   renderAudioRef: RefObject<AudioData | null>;
   renderAudio: AudioData | null;
-  liveAudio: AudioData | null;
 }
+
+// What this hook selects from the ear's view: booleans, so App() renders for
+// them only when one flips (the ear starts or stops, a calibration starts or ends).
+const hasReading = (a: AudioData | null) => a !== null;
+const hasRoom = (a: AudioData | null) => !!a?.calibration;
+const roomIsCalibrating = (a: AudioData | null) => a?.calibration?.calibrating ?? false;
 
 export function useCastFeed({
   wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
   clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
   mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
-  isCasting, ear, hear, audioData, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
-  liveAudio,
+  isCasting, ear, hear, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
 }: CastFeedDeps) {
   // ── Cast: keep the receiver in step ─────────────────────────────
   /*
@@ -213,6 +219,33 @@ export function useCastFeed({
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
   }, [castSend]);
+  /*
+    The assistant's door and copy for the mark (app/mediaNow.ts, PLAN
+    44k-13): the picture the show server serves, fetched and handed to
+    loadMark as the file input's would be (so the free tier's word, the
+    cast and the relay all follow), once it decodes as a picture.
+  */
+  const loadMarkRef = useRef(loadMark);
+  loadMarkRef.current = loadMark;
+  const clearMarkRef = useRef(clearMark);
+  clearMarkRef.current = clearMark;
+  useEffect(() => {
+    setMediaDoor('mark', {
+      load: async (url, name) => {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return `the show server would not hand over that picture (${r.status})`;
+          const blob = await r.blob();
+          (await createImageBitmap(blob)).close();
+          loadMarkRef.current(new File([blob], name, { type: blob.type }));
+          return null;
+        } catch { return 'that file would not open as a picture'; }
+      },
+      clear: () => clearMarkRef.current(),
+    });
+    return () => setMediaDoor('mark', null);
+  }, []);
+  useEffect(() => { publishMedia({ mark: markLoaded }); }, [markLoaded]);
   castReadyRef.current = () => sendCastState(true);
   /*
     A ride between React's renders asks for a send the way a change of state
@@ -266,8 +299,8 @@ export function useCastFeed({
   appRendersRef.current++;
   const hearRef = useRef(hear);
   hearRef.current = hear;
-  const liveDebugRef = useRef({ isCasting, castState, audioData, songChange, isAutomated });
-  liveDebugRef.current = { isCasting, castState, audioData, songChange, isAutomated };
+  const liveDebugRef = useRef({ isCasting, castState, songChange, isAutomated });
+  liveDebugRef.current = { isCasting, castState, songChange, isAutomated };
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
       window.chromaglassCastState = () => {
@@ -333,13 +366,33 @@ export function useCastFeed({
     if (!feedingCast) return;
     return onReading((a) => { if (!renderAudioRef.current) sendCastAudio(a); });
   }, [feedingCast, onReading, sendCastAudio]);
-  // A render's reading, and the ear going quiet (stopped: no more readings to
-  // say so), both reach the feed as state.
+  /*
+    A render's reading, and the ear going quiet (stopped: no more readings to
+    say so), both reach the feed as state. The ear's part of that is one
+    boolean selected from its view (hooks/useEarView.ts): this hook runs in
+    App(), and the reading itself as state here rendered the whole shell ten
+    times a second (PLAN.md 46f). Whether there is a reading changes when
+    the ear starts and when it stops, and that is all this effect asks.
+  */
+  const earHearing = useEarView(ear.view, hasReading);
   useEffect(() => {
     if (!feedingCast) return;
     if (renderAudio) sendCastAudio(renderAudio);
-    else if (!liveAudio) { lastCastAudioRef.current = -Infinity; sendCastAudio(null); }
-  }, [feedingCast, renderAudio, liveAudio, sendCastAudio]);
+    else if (!earHearing) { lastCastAudioRef.current = -Infinity; sendCastAudio(null); }
+  }, [feedingCast, renderAudio, earHearing, sendCastAudio]);
+
+  /*
+    The room's calibration, for the owner's assistant (app/earNow.ts, PLAN
+    44k-10). Here because this is the hook App() hands the ear's reading to,
+    and App() may not grow. The live ear's, never a render's (a render hears
+    a file, not the room), and only when the calibration starts or ends or
+    the ear starts or stops hearing, which is when the copy is taken.
+  */
+  const roomHeard = useEarView(ear.view, hasRoom);
+  const roomCalibrating = useEarView(ear.view, roomIsCalibrating);
+  const earViewRef = useRef(ear.view);
+  earViewRef.current = ear.view;
+  useEffect(() => { publishRoom(earViewRef.current.get()?.calibration ?? null); }, [roomHeard, roomCalibrating]);
 
   return {
     castState, relaySendRef, markLoaded, loadMark, clearMark,

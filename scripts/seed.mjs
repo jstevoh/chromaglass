@@ -112,6 +112,10 @@ const ALLOW = {
     crypto: 1,
     why: 'the id a Live Show destination keeps its stream key under in the keychain store (live-<id>); seeded, two destinations added on the same ?seed= would share one key; never drawn',
   },
+  'src/lib/macApp.ts': {
+    crypto: 1,
+    why: 'the one-time code the Mac app\'s window files a browser sign-in under (PLAN 23.17f, newHandoffCode); it guards a credential, so it must be unguessable, and seeded it would be the same code on every ?seed= run; never drawn',
+  },
 };
 
 /** Every source of randomness in one file, by kind, with lines. */

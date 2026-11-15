@@ -98,9 +98,9 @@ export class SurfaceWatcher {
     this.order = 0;
   }
 
-  /** One message. Note-offs are ignored: a press and its release are one control. */
+  /** One message. Note-offs and program changes are ignored: auto-map watches physical controls. */
   observe(e: MidiEvent): void {
-    if (e.kind === 'noteoff') return;
+    if (e.kind === 'noteoff' || e.kind === 'program') return;
     const kind = e.kind === 'cc' ? 'cc' : 'note';
     const key = `${kind}:${e.channel}:${e.number}`;
     let s = this.seen.get(key);

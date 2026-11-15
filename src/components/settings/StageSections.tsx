@@ -195,6 +195,30 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
           want; the plate shows through wherever the file is transparent. It sits under nothing, including the house
           dimmer, so a blackout leaves the mark on the wall. Its own opacity is the control for taking it off.
         </Info>
+        {/*
+          The song's title (PLAN 37x-10, 37x-10j): when the ear names a new
+          song, its credit goes up as the corner caption. Here beside the logo
+          because both are what the wall says about the show, and in Play's
+          Live Show set by the phone's Title switch too. It could be poured as
+          ink instead, with its colour, size, height and sweep here, until the
+          owner shelved the ink on 2026-11-12 (37x-10m: "this poured option
+          never really worked"). Those settings stay in the settings, unread
+          by any title, and their controls are gone: a dial that changes
+          nothing on the plate is a dial a performer turns mid-set for no
+          reason. The logo melt below still pours through the ink (37x-11).
+        */}
+        <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.07] pt-4" data-testid="ink-title">
+          <Toggle label="Song titles" on={!!settings.inkTitle} onChange={(v) => onUpdate({ inkTitle: v })} testId="ink-title-switch"
+            title="When a new song is named, its artist, title and album go up in the bottom-left corner for seven seconds, on the screen and in the live stream" />
+          <Info>
+            The caption is the card a music channel put over a video in the early 1980s: white letters low in the left
+            corner, the artist, the song in quotes, the album and the label, up for seven seconds and gone. It is laid over
+            the picture, on this screen and burned into the live stream; the plate under it is untouched.
+          </Info>
+          {/* The logo melted at the start of a film (PLAN 37x-11, lib/logoMelt.ts): the same ink and rinse as a title. */}
+          <Toggle label="Melt the logo at the start" on={!!settings.logoMelt} onChange={(v) => onUpdate({ logoMelt: v })} testId="logo-melt-switch"
+            title="When the Live Show goes on air or a recording starts, the ChromaGlass logo is poured big across the plate as ink, then melts into the show" />
+        </div>
       </section>
       )}
     </>

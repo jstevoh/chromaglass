@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { unhandled } from '../lib/unhandled';
 import {
-  apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
+  apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, liveBindings, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, pressedBy, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover, sameSoundBinding, withLoadedMap,
   MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, MIDI_MAP_KEY, settingLed, curveOf, valueAt, travelOf,
   type FactoryMapId,
@@ -34,6 +34,8 @@ export interface MidiHost {
   setSetting: (key: keyof VisualizerSettings, value: number) => void;
   action: (action: MidiAction) => void;
   applyPreset: (presetId: string) => void;
+  /** Play set-list item `index` (0-based) with the item's own fade, the way Go does. */
+  playSetItem?: (index: number) => void;
   selectDye: (paletteIndex: number) => void;
   /**
    * A note was struck, with its velocity.
@@ -44,7 +46,9 @@ export interface MidiHost {
    * preset pads therefore also plays the envelopes, which is the behaviour a
    * synth has and the reason the envelopes are worth having at all.
    */
-  noteStruck?: (velocity: number) => void;
+  noteStruck?: (velocity: number, source?: 'note' | 'pad') => void;
+  /** A note-on or note-off on a channel bound as Notes as voices (PLAN 24.3). */
+  noteVoice?: (e: MidiEvent, target: Extract<MidiTarget, { kind: 'voices' }>) => void;
 }
 
 /** What the LEDs should show. Changes here are pushed to the controller. */
@@ -107,6 +111,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const supported = useMemo(hasWebMidi, []);
   const [enabled, setEnabled] = useState<boolean>(() => { try { return localStorage.getItem(ENABLED_KEY) === '1'; } catch { return false; } });
   const [error, setError] = useState<string | null>(null);
+  // Web MIDI answered (PLAN 44k-14): what the assistant's switch waits for, since on is only asked until then.
+  const [open, setOpen] = useState(false);
   const [inputs, setInputs] = useState<MidiDevice[]>([]);
   const [outputs, setOutputs] = useState<MidiDevice[]>([]);
   const [ports, setPorts] = useState<{ input: string; output: string }>(() => {
@@ -193,7 +199,11 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const now = performance.now();
     heardRef.current.set(sourceKey(src), now);
     // Ahead of the bindings, and regardless of them: see `noteStruck`.
-    if (e.kind === 'noteon') hostRef.current.noteStruck?.(Math.max(0, Math.min(1, e.value / 127)));
+    if (e.kind === 'noteon') {
+      const k = sourceKey(src);
+      const isPad = e.channel === 9 || mapRef.current.bindings.some(b => sourceKey(b.source) === k && b.target.kind !== 'setting');
+      hostRef.current.noteStruck?.(Math.max(0, Math.min(1, e.value / 127)), isPad ? 'pad' : 'note');
+    }
     if (now - eventTick.current > 80) { eventTick.current = now; lastEvent.set({ source: src, value: e.value, at: now }); }
 
     /*
@@ -216,6 +226,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
 
     const learn = learningRef.current;
     if (learn && e.kind !== 'noteoff') {
+      if (learn.target.kind === 'voices' && src.kind !== 'note') return;
       const key = sourceKey(src);
       // Learn onto the layer that is live. Bank 1 is the base layer and its
       // bindings are always live (`bank: undefined`), so a map made by
@@ -228,7 +239,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         // whole point of a shift layer is that one fader means four things,
         // so learning on bank 3 must not wipe what it does on bank 1.
         bindings: [
-          ...prev.bindings.filter(b => sourceKey(b.source) !== key || b.bank !== onto),
+          ...prev.bindings.filter(b =>
+            (sourceKey(b.source) !== key || b.bank !== onto) &&
+            !(learn.target.kind === 'voices' && b.target.kind === 'voices' && b.source.channel === src.channel && b.bank === onto)),
           { id: newId(), source: src, target: learn.target, mode: learn.mode, bank: onto },
         ],
       }));
@@ -237,8 +250,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     }
 
     const h = hostRef.current;
-    const key = sourceKey(src);
-    // What this control does *on this layer*.
+    // What this control does *on this layer* (`liveBindings` in `midi.ts`).
     //
     // A binding that names a bank answers only on that one; a binding that
     // names none is always live. Where a control has both — which is exactly
@@ -247,16 +259,14 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     // always-live one stays out of the way. Firing both meant one fader
     // driving two settings at once, which on a stage reads as the app having
     // a mind of its own.
-    const matching = mapRef.current.bindings.filter(b => sourceKey(b.source) === key);
-    const onThisBank = matching.filter(b => b.bank === bankRef.current);
-    const live = onThisBank.length ? onThisBank : matching.filter(b => b.bank === undefined);
+    const live = liveBindings(mapRef.current, src, bankRef.current);
     for (const b of live) {
       // Annotated, and that is not decoration: without it `t` is `any` here,
       // so nothing in the switch below was checked at all — not the property
       // names it reads off each kind, not a misspelt case, not a missing one.
       const t: MidiTarget = b.target;
 
-      const pressed = e.kind === 'noteon' || (e.kind === 'cc' && e.value > 63);
+      const pressed = pressedBy(e);
       /**
        * Set when soft takeover held this fader back, so the report below does
        * not go on to claim it moved. `break` inside the switch leaves the
@@ -296,7 +306,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
             break;
           }
           let in01 = e.value / 127;
-          if (e.kind === 'noteon') in01 = 1;
+          if (e.kind === 'noteon' || e.kind === 'program') in01 = 1;
           // Onto the nearest detent before soft takeover sees it, so the
           // position it compares against the setting is one the setting can
           // actually hold. Snapped afterwards instead, a fader resting between
@@ -323,9 +333,11 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
           h.setSetting(t.key, onStep(stepped, valueAt(in01, t.min, t.max, curve)));
           break;
         }
-        case 'action': if (pressed) h.action(t.action); break;
-        case 'preset': if (pressed) h.applyPreset(t.presetId); break;
-        case 'dye':    if (pressed) h.selectDye(t.paletteIndex); break;
+        case 'action':  if (pressed) h.action(t.action); break;
+        case 'preset':  if (pressed) h.applyPreset(t.presetId); break;
+        case 'setlist': if (pressed) h.playSetItem?.(t.index); break;
+        case 'dye':     if (pressed) h.selectDye(t.paletteIndex); break;
+        case 'voices':  if (e.kind === 'noteon' || e.kind === 'noteoff') h.noteVoice?.(e, t); break;
         // A binding whose kind has no case here is a control that does
         // nothing when it is touched, and says nothing about why.
         default: unhandled('a MIDI binding', t);
@@ -400,6 +412,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         accessRef.current.onstatechange = null;
         accessRef.current = null;
       }
+      setOpen(false);
       refreshPorts();
       return;
     }
@@ -410,6 +423,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         if (cancelled) return;
         accessRef.current = access;
         setError(null);
+        setOpen(true);
         access.onstatechange = () => { refreshPorts(); wireInputs(); };
         refreshPorts();
         wireInputs();
@@ -498,6 +512,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
       */
       const heard = heardRef.current.get(k);
       if (heard !== undefined && performance.now() - heard < HANDS_OFF_MS) { sent.delete(k); return; }
+      if (src.kind === 'program') return;
       if (sent.get(k) === level) return;
       sent.set(k, level);
       try {
@@ -536,6 +551,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         // A pad saved before its look was retired lights for the look it now plays (PLAN.md 28a).
         const live = livePresetId(t.presetId);
         level = c ? padVelocityFor(c.r, c.g, c.b, f.activePresetId !== live) : (f.activePresetId === live ? 3 : 1);
+      } else if (t.kind === 'setlist') {
+        level = b.source.kind === 'cc' ? 127 : 1;
       } else if (t.kind === 'dye') {
         const c = f.paletteColor(t.paletteIndex);
         level = c ? padVelocityFor(c.r, c.g, c.b, f.dyeIndex !== t.paletteIndex) : 0;
@@ -604,6 +621,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const learn = useCallback((target: MidiTarget, mode: 'absolute' | 'relative' = 'absolute') => setLearning({ target, mode }), []);
   const cancelLearn = useCallback(() => setLearning(null), []);
   const removeBinding = useCallback((id: string) => setMap(prev => ({ ...prev, bindings: prev.bindings.filter(b => b.id !== id) })), [setMap]);
+  const updateBinding = useCallback((id: string, target: MidiTarget) =>
+    setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, target } : b) })), [setMap]);
   const setBindingMode = useCallback((id: string, mode: 'absolute' | 'relative') => setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, mode } : b) })), [setMap]);
   /** Move a binding onto a shift layer, or (undefined) back to always-live. */
   const setBindingBank = useCallback((id: string, bankIndex: number | undefined) =>
@@ -695,10 +714,10 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   }, [enabled, inputs, ports.input]);
 
   return {
-    supported, enabled, enable, disable, error,
+    supported, enabled, open, enable, disable, error,
     inputs, outputs, ports, choosePorts, activeInputName,
     map, setMap, rename, clearMap, loadFactory, exportMap, importFile,
-    learning, learn, cancelLearn, removeBinding, setBindingMode, setBindingBank, addBinding,
+    learning, learn, cancelLearn, removeBinding, updateBinding, setBindingMode, setBindingBank, addBinding,
     learnSound, removeSound,
     softTakeover, setSoftTakeover: setSoftTakeoverOn,
     lastEvent,
