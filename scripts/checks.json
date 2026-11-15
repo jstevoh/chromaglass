@@ -2289,6 +2289,21 @@
       ]
     },
     {
+      "name": "The TV app's sample plays the channel's films, and says when YouTube will not",
+      "shard": "browser2",
+      "run": "node scripts/tvyoutube.mjs",
+      "why": [
+        "The Android TV app's sample films page (androidtv/app/src/main/assets/films.html,",
+        "PLAN 12-tv-2h) with the films list read from Sample.java, against a stand-in",
+        "YouTube API: a film from the list through the no-cookie host with no controls,",
+        "the caption naming the look, the record and Back, PLAYING told to the app, each",
+        "ending starting the next round the whole list, an error told once with its",
+        "code, and YouTube's script not loading told too (the app then plays the press",
+        "clips). The real YouTube cannot be asked from CI (it refuses cloud machines).",
+        "About ten seconds."
+      ]
+    },
+    {
       "name": "The TV's remote picks the look",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/tvremote.mjs",
