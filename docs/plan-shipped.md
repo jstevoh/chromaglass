@@ -7252,7 +7252,7 @@ petri dishes between polarisers (2026-11-14), after 31p-1 gave the liquid's own 
   liquid moving, the liquid's stretch adds to the dish's where it runs along the hoop and
   takes from it across, so the rings wobble and shift colour where the liquid flows.
 - At 0 (the default) the branch is not taken: the plate is the look as before, to the byte.
-- `npm run polar` 37/37 (13 new): the series law against Jones matrices, plane and with the
+- `npm run polar` 39/39 (15 new): the series law against Jones matrices, plane and with the
   plates (worst 8e-16), the nine weights against the rotations (2e-15), the table series
   against the spectrum within the tables (0.005 of white), G1 = 0 is the liquid's own law,
   two retarders along one axis add and across it subtract, the dish's 1/r, hoop axis, wall
@@ -7260,8 +7260,17 @@ petri dishes between polarisers (2026-11-14), after 31p-1 gave the liquid's own 
   picture at 1; on a still plate with the plates in, each ring is the law's colour at its
   radius times the open plate (worst 0.8 levels along the axes and diagonals); between plane
   sheets the cross along the sheets is dark (at most 4 levels) and the diagonals lit
-  (81 to 128); a laid flow with the dish in, crossed plus parallel is the open plate (worst
-  2.7, mean 0.8 levels over the 80% of pixels in gamut) and the dish moves 92% of them.
+  (81 to 128), and stays on the sheets with the plate turned 45 under them; on a gentle flow
+  with the dish in, analyser at 60 and the plates half in, each pixel is the series law with
+  the dish first (mean 4.85, 95th percentile 12.2 levels; the liquid alone misses its own law
+  by 4.3, the strain being read one texture away from the display's); a laid flow with the
+  dish in, crossed plus parallel is the open plate (worst 2.7, mean 0.8 levels over the 80%
+  of pixels in gamut) and the dish moves 80% of them against the same sheets without it.
+- The check review found the first lab checks blind to the dish's axis, the order of the two
+  retarders and a dropped liquid. Mutants of the shader against the final checks: the
+  retarders swapped (mean 22.5), a K term's sign flipped (18.1), the liquid's strain dropped
+  with the dish in (36.9), the dish's axis left in the plate's uv (the turned cross lands on
+  the diagonals): each fails one line.
 - Two things found: the look's saturation grade comes after the sheets (plate.ts packs
   `saturationBoost`, default 1.45, applied after `polar()`), so law-exact lab checks render
   with it at 1; and the high orders the dish brings are partly outside sRGB (a negative
