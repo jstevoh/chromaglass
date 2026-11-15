@@ -168,6 +168,7 @@ const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
+const THIN = process.argv.includes('--thin');
 const flag = process.argv.find((a) => a.startsWith('--owed='));
 const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
 const unknown = [...owed].filter((id) => !OWED_IDS.includes(id));
@@ -207,7 +208,7 @@ const LINES = {
 const NOT_YET = `${MODULE} does not exist`;
 
 // ── cue (node) ──
-{
+if (!THIN) {
   const cue = fn('inkTitleCue'), inkOf = fn('inkTitleInk');
   if (!cue || !inkOf) {
     line('cue', LINES.cue, false, hasModule ? `${MODULE} exports no ${!cue ? 'inkTitleCue' : 'inkTitleInk'}` : NOT_YET, !hasModule);
@@ -241,7 +242,7 @@ const NOT_YET = `${MODULE} does not exist`;
 // ── setting (node) ──
 const KEYS = ['inkTitle', 'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep'];
 const hasSetting = !!DEFAULT_SETTINGS && 'inkTitle' in DEFAULT_SETTINGS;
-{
+if (!THIN) {
   const S = DEFAULT_SETTINGS ?? {};
   const bad = [];
   const missing = KEYS.filter((k) => !(k in S));
@@ -258,7 +259,7 @@ const hasSetting = !!DEFAULT_SETTINGS && 'inkTitle' in DEFAULT_SETTINGS;
 }
 
 // ── wired (source) ──
-{
+if (!THIN) {
   const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = join(dir, e.name);
     return e.isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(e.name) ? [p] : [];
@@ -269,6 +270,8 @@ const hasSetting = !!DEFAULT_SETTINGS && 'inkTitle' in DEFAULT_SETTINGS;
   const app = files.filter((p) => p !== join('src', 'lib', 'inkTitle.ts') && !p.startsWith(join('src', 'gpu')));
   const calls = (name) => app.filter((p) => new RegExp(`\\b${name}\\s*\\(`).test(text(p)));
   const cueCalls = calls('inkTitleCue'), washCalls = calls('inkTitleWash'), maskCalls = calls('inkTitleMask');
+  // The thick ink's pad and its rinse (37x-10g): poured and run by the app, not only by this check's lab.
+  const padCalls = calls('inkTitlePad'), rinseCalls = calls('inkTitleRinse');
   // A method call on the solver (`fluid.pourInk(`, `gpu?.pourInk?.(`), not a signature in a type.
   const pourCalls = app.filter((p) => /\?*\.pourInk\??\.?\s*\(/.test(text(p)));
   const shaders = files.filter((p) => p.startsWith(join('src', 'gpu', 'wgsl')) && /inkTitle/.test(text(p)));
@@ -279,6 +282,8 @@ const hasSetting = !!DEFAULT_SETTINGS && 'inkTitle' in DEFAULT_SETTINGS;
   if (!pourCalls.length) bad.push('nothing in the app calls the solver\'s pourInk');
   if (!maskCalls.length) bad.push('nothing in the app calls inkTitleMask (a title drawn some other way is not poured)');
   if (!washCalls.length) bad.push('nothing in the app calls inkTitleWash');
+  if (!padCalls.length) bad.push('nothing in the app calls inkTitlePad (the title\'s ink is not made up thick)');
+  if (!rinseCalls.length) bad.push('nothing in the app calls inkTitleRinse (a thick title has nothing to take it away)');
   if (shaders.length) bad.push(`a shader names inkTitle: ${shaders.join(', ')} (the plate draws the dye, never the title)`);
   if (!phone.length) bad.push('no phone file binds inkTitle beside the word Title');
   line('wired', LINES.wired, bad.length === 0,
@@ -294,6 +299,8 @@ if (!hasModule) {
   const need = ['inkTitleMask', 'inkTitleSweep', 'inkTitleWash', 'inkTitleInk'].filter((n) => !fn(n));
   if (need.length || !(ink.INK_TITLE_DENSITY > 0)) {
     for (const id of ['mask', 'lands', 'sweep', 'kept']) line(id, LINES[id], false, `${MODULE} exports no ${need.length ? need.join(', ') : 'INK_TITLE_DENSITY above 0'}`, false);
+  } else if (THIN) {
+    await thinLines();
   } else {
     await labLines();
   }
@@ -507,6 +514,232 @@ async function labLines() {
       const ks = [keep(d, 'default at 12 s'), keep(hard, 'top at 2 s'), keep(gentle, '0.01 at 6 s')];
       line('kept', LINES.kept, ks.every((k) => k.ok),
         `the plate holds of the title's dye: ${ks.map((k) => `${k.ok ? '' : 'FAILS '}${k.text}`).join('; ')} (bar ≥ 90%); the default's title ended ${d.reads.at(-1)?.shift.join(', ')} cells off`, false);
+    }
+  } finally {
+    await close();
+  }
+}
+
+/*
+  The thin gap (`--thin`, PLAN 37x-10e and 37x-10g). Every look opens on the
+  thin gap, and there the title is made up thick: its dye lands on a pad of
+  the plate's liquid thickened INK_TITLE_THICK times, and the wash's rinse
+  squirts clear liquid into the pad to finger through it (src/lib/inkTitle.ts
+  says why each). These arms go through the app's own frame-loop side,
+  `stepInkTitle` (src/lib/inkTitleRun.ts), with the lab's solver as its
+  plate, so what is measured is what the app pours and runs, not a copy of
+  it here.
+
+    hold     the reason for the pad. A lively look's flow, eddies an eighth
+             of the plate across turning over the whole plate (a stream
+             function, so it piles nothing up), as strong as the one the
+             private rehearsal's title cards met: the control, the title in
+             the plate's own liquid as 37x-10 poured it, reads under 0.6 a
+             second after it lands (the rehearsal: "smeared in about a
+             second"; the build before this read 0.534 here). Under the same
+             flow, with the wash at its default, the title as the app pours
+             it now reads at 0.7 or better 2.5 s after it lands and at 0.3
+             or worse by 12 s: readable for a few seconds, then washed away.
+             The control must stay smeared, or the flow is not lively enough
+             to prove anything.
+    lands    on a still plate, as the old plate's line: 0.8 at 0.5 s,
+             strokes four times their gaps, the dye risen by what was poured.
+    sweep    on a still plate: at the dial's top gone by 2 s, at 0.01 still
+             0.7 at 6 s (the default is the hold arm's).
+    kept     every arm's plate holds 90% of the title's dye at its end: the
+             rinse is clear liquid with its volume, which pushes liquid out
+             over the rim, and a rinse that flushed the title off the plate
+             would "clear" it fastest.
+    padded   the pad is there and is the pad: the species field's share
+             under the title's box after the pour is at least half its
+             cells' worth, and none of it was laid on the old plate's arm.
+
+  About ten minutes on SwiftShader (21 s of plate at 60 steps a second),
+  its own entry in scripts/checks.json.
+*/
+async function thinLines() {
+  const { openLab } = await import('./lab.mjs');
+  mkdirSync('node_modules/.cache', { recursive: true });
+  const entry = 'node_modules/.cache/inktitle-thin-entry.ts';
+  writeFileSync(entry, [
+    "import '../../scripts/lab-entry.ts';",
+    "import * as ink from '../../src/lib/inkTitle.ts';",
+    "import * as inkRun from '../../src/lib/inkTitleRun.ts';",
+    '(window as unknown as { ink: typeof ink; inkRun: typeof inkRun }).ink = ink;',
+    '(window as unknown as { ink: typeof ink; inkRun: typeof inkRun }).inkRun = inkRun;',
+    '',
+  ].join('\n'));
+  const S = DEFAULT_SETTINGS ?? {};
+  const dflt = { size: S.inkTitleSize ?? 0.5, y: S.inkTitleY ?? 0.5, sweep: S.inkTitleSweep ?? 0.5, thickness: S.gapThickness ?? 0.45 };
+  const { page, close } = await openLab({ entry });
+  try {
+    /*
+      One arm. `app` pours through stepInkTitle (the pad, the wash, the
+      rinse); without it the title is poured as 37x-10 poured it, dye alone
+      in the plate's liquid, with the wash written straight into the deltas.
+      `lively` is the look's flow above, in the deltas' units a second.
+    */
+    const arm = (o) => page.evaluate(async ({ app, dial, seconds, lively, size, y, thickness }) => {
+      const { L, N } = await lab.create(256, 192);
+      const over = { magnetSeconds: 1 / 60, thinGap: 1, gapThickness: thickness };
+      const rgb = ink.inkTitleInk('#2a4dd0', []);
+      const total = async () => { const d = await lab.field('dye'); let t = 0; for (let i = 3; i < d.length; i += 4) t += d[i]; return t; };
+      lab.dye(0.12, 0.12, 0.08, rgb, 1); lab.flush(); await lab.step(1, over, true);
+      const thinBefore = lab.thinLive();
+      const before = await total();
+      const text = { artist: 'Louis Armstrong', title: 'West End Blues' };
+      const rows = ink.inkTitleRows(text);
+      const { mask, box } = ink.inkTitleMask(rows, size, y, N);
+      const mL = ink.inkTitleMask(rows, size, y, L).mask;
+      let cover = 0; for (const v of mask) cover += v;
+      const vel = new Float32Array(L * L * 4);
+      const settings = { inkTitleColor: '#2a4dd0', inkTitleSize: size, inkTitleY: y, inkTitleSweep: dial, gapThickness: thickness };
+      const solver = lab.solver();
+      const target = {
+        size: L, gpu: solver, meanColor: [0, 0, 0], meanDensity: 0,
+        addDensity() { throw new Error('the title went through the CPU\'s arrays, not the solver'); },
+        addVelocity(i, j, vx, vy) { const o = (i + j * L) * 4; vel[o] += vx; vel[o + 1] += vy; },
+      };
+      const run = inkRun.newInkTitleRun();
+      let poured = true;
+      if (app) {
+        inkRun.queueInkTitle(run, rows);
+        inkRun.stepInkTitle(run, target, settings, 1 / 60, [], 0);
+        if (!run.box) poured = false;
+      } else {
+        poured = solver.pourInk(mask, N, rgb, ink.INK_TITLE_DENSITY);
+      }
+      // The species' share under the title's box, just after the pour: the pad (37x-10g).
+      const share = async () => {
+        const sp = await lab.field('species').catch(() => null);
+        if (!sp) return null;
+        if (sp.length < L * L * 4) return 0;   // a plate with no species field reads back as its 1×1 blank
+        let t = 0, n = 0; const n0 = Math.floor(box[0] * L), n1 = Math.ceil(box[2] * L), m0 = Math.floor(box[1] * L), m1 = Math.ceil(box[3] * L);
+        for (let j = m0; j < m1; j++) for (let i = n0; i < n1; i++) { t += sp[(i + j * L) * 4]; n++; }
+        return t / Math.max(1, n);
+      };
+      let x0 = L, x1 = 0, y0 = L, y1 = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) if (mL[i + j * L] > 0.3) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); y0 = Math.min(y0, j); y1 = Math.max(y1, j); }
+      x0 = Math.max(0, x0 - 2); y0 = Math.max(0, y0 - 2); x1 = Math.min(L - 1, x1 + 2); y1 = Math.min(L - 1, y1 + 2);
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1, mm = new Float32Array(bw * bh);
+      for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) mm[i + j * bw] = mL[x0 + i + (y0 + j) * L];
+      let mu = 0; for (const v of mm) mu += v; mu /= mm.length;
+      let ms = 0; for (const v of mm) ms += (v - mu) ** 2; ms = Math.sqrt(ms);
+      const ncc = (d, dx, dy) => {
+        let s = 0, sv = 0, svv = 0;
+        for (let j = 0; j < bh; j++) {
+          const yy = y0 + j + dy; if (yy < 0 || yy >= L) return -1;
+          for (let i = 0; i < bw; i++) {
+            const xx = x0 + i + dx; if (xx < 0 || xx >= L) return -1;
+            const v = d[xx + yy * L]; sv += v; svv += v * v; s += (mm[i + j * bw] - mu) * v;
+          }
+        }
+        const n = bw * bh, vs = Math.sqrt(Math.max(0, svv - sv * sv / n));
+        return vs > 0 ? s / (ms * vs) : 0;
+      };
+      // As the old plate's arm reads (the header): the best shifted correlation, strokes against gaps there.
+      const read = async () => {
+        const f = await lab.field('dye');
+        const d = new Float32Array(L * L);
+        for (let i = 0; i < L * L; i++) { d[i] = f[i * 4 + 3]; if (!Number.isFinite(f[i * 4]) || !Number.isFinite(d[i])) throw new Error(`the dye is not finite at cell ${i}: a broken plate, not a gone title`); }
+        const rx = L - bw, ry = L - bh;
+        let best = -1, bx = 0, by = 0;
+        for (let dy = -y0; dy <= ry - y0; dy += 3) for (let dx = -x0; dx <= rx - x0; dx += 3) { const r = ncc(d, dx, dy); if (r > best) { best = r; bx = dx; by = dy; } }
+        const cx = bx, cy = by;
+        for (let dy = cy - 2; dy <= cy + 2; dy++) for (let dx = cx - 2; dx <= cx + 2; dx++) { const r = ncc(d, dx, dy); if (r > best) { best = r; bx = dx; by = dy; } }
+        let on = 0, onN = 0, gap = 0, gapN = 0;
+        for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) {
+          const v = d[x0 + bx + i + (y0 + by + j) * L], c = mm[i + j * bw];
+          if (c > 0.5) { on += v; onN++; } else if (c < 0.02) { gap += v; gapN++; }
+        }
+        let t = 0; for (const v of d) t += v;
+        return { r: best, strokes: on / Math.max(1, onN), gaps: gap / Math.max(1, gapN), total: t };
+      };
+      const SEC = 1 / 60, reads = [];
+      const k = Math.PI / (L / 8);
+      let padShare = null;
+      for (let s = 1; s <= Math.round(seconds * 60); s++) {
+        vel.fill(0);
+        if (app) { if (s > 1) inkRun.stepInkTitle(run, target, settings, SEC, [], 0); }
+        else ink.inkTitleWash(SEC, (s - 1) * SEC, dial, box, vel, L);
+        if (lively > 0) {
+          // The look's flow: ψ = A(cos φ sin kx sin ky + sin φ cos kx cos ky), cells an eighth of the plate, φ turning 0.7 rad/s.
+          const ph = 0.7 * s * SEC, c = Math.cos(ph), sn = Math.sin(ph), amp = lively * SEC;
+          for (let j = 0; j < L; j++) {
+            const yy = j + 0.5, sy = Math.sin(k * yy), cy = Math.cos(k * yy);
+            for (let i = 0; i < L; i++) {
+              const xx = i + 3.5, sx = Math.sin(k * xx), cx = Math.cos(k * xx), o = (i + j * L) * 4;
+              vel[o] += amp * (c * sx * cy - sn * cx * sy);
+              vel[o + 1] -= amp * (c * cx * sy - sn * sx * cy);
+            }
+          }
+        }
+        lab.addVel(vel); lab.flush();
+        await lab.step(1, over, true);
+        if (s === 1) padShare = await share();
+        if (s % 30 === 0) reads.push({ t: s * SEC, ...(await read()) });
+      }
+      return { poured, thinBefore, thinAfter: lab.thinLive(), before, cover: cover * (L / N) ** 2, reads, after: await total(), padShare };
+    }, { size: dflt.size, y: dflt.y, thickness: dflt.thickness, ...o });
+
+    const at = (a, t) => a.reads.find((r) => Math.abs(r.t - t) < 1e-6);
+    const goneBy = (a) => a.reads.find((r) => r.r <= GONE)?.t ?? null;
+    const f3 = (v) => v.toFixed(3);
+    const trace = (a) => a.reads.map((r) => f3(r.r)).join(' ');
+    const LIVELY = 10;
+
+    const control = await arm({ app: false, dial: dflt.sweep, seconds: 1, lively: LIVELY });
+    const lively = await arm({ app: true, dial: dflt.sweep, seconds: 12, lively: LIVELY });
+    const hard = await arm({ app: true, dial: 1, seconds: 2, lively: 0 });
+    const gentle = await arm({ app: true, dial: 0.01, seconds: 6, lively: 0 });
+    const arms = [['lively default', lively], ['top', hard], ['0.01', gentle]];
+    const notThin = [control, ...arms.map((a) => a[1])].filter((a) => !a.thinBefore || !a.thinAfter);
+    if (notThin.length) check('the arms ran on the thin gap', false, `${notThin.length} arm(s) stepped the old plate`);
+    {
+      const c1 = at(control, 1), r25 = at(lively, 2.5), g = goneBy(lively), bad = [];
+      if (!c1 || !(c1.r < 0.6)) bad.push(`the control (dye alone, as 37x-10 poured it) reads ${c1 ? f3(c1.r) : '—'} a second into the look's flow (bar < 0.6): the flow is not lively enough to prove the pad`);
+      if (!r25 || r25.r < STILL) bad.push(`under the same flow the title reads ${r25 ? f3(r25.r) : '—'} at 2.5 s (bar ≥ ${STILL})`);
+      if (g === null) bad.push(`it still reads ${f3(lively.reads.at(-1).r)} at 12 s (bar ≤ ${GONE})`);
+      line('hold', 'on the thin gap a lively look\'s flow leaves the title readable for 2.5 s and the wash takes it by 12 s', bad.length === 0,
+        `${bad.length ? `${bad.join('; ')}. ` : ''}control ${c1 ? f3(c1.r) : '—'} at 1 s; poured now: ${r25 ? f3(r25.r) : '—'} at 2.5 s, gone at ${g ?? '—'} s [${trace(lively)}]`, false);
+    }
+    {
+      const r = at(gentle, 0.5), bad = [];
+      const rose = r ? r.total - gentle.before : 0, want = gentle.cover * ink.INK_TITLE_DENSITY;
+      if (gentle.poured !== true) bad.push('stepInkTitle poured nothing');
+      if (!r) bad.push('no reading at 0.5 s');
+      else {
+        if (r.r < READ) bad.push(`it reads at ${f3(r.r)} half a second after it lands (bar ≥ ${READ})`);
+        if (!(r.strokes >= 4 * r.gaps)) bad.push(`strokes ${f3(r.strokes)} against gaps ${f3(r.gaps)} (bar ×4)`);
+        if (!(Math.abs(rose - want) <= 0.1 * want)) bad.push(`the plate's dye rose ${rose.toFixed(1)} for ${want.toFixed(1)} poured (bar within 10%)`);
+      }
+      line('lands', 'on the thin gap a title poured as the app pours it reads when it lands, its strokes dark against their gaps, added to the plate', bad.length === 0,
+        bad.length ? bad.join('; ') : `reads ${f3(r.r)} at 0.5 s; strokes ${f3(r.strokes)} vs gaps ${f3(r.gaps)}; dye rose ${rose.toFixed(1)} for ${want.toFixed(1)} poured`, false);
+    }
+    {
+      const gH = goneBy(hard), r6 = at(gentle, 6), bad = [];
+      if (gH === null || gH > 2) bad.push(`at the top it reads ${f3(hard.reads.at(-1).r)} at 2 s (bar ≤ ${GONE})`);
+      if (!r6 || r6.r < STILL) bad.push(`at 0.01 it reads ${r6 ? f3(r6.r) : '—'} at 6 s (bar ≥ ${STILL})`);
+      line('sweep', 'on the thin gap the rinse takes it by 2 s at the top and leaves it readable at 6 s at 0.01', bad.length === 0,
+        `${bad.length ? `${bad.join('; ')}. ` : ''}top: gone at ${gH ?? '—'} s [${trace(hard)}]; 0.01: ${r6 ? f3(r6.r) : '—'} at 6 s`, false);
+    }
+    {
+      const keep = ([name, a]) => {
+        const end = a.reads.at(-1), want = a.cover * ink.INK_TITLE_DENSITY, k = end ? end.total - a.before : 0;
+        return { ok: !!end && k >= 0.9 * want, text: `${name} ${end ? `${k.toFixed(1)} of ${want.toFixed(1)}` : 'no reading'}` };
+      };
+      const ks = arms.map(keep);
+      line('kept', 'on the thin gap the title leaves by the flow and the rinse: its dye is still on the plate', ks.every((k) => k.ok),
+        `${ks.map((k) => `${k.ok ? '' : 'FAILS '}${k.text}`).join('; ')} (bar ≥ 90%)`, false);
+    }
+    {
+      const bad = [];
+      const p = lively.padShare;
+      if (p === null) bad.push('the species field could not be read');
+      else if (!(p >= 0.5)) bad.push(`the species' share under the title's box is ${f3(p)} after the pour (bar ≥ 0.5): no pad`);
+      if (control.padShare !== null && control.padShare > 1e-4) bad.push(`the control's plate has a share of ${f3(control.padShare)} (bar 0): the control is not dye alone`);
+      line('padded', 'on the thin gap the title lies on a pad of thick liquid, and the control on none', bad.length === 0,
+        bad.length ? bad.join('; ') : `share ${f3(p)} under the box (the control ${control.padShare === null ? 'none' : f3(control.padShare)})`, false);
     }
   } finally {
     await close();

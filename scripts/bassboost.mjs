@@ -111,15 +111,17 @@ check('the kick detector hears the same kicks at every setting', rows[1].kicks >
 
 // ── The frame loop, from the source ──────────────────────────────────
 {
-  const src = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  // The kick's droplets are thrown by lib/kickBloom.ts (19ai-10), read with the loop.
+  const src = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8') + fs.readFileSync('src/lib/kickBloom.ts', 'utf8');
   const has = (s) => src.includes(s);
   check('the frame loop: the bass route is read through bassRouteValue and only when it is the bass; the press, the burst and the kick\'s dye take the gain',
     has("const bassGain = velRoute === 'bass' ? boostGain : 1;")
     && has("velRoute === 'bass' ? bassRouteValue(currentAudioData.bass, boostGain) : getAudioValue(currentAudioData, velRoute)")
     && has("currentAudioData.passage, bassGain),")
     && has('const bassStr = (vel01 - 0.25) * autoAmp * bassGain;')
-    && has('bass01 * boostGain * (0.33 + 1.17 * DICE.music.float()) * autoAmp')
-    && has('* bass01 * boostGain * bloomGain;'));
+    && has('ringCol, bass01 * boostGain, autoAmp * pourDt * bloomGain')
+    && has('hit * (0.33 + 1.17 * dice.float()) * dyeGain;')
+    && has('* hit * pushGain;'));
 }
 
 // ── The plate, in the lab ─────────────────────────────────────────────

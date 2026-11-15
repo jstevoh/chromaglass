@@ -30,6 +30,9 @@
  * ingest: it acknowledges the bytes it has read, every Window Acknowledgement
  * Size the client asked for, as real servers do (`acknowledge: false` for
  * one that does not, so the client's fallback is measured too);
+ * `ownWindow` makes one that acknowledges on a window of its own whatever the
+ * client asked, and `peerBandwidth` sets its Set Peer Bandwidth apart from its
+ * window: YouTube's ingest (probed 2026-11-08) sends 2,500,000 and 59,768,832;
  * `conn.throttle(bytesPerSecond)` reads the socket no faster than that (null
  * lifts it), which is a slow upload as the client sees it: the bytes back up
  * behind it in the kernel and then in the client; `conn.kill()` drops the
@@ -43,7 +46,7 @@ import { amfDecode, amfEncode, ChunkReader, chunkMessage, serverHandshake, CSID,
 
 const SERVER_CHUNK = 4096;
 
-export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs = 1500, ackWindow = 256, acknowledge = true } = {}) {
+export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs = 1500, ackWindow = 256, peerBandwidth = ackWindow, ownWindow = 0, acknowledge = true } = {}) {
   const em = new EventEmitter();
   const streams = [];
   const sockets = new Set();
@@ -79,7 +82,7 @@ export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs =
       // few hundred bytes this side sends (a real server's is megabytes, and
       // sends so little that a client which never acknowledged would pass).
       send(CSID.CONTROL, MSG.WINDOW_ACK_SIZE, u32(ackWindow));
-      send(CSID.CONTROL, MSG.SET_PEER_BANDWIDTH, Buffer.concat([u32(ackWindow), Buffer.from([2])]));
+      send(CSID.CONTROL, MSG.SET_PEER_BANDWIDTH, Buffer.concat([u32(peerBandwidth), Buffer.from([2])]));
       send(CSID.CONTROL, MSG.SET_CHUNK_SIZE, u32(SERVER_CHUNK));
       const onData = (d) => {
         budget -= d.length;
@@ -131,9 +134,11 @@ export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs =
         }
       };
       // What a server does with the client's window: an Acknowledgement of the bytes read so far each time another window's worth has come in.
+      // `ownWindow` is a server that keeps its own window whatever the client asks (YouTube-like: its acknowledgements come megabytes apart).
       const ackingData = (d) => {
         onData(d);
-        if (acknowledge && conn.ackSize > 0 && conn.reader.bytes - conn.ackedAt >= conn.ackSize) {
+        const every = ownWindow > 0 ? ownWindow : conn.ackSize;
+        if (acknowledge && every > 0 && conn.reader.bytes - conn.ackedAt >= every) {
           conn.ackedAt = conn.reader.bytes;
           send(CSID.CONTROL, MSG.ACK, u32(conn.reader.bytes % 2 ** 32));
           conn.acksSent++;

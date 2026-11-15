@@ -1,0 +1,73 @@
+name: Main hold
+
+# While the same check is red on two main deploys running, every open PR gets a
+# red commit status, `Main not held red`, except the one labelled `fixes-main`;
+# the first green deploy turns them all green again (PLAN.md 19am; the rule and
+# why are at the top of scripts/mainhold.mjs).
+#
+# When it runs. Each time a deploy on main finishes, because that is when main
+# turns red or green under PRs that already passed their own `Checks`; on a
+# PR's opening, push, label or retargeting, so a new head or a label added or
+# taken off reads the hold at once; and by hand. Every run posts on every open
+# PR whose status differs from the verdict (one GraphQL read, so a push to one
+# PR costs one post), so runs are queued one at a time in one group, and a
+# pending run that a newer one replaces loses nothing: the newer one covers
+# every PR. Without the group a slow run that read "held" could post after a
+# later run posted green, and leave a PR red until the next event.
+#
+# Why `pull_request_target`, and why it is safe here. A plain `pull_request` run
+# from a fork gets a read-only token and could not post the status; this one
+# runs main's copy of this file and main's `scripts/mainhold.mjs`, checked out
+# by name, and never checks out, installs or runs the PR's code. Nothing of the event reaches the
+# step; the script reads every PR's head and labels from the API.
+#
+# The job is not named like the status. A job named `Main not held red` would
+# show a green check run of that name on the PR whatever it posted, and a
+# required check by that name would take the green run for a pass.
+#
+# It never runs a Mac shard, so `scripts/reach.mjs` lists it with the other
+# workflows that do not reach one.
+
+on:
+  workflow_run:
+    workflows: [Deploy to Firebase Hosting]
+    types: [completed]
+    branches: [main]
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled, unlabeled, edited]
+    branches: [main]
+  workflow_dispatch:
+
+# Read-only at the top (`npm run cisecrets`); the job asks for the one write it
+# needs, a commit status.
+permissions:
+  contents: read
+
+concurrency:
+  group: main-hold
+  cancel-in-progress: false
+
+jobs:
+  post:
+    name: Post the main hold
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: scripts/mainhold.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Post the status
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/mainhold.mjs --post

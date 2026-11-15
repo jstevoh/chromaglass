@@ -1,0 +1,19 @@
+// The Android TV app (PLAN 12-tv-2): a shell that finds the Mac by Bonjour and
+// plays its /tv page. Its own Gradle project, apart from the phone app's
+// Capacitor project (android/, PLAN 12-ctl), since the two ship as two apps.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'chromaglass-tv'
+include ':app'

@@ -50,10 +50,69 @@
 # Mac; and a longer timeout lets a starved shard finish slow, but its timing
 # lines still read the other work's GPU, not the show's.
 #
+# And work begun after this step (PLAN.md 19ah-9a). Deploy 18:16Z of
+# 2026-11-08 passed this step on every shard it began, and then sessions
+# started filming the hero, `lampzero.mjs`, `renders.mjs` in Antigravity's
+# clone and a driver of the app mid-shard: `startup` went red on the Mac ("no
+# pipeline was built on a frame"), the tools shard's own first look refused
+# the Mac, and the deploy went to GitHub's Macs to queue behind pull
+# requests. A look at the start of a shard sees only what is already running.
+# So two more things, each for one side:
+#
+#  - The shard says it is here. From the moment this step begins (before it
+#    waits, so nothing new starts while the old work drains) it writes
+#    ~/.chromaglass-runner/deploy-<runner>.json, and its last step writes the
+#    time it ended. Every harness that launches a browser through
+#    chromium.mjs, and `npm run desktop`, reads it first and waits
+#    while a shard holds the Mac, and for GRACE_S after one ends, the time the
+#    next queued shard takes to reach this step (macdeploy.mjs). A
+#    shard whose runner worker is gone (cancelled, killed) holds nothing.
+#
+#  - What does not read it (a script of a session's own, the app opened by
+#    hand) the shard looks for again before each of its checks and after the
+#    last (`--again`, from checks.mjs): the same rule as this first
+#    look, the same two-minute wait. Still there, or there at all right after
+#    a check went red (that red was measured beside it), the shard stops, its
+#    last step "The owner's Mac stayed free of other work" fails, and the
+#    watchdog moves the deploy to GitHub's Macs as it does for this step.
+#
 #   bash scripts/macbusy.sh [seconds]     (in CI, owner's Mac only: wait, then fail)
+#   bash scripts/macbusy.sh --again [--after-red] [seconds]   (before each check)
+#   bash scripts/macbusy.sh --end         (the shard's last step: marks it ended)
 #   bash scripts/macbusy.sh --selftest    (the rule against made-up process lists)
 set -uo pipefail
 CPU_FLOOR=5
+MARKS="${MAC_DEPLOY_MARKS:-$HOME/.chromaglass-runner}"
+AGAIN="${RUNNER_TEMP:-/tmp}/macbusy-again.txt"
+
+# The mark only on a runner, never in a session run by hand: a session that
+# ran this would otherwise make every other session's harness wait for it.
+onrunner() { [ "${GITHUB_ACTIONS:-}" = true ] && [ -n "${RUNNER_NAME:-}" ]; }
+markfile() { printf '%s/deploy-%s.json' "$MARKS" "$(printf '%s' "$RUNNER_NAME" | tr -c 'A-Za-z0-9_-' _)"; }
+# The runner worker this step runs under: the mark holds while it lives.
+workerpid() {
+  local p=$$ c
+  for _ in $(seq 64); do
+    c=$(ps -o command= -p "$p" 2>/dev/null) || return 0
+    case "$c" in *Runner.Worker*) echo "$p"; return 0 ;; esac
+    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+    { [ -z "$p" ] || [ "$p" -le 1 ]; } && return 0
+  done
+}
+# began: now. ended: null, a time, or gave up (the deploy is leaving the Mac,
+# so no grace for a next shard that will not come).
+mark() {
+  onrunner || return 0
+  mkdir -p "$MARKS" 2>/dev/null || return 0
+  local f; f=$(markfile)
+  local began; began=$(sed -n 's/.*"began": *\([0-9]*\).*/\1/p' "$f" 2>/dev/null)
+  [ "$1" = begin ] || [ -z "$began" ] && began=$(date +%s)
+  local ended=null gave=false
+  [ "$1" = end ] && ended=$(date +%s)
+  [ "$1" = gaveup ] && { ended=$(date +%s); gave=true; }
+  printf '{"runner": "%s", "shard": "%s", "run": "%s", "worker": %s, "began": %s, "ended": %s, "gaveUp": %s}\n' \
+    "${RUNNER_NAME//\"/}" "${SHARD:-}" "${GITHUB_RUN_ID:-}" "$(workerpid | grep . || echo null)" "$began" "$ended" "$gave" > "$f.tmp" && mv "$f.tmp" "$f"
+}
 
 # Reads `pid ppid %cpu command` lines (ps -axwwo pid=,ppid=,%cpu=,command=:
 # `ww`, or macOS's ps cuts the command at 79 columns with no terminal, and
@@ -177,14 +236,36 @@ selftest() {
 
 if [ "${1:-}" = --selftest ]; then selftest; exit; fi
 
+if [ "${1:-}" = --end ]; then
+  mark end
+  if [ -s "$AGAIN" ]; then
+    echo "::error title=The owner's Mac was busy mid-shard::other work drew with the owner's Mac's GPU while this shard's checks ran (listed below), so its timing lines read that work's GPU; the watchdog starts this deploy again on GitHub's Macs (PLAN.md 19ah-9a)"
+    cat "$AGAIN"
+    exit 1
+  fi
+  echo "the owner's Mac stayed free of other work through the checks"
+  exit 0
+fi
+
+again=false red=false
+[ "${1:-}" = --again ] && { again=true; shift; }
+$again && [ "${1:-}" = --after-red ] && { red=true; shift; }
 limit="${1:-120}"
+$again || mark begin
 waited=0
 while :; do
   now=$(ps -axwwo pid=,ppid=,%cpu=,command= | others $$)
-  [ -z "$now" ] && { echo "the owner's Mac is free of other work after ${waited}s"; exit 0; }
+  [ -z "$now" ] && { $again && [ "$waited" -eq 0 ] || echo "the owner's Mac is free of other work after ${waited}s"; exit 0; }
+  if $red; then
+    echo "::error title=The owner's Mac is busy::the check before this went red while other work drew with the owner's Mac's GPU (listed below): the red was measured beside it, so the shard stops here"
+    { echo "after a red check:"; echo "$now"; } >> "$AGAIN"
+    echo "$now"
+    exit 1
+  fi
   if [ "$waited" -ge "$limit" ]; then
     echo "::error title=The owner's Mac is busy::after ${waited}s other work on the owner's Mac still draws with its GPU (listed below); the watchdog starts this deploy again on GitHub's Macs (docs/mac-runner.md)"
     echo "$now"
+    if $again; then { echo "after ${waited}s:"; echo "$now"; } >> "$AGAIN"; else mark gaveup; fi
     exit 1
   fi
   [ "$waited" -eq 0 ] && { echo "waiting for other work on the owner's Mac to finish:"; echo "$now"; }

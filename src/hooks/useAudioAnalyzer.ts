@@ -6,7 +6,7 @@ import {
 } from '../lib/audioFeatures';
 import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
-import { installLiveConsole } from '../lib/liveShow';
+import { installLiveConsole, setLiveAudio } from '../lib/liveShow';
 import { canUseProFeature } from '../lib/tierGates';
 
 export interface AudioData {
@@ -175,6 +175,8 @@ export function useAudioAnalyzer(
       allowed: () => canUseProFeature(),
     });
   }, []);
+  // A source chosen on air reaches the stream at once, not at the next Go (37x-4f-2). Does nothing with no stream running.
+  useEffect(() => { setLiveAudio(stream); }, [stream]);
   const publishedAtRef = useRef(-Infinity);
   /** How many readings React has been told, for `npm run renders` (ten a second, and not none). */
   const publishedRef = useRef(0);

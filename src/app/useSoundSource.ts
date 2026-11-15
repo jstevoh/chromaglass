@@ -4,7 +4,9 @@ import { startSimulatedMusic, type SimulatedMusic } from '../lib/simulatedMusic'
 import type { Track } from '../lib/musicLibrary';
 import { isDesktopApp } from '../lib/platform';
 import { startSystemTap, type SystemTap } from '../lib/systemTap';
-import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY } from './shared';
+import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY, MAC_SYSTEM_AUDIO_KEY } from './shared';
+import { publishSound, setSoundDoor } from './soundNow';
+import { setMusicDoor } from './musicNow';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
 function rememberedSource(): AudioSource {
@@ -12,6 +14,8 @@ function rememberedSource(): AudioSource {
     const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
     // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
     if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
+    // A relaunched Mac app (an update, a quit) has no session left; its System audio is kept apart (MAC_SYSTEM_AUDIO_KEY).
+    if (raw === null && isDesktopApp() && localStorage.getItem(MAC_SYSTEM_AUDIO_KEY) === '1') return 'system';
   } catch { /* private */ }
   return 'none';
 }
@@ -115,7 +119,13 @@ export function useSoundSource({
     stopDrone();
 
     setAudioSource(source);
-    try { sessionStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
+    try {
+      sessionStorage.setItem(AUDIO_SOURCE_KEY, source);
+      if (isDesktopApp()) {
+        if (source === 'system') localStorage.setItem(MAC_SYSTEM_AUDIO_KEY, '1');
+        else localStorage.removeItem(MAC_SYSTEM_AUDIO_KEY);
+      }
+    } catch { /* private */ }
     if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
     if (source === 'file') {
@@ -246,6 +256,12 @@ export function useSoundSource({
   }, [audioStream, refreshAudioInputs]);
   const handleSourceChangeRef = useRef(handleSourceChange);
   handleSourceChangeRef.current = handleSourceChange;
+  // What the show hears, for the remote link to report, and the door the
+  // owner's assistant changes it through (app/soundNow.ts, PLAN 44j): the
+  // same door the Sound panel's buttons use, so nothing about a change made
+  // from there differs from one made by hand.
+  useEffect(() => { publishSound({ source: audioSource, file: audioSource === 'file' ? musicFile?.name ?? null : null }); }, [audioSource, musicFile?.name]);
+
   /** The instrument's start/stop: stopping keeps it the chosen source, so starting again is one press. */
   const toggleDrone = useCallback(() => {
     if (droneRef.current) {
@@ -262,15 +278,34 @@ export function useSoundSource({
       return next;
     });
   }, []);
-  const chooseAudioInput = useCallback((id: string) => {
+  const keepAudioInput = useCallback((id: string) => {
     setAudioInputId(id);
     audioInputIdRef.current = id;
     try { localStorage.setItem(AUDIO_INPUT_KEY, id); } catch { /* private */ }
+  }, []);
+  const chooseAudioInput = useCallback((id: string) => {
+    keepAudioInput(id);
     // Reopen the microphone on the new input if it is the live source: this
     // render's handler, told the id, so it closes the stream that is live now
     // and opens the one just picked (see audioStreamRef).
     if (audioSourceRef.current === 'microphone') void handleSourceChangeRef.current('microphone', id);
   }, []);
+  // The door (see publishSound above). With a device (PLAN 44k-12, an id
+  // soundNow found by name) the input is kept as the picker keeps it, so the
+  // panel shows it and it is remembered, and the source opens on it (closing
+  // the microphone first if it is the one open, as the picker does). It
+  // settles once the source has opened or failed: getUserMedia refuses an
+  // interface unplugged or held by another app only then, and the source
+  // falls back to none, so the assistant hears that and not "done".
+  useEffect(() => {
+    setSoundDoor(async (s, device) => {
+      if (device !== undefined) keepAudioInput(device);
+      await handleSourceChangeRef.current(s, device);
+      if ((s === 'microphone' || s === 'system') && !audioStreamRef.current) return `the ${s === 'system' ? 'system sound' : 'microphone'} did not open (or a newer choice came first): show_state's sound says what the show hears`;
+      return null;
+    });
+    return () => setSoundDoor(null);
+  }, [keepAudioInput]);
 
   /** What the show hears of the music element. */
   const musicStream = useCallback((el: HTMLAudioElement): MediaStream | null => {
@@ -358,6 +393,27 @@ export function useSoundSource({
     setMusicFile(null);
     if (audioSource === 'file') { setAudioSource('none'); setAudioStream(null); }
   }, [musicFile, audioSource]);
+  /*
+    The player's door for the owner's assistant (app/musicNow.ts, PLAN 44k-2):
+    the buttons' own callbacks, this render's, through a ref, so the door is
+    set once and never calls a stale one. Play is the transport's toggle only
+    when paused, and pause the element's own, so neither flips the other way
+    on a state that ran behind. A file comes as the show server's own address
+    (askMusic takes no other), same-origin, so not a URL of ours to revoke.
+  */
+  const musicVerbsRef = useRef({ startMusic, toggleMusic, playTrack, closeMusicFile });
+  musicVerbsRef.current = { startMusic, toggleMusic, playTrack, closeMusicFile };
+  useEffect(() => {
+    setMusicDoor({
+      track: (t) => musicVerbsRef.current.playTrack(t),
+      file: (url, name) => musicVerbsRef.current.startMusic(url, name, { objectUrl: false }),
+      play: () => { if (musicElRef.current?.paused) musicVerbsRef.current.toggleMusic(); },
+      pause: () => { musicElRef.current?.pause(); },
+      seek: (s) => { const el = musicElRef.current; if (el) el.currentTime = s; },
+      close: () => musicVerbsRef.current.closeMusicFile(),
+    });
+    return () => setMusicDoor(null);
+  }, [musicElRef]);
 
   // What the show listened to last time, brought back without asking for
   // anything. The microphone only reopens where permission is already granted,

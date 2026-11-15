@@ -163,3 +163,6 @@ tempo change reaches the page's tempo within a beat; each beat where it fell to 
 
 What no fake can say: that Live and Logic load the plugin, automate a slot and play the
 plate on the bar. That is the owner's sitting on the Mac (`docs/judging.md`).
+Live did this on 2026-11-08 (`docs/plan-shipped.md` §13.7b-film). Live lists the
+plugin only with Audio Units or VST3 System Folders turned on in Settings > Plug-Ins and
+a Rescan after the install.

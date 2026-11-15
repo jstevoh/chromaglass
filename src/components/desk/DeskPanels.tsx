@@ -18,6 +18,7 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
+import { closeupIn, closeupToggle } from '../../lib/macroLanding';
 import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
@@ -555,9 +556,9 @@ function RecipeBody({ p }: { p: DeskProps }) {
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
         <Button
           full height={32}
-          pressed={!!p.settings.macroMode}
+          pressed={closeupIn(p.settings)}
           title="The closeup camera, in among the drops (M). Lit while it is on."
-          onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
+          onClick={() => p.onSetting(closeupToggle(p.settings))}
           midiKey="action:macro-toggle"
           testId="macro-button"
         >
@@ -1089,7 +1090,6 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;
-    case 'player': return p.screens.player;
   }
   const spec = PANEL_BY_ID.get(id);
   if (!spec) return null;

@@ -256,6 +256,11 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
+- ~~**14y-2** The Mac app keeps System audio across a relaunch or an update.~~ **Shipped**
+  2026-11-10 (the owner: "I shouldn't have to click the system audio ever"). Only System audio,
+  only in the Mac app; every other source still opens on Off. `npm run opensource` (3 new lines).
+  Story in `docs/plan-shipped.md` §14y-2. The owner was asked on a card whether every source
+  should be kept instead; the default (System audio only) shipped while that waits.
 
 ## 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 
@@ -291,6 +296,10 @@ Open, found doing it:
 - **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
   `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
   the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.
+  Its check is written (46e, `npm run rungs -- --owed=120hz`): measured, it is Poster's
+  sixty given up late or never at 120 Hz. Not necessarily via `drawGate.refreshMs`: once
+  every frame steps and takes two refreshes, that median reads the loop's pace (16.7 ms),
+  not the screen's.
 - **14aa-6** (open): `npm run stutter` runs by hand on the Mac (the watcher). Whether it joins
   a Mac shard depends on what the CI runner's GPU makes of Poster, which no run has asked yet.
 

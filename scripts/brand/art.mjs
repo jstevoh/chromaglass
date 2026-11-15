@@ -229,6 +229,29 @@ export function featureGraphic(words) {
 }
 
 /**
+ * The Android TV banner (PLAN 12-tv-2b), drawn once at 16:9 for both places
+ * that ask for it: the 320 × 180 launcher banner the TV's home screen shows
+ * (androidtv/…/drawable-xhdpi/banner.png) and the 1280 × 720 TV banner of the
+ * Play listing. Google's rule for both is the app's name, legible at the small
+ * size, on an opaque ground, with no other words; so the share card's ground
+ * and burst, the lockup alone, centred and as wide as the margins allow.
+ */
+export function tvBanner(words) {
+  const W = 1280, H = 720;
+  const back = burst({ cx: 1060, cy: 360, s: 1.6, id: 'tk', detail: 'high' });
+  const full = lockup(words, { detail: 'high' });
+  const [, , lw, lh] = full.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+  const scale = (W * 0.8) / lw;
+  const lx = r1((W - lw * scale) / 2), ly = r1((H - lh * scale) / 2);
+  const inner = full.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\n$/, '');
+  const defs = radial('tvb', [['0%', '#0a3a5c'], ['60%', '#031627'], ['100%', '#00070f']], 'cx="35%" cy="40%" r="90%"') + back.defs;
+  const body = `<rect width="${W}" height="${H}" fill="url(#tvb)"/>`
+    + `<g opacity="0.28">${back.body}</g>`
+    + `<g transform="translate(${lx} ${ly}) scale(${r1(scale * 1000) / 1000})">${inner}</g>`;
+  return svg(`0 0 ${W} ${H}`, defs, body);
+}
+
+/**
  * The intro's three layers (src/lib/intro.ts), apart, because they move
  * apart: the burst turns, the hub with its C stays upright over it, and the
  * name sits under both. Drawn on no ground: the intro's own liquid is the

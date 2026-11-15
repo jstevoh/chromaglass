@@ -197,10 +197,12 @@ const md = fs.readFileSync(LISTINGS, 'utf8');
 const LIMITS = {
   'App Store': { 'Name': 30, 'Subtitle': 30, 'Promotional text': 170, 'Description': 4000, 'Keywords': 100, "What's New": 4000, 'Review notes': 4000 },
   'Google Play': { 'App name': 30, 'Short description': 80, 'Full description': 4000 },
+  // The Android TV app's own listing (PLAN 12-tv-2b): the same Play limits.
+  'Google Play TV': { 'App name': 30, 'Short description': 80, 'Full description': 4000 },
 };
-const fields = [...md.matchAll(/^### (App Store|Google Play): ([^(\n]+) \((\d+)\)\n+```text\n([\s\S]*?)\n```/gm)]
+const fields = [...md.matchAll(/^### (App Store|Google Play TV|Google Play): ([^(\n]+) \((\d+)\)\n+```text\n([\s\S]*?)\n```/gm)]
   .map(([, store, field, limit, text]) => ({ store, field: field.trim(), limit: Number(limit), text }));
-const headings = (md.match(/^### (App Store|Google Play): /gm) || []).length;
+const headings = (md.match(/^### (App Store|Google Play TV|Google Play): /gm) || []).length;
 check('every store field heading has its text block', fields.length === headings, `${fields.length} of ${headings}`);
 for (const [store, want] of Object.entries(LIMITS)) {
   for (const [field, limit] of Object.entries(want)) {
@@ -226,10 +228,44 @@ for (const [file, w, h, opaque] of [
   ['ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', 1024, 1024, true],
   ['docs/brand/store/play-icon-512.png', 512, 512, false],
   ['docs/brand/store/play-feature-1024x500.png', 1024, 500, true],
+  // The TV listing's banner and the TV's own launcher banner: Play and the TV's
+  // home screen both want an opaque 16:9 (12-tv-2b).
+  ['docs/brand/store/play-tv-banner-1280x720.png', 1280, 720, true],
+  ['androidtv/app/src/main/res/drawable-xhdpi/banner.png', 320, 180, true],
 ]) {
   const p = fs.existsSync(file) && pngInfo(file);
   check(`${file} is ${w}×${h}${opaque ? ' with no alpha channel' : ''}`, !!p && p.w === w && p.h === h && (!opaque || !p.alpha), p ? `${p.w}×${p.h}, alpha ${p.alpha}` : 'missing');
 }
+// The TV listing's screenshots (12-tv-2b): Play wants at least one 16:9 TV
+// screenshot, and refuses one with an alpha channel, so they are JPEG, each
+// measured by its frame header (jpegSize above) rather than its file name.
+const TV_SHOTS = 'docs/brand/store/tv';
+const tvShots = fs.existsSync(TV_SHOTS) ? fs.readdirSync(TV_SHOTS).filter((f) => f.endsWith('.jpg')) : [];
+const badShots = tvShots.filter((f) => { const j = jpegSize(fs.readFileSync(path.join(TV_SHOTS, f))); return !j || j.w !== 1920 || j.h !== 1080; });
+check('the TV listing has 1 to 8 screenshots, each a 1920×1080 JPEG', tvShots.length >= 1 && tvShots.length <= 8 && badShots.length === 0, `${tvShots.length} found${badShots.length ? `; wrong size: ${badShots.join(', ')}` : ''}`);
+// The TV app's sample films (androidtv/…/Sample.java, PLAN 12-tv-2f) are the
+// channel's six 1920s films, the same list the TV page plays (src/lib/tvFilms.ts):
+// a film named differently in the two would play on one screen and not the
+// other, and a TV app cannot be fixed without a new release through Play. Each
+// is fetched from the site's /films/ address, which firebase.json redirects to
+// the films' release of the repository; without that redirect every TV's
+// sample, and Play's TV review, would be an error. The files themselves are
+// not in the repository, so whether the release holds them is `npm run
+// tvfilms -- --probe` (a request to the live site), run when they are uploaded.
+const sampleJava = fs.readFileSync('androidtv/app/src/main/java/app/chromaglass/tv/Sample.java', 'utf8');
+const javaFilms = [...sampleJava.matchAll(/new Clip\("([^"]+)", "([^"]+)", "([^"]+)", "([^"]+)", (\d+)\)/g)]
+  .map((m) => [m[1], m[2], m[3], m[4], Number(m[5])].join(' | '));
+const { TV_FILMS, TV_FILMS_RELEASE, TV_FILMS_PATH } = await import('../src/lib/tvFilms.ts');
+const pageFilms = TV_FILMS.map((f) => [f.id, f.look, f.title, f.performer, f.year].join(' | '));
+const unmatched = [...javaFilms.filter((f) => !pageFilms.includes(f)), ...pageFilms.filter((f) => !javaFilms.includes(f))];
+check('the TV app\'s sample films are the TV page\'s films, in the same order', javaFilms.length >= 6 && javaFilms.join('\n') === pageFilms.join('\n'),
+  `${javaFilms.length} in Sample.java, ${pageFilms.length} in tvFilms.ts${unmatched.length ? `; in one only: ${unmatched.join('; ')}` : ''}`);
+const hostingConf = JSON.parse(fs.readFileSync('firebase.json', 'utf8')).hosting;
+const filmsRedirect = (hostingConf.redirects ?? []).find((r) => r.source === `${TV_FILMS_PATH}:file`);
+check('the site redirects /films/ to the films\' release', filmsRedirect?.destination === `https://github.com/jstevoh/chromaglass/releases/download/${TV_FILMS_RELEASE}/:file` && filmsRedirect.type === 302,
+  JSON.stringify(filmsRedirect ?? null));
+const shadowed = TV_FILMS.filter((f) => fs.existsSync(pub(`${TV_FILMS_PATH}${f.id}.mp4`)));
+check('no file under public/films/ stands in front of the redirect', shadowed.length === 0, shadowed.map((f) => f.id).join(', '));
 
 // 6. The page in a browser, served from public/ as Hosting serves it.
 // Fonts and anything else off-site are refused so the check is the same with

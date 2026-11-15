@@ -19,6 +19,13 @@
 import type { VisualizerSettings } from '../types';
 import { curveOf, travelOf } from './midi';
 import { MIX_CONTROLS, MIX_FADE_KEYS } from './mixer';
+import { ENVELOPE_TRIGGERS, formatLfoBars, LFO_SHAPES, LFO_TRIGGERS } from './modulators';
+
+const lfoShapeUnit = (v: number): string => LFO_SHAPES[Math.max(0, Math.min(LFO_SHAPES.length - 1, Math.round(v)))] ?? 'sine';
+const lfoRestartUnit = (v: number): string => LFO_TRIGGERS[Math.max(0, Math.min(LFO_TRIGGERS.length - 1, Math.round(v)))] ?? 'none';
+const envOnUnit = (v: number): string => ENVELOPE_TRIGGERS[Math.max(0, Math.min(ENVELOPE_TRIGGERS.length - 1, Math.round(v)))] ?? 'any';
+const envAttackUnit = (v: number): string => `${Math.round(v * 1000)} ms`;
+const envDecayUnit = (v: number): string => v >= 1 ? `${v.toFixed(2)} s` : `${Math.round(v * 1000)} ms`;
 
 /** A fade time as said on its slider: "cut", "1 bar", "2.5 bars". */
 export const fadeBarsLabel = (v: number): string => {
@@ -35,6 +42,12 @@ const UNITS: Record<string, (v: number) => string> = {
   macroHold:  v => `${v.toFixed(1)}s`,
   beatLead:   v => `${Math.round(v)} ms`,
   gelSpeed:   v => `${v.toFixed(2)} rpm`,
+  lfo1Bars: formatLfoBars, lfo2Bars: formatLfoBars, lfo3Bars: formatLfoBars, lfo4Bars: formatLfoBars,
+  lfo1Shape: lfoShapeUnit, lfo2Shape: lfoShapeUnit, lfo3Shape: lfoShapeUnit, lfo4Shape: lfoShapeUnit,
+  lfo1Restart: lfoRestartUnit, lfo2Restart: lfoRestartUnit, lfo3Restart: lfoRestartUnit, lfo4Restart: lfoRestartUnit,
+  env1Attack: envAttackUnit, env2Attack: envAttackUnit,
+  env1Decay: envDecayUnit, env2Decay: envDecayUnit,
+  env1On: envOnUnit, env2On: envOnUnit,
   /*
     The mixer's grades read as a photo editor's do: brightness, contrast and
     saturation as a share of the source's own (100% is untouched, and a share

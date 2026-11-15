@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself (continued)
 
-Part 2 of 3 of §19; it begins at 19l. The section starts in `19-checks-build-plan.md`.
+Part 2 of 4 of §19; it begins at 19l. The section starts in `19-checks-build-plan.md`.
 
 ## 19l. App frames readable in a cloud session
 

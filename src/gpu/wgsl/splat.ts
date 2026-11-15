@@ -135,6 +135,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dye, vec2i(id.xy), vec4f(absorb * amount, amount));
 }`,
 
+  /**
+   * A title poured as ink (PLAN 37x-10, `pourInk`): a coverage mask of any
+   * size, its rows counting up the plate as the grid's do, laid at the
+   * solver's own grid as dye. Each cell is the mean of a few bilinear taps
+   * over its footprint, up to four a side, as the video pour samples its
+   * frame: letters taken at one point a cell alias, and a reference pour
+   * laid by nearest cell read 0.789 against the 0.8 the check asks of a
+   * title just landed (`npm run inktitle`). A mask already at the grid's
+   * size takes one tap at each texel's centre, its own value.
+   *
+   * The record's b is the ink: its absorbances × density in rgb, the density
+   * in a. Written to the dye's delta, which the caller adds to the dye.
+   */
+  pourInk: `${SPLAT_STRUCT}
+@group(0) @binding(1) var<storage, read> splats: array<Splat>;
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var lin: sampler;
+@group(0) @binding(4) var dye: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
+  let taps = vec2u(clamp(ceil(vec2f(textureDimensions(src)) / A.n), vec2f(1.0), vec2f(4.0)));
+  var cover = 0.0;
+  for (var j = 0u; j < taps.y; j = j + 1u) {
+    for (var i = 0u; i < taps.x; i = i + 1u) {
+      let uv = (vec2f(id.xy) + (vec2f(f32(i), f32(j)) + 0.5) / vec2f(taps)) / A.n;
+      cover += textureSampleLevel(src, lin, uv, 0.0).r;
+    }
+  }
+  textureStore(dye, vec2i(id.xy), splats[0].b * (cover / f32(taps.x * taps.y)));
+}`,
+
   /** Bilinear from the CPU's 192² delta arrays onto the full grid. */
   upsampleDelta: upsample(false),
 
