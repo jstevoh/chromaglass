@@ -24,7 +24,7 @@
     "scripts/qa.mjs": 124212,
     "scripts/startup.mjs": 104720,
     "scripts/wall.mjs": 135706,
-    "src/App.tsx": 204748,
+    "src/App.tsx": 204680,
     "src/components/LiquidVisualizer.tsx": 422992,
     "src/gpu/wgsl/plate.ts": 180818,
     "src/sim/fluidSimulation.ts": 190750

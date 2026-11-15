@@ -9346,7 +9346,9 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   4x on load (`cleanSettings`), and a sequence stage's Closeup on or off now glides the
   zoom (to the stage's own, or 4x; off to 1). The phone's microscope opens a Macro Zoom
   slider row instead of toggling; the remote's Macro Zoom is always shown, its camera
-  dials once in; the landing on the nearest liquid (QA-32) is on every zoom in, as it
+  dials once in; the side rail's Macro became a Macro Zoom slider in its place
+  (`RailZoom.tsx`; without it the rail ended a Layers button in half at 430px, which `npm run
+  layout` caught); the landing on the nearest liquid (QA-32) is on every zoom in, as it
   already was for the slider and the pinch. The scan and the reading on today's main: 14
   of 16 lines (the flag at 1x read 4x; 16 Close-up presses in src/), 16 of 16 after. It
   also supersedes QA-32b (#707, the rail's Macro made the one press, and the readers that

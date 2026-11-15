@@ -6,6 +6,7 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
+import { RailZoom } from './components/RailZoom';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
@@ -1597,10 +1598,9 @@ export default function App() {
     return onAuthFlagChange(ask);
   }, []);
   // ── Macro zoom at will ──
-  // + and − (and the wheel over the plate, and the chip) move the closeup's
-  // magnification a step at a time, as the Macro Zoom slider does in one
-  // drag: + from the plate comes in gently, and − all the way down is the
-  // whole plate again. They are the zoom, the closeup's one control.
+  // + and − (and the wheel over the plate, and the chip) move the Macro Zoom
+  // a step at a time: + from the plate comes in gently, and − all the way
+  // down is the whole plate again.
   // (settingsRef is declared above.)
   const zoomMacro = useCallback((dir: 1 | -1, amount = 1) => {
     const cur = settingsRef.current;
@@ -2799,8 +2799,8 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* The rail's Macro button, the closeup's on/off, is gone with
-                    the desk's Close-up (PLAN QA-32c): the Macro Zoom is the way in. */}
+                {/* The Macro button became the zoom itself (PLAN QA-32c). */}
+                <RailZoom zoom={settings.macroZoom ?? 1} onZoom={pinchZoom} />
 
                 {/* Settings */}
                 <button
