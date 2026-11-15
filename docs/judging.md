@@ -2872,3 +2872,22 @@ since the page opened, over a thin bar.
 4. Within the first seconds after the plate appears, change to a look with something
    different (Ben-Day dots, Lacing, Lumia): the effect may come in a second or two late,
    never a frozen plate. Say if anything looks wrong in those seconds.
+
+## 135. A palette from any picture or video (PLAN 43d)
+
+"Palette from a picture or video" (the Dyes panel, under Palette; the phone's Dye sheet)
+takes a file's four main colours as the dyes, shown as "From picture" in the palette list
+and locked like any palette. Only the dye colours change: the look's liquids, motion and
+settings are the look's. A video's colours are taken from eight frames across it.
+
+1. With Classic up, press it and pick an album cover with two or three strong colours. Do
+   the four swatches on the button read as the cover's colours? Good: a person who knows
+   the cover would name them. Bad: a colour the cover does not have, or the cover's main
+   colour missing.
+2. Watch the plate for a minute on a lamp look (Liquid Light Lab or Overhead) and a dark
+   one (Classic): does every dye show on both? Bad: a dye that vanishes into the ground.
+3. A cover that is mostly black or white with one colour (a black sleeve, a pink title):
+   the palette should be that colour in strengths, not grey. Say if it looks dull.
+4. A video of a few seconds with changing scenes: are colours from its later scenes in
+   the palette, not only the first shot's?
+5. Reload the page: "From picture" is still the palette, in the same four colours.

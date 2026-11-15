@@ -42,6 +42,7 @@ import type { TabEdit } from '../../hooks/useDeskLayout';
 import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
 import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { PicturePaletteButton } from '../PicturePaletteButton';
 
 /**
  * ChromaGlass on a phone.
@@ -164,11 +165,13 @@ export interface PhoneStageProps {
   onLiquid: (id: string) => void;
   dyeColors: readonly string[];
   onDyeColor: (hex: string) => void;
-  palettes: { name: string; colors: string[] }[];
+  palettes: { name: string; colours: string[] }[];
   paletteLock: number | null;
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
+  /** A picture or video file's colours as the palette (usePaletteLock, PLAN 43d): the desk's own call. */
+  onPicturePalette?: (file: File) => Promise<string | null>;
   /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
   cartoons?: CartoonShelfProps;
   // Playing
@@ -859,12 +862,22 @@ export function PhoneStage(p: PhoneStageProps) {
                 className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] ${p.paletteLock === i ? LIT : 'border-border bg-elevated text-text-2'}`}
               >
                 <span className="flex">
-                  {pal.colors.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
+                  {pal.colours.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
                 </span>
                 <span className="whitespace-nowrap">{pal.name}</span>
               </button>
             ))}
           </div>
+
+          {p.onPicturePalette && (
+            <PicturePaletteButton
+              onFile={p.onPicturePalette}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2 disabled:opacity-60"
+              testId="phone-picture-palette"
+            >
+              <Palette size={18} /> Palette from a picture or video
+            </PicturePaletteButton>
+          )}
 
           <button
             onClick={() => { p.onImageDye(); close(); }}

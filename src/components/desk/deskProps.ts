@@ -191,6 +191,8 @@ export interface DeskProps {
   palettes: { name: string; colours: string[] }[];
   paletteLock: number | null;
   onPalette: (i: number | null) => void;
+  /** A picture or video file's colours as the palette, "From picture" in the list (usePaletteLock, PLAN 43d). */
+  onPicturePalette?: (file: File) => Promise<string | null>;
   onImageDye: () => void;
   onVideoDye: () => void;
   /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */

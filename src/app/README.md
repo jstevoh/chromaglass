@@ -20,7 +20,7 @@ comments, which moved with it.
 | `useToast` | the one-line notice |
 | `useFilm` | the film that drives the plate: a file, a cartoon, a camera, a window |
 | `useSceneSource` | the room camera as a sensor |
-| `usePaletteLock` | the palette held across looks |
+| `usePaletteLock` | the palette held across looks; since PLAN 43d also `paletteFromFile` (a picture or video file's colours as the palette, "From picture", the lock `PICTURE_LOCK`), `palettes` (the list the desk and the phone draw, the picture's last) and `pictureDyes` (sent to a projector with the lock) |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
 | `useSetListState` | the set list, the armed look, the Go's fade; publishes them to `setNow.ts` for the assistant, and its fade and cancel |
 | `usePhoneLayout` | phone, desks or the narrow overlay; Perform or Design |

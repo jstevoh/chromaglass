@@ -37,6 +37,7 @@
 import { useSyncExternalStore } from 'react';
 import { COLOR_HARMONY_NAMES } from '../constants';
 import type { DeskNow, DeskPanelNow } from '../lib/remoteProtocol';
+import { lockName } from '../lib/picturePalette';
 import {
   PANELS, PANEL_BY_ID, SLOTS, closePanel, collapseAll, dockPanel, floatPanel, openPanel, whereIs,
   type DeskLayout, type Slot,
@@ -72,8 +73,8 @@ export function publishDesk(tabs: DeskTab[], up: string, rides: readonly string[
     pins: { rides: [...rides], recipe: [...recipe] },
   });
 }
-/** The palette lock, as an index into COLOR_HARMONIES (usePaletteLock). */
-export function publishPalette(index: number | null): void { take({ ...now, palette: { lock: index == null ? null : COLOR_HARMONY_NAMES[index] ?? null } }); }
+/** The palette lock, as an index into COLOR_HARMONIES or the picture's (usePaletteLock, PLAN 43d). */
+export function publishPalette(index: number | null): void { take({ ...now, palette: { lock: lockName(index) } }); }
 /** The tool in hand, its amount, and the plate in hand of those on the stage (useHand). */
 export function publishHand(tool: string, amount: number, layer: number, layers: number): void { take({ ...now, hand: { tool, amount, layer, layers } }); }
 /** Ambient TV mode (useAmbientMode). */

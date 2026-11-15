@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
-import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
+import { ImagePlus, Palette, SlidersHorizontal, Video } from 'lucide-react';
+import { PicturePaletteButton } from '../PicturePaletteButton';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { LiveShowPanel } from '../LiveShowPanel';
@@ -720,6 +721,15 @@ function DyesBody({ p }: { p: DeskProps }) {
           </div>
         </>,
         portalBody,
+      )}
+      {p.onPicturePalette && (
+        <PicturePaletteButton
+          onFile={p.onPicturePalette}
+          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-60"
+          testId="picture-palette"
+        >
+          <Palette size={13} className="mr-1.5 inline" /> Palette from a picture or video…
+        </PicturePaletteButton>
       )}
       <div className="flex gap-1.5">
         <button

@@ -691,7 +691,7 @@ export default function App() {
     ? clockText((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000)
     : null;
 
-  const { paletteLock, selectPalette } = usePaletteLock({ bothEngines, visualizerRef });
+  const { paletteLock, selectPalette, paletteFromFile, palettes, pictureDyes } = usePaletteLock({ bothEngines, visualizerRef, setToast });
   // Lay the opening look's plate: its dyes, its seed, its injection styles and
   // its liquids. The settings above arrive with the first render, but the
   // plate is the visualizer's and it seeds Classic until told otherwise — so
@@ -1581,7 +1581,7 @@ export default function App() {
     castState, relaySendRef, markLoaded, loadMark, clearMark,
   } = useCastFeed({
     wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
-    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
+    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, pictureDyes, shownOutput, castSend,
     mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
     isCasting, ear, hear, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
   });
@@ -3105,9 +3105,10 @@ export default function App() {
             onLiquid={setSelectedLiquidId}
             dyeColors={DROPPER_COLORS}
             onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
-            palettes={COLOR_HARMONIES.map((h, i) => ({ name: COLOR_HARMONY_NAMES[i], colors: h.slice(0, 4).map(pi => PALETTE[pi].hex) }))}
+            palettes={palettes}
             paletteLock={paletteLock}
             onPalette={selectPalette}
+            onPicturePalette={paletteFromFile}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
             cartoons={cartoons}
@@ -3708,12 +3709,10 @@ export default function App() {
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); }}
-          palettes={COLOR_HARMONIES.map((h, i) => ({
-            name: COLOR_HARMONY_NAMES[i],
-            colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
-          }))}
+          palettes={palettes}
           paletteLock={paletteLock}
           onPalette={selectPalette}
+          onPicturePalette={paletteFromFile}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
           cartoons={cartoons}
