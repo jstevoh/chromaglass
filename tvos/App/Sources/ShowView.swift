@@ -19,6 +19,9 @@ struct ShowView: View {
                 Text(words).font(.title2).foregroundStyle(.white.opacity(0.75))
                     .padding(40).background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
             }
+            // The website's corner (SiteCorner.swift) only while there is no picture: never
+            // in the frames of the show itself.
+            if link.screen != .live { SiteCorner() }
         }
         .onAppear { link.start(address) }
         .onDisappear { link.stop() }
