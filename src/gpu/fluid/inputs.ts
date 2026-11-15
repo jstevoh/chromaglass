@@ -7,6 +7,7 @@
 
 import { PingPong, bindGroup } from '../kit';
 import { splatKernel } from '../wgsl/splat';
+import { kernel } from '../wgsl/fluid';
 import { SPLAT_FLOATS, type SplatList } from '../splats';
 import type { SolverCarry } from '../solverTypes';
 import { pressShare } from '../../lib/pressRing';
@@ -671,6 +672,19 @@ export class FluidInputs extends FluidPasses {
     }
     pass.end();
     this.submit(enc);
+  }
+
+  /**
+   * Whether `pour` can push its volume without compiling: `pourVolume` is
+   * built behind the show (fluid.ts, nothing poured in an opening's first
+   * steps), and `computePipeline` builds a missing pipeline on the frame that
+   * asks. Classic's automation drops colour from its first seconds, so a drop
+   * that poured then compiled it in the opening, which `npm run startup`
+   * read as the show's own wait (2.79 and 3.62 s against 1.22 and 1.35 for
+   * ?prepare=0, on 18c-2's branch). Until it is in, a drop is a stamp.
+   */
+  pourReady(): boolean {
+    return !!this.hsPour && this.pipelines.hasCompute(this.pipelineKey('pourVolume', 'thin'), kernel('pourVolume', 'rgba16float'));
   }
 
   /**
