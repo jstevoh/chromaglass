@@ -73,7 +73,8 @@ export class FluidInputs extends FluidPasses {
       itself, in project().
     */
     this.uploads.write(q, this.cpuDyeTex, dyeAdd, 16, rows, this.L);
-    this.uploads.write(q, this.cpuVelTex, velAdd, 16, rows, this.L);
+    for (const [y0, y1] of this.uploads.write(q, this.cpuVelTex, velAdd, 16, rows, this.L))
+      if (!this.heatLive) for (let k = y0 * this.L * 4 + 2, end = (y1 + 1) * this.L * 4; k < end; k += 4) if (velAdd[k] !== 0) { this.heatLive = true; break; }
     this.uploads.write(q, this.cpuMulTex, dyeMul, 4, rows, this.L);
     if (hands) {
       if (!this.handTex) {
@@ -136,6 +137,10 @@ export class FluidInputs extends FluidPasses {
    */
   applySplats(list: SplatList, dt: number): void {
     if (list.empty) return;
+    if (!this.heatLive) {
+      for (let i = 0, n = list.count * SPLAT_FLOATS; i < n; i += SPLAT_FLOATS)
+        if (list.records[i + 10] !== 0) { this.heatLive = true; break; }
+    }
     const q = this.device.queue;
     const bytes = Math.max(64, list.count * SPLAT_FLOATS * 4);
     if (!this.splatBuf || this.splatBuf.size < bytes) {
@@ -1011,6 +1016,7 @@ export class FluidInputs extends FluidPasses {
     const pass = enc.beginComputePass({ label: 'drain' });
     this.run(pass, 'drainVel', this.vel.write, [], this.arg('drain', [pull, t, 0, 0]));
     this.vel.swap();
+    this.heatLive = false;
     this.run(pass, 'advect', this.dye.write, [this.dye.read, this.vel.read, this.sampler], this.arg('drain advect', [0.3 / this.L, 0, 0, 0]));
     this.dye.swap();
     this.run(pass, 'scaleDye', this.dye.write, [this.dye.read], this.arg('drain fade', [1 - (0.03 + t * t * 0.35), 0, 0, 0]));

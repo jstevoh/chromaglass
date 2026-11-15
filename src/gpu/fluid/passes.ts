@@ -483,6 +483,7 @@ export class FluidPasses extends FluidFields {
     this.vel.swap();
     this.boilAlpha.swap();
     this.boilLive = true;
+    this.heatLive = true;
     this.air?.setBoilAlpha(this.boilAlpha.read);
   }
 
@@ -525,8 +526,16 @@ export class FluidPasses extends FluidFields {
    * and changed nothing (96.8% kept either way, `npm run heat` line 9) while
    * its pipeline compiled in the frame; the loss was the store's rounding,
    * which heatUnpack now does to the nearest half-float itself.
+   *
+   * Only once a writer has heated the plate since the last clear (`heatLive`,
+   * PLAN 46s: `applyDeltas`, `applySplats`, `mixForce` with `lamp > 0`, and
+   * `stepPlateBoil` handing the temperature back when the boil stops; cleared
+   * in `clear` and `drainStep`): a uniform temperature carried by a conserving
+   * carry returns what it was given, and skipping it saves the pair and 35
+   * dispatches a step (`heatPack`, 32 indirect substeps, `heatUnpack`).
    */
   protected carryHeat(pass: GPUComputePassEncoder, disp: number, argsAt?: GPUBuffer[]): void {
+    if (!this.heatLive) return;
     const h = this.heatCarried ??= new PingPong(this.device, this.disposer, [this.N, this.N], VEL, 'heat carried');
     const gap = this.arg('heat gap', [REST_GAP, 0, 0, 0]);
     this.hsRun(pass, 'heatPack', `heatPack:${this.vel.read.label}:${h.write.label}:${this.squeeze.read.label}`, gap, [this.vel.read, this.squeeze.read, h.write]);
