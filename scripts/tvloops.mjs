@@ -113,6 +113,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { port } from './ports.mjs';
 import {
   TV_LOOPS, TV_LOOP_SECONDS, TV_LOOP_WARM_S, TV_LOOP_SEAM_S, TV_LOOP_FPS, TV_LOOP_WIDTH, TV_LOOP_HEIGHT, TV_LOOP_RELEASE,
 } from '../src/lib/tvLoops.ts';
@@ -130,7 +131,7 @@ const WARM_S = Number(opt('warm') ?? TV_LOOP_WARM_S);
 const SEAM_S = Number(opt('seam') ?? TV_LOOP_SEAM_S);
 const FPS = TV_LOOP_FPS;
 const OUT = path.resolve(process.env.TVLOOPS_OUT ?? 'scratch/tvloops');
-const PORT = Number(process.env.TVLOOPS_PORT ?? 4364);
+const PORT = port(4366, 'TVLOOPS_PORT');
 
 const SEAM_OVER_KEY = 3;
 const MOVES_OVER_KEY = 3;
