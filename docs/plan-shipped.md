@@ -2467,7 +2467,13 @@ before the measured one (untested, and #396's warm in the same page did not help
     (`WebGPUPlate.displayFor`) draws lean while the draw's own uniform bytes need nothing
     it left out, whole otherwise; while the whole one is still building the lean one goes
     on drawing and the whole one is asked for, so the Mac's `startup` sees a look whose
-    first steps reach past its opening. `?lean=0` opens whole.
+    first steps reach past its opening. `?lean=0` opens whole. A look that opens through
+    the camera or the film stock (Home Movie, Song Groove) draws its display flipped into
+    their picture, so it waits for no canvas display and builds the whole one behind: the
+    Mac's first `startup` run named their lean display as waited for and asked for by
+    none. `startup` prices the lean display as the old way's display
+    (`scripts/startuplean.mjs`): on that run its 1.78 s compile read as the page's own
+    wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner.
   - Every look the same bytes: `npm run leandisplay` (new, lab9) draws all 41 looks lean
     and whole, plate and close-up, 85/85 (also with five steps each, before the switch
     to literal `false`), with controls (a gate the look uses taken out differs by 1329

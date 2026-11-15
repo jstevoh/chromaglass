@@ -217,17 +217,28 @@ export class WebGPUPlate {
    */
   static prepare(device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'plate');
-    setLeanDisplay(device, format, open.display, 'behind');
+    /*
+      A look that opens through the camera or the film stock draws its
+      display flipped into their picture (below) and never onto the canvas,
+      so its opening waits for no canvas display at all: the whole one is
+      built behind the show, for when the camera or the stock is turned off.
+      Its lean one would be a compile nothing draws with (Home Movie and
+      Song Groove waited for theirs on the Mac's first run of this, and
+      `npm run startup` named it: waited for and asked for by none).
+    */
+    const direct = !open.camera && !open.stock;
+    setLeanDisplay(device, format, direct ? open.display : null, 'behind');
     return [
       // The display first: the opening asks for render pipelines first and
       // in this order, and it is the longest compile of the show's opening
       // (`gpu/prepare.ts`). Lean, compiled for what the opening look draws
       // (`displayLean.ts`: a third of the compile on a CPU-bound compiler),
       // and the whole one first behind the show for when a look reaches past it.
-      ...(open.display === WHOLE_DISPLAY ? [cache.renderPrep(displayName(format, false), displayRecipe(device, format, false))] : [
-        cache.renderPrep(displayName(format, false, open.display), displayRecipe(device, format, false, open.display)),
-        cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true),
-      ]),
+      ...(!direct ? [cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true)]
+        : open.display === WHOLE_DISPLAY ? [cache.renderPrep(displayName(format, false), displayRecipe(device, format, false))] : [
+          cache.renderPrep(displayName(format, false, open.display), displayRecipe(device, format, false, open.display)),
+          cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true),
+        ]),
       ...(['packDye', 'packDyeBodies', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
