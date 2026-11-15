@@ -4,7 +4,9 @@
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
 import { FILM_DYE_DEPTH } from '../src/gpu/wgsl/filmDye';
 import { FILM_PRECURSOR } from '../src/gpu/wgsl/film';
-import { WebGPUPlate } from '../src/gpu/plate';
+import { WebGPUPlate, lastDisplayName, setLeanDisplay } from '../src/gpu/plate';
+import { DISPLAY_MAIN, plateWgsl } from '../src/gpu/wgsl/plate';
+import { displayGateTests, displayMayMask, leanDisplayWgslCounted } from '../src/gpu/displayLean';
 import type { AirGeo } from '../src/gpu/air';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
@@ -596,6 +598,11 @@ const api = {
   },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /** The display the plate last drew with, and the lean display's gates (`npm run leandisplay`). */
+  lastDisplay: lastDisplayName,
+  displayGates: displayGateTests,
+  displayMayMask,
+  displayGateCounts: () => leanDisplayWgslCounted(plateWgsl(DISPLAY_MAIN), 0).found,
   /**
    * The shelf's bottles as src/types.ts writes them, each liquid's real
    * numbers (viscosity, density, refractive index), and the dish's size and
@@ -755,6 +762,19 @@ const api = {
         the app's frames are (`npm run glint`).
       */
       keepPlate?: boolean;
+      /*
+        The whole display rather than the lean one the app opens a look with
+        (`gpu/displayLean.ts`). Left out, the plate draws as the app's first
+        frames do: lean, built for this look's settings, and whole wherever
+        a draw reaches past it. `npm run leandisplay` draws both and compares.
+      */
+      wholeDisplay?: boolean;
+      /** The settings the lean display is built for, when not the ones drawn (`leandisplay`'s fallback control). */
+      leanFrom?: Partial<VisualizerSettings>;
+      /** Gates taken out of the lean display and drawn lean regardless (`leandisplay`'s control that a gate is really compiled out). */
+      leanDrop?: number;
+      /** Registered as the app's opening registers it, the whole one building behind the show (`leandisplay`'s control of that path). */
+      leanBehind?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -794,6 +814,12 @@ const api = {
     };
     const fluids = cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }];
     fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N });
+    {
+      const mask = displayMayMask({ ...view.settings, ...cam.leanFrom });
+      if (cam.wholeDisplay) setLeanDisplay(device, 'rgba8unorm', null);
+      else if (cam.leanDrop) setLeanDisplay(device, 'rgba8unorm', mask & ~cam.leanDrop, 'forced');
+      else setLeanDisplay(device, 'rgba8unorm', mask, cam.leanBehind ? 'behind' : 'asked');
+    }
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     // Asked for the grain and there is none (an adapter without
