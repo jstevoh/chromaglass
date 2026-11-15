@@ -311,8 +311,11 @@ function drive({ from, to, seconds, clearing }) {
 // The desk draws a CC on a fader as a slider and one on a knob as a knob. A
 // binding only says absolute or relative, so before profiles every absolute
 // knob (the APC40's sixteen, the Launch Control XL's twenty-four) drew as a
-// fader. The control is a board this does not know, whose absolute CCs must
-// stay faders, and an endless encoder on it, which must still be a knob.
+// fader. On a board this does not know, every CC is a knob (8d-1, the owner
+// 2026-11-14: Iridescence on CC 16 of an unprofiled board sat as a slider over
+// the Recipe's knobs). The control that keeps the profile honest is the faders
+// of the known boards: they must still be sliders, so a rule that made every
+// control a knob would fail the lines above it.
 {
   const apc = apc40Mk2Map([]);
   const kinds = (map, keys, port) => keys.map(k => controlKindOf(map, k, port));
@@ -328,14 +331,17 @@ function drive({ from, to, seconds, clearing }) {
   check('the APC mini\'s faders are sliders', kinds(apcMiniMk2Map([]), ['audioImpact', 'camera']).every(k => k === 'fader'));
   // A map with no device name (made from scratch) takes the board from the port it plays from.
   const bare = { ...apc, device: undefined, name: 'Mine' };
-  check('a map with no device takes its board from the port', controlKindOf(bare, 'lightPlay', 'APC40 mkII') === 'encoder' && controlKindOf(bare, 'lightPlay', null) === 'fader');
-  // The control: an unknown board. Absolute CC 16 is a fader there; a relative one is a knob.
+  // From the port: the APC40's track fader is a slider, and with no port to name the board it is a knob.
+  check('a map with no device takes its board from the port',
+    controlKindOf(bare, 'lightPlay', 'APC40 mkII') === 'encoder' && controlKindOf(bare, 'audioImpact', 'APC40 mkII') === 'fader'
+      && controlKindOf(bare, 'audioImpact', null) === 'encoder');
+  // An unknown board: absolute CC 16 and a relative CC 17 are both knobs.
   const unknown = { ...apc, device: 'Some Box', bindings: [
     { id: 'a', source: { kind: 'cc', channel: 0, number: 16 }, target: { kind: 'setting', key: 'lightPlay', min: 0, max: 1 }, mode: 'absolute' },
     { id: 'b', source: { kind: 'cc', channel: 0, number: 17 }, target: { kind: 'setting', key: 'bloom', min: 0, max: 1 }, mode: 'relative' },
   ] };
-  check('on a board it does not know, an absolute CC stays a slider and an endless encoder is a knob',
-    controlKindOf(unknown, 'lightPlay', 'Some Box') === 'fader' && controlKindOf(unknown, 'bloom', 'Some Box') === 'encoder');
+  check('on a board it does not know, an absolute CC is a knob, as an endless encoder is',
+    controlKindOf(unknown, 'lightPlay', 'Some Box') === 'encoder' && controlKindOf(unknown, 'bloom', 'Some Box') === 'encoder');
   check('a setting learned to nothing has no kind', controlKindOf(apc, 'vorticityConfinement', 'APC40 mkII') === null);
 }
 
