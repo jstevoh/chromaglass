@@ -76,6 +76,9 @@ export const TV_LOOP_ORIGIN = 'https://chromaglass.art/loops/';
  * nothing heard its dye drains, and over the half hour the light per minute
  * fell from 86 to 9 of 255, a black screen by the end (the judge's light line
  * caught it). Clock Glass, cells of oil drifting in water, took its place.
+ * Galaxy came out the same way: its light fell to 17.6 against a median
+ * minute's 35.9, under half, for a minute of the half hour; Cell Bloom (three
+ * pools turning under a magnifier) took its place.
  * Left out on purpose: the looks made to hit with a band (Bass Drop,
  * Solar Flare, Cyberpunk Neon, Comet River, Acid Trip), the ones that move
  * the whole picture (Fractal Dream's mirror, Macro Bead's chasing camera),
@@ -88,7 +91,7 @@ export const TV_LOOPS: readonly TvLoop[] = [
   { id: 'jellyfish-bloom', look: 'jellyfish-bloom', title: 'Jellyfish Bloom', seed: 1104 },
   { id: 'velvet-underground', look: 'velvet-underground', title: 'Velvet Underground', seed: 1105 },
   { id: 'lava-lamp', look: 'lava-lamp', title: 'Lava Lamp', seed: 1106 },
-  { id: 'galaxy', look: 'galaxy', title: 'Galaxy', seed: 1107 },
+  { id: 'cell-bloom', look: 'cell-bloom', title: 'Cell Bloom', seed: 1107 },
   { id: 'oil-and-water', look: 'oil-and-water', title: 'Oil & Water', seed: 1108 },
   { id: 'soap-film', look: 'soap-film', title: 'Soap Film', seed: 1109 },
   { id: 'neon-coral-reef', look: 'neon-coral-reef', title: 'Neon Coral Reef', seed: 1110 },
