@@ -108,8 +108,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'macroOn', type: 'f32', glsl: 'u_macro', note: '0 = off, 1 = macro detail pass enabled' },  // `macro` is reserved in WGSL
   { name: 'macroCellScale', type: 'f32', note: 'cell size' },
   { name: 'macroCells', type: 'f32', note: 'paint-cell / bubble structure amount' },
-  { name: 'macroDepth', type: 'f32', note: 'dome shading, contact shadow, depth of field' },
-  { name: 'macroEdge', type: 'f32', note: 'fractal silhouette warp' },
+  { name: 'macroDepth', type: 'f32', note: 'the closeup camera\'s depth of field' },
   { name: 'macroLacing', type: 'f32', note: 'dark lacing filaments along dye boundaries' },
   { name: 'macroRelief', type: 'f32', note: 'surface relief: per-pixel normals, specular, occlusion' },
   { name: 'markOn', type: 'f32', note: '1 when there is one loaded' },

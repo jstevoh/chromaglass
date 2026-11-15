@@ -1223,6 +1223,15 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
 - In a thick look it should move much less. Does that read as the liquid being thick,
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.
+- Since 15g-11 the breath is a jet: drag a short way and hold. Does the liquid keep
+  streaming the way you dragged, a tongue running on a palm ahead of the pointer, for
+  as long as you hold? Does a slanted stroke blow along the slant, without wavering?
+  If the plume reads too long, too short or too wide, say which: its core and spread
+  are textbook numbers for a jet, not a measurement of a breath over this dish.
+- Since 15g-12 wind lays no bubbles and a press that never moves is the straw: one
+  round bubble that grows while you hold. Is anything left of the flower-like ring
+  round floating bubbles after a Blow (PLAN 15g-15)? If you miss the wind's bubbles,
+  say so: they were a stand-in, and what would be real is foam at a dish's edge.
 
 
 ## 46. Turing Print (PLAN 26d)
@@ -2766,24 +2775,23 @@ only seen here.
 5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
 6. Glitter and Side Light at 0 on any look: the look exactly as before.
 
-## 130. Polarised light (PLAN 31p-1)
+## 130. The closeup with nothing drawn over it (PLAN 38u-1, 38u-2, 38u-3)
 
-The check (`npm run polar`) proves the laws against Jones matrices and the spectrum, that off
-is off to the byte, that a still plate between crossed sheets is black and a stirred one
-lights in colour, and that the quarter-wave plates take the dark lines out, on the lab's
-software WebGPU at one frame. How the bands move with the music at sixty frames is only seen
-here.
+**Judged 2026-11-13.** The owner watched the before and after films from their Mac (Macro Bead, Cell Bloom, Classic at 5x) the same day: "looks good". Seen in both films and older than this change: the beads' scalloped rims (38h-17) and grid steps where dye is freshly poured at 5x (the fine detail's, section 47).
 
-1. Open any look with Turbulence up (or the music on, which stirs it through its cord).
-   Settings → Lamp & Light → **Polarisers** to 1. Good: rainbow bands where the liquid moves,
-   broad and smooth like the photograph's dishes, flowing with the liquid and darker where it
-   is calm. Bad: a flat tint everywhere, bands that slide over still dye, speckle or noise.
-2. **Analyser** from 90 down to 0: the dark field turns white and every band swings to its
-   opposite colour. Bad: a jump, or bands that do not change.
-3. **Quarter Wave** to 0: dark curving arms appear through the bands; back to 1, they go.
-4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
-   pinks and greens. The default 0.3 should feel like the photograph.
-5. Polarisers at 0 on any look: the look exactly as before.
+The check (`npm run stillcloseup`) proves a still plate draws a still closeup, that no shadow
+falls to one side of a pool and that Depth / Focus only defocuses, in the lab at one frame.
+Whether the closeup still reads as deep and wet without the drawn shadow is only seen here.
+
+1. Macro Bead, Cell Bloom and any look with Close-up on, at 4x to 6x. Good: pool and drop
+   edges are smooth curves that hold still when the liquid does; the clear ground is an even
+   light with no paper grain; depth reads from the soft surround and the relief's light and
+   dark along slopes. Bad: the closeup reads flat, like a sticker, with nothing to say which
+   liquid is over which.
+2. Before 38h-17 merges, the oil beads' own outline is still scalloped (their mask's grid);
+   that is its PR's, not this one's.
+3. A bubble in the closeup at Iridescence 1, the plate left alone: its colours hold. Stir
+   beside it: they shift as it moves.
 
 ## 131. The music stirs the liquid through a cord (PLAN 38u-4, 38u-5)
 
@@ -2821,3 +2829,24 @@ at one frame. Whether the looks read better without the line is only seen here.
    Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
 5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
    at the dye's edges strengthen.
+
+## 133. Polarised light (PLAN 31p-1)
+
+**Judged 2026-11-14.** The owner watched the Mac films (lamp and dye looks, before and after) and approved the look.
+
+The check (`npm run polar`) proves the laws against Jones matrices and the spectrum, that off
+is off to the byte, that a still plate between crossed sheets is black and a stirred one
+lights in colour, and that the quarter-wave plates take the dark lines out, on the lab's
+software WebGPU at one frame. How the bands move with the music at sixty frames is only seen
+here.
+
+1. Open any look with Turbulence up (or the music on, which stirs it through its cord).
+   Settings → Lamp & Light → **Polarisers** to 1. Good: rainbow bands where the liquid moves,
+   broad and smooth like the photograph's dishes, flowing with the liquid and darker where it
+   is calm. Bad: a flat tint everywhere, bands that slide over still dye, speckle or noise.
+2. **Analyser** from 90 down to 0: the dark field turns white and every band swings to its
+   opposite colour. Bad: a jump, or bands that do not change.
+3. **Quarter Wave** to 0: dark curving arms appear through the bands; back to 1, they go.
+4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
+   pinks and greens. The default 0.3 should feel like the photograph.
+5. Polarisers at 0 on any look: the look exactly as before.

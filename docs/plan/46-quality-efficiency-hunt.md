@@ -111,3 +111,123 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   20.8 ms, under any 25 ms line, and the step clock does not snap (not a whole ratio).
 - **46-1 · Found:** 19d-lazy (the first load's script, 527 KB gzipped) waits on 14h's precache
   and its offline line, so it is not in this hunt yet.
+
+## The audit of 2026-11-13: where a frame's CPU and GPU go, measured and read
+
+**Asked 2026-11-13** by the owner: the code as efficient for GPUs and CPUs as it can be,
+"so we can continue to add things in the future", and nothing that makes the picture worse.
+Four readers went through the frame loop, the engine's device calls, the shaders, and
+everything round them (timers, feeds, React), and the page's one thread was profiled on the
+owner's Mac (main c778019, Classic, the Perform desk, headless on Metal, 30 s each; the tool
+and the raw list are in the project's shared files, `perf-2026-11-13/`):
+
+| | no sound | the simulated band |
+|---|---|---|
+| the thread busy, a frame | 2.40 ms | 7.75 ms |
+| garbage | 156 KB a frame, 8.9 MB a second | 636 KB a frame, 33 MB a second |
+| React | 13.8 ms once a second | 14.3 ms ten times a second (p90 22.2), 5.4 s of 34 |
+| the frame function | 1.8 ms (p90 3.3) | 3.3 ms (p90 7.7), 471 of 1,607 over 5 ms |
+
+So the largest single cost on a page with music was not the plate: it was the shell drawn
+again ten times a second for three meters and a percentage.
+
+- ~~**46f · The ear's view and the desk's clock render themselves, not the shell**~~
+  (**shipped**, `npm run renders`: components rendered a second with the band 5,840 → 11 on
+  the laptop, 714 → 0 on the phone; no sound 531 → 1 and 65 → 0; story in
+  `docs/plan-shipped.md`).
+- ~~**46g · The poured liquids' fields are carried only once something is poured**~~
+  (**shipped**, `npm run encode`: a thin-gap step 400 dispatches, direct and indirect, → 334,
+  the open plate 500 → 494, and a liquid poured brings its carries back; `physics`,
+  `liquids`; with it 14ab-11's first parts, the uploads of a step with bubbles or music
+  1.33 MB → 0.04 to 0.24, and the liquids' step asking for no flush at all; story in
+  `docs/plan-shipped.md`).
+- **46h · A ride and a fade still render the whole shell** (M; 14u names the fade). A MIDI
+  fader tells React ten times a second and a Go fade thirty, each a render of every desk
+  panel: 14.3 ms on the owner's Mac, more than half of it the commit (React 19 updates every
+  DOM element under a component that rendered). No component under `src/components` is
+  memoised and `App()` hands the desk about a hundred inline closures, so nothing below it
+  can bail out. The build: the desk's panels behind `memo` with stable props (the handlers
+  through one ref'd table), so a setting that moved renders the control that shows it.
+  Check to write first (Claude): `renders`' fader phase holds `work` (components rendered a
+  second) to a bar an order under main's, as 46f's lines do for the band.
+- **46i · State nobody reads, set many times a second** (S): `useFilmSense` sets
+  `{energy, ms}` every 150 ms though the App reads only its ref; `useSceneCamera` sets its
+  readout every 120 ms though only Settings' Room section shows it; `ControllerSurface`
+  forces a render every 120 ms while open with nothing lit. Seven to fifteen renders of the
+  shell a second while a film or the room camera is on. Check: a film phase and a
+  fake-camera phase in `renders`, the App still.
+- **46j · The frame's own garbage** (S each, M in all; the profile's top allocators with the
+  band, bytes a frame): the frame function itself 186 KB (not yet placed: find it first, with
+  the profiler's allocation stacks at a finer sampling interval), `BubbleField.step` 44 KB
+  (a `[vx, vy]` tuple a sample, eight a bubble), `squishDisc` under the bass's hand 38 KB,
+  `fillPlateUniforms` 22 to 30 KB (133 `pack.set(name, ...values)` through a Map, a Set and
+  `Array.from`), the tempo's `estimate` 16 KB and a sort 8.5 KB every frame (0.18 ms), the
+  beads' velocity sampler (a tuple and a closure a bead), `deriveStep`'s hundred-key object
+  a step, `PatchBay.fold`'s Map, Set and arrays where a look has cords, the engine status
+  object built every frame to be compared, a projector source's copy of all 251 settings a
+  frame. Each is the same arithmetic into memory kept; the check for each is `eargc`'s
+  pattern (heap bytes a call, old against new, the result bit for bit).
+- **46k · `dyeDisperse` runs as an exact no-op where diffusion is zero** (S; Classic and
+  thirteen other looks): its gate passes whenever the plate moves, and with `dm = 0` and
+  `kappaT = 0` every flux is ±0. One full-grid dispatch a step, 25 loads of the rgba32f dye
+  a cell; the file's own comment puts it near 0.4 ms. Skip it for that case (not oil bodies
+  until read); `samelook`, `physics`, `encode`.
+- **46l · Taps the display takes and throws away** (S each): the milk's five taps a layer
+  where the lamp ground is off (ten a pixel on Classic); the ferrofluid dome's curvature
+  loading again the four neighbours it holds; the projector's `scene` sample overwritten
+  when the surface is not the wall. `samelook`, `lamp`, `spikes`, `ferrolook`, `wall`.
+- **46m · Tank and the lamp's boil compile on the frame that turns them on** (S): eleven and
+  two pipelines in no `prepare` list, a stop of two to six seconds at the Mac's compile
+  pace. Built behind the show as glint's are. Check to write first (Claude): a
+  `startup`-style line that turns each on after the opening and counts none built on a frame.
+- **46n · Device calls a frame can lose** (S each): up to eight `queue.submit` a frame (the
+  readback's and the probe's into the frame's encoder; the deltas' needs its own copy of
+  `sim`); the flash guard's probe encoding both dispatches with every ring slot busy and
+  making its args and groups again each frame; the post chain writing its uniforms up to
+  three times before one submit; `readbackAsync` rewriting the 224-byte `sim` (with H2c-7);
+  `activeMat` (two grids, never read or written) and `chem` allocated with chemistry off;
+  the aux target stored where nothing reads it (`storeOp: 'discard'`, an interim to H2c-6);
+  derive drawn on frames H2c-9 skips the pack; `packDye` and `packVel` as one kernel.
+  `framereads`, `framegroups`, `encode`, `samelook`.
+- **46o · Song ID listens and matches on the page's thread** (M): every six seconds with a
+  local library, a new AudioContext and a ScriptProcessor for four seconds, then the match
+  (a 192k-sample resample, about 86 FFTs) in one block. Into the ear's context by a worklet
+  and the index's worker. Check: long tasks over 8 ms in 30 s with the band and one track.
+- **46p · The remote's whole snapshot, serialised every 80 ms with no phone** (M):
+  `useRemote` rebuilds it (every preset with it) on any settings change and
+  `useRemoteLink` stringifies it whether or not anything is connected. Send to somebody,
+  and the lists only when they change.
+- **46q · For the owner's eyes, not built without them:** `backdrop-blur` over the moving
+  plate (the phone's dock, the top bar, the music player, the cue bar) is composited again
+  every frame, and an opaque fill would not be; the desk's preview canvas is sized from the
+  whole window though it is framed in the hole (2.2 times the hole's area at 1440×900), and
+  takes and streams record that canvas; the recorder asks for VP9 before hardware H.264 at
+  sixty frames of the full canvas.
+- ~~**46r · Three writes in one step shared the args name `'current grid'`**~~ (**shipped**
+  with 15e-1, `npm run argnames`; story in `docs/plan-shipped.md`, "15e-1 (met again as
+  14ab-16) and 46r"). 46r-1, above, was found with it.
+- **46s · The lamp's heat is carried on every thin-gap step, heated or not** (S to M; found
+  2026-11-13 re-basing `encode`'s bars). `carryHeat` (38f-1, `src/gpu/fluid/passes.ts`) packs
+  the temperature, carries it through the colour's substeps and unpacks it on every thin
+  step that is not the boil's: 3 dispatches and 32 indirect of a 334 step, and a half-float
+  pair the size of the plate, at every look, though only a look whose lamp, hand or wax
+  heats the liquid has a temperature that is not the same everywhere. A uniform temperature
+  carried by a conserving carry is the same temperature, so the stage can wait behind a
+  flag its writers set, as 46g's does for the liquids. Not done with 46g because the
+  temperature has more than one writer (the lamp's floor, a held hand, the boil's hand-over,
+  a clear) and each has to be read; a missed one is heat that stands still. Checks:
+  `encode` (the step 35 lighter where nothing heats), `heat`, `plateboil`, `physics`,
+  `samelook`.
+- **46t · Checks 46f and 46g still owe** (S each; the check-skeptic's read of the PR,
+  2026-11-13; Claude's to write, nobody builds on them until they are). (1) Nothing holds
+  the overlay's three meters or the Sound section's room readout alive: `renders` holds the
+  desk's percentage and the clock, and a meter that froze would be green. A band page with
+  the desk down counting moves of `[data-testid="ear-meters"]`, and one with Settings open
+  on Sound counting the readout's text. (2) `encode` shows a poured liquid's fields are
+  carried again, by the passes made and the textures they bind, open plate and thin gap;
+  no check reads that the liquid then moves as far as the flow does. A line in
+  `npm run liquidsgpu`: a uniform flow, one drop, the field's centre after N steps within
+  30% of the flow's travel. (3) The pressed plate's branch of `carryLiquids` (oil bodies on
+  the open plate) is stepped by no count. (4) `renders`' work counter does not count a
+  mount, so a leaf that remounted on every reading would cost work and count as none.
+

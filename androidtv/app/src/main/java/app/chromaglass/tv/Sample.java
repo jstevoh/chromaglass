@@ -1,7 +1,8 @@
 package app.chromaglass.tv;
 
 /**
- * The sample films the TV plays with no Mac on the network (PLAN 12-tv-2b).
+ * The sample films the TV plays with no Mac on the network (PLAN 12-tv-2b,
+ * and since 12-tv-2f the channel's films, whole).
  *
  * Why the app has them at all: everything else it does needs a Mac running the
  * show on the same Wi-Fi, and both the people who install it before they own
@@ -10,15 +11,23 @@ package app.chromaglass.tv;
  * turns TV apps away for showing nothing, and a person has no idea what the
  * app is for. A sample shows them the plate the app exists to play.
  *
- * They are the press page's two clips (public/press/MEDIA.md): twenty seconds
- * each of the app's own Song films, 1080p H.264 with AAC, `+faststart` so they
- * start before they finish loading, served by the website. Not bundled: 23 MB
- * in the app for a screen most people see once. Nothing is drawn or faked in
- * them; they are the solver's own frames.
+ * What they are (the owner, 2026-11-14, on the first samples: "I don't like
+ * the visuals… can we play the YouTube videos as samples? If not YouTube,
+ * let's get much better and longer samples"): the six films on the channel,
+ * each a look playing a whole 1920s record, two and a half to three and a half
+ * minutes, about nineteen minutes round. They were two twenty-second press
+ * clips before. The files are the channel's own masters, not YouTube's
+ * player: an embedded YouTube player in a TV app's WebView may refuse to play
+ * or show an advert first, and this app's WebView only ever loads the Mac's
+ * page. src/lib/tvFilms.ts (the TV page's list, which this one must match:
+ * `npm run presskit` holds the two the same) says where they are served from
+ * and why: `https://chromaglass.art/films/<id>.mp4`, a redirect to a release
+ * of the repository, which the platform player follows.
  *
- * The music is Kevin MacLeod's under CC BY 4.0, which requires the credit to
- * travel with the sound, so each clip carries its credit and the TV shows it
- * while the clip plays (ShowsTest checks every clip has one).
+ * Nothing is drawn or faked in them; they are the solver's own frames. The
+ * records were published before 1926 and are in the public domain in the US,
+ * so no credit is owed, but the TV says what is playing while it plays
+ * (ShowsTest checks every film says it).
  */
 final class Sample {
     private Sample() {}
@@ -30,18 +39,20 @@ final class Sample {
         final String look;
         final String credit;
 
-        Clip(String path, String look, String credit) {
-            this.url = ORIGIN + path;
+        Clip(String id, String look, String title, String performer, int year) {
+            this.url = ORIGIN + "/films/" + id + ".mp4";
             this.look = look;
-            this.credit = credit;
+            this.credit = "“" + title + "”, " + performer + " (" + year + ")";
         }
     }
 
     static final Clip[] CLIPS = {
-        new Clip("/press/clips/neon-coral-reef.mp4", "Neon Coral Reef",
-                "Music: “Newer Wave” by Kevin MacLeod (incompetech.com), CC BY 4.0"),
-        new Clip("/press/clips/ferro-paint.mp4", "Ferro Paint",
-                "Music: “Ethernight Club” by Kevin MacLeod (incompetech.com), CC BY 4.0"),
+        new Clip("wolverines", "Splodascope", "Riverboat Shuffle", "The Wolverine Orchestra, with Bix Beiderbecke", 1924),
+        new Clip("caruso", "Solar Flare", "Vesti la giubba", "Enrico Caruso", 1907),
+        new Clip("rachmaninoff", "Galaxy", "Prelude in C-sharp minor", "Sergei Rachmaninoff", 1921),
+        new Clip("whiteman", "Aurora Borealis", "Whispering", "Paul Whiteman and His Ambassador Orchestra", 1920),
+        new Clip("oliver", "Neon Coral Reef", "Tears", "King Oliver's Creole Jazz Band, with Louis Armstrong", 1923),
+        new Clip("bessie", "Velvet Underground", "Careless Love Blues", "Bessie Smith, with Louis Armstrong", 1925),
     };
 
     /** The clip after `i`, round and round: the sample plays until Back. */
