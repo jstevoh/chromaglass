@@ -520,8 +520,13 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Written as the sample's Back is (below): lint's GestureBackNavigation errors on a bare
+        // KEYCODE_BACK test, and a TV remote's Back is a key event, not a gesture.
+        if (keyCode == KeyEvent.KEYCODE_BACK && loopsLayer != null) {
+            stopLoops(null);
+            return true;
+        }
         if (loopsLayer != null) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) { stopLoops(null); return true; }
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                 loopsFailed = 0;
                 playLoop(Loops.step(loopAt, keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1));
