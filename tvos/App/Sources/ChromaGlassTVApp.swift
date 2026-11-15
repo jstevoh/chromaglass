@@ -94,6 +94,8 @@ struct AddressView: View {
         }
         .foregroundStyle(.white)
         .padding(80)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay { SiteCorner() }
     }
 }
 

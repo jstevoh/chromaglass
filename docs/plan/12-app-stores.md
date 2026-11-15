@@ -338,31 +338,27 @@ What route 2 still needs, found while building 12-tv-1:
   could send each bundle to the internal track itself with the Play Developer API
   (a Google Cloud service account the owner adds in Play Console → Users and
   permissions, its JSON as a secret). Shared with 12-ctl-ship's upload job.
-- **12-tv-2h: the films through YouTube first, the splash, and the website's QR
-  code (S, built 2026-11-14).** The owner asked first for "the YouTube videos as
-  samples", then "if not YouTube, much better and longer samples"; 12-tv-2f
-  answered the second (the films, whole, from the site). This answers the first
-  on top of it: the logo on the launch screen behind Android's own splash (whose
-  colour is now the logo square's blue), and **Watch a sample film** plays the channel's six song films, each
-  a whole public-domain record, through YouTube's embedded player on a page of the
-  app's own (`assets/films.html`, loaded on a chromaglass.art base so YouTube sees
-  an origin), one after another with the film's look and record named on screen;
-  when YouTube will not play (an error, or nothing for 20 s) 12-tv-2f's films play
-  from the site instead, and the logo covers the page until YouTube says a film
-  plays. Check `npm run tvyoutube` (the page against a stand-in YouTube: the list,
-  the caption, PLAYING, the order round, an error told once, no script); the films
-  list and the page's escaping are unit tests. Asked of the real player from the
-  owner's Chrome on a chromaglass.art page, all six played; from a cloud session
-  YouTube answers 150 to nearly every video, so that cannot be a CI check. Unseen:
-  YouTube in a TV's WebView (whether it plays, and whether it shows ads before a
-  film), judged with 12-tv-2c. Also in it, the owner the same day: point people to
-  the website, "just point them to the webpage to try more free chromaglass.art
-  visuals", not to a purchase. The start screen's bottom-right corner says "Try
-  more free visuals at chromaglass.art" beside a QR code for https://chromaglass.art
-  (`res/drawable-nodpi/site_qr.png`, version 2, level M; read back with zxing to
-  that address), since Android TV has no browser to open a link; it takes no
-  focus. Worded as free visuals, it is no call to buy outside Play billing.
-  Released 1.0.8 (without these) went to Production review 2026-11-14.
+- ~~**12-tv-2h: the films through YouTube first, the splash, and the website's QR code.**~~
+  (shipped 2026-11-15; story in `docs/plan-shipped.md` §12-tv-2h.)
+- **12-promo-1: the website in every app (S, built 2026-11-15).** The owner,
+  2026-11-14: "put sufficient advertisements into all of the apps period tv, phone,
+  whatever", pointing at the website "to try more free chromaglass.art visuals", and
+  "Don't point them to purchase". One sentence in all of them, "Try more free visuals
+  at chromaglass.art", with no price, tier or call to buy (which also keeps the store
+  apps clear of steering to purchases outside them). The Google TV app had it from
+  12-tv-2h (start screen, QR corner). The Apple TV app now has it too
+  (`tvos/App/Sources/SiteCorner.swift`): the words beside a QR code for
+  https://chromaglass.art drawn by CoreImage, on the address screen and over the
+  black screen while it looks for the Mac, never over the live picture and not on
+  the sign-in screen, whose own big code would be confused with it. The iPhone and
+  Android phone apps have a tappable link (`src/components/SiteLink.tsx`) in More,
+  on the laptop form and in the app bar over the remote, which Capacitor opens in
+  the system browser (no `allowNavigation` hosts); the website shows none. Check:
+  `npm run applink` (the words, nothing that sells, the TVs' copies the same, the
+  Apple TV corner kept off the live picture; the link in all three places in the
+  app, leaving for the site; none on the website). Unseen: the Apple TV corner on a
+  screen (the tvOS build in `tvos.yml` compiles it), the link opening Safari or
+  Chrome on a real phone (`docs/judging.md` §16).
 - **12-tv-2c: judged on a real TV (S, the owner's eyes).** Side-load the
   workflow's APK on a Google TV, pair it with the Mac app, watch an evening.
   Unseen so far: NsdManager against the advert on a real network, the advert
