@@ -261,28 +261,17 @@ export function useWallLook({
   }, [wallLook, effectiveSettings, musicIntel.overrides]);
 
   /**
-   * How long the look on the wall has been up.
-   *
-   * Ticked once a second rather than derived per frame: a clock on a desk
-   * does not need to be right to the millisecond, and the alternative is a
-   * re-render of the whole shell sixty times a second for a number that
-   * changes once.
+   * When the look on the wall went up. The desk's clock counts from it in a
+   * component of its own (components/desk/LiveFor.tsx): the seconds were
+   * state here, set once a second, and each tick rendered the whole shell
+   * (13.8 ms on the owner's Mac) for four characters in the plate's bar
+   * (PLAN.md 46f). State and not a ref, so the clock starts again when the
+   * look changes: one render for a new look, as `setLookFor(0)` was.
    */
-  const lookSince = useRef(Date.now());
-  const [lookFor, setLookFor] = useState(0);
-  useEffect(() => { lookSince.current = Date.now(); setLookFor(0); }, [pinnedPresetId]);
-  const clockLive = deskLayout.plateMode === 'live';
-  useEffect(() => {
-    // On the tab's plate being Live, as it ran on the Gig desk being chosen:
-    // not on `performing`, which is also a window wide enough for the desk,
-    // so a phone (never a desk) lost the clock and `npm run renders` read 0
-    // renders a second where its clock is asked for (0.6 to 1.5).
-    if (!clockLive) return;
-    const id = setInterval(() => setLookFor((Date.now() - lookSince.current) / 1000), 1000);
-    return () => clearInterval(id);
-  }, [clockLive]);
+  const [lookSince, setLookSince] = useState(() => Date.now());
+  useEffect(() => { setLookSince(Date.now()); }, [pinnedPresetId]);
 
   return {
-    wallLook, ridePlate, drafting, walled, wallEngineRef, sendToWallRef, wallSettings, lookFor,
+    wallLook, ridePlate, drafting, walled, wallEngineRef, sendToWallRef, wallSettings, lookSince,
   };
 }
