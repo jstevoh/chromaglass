@@ -35,8 +35,9 @@ own. Check: `npm run moire`.
   cords, so every look keeps 28i-3b's two or three; Quasicrystal Garden and Zoom Tunnel print
   their sheets at 0.6 ink, since at full ink their dense patterns left under a fifth of the
   frame for the dye (`npm run litstage` c4) and the lamp under 6% of the picture
-  (`npm run lampzero`). `npm run grainedge` asks the grain under the sheets, as it asks it
-  under Roy's print.
+  (`npm run lampzero`; since 2026-11-12 that line reads a sheeted look through its sheets and
+  no longer holds the ink, 45a-15 below). `npm run grainedge` asks the grain under the sheets,
+  as it asks it under Roy's print.
   Found while building it, not done:
   - ~~**45a-2. Selling it to Home.**~~ **Shipped** (2026-11-07): a `packs` list in the signed
     key, the store's Moiré Pack product ($15 once) re-signing the buyer's Home key, the account
@@ -87,3 +88,28 @@ own. Check: `npm run moire`.
     stills: a few seconds off the Mac's take (the film script and takes are on the owner's
     Mac), as a muted, looping, `playsinline` video under 1 MB with a still as its poster.
     Needs #691 merged and a Mac session for the file.
+  - ~~**45a-13. Random looks land on moiré one pick in sixteen, not one in five**~~
+    (**shipped** 2026-11-11, `npm run panel`; story in `docs/plan-shipped.md`).
+  - ~~**45a-14. Randomise lays a pair of sheets now and then**~~ (**shipped** 2026-11-11 with
+    45a-13, `npm run panel`; story in `docs/plan-shipped.md`).
+  - **45a-15. How much ink before the lamp is lost under a sheet** (found 2026-11-12, 27f-9h).
+    A pack look is its house look under sheets, so Zoom Tunnel took the Lava Lamp's gold LED,
+    its brighter exposure and its no-hands settings when the Lava Lamp changed, and
+    `npm run lampzero` went red on it: "moire-tunnel 6%". The lamp's ground had not stopped
+    reaching it. The line reads how far a look differs from itself at Lamp Ground 0 against a
+    6% bar placed for looks with no sheets, and the tunnel's two sheets pass 39% of the light,
+    so it had read the Lava Lamp's number times 0.39 since the pack shipped: 6.54% on main
+    (the Lava Lamp 17.03%), 5.56% with the gold LED (the Lava Lamp 14.12%). lampzero now
+    divides a sheeted look's difference by what its sheets pass (the larger of the share at 0
+    and as shipped: Star, Waves and Groove pass 0.64 to 0.68 at 0 and 0.22 to 0.26 on the
+    lamp, the other four the same both ways) and prints it beside the same look with its
+    sheets lifted; all seven agree within three points. **What that gave up:** the line no
+    longer holds a sheet's ink to the lamp's share of the picture, which is half of why the
+    Garden and the tunnel print at 0.6 (above). At full ink the tunnel passes it now with the
+    lamp at 2.26% of the picture. `npm run litstage` c4 still holds the ink by the dye left in
+    the frame. Wanted: a line of its own for "the lamp can be seen under the ink", with a bar
+    someone looked at (a picture judged, as lampjudge's 6% was), not one read off a look that
+    happened to pass. Also open: why the spoke, wave and song sheets pass three times the
+    light at Lamp Ground 0 that they pass on the lamp, when the ring, quasi, ink and zoom
+    sheets pass the same both ways; if that is the sheets being drawn another way on the
+    black ground, it wants a sentence in the guide, and if it is not meant, a fix.

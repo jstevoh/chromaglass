@@ -44,11 +44,11 @@
  *      glycerine), and on a plate whose colour is spread evenly, which the
  *      tilt alone cannot move, its slide sloshes the picture the way the
  *      glass went, at 0.2, 0.45 and full each further than the last.
- *   4. Turbulence's dial reaches: with the band playing (energy 0.8, Sound
- *      Drive 0.45) full stirs at least four times as fast as 0.5 (it was 1.33
- *      times), a look's own 0.3 stays within 10% of what it was, and in the
- *      lab the plate's mean speed follows the stir it is given (full at least
- *      three times 0.5's).
+ *   4. Turbulence's dial reaches: full stirs at least four times as fast as
+ *      0.5 (it was twice), a look's own 0.3 stays within 10% of what it was,
+ *      and in the lab the plate's mean speed follows the stir it is given
+ *      (full at least three times 0.5's). What the band adds to the dial is
+ *      a cord's now and `npm run musicstir` holds it (PLAN 38u-4).
  *
  * And any GPU validation error fails the run: a pass that never ran would read
  * as stillness.
@@ -128,14 +128,23 @@ const covers = ({ R, t = 0.45, steps = 120, spring = false }) => {
   }
   return out;
 };
-const BAND = [0.8, 0.45];
+/*
+  The dial's own curve, with no band. These three lines read the stir with
+  the band playing (energy 0.8, Sound Drive 0.45) while the solver's step
+  took the energy itself and multiplied the stir by it. It does not now
+  (PLAN 38u-4): the band reaches Turbulence through a cord on the dial, so
+  what the band adds is `npm run musicstir`'s to hold, and what is the
+  dial's (its top against its middle, a look's own value, nothing at 0) is
+  held here on the dial alone, against the old curve in silence.
+*/
+const WITH_BAND = 1 + 0.8 * 0.45 * 2.0;
 {
-  const now = stirOf(1, ...BAND) / stirOf(0.5, ...BAND), was = stirBefore(1, ...BAND) / stirBefore(0.5, ...BAND);
-  const look = stirOf(0.3, ...BAND) / stirBefore(0.3, ...BAND);
-  check('Turbulence: with the band playing, full stirs at least four times as fast as half way', now >= 4 && was < 2,
+  const now = stirOf(1) / stirOf(0.5), was = stirBefore(1, null, 0.45) / stirBefore(0.5, null, 0.45);
+  const look = stirOf(0.3) / stirBefore(0.3, null, 0.45);
+  check('Turbulence: full stirs at least four times as fast as half way', now >= 4 && was <= 2,
     `${now.toFixed(2)}× (it was ${was.toFixed(2)}×)`);
   check('and a look\'s own 0.3 stirs within 10% of what it did', Math.abs(look - 1) < 0.1, `${look.toFixed(3)} of before`);
-  check('and nothing at 0, with or without the band', stirOf(0, ...BAND) === 0 && stirOf(0, null, 0.45) === 0);
+  check('and nothing at 0', stirOf(0) === 0);
 }
 
 {
@@ -630,7 +639,10 @@ try {
     SHEET: { def: SHEET_CELLS, ring: SHEET_RING, far: SHEET_FAR, nu: thicknessViscosity(0.45) },
     glasses: { springFull: covers({ R: 1, spring: true }), springDef: covers({ R: 0.45, spring: true }), full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }) },
     kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), sheet: kickDepth(0.5, 0.7, 1) * kickPress(thicknessViscosity(0.45), 0).share, sheetFull: kickDepth(1, 1, 1) * kickPress(thicknessViscosity(0.45), 0).share, before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
-    stirs: { 'a look\'s 0.3': stirOf(0.3, ...BAND), '0.5': stirOf(0.5, ...BAND), full: stirOf(1, ...BAND) },
+    // The speeds these bars were set at, unchanged: the dial's curve times 1.72, which is what the band's energy
+    // (0.8 at Sound Drive 0.45) multiplied it by while the step read the analyser (until PLAN 38u-4). Kept as
+    // the same numbers so the yardstick below ('a look's 0.3') and every bar set against it stand where they were.
+    stirs: { 'a look\'s 0.3': stirOf(0.3) * WITH_BAND, '0.5': stirOf(0.5) * WITH_BAND, full: stirOf(1) * WITH_BAND },
     rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), fullGain: rockPast(1), defGain: rockPast(0.45), spring: tilts({ R: 0.45, spring: true }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
   });
 

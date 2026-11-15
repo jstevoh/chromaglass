@@ -135,9 +135,21 @@ export const GRID_FILTER_KERNELS: Record<string, string> = {
     shared memory instead of 49 texture loads a cell, summed in the same
     order. The 7×7 sums drop the rim test on each tap (only the grid's own
     bounds remain) because both passes before them write 0 past the rim, and
-    adding 0 to a sum that starts at +0 changes no bit. Nothing about what
-    the filter does changed: `npm run grating` and `npm run slump` read the
-    same as before.
+    adding 0 to a sum that starts at +0 changes no bit.
+
+    Why [lo, hi] is also held to `here` unless the cross-curvature m = δx²δy²f
+    oscillates along both grid axes (PLAN 18m-5c): once the glass gap became a
+    real 2 mm (PLAN 18m-6), the glycerine drop's bare 2% front moved only
+    3.94 → 4.13 mm in 20 s, exposing +0.36 mm of filter creep (to 4.50 mm, with
+    its half-peak contour pulled in 2.92 → 2.79 mm). Along a diagonal rim at
+    (5, 1), (4, 1) and (3, 2), `here - mn > 0` passed the one-sided `6.0` foot
+    gate while inner dome cells (1, 0) and (2, 0) had large room w and absorbed
+    the clamp's returned excess in place of (2, 2). A 1D front or radially
+    symmetric dome has m = δx²δy²f = 0, and at a curved front m does not
+    alternate along both axes, whereas any 2D grid wave with kx, ky in (π/3, π]
+    (cos k < 1/2) reverses sign on at least one axial neighbour or has both
+    axial neighbours below m0 / 2 (`ax & ay`), accumulated from the same 5×5
+    loads with no extra texture reads.
 
     A.a.x is s.
   */
@@ -180,12 +192,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     return;
   }
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  let k2 = array<f32, 5>(0.0, 1.0, -2.0, 1.0, 0.0);
   var acc = vec4f(0.0);
+  var r2: array<vec4f, 5>;
+  var c2 = array<vec4f, 5>(vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0));
   for (var j = -2; j <= 2; j++) {
     let wy = k[j + 2];
+    let wy2 = k2[j + 2];
+    var row2 = vec4f(0.0);
     for (var i = -2; i <= 2; i++) {
-      acc += (k[i + 2] * wy) * (loadDom(p + vec2i(i, j), here) - here);
+      let d0 = loadDom(p + vec2i(i, j), here) - here;
+      acc += (k[i + 2] * wy) * d0;
+      row2 += k2[i + 2] * d0;
+      c2[i + 2] += wy2 * d0;
     }
+    r2[j + 2] = row2;
   }
   let nW  = loadBox(p + vec2i(-1,  0), here);
   let nE  = loadBox(p + vec2i( 1,  0), here);
@@ -208,6 +229,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   lo = max(lo, vec4f(0.0));
   hi = max(hi, vec4f(0.0));
+  let m0 = r2[1] - 2.0 * r2[2] + r2[3];
+  let mW = c2[0] - 2.0 * c2[1] + c2[2];
+  let mE = c2[2] - 2.0 * c2[3] + c2[4];
+  let mS = r2[0] - 2.0 * r2[1] + r2[2];
+  let mN = r2[2] - 2.0 * r2[3] + r2[4];
+  let ax = (mW * m0 < vec4f(0.0)) | (mE * m0 < vec4f(0.0)) | (((2.0 * mW - m0) * m0 < vec4f(0.0)) & ((2.0 * mE - m0) * m0 < vec4f(0.0)));
+  let ay = (mS * m0 < vec4f(0.0)) | (mN * m0 < vec4f(0.0)) | (((2.0 * mS - m0) * m0 < vec4f(0.0)) & ((2.0 * mN - m0) * m0 < vec4f(0.0)));
+  let alt = ax & ay;
+  lo = select(here, lo, alt);
+  hi = select(here, hi, alt);
 
   let u = -A.a.x * (acc * (1.0 / 256.0));
   let c = clamp(here + u, lo, hi);
@@ -260,14 +291,22 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   let here = textureLoad(src, p, 0);
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  let k2 = array<f32, 5>(0.0, 1.0, -2.0, 1.0, 0.0);
   var acc = vec4f(0.0);
   var sumW = vec4f(0.0);
+  var r2: array<vec4f, 5>;
+  var c2 = array<vec4f, 5>(vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0));
   for (var j = -2; j <= 2; j++) {
     let wy = k[j + 2];
+    let wy2 = k2[j + 2];
+    var row2 = vec4f(0.0);
     for (var i = -2; i <= 2; i++) {
-      let q = p + vec2i(i, j);
-      acc += (k[i + 2] * wy) * (loadDom(q, here) - here);
+      let d0 = loadDom(p + vec2i(i, j), here) - here;
+      acc += (k[i + 2] * wy) * d0;
+      row2 += k2[i + 2] * d0;
+      c2[i + 2] += wy2 * d0;
     }
+    r2[j + 2] = row2;
   }
   let n = i32(S.n);
   for (var j = -3; j <= 3; j++) {
@@ -299,6 +338,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   lo = max(lo, vec4f(0.0));
   hi = max(hi, vec4f(0.0));
+  let m0 = r2[1] - 2.0 * r2[2] + r2[3];
+  let mW = c2[0] - 2.0 * c2[1] + c2[2];
+  let mE = c2[2] - 2.0 * c2[3] + c2[4];
+  let mS = r2[0] - 2.0 * r2[1] + r2[2];
+  let mN = r2[2] - 2.0 * r2[3] + r2[4];
+  let ax = (mW * m0 < vec4f(0.0)) | (mE * m0 < vec4f(0.0)) | (((2.0 * mW - m0) * m0 < vec4f(0.0)) & ((2.0 * mE - m0) * m0 < vec4f(0.0)));
+  let ay = (mS * m0 < vec4f(0.0)) | (mN * m0 < vec4f(0.0)) | (((2.0 * mS - m0) * m0 < vec4f(0.0)) & ((2.0 * mN - m0) * m0 < vec4f(0.0)));
+  let alt = ax & ay;
+  lo = select(here, lo, alt);
+  hi = select(here, hi, alt);
 
   let u = -A.a.x * (acc * (1.0 / 256.0));
   let c = clamp(here + u, lo, hi);
@@ -372,12 +421,21 @@ ${W} fn main(
 
   let here = textureLoad(src, p, 0);
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  let k2 = array<f32, 5>(0.0, 1.0, -2.0, 1.0, 0.0);
   var acc = vec4f(0.0);
+  var r2: array<vec4f, 5>;
+  var c2 = array<vec4f, 5>(vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0));
   for (var j = -2; j <= 2; j++) {
     let wy = k[j + 2];
+    let wy2 = k2[j + 2];
+    var row2 = vec4f(0.0);
     for (var i = -2; i <= 2; i++) {
-      acc += (k[i + 2] * wy) * (loadDom(p + vec2i(i, j), here) - here);
+      let d0 = loadDom(p + vec2i(i, j), here) - here;
+      acc += (k[i + 2] * wy) * d0;
+      row2 += k2[i + 2] * d0;
+      c2[i + 2] += wy2 * d0;
     }
+    r2[j + 2] = row2;
   }
   let nW  = loadBox(p + vec2i(-1,  0), here);
   let nE  = loadBox(p + vec2i( 1,  0), here);
@@ -400,6 +458,16 @@ ${W} fn main(
   }
   lo = max(lo, vec4f(0.0));
   hi = max(hi, vec4f(0.0));
+  let m0 = r2[1] - 2.0 * r2[2] + r2[3];
+  let mW = c2[0] - 2.0 * c2[1] + c2[2];
+  let mE = c2[2] - 2.0 * c2[3] + c2[4];
+  let mS = r2[0] - 2.0 * r2[1] + r2[2];
+  let mN = r2[2] - 2.0 * r2[3] + r2[4];
+  let ax = (mW * m0 < vec4f(0.0)) | (mE * m0 < vec4f(0.0)) | (((2.0 * mW - m0) * m0 < vec4f(0.0)) & ((2.0 * mE - m0) * m0 < vec4f(0.0)));
+  let ay = (mS * m0 < vec4f(0.0)) | (mN * m0 < vec4f(0.0)) | (((2.0 * mS - m0) * m0 < vec4f(0.0)) & ((2.0 * mN - m0) * m0 < vec4f(0.0)));
+  let alt = ax & ay;
+  lo = select(here, lo, alt);
+  hi = select(here, hi, alt);
 
   let u = -A.a.x * (acc * (1.0 / 256.0));
   let c = clamp(here + u, lo, hi);

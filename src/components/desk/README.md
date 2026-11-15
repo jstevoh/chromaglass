@@ -27,8 +27,13 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 - `RecordControls.tsx`: the one Record button.
 - `SaveLookSheet.tsx`: save a look, tied to a song.
 - `tools.ts`: `DESK_TOOLS`, tools and their letters.
-- `Desk.tsx`, `deskProps.ts`, `DeskPanels.tsx`, `DeskHeader.tsx`, `TabStrip.tsx`: above.
+- `LiveFor.tsx`: `LiveFor`, the plate bar's "live for m:ss" clock on its own one-second tick (`DeskProps.liveSince`; PLAN 46f: it was a string from `App()`, which rendered once a second for it).
+- `Desk.tsx`, `deskProps.ts`, `DeskPanels.tsx`, `DeskHeader.tsx`, `TabStrip.tsx`: above. `DeskProps.status.audio` is a node, not a string: the level in it is `EarPercent`, which renders itself.
 
 ## Checks
 
 `npm run panel` and `npm run desk`, layout at 1440, 1280 and 1024 wide in a browser, and `desklayout` (layouts and tabs, in node). The mixer's panel: `mixer`, `rowfade`. A new or changed setting: `panel`, `desk` and the `setting-auditor` agent. Every desk feature ships its phone version in the same PR.
+
+`DeskProps.screens` holds `songs` and `sequences`. The `player` screen (Music & Drone) is
+the top of the Sound section since PLAN 35c-7, and its id is in `MERGED_SECTIONS`
+(`lib/settingsMap.ts`), so a saved layout with it opens Sound.

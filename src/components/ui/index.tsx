@@ -1000,7 +1000,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
   /**
    * Drawn inside a desk panel rather than over the window: no scrim, no
    * title bar (the panel has its own), the body filling the panel. For the
-   * screens a tab can hold (Songs, Sequences, Music & Drone). A container
+   * screens a tab can hold (Songs, Sequences). A container
    * for `@container` queries, so a body laid out in columns for the sheet's
    * width can stack them in a column a third as wide. Its test id is the
    * sheet's with `-box`, so a panel and the sheet open over it are never

@@ -1675,28 +1675,15 @@ try {
         const at = pane.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return {
           at: at?.textContent?.trim() ?? null,
-          source: !!pane.querySelector('[data-testid="audio-source-state"]'),
-          device: !!pane.querySelector('[data-testid="audio-input"]'),
-          open: !!pane.querySelector('[data-testid="audio-source-open"]'),
+          // One tile lit: what is listening, said by the control that chooses it (PLAN 35c-7).
+          source: pane.querySelectorAll('[data-testid^="sound-source-"][aria-pressed="true"]').length === 1,
+          choose: !!pane.querySelector('[data-testid="sound-source-microphone"]'),
         };
       });
       check('the Mic dot opens the sound settings', !!micDot && /sound/i.test(micDot.at ?? ''), micDot?.at ?? 'no panel');
       check('and they say what is listening', !!micDot?.source);
-      check('and which device it listens on', !!micDot?.device);
-      /*
-        The source is chosen in the Sound sheet, one home (PLAN 35c-3), so the
-        section's link has to get there and the sheet has to be able to choose
-        it: its Mic tile is the control the section used to draw a second copy
-        of. The link closes Settings, so it is the sheet that is closed after.
-      */
-      if (micDot?.open) {
-        await clickOn('audio-source-open');
-        check('and a way to the sheet that chooses it',
-          await appears('sound-source-microphone'));
-        await escapeCloses('sound-panel');
-      } else {
-        check('and a way to the sheet that chooses it', false, 'no audio-source-open');
-      }
+      // One page since PLAN 35c-7: the Mic tile is in the section, and its device picker under it once on (`npm run inputpick`).
+      check('and choose it there, the Mic among the sources', !!micDot?.choose);
       /*
         `escapeCloses`, not Escape and a fixed wait.
 

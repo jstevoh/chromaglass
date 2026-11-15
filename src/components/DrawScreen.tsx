@@ -1,6 +1,6 @@
 import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, ListMusic } from 'lucide-react';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
@@ -169,6 +169,8 @@ export interface DrawScreenProps {
   onPadUp: (e: ReactPointerEvent) => void;
   action: (a: RemoteAction) => void;
   onControls: () => void;
+  /** The Songs screen: the Mac's set list and song shows (PLAN 12-ctl-1). */
+  onSongs: () => void;
 }
 
 /** Glass over the plate (DESIGN-SYSTEM "Glass"): full-opacity type on a dark blur. */
@@ -422,6 +424,21 @@ export function DrawScreen(p: DrawScreenProps) {
       <SlidersHorizontal size={14} /> {tablet && 'Controls'}
     </button>
   );
+  /*
+    Songs beside Controls (PLAN 12-ctl-1): the set list and the song shows are
+    what a hand reaches for between songs, so they are one tap from the pad
+    and not two (Draw, then Controls, then a section down the page).
+  */
+  const songsButton = (
+    <button
+      onClick={p.onSongs}
+      className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 ${GLASS}`}
+      title="The set list and the song shows"
+      data-testid="remote-to-songs"
+    >
+      <ListMusic size={14} /> {tablet && 'Songs'}
+    </button>
+  );
   const touches = (
     <span className={`flex h-9 shrink-0 items-center rounded-full px-3 font-mono text-[12px] text-text-2 ${tablet ? '' : GLASS}`} data-testid="draw-touches">
       {p.touchCount} {p.touchCount === 1 ? 'touch' : 'touches'}
@@ -481,6 +498,7 @@ export function DrawScreen(p: DrawScreenProps) {
             </div>
           )}
           {touches}
+          {songsButton}
           {controlsButton}
         </header>
         <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto border-r border-border p-3" data-testid="draw-tools">
@@ -545,6 +563,7 @@ export function DrawScreen(p: DrawScreenProps) {
           </span>
           <span className="ml-auto" />
           {touches}
+          {songsButton}
           {controlsButton}
         </header>
         <div className="absolute left-3 top-[64px] flex w-11 flex-col gap-2 overflow-y-auto py-1" style={{ bottom: foot, scrollbarWidth: 'none' }} data-testid="draw-dyes">

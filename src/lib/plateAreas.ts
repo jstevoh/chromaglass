@@ -136,20 +136,6 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     { x: 0.5, y: 0.7, r: 0.13, liquid: 'soap', dye: 2, dyes: [2, 5], band: 'bass' },
   ],
   /*
-    Lumia: Wilfred's light forms came and went in a few places on a dark field,
-    never as a texture over all of it. Three veils of dye on the nearly clear
-    plate, apart: two in glycerine, which holds a fold, and one with a little
-    soap in it, which spreads its veil thin and opens it each time the hands
-    add to it. (Water was tried there first; it carries no property, so the
-    area poured nothing and was a plain patch of the plate.) No beat; what
-    music reaches it takes the areas in turn.
-  */
-  'lumia': [
-    { x: 0.30, y: 0.38, r: 0.16, liquid: 'glycerine', dye: 0, dyes: [0], band: 'any', fill: 0.45 },
-    { x: 0.71, y: 0.30, r: 0.13, liquid: 'soap', dye: 1, dyes: [1], band: 'any', fill: 0.4 },
-    { x: 0.62, y: 0.70, r: 0.12, liquid: 'glycerine', dye: 2, dyes: [2], band: 'any', fill: 0.35 },
-  ],
-  /*
     Cell Bloom: a closeup look, so its areas are where its camera is. It
     followed one pool (follow mode locks onto the liquid nearest its aim and
     rides it, never cutting away), and at its 3.5x zoom its Paint Cells were

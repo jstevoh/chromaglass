@@ -237,3 +237,19 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - **28h-6.** A repeated section in a live take (the band plays the chorus twice)
     maps back to the same section index, so a cue on it fires once; decide with 28g
     whether a repeat should fire its cue again.
+  - **28h-8. Listen in the Songs panel** (**shipped**, this PR; the story is in
+    `docs/plan-shipped.md` §28h-8). One press names the song, adds it, and designs its
+    show from its map once heard through (`lib/songDesign.ts`, `npm run listen`).
+  - **28h-9. A first listen's map in the song's seconds** (**shipped**, this PR; the
+    story is in `docs/plan-shipped.md` §28h-9). The map and its fingerprint are moved
+    by where the clock put the recording's first sample (`lib/songMapLead.ts`,
+    `npm run listen`).
+  - **28h-11.** Maps made before 28h-9 are still early by their song's ID offset, and
+    nothing kept says by how much. Offer "hear it again" on a song in the Songs panel
+    (forget its map and fingerprint so the next play maps it afresh), or re-anchor an
+    old map from its fingerprint the next time the song is matched locally (the match's
+    offset against the API's says the lead).
+  - **28h-10.** Judge Listen on the owner's Mac (docs/judging.md): press it over a
+    record, watch the song fill in, play it through, and judge the designed stages and
+    cues on the second play. Then decide whether a heard song should be designed from
+    its live song shape (28h-3) before the map exists, so its first play has a show.

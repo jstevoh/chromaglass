@@ -79,14 +79,26 @@ export class BeadMask {
     if (p.wide) this.cuts.write(p.cuts, p.nCuts * 16);
     this.bytes = 16 + (p.n * BEAD_FLOATS + p.tileWords + (p.wide ? p.nCuts * 4 : 0)) * 4;
     this.due = p;
+    this.ringsLive = !p.wide;
     return [p.wide ? p.S * 2 : p.S, p.S];
   }
+
+  /**
+   * The rings' list as the plate reads it, the args, the beads and the tiles
+   * the mask was drawn from (38h-17: `wgsl/beadShape.ts` evaluates the rings
+   * at the screen's resolution from them). Null for the drops, whose mask
+   * takes passes over neighbours, and once a picture stands in for a list.
+   */
+  get rings(): { args: GPUBuffer; beads: GPUBuffer; tiles: GPUBuffer } | null {
+    return this.ringsLive && this.beads.buffer && this.tiles.buffer ? { args: this.args, beads: this.beads.buffer, tiles: this.tiles.buffer } : null;
+  }
+  private ringsLive = false;
 
   /** Whether a pack is waiting to be drawn. */
   get pending(): boolean { return this.due !== null; }
 
   /** Drop a pack not yet drawn (the plate was handed a picture for the beads instead). */
-  cancel(): void { this.due = null; }
+  cancel(): void { this.due = null; this.ringsLive = false; }
 
   /** Draw the waiting pack into `mask` (its size the one `set` gave). */
   draw(encoder: GPUCommandEncoder, mask: GPUTexture): void {

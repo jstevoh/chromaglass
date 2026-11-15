@@ -47,6 +47,8 @@ export interface MidiHost {
    * synth has and the reason the envelopes are worth having at all.
    */
   noteStruck?: (velocity: number, source?: 'note' | 'pad') => void;
+  /** A note-on or note-off on a channel bound as Notes as voices (PLAN 24.3). */
+  noteVoice?: (e: MidiEvent, target: Extract<MidiTarget, { kind: 'voices' }>) => void;
 }
 
 /** What the LEDs should show. Changes here are pushed to the controller. */
@@ -109,6 +111,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const supported = useMemo(hasWebMidi, []);
   const [enabled, setEnabled] = useState<boolean>(() => { try { return localStorage.getItem(ENABLED_KEY) === '1'; } catch { return false; } });
   const [error, setError] = useState<string | null>(null);
+  // Web MIDI answered (PLAN 44k-14): what the assistant's switch waits for, since on is only asked until then.
+  const [open, setOpen] = useState(false);
   const [inputs, setInputs] = useState<MidiDevice[]>([]);
   const [outputs, setOutputs] = useState<MidiDevice[]>([]);
   const [ports, setPorts] = useState<{ input: string; output: string }>(() => {
@@ -222,6 +226,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
 
     const learn = learningRef.current;
     if (learn && e.kind !== 'noteoff') {
+      if (learn.target.kind === 'voices' && src.kind !== 'note') return;
       const key = sourceKey(src);
       // Learn onto the layer that is live. Bank 1 is the base layer and its
       // bindings are always live (`bank: undefined`), so a map made by
@@ -234,7 +239,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         // whole point of a shift layer is that one fader means four things,
         // so learning on bank 3 must not wipe what it does on bank 1.
         bindings: [
-          ...prev.bindings.filter(b => sourceKey(b.source) !== key || b.bank !== onto),
+          ...prev.bindings.filter(b =>
+            (sourceKey(b.source) !== key || b.bank !== onto) &&
+            !(learn.target.kind === 'voices' && b.target.kind === 'voices' && b.source.channel === src.channel && b.bank === onto)),
           { id: newId(), source: src, target: learn.target, mode: learn.mode, bank: onto },
         ],
       }));
@@ -330,6 +337,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         case 'preset':  if (pressed) h.applyPreset(t.presetId); break;
         case 'setlist': if (pressed) h.playSetItem?.(t.index); break;
         case 'dye':     if (pressed) h.selectDye(t.paletteIndex); break;
+        case 'voices':  if (e.kind === 'noteon' || e.kind === 'noteoff') h.noteVoice?.(e, t); break;
         // A binding whose kind has no case here is a control that does
         // nothing when it is touched, and says nothing about why.
         default: unhandled('a MIDI binding', t);
@@ -404,6 +412,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         accessRef.current.onstatechange = null;
         accessRef.current = null;
       }
+      setOpen(false);
       refreshPorts();
       return;
     }
@@ -414,6 +423,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         if (cancelled) return;
         accessRef.current = access;
         setError(null);
+        setOpen(true);
         access.onstatechange = () => { refreshPorts(); wireInputs(); };
         refreshPorts();
         wireInputs();
@@ -611,6 +621,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const learn = useCallback((target: MidiTarget, mode: 'absolute' | 'relative' = 'absolute') => setLearning({ target, mode }), []);
   const cancelLearn = useCallback(() => setLearning(null), []);
   const removeBinding = useCallback((id: string) => setMap(prev => ({ ...prev, bindings: prev.bindings.filter(b => b.id !== id) })), [setMap]);
+  const updateBinding = useCallback((id: string, target: MidiTarget) =>
+    setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, target } : b) })), [setMap]);
   const setBindingMode = useCallback((id: string, mode: 'absolute' | 'relative') => setMap(prev => ({ ...prev, bindings: prev.bindings.map(b => b.id === id ? { ...b, mode } : b) })), [setMap]);
   /** Move a binding onto a shift layer, or (undefined) back to always-live. */
   const setBindingBank = useCallback((id: string, bankIndex: number | undefined) =>
@@ -702,10 +714,10 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   }, [enabled, inputs, ports.input]);
 
   return {
-    supported, enabled, enable, disable, error,
+    supported, enabled, open, enable, disable, error,
     inputs, outputs, ports, choosePorts, activeInputName,
     map, setMap, rename, clearMap, loadFactory, exportMap, importFile,
-    learning, learn, cancelLearn, removeBinding, setBindingMode, setBindingBank, addBinding,
+    learning, learn, cancelLearn, removeBinding, updateBinding, setBindingMode, setBindingBank, addBinding,
     learnSound, removeSound,
     softTakeover, setSoftTakeover: setSoftTakeoverOn,
     lastEvent,

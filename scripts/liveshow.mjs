@@ -43,8 +43,10 @@ import { presentsInXvfb, port } from './chromium.mjs';
 import { filmFile, stackJudge, gridOfPixels, barColumnOfRow, barMoves, barMovesProof, STACK_KEYSTONE } from './liveshowstack.mjs';
 import { narrowLines } from './liveshownarrow.mjs';
 import {
-  cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS,
+  cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS, loadFormat,
 } from '../src/lib/liveShow.ts';
+import { liveRates, keepCeiling, LIVE_FLOOR_KBPS, CEILING_HOURS } from '../src/lib/liveRate.ts';
+import { liveConsolePlan } from '../src/lib/liveStream.ts';
 
 let failed = 0;
 let total = 0;
@@ -62,18 +64,71 @@ const smuggled = cleanDestination({ ...dest('abc'), key: SECRET, streamKey: SECR
 check('a destination as kept has no room for a key', smuggled && !JSON.stringify(smuggled).includes(SECRET),
   smuggled ? Object.keys(smuggled).join(' ') : 'refused');
 
-// render.ts's H.264 rate: 0.1 bit a pixel a frame, at least 2 Mb/s; each destination its own copy, plus the sound.
+// The stream's own H.264 rate (liveRate.ts, 37x-4h), worked by hand here and
+// not imported, so a change to the rule shows as a red line: 14 Mb/s at
+// 1080p60, scaled by pixels and by the square root of the frame rate; each
+// destination its own copy, plus the sound. Before 37x-4h the stream took
+// Record's rule (0.1 bit a pixel a frame: 6.2 Mb/s at 1080p30) and these
+// lines read 6221, 2765 and 5530.
 const f1080 = { height: 1080, fps: 30 };
-const wide1080 = 1920 * 1080 * 30 * 0.1 / 1000;   // 6220.8
-const tall = 720 * 1280 * 30 * 0.1 / 1000;        // 2764.8
-const wide720at60 = 1280 * 720 * 60 * 0.1 / 1000; // 5529.6
+const at = (px, fps) => 14000 * px / (1920 * 1080) * Math.sqrt(fps / 60);
+const wide1080 = at(1920 * 1080, 30);   // 9899.5
+const tall = at(720 * 1280, 30);        // 4399.8
+const wide720at60 = at(1280 * 720, 60); // 6222.2
 const near = (a, b) => Math.abs(a - b) <= 1;
 const n1 = needKbps([dest('a')], f1080);
-const n3 = needKbps([dest('a'), dest('b', { service: 'twitch' }), dest('c', { service: 'instagram', orientation: 'portrait' })], f1080);
+const n3 = needKbps([dest('a'), dest('b', { service: 'other' }), dest('c', { service: 'other', orientation: 'portrait' })], f1080);
 const n720 = needKbps([dest('a')], { height: 720, fps: 60 });
-check('one 1080p30 destination needs its encode and its sound', near(n1, wide1080 + AUDIO_KBPS), `${n1} kb/s, by hand ${wide1080 + AUDIO_KBPS}`);
+check('one 1080p30 destination needs its encode and its sound', near(n1, wide1080 + AUDIO_KBPS), `${n1} kb/s, by hand ${(wide1080 + AUDIO_KBPS).toFixed(1)}`);
 check('three need three copies: two of the wide encode and one of the tall', near(n3, 2 * wide1080 + tall + 3 * AUDIO_KBPS), `${n3} kb/s, by hand ${(2 * wide1080 + tall + 3 * AUDIO_KBPS).toFixed(0)}`);
-check('720p60 is its own rate', near(n720, wide720at60 + AUDIO_KBPS), `${n720} kb/s, by hand ${wide720at60 + AUDIO_KBPS}`);
+check('720p60 is its own rate', near(n720, wide720at60 + AUDIO_KBPS), `${n720} kb/s, by hand ${(wide720at60 + AUDIO_KBPS).toFixed(1)}`);
+
+// What the encoder is handed: the rate above, on each output, not left for
+// LiveEncoder to fill in. 1080p60 is what the panel opens at with nothing
+// saved (the rehearsal's stream went at 30 while the plate was drawn at 60):
+// loadFormat itself, which the panel calls, not the constant it falls back to.
+const f60 = loadFormat();
+const plan60 = liveConsolePlan(liveOptionsFor([dest('a'), dest('t', { service: 'other', orientation: 'portrait' })], f60));
+const handed = Object.fromEntries(plan60.outputs.map((o) => [o.id, (o.videoBitrate ?? 0) / 1000]));
+check('the panel opens at 1080p60, and the encoder is handed 14 Mb/s for it, the portrait encode its own rate',
+  f60.height === 1080 && f60.fps === 60 && near(handed.landscape, 14000) && near(handed.portrait, at(720 * 1280, 60)),
+  `${f60.height}p${f60.fps}; landscape ${handed.landscape} kb/s, portrait ${handed.portrait} kb/s (by hand ${at(720 * 1280, 60).toFixed(1)})`);
+
+// One landscape encode feeds every landscape destination, so it goes at the
+// least any of them takes: YouTube alone 14, with Twitch 6, with Kick 8.
+const capYt = liveRates([dest('a')], f60).landscape;
+const capTw = liveRates([dest('a'), dest('b', { service: 'twitch' })], f60).landscape;
+const capKick = liveRates([dest('a'), dest('b', { service: 'kick' })], f60).landscape;
+const capIg = liveRates([dest('c', { service: 'instagram', orientation: 'portrait' })], f60).portrait;
+check('each platform\'s ceiling holds the encode it shares: YouTube none, Twitch 6, Kick 8, Instagram 4 Mb/s',
+  near(capYt.kbps, 14000) && capYt.limit === 'size' && capTw.kbps === 6000 && capTw.by === 'twitch' && capKick.kbps === 8000 && capIg.kbps === 4000 && capIg.by === 'instagram',
+  `${capYt.kbps} (${capYt.limit}), ${capTw.kbps} (${capTw.by}), ${capKick.kbps} (${capKick.by}), ${capIg.kbps} (${capIg.by})`);
+
+// Fitted to the last stream's ceiling: under it with the headroom, never
+// below the floor, and a stale or absent ceiling ignored.
+const t0 = Date.parse('2026-11-10T20:00:00Z');
+const fresh = (kbps, hoursAgo = 1) => ({ heldKbps: 0, saturatedKbps: kbps, at: '', saturatedAt: new Date(t0 - hoursAgo * 3600e3).toISOString() });
+const two = [dest('a'), dest('b', { service: 'other' })];
+const fit = liveRates(two, f60, fresh(20000), t0).landscape;
+const fitNeed = 2 * (fit.kbps + AUDIO_KBPS) * HEADROOM;
+const floor = liveRates(two, f60, fresh(3000), t0).landscape;
+const stale = liveRates(two, f60, fresh(3000, CEILING_HOURS + 1), t0).landscape;
+const roomy = liveRates(two, f60, fresh(60000), t0).landscape;
+check('a measured ceiling fits the stream under it with the headroom, never below the floor, and only for half a day',
+  fit.limit === 'upload' && fitNeed <= 20000 && fitNeed >= 19900 && floor.kbps === LIVE_FLOOR_KBPS && stale.limit === 'size' && roomy.limit === 'size' && near(roomy.kbps, 14000),
+  `20 Mb/s link: ${fit.kbps} kb/s each, ${fitNeed.toFixed(0)} with headroom; 3 Mb/s: ${floor.kbps}; 3 Mb/s ${CEILING_HOURS + 1} h old: ${stale.kbps} (${stale.limit}); 60 Mb/s: ${roomy.kbps}`);
+
+// The ceiling is kept while streams fitted under it never fill the link
+// (else every other stream would go back to full rate and fall behind),
+// dropped once one carries more, or when it ages out.
+const before = fresh(10000, 2);
+const kept = keepCeiling({ heldKbps: 8000, saturatedKbps: null }, before, t0);
+const passed = keepCeiling({ heldKbps: 12000, saturatedKbps: null }, before, t0);
+const aged = keepCeiling({ heldKbps: 8000, saturatedKbps: null }, fresh(10000, CEILING_HOURS + 1), t0);
+const anew = keepCeiling({ heldKbps: 8000, saturatedKbps: 9000 }, before, t0);
+check('a ceiling outlives a stream fitted under it, not one that carried more, nor half a day',
+  kept?.kbps === 10000 && kept.at === before.saturatedAt && passed === null && aged === null && anew?.kbps === 9000 && anew.fresh,
+  `kept ${kept?.kbps}, after 12 Mb/s carried ${passed}, aged ${aged}, a new one ${anew?.kbps}`);
 
 const need = 10000;
 const levels = [
@@ -291,7 +346,9 @@ try {
   await page.getByTestId(`live-dest-test-${unlisted}`).click();
 
   // ── The upload, before anything was measured ────────────────────
-  const upNeed = 2 * (wide1080 + AUDIO_KBPS) + tall + AUDIO_KBPS;
+  // At the panel's 1080p60, YouTube and Twitch share the wide encode at
+  // Twitch's 6 Mb/s, and Instagram's portrait one goes at its 4.
+  const upNeed = 2 * (6000 + AUDIO_KBPS) + 4000 + AUDIO_KBPS;
   const up0 = await page.getByTestId('live-upload').evaluate(e => ({ level: e.dataset.level, need: Number(e.dataset.need), text: e.textContent }));
   check('the panel sums what Go live\'s three destinations will push', near(up0.need, upNeed) && up0.level === 'unknown', `${up0.need} kb/s (${up0.level}): "${up0.text}"`);
 
@@ -309,6 +366,10 @@ try {
     && req.destinations.every(d => d.keyName === `live-${after.dests.find(x => x.name === d.name)?.id}` && d.key === undefined), names ?? 'no start');
   check('two encodes: 1920x1080 for the wide ones, 720x1280 for Instagram', req?.outputs.map(o => `${o.id} ${o.meta.width}x${o.meta.height}`).join(', ') === 'landscape 1920x1080, portrait 720x1280',
     req?.outputs.map(o => `${o.id} ${o.meta.width}x${o.meta.height}`).join(', '));
+  const rateSaid = await page.getByTestId('live-rate').textContent().catch(() => '');
+  check('at 60 fps and the rate the panel says: Twitch\'s 6 Mb/s on the wide encode, Instagram\'s 4 on the tall',
+    req?.outputs.every(o => o.meta.fps === 60) && req.outputs.map(o => o.meta.videoBitrate).join() === '6000000,4000000' && /1080p60 at 6\.0 Mb\/s, Twitch/.test(rateSaid) && /portrait at 4\.0 Mb\/s, Instagram/.test(rateSaid),
+    `${req?.outputs.map(o => `${o.id} ${o.meta.fps} fps ${o.meta.videoBitrate}`).join(', ')}; "${rateSaid}"`);
   // Waited for, not read at once: the encoders hand their configuration over
   // with their first output, which can land after the start has been
   // answered. Read at once, a loaded runner saw "0 configurations" (CI on
@@ -375,6 +436,20 @@ try {
   await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
   const up2 = await page.getByTestId('live-upload').evaluate(e => ({ level: e.dataset.level, text: e.textContent }));
   check('a link that fell behind at 3 Mb/s warns that Go live\'s three will not fit', up2.level === 'short', `"${up2.text}"`);
+  const fitted = await page.getByTestId('live-rate').evaluate(e => ({ kbps: Number(e.dataset.kbps), text: e.textContent }));
+  check('and the next Go live is fitted to it, at the floor, and says so', fitted.kbps === 2000 && /to fit/.test(fitted.text), `${fitted.kbps} kb/s: "${fitted.text}"`);
+  // What Go hands the encoder, not only what the line says (the
+  // check-skeptic: the line and the press compute the rate apart, so a press
+  // that dropped the measured upload would leave the line green). The next
+  // Test, to its one YouTube destination: full rate before the ceiling was
+  // met, fitted under 3 Mb/s with the headroom after (3000 / 1.2 - 160).
+  await page.getByTestId('live-test').click();
+  await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'live');
+  const treq2 = await page.evaluate(() => window.__liveStub.calls.start[2]);
+  await page.getByTestId('live-stop').click();
+  await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
+  const handedBefore = treq?.outputs.map(o => o.meta.videoBitrate).join(), handedAfter = treq2?.outputs.map(o => o.meta.videoBitrate).join();
+  check('and Go hands the encoder the fitted rate: Test at 14 Mb/s before the ceiling, 2.34 after', handedBefore === '14000000' && handedAfter === '2340000', `before ${handedBefore}, after ${handedAfter}`);
 
   await page.screenshot({ path: 'scratch/liveshow-panel.png' }).catch(() => {});
   await remote.context().close();

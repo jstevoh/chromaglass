@@ -11,6 +11,7 @@ import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { TempoSource } from '../lib/tempo';
 import { SOUND_OUT, loadOscOut, oscOutTarget, saveOscOut, type OscOutLabel } from '../lib/oscOut';
+import { publishOscOut, setOscOutDoor } from './outputsNow';
 
 type OscOutState = Extract<RemoteMessage, { type: 'osc-out' }>;
 
@@ -127,6 +128,10 @@ export function useShowFeed({ connected, relaySendRef, wallRef, blackoutRef, hea
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [sending, wallRef, relaySendRef]);
+
+  // The owner's assistant reads the switch and flips it through the same door as the row (PLAN 44k-14, app/outputsNow.ts).
+  useEffect(() => { publishOscOut(oscOut); }, [oscOut]);
+  useEffect(() => { setOscOutDoor(onOscOut); return () => setOscOutDoor(null); }, [onOscOut]);
 
   return { oscOut, onOscOut };
 }

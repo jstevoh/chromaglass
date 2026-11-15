@@ -299,6 +299,12 @@ watches the deploy to green and reports it in Pacific time on the PR; Antigravit
 run restarts its branch from `main`. If `Checks` is not green on that head when the
 `PASS` is written, the `PASS` says so and the merge waits for the `READY` line.
 
+**Main held red** (PLAN.md 19am, the owner's rule made mechanical on 2026-11-09): while the
+same check is red on two main deploys running, the PR's `Main not held red` status is red
+and no one merges it, Antigravity or Claude Code, whatever the PR's own checks say. Only a
+PR labelled `fixes-main` merges until a deploy is green. The label goes on the PR that
+fixes the red check, and on nothing else; the status says which check and which deploys.
+
 A PR that owes no review before merge (`sampled` or `none`) is merged by Antigravity
 the same way, pinned to its green head. A clean merge of `main` after a `PASS` (no
 conflict to resolve) needs no new review, only the green; a merge that resolved a

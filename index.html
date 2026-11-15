@@ -21,10 +21,11 @@
       first frame, over the black the opening's compiles leave. Styled here,
       not in the app's CSS, because it has to paint before any of the app has
       arrived. The remote and a cast are not shows: no intro, decided before
-      the first paint so it never flashes there.
+      the first paint so it never flashes there. Nor is a TV at home (/tv,
+      PLAN 12-tv), which plays the show's picture and not the show.
     -->
     <script>
-      if (/[?&](remote|cast)(=|&|$)/.test(location.search)) document.documentElement.classList.add('cg-no-intro');
+      if (/[?&](remote|cast)(=|&|$)/.test(location.search) || /^\/tv\/?$/.test(location.pathname)) document.documentElement.classList.add('cg-no-intro');
     </script>
     <!--
       One address (PLAN.md 23.16). The owner asked, 2026-10-24, for
@@ -222,9 +223,16 @@
       /* The hub is the burst's middle 208 of its 560: drawn to that share of the dish. */
       .cg-hub { position: absolute; left: 31.43%; top: 31.43%; width: 37.14%; height: 37.14%; }
       .cg-name { height: max(22px, 7cqmin); width: auto; }
-      .cg-sub { font: 400 max(10px, 1.9cqmin)/1 "Geist Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); animation: cg-breathe 2.8s ease-in-out infinite; }
+      /* The loading line (lib/intro.ts, introStage): what the show is waiting
+         for and how far along. Steady, not breathing: it is read, and held
+         still it would have stopped at its faintest. */
+      .cg-sub { font: 400 max(11px, 2.1cqmin)/1.2 "Geist Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.06em; color: rgba(255,255,255,0.72); font-variant-numeric: tabular-nums; }
+      /* The loading line's bar (lib/intro.ts, introStage): moved in steps by
+         transform, never a transition, which would be a new picture on every
+         frame while the GPU process is busy compiling. */
+      .cg-bar { width: max(120px, 30cqmin); height: 2px; border-radius: 1px; background: rgba(255,255,255,0.12); overflow: hidden; }
+      .cg-bar > i { display: block; height: 100%; background: rgba(255,255,255,0.65); transform-origin: left center; transform: scaleX(0.04); }
       @keyframes cg-turn { to { transform: rotate(360deg); } }
-      @keyframes cg-breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { #cg-intro *, #cg-intro { animation: none !important; transition: none !important; } }
     </style>
     <!--
@@ -235,7 +243,7 @@
       milliseconds. CastDisplay.tsx says why; `npm run showcursor` holds it.
     -->
     <style>html.show-screen, html.show-screen * { cursor: none !important; }</style>
-    <script>if (/[?&]cast(=|&|$)/.test(location.search)) document.documentElement.classList.add('show-screen');</script>
+    <script>if (/[?&]cast(=|&|$)/.test(location.search) || /^\/tv\/?$/.test(location.pathname)) document.documentElement.classList.add('show-screen');</script>
   </head>
   <body>
     <div id="root"></div>
@@ -246,7 +254,8 @@
       <div class="cg-mark">
         <div class="cg-dish"><img class="cg-burst" src="/intro-burst.svg" alt="" /><img class="cg-hub" src="/intro-hub.svg" alt="" /></div>
         <img class="cg-name" src="/intro-name.svg" alt="ChromaGlass" />
-        <div class="cg-sub">Warming the lamp</div>
+        <div class="cg-sub">Loading</div>
+        <div class="cg-bar"><i></i></div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

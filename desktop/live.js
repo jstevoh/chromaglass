@@ -93,6 +93,8 @@ export const WINDOW_ACK = 262144;
 export const BEHIND_LIMIT_SECONDS = 2;
 /** A server's acknowledgement older than this is taken as one that has stopped acknowledging, and the socket's own word is used instead. */
 const ACK_STALE_MS = 5000;
+/** The delivery queue's track numbers (`behind` judges each on its own clock). */
+const TRACK = { video: 0, audio: 1 };
 /**
  * A server whose acknowledgements come further apart than this share of the
  * bound (in seconds of the stream) is too coarse to judge by, and the socket's
@@ -152,13 +154,17 @@ export class LiveClient extends EventEmitter {
     /** The stream-clock time this connection's timestamps start from: 0 for the stream's first, the joining keyframe's for a later one (null until it comes). */
     this.base = join ? null : 0;
     /**
-     * What has been written and what has arrived: `queue` holds, for each
-     * media packet written and not yet known to have arrived, the byte count
-     * at its end and its timestamp. `flushed` is the bytes node has handed the
-     * kernel (each write's callback, in order); `serverAck` what the server
-     * last said it has (its count wraps at 2^32, unwrapped here).
+     * What has been written and what has arrived: `queues` holds one queue a
+     * track (TRACK), and each, for every media packet of that track written
+     * and not yet known to have arrived, the byte count at its end and its
+     * timestamp (`heads` where each queue starts). `writtenTs` is each
+     * track's newest timestamp written. `flushed` is the bytes node has
+     * handed the kernel (each write's callback, in order); `serverAck` what
+     * the server last said it has (its count wraps at 2^32, unwrapped here).
+     * `behind` never compares one track's timestamps with the other's (see
+     * there).
      */
-    this.delivery = { queue: [], head: 0, flushed: 0, serverAck: 0, serverAckAt: 0, ackStep: 0, lastAckRaw: 0, wraps: 0, writtenTs: 0, deliveredTs: 0, rate: [] };
+    this.delivery = { queues: [[], []], heads: [0, 0], flushed: 0, serverAck: 0, serverAckAt: 0, ackStep: 0, lastAckRaw: 0, wraps: 0, writtenTs: [null, null], rate: [] };
     this.ackedAt = 0;
     this.peerWindow = 0;
     this.startedAt = 0;
@@ -174,6 +180,7 @@ export class LiveClient extends EventEmitter {
       bytesBehind: behind.bytes,
       secondsBehind: behind.seconds,
       behindLimit: BEHIND_LIMIT_SECONDS,
+      avSkewSeconds: behind.skew,
       measuredAt: behind.by,
       kbps: this.kbps(),
       dropping: this.dropping,
@@ -186,7 +193,28 @@ export class LiveClient extends EventEmitter {
    * How far behind the stream is: the bytes written that the server is not
    * known to have, and the seconds of the stream they hold. `by` says whose
    * word it is: 'server' (its acknowledgements) or 'socket' (what node has
-   * handed the kernel, when the server is not acknowledging).
+   * handed the kernel, when the server is not acknowledging). `skew` is the
+   * newest audio timestamp written less the newest video one, in seconds
+   * (null until both have been written), for the readout.
+   *
+   * The seconds are judged track by track: for each track with packets
+   * waiting, its newest timestamp written less its oldest still waiting, and
+   * the larger of the two. Not less its last delivered: across a drop that
+   * is the frame before the drop, seconds ago, so the keyframe that ends it
+   * would read the whole drop as backlog the moment it waited at all, and
+   * start another (the skew check's held line: five drop runs for one
+   * backlog, measured on the first draft of this).
+   * Until 37x-4g they were the newest timestamp written on either track less
+   * the timestamp of the last packet delivered, whichever track that was, and
+   * so a stream whose audio stamps had come apart from its video by more than
+   * the bound read as more than the bound behind whenever a single byte was
+   * waiting. On loopback nothing waits and nothing showed; on a real uplink a
+   * keyframe waits a few milliseconds every two seconds, and from then on the
+   * stream sent keyframes and audio and dropped every frame between (the
+   * owner's private rehearsal, 2026-11-08: six good minutes, then under
+   * 1 Mbps and "No data" until the end, a restart good for fifteen seconds).
+   * A backlog is the media of one track that has been written and not
+   * delivered; how the two tracks' clocks sit against each other is not one.
    */
   behind() {
     const d = this.delivery;
@@ -195,13 +223,21 @@ export class LiveClient extends EventEmitter {
     const fine = streamBytesPerSecond <= 0 || d.ackStep <= streamBytesPerSecond * BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE;
     const fresh = fine && d.serverAckAt > 0 && Date.now() - d.serverAckAt < ACK_STALE_MS;
     const arrived = fresh ? Math.min(d.serverAck, d.flushed) : d.flushed;
-    while (d.head < d.queue.length && d.queue[d.head][0] <= arrived) d.deliveredTs = d.queue[d.head++][1];
-    if (d.head > 4096) { d.queue = d.queue.slice(d.head); d.head = 0; }
+    let seconds = 0;
+    for (let t = 0; t < 2; t++) {
+      const q = d.queues[t];
+      let h = d.heads[t];
+      while (h < q.length && q[h][0] <= arrived) h++;
+      if (h > 4096) { d.queues[t] = q.slice(h); h = 0; }
+      d.heads[t] = h;
+      const waiting = d.queues[t][h];
+      if (waiting) seconds = Math.max(seconds, (d.writtenTs[t] - waiting[1]) / 1000);
+    }
     const now = Date.now();
     const last = d.rate[d.rate.length - 1];
     if (!last || now - last[0] >= 250) { d.rate.push([now, arrived]); while (d.rate.length > 1 && now - d.rate[0][0] > 3000) d.rate.shift(); }
-    const waiting = d.head < d.queue.length;
-    return { bytes: Math.max(0, this.counts.bytesSent - arrived), seconds: waiting ? Math.max(0, (d.writtenTs - d.deliveredTs) / 1000) : 0, by: fresh ? 'server' : 'socket' };
+    const [v, a] = d.writtenTs;
+    return { bytes: Math.max(0, this.counts.bytesSent - arrived), seconds, skew: v === null || a === null ? null : (a - v) / 1000, by: fresh ? 'server' : 'socket' };
   }
 
   /** Kilobits a second arriving, over the last two to three seconds (`behind` keeps the samples). */
@@ -262,16 +298,16 @@ export class LiveClient extends EventEmitter {
   }
 
   /** The chunk size the writer uses: ours, which we told the server. */
-  send(csid, type, body, { msid = 0, timestamp = 0, media = false } = {}) {
+  send(csid, type, body, { msid = 0, timestamp = 0, media = null } = {}) {
     if (!this.socket || this.socket.destroyed) return false;
     const bytes = chunkMessage({ csid, msid, type, timestamp, body }, CHUNK_SIZE);
     this.counts.bytesSent += bytes.length;
     const d = this.delivery;
-    if (media) {
-      // Kept on the stream's clock, before the connection's base is taken off, so a join's seconds compare with the rest.
+    if (media !== null) {
+      // Kept on the stream's clock, before the connection's base is taken off, so a join's seconds compare with the rest; and per track (`behind`).
       const at = timestamp + (this.base ?? 0);
-      d.queue.push([this.counts.bytesSent, at]);
-      if (at > d.writtenTs) d.writtenTs = at;
+      d.queues[media].push([this.counts.bytesSent, at]);
+      if (d.writtenTs[media] === null || at > d.writtenTs[media]) d.writtenTs[media] = at;
     }
     const n = bytes.length;
     return this.socket.write(bytes, () => { d.flushed += n; });
@@ -332,7 +368,7 @@ export class LiveClient extends EventEmitter {
       if (!key || seconds > BEHIND_LIMIT_SECONDS / 2) { this.counts.videoDropped++; return false; }
       this.dropping = false;
     }
-    this.send(CSID.VIDEO, MSG.VIDEO, avcTag(key ? 'key' : 'delta', data), { msid: this.streamId, timestamp: timestampMs - this.base, media: true });
+    this.send(CSID.VIDEO, MSG.VIDEO, avcTag(key ? 'key' : 'delta', data), { msid: this.streamId, timestamp: timestampMs - this.base, media: TRACK.video });
     this.counts.videoFrames++;
     return true;
   }
@@ -342,7 +378,7 @@ export class LiveClient extends EventEmitter {
     if (this.phase !== 'live' || !this.sequenced.audio) return false;
     if (this.base === null || timestampMs < this.base) { this.counts.joinSkipped++; return false; }
     const tag = this.audioCodec === 'aac' ? aacTag('frame', data) : opusTag('frame', data);
-    this.send(CSID.AUDIO, MSG.AUDIO, tag, { msid: this.streamId, timestamp: timestampMs - this.base, media: true });
+    this.send(CSID.AUDIO, MSG.AUDIO, tag, { msid: this.streamId, timestamp: timestampMs - this.base, media: TRACK.audio });
     this.counts.audioPackets++;
     return true;
   }
