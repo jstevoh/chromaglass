@@ -350,7 +350,8 @@
     "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
     "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",
     "logomelt": "PW_WEBGPU=1 node scripts/logomelt.mjs",
-    "presskit": "node scripts/presskit.mjs",
+    "presskit": "node --experimental-strip-types scripts/presskit.mjs",
+    "tvfilms": "node --experimental-strip-types scripts/tvfilms.mjs",
     "loopseam": "node --experimental-strip-types scripts/loopseam.mjs",
     "tvvideo": "node scripts/tvvideo.mjs"
   },
