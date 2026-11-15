@@ -6,6 +6,7 @@
  *   npm run tvloops                                render, loop and judge all ten (a Mac)
  *   npm run tvloops -- --only=chemical-clock --seconds=60    one, short, to try a look
  *   npm run tvloops -- --upload                    and put each on the tv-loops-1 pre-release
+ *   npm run tvloops -- --upload --clean            and delete each loop here once it is up
  *   npm run tvloops -- --judge=out/galaxy.mp4      the judge alone, on any loop
  *
  * The owner, 2026-11-14: "audio free visuals that the appletv and googletv
@@ -123,6 +124,7 @@ const JUDGE = typeof opt('judge') === 'string' ? opt('judge') : null;
 const ONLY = typeof opt('only') === 'string' ? opt('only').split(',') : null;
 const UPLOAD = !!opt('upload');
 const KEEP_RAW = !!opt('keep-raw');
+const CLEAN = !!opt('clean');
 const LOOP_S = Number(opt('seconds') ?? TV_LOOP_SECONDS);
 const WARM_S = Number(opt('warm') ?? TV_LOOP_WARM_S);
 const SEAM_S = Number(opt('seam') ?? TV_LOOP_SEAM_S);
@@ -368,6 +370,10 @@ async function makeAll() {
 
   for (const loop of loops) {
     const raw = path.join(OUT, `${loop.id}-raw.mp4`), out = path.join(OUT, `${loop.id}.mp4`);
+    // Room for the render (about 1.4 GB) and the loop (up to 1.4 GB) beside
+    // it: a disk that fills halfway through a render loses the half hour.
+    const free = (() => { try { const f = fs.statfsSync(OUT); return f.bavail * f.bsize; } catch { return Infinity; } })();
+    if (free < 4e9) throw new Error(`${loop.id}: ${(free / 1e9).toFixed(1)} GB free here, and a loop needs about 3 GB while it is made; stopping`);
     const t0 = Date.now();
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
@@ -449,9 +455,16 @@ async function makeAll() {
         execFileSync('gh', ['release', 'create', TV_LOOP_RELEASE, '--prerelease', '--title', 'TV loops 1',
           '--notes', 'The TV apps\' calm loops (PLAN 12-tv-loops, src/lib/tvLoops.ts): half-hour silent films of the app\'s own renders, served as https://chromaglass.art/loops/<id>.mp4. A pre-release, never latest: the Mac app\'s updater reads releases/latest.'], { stdio: 'inherit' });
       }
-      execFileSync('gh', ['release', 'upload', TV_LOOP_RELEASE, out, '--clobber'], { stdio: 'inherit' });
+      for (let tries = 1; ; tries++) {
+        try { execFileSync('gh', ['release', 'upload', TV_LOOP_RELEASE, out, '--clobber'], { stdio: 'inherit' }); break; } catch (e) {
+          if (tries >= 4) throw e;
+          console.log(`  ${loop.id}: upload failed (${e.message.slice(0, 120)}); again in ${30 * tries} s`);
+          await new Promise((r) => setTimeout(r, 30000 * tries));
+        }
+      }
       manifest[loop.id].uploaded = true;
       console.log(`  ${loop.id}: uploaded to ${TV_LOOP_RELEASE}`);
+      if (CLEAN) fs.rmSync(out);
     }
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   }
