@@ -2473,7 +2473,10 @@ before the measured one (untested, and #396's warm in the same page did not help
     Mac's first `startup` run named their lean display as waited for and asked for by
     none. `startup` prices the lean display as the old way's display
     (`scripts/startuplean.mjs`): on that run its 1.78 s compile read as the page's own
-    wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner.
+    wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner. And the
+    line says nothing at the start of the builds: its "0 of 67" changed the picture as the
+    opening began waiting for the page's frames, and the Mac asked its first compile 1.12 s
+    after the device (0.06 s on main).
   - Every look the same bytes: `npm run leandisplay` (new, lab9) draws all 41 looks lean
     and whole, plate and close-up, 85/85 (also with five steps each, before the switch
     to literal `false`), with controls (a gate the look uses taken out differs by 1329

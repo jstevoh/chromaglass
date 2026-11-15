@@ -265,7 +265,14 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     at: Math.round(t0), lastAt: Math.round(t0), cap: PREPARE_TIMEOUT_MS, done: false, rendering: 0,
   };
   prepareProgress.push(progress);
-  quiet?.progress?.(0, builds.length, 0);
+  /*
+    No word on the loading line yet: the first is said when a build settles
+    with no render pipeline compiling. Said here ("0 of 67"), it changed the
+    picture just as `quiet.still()` began waiting for the page's frames, and
+    on the Mac's cold GPU process that new frame came back late: the first
+    compile was asked 1.12 s after the device was given (job 132612767004),
+    against 0.06 s on main, and `npm run startup` counted it the page's own.
+  */
   // Each lane takes the next build in the list when its last one settles, so
   // the order they are asked in is the list's, as it was with one, but for
   // the one render pipeline at a time (`renderBusy`, below).
@@ -477,7 +484,7 @@ export interface Quiet {
   go(): void;
   /**
    * How far the opening has got, each time a build settles and each time a
-   * render pipeline starts or finishes: the loading line's count
+   * render pipeline finishes (never before the first): the loading line's count
    * (`introStage` in `lib/intro.ts`), which holds its words while
    * `rendering` is up, for the reason above.
    */
