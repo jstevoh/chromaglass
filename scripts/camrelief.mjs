@@ -11,7 +11,7 @@
  * camera focused a little past the liquid) had only ever been handed the
  * colour step between two dyes by the derive pass's camera branch. It shaded
  * every seam up to half darker, scaled by Boundary Contrast, and a swell of
- * the liquid drew nothing. PLAN 18e-7 hands it the path (OPL = n·h, the
+ * the liquid drew nothing. PLAN 18e-7 hands it the dye's path (OPL = n·h, the
  * dye's stand-in index at gain 1) and reads its curvature over the lens's
  * disc (camLap). Two readings were tried before and taken back: nothing (a
  * flat closeup), and the path's nine-tap Laplacian, which read a bubble's
@@ -20,11 +20,11 @@
  *
  * holeline asks the seam (the dial moves nothing up close; a seam at one
  * depth is no darker than its two dyes) and macroview that the closeup is
- * still shaded on every look. Asked here, at 4x, each picture against the
+ * still shaded on every look. Asked here, at 2x and 4x, each picture against the
  * same plate with Macro Relief at 0, so what is measured is the relief alone:
  *
- *   1. a swell gathers light: flat dye over a dome in the gap (the column
- *      SWELL thicker in its middle, a Gaussian of SIGMA of the plate, laid at
+ *   1. a swell gathers light: one dye laid flat with a dome of more of it
+ *      (SWELL deeper in its middle, a Gaussian of SIGMA of the plate, laid at
  *      DOME, off the frame's middle) is brighter in its middle by more than
  *      LIFT levels and darker on a ring at 2.5 sigma by more than FLANK of
  *      that (a Gaussian's Laplacian there is -0.09 of its middle's). The
@@ -33,8 +33,13 @@
  *      is under KEEP of what the dome's core (within 1.4 sigma) gains; a
  *      relief that only brightened would sum to more than the core
  *   1c. and the lift is the dome's: at its mirror across the frame (a field
- *      read flipped would put it there) and at its own place with the gap
+ *      read flipped would put it there) and at its own place with the dye
  *      level, the relief moves the middle under LIFT/3
+ *   1d. the glass's shape is not the liquid's relief: the same level dye
+ *      with a dome in the gap (GAP_DOME high) instead moves what the relief
+ *      draws by no more than GAP_MAX. The first build read the gap, oil and
+ *      pours too, texel by texel, and the Mac's film drew a jagged ribbon
+ *      clipped bright and scalloped shells round bubbles (camLap says why)
  *   2. a bubble's hole is the bubble's: on a cluster of holes cut in one dye
  *      (the air as the app cuts it, bubbleClear 1; the bubbles' own drawing
  *      off and their air handed to the plate, so only the dye is seen), the
@@ -49,8 +54,8 @@
  *      BUB_CONTROL, or the plate is not one the mask is needed on
  *
  * Before anything is judged, the plates are asked to be what they say: the
- * dome is in the gap the plate reads (the relief picture must differ from
- * one without the dome), and at least five of the holes are cut to the glass.
+ * dome is laid (the relief picture must differ from one without it), and
+ * at least five of the holes are cut to the glass.
  */
 import { openLab } from './lab.mjs';
 import { readFileSync } from 'node:fs';
@@ -63,10 +68,10 @@ const check = (name, ok, detail = '') => {
 
 /** The bubbles at 4x; the swell at 2x, so the dome, its flanks and its mirror all sit in the frame. */
 const N = 256, SIZE = 384, ZOOM = 4, SWELL_ZOOM = 2;
-const SWELL = 0.015, SIGMA = 0.02, LIFT = 6, KEEP = 0.25, FLANK = 0.05;
+const SWELL = 0.5, GAP_DOME = 0.015, GAP_MAX = 2, SIGMA = 0.02, LIFT = 6, KEEP = 0.25, FLANK = 0.05;
 /** The dome off the frame's middle (the camera at 0.5, 0.5), and the far dome on the bubbles' plate, 4.5 sigma clear of the cluster's edge. */
 const DOME = [0.56, 0.535], FAR = [0.66, 0.5];
-const BUB_MAX = 12, BUB_CONTROL = 30, CUT = 24;
+const BUB_MAX = 12, BUB_CONTROL = 24, CUT = 24;
 
 /*
   The control: camLap with the air not read, so a tap that lands in a hole
@@ -85,7 +90,7 @@ const CONTROL_AIR = {
   },
 };
 
-const measure = (page, which) => page.evaluate(async ({ N, SIZE, ZOOM, SWELL_ZOOM, SWELL, SIGMA, CUT, DOME, FAR, which }) => {
+const measure = (page, which) => page.evaluate(async ({ N, SIZE, ZOOM, SWELL_ZOOM, SWELL, SIGMA, CUT, DOME, FAR, GAP_DOME, which }) => {
   const S = SIZE, P = S * S;
   const pink = [1.2, 0.3, 0.8];
   const lum = (p, i) => 0.2126 * p[4 * i] + 0.7152 * p[4 * i + 1] + 0.0722 * p[4 * i + 2];
@@ -94,10 +99,21 @@ const measure = (page, which) => page.evaluate(async ({ N, SIZE, ZOOM, SWELL_ZOO
     if (p.length !== P * 4) throw new Error(`camrelief: a picture came back ${p.length} bytes, not ${P * 4}`);
     return p;
   };
-  const flood = async (lo, hi) => {
-    await lab.create(N);
-    for (let y = lo; y < hi; y += 0.01) for (let x = lo; x < hi; x += 0.01) lab.dye(x, y, 0.012, pink, 1.3);
-    lab.flush(); await lab.step(6);
+  // One dye laid flat over [lo, hi] at depth 1.3, with an optional dome of
+  // more of it: depth 1.3 (1 + amp e^(-r²/2σ²)) about (x, y). Cell by cell, so
+  // the dome is the Gaussian and not a cluster of splats.
+  const flood = async (lo, hi, dome = null) => {
+    const { L } = await lab.create(N);
+    const add = new Array(L * L * 4).fill(0);
+    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+      const x = (i + 0.5) / L, y = (j + 0.5) / L;
+      if (x < lo || x > hi || y < lo || y > hi) continue;
+      let d = 1.3;
+      if (dome) d *= 1 + dome[2] * Math.exp(-((x - dome[0]) ** 2 + (y - dome[1]) ** 2) / (2 * SIGMA * SIGMA));
+      const k = (i + j * L) * 4;
+      add[k] = pink[0] * d; add[k + 1] = pink[1] * d; add[k + 2] = pink[2] * d; add[k + 3] = d;
+    }
+    lab.addDye(add); lab.flush(); await lab.step(6);
   };
   const out = {};
   // The plate's view (oil, mix, gap) laid by hand: level, or with a dome in
@@ -132,16 +148,22 @@ const measure = (page, which) => page.evaluate(async ({ N, SIZE, ZOOM, SWELL_ZOO
   };
   if (which === 'plain') {
     // 1. The swell, off the frame's middle so its mirror is somewhere else.
-    await flood(0.1, 0.9);
     px = 1.5 * SWELL_ZOOM * S;
     const z2 = { zoom: SWELL_ZOOM };
     const [dx, dy] = DOME, sx = colOf(dx, 0.5), sy = rowOf(dy, 0.5), mx = S - sx, my = S - sy, sig = SIGMA * px;
-    layDome(dx, dy, SWELL);
+    await flood(0.1, 0.9, [dx, dy, SWELL]);
     const on = await shot({}, z2), flat = await shot({ macroRelief: 0 }, z2);
-    layDome(dx, dy, 0);
+    await flood(0.1, 0.9);
     const level = await shot({}, z2), levelFlat = await shot({ macroRelief: 0 }, z2);
-    let frame = 0, dome = 0;
-    for (let i = 0; i < P; i++) { frame += lum(on, i) - lum(flat, i); dome = Math.max(dome, Math.abs(lum(on, i) - lum(level, i))); }
+    // 1d. The same level dye with a dome in the gap between the glasses instead.
+    layDome(dx, dy, GAP_DOME);
+    const gap = await shot({}, z2), gapFlat = await shot({ macroRelief: 0 }, z2);
+    let frame = 0, dome = 0, gapMoves = 0;
+    for (let i = 0; i < P; i++) {
+      frame += lum(on, i) - lum(flat, i);
+      dome = Math.max(dome, Math.abs(lum(on, i) - lum(level, i)));
+      gapMoves = Math.max(gapMoves, Math.abs((lum(gap, i) - lum(gapFlat, i)) - (lum(level, i) - lum(levelFlat, i))));
+    }
     out.swell = {
       middle: ring(on, flat, sx, sy, 0, 0.3 * sig).mean,
       flank: ring(on, flat, sx, sy, 2.2 * sig, 2.8 * sig).mean,
@@ -150,11 +172,12 @@ const measure = (page, which) => page.evaluate(async ({ N, SIZE, ZOOM, SWELL_ZOO
       core: ring(on, flat, sx, sy, 0, Math.SQRT2 * sig).sum,
       frame,
       dome,
+      gapMoves,
     };
   }
   // 2. The bubbles: a cluster of holes cut in one dye.
   px = 1.5 * ZOOM * S;
-  await flood(0.2, 0.8);
+  await flood(0.2, 0.8, [FAR[0], FAR[1], SWELL]);
   let s = 11; const r = () => (s = s * 16807 % 2147483647) / 2147483647;
   const holes = [];
   for (let k = 0; k < 10; k++) holes.push({ x: 0.5 + (r() - 0.5) * 0.14, y: 0.5 + (r() - 0.5) * 0.14, r: (1.5 + r() * 3) / N });
@@ -176,13 +199,12 @@ const measure = (page, which) => page.evaluate(async ({ N, SIZE, ZOOM, SWELL_ZOO
   // on this same plate, its air handed over, still lifts. A mask that spread
   // over everything would leave it flat, and line 2 would read 0 for that.
   const [fx, fy] = FAR;
-  layDome(fx, fy, SWELL);
   const farCam = { ...cam, cx: fx, cy: fy };
   const fOn = await shot({}, farCam), fFlat = await shot({ macroRelief: 0 }, farCam);
   const far = ring(fOn, fFlat, S / 2, S / 2, 0, 0.3 * SIGMA * px).mean;
   out.bubbles = { most, white, cuts, CUT, far };
   return out;
-}, { N, SIZE, ZOOM, SWELL_ZOOM, SWELL, SIGMA, CUT, DOME, FAR, which });
+}, { N, SIZE, ZOOM, SWELL_ZOOM, SWELL, SIGMA, CUT, DOME, FAR, GAP_DOME, which });
 
 const t0 = Date.now();
 const plain = await openLab();
@@ -196,13 +218,13 @@ try {
 console.log(`   (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
 
 const sw = now.swell;
-console.log(`   the swell (the gap ${SWELL * 100}% thicker in its middle): middle ${sw.middle.toFixed(1)} levels, flank ${sw.flank.toFixed(1)}, at its mirror ${sw.mirror.toFixed(1)}, the same place with no dome ${sw.bare.toFixed(1)}; the frame's sum ${sw.frame.toFixed(0)} against the core's ${sw.core.toFixed(0)}; the dome moves the relief picture ${sw.dome.toFixed(0)} levels`);
+console.log(`   the swell (the dye ${SWELL * 100}% deeper in its middle): middle ${sw.middle.toFixed(1)} levels, flank ${sw.flank.toFixed(1)}, at its mirror ${sw.mirror.toFixed(1)}, the same place with no dome ${sw.bare.toFixed(1)}; the frame's sum ${sw.frame.toFixed(0)} against the core's ${sw.core.toFixed(0)}; the dome moves the relief picture ${sw.dome.toFixed(0)} levels; a dome in the gap moves the relief ${sw.gapMoves.toFixed(1)}`);
 for (const [name, b] of [['the shader', now.bubbles], ['the control (no air in camLap)', ctl.bubbles]]) {
   console.log(`   ${name}, bubbles: the relief moves a pixel at most ${b.most} levels, ${b.white} turned white; holes cut ${b.cuts.map((c) => c.toFixed(0)).join(', ')} levels from the dye; a dome away from them lifts ${b.far.toFixed(1)}`);
 }
 
 // The plates are what they say.
-if (!(sw.dome > LIFT)) throw new Error(`camrelief: the dome moves the relief picture ${sw.dome} levels (the gap was not read)`);
+if (!(sw.dome > LIFT)) throw new Error(`camrelief: the dome moves the relief picture ${sw.dome} levels (the dome was not laid)`);
 for (const b of [now.bubbles, ctl.bubbles]) {
   // The smallest (1.5 cells) do not always clear to the glass at their middle; most must.
   const cut = b.cuts.filter((c) => c > CUT).length;
@@ -215,6 +237,8 @@ check(`1b. and makes no light: the frame's summed change ${sw.frame.toFixed(0)} 
   sw.core > 0 && Math.abs(sw.frame) < KEEP * sw.core);
 check(`1c. and it is the dome's: at its mirror across the frame ${sw.mirror.toFixed(1)}, and where it was with no dome ${sw.bare.toFixed(1)}, both under ${(LIFT / 3).toFixed(0)} levels`,
   Math.abs(sw.mirror) < LIFT / 3 && Math.abs(sw.bare) < LIFT / 3);
+check(`1d. the glass's shape is not the liquid's relief: a dome in the gap ${GAP_DOME * 100}% high moves what the relief draws by ${sw.gapMoves.toFixed(1)} levels (≤ ${GAP_MAX})`,
+  sw.gapMoves <= GAP_MAX);
 check(`2. a bubble's hole is the bubble's: the relief moves no pixel round a cluster of holes by more than ${BUB_MAX} levels (${now.bubbles.most}) and turns none white (${now.bubbles.white})`,
   now.bubbles.most <= BUB_MAX && now.bubbles.white === 0);
 check(`2b. and the mask is the holes' alone: a dome on the same plate away from them lifts ${now.bubbles.far.toFixed(1)} levels (> ${LIFT})`,

@@ -1280,13 +1280,13 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
-  // The camera's views keep their own slope. The closeup's .w is the path
-  // (its .z nothing): camLap reads its curvature at the lens's scale. The
-  // dye's stand-in index at gain 1, so Boundary Contrast moves nothing up
-  // close (PLAN 18e-7, plateTransmit.ts says why).
+  // The camera's views keep their own slope. The closeup's .w is the dye's
+  // path alone (its .z nothing), its stand-in index at gain 1, so Boundary
+  // Contrast moves nothing up close: camLap reads its curvature at the
+  // lens's scale (PLAN 18e-7; plateTransmit.ts says why not the gap or oil).
   if (isCamera) {
     var path = 0.0;
-    if (closeup) { path = oplAt(decodeDensity(tex2(src, in.uv).a), in.uv, 1.0); }
+    if (closeup) { path = calcOpl(decodeDensity(tex2(src, in.uv).a), vec3f(0.0, 0.03, 0.0), 0.0, 1.0); }
     return vec4f(sobelGrad(src, in.uv), 0.0, path);
   }
 

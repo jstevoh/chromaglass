@@ -92,14 +92,26 @@ fn defocusShadow(t: texture_2d<f32>, uv: vec2f) -> f32 {
   meant its depth to be this, but the derive pass's camera branch handed it
   the colour step between two dyes, so up close every seam was shaded up to
   half darker, scaled by Boundary Contrast, and a swell drew nothing. Now
-  the camera branch writes the path in .w, with the dye's stand-in index at
+  the camera branch writes the dye's path in .w, its stand-in index at
   gain 1 (refractionOptics note 6: a dye barely moves the index, and the
   dial is the projector's), and its curvature is read at the lens's disc
   as defocusShadow reads it, two ring means. Two dyes at one depth make no
-  path step, so no line; a swell (a thicker column) is a dome of path and
-  gathers light in its middle; a pool's edge or a step in the dye's depth is
-  a soft shadow-and-bright pair as wide as the disc. Returned as the
-  curvature over the path, which camShadow takes.
+  path step, so no line; a swell of dye is a dome of path and gathers light
+  in its middle; a pool's edge or a step in the dye's depth is a soft
+  shadow-and-bright pair as wide as the disc. Returned as the curvature
+  over the path, which camShadow takes.
+
+  The dye's path, not the whole column's. The first build read the wall's
+  whole path, gap, oil and pours included, and the Mac's film of it (Classic
+  at 6x, Splodascope at 4x) drew a jagged ribbon clipped bright and rows of
+  scalloped shells round a bubble cluster, and a hard pale patch inside an
+  oil drop. Those fields are read texel by texel (viewProps, pouredDn: a
+  packed or 32-bit field cannot be filtered), so up close every step is a
+  cell-sized stair, and the gap bows hard round each bubble; their index
+  steps (oil 0.137, glycerine 0.14) are ten times the dye's stand-in, so
+  the stairs went straight to camShadow's clamp. An oil drop's and a
+  pour's rims are 18e-2's to draw, a bubble's wall its own lens; returning
+  them to the closeup waits on reading them smoothly (PLAN 18e-11).
 
   Two readings were tried before this and taken back (18e-5's thread):
   nothing (a flat closeup) and the derive pass's own nine-tap Laplacian of

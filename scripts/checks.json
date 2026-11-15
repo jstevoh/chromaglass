@@ -1499,11 +1499,12 @@
         "The closeup's relief reads the optical path at the lens's disc (PLAN 18e-7,",
         "camLap in src/gpu/wgsl/plateTransmit.ts), not the colour step between two",
         "dyes it was handed until then (the owner's black lines, up close). A swell",
-        "in the gap gathers light in its middle with the frame's mean kept, and a",
+        "of dye gathers light in its middle with the frame's light kept, a dome in the",
+        "gap moves nothing (the first build's ribbons on the Mac, PLAN 18e-11), and a",
         "cluster of bubbles cut in one dye is left alone (a control without the air",
         "mask finds the halo the path's nine-tap Laplacian drew on the Mac). The seam",
         "itself is holeline's lines 6 to 6b. Lab, two builds; about two minutes on",
-        "SwiftShader (125 s, 2026-11-15), in lab9 beside glint."
+        "SwiftShader (152 s, 2026-11-15), in lab9 beside glint."
       ]
     },
     {
