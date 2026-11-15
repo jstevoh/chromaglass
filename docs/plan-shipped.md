@@ -3155,6 +3155,89 @@ Lab (`npm run bubbledye`, 128², main → now): left under a whole bubble 1.2% �
 1.0% → 0.0%, a moving one 6.6% → 0.0%; deepest cell after a pop 1.097 → 1.088; deepest cell round a
 moving bubble 1.019 → 1.036; every total 0.000%. The bar under a bubble is 2% now (was 8%).
 
+### 15g-11. The breath is a jet along the surface, with a direction (shipped, with 15g-5)
+
+What was reported (the owner, 2026-11-13, on the desktop app): "blowing looks like shit
+generally. It doesn't blow across the surface like I would expect (unless you're blowing
+hard), it doesn't seem to have a direction in mind."
+
+What was found. The breath's stress (15g's first part) landed in a disc under the hand, one
+footprint across, so the liquid moved under the pointer and nowhere ahead of it: a held
+breath drove 19.62 mm/s under itself and 0.12 mm/s a palm on (`npm run airblow`, software
+WebGPU). A breath blown along a surface is a jet that runs along it. And its direction was
+each pointer move's own: at the pointer's pixel steps a 30° stroke read as moves of 0° and
+45° to 90° by turns, and 150 ms after the hand stopped the direction was dropped and the
+hand became the straw, so a stroke that paused blew bubbles where it stood.
+
+What changed.
+- `src/lib/breath.ts`, `layBreath` and `jetShare`: the stress is whole over the landing
+  footprint and a core of five footprints, then falls as 1/(1 + (s/s_c)²) (a round jet's
+  centreline speed goes as one over the distance past its core, and the stress as its
+  square; Launder and Rodi's review of the wall jet for the 0.15 a radius it spreads by),
+  Gaussian across, cut smoothly to nothing at a twentieth: 21.7 footprints of reach,
+  135 mm on the 200 mm dish, and 13 times the disc's whole force for the same breath.
+- `src/lib/blowAim.ts` (new; the Blow's hold constants came with it from
+  `src/sim/tools.ts`): the direction is the way from a point trailing the hand on a leash
+  of four cells to the hand. It turns as the stroke turns and not with each pixel, and on
+  a thin gap it is kept while the hand is down, so a hand that stops goes on blowing the
+  way it was going. The straw is a press that never moved.
+- 15g-5: a remote hand's directed Blow is the same air. Its messages come a few a second,
+  so the solver holds its breath a quarter of a second past each (`holdBreath`,
+  `breatheHeld`, `REMOTE_BREATH_HOLD`) and lays it every step; its push and carries no
+  longer run on a thin gap. One breath a plate for now (15g-13).
+
+Measured (`npm run blowrange`, node): the stress along the breath at 0, 1, 2, 5, 10 and 15
+footprints 1.00, 0.96, 0.85, 0.47, 0.16, 0.05; the same in sixteen directions to 0.0%; at
+most 7.1° off a 30° stroke where one move's worth swung 60.0°; two seconds held keeps the
+wind and starts no straw. `npm run airblow` (lab, software WebGPU), main → now: under a
+held breath 19.62 → 31.84 mm/s (0.37 → 0.61 of τh/2μ: the plume's liquid has a longer way
+back round, so the middle runs nearer the speed its own gap gives); a palm on 0.12 → 8.82
+mm/s, as far behind 0.12 → 0.86; a 1.5 s stroke across a pool moved its middle 2.72% →
+13.07% of the plate, colour kept (+0.00%). Check 1's band moved with the share
+(0.28–0.47 → 0.46–0.76, still a quarter either side) and its held Press is sixteen
+footprints, not eight, so the whole plume blows on pressed film (1.17 → 1.08 of what the
+gap gives); check 6's gale is held against the stroke's own length and starts 0.2 of the
+plate along, where it moved the pool 37.06% and kept its colour (from the middle it blew
+36.17% of the pool over the dish's open rim, 15g-16); check 7 is new (the plume ahead,
+not behind).
+
+On the Mac (the app, Metal, Foam Cells, the same hands before and after: two holds, three
+strokes, six quick presses, two short drags held): before, 160 straw steps and 265 of wind
+with 24 carries, the drags' holds turned to the straw (152 more straw steps) and about a
+hundred bubbles stood on the plate; now, 120 straw steps, no carry, the drags' holds 178
+steps of wind the way they were dragged, and the straw's two bubbles, round.
+
+### 15g-12. The wind lays no bubbles, and a straw's bubble is round (shipped)
+
+What was reported (the owner, the same day): "I'm still seeing these flower like things
+around the floating bubbles. I blew on the plate and these popped up", and "the bubble
+spawning is weird at best."
+
+What was found. A moving wind laid two bubbles every sixth step once the breath passed
+the blowing number (QA-20's rule): 40 in two seconds of the default wind in the lab, about
+a hundred after a few strokes on the Mac. That number is the threshold for a jet tearing
+drops off a deep bath; over a 2 mm film a breath's 118 Pa is seven times the film's weight
+and presses it aside, with nothing under it to fold air into. A held straw's bubble shed
+satellites round its rim, and its rim broke into fingers by a count worked at a gap 21
+times thinner than the plate's (the code's own comment said so). And the pointer's Blow
+opened every press with a puff, whose carries take 24% of the colour out of a hard-edged
+disc at a time.
+
+What changed. `spawnsOf`, `airTaken`, the blowing number and the wind's spawn calls are
+gone (`src/lib/breath.ts`, `LiquidVisualizer`): no Blow lays a bubble but the straw. The
+straw's fingers are Paterson's (1981) fastest mode for air driven into a Hele-Shaw cell,
+n = √((1 + 12 Ca R²/b²)/3), at the plate's real gap (`strawFingers`, `src/lib/bubbles.ts`):
+0.75 for the default liquid at the straw's fastest, so the bubble is round, and a rim
+fingers only where the liquid is thick enough for two or more (8.4, eight lobes, in one
+300 times as thick). No satellites. On a thin gap the pointer's press lays nothing until
+it is the straw (150 ms and three frames, as before).
+
+Measured (`npm run straw`, lab): the default bubble's fingering 0.000, nothing shed, let
+go it stays round; `npm run blowrange`: the breath exports nothing that lays air, where
+three seconds of the old rule laid 60 bubbles; the straw's growth with the Amount is as
+it was (16 / 40 / 88 / 170 cells² after a second at 0.05 / 0.2 / 0.5 / 1). The flower itself was not rebuilt in
+isolation: 15g-15 says what was ruled out.
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
@@ -4668,6 +4751,16 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   - `npm run mixer`: 68/68 (back plate Screen/Multiply 10.3 > 10).
   - `npm run lamp`: 9/9 and `npm run lampzero`: 4/4 (every look at Lamp Ground 0 as before the lamp, none different; two projectors add their light, mean error 0.51).
   - `npm run stages` (round 2): drawing pass at 768², two layers, 3.57 vs 3.46 ms base/branch.
+
+- **18e-5 (shipped 2026-11-13, #857). No line where two dyes meet.**
+  - **What was reported:** the owner, with a screenshot of Comet River on the Design desk: "I don't really like the super thick black lines around things. Where does this even come from?" Black bands a few percent of the plate wide ran along every place two colours met (cyan against yellow, orange against violet) and round the islands of one colour inside another.
+  - **Where it came from:** Boundary Contrast (Boundary Glow on the desks, 0.35 by default, 0.6 on Comet River, up to 0.9 on some looks). `boundaryDiff` read the lit colour on a cross of four taps 1.65 cells out and drew a line where it changed, gated since 33a to where the hue changes. It began as a bright seam (the dye times 1.6 plus a quarter of white). 38h-2 put the light under the glass and made the line a deflection, the colour step bending the lamp's light by 1.1 of the line in radians: on the wall `refractionOptics` took up to 78% of the light (`smoothstep(0.25, 1, uB) · 0.78`, at its ceiling from a dial of about 0.45 up), over the four or five cells the taps span; the camera's views took it through `boundaryShade`. In the closeup the same number does more, and still does (the last bullet).
+  - **The real phenomenon:** two dyes in one liquid do not bend light where they meet. A dye at a few percent moves water's index in the fourth decimal place, the liquids are miscible, and there is no surface between them to slope: no index step, no meniscus, nothing for the lens's aperture to lose. What the boundary does is absorb with both dyes where they overlap (Beer–Lambert, the absorbances added), which `decodeFluid` already draws. Dark rims are real where the index steps: oil in water, glycerine poured clear, an air pocket's wall.
+  - **What changed:** on the wall `refractionOptics` is the slope's aperture loss alone (the `uBound` term and its `bEdge`, `edgeK` gone), and the camera's line (`boundaryLine`, `boundaryEdge`, `boundaryShade`) is gone from a photographed look and from the closeup. A thinner or fainter line was not made: at any width it is a line the liquid does not draw. The back plate's painted bright rim (18e-1) and the dial's gain on the optical path are as they were. `boundaryDiff` stays for one reader, the closeup's relief (below).
+  - **Measured (the lab, SwiftShader, 256², `npm run holeline` rewritten to ask it):** Boundary Contrast at 0.35, 1 and 2 against 0 moved a seam between two dyes by up to 173 levels at one depth, 136 at depths five times apart, 13 at hues 0.2 apart and 141 photographed, and the seam on the wall was 43 levels darker than the darker dye beside it; now 0, 0, 0, 0 and 3. Round a bubble's hole and at a pool's rim it moved nothing before or after (33a's hue gate), and out of focus the dial still moves the pool's rim (19 levels on average), so the zeros are the shader's. On a Comet River plate of forty pools in five colours, the picture at the look's 0.6 is now the picture main draws at 0, to the byte.
+  - **Filmed on the Mac (Metal), main against the branch, the same seed and pours:** Comet River, Splodascope and Poster 1969 (the dial at 0.9): the black bands between colours gone in every pair; Splodascope's drops and bubbles keep their rims; the dark zone where red meets blue is in both (the two dyes' own absorbance).
+  - **The closeup is not fixed here, and why.** The closeup's relief (38h-7's `camShadow`) reads the derive pass's `.z` over `.w` as the optical path's curvature, but the camera's branch of that pass has only ever put the colour step's strength in `.z` and 0 in `.w`. So up close a seam between two dyes is shaded darker by the same step (26 levels at one depth in the lab), and that shading is all the depth Macro Relief draws where there are no cells. Two replacements were built and taken back. With nothing in `.z`, `npm run macroview` read relief 0 on every look: a flat closeup. With the wall's path and nine-tap Laplacian there, the Mac's film showed a flat white patch round a cluster of bubbles on pink dye, up to 17% of a closeup frame clipped (0% in any frame of main's), and the lab a doublet 119 levels darker and 99 brighter at a step in the dye's depth. The closeup therefore draws what main drew, to the byte (a Comet River closeup at 3x, Macro Relief 1), and the real thing is 18e-7.
+  - **Found on the way:** 18e-6 (what the dial is for now; `shaderdials`' owed `glow`), 18e-7 (the closeup's relief has never read the path).
 
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
@@ -6684,6 +6777,29 @@ What shipped in #473:
 - **Area cords and colour families (`src/lib/plateAreas.ts`, `src/presets.ts`, `scripts/soundpatch.mjs`):** Added explicit disjoint `dyes` families to `lumia` (`[0]`, `[1]`, `[2]`) and `cell-bloom` (`[0, 3]`, `[1]`, `[2]`), and added `PRESET_AREAS` entries for `poster-1969` (three poster shapes: left `milk` `[0, 1]` on `bass`, right `ink` `[3, 4]` on `mid`, lower `milk` `[2]` on `treble`), `milk-marble` (three food-colouring spots in `OWN_SEED_AREAS` so `seedPreset` still lays the white milk dish and four spots: `[0, 1]` on `bass`, `[2, 3]` on `mid`, `[4, 5]` on `treble`), and `red-cabbage` (two pH wells: left `acid` `[0]` on `mid`, right `base` `[1]` on `bass`). `poster-1969` joins `soundpatch`'s `PATTERN` list (closing 28i-6(d)), and `soundpatch` §2 counts both plate-wide liquid patches and area cords on fast readings (`hits` and `bands`, including onsets and notes) toward a look's two or three while holding area looks free of redundant plate-wide patches (`100 of 100 move`, `29 looks checked (+ 3 from 25h)`).
 - **Patch bay hit targets on the desk (`src/components/SettingsPanel.tsx`):** Now that `classic` and `jellyfish-bloom` carry `sceneMappings`, the `patches` deck panel renders their patch cards on load; `Remove mapping` (`h-6 w-6`), `Depth` (`set-range`), `patch-gate-on` (`h-6 w-6`) and the gate sliders (`set-range`) meet the desk's 24 px minimum hit-target rule (`npm run layout`, `npm run qa`).
 - **Still open in `PLAN.md` (`28i-3` film measure, `28i-3b`, `28f-2`):** A fresh showreel (28f-2) and a main-vs-head film on the same looks (seed 1, band in a box) are still owed, and 27 of the 28 changed looks still miss one or more of the 28i film bars (`2–3.5 swells a minute`, `at least 6 colour changes a minute`, `r1 in [−0.13, 0.22]`); all 28 per-look numbers are recorded under `28i-3b` in `PLAN.md`.
+
+### 28i-7c. Velvet Underground's pools stay pools (asked 2026-11-11)
+
+Filmed with every look (28i-7): the frame was the violet ground with one ultramarine lobe
+and a fleck of red where the seed lays three pools, 83% near black, and more dye, more
+exposure, a brighter lamp and the screen blend left it as it was. A probe in the app on the
+owner's Mac (Metal, seed 1, five runs, each turning suspects off) found the dye was never
+lost: the dish held 0.43 to 0.42 of mean dye, while the magenta glycerine kept 38% of its
+dye over 90 s, the soap 71%, the syrup 86%, and the dye outside the three areas went from
+0.001 to 0.117 of the plate. The regulator, the music (band on or off), the hands, the rock,
+the plate pressure, the smear, the drip, the vibration, the air, the surge, the lamp's heat
+(dimmer 0), the buoyancy, the polarity, the carrier's viscosity and the cover glass each
+changed the minute by a point or two at most, and all of them off at once still drained;
+only Advection 0 stopped it, so the flow was the solver's own. It was Turbulence: the look
+never named it and ran the default 0.5, curl noise added to the flow everywhere every step
+(`forcesB`), the plate's speed 0.43 against 0.14 without it. With it at 0 the pools kept
+97/96/95% over 90 s (98.3/96.7/96.0% at 60 s against 67.2/75.5/90.9%), the band's run the
+same. `npm run pools` (Mac, `open` shard) holds the minute at 85% a pool from the moment the
+dish has settled (on GitHub's macOS runner the regulator was still trimming the seed when a
+fixed-time minute began, and took a fifth of every pool with the dish: 28i-7h), runs the old stir
+as its control (which must drain one), and asks that the plate still moves. Found along the
+way: 28i-7f (thirteen looks still inherit the noise stir) and 28i-7g (with the motor off
+too, a smaller out-flow remains).
 
 ## 28j. Changing looks without a jump
 
@@ -10995,6 +11111,33 @@ over a second (`originGap >= 1000`).
   the swirl ran on 91–100% of the nine thin looks' steps. It was thirteen dispatches a step on
   the current's half grid (spinSwirl, its divergence, ten Jacobi sweeps, the gradient).
 
+#### 22n. A spun plate's liquid heaps, lags and overshoots
+
+- ~~**22n. A spun plate's liquid did not heap, lag or overshoot.**~~ **Shipped.** The owner,
+  2026-11-13: "if I'm spinning the plate, shouldn't the liquid follow the physics? and get
+  spread out and if stopped suddenly, overshoot?" The liquid between the plate's two glasses
+  followed the dish within h²/12ν, a third of a second for water at the 2 mm gap and a
+  sixtieth for the thick liquid, and with no free surface a liquid of one density cannot
+  heap; only heavier dye moved out. So a spin was all but a rigid turn of the picture, and
+  a dish stopped dead stopped its liquid. The open dish (lib/slosh.ts, the two-layer shallow
+  water that sloshes under a tilt) is now solved in the frame that turns with the glass:
+  the centrifugal force as a paraboloid floor −Ω²r²/2g (the scheme's well-balancing holds
+  the heap at rest exactly), and the Euler force −Ω̇ ẑ×r and the Coriolis force −2Ω ẑ×u on
+  both layers, in the TypeScript reference and the GPU kernels alike. A spin over 0.34 rad/s
+  (a heap of a hundredth of the depth) or a change of speed over 0.25 rad/s² wakes the dish;
+  the looks' own motors (0.31 rad/s at most) do not, so a look nobody spins costs what it
+  did. The step shortens with the spin and with what the liquid still carries after a stop
+  (sloshSpinFast), so a hard stop from the hand's top speed holds. Measured (`npm run spinslosh`): the paraboloid
+  at 2 rad/s to 0.0% of Ω²r²/2g; a ring of dye at r = 0.2 carried out 3.1 mm, 99% of what the
+  heap's volume asks; spun up in 0.1 s, water 90% behind the glass, catching up at 0.309/s
+  against the floor's drag on its own depth, 0.305/s; stopped in 0.05 s from 2 rad/s, water
+  runs on 254° past the glass and the default Thickness 11°, both 74% of Ω/k (22o, the
+  staircase rim, takes the rest); the middle still thinned 0.2 s after the stop and level 16
+  s later; from 2.5 to 9.4 rad/s, every stage under the 0.7 the step is sized for.
+  `npm run sloshgpu` case 6 holds the GPU to the reference through a spin-up and a hard
+  stop with a lens on the water, to 8e-6. No new setting: Thickness already sets the drag,
+  and the phone's Spin tool turns the same dish.
+
 ### 23. Selling it: the site free, the app paid
 
 #### 23.16b. The address is the webpage
@@ -13786,6 +13929,39 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+## 12-tv-2f. The TV's samples are the channel's films, and the logo on its loading screen (2026-11-14)
+
+Asked by the owner on 2026-11-14: "Let's add the logo to the loading screen for the
+app. Also, I don't like the visuals that we have as samples. Can we play the YouTube
+videos as samples? If not YouTube, let's get much better and longer samples."
+
+The samples were the press page's two clips (twenty seconds each of Neon Coral Reef
+and Ferro Paint to Kevin MacLeod, cut on 2026-10-29). They are now the channel's six
+films of 1920s records (PLAN 34a-6), each a look playing a whole record, about nineteen
+minutes round, in the Android TV app's "Watch a sample film" and on the `/tv` page
+while the show is off. Not YouTube's player: inside a TV app's WebView it may refuse
+to play an embed or put an advert first, and this app's WebView loads only the Mac's
+page. The files are the channel's own masters, copied with their index first and no
+re-encode by `npm run tvfilms` on the Mac that rendered them, into a pre-release of the
+repository (`tv-films-1`, never "latest", so the Mac app's updater never reads it); the
+site's `/films/<id>.mp4` redirects there (firebase.json), and the app and page name only
+the site's address, so the films can move with one line and no new TV app.
+`src/lib/tvFilms.ts` is the list, `Sample.java` the app's copy, which `npm run
+presskit` holds the same. A film that will not play is skipped, and when all six fail
+(no internet) the app says so and the page shows the logo.
+
+The logo is the brand's own mark (`res/drawable-nodpi/logo.png`, the same file as
+`public/brand/chromaglass-logo-512.png`): it heads the app's list while it looks for a
+Mac, covers the screen while the show's page or a sample film loads (the WebView and the
+player are black until their first frame), and heads the `/tv` page's pairing digits
+and its line at the bottom. The screen's colour is the logo square's own blue.
+
+Checks: `npm run tv` (the page asks for the site's first film and plays it, answered
+in the harness with a real MP4; the show server serves the logo), `npm run presskit`
+(the app's list is the page's, the redirect is there and nothing in public/ shadows
+it), `npm run tvfilms -- --probe` (the live site serves all six, index first), and the
+TV app's unit tests (six films, each from the site, each saying what it plays).
 
 ## 12-tv-signin. A TV signs in by a short code (2026-11-08)
 

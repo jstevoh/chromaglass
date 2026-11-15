@@ -1223,6 +1223,15 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
 - In a thick look it should move much less. Does that read as the liquid being thick,
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.
+- Since 15g-11 the breath is a jet: drag a short way and hold. Does the liquid keep
+  streaming the way you dragged, a tongue running on a palm ahead of the pointer, for
+  as long as you hold? Does a slanted stroke blow along the slant, without wavering?
+  If the plume reads too long, too short or too wide, say which: its core and spread
+  are textbook numbers for a jet, not a measurement of a breath over this dish.
+- Since 15g-12 wind lays no bubbles and a press that never moves is the straw: one
+  round bubble that grows while you hold. Is anything left of the flower-like ring
+  round floating bubbles after a Blow (PLAN 15g-15)? If you miss the wind's bubbles,
+  say so: they were a stand-in, and what would be real is foam at a dish's edge.
 
 
 ## 46. Turing Print (PLAN 26d)
@@ -2783,3 +2792,22 @@ whole dish. Judge from the before and after films (same look, same song, same se
 3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
    swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
    too much in the quiet parts.
+
+## 132. No black lines where two colours meet (PLAN 18e-5)
+
+The check (`npm run holeline`) proves that Boundary Contrast moves no pixel in focus and that a
+seam between two dyes is no darker than the darker dye beside it, on the lab's software WebGPU
+at one frame. Whether the looks read better without the line is only seen here.
+
+1. **Comet River**, a minute in: colours meet and blend where they overlap (orange over violet
+   a dark red, cyan over yellow a green) with no black band between them. Bad: a hard dark
+   line along a boundary, or the colours duller than before.
+2. Any look with two layers (Comet River is one): the back plate's rims are still a little
+   brighter than its dye, as before.
+3. **Macro Zoom** to 4x on Comet River: unchanged by this (PLAN 18e-7). Where two colours
+   meet up close there is still a darker band; that is the closeup's relief reading the colour
+   step, and it goes when the closeup shades from the liquid's own optical path.
+4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
+   Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
+5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
+   at the dye's edges strengthen.
