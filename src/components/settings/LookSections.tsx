@@ -958,15 +958,6 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
           settingKey="macroDepth"
         />
             <Slider
-              label="Edge Detail"
-              value={settings.macroEdgeDetail}
-              min={0}
-              max={2.5}
-              step={0.05}
-              onChange={(v: number) => onUpdate({ macroEdgeDetail: v })}
-          settingKey="macroEdgeDetail"
-        />
-            <Slider
               label="Relief / 3D"
               value={settings.macroRelief}
               min={0}

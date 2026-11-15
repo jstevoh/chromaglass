@@ -21,6 +21,7 @@ import type { AirGeo } from './air';
 import { UniformPack } from './uniforms';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
+import { WHOLE_DISPLAY, displayNeeds, leanCovers, leanDisplayWgsl } from './displayLean';
 import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
 import { FerroDrop } from './ferroDrop';
 import { groupOf, viewOf } from './groupCache';
@@ -104,13 +105,19 @@ function deriveRecipe(device: GPUDevice): RenderRecipe {
   });
 }
 
-function displayName(format: GPUTextureFormat, toTexture: boolean): string {
-  return `display ${format}${toTexture ? ' flipped' : ''}`;
+function displayName(format: GPUTextureFormat, toTexture: boolean, mask = WHOLE_DISPLAY): string {
+  return `display ${format}${toTexture ? ' flipped' : ''}${mask === WHOLE_DISPLAY ? '' : ` lean ${(mask >>> 0).toString(36)}`}`;
 }
 
-function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean): RenderRecipe {
+/*
+  The display, whole or lean (`displayLean.ts`): a lean one is the display's
+  text with the tests its look cannot reach written `false`, its own module.
+  Only into the canvas: the flipped displays (the camera's, the film stock's,
+  the lens pass's scene) are built behind the show, whole, as before.
+*/
+function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean, mask = WHOLE_DISPLAY): RenderRecipe {
   return (module) => {
-    const code = plateWgsl(DISPLAY_MAIN);
+    const code = leanDisplayWgsl(plateWgsl(DISPLAY_MAIN), mask);
     return {
       layout: device.createPipelineLayout({
         bindGroupLayouts: [layoutFromWgsl(device, code, 'display', GPUShaderStage.FRAGMENT)],
@@ -126,6 +133,27 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
     };
   };
 }
+
+/**
+ * The lean display a device opened with, into the canvas's format: the
+ * gates it keeps, its name, and how the whole one is come by: `behind`, the
+ * app's opening, which builds it behind the show; `asked`, the lab, which
+ * builds it on the draw that wants it; `forced`, a harness's control only,
+ * which draws lean whatever the draw wants (`npm run leandisplay`).
+ */
+type LeanMode = 'behind' | 'asked' | 'forced';
+interface Lean { format: GPUTextureFormat; mask: number; name: string; recipe: RenderRecipe; mode: LeanMode; wholeName: string }
+const leans = new WeakMap<GPUDevice, Lean>();
+
+/** Which lean display the canvas draws with on this device (`WebGPUPlate.prepare` sets it; the lab sets its own). Null: always whole. */
+export function setLeanDisplay(device: GPUDevice, format: GPUTextureFormat, mask: number | null, mode: LeanMode = 'asked'): void {
+  if (mask === null || (mask === WHOLE_DISPLAY && mode !== 'forced')) { leans.delete(device); return; }
+  leans.set(device, { format, mask, name: displayName(format, false, mask), recipe: displayRecipe(device, format, false, mask), mode, wholeName: displayName(format, false) });
+}
+
+/** The display the plate last drew with, by name, for a harness (`npm run leandisplay`). */
+let lastDisplay = '';
+export const lastDisplayName = (): string => lastDisplay;
 
 export class WebGPUPlate {
   private readonly disposer = new Disposer();
@@ -189,11 +217,28 @@ export class WebGPUPlate {
    */
   static prepare(device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'plate');
+    /*
+      A look that opens through the camera or the film stock draws its
+      display flipped into their picture (below) and never onto the canvas,
+      so its opening waits for no canvas display at all: the whole one is
+      built behind the show, for when the camera or the stock is turned off.
+      Its lean one would be a compile nothing draws with (Home Movie and
+      Song Groove waited for theirs on the Mac's first run of this, and
+      `npm run startup` named it: waited for and asked for by none).
+    */
+    const direct = !open.camera && !open.stock;
+    setLeanDisplay(device, format, direct ? open.display : null, 'behind');
     return [
       // The display first: the opening asks for render pipelines first and
       // in this order, and it is the longest compile of the show's opening
-      // (`gpu/prepare.ts`).
-      cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
+      // (`gpu/prepare.ts`). Lean, compiled for what the opening look draws
+      // (`displayLean.ts`: a third of the compile on a CPU-bound compiler),
+      // and the whole one first behind the show for when a look reaches past it.
+      ...(!direct ? [cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true)]
+        : open.display === WHOLE_DISPLAY ? [cache.renderPrep(displayName(format, false), displayRecipe(device, format, false))] : [
+          cache.renderPrep(displayName(format, false, open.display), displayRecipe(device, format, false, open.display)),
+          cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true),
+        ]),
       ...(['packDye', 'packDyeBodies', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
@@ -477,11 +522,11 @@ export class WebGPUPlate {
     // The tank's side view (PLAN 47n) draws in the plate's place when its look is up.
     if (drawTank(this.device, this.pipelines, encoder, target, viewOf(this.aux), fields[0]?.tank, size, timestamps, toTexture, format, this.trackBuf)) return;
     if (lensOn) {
-      this.display(encoder, this.glint.sceneView(size.width, size.height), viewOf(this.aux), this.uniformBuffer, fields, timestamps, true, GLINT_SCENE_FORMAT);
+      this.display(encoder, this.glint.sceneView(size.width, size.height), viewOf(this.aux), this.uniformBuffer, this.pack.bytes, fields, timestamps, true, GLINT_SCENE_FORMAT);
       this.glint.run(encoder, target, toTexture, format, this.pack, this.uniformBuffer, this.sampler, this.aux, this.layers[0].vel, this.source('mark'));
       return;
     }
-    this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, fields, timestamps, toTexture, format);
+    this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, this.pack.bytes, fields, timestamps, toTexture, format);
   }
 
   /** The uniforms for a projector's plate source, to fill with `fillPlateUniforms` before `drawSource`. */
@@ -527,7 +572,7 @@ export class WebGPUPlate {
       this.sourceAuxSize = [size.width, size.height];
     }
     if (!drawTank(this.device, this.pipelines, encoder, target, viewOf(this.sourceAux), fields[0]?.tank, size, timestamps, true, format, this.trackBuf)) {
-      this.display(encoder, target, viewOf(this.sourceAux), set.buffer, fields, timestamps, true, format);
+      this.display(encoder, target, viewOf(this.sourceAux), set.buffer, set.pack.bytes, fields, timestamps, true, format);
     }
   }
 
@@ -544,12 +589,14 @@ export class WebGPUPlate {
     target: GPUTextureView,
     auxView: GPUTextureView,
     uniforms: GPUBuffer,
+    /** What `uniforms` was written from: which of the display's effects this draw turns on. */
+    bytes: ArrayBuffer,
     fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
   ): void {
-    const display = this.pipelines.renderPipeline(displayName(format, toTexture), displayRecipe(this.device, format, toTexture));
+    const display = this.displayFor(bytes, toTexture, format);
     if (!display) return;
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
@@ -595,6 +642,27 @@ export class WebGPUPlate {
     ]));
     pass.draw(6);
     pass.end();
+  }
+
+  /**
+   * Which display draws this one (`displayLean.ts`). The lean one while it
+   * draws this draw's uniforms exactly; else the whole one. While the whole
+   * one is still being built behind the show, the lean one goes on drawing
+   * (an effect the look reached past its opening shows a few seconds late,
+   * rather than the plate stopping for a compile on the frame), and the
+   * whole one is asked for all the same, so `npm run startup` sees a look
+   * whose first steps reach past what its opening built.
+   */
+  private displayFor(bytes: ArrayBuffer, toTexture: boolean, format: GPUTextureFormat): GPURenderPipeline | null {
+    const lean = toTexture ? undefined : leans.get(this.device);
+    let name: string;
+    let recipe: RenderRecipe;
+    if (!lean || lean.format !== format) { name = displayName(format, toTexture); recipe = displayRecipe(this.device, format, toTexture); }
+    else if (lean.mode === 'forced' || leanCovers(lean.mask, displayNeeds(bytes))
+      || (lean.mode === 'behind' && !this.pipelines.hasRender(lean.wholeName, true) && this.pipelines.hasRender(lean.name))) { name = lean.name; recipe = lean.recipe; }
+    else { name = lean.wholeName; recipe = displayRecipe(this.device, format, false); }
+    lastDisplay = name;
+    return this.pipelines.renderPipeline(name, recipe);
   }
 
   dispose(): void {

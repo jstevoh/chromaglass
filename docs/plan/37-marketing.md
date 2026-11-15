@@ -552,6 +552,11 @@ rest is routine and the owner's calls.
       until the next keyframe. Lower the encoder's rate on air (`VideoEncoder.configure`
       with a new bitrate) when a destination is a second behind on the server's count,
       and raise it back when it keeps up.
+    - ~~*37x-4h-5*~~ shipped 2026-11-14: `npm run live`'s "the plate kept redrawing under
+      the stream" asks for a redraw in every sixth of the stream and no gap past three of
+      the plate's typical ones, not SECONDS / 2 redraws: the 700 ms timer quantizes the
+      count to 21 or 14 by the runner's speed, and the bar of 15 sat between (main red at
+      14 on 6b241cb; a plate stopped at 12 s reads 3 of 6 sixths, longest gap 16.5 s).
     - *37x-4h-4. The 2 Mb/s floor is too low for 1080p60.* Fitted to a short link the
       encode can drop to 2 Mb/s at 1920x1080 60 fps; on the rate check's moving picture
       openh264 asked for 2 Mb/s made 4.26 (the check-skeptic's run), past the link it was

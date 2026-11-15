@@ -198,7 +198,32 @@ try {
   const s = summarize(published);
   const seconds = (Date.now() - published.started) / 1000;
   console.log(`  page: ${live.frames} frames taken, ${live.skipped} skipped, ${live.keyframes} keyframes, ${live.audioPackets} audio packets in ${fmt(live.seconds)} s; encoder queue ${live.encodeQueue}; the plate redrawn ${plateDrawn.redraws} times${plateDrawn.errors.length ? `, errors: ${plateDrawn.errors.join(' | ')}` : ''}`);
-  check(`the plate kept redrawing under the stream, and ${EVENTS} flashes were made`, plateDrawn.redraws >= SECONDS / 2 && plateDrawn.errors.length === 0 && events.length === EVENTS, `${plateDrawn.redraws} redraws, ${events.length} flashes`);
+  /*
+    Kept redrawing: through the whole stream, not at a rate. Until
+    2026-11-14 this asked for SECONDS / 2 redraws, which on software WebGPU
+    is a reading of the runner: the timer ticks every plateMs (700 ms) and
+    skips a tick while a redraw is still busy, so a redraw that costs a
+    little over 1.4 s waits for the tick at 2.1 s and the count falls from
+    30/1.4 = 21 to 30/2.1 = 14 with nothing wrong. Main's deploys read 21,
+    21, 20 and 42 (one 0.7 s runner), then 14 on a runner a fifth slower
+    across the whole lab shard (6b241cb, a change to another check only),
+    and a cloud session reads 13: the bar of 15 sat between the two counts
+    the timer allows. What the line is for is a plate that stops under the
+    stream (the canvas left white, the flashes unmeasurable: the
+    check-skeptic's control under load). So: a redraw in every sixth of the
+    stream, and no gap between two (or from the start, or to the end)
+    longer than three of the plate's own typical gaps, which a stall breaks
+    on any runner and a slow one does not.
+  */
+  const rt = plateDrawn.times ?? [], plateSpan = plateDrawn.spanMs;
+  const sixths = Array.from({ length: 6 }, (_, k) => rt.some((t) => t >= plateSpan * k / 6 && t < plateSpan * (k + 1) / 6));
+  const between = rt.slice(1).map((t, i) => t - rt[i]).sort((a, b) => a - b);
+  const typicalGap = between.length ? between[between.length >> 1] : Infinity;
+  const gaps = rt.length ? [rt[0], ...rt.slice(1).map((t, i) => t - rt[i]), plateSpan - rt[rt.length - 1]] : [plateSpan];
+  const longestGap = Math.max(...gaps);
+  check(`the plate kept redrawing under the stream, and ${EVENTS} flashes were made`,
+    sixths.every(Boolean) && between.length >= 5 && longestGap <= 3 * typicalGap && plateDrawn.errors.length === 0 && events.length === EVENTS,
+    `${plateDrawn.redraws} redraws, in ${sixths.filter(Boolean).length} of 6 sixths of the stream; typical gap ${fmt(typicalGap / 1000, 2)} s (the timer's ${fmt(plateDrawn.periodMs / 1000)} s), longest ${fmt(longestGap / 1000, 2)} s; ${events.length} flashes`);
   console.log(`  client: ${first(stopped?.transport)?.bytesSent ?? 0} bytes, ${first(stopped?.transport)?.videoFrames ?? 0} frames, ${first(stopped?.transport)?.videoDropped ?? 0} dropped, ${first(stopped?.transport)?.acks ?? 0} acks, ${first(stopped?.transport)?.pings ?? 0} pings; status ${JSON.stringify(first(stopped?.transport)?.status ?? [])}`);
   console.log(`  server: ${s.video.frames} frames (${s.video.keyframes} key, ${s.video.codec}) ${s.video.firstMs}..${s.video.lastMs} ms, ${s.audio.packets} ${s.audio.codec} packets ${s.audio.firstMs}..${s.audio.lastMs} ms, ${s.acks} acks, ${s.pongs} pongs`);
 
