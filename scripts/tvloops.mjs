@@ -36,9 +36,9 @@
  * its own (weight 1 at SEAM). So the loop's last frame, the film's frame at
  * WARM + L − 1/fps, is followed when it comes round by the film's very next
  * frame: the seam is one ordinary step. WARM because the look being laid is a
- * beginning, which a loop has none of. Each of the three pieces is its own
- * input to ffmpeg, seeked to its start: one input split three ways would hold
- * twenty-nine minutes of frames in memory waiting for the crossfade's tail.
+ * beginning, which a loop has none of. The tail and the film are each their
+ * own input to ffmpeg, seeked to their start: one input split two ways would
+ * hold twenty-nine minutes of frames in memory waiting for the tail.
  *
  * The file is H.264 High at level 4.1, 1080p30, no audio track, a keyframe
  * every two seconds and `+faststart`: what every Google TV and every Apple
@@ -72,8 +72,12 @@
  *      16x16 thumbnail is smaller still, each thumb pixel being the mean of a
  *      120x67 block;
  *   4. the joint where the crossfade ends and the film runs on alone is one
- *      step too, by the same bar: the edit's other place where two pieces
- *      meet, and where a piece seeked a frame or a second wrong shows. Not
+ *      step too: at most 3 times the larger of the keyframe step and the
+ *      fade's own median step. The fade's own because a crossfade moves every
+ *      frame by a share of the difference between the tail and the film, so
+ *      on a slow look whose last minutes are far from its first the fade's
+ *      every step is larger than the film's, the one into the film included;
+ *      a cut there is larger than both. Not
  *      "no step anywhere is large", as loopseam asks of a few seconds: tried
  *      on the Mac's first real loop (Chemical Clock, a minute, 2026-11-15)
  *      the largest step was already 7.9 keyframe steps, a wave front, and a
@@ -175,32 +179,43 @@ const tvH264 = ['-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-maxrate', 
  */
 function makeLoop(raw, out, { warm, loop, seam, audio = false, threads = 0, skew = 0 }) {
   const t = (s) => s.toFixed(6);
-  const inputs = seam > 0
-    ? ['-ss', t(warm + loop), '-t', t(seam), '-i', raw, '-ss', t(warm), '-t', t(seam), '-i', raw, '-ss', t(warm + seam + skew), '-t', t(loop - seam), '-i', raw]
-    : ['-ss', t(warm), '-t', t(loop), '-i', raw];
-  // The weights by frame number, never by blend's T: A (the tail) whole at
-  // the loop's first frame, B (its own) whole at the crossfade's last, so the
-  // step from there into the film's next frame is the film's own. Measured on
-  // the owner's Mac (Classic, 2026-11-15): weighted by T/seam the fade's last
-  // frames still carried the tail, its ramp a few frames short of whole, and
-  // the step out of the fade read 4 to 10 keyframe steps on four of the first
-  // six loops while the films' own steps beside it read one.
-  //
-  // Every piece is cut to its count of frames and its frames numbered afresh
-  // (setpts=N/fps), never left to its timestamps: measured on the controls,
-  // concat followed by an fps filter read a rounding gap at the joint as a
-  // missing frame and doubled one, which put the loop's last frame two frames
-  // short of the film's frame before the tail, and the seam read twice an
-  // ordinary step.
   const n = (s) => Math.round(s * FPS);
-  const piece = (i, frames, name) => `[${i}:v]trim=end_frame=${frames},setpts=N/${FPS}/TB[${name}]`;
-  const graph = seam > 0
-    ? `${piece(0, n(seam), 'a')};${piece(1, n(seam), 'b')};${piece(2, n(loop - seam), 'c')};` +
-      `[a][b]blend=all_expr='A*(1-N/${n(seam) - 1})+B*(N/${n(seam) - 1})'[f];[f][c]concat=n=2:v=1:a=0,setpts=N/${FPS}/TB,format=yuv420p[v]`
-    : `${piece(0, n(loop), 'c')};[c]format=yuv420p[v]`;
+  // Each piece cut to its count of frames and numbered afresh (setpts=N/fps),
+  // never left to its timestamps: on the controls, concat and an fps filter
+  // read a rounding gap at a joint as a missing frame and doubled one.
+  const piece = (i, frames, name) => `[${i}:v]trim=end_frame=${frames},setpts=N/${FPS}/TB,fps=${FPS},settb=1/${FPS}[${name}]`;
+  /*
+    ffmpeg's own crossfade, xfade, over the film's tail (input 0) and the film
+    from WARM (input 1): the tail whole at the loop's first frame, the film
+    whole from frame SEAM·fps on, a straight ramp between. Not blend with a
+    weight written by hand: on the owner's Mac (Classic, 2026-11-15) blend
+    weighted by T/seam left the fade's last frames still carrying the tail
+    and the step out of the fade read 4 to 10 keyframe steps on four of the
+    first six loops, and weighted by N it put the fade's frames out of order
+    (frame 148 the film's whole, 149 a mix again), both read losslessly
+    against the raw film's own frames. xfade's frames, read the same way, are
+    the tail's at frame 0 and the film's exactly from frame 150 of a 5 s fade,
+    in order. The film from WARM is one input, so the fade's end and the film
+    after it cannot be seeked apart. `skew` (the controls only) builds it from
+    two pieces seeked apart, the fault the joint line is there to see.
+  */
+  const inputs = ['-ss', t(warm + loop), '-t', t(seam), '-i', raw];
+  let graph;
+  if (seam <= 0) {
+    inputs.splice(0, inputs.length, '-ss', t(warm), '-t', t(loop), '-i', raw);
+    graph = `${piece(0, n(loop), 'c')};[c]format=yuv420p[v]`;
+  } else if (skew) {
+    inputs.push('-ss', t(warm), '-t', t(seam), '-i', raw, '-ss', t(warm + seam + skew), '-t', t(loop - seam), '-i', raw);
+    graph = `${piece(0, n(seam), 'a')};${piece(1, n(seam), 'b')};${piece(2, n(loop - seam), 'c')};[b][c]concat=n=2:v=1:a=0,setpts=N/${FPS}/TB,settb=1/${FPS}[h];` +
+      `[a][h]xfade=transition=fade:duration=${seam}:offset=0,format=yuv420p[v]`;
+  } else {
+    inputs.push('-ss', t(warm), '-t', t(loop), '-i', raw);
+    graph = `${piece(0, n(seam), 'a')};${piece(1, n(loop), 'h')};[a][h]xfade=transition=fade:duration=${seam}:offset=0,format=yuv420p[v]`;
+  }
+  const inputCount = inputs.filter((x) => x === '-i').length;
   const a = audio ? ['-f', 'lavfi', '-t', t(loop), '-i', 'anullsrc=r=48000:cl=stereo'] : [];
-  const maps = audio ? ['-map', '[v]', '-map', `${seam > 0 ? 3 : 1}:a`, '-c:a', 'aac'] : ['-map', '[v]', '-an'];
-  ff([...inputs, ...a, '-filter_complex', graph, ...maps, ...tvH264, ...(threads ? ['-threads', String(threads)] : []), '-r', String(FPS), '-frames:v', String(Math.round(loop * FPS)), out]);
+  const maps = audio ? ['-map', '[v]', '-map', `${inputCount}:a`, '-c:a', 'aac'] : ['-map', '[v]', '-an'];
+  ff([...inputs, ...a, '-filter_complex', graph, ...maps, ...tvH264, ...(threads ? ['-threads', String(threads)] : []), '-r', String(FPS), '-frames:v', String(n(loop)), out]);
 }
 
 // ─── the judge ───────────────────────────────────────────────────────────────
@@ -245,7 +260,13 @@ function judge(file, loopSeconds, seamSeconds) {
   const seam = dist(fr[fr.length - 1], fr[0]);
   const largest = Math.max(...steps);
   // The step into the first frame the film plays alone, after the crossfade.
-  const joint = seamSeconds > 0 ? steps[Math.round(seamSeconds * FPS) - 1] : null;
+  const fadeFrames = Math.round(seamSeconds * FPS);
+  const joint = seamSeconds > 0 ? steps[fadeFrames - 1] : null;
+  // The crossfade's own step: each of its frames moves by the film's motion
+  // plus a 1/fadeFrames share of the difference between the tail and the
+  // film, which on a slow look whose tail is far from its start is several
+  // keyframe steps every frame of the fade, and so at its end too.
+  const fadeMedian = seamSeconds > 0 ? median(steps.slice(0, fadeFrames - 1)) : null;
   const window = Math.round(Math.min(60, loopSeconds / 6) * FPS);
   const travels = [];
   for (let i = 0; i + window < fr.length; i += window) travels.push(dist(fr[i], fr[i + window]));
@@ -258,7 +279,7 @@ function judge(file, loopSeconds, seamSeconds) {
   }
   return {
     file: path.basename(file), seconds: f.seconds, audio: f.audio, frames: fr.length,
-    medianStep: median(steps), keyMedian: keyMed, keyframes: keys.length + 1, seam, joint, largest,
+    medianStep: median(steps), keyMedian: keyMed, keyframes: keys.length + 1, seam, joint, fadeMedian, largest,
     minTravel: Math.min(...travels), medianTravel: median(travels), windowSeconds: window / FPS,
     minLight: Math.min(...light), medianLight: median(light), minPattern: Math.min(...pattern), medianPattern: median(pattern),
   };
@@ -267,7 +288,7 @@ const lines = (j, loopSeconds) => ({
   length: Math.abs(j.seconds - loopSeconds) <= 1 / FPS + 1e-3,
   audio: j.audio === 0,
   seam: j.seam <= SEAM_OVER_KEY * j.keyMedian,
-  joint: j.joint === null || j.joint <= SEAM_OVER_KEY * j.keyMedian,
+  joint: j.joint === null || j.joint <= SEAM_OVER_KEY * Math.max(j.keyMedian, j.fadeMedian),
   // Strictly more: a picture the codec holds perfectly still has a travel and a keyframe step of 0.
   moves: j.minTravel > MOVES_OVER_KEY * j.keyMedian,
   light: j.minLight >= KEEP_SHARE * j.medianLight && j.minPattern >= KEEP_SHARE * j.medianPattern,
@@ -278,7 +299,7 @@ function report(name, j, loopSeconds) {
   check(`${name}: ${loopSeconds} s long, to a frame`, l.length, `${j.seconds.toFixed(3)} s, ${j.frames} frames`);
   check(`${name}: no audio track`, l.audio, `${j.audio} audio track(s)`);
   check(`${name}: the seam is one step across a keyframe, not a cut`, l.seam, `last to first ${j.seam.toFixed(2)}, ${r(j.seam, j.keyMedian)}x the median keyframe step ${j.keyMedian.toFixed(2)} (at most ${SEAM_OVER_KEY}x; median step ${j.medianStep.toFixed(2)})`);
-  check(`${name}: the crossfade's end is one step too`, l.joint, j.joint === null ? 'no crossfade' : `${j.joint.toFixed(2)}, ${r(j.joint, j.keyMedian)}x (at most ${SEAM_OVER_KEY}x); the largest step anywhere ${j.largest.toFixed(2)}, ${r(j.largest, j.keyMedian)}x, for the eye`);
+  check(`${name}: the crossfade's end is one step too`, l.joint, j.joint === null ? 'no crossfade' : `${j.joint.toFixed(2)}, ${r(j.joint, Math.max(j.keyMedian, j.fadeMedian))}x the larger of the keyframe step and the fade's own median step ${j.fadeMedian.toFixed(2)} (at most ${SEAM_OVER_KEY}x); the largest step anywhere ${j.largest.toFixed(2)}, ${r(j.largest, j.keyMedian)}x, for the eye`);
   check(`${name}: it keeps moving, every ${j.windowSeconds} s`, l.moves, `least travel ${j.minTravel.toFixed(2)}, ${r(j.minTravel, j.keyMedian)}x the keyframe step (at least ${MOVES_OVER_KEY}x; median ${j.medianTravel.toFixed(2)})`);
   check(`${name}: it keeps its light and its pattern`, l.light, `least light ${j.minLight.toFixed(1)} of median ${j.medianLight.toFixed(1)}, least spread ${j.minPattern.toFixed(1)} of median ${j.medianPattern.toFixed(1)} (at least ${KEEP_SHARE} of each)`);
   return l;
@@ -333,7 +354,7 @@ function controls() {
     for (const [k, v] of Object.entries(want)) {
       const got = l[k];
       check(`${name}: the ${k} line ${v ? 'passes' : 'fails'}`, got === v,
-        `seam ${j.seam.toFixed(2)}, keyframe step ${j.keyMedian.toFixed(2)}, joint ${j.joint?.toFixed(2)}, least travel ${j.minTravel.toFixed(2)}, light ${j.minLight.toFixed(0)}/${j.medianLight.toFixed(0)}, spread ${j.minPattern.toFixed(1)}/${j.medianPattern.toFixed(1)}, ${j.seconds.toFixed(3)} s, ${j.audio} audio`);
+        `seam ${j.seam.toFixed(2)}, keyframe step ${j.keyMedian.toFixed(2)}, joint ${j.joint?.toFixed(2) ?? 'none'}, least travel ${j.minTravel.toFixed(2)}, light ${j.minLight.toFixed(0)}/${j.medianLight.toFixed(0)}, spread ${j.minPattern.toFixed(1)}/${j.medianPattern.toFixed(1)}, ${j.seconds.toFixed(3)} s, ${j.audio} audio`);
     }
   }
 }
