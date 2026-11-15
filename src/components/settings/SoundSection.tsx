@@ -8,6 +8,38 @@ import { OscOutRow } from '../ui/OscOutRow';
 import { linkLine, tempoSourceName } from '../../lib/tempo';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
+import type { AudioData } from '../../hooks/useAudioAnalyzer';
+import { useEarView, type EarView } from '../../hooks/useEarView';
+
+/*
+  The room calibration's readout, a component of its own so it alone renders
+  as the room is heard (hooks/useEarView.ts, PLAN.md 46f). The calibration is
+  a new object on every reading, so whoever reads it renders ten times a
+  second: it was a prop from App(), which rendered the whole shell for it.
+*/
+const roomOf = (a: AudioData | null) => a?.calibration ?? null;
+function RoomReadout({ view }: { view: EarView }) {
+  const calibration = useEarView(view, roomOf);
+  if (!calibration) return <span className="text-[12px] opacity-40">Waiting for audio</span>;
+  return (
+    <>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[12px] opacity-60">
+          {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
+        </span>
+        <span className="text-[12px] font-mono opacity-50">
+          {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
+        </span>
+      </div>
+      <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
+          style={{ width: `${Math.round(calibration.progress * 100)}%` }}
+        />
+      </div>
+    </>
+  );
+}
 
 /*
   Feed: Sound, the section that was the longest on its own (the device, the room's
@@ -22,7 +54,7 @@ import type { SectionCtx } from './props';
 */
 export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
   const {
-    settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate,
+    settings, onUpdate, songDetection, onSongDetection, earView, onRecalibrate,
     audioInputs, audioInputId, onAudioInput, tempo, onTap, readTempo, onTempoClear,
     onTempoBpm, onLink, oscOut, onOscOut, onLinkTransport, midiClocked, timecode, focusSection, midi, soundSources, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
@@ -299,26 +331,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         </div>
         {settings.autoCalibrate !== false && (
           <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
-            {calibration ? (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[12px] opacity-60">
-                    {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
-                  </span>
-                  <span className="text-[12px] font-mono opacity-50">
-                    {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
-                  </span>
-                </div>
-                <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
-                    style={{ width: `${Math.round(calibration.progress * 100)}%` }}
-                  />
-                </div>
-              </>
-            ) : (
-              <span className="text-[12px] opacity-40">Waiting for audio</span>
-            )}
+            {earView ? <RoomReadout view={earView} /> : <span className="text-[12px] opacity-40">Waiting for audio</span>}
             <button
               onClick={() => onRecalibrate?.()}
               className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[13px] font-medium opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
