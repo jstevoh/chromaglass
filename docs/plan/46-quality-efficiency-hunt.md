@@ -64,10 +64,11 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   in the opening; every look opens on only what it waited for; nothing a first step asks for
   left out) and `physics`/`thingap` for any fused kernel. The owner's Mac's number to beat:
   first step 15.48 s cold, read from main's deploy after merge.
-- **46a-2 · A smaller display** (Antigravity, after 46a): the display's compile, 6.77 s of a
-  cold opening on the owner's Mac, split by what a look turns on so Classic compiles only
-  what it draws. Held by `samelook` (byte-level after five steps), `plate`, `nolight`,
-  `filmlook`, `bubblelook`; numbers from `openingtime`'s "slowest" line before and after.
+- **46a-2 · A smaller display: shipped by 14v-12** (2026-11-14, a Claude thread, not
+  Antigravity's: the owner's report of a thirty-second start on a phone). The opening
+  compiles the display with only the effects its look can reach and builds the whole one
+  behind the show; every look the same bytes (`npm run leandisplay`). Story in
+  `docs/plan-shipped.md` §14v-12; what is left of it is 14v-14 and 14v-16.
 - **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, H2c-6, H2c-9
   (briefs of 2026-11-07), then H2c-8 and H2c-5, then H2c-2 once H2c-3 and H2c-1 merge. Each
   takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
