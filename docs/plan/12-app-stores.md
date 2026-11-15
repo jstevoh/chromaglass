@@ -346,6 +346,16 @@ What route 2 still needs, found while building 12-tv-1:
   and the WebView's WebRTC decode on a TV box. `docs/judging.md` §125; the
   sample film (12-tv-2b) on the TV too: Back returns to the list, and a Mac
   starting its show replaces it.
+- ~~**12-tv-2f: the samples are the channel's films; the logo on the loading screen.**~~
+  (shipped 2026-11-14; story in `docs/plan-shipped.md` §12-tv-2f.)
+- **12-tv-2g: the films on storage made for streaming (S, if needed).** 12-tv-2f
+  serves the six films from a release of the repository behind the site's
+  `/films/` redirect: free, but a release is for downloads, not for streaming to
+  every TV that installs the app. If it is ever slow or refused, the redirect points
+  at a bucket with free egress (Cloudflare R2, on the account the Workers use) and
+  `npm run tvfilms` uploads there; no TV app changes. A TV that had no internet
+  when the films failed shows the logo until the show comes back; it could try the
+  films again after a minute.
 - **12-tv-2d: the newer NSD calls (S).** `resolveService` is deprecated from
   Android 14 for `registerServiceInfoCallback`, which also follows a Mac whose
   address changes while the TV watches; the app uses the old call on every

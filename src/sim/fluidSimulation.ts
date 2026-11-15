@@ -15,7 +15,7 @@
  * the solver's constants (`constants.ts`) and the step (`stepping.ts`).
  */
 import { layFinger } from '../lib/handSolid';
-import { layBreath } from '../lib/breath';
+import { layBreath, holdBreath, breatheHeld, type HeldBreath } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH } from '../lib/handCarry';
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
@@ -337,6 +337,8 @@ export class FluidSimulation {
   /** A Blow's wind on a thin gap this step, as the air's stress on the surface (lib/breath.ts), made at the first breath. */
   private breath: Float32Array | null = null;
   private breathLaid = false;
+  /** A remote hand's breath, held between messages (lib/breath.ts). */
+  private readonly held: HeldBreath = { x: 0, y: 0, r: 0, dx: 0, dy: 0, share: 0, left: 0 };
   /** Whether the last blowWind blew as air on the film (PLAN 15g) rather than by the carries: `npm run tools` counts it. */
   lastBlowAired = false;
   /*
@@ -2492,31 +2494,24 @@ export class FluidSimulation {
    * step at a share sized for one carry a reading. Returns the colour it
    * moved (in the mirror's units), for `npm run tools`.
    */
-  blowWind(x: number, y: number, radius: number, strength: number, dx: number, dy: number, air = true): number {
+  blowWind(x: number, y: number, radius: number, strength: number, dx: number, dy: number, remote = false): number {
     const moving = Math.hypot(dx, dy) > 1e-4;
     this.lastBlowAired = false;
     /*
-      On a thin gap (every look since #248) the moving wind is air on the
-      film (PLAN.md §15g; lib/breath.ts has the physics and the numbers,
-      `npm run airblow` the check): the breath's stress on the surface, a
-      force the solve takes in with the other body forces for as long as the
-      breath goes on, and the flow it drives carries the colour, the oil and
-      the ferrofluid, so neither the push below nor any carry runs. The
-      Amount (`strength` against the tool's own) is how hard one blows.
-      Held still, a puff is the jet's pressure and an outward shear, which a
-      rigid film moves nothing by; it keeps the carries until the jet's
-      dimple is built (PLAN.md 15g-2). And a remote hand's wind (`air`
-      false) keeps them too: its strokes arrive a message at a time, so a
-      breath laid only on those steps would push the liquid for one step in
-      every few, a fraction of the mouse's, until it is held between
-      messages as the pointer's direction is (PLAN.md 15g-5).
+      On a thin gap the moving wind is air on the film (PLAN.md §15g;
+      lib/breath.ts has the physics and the jet, `npm run airblow` the
+      check): a force the solve takes in while the breath goes on, whose
+      flow carries the colour, the oil and the ferrofluid, so neither the
+      push below nor any carry runs. The Amount is how hard one blows. A
+      remote hand's (`remote`) is held between its messages and laid by
+      the step. Held still, a puff keeps the carries until the jet's dimple
+      is built (PLAN.md 15g-2), for the hands that still ask for one.
     */
-    if (moving && air && this.airsFilm()) {
+    if (moving && this.airsFilm()) {
+      const r = radius * GRID_SCALE, share = strength / BLOW_STRENGTH;
       if (!this.breath) this.breath = new Float32Array(GRID_AREA * 4);
-      const r = radius * GRID_SCALE;
-      if (layBreath(this.breath, this.size, x, y, r, dx, dy, strength / BLOW_STRENGTH) > 0) {
-        this.rows.disc(y, r); this.breathLaid = true; this.lastBlowAired = true;
-      }
+      if (remote) { holdBreath(this.held, x, y, r, dx, dy, share); this.lastBlowAired = true; }
+      else if (layBreath(this.breath, this.size, x, y, r, dx, dy, share, this.rows) > 0) this.breathLaid = this.lastBlowAired = true;
       return 0;
     }
     if (moving) this.blowDirected(x, y, radius, strength, dx, dy);
@@ -2838,6 +2833,7 @@ export class FluidSimulation {
     this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, DT_FLOOR), 0.05) : DT_FLOOR;
     this.stepIndex++;
     this.liftStep();
+    if (this.breath && breatheHeld(this.held, this.breath, this.size, this.dtSeconds, this.airsFilm(), this.rows) > 0) this.breathLaid = true;
 
     const p = this.deriveStep(settings, time, noise2D);
     this.lastStep = p;
