@@ -29,8 +29,7 @@ export class FluidCore {
   protected readonly dyeFormat: GPUTextureFormat;
 
   protected readonly dye: PingPong;
-  public readonly chem: PingPong;
-  public readonly activeMat: PingPong;
+  public chem: PingPong | null = null;
   public chemLive = false;
   /**
    * The plate's dye while a print is drawn: the dye in the solver with the
@@ -477,25 +476,6 @@ export class FluidCore {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
-    /*
-      The reaction's field in the dye's format: full floats wherever the GPU
-      can filter them (every Mac, and SwiftShader). It was half floats, and a
-      half float's step just under 1 is 1/2048: the substrate's refill, feed ×
-      (1 − u) a step, falls under that step before the dish is full, so the
-      stored u stopped rising there. How far short depends on how the GPU
-      rounds a stored half float: SwiftShader rounds to nearest and stopped
-      0.003 to 0.005 short (measured); the Mac's, by the widths it drew,
-      rounds toward zero and drops every step under 1/2048, so it stops about
-      twice as far short. The pattern's wavelength follows the substrate, so CI's
-      Mac drew the labyrinth's stripe 3.08%, 3.35% and 3.51% of the plate at
-      256², 384² and 512², 14% apart, where SwiftShader drew 3.06%, 3.12% and
-      3.19%; the lab, rounding toward zero by hand, drew the Mac's widths to
-      the hundredth. In full floats the dish fills to within 5e-6 of its
-      reservoir, as the arithmetic says it should (`npm run turing`, line 1).
-      A GPU that cannot filter full floats keeps half floats (PLAN 26d-5).
-    */
-    this.chem = pp(this.N, this.dyeFormat, 'chem');
-    this.activeMat = pp(this.N, 'r32float', 'activeMat');
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
@@ -780,9 +760,12 @@ export class FluidCore {
     this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    if (this.chem) for (const t of [this.chem.a, this.chem.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
+    this.chemLive = false;
+    this.reagentLive = false;
     // The clear film goes with the plate, and is laid fresh on the next step a look asks for one.
     this.filmLaid = 0;
     pass.end();

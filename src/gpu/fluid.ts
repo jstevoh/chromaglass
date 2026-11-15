@@ -201,7 +201,7 @@ export class WebGPUFluid extends FluidCover {
       // The ferrofluid and the mix carried onto a new grid (takeOver, PLAN
       // 9w): only when the governor moves the grid, a few seconds into a
       // show at the earliest, so built behind it.
-      ['carryArea', [R32, RGBA32], false],
+      ['carryArea', [R32, RGBA32, dye], false],
       // The clear film (§20b), if a look lays one (Opening.film).
       ['filmAdvect', [RGBA32], open.film],
       ['filmMu', [R32], open.film],
@@ -1115,6 +1115,7 @@ export class WebGPUFluid extends FluidCover {
         a step, and a carry that cannot keep up leaves the colour behind.
       */
       if (thin) this.planCarry(pass, disp);
+      const chem = this.chemLive ? this.ensureChem() : null;
       if (!bodiesOn && mazeFlow) {
         // The maze's sixths, or as many as a hand in the liquid needs (handSubs), as the ferrofluid takes.
         const flux = this.arg(`dye flux ${handSubs}`, [0, 0, 0, 0, 0, disp / handSubs, 1, thin ? REST_GAP : 0]);
@@ -1130,14 +1131,14 @@ export class WebGPUFluid extends FluidCover {
             dye alone, so under a Labyrinth the pattern stood still while the
             print it had made moved off.
           */
-          if (this.chemLive) {
-            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read, sixth);
-            else this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], flux);
-            this.chem.swap();
+          if (chem) {
+            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', chem.write, chem.read, sixth);
+            else this.runPressed(pass, 'bodyAdvect', chem.write, [chem.read, this.velForced], flux);
+            chem.swap();
           }
         }
         this.shiftCarried(pass, this.dye);
-        if (this.chemLive) this.shiftCarried(pass, this.chem);
+        if (chem) this.shiftCarried(pass, chem);
         return;
       }
       if (!bodiesOn && thin) {
@@ -1145,13 +1146,13 @@ export class WebGPUFluid extends FluidCover {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        if (chem) this.carrySubsteps(pass, 'bodyAdvect', chem, thinAdv, undefined, thinAt);
         return;
       }
       if (!bodiesOn) { 
         this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
         this.carryLiquids(pass, 'mac', null, disp);
-        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
+        if (chem) this.macCormack(pass, chem, this.velForced, disp, 'dye'); 
         return; 
       }
       /*
@@ -1181,7 +1182,7 @@ export class WebGPUFluid extends FluidCover {
         speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv, undefined, thinAt);
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        if (chem) this.carrySubsteps(pass, 'bodyAdvect', chem, thinAdv, undefined, thinAt);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -1190,9 +1191,9 @@ export class WebGPUFluid extends FluidCover {
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
       od.swap();
       this.carryLiquids(pass, 'pressed', adv);
-      if (this.chemLive) {
-        this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);
-        this.chem.swap();
+      if (chem) {
+        this.runPressed(pass, 'bodyAdvect', chem.write, [chem.read, this.velForced], adv);
+        chem.swap();
       }
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
