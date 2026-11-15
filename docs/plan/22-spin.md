@@ -90,3 +90,11 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
   the middle a small move is a large angle. A hand's real torque is its friction
   times its lever arm: weight each hand by its radius and let a thick liquid's drag
   push back (22e).
+
+- **22q. `npm run flick`'s "the solver is handed the dish's drag" reads a step that does not
+  move.** On GitHub's Mac (18c-2's PR, 2026-11-14) the last step's `spinDish` read 0.732 rad/s
+  on two branches, at 0.34 s and at 0.44 s after the flick, while the frame's Ω − ω_l fell
+  from 0.623 to 0.475, so the line passed or failed (ratio 1.17, 1.54; bar 1.5) on how late
+  the read landed. Either the plate takes no step between the flick's first and the read while
+  frames draw, or `lastStep` is not the latest; find which, and read the step and the frame
+  from the same step.

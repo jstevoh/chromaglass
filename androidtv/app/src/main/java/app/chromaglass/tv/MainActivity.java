@@ -30,7 +30,11 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.VideoView;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -59,8 +63,9 @@ import java.util.Map;
  * by its address, which a router may change any evening.
  *
  * With no Mac to be found, "Watch a sample film" plays the channel's films,
- * whole (Sample.java), while the app keeps looking; a Mac that turns up takes
- * over.
+ * whole: through YouTube's player first (Sample.FILMS, assets/films.html,
+ * 12-tv-2h), and from the site when YouTube will not play (Sample.CLIPS),
+ * while the app keeps looking; a Mac that turns up takes over.
  *
  * The logo (the owner, 2026-11-14: "add the logo to the loading screen") is
  * the brand's own mark, res/drawable-nodpi/logo.png, the same file as
@@ -109,6 +114,9 @@ public class MainActivity extends Activity {
     private Shows.Show playing;
     private Button sampleButton;
     private FrameLayout sampleLayer;
+    /** The YouTube films (startFilms), or null while the clips play. */
+    private WebView sampleWeb;
+    private final Runnable filmsTooSlow = () -> filmsFailed("slow");
     private VideoView sampleVideo;
     private TextView sampleCredit;
     private ImageView sampleLogo;
@@ -189,7 +197,7 @@ public class MainActivity extends Activity {
         sampleButton.setTextColor(Color.argb(220, 255, 255, 255));
         sampleButton.setFocusable(true);
         sampleButton.setBackground(rowBackground());
-        sampleButton.setOnClickListener(v -> startSample());
+        sampleButton.setOnClickListener(v -> startFilms());
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(dp(520), dp(56));
         slp.topMargin = dp(12);
         picker.addView(sampleButton, slp);
@@ -205,6 +213,7 @@ public class MainActivity extends Activity {
         picker.addView(help, new LinearLayout.LayoutParams(dp(560), LinearLayout.LayoutParams.WRAP_CONTENT));
 
         root.addView(picker, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        root.addView(siteCorner(), siteCornerParams());
         setContentView(root);
         showList();
     }
@@ -238,6 +247,44 @@ public class MainActivity extends Activity {
         t.setPadding(0, dp(20), 0, 0);
         l.addView(t);
         return l;
+    }
+
+    /**
+     * The website, in the corner of the start screen: a QR code for
+     * https://chromaglass.art and a line saying there are more free visuals
+     * there (the owner asked for it, 2026-11-14, worded as free visuals and
+     * not as a purchase: the app sells nothing and points nowhere to buy).
+     * A code and not a link because Android TV has no web browser to open;
+     * a phone's camera opens it. Nothing here takes focus, so the remote
+     * never lands on it. In the corner, out of the picker's column, so a long
+     * list of Macs never pushes it off a 540 dp screen.
+     */
+    private View siteCorner() {
+        LinearLayout corner = new LinearLayout(this);
+        corner.setOrientation(LinearLayout.HORIZONTAL);
+        corner.setGravity(Gravity.CENTER_VERTICAL);
+        corner.setFocusable(false);
+
+        TextView words = new TextView(this);
+        words.setText("Try more free visuals at\nchromaglass.art");
+        words.setTextColor(Color.argb(170, 255, 255, 255));
+        words.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        words.setGravity(Gravity.END);
+        words.setPadding(0, 0, dp(12), 0);
+        corner.addView(words);
+
+        ImageView code = new ImageView(this);
+        code.setImageResource(R.drawable.site_qr);
+        code.setContentDescription("QR code for chromaglass.art");
+        corner.addView(code, new LinearLayout.LayoutParams(dp(84), dp(84)));
+        return corner;
+    }
+
+    private FrameLayout.LayoutParams siteCornerParams() {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+        lp.setMargins(0, 0, dp(32), dp(28));
+        return lp;
     }
 
     private void showList() {
@@ -451,13 +498,94 @@ public class MainActivity extends Activity {
     // ── The sample film ─────────────────────────────────────────────────
 
     /**
-     * The channel's films, one after another until Back, over the list. Looking
-     * goes on underneath (discovery is not stopped), so a Mac starting its
-     * show replaces the sample through open(). VideoView rather than the
-     * WebView: the WebView only ever loads the Mac's own page (open()), and
-     * the platform player plays an H.264 file on every TV this app runs on.
+     * The channel's song films from YouTube (Sample.FILMS, assets/films.html),
+     * one after another until Back, over the list. Looking goes on underneath
+     * (discovery is not stopped), so a Mac starting its show replaces the
+     * sample through open(). A WebView of its own, apart from the show's: the
+     * show's WebView stays on the Mac's origin (open()), this one only ever
+     * holds the app's own page and the YouTube player that page embeds.
+     *
+     * If YouTube's player fails, or says nothing for Sample.FILMS_START_MS,
+     * the same films play from the site instead (startClips): a TV with no Mac, Play's
+     * reviewer's among them, still sees the plate.
      */
-    private void startSample() {
+    @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
+    private void startFilms() {
+        if (sampleLayer != null || playing != null) return;
+        String template = asset("films.html");
+        if (template == null) { startClips(); return; }
+        sampleLayer = new FrameLayout(this);
+        sampleLayer.setBackgroundColor(Color.BLACK);
+        sampleWeb = new WebView(this);
+        sampleWeb.setBackgroundColor(Color.BLACK);
+        WebSettings ws = sampleWeb.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        // Nobody presses play on a TV: the films start when the page asks.
+        ws.setMediaPlaybackRequiresUserGesture(false);
+        sampleWeb.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+                // The page never navigates: a tap through to YouTube itself
+                // would leave a TV on the open web with no way back but Back.
+                return true;
+            }
+        });
+        // Only the app's own page is ever in this WebView (above), so only it can call these.
+        sampleWeb.addJavascriptInterface(new FilmsBridge(), "ChromaglassSample");
+        sampleWeb.setFocusable(false);
+        sampleLayer.addView(sampleWeb, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        // Over the page until YouTube says a film plays, as over the site's
+        // films until their first frame: the player is black while it loads.
+        sampleLogo = logo();
+        sampleLayer.addView(sampleLogo, new FrameLayout.LayoutParams(dp(LOGO_DP), dp(LOGO_DP), Gravity.CENTER));
+        root.addView(sampleLayer, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        picker.setVisibility(View.GONE);
+        main.postDelayed(filmsTooSlow, Sample.FILMS_START_MS);
+        sampleWeb.loadDataWithBaseURL(Sample.FILMS_BASE, Sample.page(template), "text/html", "utf-8", null);
+    }
+
+    /** YouTube's player could not play here: the films from the site, played by the app itself, instead. */
+    private void filmsFailed(String why) {
+        if (sampleWeb == null) return;
+        stopSample(null);
+        startClips();
+    }
+
+    /** What films.html tells the app, from the WebView's thread. */
+    final class FilmsBridge {
+        @JavascriptInterface
+        public void playing() {
+            main.post(() -> {
+                main.removeCallbacks(filmsTooSlow);
+                if (sampleWeb != null && sampleLogo != null) sampleLogo.setVisibility(View.GONE);
+            });
+        }
+
+        @JavascriptInterface
+        public void failed(String why) {
+            main.post(() -> filmsFailed(why));
+        }
+    }
+
+    private String asset(String name) {
+        try (InputStream in = getAssets().open(name)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The same films from the site (Sample.CLIPS), one after another until
+     * Back, over the list: the fallback when YouTube's player cannot play
+     * (startFilms). VideoView: the platform player plays an H.264 file on
+     * every TV this app runs on.
+     */
+    private void startClips() {
         if (sampleLayer != null || playing != null) return;
         sampleLayer = new FrameLayout(this);
         sampleLayer.setBackgroundColor(Color.BLACK);
@@ -507,7 +635,13 @@ public class MainActivity extends Activity {
 
     private void stopSample(String says) {
         if (sampleLayer == null) return;
-        sampleVideo.stopPlayback();
+        main.removeCallbacks(filmsTooSlow);
+        if (sampleVideo != null) sampleVideo.stopPlayback();
+        if (sampleWeb != null) {
+            sampleLayer.removeView(sampleWeb);
+            sampleWeb.destroy();
+            sampleWeb = null;
+        }
         root.removeView(sampleLayer);
         sampleLayer = null;
         sampleVideo = null;

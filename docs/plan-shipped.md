@@ -2448,6 +2448,54 @@ before the measured one (untested, and #396's warm in the same page did not help
   render compile (on software WebGPU that stretch was the first uses' wait, 9.05 to
   9.19 s; on the Mac it is the kernels too), 9 and 9b red. Cold, the mark is now still for the whole wait and fades
   as the plate's first step comes; the phone opens through the same code.
+- **Shipped, 14v-12: the opening compiles a display for its own look, and the intro says
+  what it is waiting for** (2026-11-14). What was reported (the owner): "Things take like
+  30 seconds to get loaded and started on mobile web ... we should have the loading state
+  present if there are no visuals and some kind of loading updates." What was measured, on
+  software WebGPU (all CPU, the nearest a cloud session has to a phone's compiler; `npm run
+  openingtime`): the plate's display, one fragment shader holding every look's effects, was
+  7.63 s of a 9.61 s opening, the other 66 pipelines running beside it. Compiled alone with
+  the effects' uniform tests written `false` it took 0.9 s against 5 s whole, and no one
+  effect was most of it (the second plate 0.34 s alone, the bubbles 0.25, the lacing 0.24,
+  the lumia 0.23 ...). A first try with WGSL overrides (`(CG_X && TEST)`) gained little,
+  4.0 to 4.6 s with every gate off: `false && TEST` is not a constant expression, so the
+  branch stays compiled. Written `false` it goes.
+  - `src/gpu/displayLean.ts`: 30 gates (31 until 38u took Macro Depth's own branch out of
+    the shader, which `leandisplay`'s first line caught), each a uniform test as the shader writes it and the
+    settings (and cords) a look reaches it by. The opening builds the display with the
+    tests its look cannot reach written `false` (Classic keeps 6; every look 4 to 9)
+    and the whole display first behind the show (`later` sorted render first). The frame
+    (`WebGPUPlate.displayFor`) draws lean while the draw's own uniform bytes need nothing
+    it left out, whole otherwise; while the whole one is still building the lean one goes
+    on drawing and the whole one is asked for, so the Mac's `startup` sees a look whose
+    first steps reach past its opening. `?lean=0` opens whole. A look that opens through
+    the camera or the film stock (Home Movie, Song Groove) draws its display flipped into
+    their picture, so it waits for no canvas display and builds the whole one behind: the
+    Mac's first `startup` run named their lean display as waited for and asked for by
+    none. `startup` prices the lean display as the old way's display
+    (`scripts/startuplean.mjs`): on that run its 1.78 s compile read as the page's own
+    wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner. And the
+    line says nothing at the start of the builds: its "0 of 67" changed the picture as the
+    opening began waiting for the page's frames, and the Mac asked its first compile 1.12 s
+    after the device (0.06 s on main).
+  - Every look the same bytes: `npm run leandisplay` (new, lab9) draws all 41 looks lean
+    and whole, plate and close-up, 85/85 (also with five steps each, before the switch
+    to literal `false`), with controls (a gate the look uses taken out differs by 1329
+    bytes; Classic with Lacing up falls back to whole and matches).
+  - Numbers, Classic, three openings each, interleaved, one build: first step 8.11 s
+    (`lean=0`) → 5.57 s median; the display 6.18–6.62 s → 3.00–3.31 s; the opening now
+    ends on its compute kernels.
+  - The loading line: under the intro's mark, "Loading", "Starting the graphics",
+    "Compiling shaders n of N", "Pouring the first frame", each with the seconds, over a
+    stepped bar (`introStage`, `introQuiet`; `Quiet.progress`). Its words change only
+    when no render pipeline is compiling (`prepareProgress.rendering`): a new picture
+    then waits in the GPU process on a Mac. `npm run intro` 9c holds it (in order, counted
+    to the last, 0 changes in the render compiles, 45 settles held back). The plain
+    loading screen behind the intro (`main.tsx`'s `Loading`, what a slow download shows
+    once the intro gives way at 8 s) now carries the mark too (the owner, same day: "add
+    the logo to the loading screen").
+  Open: 14v-13 (the phone's own numbers), 14v-14 (lean flipped displays), 14v-15 (a slow
+  network), 14v-16 (moiré tests every look passes), 14v-17 ("rebuilding the plate…").
 
 ### 14m. Anyone on the venue's network can drive the show
 
@@ -4660,6 +4708,29 @@ Measured on SwiftShader: a ring of colour round a held pour of water moves out b
 accounted for; a dish of glycerine flushed with a quarter of its volume of water keeps
 0.748 of it (the volume says 0.750), its middle clear. The colour's own drops, the Pour's
 kicks and the splash crown are still not volume (18c-2, 18c-3).
+
+**18c-2, and 18c-3's splash crown** (2026-11-14, `npm run dropwindow`): a colour drop is
+liquid. The owner's reference (a Liquid Light Lab clip, 2026-11-13) has a drop open a bright
+round window in a pool of dark dye, its own colour in the middle, still open seconds later,
+nothing thrown; ours stamped the dye on top (the middle 2.23 → 2.64 absorbance), pushed with
+a ring of velocity the pressure solve deletes, and threw satellites at any height. Now on a
+thin gap `autoInject`'s drop (sim/dropSplash.ts `layDrop`) queues a pour of its volume
+(lib/dropImpact.ts; amount 5 ≈ 0.07 mL, the bottle dose's convention, from amount not
+amount × dye) through a contact patch 0.7 of the window it fills, over about five steps, with
+the dye the stamp laid arriving over the same dome, so the colour comes with the liquid that
+carries it. A one-step source keeps 1/(1 + f) of the cell's old dye; five steps through the
+smaller patch keep 1/(1 + f)⁵ and push, not mix, the cells outside it (18c-9 names the
+numerics). The music's trickle accrues at the dropper's tip until a drop's worth falls (Tate's
+law, amount 3.3); a fresh plate's lay and a bottle whose pour already brought volume bring
+none. The splash's ring kick is deleted, the crater on a thin gap is the glass's bowl (no drawn
+multiplies), and satellites come only past Cossali's K = We·Oh^−0.4 > 2100 + 5880(h/D)^1.44,
+as many as a share of Bhola–Chandra's crown fingers (Drop Height 1 = 0.3 m; a 5 mm drop
+splashes past about 0.2 m, Drop Height 0.67). Measured on SwiftShader, a yellow drop of
+amount 30 in a cyan pool on a 192² plate: the pool's red in the window's middle 1.795 → 0.090,
+still 0.091 ninety steps later; the dish's red kept to 0.17%, its mean r² grown by 0.88 of
+R² (the volume says 1; the floating glass takes some); the middle's blue 0.66 of the drop's
+own; the same dye stamped with no volume 1.795 → 1.539, no window. The rim's spokes and the
+dark collar of the reference are not yet the solver's (18c-6, 18c-7).
 
 ### 18d. Each liquid has its real properties
 
@@ -7596,6 +7667,38 @@ the channel's handle `@Chromaglassart` in a new tab. The landing is one responsi
 phone version is the same markup. Measured: `npm run signin` 11b now asserts the header link's
 href, new tab, height and place on the first screen at 1024×768, 390×844 and 844×390; before this
 change it reads "YouTube link missing" at all three, after it reads "ok".
+
+### 34f. A clip made to be posted: the Record button's 9:16 frame (2026-10-28)
+
+What was asked: a single "Save a clip with sound" that picks the container and size itself, for
+Reels and TikTok, with the free site's mark (PLAN 34, 23). Most of it was there: Record writes the
+plate with the sound it hears, the free site caps it at 15 seconds and marks it, and Play's Share
+clip hands the file to the phone's share sheet. What was missing was the frame: a post meant a
+landscape file cropped in another app, or a strip of plate with black above and below.
+
+What was built, on the one Record button (14ae; no second button): a **Frame** choice, *As the
+plate is* or *Portrait 9:16* (`RecorderOptions.shape`, `lib/clipFrame.ts`). Portrait asks for MP4
+first (Instagram does not take WebM) and keeps sound on.
+
+- **Drawn at 9:16, not cut down.** When nothing else owns the canvas the visualizer is given a
+  1080 × 1920 stage (720 × 1280 on the free site) for as long as the recording runs, through the
+  same `setStage` a projector uses: the solver lays the plate out tall, the window letterboxes it,
+  and the stage is put back when the recording ends however it ends (`App.tsx`, `endClipStage`).
+- **A slice where the canvas is not ours.** With a projector attached, or on a phone, the canvas
+  keeps its shape and the recorder draws the widest centred 9:16 slice of it onto a canvas of its
+  own (`coverCrop`); that is the one crop, and PLAN 34f-2 is the item to replace it.
+- **The free site's mark** keeps its 15 seconds and its text, and in a portrait frame sits centred
+  at 80% of the height, above the caption band Reels and TikTok cover.
+- **Share.** The Record panel's last clip has a Share button and the phone's More sheet a
+  *Share the last clip* one, both through `lib/shareClip.ts`, which Play's Share clip now uses too.
+- A phone opens on Portrait (a desk on the plate); More › Record has the Frame beside what Record
+  makes.
+
+Measured (`npm run clip` 30 checks, 21 of them in node and 9 recording in the page and reading the file's own bytes; the page half is the Mac's, a cloud session's software renderer lands a frame every few seconds and passed it two runs in three):
+the slice of every window shape is 9:16 in even pixels (1920 × 1080 → 606 × 1080, 31.6% of the width,
+the reason the plate is drawn tall when it can be); on a 1440 × 900 desk the canvas is 9:16 while
+recording and back to 1.600 after, the free site's file is a 9:16 MP4 with an Opus track, and a
+phone's is the 9:16 slice of its screen.
 
 ## 35. Clear controls: on reads on, one name for one thing
 
@@ -13964,6 +14067,34 @@ in the harness with a real MP4; the show server serves the logo), `npm run press
 (the app's list is the page's, the redirect is there and nothing in public/ shadows
 it), `npm run tvfilms -- --probe` (the live site serves all six, index first), and the
 TV app's unit tests (six films, each from the site, each saying what it plays).
+
+## 12-tv-2h. The TV's films through YouTube first, a launch splash, and a QR code for the website (2026-11-15)
+
+The owner asked first for "the YouTube videos as
+samples", then "if not YouTube, much better and longer samples"; 12-tv-2f
+answered the second (the films, whole, from the site). This answers the first
+on top of it: the logo on the launch screen behind Android's own splash (whose
+colour is now the logo square's blue), and **Watch a sample film** plays the channel's six song films, each
+a whole public-domain record, through YouTube's embedded player on a page of the
+app's own (`assets/films.html`, loaded on a chromaglass.art base so YouTube sees
+an origin), one after another with the film's look and record named on screen;
+when YouTube will not play (an error, or nothing for 20 s) 12-tv-2f's films play
+from the site instead, and the logo covers the page until YouTube says a film
+plays. Check `npm run tvyoutube` (the page against a stand-in YouTube: the list,
+the caption, PLAYING, the order round, an error told once, no script); the films
+list and the page's escaping are unit tests. Asked of the real player from the
+owner's Chrome on a chromaglass.art page, all six played; from a cloud session
+YouTube answers 150 to nearly every video, so that cannot be a CI check. Unseen:
+YouTube in a TV's WebView (whether it plays, and whether it shows ads before a
+film), judged with 12-tv-2c. Also in it, the owner the same day: point people to
+the website, "just point them to the webpage to try more free chromaglass.art
+visuals", not to a purchase. The start screen's bottom-right corner says "Try
+more free visuals at chromaglass.art" beside a QR code for https://chromaglass.art
+(`res/drawable-nodpi/site_qr.png`, version 2, level M; read back with zxing to
+that address), since Android TV has no browser to open a link; it takes no
+focus. Worded as free visuals, it is no call to buy outside Play billing.
+Released 1.0.8 (without these) went to Production review 2026-11-14.
+Merged 2026-11-15 (#871); the next TV release carries it.
 
 ## 12-tv-signin. A TV signs in by a short code (2026-11-08)
 
