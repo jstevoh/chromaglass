@@ -71,15 +71,46 @@ public class ShowsTest {
         assertNull(Shows.txt(null, "id"));
     }
 
-    // The sample films (Sample.java): the music is CC BY, so a clip without its
-    // credit would break the licence on every TV that plays it; and the sample
-    // must come from the website over https, never from an address on the LAN.
-    @Test public void everySampleClipCarriesItsMusicCreditAndComesFromTheSite() {
-        assertEquals(true, Sample.CLIPS.length > 0);
+    // The sample films (Sample.java): each comes from the website over https,
+    // never from an address on the LAN, at the address the site redirects to the
+    // films' release (firebase.json, /films/), and says what it is playing.
+    @Test public void everySampleFilmComesFromTheSiteAndSaysWhatItPlays() {
+        assertEquals(6, Sample.CLIPS.length);
         for (Sample.Clip c : Sample.CLIPS) {
-            assertEquals(c.url, true, c.url.startsWith("https://chromaglass.art/") && c.url.endsWith(".mp4"));
-            assertEquals(c.look, true, c.credit.contains("Kevin MacLeod") && c.credit.contains("CC BY 4.0"));
+            assertEquals(c.url, true, c.url.matches("https://chromaglass\\.art/films/[a-z]+\\.mp4"));
+            assertEquals(c.look, true, !c.look.isEmpty() && c.credit.matches("\u201c.+\u201d, .+ \\(19[0-2][0-9]\\)"));
         }
+    }
+
+    // The YouTube films (Sample.FILMS, 12-tv-2h): each a real YouTube id, no
+    // film twice, and each named on screen by its look and its record, which
+    // must be one old enough to be public domain (published before 1926).
+    @Test public void everyFilmIsAYouTubeIdWithItsRecordNamed() {
+        assertEquals(true, Sample.FILMS.length >= 4);
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (Sample.Film f : Sample.FILMS) {
+            assertEquals(f.id, true, f.id.matches("[A-Za-z0-9_-]{11}"));
+            assertEquals(f.id, true, ids.add(f.id));
+            assertEquals(f.id, false, f.look.isEmpty() || f.title.isEmpty() || f.performer.isEmpty());
+            assertEquals(f.id, true, f.year >= 1890 && f.year < 1926);
+        }
+        assertEquals(true, Sample.FILMS_BASE.startsWith("https://chromaglass.art/"));
+    }
+
+    // The page gets the list as JSON where FILMS_JSON stood, every film in it,
+    // and nothing in a name can end the script it sits in.
+    @Test public void thePageGetsTheListAndNoNameCanBreakOutOfIt() {
+        String page = Sample.page("<script>var FILMS = FILMS_JSON;</script>");
+        assertEquals(false, page.contains("FILMS_JSON"));
+        // Every field under the name films.html reads it by (f.look, f.title, ...):
+        // a renamed key would leave the TV's caption saying "undefined".
+        for (Sample.Film f : Sample.FILMS) {
+            String one = "{\"id\":" + Sample.json(f.id) + ",\"look\":" + Sample.json(f.look)
+                + ",\"title\":" + Sample.json(f.title) + ",\"performer\":" + Sample.json(f.performer)
+                + ",\"year\":" + f.year + "}";
+            assertEquals(f.id, true, page.contains(one));
+        }
+        assertEquals("\"a\\\"b\\u003c/script>\"", Sample.json("a\"b</script>"));
     }
 
     @Test public void theSampleGoesRoundAndRound() {
