@@ -71,14 +71,14 @@ public class ShowsTest {
         assertNull(Shows.txt(null, "id"));
     }
 
-    // The sample films (Sample.java): the music is CC BY, so a clip without its
-    // credit would break the licence on every TV that plays it; and the sample
-    // must come from the website over https, never from an address on the LAN.
-    @Test public void everySampleClipCarriesItsMusicCreditAndComesFromTheSite() {
-        assertEquals(true, Sample.CLIPS.length > 0);
+    // The sample films (Sample.java): each comes from the website over https,
+    // never from an address on the LAN, at the address the site redirects to the
+    // films' release (firebase.json, /films/), and says what it is playing.
+    @Test public void everySampleFilmComesFromTheSiteAndSaysWhatItPlays() {
+        assertEquals(6, Sample.CLIPS.length);
         for (Sample.Clip c : Sample.CLIPS) {
-            assertEquals(c.url, true, c.url.startsWith("https://chromaglass.art/") && c.url.endsWith(".mp4"));
-            assertEquals(c.look, true, c.credit.contains("Kevin MacLeod") && c.credit.contains("CC BY 4.0"));
+            assertEquals(c.url, true, c.url.matches("https://chromaglass\\.art/films/[a-z]+\\.mp4"));
+            assertEquals(c.look, true, !c.look.isEmpty() && c.credit.matches("\u201c.+\u201d, .+ \\(19[0-2][0-9]\\)"));
         }
     }
 

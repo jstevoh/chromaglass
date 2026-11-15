@@ -185,6 +185,23 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
   under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
   with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-6, open** (E, S): **`mirror`'s "and nowhere else" reads at its bar on main since 2026-11-14.**
+  Red once on a GitHub Mac (`show`, the closeup pull request for 38u, head b7c33e8): "Classic, calm,
+  layer 1 turned a quarter: and nowhere else", 28.5 past its drift where 27.4 was allowed, 95.4 under
+  the drop, each of the four drops alike (30.7 30.0 25.6 29.8 against a drift of 2.2 1.1 1.1 1.3), so
+  not one unlucky drop. The line is judged in silence at the plate's own zoom, which that pull
+  request's diff (the closeup's drawing, the treble's shake of a bubble) does not reach, and it was
+  green on its three earlier heads. Main's own deploy 839 (c258561, the owner's Mac) is as close
+  without it: `layer 1` 27.6 of 33.1 allowed, `layer 1 turned a quarter` 18.2 of 22.9. This line's
+  history is 0.4 to 11 (19ac-4, and #225/#238 in `docs/plan-shipped.md`), so one of the nine merges
+  between adcbe3f and c258561 roughly doubled what a drop leaves beyond its reach: the spun plate's
+  dish (22n), the two-dye line gone (18e-5: the picture under and round a drop is brighter, and the
+  bar is a share of the reading under the drop), or Velvet's stir. *Do:* run `npm run mirror` on the
+  Mac at adcbe3f and at each merge after it and name the one that moved it; then decide whether the
+  drop really spreads further (a fault in that change) or the picture changed and the reach or the
+  bar's share was set on the old one (then re-measure DROP_REACH as 19ac-4 did, never widen the bar
+  to fit). *Measure:* twenty Mac runs, GitHub's and the owner's, read under half the allowance on
+  all three scenes; a drop mirrored where it should not be is still red.
 - **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
   and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
   the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
