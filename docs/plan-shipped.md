@@ -2477,7 +2477,10 @@ before the measured one (untested, and #396's warm in the same page did not help
     wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner. And the
     line says nothing at the start of the builds: its "0 of 67" changed the picture as the
     opening began waiting for the page's frames, and the Mac asked its first compile 1.12 s
-    after the device (0.06 s on main).
+    after the device (0.06 s on main). After it merged, the words still changed as one render pipeline
+    finished, in the millisecond the next was asked (`intro` 9c red 2 of 3 on #881's branch):
+    the count now holds until every render pipeline is asked for (they come first), and 9c
+    also reads the two frames before each compile (red on the old code: 8 changes).
   - Every look the same bytes: `npm run leandisplay` (new, lab9) draws all 41 looks lean
     and whole, plate and close-up, 85/85 (also with five steps each, before the switch
     to literal `false`), with controls (a gate the look uses taken out differs by 1329
