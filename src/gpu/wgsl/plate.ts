@@ -36,6 +36,7 @@ import { BEAD_SHAPE_WGSL } from './beadShape';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
+import { DYE_INDEX_WGSL } from './dyeIndex';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -1298,19 +1299,17 @@ fn pouredDn(uv: vec2f) -> f32 {
   return sp.a - sp.r * N_CLEAR;
 }
 
+${DYE_INDEX_WGSL}
 /*
   The optical path through the column, OPL = n·h, with h in rest gaps
   (DISH_REST_GAP, 6 mm on the 0.2 m dish), so a column of clear water at
-  rest reads 1.333. v is viewProps' (oil, gap, film); dn is pouredDn's.
-  The dye's own term, d·0.015·dyeGain, is a named stand-in (refractionOptics
-  note 6): a dilute dye barely moves water's index, and this is what gives
-  a dye-only look its edges.
+  rest reads 1.333. dyeN is dyeDn's, v is viewProps' (oil, gap, film), dn is
+  pouredDn's.
 */
-fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
-  let deltaDye = d * (0.015 * dyeGain);
+fn calcOpl(dyeN: f32, v: vec3f, dn: f32) -> f32 {
   let deltaOil = v.x * 0.137;
   let deltaFilm = v.z * 0.087;
-  let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
+  let n = N_CLEAR + dyeN + deltaOil + deltaFilm + dn;
   let gap = v.y;
   let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
   let h = hScale * (1.0 - 0.5 * v.z);
@@ -1318,8 +1317,8 @@ fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
 }
 
 // One tap's optical path, from its own view and its own poured index.
-fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
-  return calcOpl(d, viewProps(uv), pouredDn(uv), dyeGain);
+fn oplAt(dyeN: f32, uv: vec2f) -> f32 {
+  return calcOpl(dyeN, viewProps(uv), pouredDn(uv));
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
@@ -1336,24 +1335,32 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   }
 
   let ts = 3.0 / U.logicalGrid;
-  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
 
-  let d00 = decodeDensity(tex2(src, in.uv + vec2f(-ts, -ts)).a);
-  let d10 = decodeDensity(tex2(src, in.uv + vec2f( 0.0, -ts)).a);
-  let d20 = decodeDensity(tex2(src, in.uv + vec2f( ts, -ts)).a);
-  let d01 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  0.0)).a);
-  let dC  = decodeDensity(tex2(src, in.uv).a);
-  let d21 = decodeDensity(tex2(src, in.uv + vec2f( ts,  0.0)).a);
-  let d02 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  ts)).a);
-  let d12 = decodeDensity(tex2(src, in.uv + vec2f( 0.0,  ts)).a);
-  let d22 = decodeDensity(tex2(src, in.uv + vec2f( ts,  ts)).a);
+  let t00 = tex2(src, in.uv + vec2f(-ts, -ts));
+  let t10 = tex2(src, in.uv + vec2f( 0.0, -ts));
+  let t20 = tex2(src, in.uv + vec2f( ts, -ts));
+  let t01 = tex2(src, in.uv + vec2f(-ts,  0.0));
+  let tC  = tex2(src, in.uv);
+  let t21 = tex2(src, in.uv + vec2f( ts,  0.0));
+  let t02 = tex2(src, in.uv + vec2f(-ts,  ts));
+  let t12 = tex2(src, in.uv + vec2f( 0.0,  ts));
+  let t22 = tex2(src, in.uv + vec2f( ts,  ts));
+
+  let d00 = decodeDensity(t00.a);
+  let d10 = decodeDensity(t10.a);
+  let d20 = decodeDensity(t20.a);
+  let d01 = decodeDensity(t01.a);
+  let d21 = decodeDensity(t21.a);
+  let d02 = decodeDensity(t02.a);
+  let d12 = decodeDensity(t12.a);
+  let d22 = decodeDensity(t22.a);
 
   let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
   let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
   let g = vec2f(gradX, gradY);
 
   let vC = viewProps(in.uv);
-  let oC = calcOpl(dC, vC, pouredDn(in.uv), dyeGain);
+  let oC = calcOpl(dyeDn(tC), vC, pouredDn(in.uv));
 
   var o00: f32; var o10: f32; var o20: f32;
   var o01: f32; var o21: f32;
@@ -1364,23 +1371,23 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   // with none, so a plate with nothing poured pays for none of these reads).
   let poured = textureDimensions(speciesSrc).x > 1u;
   if (vC.x > 0.001 || vC.z > 0.001 || poured) {
-    o00 = oplAt(d00, in.uv + vec2f(-ts, -ts), dyeGain);
-    o10 = oplAt(d10, in.uv + vec2f( 0.0, -ts), dyeGain);
-    o20 = oplAt(d20, in.uv + vec2f( ts, -ts), dyeGain);
-    o01 = oplAt(d01, in.uv + vec2f(-ts,  0.0), dyeGain);
-    o21 = oplAt(d21, in.uv + vec2f( ts,  0.0), dyeGain);
-    o02 = oplAt(d02, in.uv + vec2f(-ts,  ts), dyeGain);
-    o12 = oplAt(d12, in.uv + vec2f( 0.0,  ts), dyeGain);
-    o22 = oplAt(d22, in.uv + vec2f( ts,  ts), dyeGain);
+    o00 = oplAt(dyeDn(t00), in.uv + vec2f(-ts, -ts));
+    o10 = oplAt(dyeDn(t10), in.uv + vec2f( 0.0, -ts));
+    o20 = oplAt(dyeDn(t20), in.uv + vec2f( ts, -ts));
+    o01 = oplAt(dyeDn(t01), in.uv + vec2f(-ts,  0.0));
+    o21 = oplAt(dyeDn(t21), in.uv + vec2f( ts,  0.0));
+    o02 = oplAt(dyeDn(t02), in.uv + vec2f(-ts,  ts));
+    o12 = oplAt(dyeDn(t12), in.uv + vec2f( 0.0,  ts));
+    o22 = oplAt(dyeDn(t22), in.uv + vec2f( ts,  ts));
   } else {
-    o00 = calcOpl(d00, vC, 0.0, dyeGain);
-    o10 = calcOpl(d10, vC, 0.0, dyeGain);
-    o20 = calcOpl(d20, vC, 0.0, dyeGain);
-    o01 = calcOpl(d01, vC, 0.0, dyeGain);
-    o21 = calcOpl(d21, vC, 0.0, dyeGain);
-    o02 = calcOpl(d02, vC, 0.0, dyeGain);
-    o12 = calcOpl(d12, vC, 0.0, dyeGain);
-    o22 = calcOpl(d22, vC, 0.0, dyeGain);
+    o00 = calcOpl(dyeDn(t00), vC, 0.0);
+    o10 = calcOpl(dyeDn(t10), vC, 0.0);
+    o20 = calcOpl(dyeDn(t20), vC, 0.0);
+    o01 = calcOpl(dyeDn(t01), vC, 0.0);
+    o21 = calcOpl(dyeDn(t21), vC, 0.0);
+    o02 = calcOpl(dyeDn(t02), vC, 0.0);
+    o12 = calcOpl(dyeDn(t12), vC, 0.0);
+    o22 = calcOpl(dyeDn(t22), vC, 0.0);
   }
 
   let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
@@ -1879,7 +1886,7 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      resolution. A second term stood beside it until 18e-5, a deflection at a hue-gated two-dye
      boundary (PLAN 33a): two dyes in one liquid have no index step between them and no surface
      to slope, so it is gone (the comment where boundaryDiff was, above).
-  2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step.
+  2. (Boundary Contrast scaled the dye's index step until 38u-10; see note 6.)
   3. Pupil overlap is approximated by a smoothstep with a 0.15 extinction floor (0.85 max loss),
      weighted by reliefK (Edge Relief × plateAmt) on the meniscus slope.
   4. (The shadowgraph, once here and masked to the dye's edges, is defocusShadow's.)
@@ -1891,10 +1898,12 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      the 90th-percentile thin-dye rim in mixer's mid-grey contrast check (129.5 → 136.4
      without it, 130.9 → 134.7 with it). Tracked in PLAN 18e-1 (with 31a) to replace once
      the two dishes sit at separate heights in the projector's focal cone.
-  6. The dye's index, d · 0.015 · dyeGain in calcOpl (the derive pass), is a stand-in:
-     a few percent of dye in water moves its index by far less, and nothing in the
-     shelf's table gives a dye one. It is what gives a dye-only look its Becke lines.
-     The poured liquids' indices are real (the species field, PLAN 18d-9): glycerine
+  6. The dye's index is tartrazine's measured dn/dc scaled by each dye's absorbance
+     (dyeDn, the derive pass, PLAN 38u-10), times Dye Index Boost: at its default of 1
+     a dye-only look draws Becke lines too faint to see, as a real dilute dye does, and
+     the boost brings them back. One dn/dc for every dye and one index for every
+     wavelength are the shortcut, PLAN 38u-17.
+     The poured liquids' indices are real too (the species field, PLAN 18d-9): glycerine
      reads 1.4746 because the shelf says so, and npm run derive measures it so.
   7. A clear poured liquid's edge (glycerine into water, no dye) or an oil drop's
      deflects nothing here, which reads the dye's slope (note 1): it draws its

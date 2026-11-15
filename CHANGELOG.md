@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the dye bends light at its real strength (PLAN 38u-10)
+
+- The dye's refractive index is its measured one (tartrazine's dn/dc over its absorbance),
+  about 2e-5 for a deep dye, where it was a stand-in 300 to 600 times that scaled by Boundary
+  Contrast. A dye-only look no longer shows bright and dark lines at its edges out of focus.
+- **Dye Index Boost** (Settings → Look, MIDI, the desks, the phone) brings them back: ×1 is
+  real, up to ×1000.
+
 ### Removed — what the closeup drew over the liquid (PLAN 38u-1, 38u-2, 38u-3)
 
 - **Edge Detail** is gone (Settings → Macro, the desks, the phone). It read the closeup through

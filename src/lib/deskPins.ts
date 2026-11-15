@@ -131,6 +131,7 @@ const SECTION_OF: Record<string, string> = {
   particles: 'look',
   particleMix: 'look',
   granulation: 'look',
+  dyeIndexBoost: 'look',
   macroZoom: 'macro',
   macroSync: 'macro',
   macroChase: 'macro',

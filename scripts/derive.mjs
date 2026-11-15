@@ -81,7 +81,15 @@ try {
       buf.unmap();
       return { w, h, at: (x, y, c) => half(halves[y * (row / 2) + x * 4 + c]) };
     };
-    const one = await derived({ dye: solver.dye.read, velForced: solver.velForced, grain: null, particles: null, air: null, view: null });
+    /*
+      The dye's index (PLAN 38u-10) is real by default, too small to draw a
+      Becke line, and Dye Index Boost multiplies it. The doublet lines below
+      are asked at 500 times real, where the stand-in it replaced sat (300 to
+      600 times); the lines after them ask the real strength itself.
+    */
+    const plain = { dye: solver.dye.read, velForced: solver.velForced, grain: null, particles: null, air: null, view: null };
+    plate.pack.set('dyeIndexBoost', 500);
+    const one = await derived(plain);
     const { w, h } = one;
     let sum = 0, sx = 0, sy = 0;
     let minLap = 1e9, maxLap = -1e9;
@@ -160,6 +168,7 @@ try {
       { id: 'syrup', x: 0.28, y: 0.28 },
     ];
     for (const p of pools) lab.addSpecies(p.x, p.y, 0.1, 50, p.id, false);
+    plate.pack.set('dyeIndexBoost', 1);
     const two = await derived({ dye: solver.dye.read, velForced: solver.velForced, grain: null, particles: null, air: null, view, species: solver.fields.species });
     // The mean path over the middle of a place (within 0.04 of it), well inside a pool's flat top.
     const pathAt = (cx, cy) => {
@@ -239,8 +248,44 @@ try {
       water: flatMost(0.72, 0.72, 0.05),
     };
 
+    /*
+      The dye's index at its real strength (PLAN 38u-10), against the
+      measurement worked out here from the paper's numbers alone, not the
+      shader's constant: tartrazine (arXiv 2503.05105) takes 25.0 per mM per
+      cm at its band, molar mass 534.36 g/mol, and raises water's index by
+      0.41 per g/mL. One unit of a channel's absorbance as the solver reads it
+      out (readField hands back the decoded density, decodeDensity's) is 2.8
+      nat across the 0.6 cm rest gap. So a dye's index rise is its three
+      channels' sum times dnPerUnit. Read at 1000 times real, where the path's half floats (one
+      step in about a thousandth near 1.33) resolve it to a percent or two,
+      as the path over the dye's peak less the path through clear water; and
+      read at 1 as .z, which the pass works out in full floats before it is
+      stored, so its peak at 1 times 1000 has to be its peak at 1000: linear,
+      so the default is the real strength and not a floor or a clamp.
+    */
+    // 25.0 L/(mmol·cm) is 25 000 L/(mol·cm), over 534.36 g/mol, in mL: about 46 800 mL/(g·cm).
+    const dnPerUnit = 0.41 * (2.8 / Math.LN10 / 0.6) / (25.0e3 / 534.36 * 1000);
+    let dyeIndexPeak = 0;
+    for (let k = 0; k < n * n; k++) {
+      dyeIndexPeak = Math.max(dyeIndexPeak, dnPerUnit * (dye[k * 4] + dye[k * 4 + 1] + dye[k * 4 + 2]));
+    }
+    const zPeak = (f) => { let m = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) m = Math.max(m, Math.abs(f.at(x, y, 2))); return m; };
+    const pathPeak = (f) => { let m = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) m = Math.max(m, f.at(x, y, 3)); return m; };
+    const clearPath = (f) => f.at(Math.floor(w * 0.2), Math.floor(h * 0.8), 3);
+    plate.pack.set('dyeIndexBoost', 1);
+    const real = await derived(plain);
+    plate.pack.set('dyeIndexBoost', 1000);
+    const big = await derived(plain);
+    plate.pack.set('dyeIndexBoost', 1);
+    const index = {
+      predicted: dyeIndexPeak,
+      read: (pathPeak(big) - clearPath(big)) / 1000,
+      clear: clearPath(real),
+      zReal: zPeak(real), zBig: zPeak(big),
+    };
+
     const corr = (cn * czl - cz * cl) / Math.sqrt(Math.max(1e-12, (cn * czz - cz * cz) * (cn * cll - cl * cl)));
-    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, corr, paths, thickness, grad };
+    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, corr, paths, thickness, grad, index };
   });
   const at = (x, y) => `${x.toFixed(2)},${y.toFixed(2)}`;
   check('the derive pass finds slopes at all', r.sum > 0, `weight ${r.sum.toFixed(1)}`);
@@ -256,8 +301,30 @@ try {
     the boundary difference here, which is never negative, so its minimum is
     0 and this fails.
   */
-  check('Becke line doublet present in Laplacian', r.minLap < -0.07 && r.maxLap > 0.18,
+  check('Becke line doublet present in Laplacian (Dye Index Boost 500)', r.minLap < -0.07 && r.maxLap > 0.18,
     `Laplacian of the path (.w) min ${r.minLap.toFixed(3)}, max ${r.maxLap.toFixed(3)}; .z min ${r.minZ.toFixed(3)}, max ${r.maxZ.toFixed(3)}`);
+  {
+    /*
+      PLAN 38u-10: the dye bends light at its measured strength. The path
+      over the dye's peak rises by tartrazine's dn/dc times the dye's summed
+      absorbance (within 5%, at 1000 times real), clear water still reads
+      1.333 at the boost's default, and the pass's Laplacian is linear in the
+      boost (1000 times its peak at 1 within 5% of its peak at 1000). And
+      real is invisible: at 1 the Laplacian's peak through water's path at
+      Projector Focus 1 (Δz 0.75) changes the light by under one step of a
+      byte (0.39%), against the doublet line's 4%, on a strong dye (strength
+      3, 8 nat in its deepest channel). The old stand-in (0.015 times the dye's density
+      times up to 3 times Boundary Contrast) fails the first line by 300 to
+      800 times and the last by as much.
+    */
+    const ix = r.index;
+    const err = Math.abs(ix.read / Math.max(1e-12, ix.predicted) - 1);
+    const lin = Math.abs(ix.zReal * 1000 / Math.max(1e-12, ix.zBig) - 1);
+    const dim = ix.zReal * 0.75 / 1.333;
+    check('38u-10: the dye raises the path by its measured index (tartrazine\'s dn/dc × its summed absorbance, within 5%), linear in Dye Index Boost, and real is too faint to see',
+      ix.predicted > 1e-5 && err < 0.05 && Math.abs(ix.clear - 1.333) < 0.002 && ix.zBig > 0 && lin < 0.05 && dim < 1 / 255,
+      `index rise over the dye ${ix.read.toExponential(3)} against ${ix.predicted.toExponential(3)} predicted (${(err * 100).toFixed(1)}% off); clear water ${ix.clear.toFixed(4)}; .z peak ${ix.zReal.toExponential(3)} at 1, ${ix.zBig.toFixed(4)} at 1000 (${(lin * 100).toFixed(1)}% from linear); real changes the light by ${(dim * 100).toFixed(3)}% at full defocus`);
+  }
   const worst = Math.max(...r.paths.map((p) => Math.abs(p.read - p.expected)));
   check('optical path is each liquid\'s own index times its depth (glycerine, syrup, water)', worst < 0.005,
     `${r.paths.map((p) => `${p.id} ${p.read.toFixed(4)} against ${p.n} × ${r.thickness.toFixed(2)} = ${p.expected.toFixed(4)}`).join('; ')}`);
