@@ -820,7 +820,8 @@ if (!process.argv.includes('--node')) {
     const rows = [];
     for (const id of ['velvet-underground', 'jellyfish-bloom', 'bass-drop']) {
       const look = PRESETS.find(p => p.id === id).settings;
-      const cords = (look.sceneMappings ?? []).filter(isAreaCord);
+      // The look's own cords: the music's hands in its areas (38v-1) read the smoothed bands, which this song does not play; `npm run musiccords` holds them.
+      const cords = (look.sceneMappings ?? []).filter(m => isAreaCord(m) && !isMusicCord(m));
       const pourAreas = new Set(cords.filter(m => m.setting === 'areaPour').map(m => m.area));
       const lookOver = { ...over, dt: look.globalSpeed * 0.2, advection: look.advection, damping: look.damping };
       const cfg = { L, seconds: 4, areas: PRESET_AREAS[id], contract: PRESET_CONTRACTS[id], cords, bursts: song, over: lookOver, every: 60, pools: false };
