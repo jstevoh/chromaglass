@@ -207,3 +207,20 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   operator's tilts and presses, heat, the pour's momentum) on the looks that should be
   lively, measured by `npm run watch`'s turnover and lifetime against the reference
   library, never by speeding the clock (38u-6 is the clock's own item).
+
+- **48r. Timbre and harmony as cord sources** (S–M; asked 2026-11-21 with the owner's pick:
+  "what music aspects can we send through cords? ... like melody, timbre?"). A cord today
+  reads the level, the kick, bass, snare and hats, the pitched part (`note`) and the
+  sustained part in three registers (`tonalLow`, `tonalMid`, `tonalHigh`), eight EQ bands,
+  hits as events, the lead's pitch (`pitch`, the melody's height) and which of the twelve
+  notes it is on (`noteClass`), the beat and the bar, the song's build, drop and breakdown,
+  and MIDI notes. The ear already works out two more that no cord can take: the sound's
+  brightness (`brightness` and `timbre` in `audioFeatures.ts`, the spectral centroid: a
+  bright synth or a cymbal against a warm pad) and its harmony (`chroma`, the twelve notes
+  sounding, which only the song follower reads). Offer both as sources: timbre as a level,
+  and harmony as how much the chord changes (the distance between this and the last
+  second's chroma) and whether it is major or minor. For the music-driven ideas these are
+  the natural drives: brightness to 48f's drive frequency (a brighter sound, a finer
+  pattern), a chord change to 48a's light. Check: a sweep from a sine to a sawtooth at one
+  pitch raises the timbre source and leaves `pitch` alone; a chord change moves the harmony
+  source and a held chord does not.
