@@ -541,4 +541,12 @@ await browser.close();
 server.close();
 const failed = checks.filter((c) => !c.ok).length;
 console.log(failed ? `\n${failed} of ${checks.length} FAILED` : `\nall ${checks.length} ok`);
+// The runner (scripts/checks.mjs) honours a quarantined line (PLAN.md 19ak-1)
+// only when the harness also says how many of its lines passed, in its own
+// words, so a crash after the quarantined line cannot pass for it. This
+// harness never printed that tally, so 19ak-9's quarantine of 9c could never
+// hold: every pull request that ran the browser shard went red on 9c alone
+// (found 2026-11-21 on the webpage films' run). The tally is the same count
+// as the line above, in the form the runner reads.
+console.log(`${checks.length - failed}/${checks.length} checks passed`);
 process.exit(failed ? 1 : 0);
