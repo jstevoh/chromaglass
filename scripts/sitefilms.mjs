@@ -7,6 +7,7 @@
  *   SITEFILMS_ONLY=machina npm run sitefilms          one
  *   npm run sitefilms -- --films ~/renders            cut from renders made already
  *   npm run sitefilms -- --album cylinders            a channel album: a look a piece, one film
+ *   SITEFILMS_ONLY=3 npm run sitefilms -- --album cylinders   only its third piece
  *   npm run sitefilms -- --banner                     the channel's banner, from the desk
  *
  * What was asked (the owner, 2026-10-29, 2026-11-08 and 2026-11-21; PLAN.md
@@ -44,6 +45,10 @@
  * rate), with youtube.txt carrying a chapter at the start of each piece. Each
  * piece is its own render, so a look starts fresh on its piece the way a
  * performer changes look between songs; the cut falls where one piece ends.
+ * A piece rendered already is kept, and SITEFILMS_ONLY names pieces by their
+ * number, so the album can be made a piece at a time between the Mac's
+ * deploys (the GPU busy with a render sends a deploy to a slower runner,
+ * docs/mac-runner.md); the pieces are joined once all are there.
  *
  * The music: the composer's own file (siteFilms.ts says whose and why),
  * checked against its checksum, trimmed from its head silence to just past
@@ -287,10 +292,12 @@ if (BANNER) {
   const dir = path.join(OUT, ALBUM.id);
   fs.mkdirSync(dir, { recursive: true });
   const parts = [];
+  let missing = 0;
   try {
     for (const [i, piece] of ALBUM.pieces.entries()) {
       const id = `${ALBUM.id}-${i + 1}`;
       const part = path.join(dir, `${i + 1}.mp4`);
+      if (!fs.existsSync(part) && ONLY && !ONLY.includes(String(i + 1))) { missing++; continue; }
       if (!fs.existsSync(part)) {
         const wav = await musicOf(id, piece.music);
         const page = await openShow(piece.look, { seed: piece.seed, viewport: { width: 1280, height: 800 } });
@@ -300,6 +307,7 @@ if (BANNER) {
       checkFilm(id, part, piece.music.seconds);
       parts.push(part);
     }
+    if (missing) throw new Error(`${missing} of ${ALBUM.pieces.length} pieces still to render; the album is joined once all are there`);
     const list = path.join(dir, 'parts.txt');
     fs.writeFileSync(list, parts.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'));
     const film = path.join(dir, 'film.mp4');
