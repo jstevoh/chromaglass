@@ -440,8 +440,8 @@ export default function App() {
   const { songLine, barKnown, heardBpm, songCueSeqRef } = useSongLine({ wallRef });
 
   const {
-    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying, pouringCartoon,
-    setPouringCartoon, pourName, setPourName, pourVideoFrom, stopPour, pourFile, handleVideoUpload,
+    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
+    pourName, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
   } = usePour({
     visualizerRef,
   });
@@ -535,9 +535,9 @@ export default function App() {
 
   const {
     filmSource, filmName, loadFilm, cameras, filmCameraId, filmCamera, filmCameraLost,
-    startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, cartoons,
+    startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, video,
   } = useFilm({
-    wallRef, setToast, pouringCartoon, pourVideoFrom, setPouringCartoon, setPourName, stopPour,
+    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour,
   });
 
   const {
@@ -557,11 +557,12 @@ export default function App() {
     twitchy a reading should be, which is a property of the plate rather than
     of where the pixels came from.
   */
-  const filmDriving = filmSource !== 'none'
+  // A poured video is read the same (PLAN 14ag): the film's when one plays, else the pour's.
+  const filmDriving = (filmSource !== 'none' || isVideoPlaying)
     && ((settings.filmDrive ?? 0) > 0 || (settings.filmImpact ?? 0) > 0);
   const filmSense = useFilmSense({
     enabled: filmDriving,
-    getVideo: () => wallRef.current?.filmVideoEl() ?? null,
+    getVideo: () => wallRef.current?.filmVideoEl() ?? (isVideoPlaying ? videoPlayerRef.current : null),
     deadzone: settings.sceneDeadzone ?? 0.25,
     smooth: settings.sceneSmooth ?? 0.35,
   });
@@ -691,7 +692,7 @@ export default function App() {
     ? clockText((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000)
     : null;
 
-  const { paletteLock, selectPalette } = usePaletteLock({ bothEngines, visualizerRef });
+  const { paletteLock, selectPalette, paletteFromFile, palettes, pictureDyes } = usePaletteLock({ bothEngines, visualizerRef, setToast });
   // Lay the opening look's plate: its dyes, its seed, its injection styles and
   // its liquids. The settings above arrive with the first render, but the
   // plate is the visualizer's and it seeds Classic until told otherwise — so
@@ -1581,7 +1582,7 @@ export default function App() {
     castState, relaySendRef, markLoaded, loadMark, clearMark,
   } = useCastFeed({
     wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
-    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
+    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, pictureDyes, shownOutput, castSend,
     mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
     isCasting, ear, hear, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
   });
@@ -2156,11 +2157,8 @@ export default function App() {
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       filmName={filmSource === 'file' ? filmName : null}
-      pourName={isVideoPlaying ? pourName : null}
-      cartoons={cartoons}
+      video={video}
       onFilmFile={loadFilm}
-      onPourVideo={pourFile}
-      onStopPourVideo={stopPour}
       onFilmCamera={() => void startFilmCamera()}
       filmCameraId={filmCameraId}
       onFilmCameraDevice={chooseFilmCamera}
@@ -3105,12 +3103,13 @@ export default function App() {
             onLiquid={setSelectedLiquidId}
             dyeColors={DROPPER_COLORS}
             onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
-            palettes={COLOR_HARMONIES.map((h, i) => ({ name: COLOR_HARMONY_NAMES[i], colors: h.slice(0, 4).map(pi => PALETTE[pi].hex) }))}
+            palettes={palettes}
             paletteLock={paletteLock}
             onPalette={selectPalette}
+            onPicturePalette={paletteFromFile}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
-            cartoons={cartoons}
+            video={video}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -3708,15 +3707,13 @@ export default function App() {
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); }}
-          palettes={COLOR_HARMONIES.map((h, i) => ({
-            name: COLOR_HARMONY_NAMES[i],
-            colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
-          }))}
+          palettes={palettes}
           paletteLock={paletteLock}
           onPalette={selectPalette}
+          onPicturePalette={paletteFromFile}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
-          cartoons={cartoons}
+          video={video}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}

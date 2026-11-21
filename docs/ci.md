@@ -42,6 +42,10 @@ deploy:
   never move for it, and adding one or moving its end later is a check change the PR
   names (`checkguard`). A red run on a line the PR cannot move is re-run by its
   **failed jobs** only, never all jobs.
+  One exception to "main's deploy holds every line", the owner's choice (PLAN.md
+  19ak-10, 2026-11-21): a deploy that trusts a PR's green run (`deploygate.sh` rules 4
+  and 5) trusts it even when a quarantine held it green, so it does not run the
+  quarantined line itself; only a deploy that runs its own checks holds it.
 - **The Mac waits for the typecheck** (`Compiles, before the Mac`, PLAN.md 19ak-3c):
   `tsc --noEmit` on ubuntu beside `reach`; a PR that does not compile takes no Mac.
 - **A whole run re-run skips the shards that passed** (PLAN.md 19ak-3a): on attempt 2

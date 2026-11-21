@@ -49,6 +49,7 @@ import { coveredControls, legibility } from './layoutProbe.mjs';
 import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
 import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
 import { magnetSizeEnds, MAGNET_SIZE_TOP } from './phoneMagnet.mjs';
+import { dyeSheetLines } from './phoneDye.mjs';
 
 const PORT = port(4183, 'PHONE_PORT');
 const HEADED = process.argv.includes('--head');
@@ -649,11 +650,7 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
       await page.waitForTimeout(250);
 
-      // A bottle from the Dye sheet is the one in the dock.
-      await tap(page, 'phone-open-dye');
-      await tap(page, 'phone-liquid-ink');
-      const dyeLabel = (await page.getByTestId('phone-open-dye').innerText()).trim();
-      check('a bottle picked in the Dye sheet is the one in the dock', /ink/i.test(dyeLabel), `dock says "${dyeLabel}"`);
+      await dyeSheetLines(page, tap, check);
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*

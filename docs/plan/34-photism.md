@@ -72,6 +72,21 @@ a grid of generic stock thumbnails: ours are the plate itself.
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
+- **34a-6. The looks as films, each to its own kind of music, and on the channel.** *The row
+  shipped (2026-11-08): six 1920s records, each played whole by a look, under the gallery; story
+  in `docs/plan-shipped.md` §34a-6.*
+  - **34a-6a. The channel's ids.** *Shipped (2026-11-08): all six on the channel, Public, ids
+    in `siteFilms.ts`; story in `docs/plan-shipped.md` §34a-6.*
+  - **34a-6c. Open: the channel's content claims.** Five of the six carry a claim from the
+    channel's matching of a label's remaster: Rachmaninoff and Tears are blocked in some
+    countries (Tears in Russia), Bessie, Caruso and the Wolverines only lose earnings. Every one
+    is a Great 78 transfer of the original disc, published in the US before 1926, so each is
+    disputed as public domain with the credit lines and `public/landing/films/SOURCES.md`;
+    all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
+    about 30 days). Until one is won, a visitor in a blocked country who opens
+    that card gets YouTube's own notice in the player, not the film.
+  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills; more records
+    as each year's recordings enter the public domain (1926's on 1 January 2027).
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
   synth people, producers and artists, who need the technical capabilities before they pay.)*
   `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
@@ -103,8 +118,9 @@ a grid of generic stock thumbnails: ours are the plate itself.
     variables when the show server starts, which a Finder launch never sets, though
     `desktop/README.md` says it works "with no terminal". A Show menu item or a Settings → Wall
     card for host, universe, fixtures, order and the in-map, kept in the app's settings.
-  - **34a-7d. Network displays cannot start over the Wi-Fi.** A `?cast` page at an `http://`
-    address gets no WebGPU (14m-https, #443), so "more screens on other computers" is not sold yet.
+  - **34a-7d. Network displays cannot start over the Wi-Fi.** The show server now serves them over
+    https (14m-https, shipped); "more screens on other computers" can be sold once the owner has seen
+    a TV or a second computer take it (judging §136).
   - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
@@ -136,9 +152,9 @@ a grid of generic stock thumbnails: ours are the plate itself.
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
 - **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
   story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
-  - **34a-8a. The films themselves on the page.** The link sends a visitor away to watch; the six
-    public films (PR #729's ids in `siteFilms`) could play on the page itself, a card per look, once
-    #679's cards are on main. Until then the channel link is the only way to see a look move.
+  - **34a-8a. The films themselves on the page.** *Shipped with 34a-6 (PR #679, carried from #729): the row
+    "Six records from the 1920s" sits under the looks, and each card opens its film from the
+    channel on the page itself.*
 
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
@@ -211,6 +227,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
   are what a producer and a VJ pay for, and Photism has both. No change in scope, but
   13.7 is the one a music-maker audience (Home's buyers) asks for first: when the signed
   Mac app (13.1-sign) is out, take 13.7 before 13.3.
+
+- **34j. The second look: the clips, watched (2026-11-15).** The owner sent a Photism Instagram ad;
+  this time its nineteen scene clips (photism.app/clips/, 4 to 16 s, silent) were watched with
+  `npm run watch`. Notes and a poster mosaic: the project's shared `references/photism-2026-11-15/`.
+  It is shader art, not fluid: fractals, raymarched tunnels, lasers, particles on a swirl, a chrome
+  bust, and one reaction-diffusion maze (Morphogen). Its hero (Anemone) pumps the whole frame's
+  brightness on the beat (luminance 0.06 to 0.28 at 2.0 s and 6.0 s), the whole-frame reaction our
+  rule forbids. Morphogen is the one picture to aim at: a crisp lit labyrinth, edges 0.71% of the
+  width, stripes about 1.2% apart, about 213 forms a frame; kept as the reference
+  `photism-morphogen` for Ferro Labyrinth's fingers (38d, the fingers thread's PR #838), where the
+  maze must come from the magnetic instability, not a reaction-diffusion formula. New on its page
+  since 10-22: cover art builds a scene's palette (ours is being built from any image or video,
+  17 and 43), and 1,000+ users became 3,000+. The owner's calls: Home to $29 with the Live Show
+  and the DAW bridge (23.21); the page's refund line and phone-to-computer email are not taken.
 
 **Order.** 34a first (it needs no engine work and the site is the demo), then ~~34f~~ (shipped) and 34g
 (small), then 34b and 34c; 34d, 34e and 34h are for when the planned VJ and DAW steps

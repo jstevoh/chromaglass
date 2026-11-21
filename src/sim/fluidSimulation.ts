@@ -490,7 +490,7 @@ export class FluidSimulation {
       soap for what it already does pays nothing for the passes that would
       move it.
     */
-    this.liquid.onDeposit = (cx, cy, radius, what, amount, seconds) => {
+    this.liquid.onDeposit = (cx, cy, radius, what, amount, seconds, push) => {
       const g = this.gpu;
       const s = this.lastSettings;
       if (!g || !s || amount <= 0) return;
@@ -528,7 +528,7 @@ export class FluidSimulation {
         Only on a thin gap: the old plate has no volume to push and no
         viscosity a cell to give it.
       */
-      if (this.thinGap && g.pour) {
+      if (this.thinGap && g.pour && push !== false) {
         const L = this.size;
         const r = Math.max(1.5, radius) / L;
         g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds, g.coverMetres), speciesOf(what), true, what);
@@ -2563,8 +2563,7 @@ export class FluidSimulation {
     `dye`, the share of `amount` that is colour, in every style: 0 for a clear
     liquid (lib/liquidColour.ts) or the music on a reagent (PLAN 25i-10). A
     clear drop still splashes; only what it lays is scaled. `volume` false for
-    a drop that brings no liquid of its own (a fresh plate's lay, a bottle
-    whose own pour brought it; sim/dropSplash.ts).
+    a drop with no liquid of its own (a fresh plate's lay; sim/dropSplash.ts).
   */
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1, volume = true) {
     const S = this.size;
@@ -2921,7 +2920,7 @@ export class FluidSimulation {
     };
   }
 
-  /** The slosh dish: what drives it this frame (lib/slosh.ts SloshDrive says what, and why). */
+  /** The slosh dish: what drives it (lib/slosh.ts SloshDrive says why). */
   private stepSlosh(settings: VisualizerSettings, p: GpuStepParams) {
     const gpu = this.gpu;
     if (!gpu) return;
@@ -2931,7 +2930,7 @@ export class FluidSimulation {
       if (this.sloshClock.live) gpu.setSlosh(null);
       this.sloshClock.stop();
       this.dishKicks.length = 0;
-      this.sloshSpin.read(this.dishSpin, 0);
+      this.sloshSpin.read(this.dishSpin, 0, 0);
       return;
     }
     const [hx, hy] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);
@@ -2946,7 +2945,7 @@ export class FluidSimulation {
     }
     this.dishKicks = this.dishKicks.filter((k) => k.t < KICK_HOLD + KICK_RELEASE + dt);
     const r = sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
-    const sp = this.sloshSpin.read(this.dishSpin, dt);
+    const sp = this.sloshSpin.read(this.dishSpin, dt, r);
     const driven = ax !== 0 || ay !== 0 || presses.some((q) => q.depth > 0) || sp.wakes;
     const tick = this.sloshClock.tick(dt, driven, r);
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, spin: sp.spin, spinRate: sp.rate } : null);

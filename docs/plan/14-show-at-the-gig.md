@@ -177,6 +177,17 @@ the filter removed either: the median-and-MAD threshold already eats a steady vi
 does), where plain flux fires and the maximum filter does not. *Measure:* pulses a minute on
 that voice, with and without the filter.
 
+## 14d-10. A long song's plate drifts, brighter or fainter, by its end
+
+**Measured 2026-11-08** (the six 1920s films, brightness every 15 s, before and after 14d-2):
+with the beat feeding Kick hit, Rachmaninoff no longer fades but Whiteman still does (it ends
+at 29 against 45 at its start), and Oliver's second half runs brighter (120 to 133). Wolverines
+peaks lower (97 against 113); Bessie and Caruso hold. So over three minutes the plate does not
+hold its level: dye in and dye out are not balanced for the song's whole length. Noted, not
+fixed: the owner has not asked for it. *Measure:* the brightness of each 15 s window against
+the first minute's, on the six films; *fix* in the dye budget the beat feeds, never by
+normalising the picture.
+
 ## 14e. The picture and the room disagree about when the kick is
 
 **Read in the code; the output delays are inferred.**
@@ -391,17 +402,7 @@ Left open from it:
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
 - ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
 - ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- **14m-https** (M, found in 14m-lan): a **network display cannot start at an `http://`
-  Wi-Fi address**. Browsers give WebGPU only to a secure page (https, or localhost), so
-  `http://<laptop-ip>:3000/?cast=true&key=…`, the address the README and the server give
-  a projector's browser or a second computer, fails at the first shader module with
-  "GPUTextureUsage is not defined" (measured in Chromium on 2026-10-24; `npm run
-  phonelink` now asks for the plain words on that screen). The phone's remote needs no
-  GPU and is unaffected. *Fix, to choose:* the show server serves https on the LAN with a
-  certificate the owner's devices trust (mkcert-style; every device installs it once), or
-  network displays go through the tunnel's https address, or the network display gets a
-  WebGL2 fallback of the plate. *Measure:* a network display opened at the address the
-  server prints draws a plate in a browser as it ships (the Mac's `wall`).
+- ~~**14m-https**~~ (M): a network display at a Wi-Fi address starts, over https on `PORT + 443` with a self-signed certificate. **Shipped** (`npm run netdisplay` 3 → 11 of 11). Story in `docs/plan-shipped.md`. Left: **14m-https-wall** (S, the Mac): a TV's or a second Mac's browser takes the warning once and draws the plate (judging §136).
 - **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
   address, the server refuses new joins from everyone but the laptop for 60 s. That is
   what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years

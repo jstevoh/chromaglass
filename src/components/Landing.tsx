@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
+import { SiteFilms, anyFilmOpens } from './LandingFilms';
 import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /*
@@ -122,13 +123,14 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
   {
     id: 'home',
     name: 'Home',
-    price: '$35',
+    price: '$29',
     buy: CHECKOUT_HOME_URL,
     lines: [
       'Full-length recording, 1080p and 4K render, no mark',
       'Phone remote',
       'Song ID with timed lyrics',
       'Your own logo on the glass',
+      'Live Show: stream to YouTube, Twitch and the rest',
       'The Mac app: the show offline, the phone remote built in',
     ],
   },
@@ -253,7 +255,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             Free in your browser for good, nothing to install. You sign in once with Google, Apple, an emailed link or a password.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
-            Home $35 · Pro $199 · pay once, no subscription
+            Home $29 · Pro $199 · pay once, no subscription
           </p>
         </div>
       </section>
@@ -295,6 +297,16 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         </a>
       </section>
 
+      {/* Films: six records from before 1926, each played whole by a look (LandingFilms.tsx, PLAN.md 34a-6). */}
+      <section id="films" className="mx-auto w-full max-w-[1120px] px-4 pb-16 sm:px-8 sm:pb-24">
+        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Six records from the 1920s</h2>
+        <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
+          The app listening to six old 78s and playing each from the first note to the last, with nothing added afterwards.
+          The records are in the public domain in the US.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
+        </p>
+        <SiteFilms />
+      </section>
+
       {/* How it works */}
       <section className="border-y border-border bg-surface">
         <div className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-8 sm:py-24">
@@ -317,7 +329,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
           The whole plate is free in your browser, and it stays free: this is not a trial. Home and Pro add the Mac app and what a show needs:
           full-length recordings with no mark, the phone remote, OSC and Art-Net for a rig. Pay once, no subscription. Start with Home and move to
-          Pro later for the $164 difference. The store opens in a new tab: buy with the email you will sign in with, so the app finds your licence.
+          Pro later for the $170 difference. The store opens in a new tab: buy with the email you will sign in with, so the app finds your licence.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {TIERS.map((t) => (
