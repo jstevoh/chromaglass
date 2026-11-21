@@ -2176,6 +2176,7 @@
       "shard": "browser",
       "run": "node scripts/intro.mjs",
       "env": {"PW_WEBGPU":"1"},
+      "quarantine": [{ "line": "9c. its loading line says what the show waits for", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before",
         "the app has arrived, taken into the plate's frame on the desk and the",
@@ -3748,6 +3749,7 @@
       "shard": "tools",
       "run": "node --experimental-strip-types scripts/drawwall.mjs --app",
       "timeout": 4,
+      "quarantine": [{ "line": "the control: through the camera without the dish", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md",
         "8-draw-a): the laptop's own frames reach the pad, the plate's colour,",
