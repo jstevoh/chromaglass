@@ -48,6 +48,10 @@
  *  11. where it settles is told once (`onLand`, which the app makes the aim),
  *      and a nudge of the aim from there (the arrows, the sliders, Evolve)
  *      pans on from the pool rather than back to the bare middle
+ *  12. every hand in src/ writes `macroMode` only as true, false or a zoom
+ *      against 1.05, and no reader outside the two readings takes
+ *      `macroZoom ?? 1` (the side rail flipped the flag alone after #856,
+ *      and eleven readers saw 1x on a 4x closeup look)
  *
  * The app half: classic, the plate cleared and one pool laid at (0.33, 0.5)
  * through the debug hook; at 1x the pool is drawn (the control: a black frame
@@ -266,6 +270,48 @@ if (process.argv.includes('--node')) {
     check('the landing\'s zooms are the solver\'s, and the button is lit exactly when the closeup is in',
       LAND_FULL_ZOOM === MACRO_FULL_ZOOM && CLOSEUP_PRESS_ZOOM === MACRO_PRESET_ZOOM && disagree === 0,
       `full ${LAND_FULL_ZOOM} vs ${MACRO_FULL_ZOOM}, press ${CLOSEUP_PRESS_ZOOM} vs ${MACRO_PRESET_ZOOM}; lit state wrong on ${disagree} of ${cases} settings`);
+  }
+
+  {
+    /*
+      Line 12: every hand and every reader in the app's source goes through
+      the one press and the one reading. Line 8 proves closeupToggle is
+      right and line 9 that closeupIn is; neither sees a caller that skips
+      them. Two did after #856: the side rail's Macro button flipped
+      `macroMode` alone (a 4x plate under a knob reading 1.0x, dark after a
+      pinch, and a second press over a pinched-in closeup turning the flag
+      on instead of taking the plate out), and eleven readers took
+      `macroZoom ?? 1` where the frame draws `macroZoomOf` (4 for a closeup
+      look with no zoom of its own), so the zoom chip, the Settings slider,
+      the wheel guard, the +/- ramp, the arrows, the desk's zoom, the
+      phone, the look's pace and Evolve's camera guard each read 1x on a
+      4x frame. So the scan: a write to `macroMode` is only `true`, `false`
+      or a zoom compared to 1.05 (closeupToggle's own, the slider's, the
+      ramp's), and `macroZoom ?? 1` appears only inside the two readings
+      themselves (sim/constants.ts macroZoomOf, lib/macroLanding.ts
+      closeupIn, whose agreement line 9 holds).
+    */
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join, relative } = await import('node:path');
+    const root = join(process.cwd(), 'src');
+    const files = [];
+    const walk = (d) => { for (const n of readdirSync(d)) { const f = join(d, n); if (statSync(f).isDirectory()) walk(f); else if (/\.tsx?$/.test(n)) files.push(f); } };
+    walk(root);
+    const flips = [], readers = [];
+    const OWN = new Set(['sim/constants.ts', 'lib/macroLanding.ts']);
+    for (const f of files) {
+      const rel = relative(root, f).split('\\').join('/');
+      readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+        if (/^\s*(\/\/|\*)/.test(line)) return;
+        for (const m of line.matchAll(/macroMode:\s*([^,}\n]+)/g)) {
+          const v = m[1].trim();
+          if (!/^(true|false)$/.test(v) && !/^(boolean|undefined)\b/.test(v) && !/^\w+ > 1\.05$/.test(v)) flips.push(`${rel}:${i + 1} ${v}`);
+        }
+        if (/macroZoom \?\? 1\b/.test(line) && !OWN.has(rel)) readers.push(`${rel}:${i + 1}`);
+      });
+    }
+    check('every hand presses closeupToggle and every reader reads macroZoomOf', files.length > 100 && flips.length === 0 && readers.length === 0,
+      `${files.length} files; macroMode written otherwise: ${flips.join(', ') || 'none'}; reads macroZoom ?? 1: ${readers.join(', ') || 'none'}`);
   }
 } else {
   const { chromium } = await import('playwright');

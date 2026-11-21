@@ -32,6 +32,9 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   coming in lands (QA-32). Follow rides the liquid instead. Whether Hold should step to the
   nearest liquid when its frame has been bare for a few seconds, with no hand on the aim,
   is the owner's call; `npm run closeupland` is where its line would go. Found with QA-32.
+- ~~**QA-32b** The side rail's Macro button still flipped `macroMode` alone after QA-32,
+  and eleven readers of the zoom read `macroZoom ?? 1` on a closeup look drawn at 4x.~~
+  **Fixed** (`npm run closeupland`, line 12). Story in `docs/plan-shipped.md` §QA-32b.
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
