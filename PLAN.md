@@ -22,59 +22,64 @@ from before the 2026-11-21 sweep takes it in.)
 ## This week: beautiful visuals, real physics (2026-11-21 to 11-28)
 
 The owner, 2026-11-21: "lets reprioritize the remaining work to focus on beautiful
-visualizations/physics for this week." Ranked: what an audience would see change, against
-how close it is to done. Each line is its own thread and PR, as always, with its check
-first, filmed before and after on the owner's Mac for the owner to judge. The standing rule
-holds for every line: the phenomenon is simulated, the dials may ramp past real, and the
-plate shader draws only what the solver makes.
+visualizations/physics for this week", and then "lets rank order them by how big of a
+change visually it will make". So the list is ranked by how much a person watching the
+wall would see change, biggest first. Each line is its own thread and PR, as always, with
+its check first, filmed before and after on the owner's Mac for the owner to judge. The
+standing rule holds for every line: the phenomenon is simulated, the dials may ramp past
+real, and the plate shader draws only what the solver makes.
 
-1. **Real drops: a colour drop pushes the dye aside** (**18c-9** the contact patch and its
+1. **Faraday waves: the music's vibration stands up as a pattern** (**48f**, the owner's
+   pick from §48: "anything that can be impacted by the music itself"). A whole new kind
+   of picture, stripes, squares and hexagons that grow with a note and fade with it, on
+   any look a cord drives. Started in its own thread.
+2. **Soap Film's big swirls** (**32k**, **32h**, **32d-1**, PR #837: a Brinkman film with
+   its own air, and Frame Tilt as gravity in the plane). The look goes from 82–87% black
+   (the 2026-11-12 study) to a continuous swirling sheet of Newton's colours, as in the
+   "Liquid Tapestry" reference. Built; merge on green, then film. Next in §32: **32i** real
+   drag with time as its own dial, **32j** the surfactant moves (Marangoni).
+3. **Video as the lamp** (**14ag-3**, PR #899): any footage under the dish, seen through
+   the liquid, refracted and coloured by the oil. A new source for every look. Built;
+   merge on green, then film.
+4. **The liquid looks at a real show's pace** (**48q**): 25 of 33 liquid looks turn over
+   several times slower than real shows, and the cause is the forcing, not the camera.
+   The widest change on the list, since it touches most looks: work the liquid harder by
+   real means on the looks meant to be lively, measured by `npm run watch` against the
+   reference library.
+5. **Polarised light: stress rainbows** (**31p-1**, PR #855, the liquid's flow
+   birefringence between a polariser and a turnable analyser; **31p-3**, PR #895, Dish
+   Stress, the moulded dish's own rainbows in series). A new look mode of saturated
+   rainbow bands that follow the flow, where it is turned on. Built; merge on green, then
+   film.
+6. **Ferrofluid fingers, thin and branched** (**38d-1**, PR #838, the magnetic Bond number
+   sets the labyrinth's period; reference `photism-morphogen`). A crisp branching maze in
+   place of today's fine hatch, on Ferro Paint and Magnet Garden. Built; its thread takes it
+   to green and films both looks.
+7. **Real drops: a colour drop pushes the dye aside** (**18c-9** the contact patch and its
    steps on the capillary time, then **18c-8** the round window, **18c-6** the rim's
    fingers, **18c-7** the dark collar; `18-physics-2.md`). In progress in its own thread.
-   A drop is the commonest gesture in a show; it should part the liquid like a real one.
-2. **Ferrofluid fingers, thin and branched** (**38d-1**, PR #838, the magnetic Bond number
-   sets the labyrinth's period; reference `photism-morphogen`). Built; its thread takes it
-   to green and films Ferro Paint and Magnet Garden.
-3. **Polarised light: stress rainbows** (**31p-1**, PR #855, the liquid's flow birefringence
-   between a polariser and a turnable analyser; **31p-3**, PR #895, Dish Stress, the moulded
-   dish's own rainbows in series). Built; merge on green, then film.
-4. **Soap Film's big swirls** (**32k**, **32h**, **32d-1**, PR #837: a Brinkman film with
-   its own air, and Frame Tilt as gravity in the plane). Built; merge on green, then film
-   against the "Liquid Tapestry" reference, where the film should be a continuous sheet,
-   not 82–87% black (the 2026-11-12 study). Next in §32: **32i** real drag with time as
-   its own dial, **32j** the surfactant moves (Marangoni).
-5. **Video as the lamp** (**14ag-3**, PR #899): the video under the dish, seen through the
-   liquid, so a performer's own footage is refracted and coloured by the oil. Built; merge
-   on green, then film.
-6. **The physics-shortcut audit's findings** (the fourth pass after §18, §38, §38u; running
-   now in its own thread). A slot held: its findings go into §38 as ranked items, and the
-   top two or three take lines here when they land, above anything below this line that
-   has not started.
-7. **The physics calls already built, landed** (each a PR waiting on green, merge as each
-   goes green): **38u-8** and **38u-11** Granulation and Glass Smear still unless something
-   moves them (#889); **38u-10** the dye's index at its measured strength with Dye Index
-   Boost (#882); **38u-7**, **38u-12**, **38u-14** (#848); **18e-7** no line where two dyes
-   meet up close (#881); **38u-9** Macro Lacing rides the flow (#883); **18e-2** a clear
-   pour's edge from the optical path (#755); **38h-6** the bubble film by transmission
-   (#750); **15e-10** a bottle slides down a rocked gap at Hele-Shaw's speed (#877);
-   **38r-16** the pinch and the puddle (#873); **47a** the closeup's fine dye (#835).
-8. **The rest of the third realism pass** (§38u): **38u-6** the music no longer speeds the
+   Every drop parts the liquid like a real one: seen on each drop, but each drop is small.
+8. **The physics calls already built, landed** (each a PR waiting on green, merge as each
+   goes green). Mostly subtle one by one, together a cleaner plate: **38u-8** and **38u-11**
+   Granulation and Glass Smear still unless something moves them (#889, looks open a
+   touch brighter and steadier); **18e-7** no line where two dyes meet up close (#881);
+   **18e-2** a clear pour's edge from the optical path (#755); **38u-10** the dye's index
+   at its measured strength with Dye Index Boost (#882); **38u-7**, **38u-12**, **38u-14**
+   (#848); **38u-9** Macro Lacing rides the flow (#883); **38h-6** the bubble film by
+   transmission (#750); **15e-10** a bottle slides down a rocked gap at Hele-Shaw's speed
+   (#877); **38r-16** the pinch and the puddle (#873); **47a** the closeup's fine dye (#835).
+9. **The rest of the third realism pass** (§38u): **38u-6** the music no longer speeds the
    solver's clock, **38u-13** kicks no longer make air from nowhere, **38u-15** the drain
-   flushes the dye rather than fading it.
-9. **The liquid looks at a real show's pace** (**48q**): 25 of 33 liquid looks turn over
-   several times slower than real shows, and the cause is the forcing, not the camera.
-   Work the liquid harder by real means on the looks meant to be lively, measured by
-   `npm run watch` against the reference library.
-10. **The owner's pick from the ideas** (§48, [`48-ideas-visuals.md`](docs/plan/48-ideas-visuals.md)):
-    the short list is the chemical clock steered by light (48a), every drop a lens with
-    caustics on the wall (48b, with 47j), bioluminescent trails (48c), lifting the glass
-    into air ferns (48d), oil-slick rainbows (48e) and Faraday waves through a cord (48f).
-    **The owner picked, 2026-11-21: "anything that can be impacted by the music itself.
-    Like the standing-wave patterns."** So **48f** Faraday waves starts this week, in its
-    own thread, and the ideas the music can move through a cord come next in this order:
-    48c (the music's cords stir, the plate glows where they shear), 48a (a cord on the
-    light that holds the clock's waves back), 48d (a cord on the lift), 48i (a cord that
-    turns the ferrofluid's field).
+   flushes the dye rather than fading it. Small to see, right to have.
+10. **The physics-shortcut audit's findings** (the fourth pass after §18, §38, §38u; running
+    now in its own thread). A slot held: its findings go into §38 as ranked items, and each
+    takes its place in this list by how much it would change on the wall.
+
+After this week, the ideas the music can move through a cord, in the owner's order
+(§48): **48c** bioluminescent trails where the music's cords stir, **48a** the chemical
+clock with a cord on the light that holds its waves back, **48d** lifting the glass into
+ferns, **48i** the ferrofluid's stripes turned by the field, and **48r** timbre and harmony
+as cord sources, which every one of them can use.
 
 **Parked this week, kept in the plan.** The launch, the stores and the money (§12, §23,
 §37, §39, §43), the VJ software and the gig's plumbing (§13, §14, §16, §17, §24), the
