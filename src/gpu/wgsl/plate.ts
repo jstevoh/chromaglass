@@ -809,7 +809,7 @@ fn cellField(p0: vec2f, flow: vec2f, seed: f32, period: f32, phase: f32, rimWidt
  * the top, above the early exits, and the caller masks the result rather than
  * branching around the call on a per-pixel test.
  */
-fn lacing(color: vec3f, t: texture_2d<f32>, fuv: vec2f, alpha: f32, amount: f32) -> vec3f {
+fn lacing(color: vec3f, t: texture_2d<f32>, grainTex: texture_2d<f32>, fuv: vec2f, alpha: f32, amount: f32) -> vec3f {
   let e = 3.0 / U.logicalGrid;       // one solver cell, in fluid uv
   let cR = decodeFluid(t, fuv + vec2f( e, 0.0), 0.0, false);
   let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
@@ -879,10 +879,13 @@ fn lacing(color: vec3f, t: texture_2d<f32>, fuv: vec2f, alpha: f32, amount: f32)
   let reach = abs(fP - fM);                     // the whole change, in colour
   if (reach < 0.02) { return color; }
   // The level to draw at: the middle of that change, jittered toward the
-  // brighter side rather than along n, which turns round as a boundary passes
-  // through vertical.
+  // brighter side rather than along n, in the grain's carried coordinates (PLAN 38u-9).
+  var a = fuv;
+  var b = fuv;
+  if (textureDimensions(grainTex).x > 1u) { let g = tex2(grainTex, fuv); a = g.rg; b = g.ba; }
+  let ls = U.logicalGrid * 0.16;
   let toward = clamp(dot(axis, vec3f(0.299, 0.587, 0.114)) * 8.0, -1.0, 1.0);
-  let mid = 0.5 * (fP + fM) + (fbm3(fuv * U.logicalGrid * 0.16 + U.time * 0.015) - 0.5) * 0.14 * reach * toward;
+  let mid = 0.5 * (fP + fM) + (mix(fbm3(a * ls), fbm3(b * ls), U.grainMix) - 0.5) * 0.14 * reach * toward;
   let lvl = abs(fC - mid);
   // A thread is a few pixels wide on a rim and on a fifty-cell ramp alike, so
   // the width is set in pixels and only then capped by the change.
@@ -1074,7 +1077,7 @@ fn decodeFluidDof(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool,
 // Control flow here is uniform (branches test uniforms only, masks do the
 // per-pixel work) because the relief pass takes screen-space derivatives of
 // the height field, which are undefined inside divergent branches.
-fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: vec3f, grad: f32, dof: f32, lapK: f32) -> vec4f {
+fn macroDetail(colIn: vec3f, alpha: f32, grainTex: texture_2d<f32>, fuv: vec2f, flow: vec2f, gridNormal: vec3f, grad: f32, dof: f32, lapK: f32) -> vec4f {
   var col = colIn;
   let cuv = fuv;
   let focus = 1.0 - dof * 0.85;
@@ -1135,14 +1138,18 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
   }
 
-  // ── Lacing — thin dark filaments streaming along the flow ───────
+  // ── Lacing — thin dark filaments carried with the flow (PLAN 38u-9) ──
   var lace = 0.0;
   if (U.macroLacing > 0.005) {
+    var a = cuv;
+    var b = cuv;
+    if (textureDimensions(grainTex).x > 1u) { let g = tex2(grainTex, cuv); a = g.rg; b = g.ba; }
     var dir = vec2f(1.0, 0.0);
     if (length(flow) > 1e-5) { dir = normalize(flow); }
     let nrm = vec2f(-dir.y, dir.x);
-    let q = vec2f(dot(cuv, dir) * U.logicalGrid * 0.35, dot(cuv, nrm) * U.logicalGrid * 3.2);
-    let n = fbm3(q + U.time * 0.03) - 0.5;
+    let qa = vec2f(dot(a, dir) * U.logicalGrid * 0.35, dot(a, nrm) * U.logicalGrid * 3.2);
+    let qb = vec2f(dot(b, dir) * U.logicalGrid * 0.35, dot(b, nrm) * U.logicalGrid * 3.2);
+    let n = mix(fbm3(qa), fbm3(qb), U.grainMix) - 0.5;
     let line = 1.0 - smoothstep(0.0, 0.055, abs(n));
     let edgeMask = (0.35 + 0.65 * smoothstep(0.08, 0.45, grad)) * smoothstep(0.04, 0.2, alpha);
     // Filaments a fraction of a cell wide: they come through last.
@@ -1159,20 +1166,12 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     Lit from beneath, as the closeup's camera sees a plate on a light box
     (PLAN 38h-2): the relief is the share of the light that slope leaves in
     the lens (edgePass, the camera's fill), so a steep cell wall or groove
-    is a dark ring and a level top is the plate. It was a lamp lowered over
-    the plate (33g): Lambert from one side, a Blinn glint and a Fresnel
-    brightening of every edge, on the field's slope taken 14 times over to
-    make a dome of it, light from above that a plate on a projector or a
-    light box cannot show. At 14 times the field the camera's cone lost the
-    whole of a pool (in the lab, 2026-10-31), so the field
-    keeps its own slope here; the dome a bead has is the beads' block's.
+    is a dark ring and a level top is the plate; the field keeps its own
+    slope here, and the dome a bead has is the beads' block's.
     A cell's wall is as steep at 4x as at 14x; what the zoom changes is
     whether the camera resolves it. So the wall's full slope goes through
     the lens and its dark ring is faded in as the wall is resolved (k
-    times seeWall), not its slope scaled by k: through the pupil's knee a
-    scaled slope left no ring until one zoom and then the whole ring at
-    once, twice the fine structure at 4x as at 14x (npm run microscope,
-    2.09 -> 25.24 -> 14.58).
+    times seeWall), not its slope scaled by k (npm run microscope).
   */
   if (U.macroRelief > 0.005) {
     let r3 = U.macroRelief;
@@ -2491,7 +2490,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // call: lacing measures two widths with fwidth, and WGSL reads a
   // derivative across the whole quad or not at all.
   if (U.lacing > 0.005) {
-    let laced0 = lacing(fluid0.rgb, layer0, fuv0, fluid0.a, U.lacing);
+    let laced0 = lacing(fluid0.rgb, layer0, grain0, fuv0, fluid0.a, U.lacing);
     if (fluid0.a > 0.02 && sharp0) { fluid0 = vec4f(laced0, fluid0.a); }
   }
   if (plateOn && U.edgeRelief > 0.005 && sharp0) {
@@ -2527,7 +2526,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    let detail0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof, near0.z / max(1.0, near0.w));
+    let detail0 = macroDetail(fluid0.rgb, fluid0.a, grain0, fuv0, flow0, normal0, grad0, dof, near0.z / max(1.0, near0.w));
     // The film follows what the closeup does to the opacity, as it did when
     // it read fluid0.a here; only the grain is kept out of it.
     film0 = mix(film0, detail0.a * film0 / max(fluid0.a, 1e-4), macroAmt);
@@ -3033,7 +3032,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // call: lacing measures two widths with fwidth, and WGSL reads a
     // derivative across the whole quad or not at all.
     if (U.lacing > 0.005) {
-      let laced1 = lacing(fluid1.rgb, layer1, fuv1, fluid1.a, U.lacing);
+      let laced1 = lacing(fluid1.rgb, layer1, grain1, fuv1, fluid1.a, U.lacing);
       if (fluid1.a > 0.02 && sharp1) { fluid1 = vec4f(laced1, fluid1.a); }
     }
     if (plateOn && U.edgeRelief > 0.005 && sharp1) {
@@ -3044,7 +3043,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
     if (closeup) {
       let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
-      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof, near1.z / max(1.0, near1.w)), macroAmt);
+      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, grain1, fuv1, flow1, normal1, grad1, dof, near1.z / max(1.0, near1.w)), macroAmt);
     }
 
     // The mixer's grade and level for the back plate, on its own picture.

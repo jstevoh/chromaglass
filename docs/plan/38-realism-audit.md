@@ -821,9 +821,9 @@ On in many looks:
 Behind a dial at 0, or in one look:
 
 - **38u-9. The drawn textures that are left** (M, one PR; Low-Medium). Each is noise or a hash
-  on a clock, drawn over the liquid: Macro Lacing (fbm filaments on `U.time`, Lacing Run only;
-  `npm run stillcloseup` prints 3.2% of its frame moving on a still plate, and Paint Cells at 1 the same), Lacing's pale
-  thread (its level jittered by fbm on the clock), Paint Cells and the plate's Cells
+  on a clock, drawn over the liquid: ~~Macro Lacing and Lacing's thread on `U.time`~~ (**shipped**:
+  read in the grain's carried coordinates, `stillcloseup` `lace-run` 0.000%; still drawn noise),
+  Paint Cells (`stillcloseup` prints 3.2% at 1) and the plate's Cells
   (`cellField` on a clock; **20c-1** holds the closeup's), Satellite Droplets (a hashed
   lattice that never moves with the flow; 38h fixed their optics, not their places), Thin
   Film at Film Physics 0 (**38m**, **38n-2**), Colour Body (a chroma grade), the glitter's
