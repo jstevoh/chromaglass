@@ -60,6 +60,22 @@ import { spawn } from 'node:child_process';
 import { EarClock } from '../src/lib/earClock.ts';
 
 const PORT = port(4331, 'EARS_PORT');
+/*
+  What a window waits for before it is judged (`watch`): 30 of whatever the
+  runner offers, half again the largest bar below (more than 20 readings),
+  so a line is judged on enough to clear its bar with room, and at most
+  15 s of waiting for it. `--slow=N` runs the page and the wall at 1/N of
+  the CPU, to put this machine where a starved runner is.
+*/
+const ENOUGH = 30;
+const WINDOW_CAP_MS = 15_000;
+const SLOW = Number(process.argv.find(a => a.startsWith('--slow='))?.slice(7) ?? 0);
+/*
+  `--busy=MS` keeps the page's main thread busy for MS of every MS + 10:
+  the other way a runner starves, a page free a few times a second while the
+  CPU is not slowed (deploy 729's 15 ticks in two seconds).
+*/
+const BUSY = Number(process.argv.find(a => a.startsWith('--busy='))?.slice(7) ?? 0);
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
@@ -317,12 +333,23 @@ try {
       skeptic's control: 119 frames read of "238 drawn").
     */
     window.__rafTimes = [];
+    window.__rafCount = 0;
+    /*
+      How many turns the page got, counted by a timer of its own every 16 ms:
+      on a free page about 60 a second, on a starved one as few as the
+      runner allows (a browser runs a late interval once, not once per
+      period missed). It is what a starved runner offered the worker's tick,
+      so the tick's window waits on it (`watch` below), not on the ticks.
+    */
+    window.__turns = 0;
+    setInterval(() => { window.__turns++; }, 16);
     let lastTs = null;
     const stamp = (cb) => (ts) => {
       if (ts !== lastTs) {
         lastTs = ts;
         const a = window.__rafTimes;
         a.push(performance.now());
+        window.__rafCount++;
         if (a.length > 4000) a.splice(0, 2000);
       }
       cb(ts);
@@ -341,6 +368,13 @@ try {
       for (const cb of cbs) raf(stamp(cb));
     };
   });
+  const slow = async (pg) => { if (SLOW > 1) await (await pg.context().newCDPSession(pg)).send('Emulation.setCPUThrottlingRate', { rate: SLOW }); };
+  await slow(page);
+  if (BUSY > 0) {
+    await page.addInitScript((ms) => {
+      setInterval(() => { const end = performance.now() + ms; while (performance.now() < end) { /* busy */ } }, ms + 10);
+    }, BUSY);
+  }
   await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassCastState === 'function' && !!window.chromaglassCastState().ear, null, { timeout: 60_000 });
 
@@ -352,16 +386,41 @@ try {
     nobody gives one value however long it is watched. No reading at all is
     not "one value": it throws, so a dead ear cannot pass the control.
   */
-  const levels = async (ms) => {
+  /*
+    Sampled for `ms`, or, given `enough`, for at least `ms` and on until
+    the runner has offered enough to judge by (see `watch`), at most
+    WINDOW_CAP_MS. Each sample also reads the page's own counts, so the
+    window knows what it has been offered without a second round trip.
+  */
+  const levels = async (ms, enough = null) => {
     const seen = new Set();
     const t0 = Date.now();
-    while (Date.now() - t0 < ms) {
-      const v = await page.evaluate(() => window.chromaglassDebug?.().heard?.volume ?? null);
-      if (v === null) throw new Error('the plate has no sound reading at all');
-      seen.add(v.toFixed(4));
+    const count = () => page.evaluate(() => {
+      const dbg = window.chromaglassDebug?.();
+      return {
+        v: dbg?.heard?.volume ?? null, stamped: window.__rafCount, turns: window.__turns,
+        asked: window.__wallAsks ?? 0, reads: { ...window.chromaglassCastState().ear.reads },
+      };
+    });
+    const first = await count();
+    let samples = 0, got = null, capped = false;
+    for (;;) {
+      const c = await count();
+      if (c.v === null) throw new Error('the plate has no sound reading at all');
+      seen.add(c.v.toFixed(4));
+      samples++;
+      got = {
+        samples, stamped: c.stamped - first.stamped, turns: c.turns - first.turns, asked: c.asked - first.asked,
+        read: c.reads.ask + c.reads.tick - first.reads.ask - first.reads.tick,
+      };
+      const spent = Date.now() - t0;
+      if (spent >= WINDOW_CAP_MS) { capped = !!enough; break; }
+      // The clock's record holds 256 readings by the wall and the tick;
+      // a window that grew past that could not be checked against it.
+      if (spent >= ms && (!enough || enough(got) || got.read >= 200)) break;
       await page.waitForTimeout(50);
     }
-    return { size: seen.size, values: [...seen] };
+    return { size: seen.size, values: [...seen], ms: Date.now() - t0, got, capped };
   };
   const delta = (a, b) => ({ frame: b.reads.frame - a.reads.frame, ask: b.reads.ask - a.reads.ask, tick: b.reads.tick - a.reads.tick });
   const frames = () => page.evaluate(() => window.chromaglassDebug().frames);
@@ -419,9 +478,29 @@ try {
       honest: counted.ask === d.ask && counted.tick === d.tick && stamped >= d.frame,
     };
   }, [t0, t1, d]);
-  const watch = async (ms) => {
+  /*
+    A window long enough to judge by, counted in what the runner offered and
+    not in seconds. Every line below was a fixed two seconds, and on
+    2026-11-09 three of them went red on GitHub's starved Macs on what the
+    runner offered rather than on the ear, each on a different line: deploy
+    729's "covered with no wall" read 15 ticks and 7 levels in its two
+    seconds (the page free about 7 times a second), #718's "uncovered" too
+    few frames to clear its 20, #744's "visible with the wall asking" 7
+    frames of the 10 it needs. Each window still lasts at least two seconds,
+    so a free runner measures exactly as before, and then runs on until the
+    runner has offered enough: `enough` names that in the runner's own
+    terms (frames the page drew, frames the wall asked for, turns the page
+    got, samples of the level taken), never in the readings being judged,
+    so a window cannot wait for the ear to pass. At most WINDOW_CAP_MS: an
+    ear that is deaf, or a clock that reads in the wrong place, is as red at
+    the cap as it was at two seconds, and every bar is the one it was. Slowed
+    by hand to a sixteenth (`--slow=16`, Chromium's CPU throttle), the
+    two-second windows read 8 to 12 frames and went red on four lines here,
+    as the hosted Macs did; these went green with the same bars.
+  */
+  const watch = async (ms, enough) => {
     const a = await snap();
-    const lv = await levels(ms);
+    const lv = await levels(ms, enough);
     const b = await snap();
     const d = delta(a.ear, b.ear);
     return { lv, d, drawn: b.frames - a.frames, ear: b.ear, at: await placed(a.now, b.now, d), t0: a.now, t1: b.now };
@@ -444,7 +523,9 @@ try {
   */
   const everyFrame = (v) => v.at.stamped >= 10 && v.d.frame >= v.at.stamped - v.at.excused;
   const frameNote = (v) => ` (of ${v.at.stamped} frames the page drew${v.at.excused ? `, ${v.at.excused} of them within 4 ms of another reading` : ''})`;
-  const stallNote = (v) => `; ${v.at.n ? `${v.at.misplaced} of ${v.at.n} read within 250 ms of a frame (closest ${v.at.closest.toFixed(0)} ms)` : 'none read off a frame'}` +
+  // A window that ran to WINDOW_CAP_MS without the runner offering enough says so.
+  const capNote = (v) => (v.lv.capped ? ` (the ${WINDOW_CAP_MS / 1000} s cap: the runner offered too little to judge)` : '');
+  const stallNote = (v) => `; over ${(v.lv.ms / 1000).toFixed(1)} s${capNote(v)}; ${v.at.n ? `${v.at.misplaced} of ${v.at.n} read within 250 ms of a frame (closest ${v.at.closest.toFixed(0)} ms)` : 'none read off a frame'}` +
     `${v.at.honest ? '' : `; the record does not agree (${v.at.stamped} frames stamped)`}`;
 
   /*
@@ -458,10 +539,10 @@ try {
   */
   // Let the band start and the room calibrate.
   await page.waitForTimeout(4000);
-  const v1 = await watch(2000);
+  const v1 = await watch(2000, (g) => g.stamped >= ENOUGH && g.samples >= ENOUGH);
   check('visible, the band is heard on the frames alone (the tick only where its frames stalled past 250 ms)',
     v1.lv.size >= 10 && everyFrame(v1) && v1.d.ask === 0 && inStalls(v1),
-    `${v1.lv.size} distinct levels in 2 s; readings ${v1.d.frame} frame, ${v1.d.ask} ask, ${v1.d.tick} tick${frameNote(v1)}; context ${v1.ear.state}${stallNote(v1)}`);
+    `${v1.lv.size} distinct levels in ${(v1.lv.ms / 1000).toFixed(1)} s; readings ${v1.d.frame} frame, ${v1.d.ask} ask, ${v1.d.tick} tick${frameNote(v1)}; context ${v1.ear.state}${stallNote(v1)}`);
 
   /*
     The wall: a second window asking for frames on its own animation frames,
@@ -474,16 +555,29 @@ try {
     page.waitForEvent('popup'),
     page.evaluate(() => { window.open('about:blank', 'wall', 'popup,width=480,height=270'); }),
   ]);
+  await slow(wall);
   await wall.evaluate(() => {
     // With its refresh's time on the show's clock, as CastDisplay asks (PLAN.md §14b).
     const ask = (ts) => {
-      try { const o = window.opener; if (o && !o.closed) o.__chromaglassFrame?.(ts + performance.timeOrigin - o.performance.timeOrigin); } catch { /* gone */ }
+      try {
+        const o = window.opener;
+        if (o && !o.closed) {
+          // Counted on the show's side, so the window knows how many the wall offered.
+          o.__wallAsks = (o.__wallAsks ?? 0) + 1;
+          // And when, on the show's clock, so an ask the ear passed over can
+          // be told from one it never got (the covered line below).
+          const at = (o.__wallAskAt ??= []);
+          at.push(o.performance.now());
+          if (at.length > 4000) at.splice(0, 2000);
+          o.__chromaglassFrame?.(ts + performance.timeOrigin - o.performance.timeOrigin);
+        }
+      } catch { /* gone */ }
       requestAnimationFrame(ask);
     };
     requestAnimationFrame(ask);
   });
   await page.waitForTimeout(300);
-  const v2 = await watch(2000);
+  const v2 = await watch(2000, (g) => g.stamped >= ENOUGH);
   check('visible with the wall asking too, still only the frames read (the wall only where the frames stalled past 250 ms)',
     everyFrame(v2) && inStalls(v2),
     `readings ${v2.d.frame} frame, ${v2.d.ask} ask, ${v2.d.tick} tick${frameNote(v2)}${stallNote(v2)}`);
@@ -491,14 +585,27 @@ try {
   // Covered, the wall still asking.
   await page.evaluate(() => { window.__covered = true; });
   await page.waitForTimeout(300);
-  const v3 = await watch(2000);
+  const v3 = await watch(2000, (g) => g.asked >= ENOUGH && g.samples >= ENOUGH);
   check('covered, with the wall asking, the plate keeps hearing the band',
-    v3.lv.size >= 10, `${v3.lv.size} distinct levels in 2 s`);
+    v3.lv.size >= 10, `${v3.lv.size} distinct levels in ${(v3.lv.ms / 1000).toFixed(1)} s`);
   /*
     One reading per ask the show answered. `frames` counts passes through the
     loop, and every ask that reads calls `draw()` once, so the two have to
     match both ways: more readings than asks answered is a second clock, fewer
     is an ask the ear missed.
+
+    The tick draws nothing (it reads; only an ask or the window's own frame
+    calls `draw()`, LiquidVisualizer's `askFrame` and `render`), so the
+    count this held to, asks and ticks together within 2 of the frames drawn,
+    was right only while ticks were 0 or 1. Slowed to a sixteenth here the
+    wall's asks came more than 250 ms apart, the tick read in those gaps as it
+    is written to, and the line read 32 asks and 9 ticks over 32 frames drawn:
+    every frame an ask's, and red. So the two ways, exactly: no more ask
+    readings than frames drawn, and frames drawn past the ask readings only
+    for asks that came just after a tick's reading (within EAR_MIN_GAP_MS an
+    ask is that reading, lib/earClock.ts), each found by its own time
+    (`excused` below). The 44 asks and 1 tick over 45 frames of #718's red
+    on 2026-11-08 read as that: one ask that drew on the tick's reading.
   */
   /*
     "Not the tick" as the clock is written, not as the runner's frame rate.
@@ -530,21 +637,49 @@ try {
       closest = Math.min(closest, gap);
       if (gap <= 250) misplaced++;
     }
-    return { n, asks, misplaced, closest };
+    /*
+      The asks the clock was right to pass over: one that came within
+      EAR_MIN_GAP_MS (4) of a tick's reading, which it takes as that reading.
+      Each by its own time on the wall's side, not one per tick: a tick read
+      in a gap left by asks that never reached the ear (dropped before
+      `offer`, so the hold never saw them) would otherwise excuse them, and
+      the check-skeptic's control, an ear deaf to every ask in the first half
+      of each second, went green on that at 31 asks read, 49 ticks, 61 frames
+      drawn. The wall stamps its ask a moment before the show takes its own
+      time for it, so 6 ms here, not 4.
+    */
+    const askAt = (window.__wallAskAt ?? []).filter(a => a > t0 && a <= t1);
+    const excused = askAt.filter(a => recent.some(r => r.driver === 'tick' && a - r.at >= 0 && a - r.at < 6)).length;
+    return { n, asks, misplaced, closest, excused };
   }, [v3.t0, v3.t1]);
   check('and it hears on the wall\'s asks, one a frame, not on its own frames, nor the tick but where the asks stopped past 250 ms',
-    v3.d.ask > 20 && v3.d.frame === 0 && v3t.n === v3.d.tick && v3t.asks === v3.d.ask && v3t.misplaced === 0 && Math.abs(v3.d.ask + v3.d.tick - v3.drawn) <= 2,
+    v3.d.ask > 20 && v3.d.frame === 0 && v3t.n === v3.d.tick && v3t.asks === v3.d.ask && v3t.misplaced === 0 && v3.d.ask <= v3.drawn && v3.drawn - v3.d.ask <= v3t.excused,
     `readings ${v3.d.ask} ask, ${v3.d.frame} frame, ${v3.d.tick} tick, over ${v3.drawn} frames asked for` +
+    `${v3t.excused ? `, ${v3t.excused} of them asked within 6 ms of a tick's reading` : ''}${capNote(v3)}` +
     `${v3t.n ? `; ${v3t.misplaced} of ${v3t.n} ticks within 250 ms of an ask (closest ${v3t.closest.toFixed(0)} ms)` : ''}` +
     `${v3t.n === v3.d.tick && v3t.asks === v3.d.ask ? '' : `; the record does not agree (${v3t.n} ticks, ${v3t.asks} asks recorded)`}`);
   await wall.close();
 
-  // No wall: the worker's tick.
+  /*
+    No wall: the worker's tick. A window stretched for a starved runner makes
+    "more than 20" easy to clear (a tick at a quarter of its rate would, over
+    15 s), so the tick is also held to a rate across the whole window: the
+    ten readings a second that make "hearing" (see "How many readings"
+    above), or, where the page itself got fewer turns than that, half the
+    turns it got (each turn has a tick waiting; a queue of them reads once,
+    EAR_TICK_MIN_MS). Not half the turns alone: that was this PR's first
+    try, and on a GitHub Mac (2026-11-14) the page's own 16 ms timer fired
+    99 times in 2.1 s while the worker's tick read 48, a worker thread that
+    runs about half as often as the page there, which is still hearing at
+    23 a second. Measured: 128 ticks against 127 turns in 2.0 s at full speed
+    here, 46 against 30 turns over 4.3 s on a page busy 130 ms in every 140
+    (`--busy=130`), 38 and 45 in 2 s on the hosted Macs of 11-09.
+  */
   await page.waitForTimeout(300);
-  const v4 = await watch(2000);
+  const v4 = await watch(2000, (g) => g.turns >= ENOUGH && g.samples >= ENOUGH);
   check('covered with no wall, the worker\'s tick keeps the ear going',
-    v4.lv.size >= 10 && v4.d.tick > 20 && v4.d.ask === 0 && v4.d.frame === 0,
-    `${v4.lv.size} distinct levels in 2 s; readings ${v4.d.tick} tick, ${v4.d.ask} ask, ${v4.d.frame} frame`);
+    v4.lv.size >= 10 && v4.d.tick > 20 && v4.d.tick >= Math.min(10 * v4.lv.ms / 1000, v4.lv.got.turns / 2) && v4.d.ask === 0 && v4.d.frame === 0,
+    `${v4.lv.size} distinct levels in ${(v4.lv.ms / 1000).toFixed(1)} s${capNote(v4)}; readings ${v4.d.tick} tick, ${v4.d.ask} ask, ${v4.d.frame} frame; ${v4.lv.got.turns} turns the page got`);
 
   /*
     The control: covered, nothing asking, the tick stopped. The ear as it was
@@ -569,12 +704,17 @@ try {
   const revived = await ear();
   check('and not once it hears again', revived.deaf === false, `deaf ${revived.deaf}`);
 
-  // Uncovered.
+  /*
+    Uncovered: every frame drawn reads (`everyFrame`, as the visible lines),
+    not only more than 20 of them, which an ear reading every other frame
+    cleared too, and a stretched window makes easier still.
+  */
   await page.evaluate(() => window.__uncover());
   await page.waitForTimeout(300);
-  const v5 = await watch(2000);
+  const v5 = await watch(2000, (g) => g.stamped >= ENOUGH);
   check('uncovered, the frames read again and the tick stands back',
-    v5.d.frame > 20 && v5.d.ask === 0 && inStalls(v5), `readings ${v5.d.frame} frame, ${v5.d.ask} ask, ${v5.d.tick} tick${stallNote(v5)}`);
+    v5.d.frame > 20 && everyFrame(v5) && v5.d.ask === 0 && inStalls(v5),
+    `readings ${v5.d.frame} frame, ${v5.d.ask} ask, ${v5.d.tick} tick${frameNote(v5)}${stallNote(v5)}`);
 
   // Deaf: the context suspended.
   const line = () => page.evaluate(() => document.body.innerText.includes('not hearing'));
