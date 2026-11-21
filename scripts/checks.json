@@ -1577,6 +1577,23 @@
       ]
     },
     {
+      "name": "The closeup's relief is the liquid's path",
+      "shard": "lab9",
+      "run": "npm run camrelief",
+      "timeout": 12,
+      "why": [
+        "The closeup's relief reads the optical path at the lens's disc (PLAN 18e-7,",
+        "camLap in src/gpu/wgsl/plateTransmit.ts), not the colour step between two",
+        "dyes it was handed until then (the owner's black lines, up close). A swell",
+        "of dye gathers light in its middle with the frame's light kept, a dome in the",
+        "gap moves nothing (the first build's ribbons on the Mac, PLAN 18e-11), and a",
+        "cluster of bubbles cut in one dye is left alone (a control without the air",
+        "mask finds the halo the path's nine-tap Laplacian drew on the Mac). The seam",
+        "itself is holeline's lines 6 to 6b. Lab, two builds; about two minutes on",
+        "SwiftShader (152 s, 2026-11-15), in lab9 beside glint."
+      ]
+    },
+    {
       "name": "Polarised light",
       "shard": "lab9",
       "run": "npm run polar",
@@ -1714,7 +1731,7 @@
         "round things; two dyes in one liquid bend no light where they meet), so",
         "this asks that Boundary Contrast at 0.35, 1 and 2 moves no pixel in focus",
         "round a hole, at a pool's rim or across two dyes meeting, on the wall and",
-        "photographed, that the seam is no darker than the darker dye beside it,",
+        "photographed, and up close (PLAN 18e-7), that the seam is no darker than the darker dye beside it,",
         "and that the dial is live out of focus so nothing moving is the shader's",
         "answer. It also",
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",

@@ -2822,9 +2822,7 @@ at one frame. Whether the looks read better without the line is only seen here.
    line along a boundary, or the colours duller than before.
 2. Any look with two layers (Comet River is one): the back plate's rims are still a little
    brighter than its dye, as before.
-3. **Macro Zoom** to 4x on Comet River: unchanged by this (PLAN 18e-7). Where two colours
-   meet up close there is still a darker band; that is the closeup's relief reading the colour
-   step, and it goes when the closeup shades from the liquid's own optical path.
+3. **Macro Zoom** to 4x on Comet River: judged in §139 (PLAN 18e-7 took the band up close).
 4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
    Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
 5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
@@ -2936,3 +2934,23 @@ here.
 4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
    pinks and greens. The default 0.3 should feel like the photograph.
 5. Polarisers at 0 on any look: the look exactly as before.
+
+## 139. No black lines up close, and the closeup's depth from the liquid (PLAN 18e-7)
+
+Judged 2026-11-15 by the owner on the Mac's frame-locked films of main against the fix: "Looks good"
+(Comet River 4x and Classic 6x better than main, Splodascope 4x about the same).
+
+The checks (`npm run holeline` lines 6 to 6b, `npm run camrelief`) prove in the lab that up close
+Boundary Contrast moves nothing, a seam between two dyes is no darker than its two dyes, a swell
+gathers light and a cluster of bubbles stays clean. How the closeup reads at 60 fps is only seen
+here.
+
+1. **Macro Zoom** to 4x on **Comet River**: where two colours meet there is no dark band, up close
+   as on the wall (§132). Bad: a darker line along any boundary between two colours.
+2. The same closeup: it still has depth. A thick pool's edge into clear water carries a soft
+   shadow on one side and a bright edge on the other, as wide as the lens's blur. Bad: the
+   closeup flat as a printed photograph, or the relief a hard outline.
+3. **Splodascope** or any look with bubbles, up close: no white patch or bright halo round a
+   cluster of bubbles. Bad: a bubble's surroundings brighter than the dye away from it.
+4. Macro Relief from 0 to 1 up close: the shading deepens and widens a little; the frame's
+   brightness stays about the same. Boundary Glow from 0 to 1 up close: nothing moves.
