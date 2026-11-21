@@ -3125,7 +3125,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (p.age < HAND_SETTLE && !p.fresh) continue;
             const speed = Math.hypot(p.vx, p.vy);
             const size = Math.min(1, p.area * 8);
-            const color = harmony.length ? PALETTE[harmony[p.id % harmony.length]].hex : undefined;
+            const color = PALETTE[harmony[p.id % harmony.length]]?.hex; // a 43d picture dye: none
 
             if (p.fresh) {
               performGesture({ tool: 'drop', x: p.x, y: p.y, color, layer: 0, amount: roomHands * (0.35 + 0.4 * size) });
