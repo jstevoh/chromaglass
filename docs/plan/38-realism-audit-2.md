@@ -92,6 +92,12 @@ water, so it never does.
   the sparks and the hue nudge. Touches 27e-1, 27e-3 and `00-dye-tools.md:68-76`. Check:
   with `sceneMappings` empty, loud music against silence lays zero dye, heat and doses
   apart; `npm run soundpatch` and `npm run breakdown` stay green. (38v, from RS-43.)
+  The owner (2026-11-21) wants the music able to add things aggressively, so the cords
+  must reach at least as far as the block does: a whole-plate pour cord (today `areaPour`
+  needs an area), a gated pour that lays a slug of liquid of a set volume and size on each
+  hit rather than only opening a bottle wider, and a whole-plate heat cord for the centre
+  pulse. Each piece then gets its own depth and gain, where the block shared one Audio
+  Impact.
 
 - **38v-2. Comet's pull flickers with the beat, and is absent on the open plate** (S;
   Medium). `thinGap.ts:330-357` adds the `cometX/Y` pull inside `hsBody`
