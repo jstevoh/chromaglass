@@ -177,6 +177,17 @@ the filter removed either: the median-and-MAD threshold already eats a steady vi
 does), where plain flux fires and the maximum filter does not. *Measure:* pulses a minute on
 that voice, with and without the filter.
 
+## 14d-10. A long song's plate drifts, brighter or fainter, by its end
+
+**Measured 2026-11-08** (the six 1920s films, brightness every 15 s, before and after 14d-2):
+with the beat feeding Kick hit, Rachmaninoff no longer fades but Whiteman still does (it ends
+at 29 against 45 at its start), and Oliver's second half runs brighter (120 to 133). Wolverines
+peaks lower (97 against 113); Bessie and Caruso hold. So over three minutes the plate does not
+hold its level: dye in and dye out are not balanced for the song's whole length. Noted, not
+fixed: the owner has not asked for it. *Measure:* the brightness of each 15 s window against
+the first minute's, on the six films; *fix* in the dye budget the beat feeds, never by
+normalising the picture.
+
 ## 14e. The picture and the room disagree about when the kick is
 
 **Read in the code; the output delays are inferred.**
