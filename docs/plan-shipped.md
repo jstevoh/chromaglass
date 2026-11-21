@@ -4500,6 +4500,21 @@ out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` 
 every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
 lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
 
+### 19aj-3. The pouring tools are held for the plate's steps (2026-11-21)
+
+What was seen: `npm run tools` "and spreads it out from where it lands" red on both of #897's
+hosted-Mac runs, the Pour's share from 0.02 to 0.07 at 76 and 75% against the Drop's 78%,
+on a PR that changed only the loading line. Across that morning's runs the Pour's total
+fell with its share (879 and 921 laid on the red runs, 1345 at 84% on deploy 854, 1557 to
+1640 at 86 to 87% on four other PRs) while the Drop's share held at 76 to 78%: the Pour
+lays its dye with an outward push once a step, and the push spreads it only as the solver
+steps, so 1.2 s of the wall's on a runner that stepped less laid less and spread less. The
+line was reading the runner's step rate. What changed: the five pouring lines and the
+Amount's hold and wait for a count of solver steps (72 and 42 on a GPU, sixty to a second,
+not `dtSeconds`, which the governor can halve; check-skeptic), settlePlate's share in
+software, and a wait that runs out before its steps turns those lines red instead of
+feeding them a short hold. Each tool's line now prints the steps it was held for.
+
 ### 19ak. The Mac runs what a PR reaches, and known flakes report without blocking (2026-11-01)
 
 Asked by the owner on 2026-11-01 ("are we running too many checks on everything?"),

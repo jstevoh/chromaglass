@@ -583,6 +583,14 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   circle's edge; find whether the red runs read a lit edge
   (the sample too close) or a frame not yet drawn (the read too early), and measure the
   feature, not the moment.
+- **19aj-3. Shipped: the pouring tools are held for the plate's steps, not the wall's
+  milliseconds** (2026-11-21, found when `npm run tools` "and spreads it out from where it
+  lands" went red on both of #897's hosted-Mac runs). Story in `docs/plan-shipped.md` §19aj-3.
+- **19aj-4. Open, found 2026-11-21: Measure · lab9 runs out of its 25 minutes on a slow
+  runner.** It takes 14 to 19 minutes on a normal one (deploy 854: moiré 3:28, leandisplay
+  7:14, glitter 2:58) and was cancelled at 25:00 on #878's run 44884668374 with leandisplay
+  alone at 12:56. Move "Glitter, the lens and the side lamp" (about 3 minutes) to lab8 or
+  lab5 (two checks each), so a runner at two thirds of the usual speed still finishes.
 - **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
   an end date (docs/plan-shipped.md, 19ak).
 - **19ak-2. Shipped:** a PR's site files run only the Mac checks that read them
