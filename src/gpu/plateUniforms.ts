@@ -23,12 +23,16 @@ import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
+import { SOAP } from '../lib/filmTable';
+import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+/** Video Zoom as the plate takes it (PLAN 14ag): its travel, and 1 (as it always landed) for a look saved before it. */
+export const filmZoomOf = (z: number | undefined) => (Number.isFinite(z) ? clamp(z as number, 0.25, 4) : 1);
 
 /**
  * The frame, as the uniforms read it.
@@ -212,6 +216,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
       // Cover-fit: crop whichever axis the frame has too much of.
       const va = v.videoWidth / v.videoHeight, ca = width / height;
       if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
+      // Video Zoom over the cover-fit (PLAN 14ag): 2 shows half the frame's span, 0.5 twice it.
+      const zoom = filmZoomOf(s.filmZoom);
+      filmScaleX /= zoom;
+      filmScaleY /= zoom;
     }
   }
 
@@ -250,6 +258,18 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('benDay', clamp01(s.benDay ?? 0));
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('projectorFocus', clamp01(s.projectorFocus ?? 0.5));
+  /*
+    Glitter, the lens photographing it and the side lamp (PLAN 47e, 47d,
+    47b-side; lib/glint.ts). At 0 and 0 the lens pass does not run, and the
+    display is drawn as it was. Focus (projectorFocus) is the lens's focal
+    plane, a depth in the gap, for the specks as for the Becke lines.
+  */
+  pack.set('glitter', Number.isFinite(s.glitter) ? clamp01(s.glitter) : 0);
+  pack.set('lensStop', clamp(Number.isFinite(s.lensStop) ? s.lensStop : 4, 1.4, 22));
+  const side = Number.isFinite(s.sideLight) ? clamp01(s.sideLight) : 0;
+  pack.set('sideLight', side * SIDE_RADIANCE);
+  pack.set('sideColor', ...sideLampColour(Number.isFinite(s.sideLightHue) ? s.sideLightHue : 30));
+  pack.set('sideLamp', ...sideLampPlace(Number.isFinite(s.sideLightAngle) ? s.sideLightAngle : 160));
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));
@@ -343,6 +363,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('thinFilm', clamp01(s.thinFilm ?? 0));
     // Not clamp01 alone: it passes NaN, and ?set=filmPhysics=x is how the owner is asked to try it.
     pack.set('filmPhysics', Number.isFinite(s.filmPhysics) ? clamp01(s.filmPhysics) : 0);
+    // The frame's soap film (PLAN 32d): its reflection, and Snell's law for the angle it is seen at.
+    pack.set('soapFilm', Number.isFinite(s.soapFilm) ? clamp01(s.soapFilm) : 0);
+    const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
+    pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
   }
   {
     // Lumia and gel colours come from the working harmony, so they
@@ -387,6 +411,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
     pack.set('filmKey', clamp(s.filmKey ?? 0.18, 0, 0.9));
     pack.set('filmScale', filmScaleX, filmScaleY);
+    pack.set('filmPan', clamp(s.filmX ?? 0, -1, 1), clamp(s.filmY ?? 0, -1, 1));
   }
   {
     const throw1 = view.layer1;
@@ -397,7 +422,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.setAll('bubbles', view.bubblePack.packed.length > 160 ? view.bubblePack.packed.subarray(0, 160) : view.bubblePack.packed);
     pack.setAll('bubbleShape', view.bubblePack.shape.length > 160 ? view.bubblePack.shape.subarray(0, 160) : view.bubblePack.shape);
     pack.set('bubbleCount', Math.min(40, bubbles.count));
-    pack.set('bubbleStrength', bubbles.strength);
+    pack.set('bubbleStrength', (s.heat ?? 0) > 0 ? Math.max(bubbles.strength, 1) : bubbles.strength);
   }
   pack.set('postBlur', s.postBlurRadius ?? 0.35);
   // Sampling math follows the texture actually bound; the tuned look
@@ -413,7 +438,6 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('macroCellScale', s.macroCellScale ?? 0.5);
   pack.set('macroLacing', s.macroLacing ?? 0);
   pack.set('macroDepth', s.macroDepth ?? 0.5);
-  pack.set('macroEdge', s.macroEdgeDetail ?? 0.6);
   pack.set('macroRelief', s.macroRelief ?? 0.7);
   pack.set('flowRate', view.flowRate);
   pack.set('cellClock', view.cellClock);
@@ -469,7 +493,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
   // Into the chain's half floats nothing; into the camera's 8-bit texture
   // still a dither, or a dark ramp bands before the camera sees it.
-  pack.set('finishInMain', !ctx.postChain ? 1 : ctx.cameraOn ? 2 : 0);
+  const finishInMain = !ctx.postChain ? 1 : ctx.cameraOn ? 2 : 0;
+  pack.set('finishInMain', finishInMain);
+  // The lens pass lays this finish instead when it runs (gpu/glint.ts; WebGPUPlate.draw sets finishInMain to 0 for the display then).
+  pack.set('lensFinish', finishInMain);
 }
 
 /**

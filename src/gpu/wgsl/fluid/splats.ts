@@ -17,15 +17,12 @@ export const SPLAT_KERNELS: Record<string, string> = {
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
 @group(0) @binding(4) var mulT: texture_2d<f32>;
-@group(0) @binding(5) var liquids0: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  let soap = textureLoad(liquids0, p, 0).r;
-  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
-  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r * soapMul + textureLoad(addT, p, 0)));
+  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0)));
 }`,
 
   // vel.xy += add.xy ; temp (vel.z) += add.z
@@ -166,6 +163,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   let take = clamp(A.a.w * w, 0.0, 1.0);
   textureStore(dst, vec2i(id.xy), mix(v, A.b, take));
+}`,
+
+  /*
+    A title's ink carrier (PLAN 37x-10g, `pourInk` with a carrier): the
+    title's coverage mask, sampled as `pourInk` samples it for the dye (the
+    mean of a few bilinear taps over the cell's footprint, so the carrier
+    lies exactly under the letters' dye), replaces that share of the column
+    with the ink's own liquid, as a pour laid without its volume does
+    (speciesSplat with A.b.w at 0): r toward 1, g toward its ln(ν/ν_water),
+    b toward its scatter, a toward its index. A.a is (share at coverage 1,
+    ln(ν/ν_water), scatter, index).
+  */
+  inkSpecies: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var mask: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var lin: sampler;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let taps = vec2u(clamp(ceil(vec2f(textureDimensions(mask)) / S.n), vec2f(1.0), vec2f(4.0)));
+  var cover = 0.0;
+  for (var j = 0u; j < taps.y; j = j + 1u) {
+    for (var i = 0u; i < taps.x; i = i + 1u) {
+      let uv = (vec2f(id.xy) + (vec2f(f32(i), f32(j)) + 0.5) / vec2f(taps)) / S.n;
+      cover += textureSampleLevel(mask, lin, uv, 0.0).r;
+    }
+  }
+  let f = clamp(cover / f32(taps.x * taps.y) * A.a.x, 0.0, 1.0);
+  let was = textureLoad(src, p, 0);
+  textureStore(dst, p, mix(was, vec4f(1.0, A.a.y, A.a.z, A.a.w), f));
 }`,
 
   speciesSplat: `${HEAD}

@@ -103,6 +103,8 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { engineQuery } from './frame.mjs';
 import { heldStretches, selfCheck } from './pagehold.mjs';
+import { buildsIn } from './compilestop.mjs';
+import { asOldWay, behindSaid, halvesWhole, waitBehind } from './startupbehind.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -775,17 +777,11 @@ async function open(query, looks) {
       any look is changed to: a change is a mid-show ask, and what that
       measures is whether the lists hold everything a show can ask for once
       they have been built, not a race between a look change and the builds.
+      For as long as the app says its builds still come in, not a fixed
+      time: `startupbehind.mjs` on why.
     */
-    const behind = query.includes('prepare=0') ? null : await page.evaluate(async () => {
-      const t0 = performance.now();
-      const later = () => {
-        const all = window.chromaglassDebug?.()?.pipelines?.()?.prepares ?? [];
-        const first = all.find((p) => p.stage === 'opening');
-        return first ? all.find((p) => p.stage === 'later' && p.device === first.device) ?? null : null;
-      };
-      while (!later() && performance.now() - t0 < 45000) await new Promise((r) => setTimeout(r, 100));
-      return later();
-    });
+    const behindWait = query.includes('prepare=0') ? null : await waitBehind(page);
+    const behind = behindWait?.done ?? null;
     /*
       Never shorter than the wait above for the plate to be running. On run
       36306624796 the control's freeze (12.83 s, on a runner whose adapter
@@ -1019,7 +1015,7 @@ async function open(query, looks) {
       }
       return { ledger, direct: window.__startupDirect.map(([t, l]) => [+(t / 1000).toFixed(2), l]) };
     });
-    return { cache, running, watch, ...opening, ...after, behind, slow };
+    return { cache, running, watch, ...opening, ...after, behind, behindWait, slow };
   } finally { await browser.close(); }
 }
 
@@ -1231,14 +1227,13 @@ const gpuTime = (o) => {
   its first build under that name only (`gpu/prepare.ts`). Both include each
   pipeline's first use, which the old way paid on its frames as well
   (`gpu/kit.ts`, firstUse). What the show waited for beyond the old way's
-  list is not priced out: it is the show's own wait.
+  list is its own wait.
 
-  Moving for good is read off steps sampled every quarter second, on both
-  sides, so the two own waits are each good to about a quarter second. The
+  Moving for good is read off steps sampled every quarter second on both
+  sides, so each own wait is good to about a quarter second. The
   seventy runs' logs printed only each control's longest frame stop and each
   show's whole build, so the replay of them (-0.90 to +0.31 s) is a proxy
-  for this rule; every run now
-  prints the stop it chose and where it began, to read it against.
+  for this rule; every run now prints the stop it chose and where it began.
 */
 const waitOf = (x, oldWay) => {
   if (x.steadyFrom == null) return null;
@@ -1256,7 +1251,8 @@ const waitOf = (x, oldWay) => {
   const priced = [];
   if (x.prepared) {
     const seen = new Set();
-    for (const [key, at, ms] of x.prepared.builds ?? []) {
+    for (const [b, at, ms] of x.prepared.builds ?? []) {
+      const key = asOldWay(b);
       if (!oldWay.includes(key) || seen.has(key) || at / 1000 >= steady) continue;
       seen.add(key);
       compile += Math.min(ms / 1000, steady - at / 1000);
@@ -1269,12 +1265,9 @@ const waitOf = (x, oldWay) => {
     // end of Chromium's requests at the earliest, so a first step built
     // inside the device's own hold is not counted twice, and only to the
     // frames' return, the quarter second to the next counted step being the
-    // page's own on both sides. A build sits in the stop that holds it, or,
-    // held by none, in one begun within the second after it (the frame it
-    // was asked for in may close before the GPU stops the next); a stop no
-    // build sat in is not the compile, however long or near the builds, so
-    // a runner's stall is not priced as compile. What is left of a stop
-    // under a quarter second, the steps' own resolution, is not one.
+    // page's own on both sides. Which stops a build sat in, and why:
+    // scripts/compilestop.mjs (19aa-7d). What is left of a stop under a
+    // quarter second, the steps' own resolution, is not one.
     //
     // On this PR's own first Mac run (run 37171671783) the control's frames
     // stopped through Chromium's handover of the device with its first
@@ -1327,12 +1320,7 @@ const waitOf = (x, oldWay) => {
     const builds = (x.ledger?.onFrame ?? []).filter((e) => e.at / 1000 <= steady);
     const built = builds.map((e) => e.at / 1000);
     const raw = (x.frameStopsRaw ?? []).filter(([from]) => from < steady);
-    const holds = raw.map(() => 0);
-    for (const t of built) {
-      let i = raw.findIndex(([from, len]) => t >= from && t <= from + len);
-      if (i < 0) i = raw.findIndex(([from]) => from > t && from <= t + 1);
-      if (i >= 0) holds[i]++;
-    }
+    const { holds, lead } = buildsIn(raw, built, x.ticks ?? [], (x.raw?.frames ?? []).map((t) => t / 1000), { freeS: TICK_FREE_MS / 1000, maxGapS: MAX_GAP_S });
     // The ledger names a pipeline scope/label, a submit's work by its label
     // (a draw as "draw label"); each build's first submit, [handed, done].
     const labels = new Set(builds.map((e) => e.name.slice(e.name.indexOf('/') + 1)));
@@ -1375,7 +1363,7 @@ const waitOf = (x, oldWay) => {
     });
     let compiling = -Infinity;
     stops = raw.map(([s, len], i) => {
-      const from = Math.max(s, end);
+      const from = Math.max(lead[i]?.at ?? s, end);
       const n = Math.max(0, Math.min(s + len, steady) - from);
       const follows = holds[i] === 0 && s - compiling <= 1;
       const taken = (holds[i] > 0 || follows || waited[i] > 0) && n >= 0.25;
@@ -1390,7 +1378,7 @@ const waitOf = (x, oldWay) => {
         and 1b judged a stall. #257's run still prices its 18.29 s.
       */
       if (holds[i] > 0 && n >= 0.25) compiling = s + len;
-      return { from: from - t0, len: n, builds: holds[i], follows, waited: waited[i], ...why[i], taken };
+      return { from: from - t0, len: n, builds: holds[i], lead: lead[i] && { gap: s - lead[i].at, run: lead[i].run }, follows, waited: waited[i], ...why[i], taken };
     });
     for (const st of stops.filter((st) => st.taken)) {
       compile += st.len;
@@ -1431,7 +1419,7 @@ const sayWait = (w) => (w == null ? 'never moving for good'
   : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`
     + (w.leftOver ? ` (neither Chromium's nor a build's: ${w.leftOver.total.toFixed(2)} s in ${w.leftOver.pieces} stretches, ${w.leftOver.free.toFixed(2)} s of it with the page's timer ticking on time${w.leftOver.longest ? `, the longest ${w.leftOver.longest[1].toFixed(2)} s from ${w.leftOver.longest[0].toFixed(2)} s` : ''})` : '')
     // Every stop its frames made, so a pick that is wrong reads off the log.
-    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it, ${st.waited} first used before it and done as it ended (${st.last === undefined ? 'none out as it began' : st.last === null ? 'one out as it began never done' : `the last out as it began done ${st.last.toFixed(2)} s from its end`}, the page's timer silent at most ${st.silent.toFixed(2)} s)${st.taken ? `${st.follows ? ' (the compile going on from the stop before)' : ''}, priced` : ''}`).join('; ') : 'never'}]` : ''));
+    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it${st.lead ? ` (held into it from them ${st.lead.gap.toFixed(2)} s before, the page running at most ${st.lead.run.toFixed(2)} s at a time)` : ''}, ${st.waited} first used before it and done as it ended (${st.last === undefined ? 'none out as it began' : st.last === null ? 'one out as it began never done' : `the last out as it began done ${st.last.toFixed(2)} s from its end`}, the page's timer silent at most ${st.silent.toFixed(2)} s)${st.taken ? `${st.follows ? ' (the compile going on from the stop before)' : ''}, priced` : ''}`).join('; ') : 'never'}]` : ''));
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, held = null) => {
   // Whether the page's own thread was busy through a gap (a long task
@@ -1573,12 +1561,12 @@ try {
   check(`and it built the old way's pipelines no slower than the old way compiled them on its frames (at most ${COMPILE_RATIO}×)`,
     rate != null && rate <= COMPILE_RATIO,
     rate == null ? `nothing to compare${cDevices === 1 ? '' : ` (the control had ${cDevices} devices)`}` : `${oWait.compile.toFixed(2)} s building ${oWait.shared} of the ${oldWay.length} ahead, against ${cWait.compile.toFixed(2)} s stopped for them: ${rate.toFixed(2)}×`);
-  const notWaited = p ? oldWay.filter((k) => !p.keys.includes(k)) : oldWay;
+  const notWaited = p ? oldWay.filter((k) => !p.keys.map(asOldWay).includes(k)) : oldWay;
   check('every pipeline it asked for ahead was built ahead, before it opened and behind it, on the device it opened on',
-    !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && p.ready === p.asked && !p.timedOut && b.ready === b.asked && !b.timedOut,
+    !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && halvesWhole(p, b),
     !p ? 'nothing was prepared (no `pipelines` in chromaglassDebug)'
       : `${p.ready} of ${p.asked} before it opened in ${(p.ms / 1000).toFixed(2)} s${p.timedOut ? ', and it stopped waiting' : ''}; `
-        + (b ? `${b.ready} of ${b.asked} behind it in ${(b.ms / 1000).toFixed(2)} s${b.timedOut ? ', and it stopped waiting' : ''}` : 'nothing built behind it')
+        + behindSaid(b, p, o.behindWait)
         + `; waited for ${oldWay.length - notWaited.length} of the ${oldWay.length} the old way built on its frames`
         + (notWaited.length ? ` (not: ${notWaited.join(', ')})` : ''));
   const late = o.ledger?.onFrame ?? [];

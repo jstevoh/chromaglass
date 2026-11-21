@@ -53,8 +53,10 @@ declare global {
     __cgRiding?: unknown;
     /** Turn the plates to given angles in radians, to reproduce a report's plate exactly. */
     chromaglassRotation?: (angles: number[]) => void;
-    /** The video pour and the film's video, for `npm run cartoons`. */
+    /** The video pour and the film's video, for `npm run myvideo`. */
     __cgVideo?: () => unknown;
+    /** The film sense (hooks/useFilmSense.ts): whether it runs, the video it reads, and its reading, for `npm run myvideo`. */
+    __cgFilmSense?: () => { enabled: boolean; src: string | null; ready: boolean; energy: number };
 
     // ── The show and the desks (App's hooks in `src/app/`, most in `useCheckHooks.ts`; `?debug`) ──
 
@@ -101,15 +103,15 @@ declare global {
     /** Stop the song's show. */
     chromaglassSongStop?: () => void;
     /** Pour rows of text onto the plate. */
-    chromaglassPourText?: (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => unknown;
+    chromaglassPourText?: (rows: { text: string; weight?: number }[], opts?: { colour?: string }) => unknown;
     /** Start the bench (`npm run bench`). */
     chromaglassBench?: (opts?: BenchOptions) => void;
     /** The cast session as the show sees it. */
     chromaglassCastState?: () => unknown;
     /** What a render could leave running in the live show: fades and glides on the film's clock. */
     chromaglassRenderPending?: () => { lookFade: boolean; dimmerFade: boolean; glides: number };
-    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app`. */
-    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number }) => Promise<unknown>;
+    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app`; `toDisk` writes through the save picker instead of memory, for `npm run tvloops`. */
+    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number; toDisk?: boolean; hashFrames?: boolean }) => Promise<unknown>;
     /** The MIDI input and the gamepad as the desk sees them. */
     chromaglassInputs?: () => unknown;
 
@@ -119,6 +121,8 @@ declare global {
     __cgFadeLog?: unknown[];
     /** The licence key's public key, swapped for a test pair by the licence checks (`lib/licenseKey.ts`). */
     __cgTestLicensePublicKey?: JsonWebKey;
+    /** Where the Android app's Open in Chrome hands the show's address instead of Chrome, so a check can read it (`lib/appLink.ts`, `openInChrome`; `npm run controller`). */
+    __cgOpenExternal?: (url: string) => void;
 
     // ── Elsewhere (the file and its gate on each line) ──
 

@@ -21,7 +21,7 @@ struct Sim {
   disp: f32,           // velocity → uv displacement for advection
   visc: f32,
   turbScale: f32,
-  spin: f32,
+  free7: f32,          // was the music's eddies (PLAN 38u-5); the slot is kept so every offset after it stands
   tension: f32,
   thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
@@ -77,6 +77,20 @@ struct Sim {
   lampHeat: f32,
   // The cover glass's gap on its liquid, in gap units, 0.03 at 2 mm (PLAN 38r-5, lib/cover.ts): the dome's mean.
   cover: f32,
+  /*
+    The oil's weight against the water, cold, in the dye's units (Oil
+    Weight, oilRhoOf: −0.15 the mineral oil every oil look had), and how much
+    more than the water it swells with heat, per unit of oil (OIL_EXPAND).
+    PLAN 27f-9c: a lava lamp's wax is the oil, heavy cold and light warm.
+  */
+  oilRho: f32,
+  oilExpand: f32,
+  /*
+    A standing plate's lamp: how far its glass draws a water cell's heat
+    down in one step, π²κ·secs/h² on the step's real seconds and the gap
+    (PLAN 27f-9e, constants.ts KAPPA_WAX), the heat kept exp(−that).
+  */
+  lampCool: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 

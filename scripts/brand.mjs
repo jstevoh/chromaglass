@@ -25,7 +25,10 @@
  *                                   profile pictures)
  *   docs/brand/store/…              Google Play's 512 icon and 1024 × 500 feature
  *                                   graphic (PLAN 12.6; the App Store's icon is the
- *                                   iPhone app's own 1024 above)
+ *                                   iPhone app's own 1024 above), the TV listing's
+ *                                   1280 × 720 banner, and tv/ the TV screenshots:
+ *                                   the press stills at 1920 × 1080 (12-tv-2b)
+ *   androidtv/…/banner.png          the Android TV launcher banner, 320 × 180
  *   public/press/logo/…             the press page's downloads (PLAN 37k): the icon
  *                                   and the lockup as SVG and as large PNGs
  *
@@ -38,7 +41,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { icon, lockup, shareCard, featureGraphic, introLayers } from './brand/art.mjs';
+import { icon, lockup, shareCard, featureGraphic, tvBanner, introLayers } from './brand/art.mjs';
 
 const words = JSON.parse(fs.readFileSync('scripts/brand/words.json', 'utf8'));
 
@@ -86,6 +89,8 @@ const PNG = [
   // middle of it, so the dish is inset as the profile picture's is.
   ['docs/brand/store/play-icon-512.png', icon({ shape: 'square', scale: 0.8 }), 512, 512],
   ['docs/brand/store/play-feature-1024x500.png', featureGraphic(words), 1024, 500],
+  ['docs/brand/store/play-tv-banner-1280x720.png', tvBanner(words), 1280, 720],
+  ['androidtv/app/src/main/res/drawable-xhdpi/banner.png', tvBanner(words), 320, 180],
   ['public/press/logo/chromaglass-icon-1024.png', icon({ shape: 'tile' }), 1024, 1024],
   ['public/press/logo/chromaglass-lockup-2400.png', pressLockup, 2400, Math.round(2400 * lh / lw)],
 ];
@@ -101,6 +106,22 @@ try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     await page.screenshot({ path: file, omitBackground: true, clip: { x: 0, y: 0, width: w, height: h } });
     console.log(`  ${file}  ${w}×${h}  ${(fs.statSync(file).size / 1024).toFixed(1)} KB`);
+  }
+
+  // The Play listing's TV screenshots (PLAN 12-tv-2b): what the TV shows is
+  // the plate, full screen, so they are the press stills (the app's own Song
+  // films, public/press/MEDIA.md) at the 1920 × 1080 Play asks of a TV
+  // screenshot, as JPEG because Play refuses a PNG with an alpha channel.
+  console.log('TV screenshots');
+  const stills = ['neon-coral-reef', 'ferro-paint', 'cell-bloom', 'aurora-borealis', 'lace-run', 'macro-bead'];
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  for (const [i, name] of stills.entries()) {
+    const src = fs.readFileSync(`public/press/stills/${name}.jpg`).toString('base64');
+    await page.setContent(`<html><body style="margin:0;background:#000"><img style="display:block;width:1920px;height:1080px" src="data:image/jpeg;base64,${src}"></body></html>`);
+    const file = `docs/brand/store/tv/${i + 1}-${name}-1920x1080.jpg`;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    await page.screenshot({ path: file, type: 'jpeg', quality: 90, clip: { x: 0, y: 0, width: 1920, height: 1080 } });
+    console.log(`  ${file}  1920×1080  ${(fs.statSync(file).size / 1024).toFixed(1)} KB`);
   }
 
   // The Mac app's icon (PLAN 13-icon). It was the website's 512 tile, which

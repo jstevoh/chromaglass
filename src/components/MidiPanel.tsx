@@ -1,4 +1,6 @@
 import { HIT_FEATURES } from '../lib/hitSource';
+import { VOICE_DEFAULTS, type VoiceTool } from '../lib/noteVoices';
+import { DEFAULT_LIQUID_TYPES } from '../types';
 import { useEffect, useRef, useState } from 'react';
 import { Sheet, LIT } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Music } from 'lucide-react';
@@ -63,6 +65,7 @@ const SONG_EVENT_SAYS: Record<'drop' | 'build' | 'breakdown', string> = {
 function whyNotMusic(target: MidiTarget): string | null {
   if (target.kind === 'setting') return soundMappable(target.key) ? null : 'This one sets how hard a source drives the plate, so the music cannot ride it';
   if (target.kind === 'action') return triggerable(target.action) ? null : 'Not on a beat: pressed on every hit it would toggle twice a second';
+  if (target.kind === 'voices') return 'Notes as voices is played from a MIDI channel';
   return null;
 }
 
@@ -139,7 +142,7 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
 }
 
 export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, onSetup, onClose }: MidiPanelProps) {
-  const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'setlist' | 'dyes'>('settings');
+  const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'setlist' | 'dyes' | 'voices'>('settings');
   const lastEvent = useMidiLastEvent(midi);
   /*
     The activity light goes out 400 ms after the last message, and the panel
@@ -166,18 +169,18 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
   const setItemName = (index: number) => setItems.find(item => item.index === index)?.name;
 
   const learnButton = (target: MidiTarget, label: string, key: string) => {
-    const isLearning = midi.learning && JSON.stringify(midi.learning.target) === JSON.stringify(target);
-    const same = (t: MidiTarget) => JSON.stringify(t) === JSON.stringify(target);
+    const same = (t: MidiTarget) => target.kind === 'voices' ? t.kind === 'voices' : JSON.stringify(t) === JSON.stringify(target);
+    const isLearning = midi.learning && same(midi.learning.target);
     const bound = midi.map.bindings.filter(b => same(b.target));
     const heard = (midi.map.sound ?? []).filter(b => same(b.target));
     const notMusic = whyNotMusic(target);
     const open = musicOpen === key;
     return (
       <div key={key} className="border-b border-white/5">
-        <div className="flex items-center gap-2 py-1" data-testid={`midi-target-${key}`}>
+        <div className="flex items-center gap-2 py-1" data-testid={`midi-target-${key}`} data-midi-key={target.kind === 'voices' ? 'voices' : undefined}>
           <span className="flex-1 text-[11px] truncate">{label}</span>
           <span className="text-[11px] font-mono text-white/40 truncate max-w-[40%]">
-            {[...bound.map(b => sourceLabel(b.source)), ...heard.map(soundLabel)].join(', ')}
+            {[...bound.map(b => b.target.kind === 'voices' ? `Ch ${b.source.channel + 1}` : sourceLabel(b.source)), ...heard.map(soundLabel)].join(', ')}
           </span>
           <button
             aria-pressed={!!isLearning}
@@ -362,8 +365,8 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
       </div>
 
       {/* Learn targets */}
-      <div className="flex gap-1 mb-3" role="tablist" aria-label="Learn targets">
-        {(['settings', 'actions', 'presets', 'setlist', 'dyes'] as const).map(t => (
+      <div className="flex flex-wrap gap-1 mb-3" role="tablist" aria-label="Learn targets">
+        {(['settings', 'actions', 'presets', 'setlist', 'dyes', 'voices'] as const).map(t => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t === 'setlist' ? 'set list' : t}</button>
         ))}
       </div>
@@ -378,6 +381,18 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
           ? setItems.map(item => learnButton({ kind: 'setlist', index: item.index }, `#${item.index + 1} · ${item.name}`, `setlist-${item.index}`))
           : <p className="text-[12px] text-white/40">No items in the set list.</p>)}
         {tab === 'dyes' && PALETTE.map((c, i) => learnButton({ kind: 'dye', paletteIndex: i }, c.name, `dye-${i}`))}
+        {tab === 'voices' && (
+          <div>
+            {learnButton(
+              { kind: 'voices', tool: 'dropper', attack: VOICE_DEFAULTS.attack, release: VOICE_DEFAULTS.release, cap: VOICE_DEFAULTS.cap },
+              'Notes as voices (channel)',
+              'voices',
+            )}
+            <p className="mt-2 text-[11px] leading-relaxed text-white/50">
+              Play any note on a channel to learn that channel. Each note-on lets go one drop placed by pitch along Melody Walk’s line, its size by velocity; a held note pours with its attack and release, up to the channel’s voice cap.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Bindings */}
@@ -385,20 +400,76 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
       <div data-testid="midi-bindings">
         {midi.map.bindings.length === 0 && !midi.map.sound?.length && <p className="text-[12px] text-white/40">None yet.</p>}
         {midi.map.bindings.map(b => (
-          <div key={b.id} className={`flex items-center gap-2 py-1 border-b border-white/5 text-[12px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-40' : ''}`} data-testid="midi-binding">
-            <span className="font-mono text-white/50 w-28 shrink-0">{sourceLabel(b.source)}</span>
-            <span className="flex-1 truncate">{targetLabel(b.target, presetName, setItemName)}</span>
-            {b.target.kind === 'setting' && b.source.kind === 'cc' && (
-              <button onClick={() => midi.setBindingMode(b.id, b.mode === 'relative' ? 'absolute' : 'relative')} className="text-[8px] uppercase text-white/40 hover:text-white" title="Absolute fader or endless encoder">{b.mode === 'relative' ? 'enc' : 'abs'}</button>
-            )}
-            <button
-              onClick={() => midi.setBindingBank(b.id, b.bank === undefined ? 1 : b.bank + 1 >= midi.banks ? undefined : b.bank + 1)}
-              className="w-8 shrink-0 text-[8px] uppercase text-white/40 hover:text-white"
-              title="Which shift layer this binding answers on — 'all' is every one"
-            >
-              {b.bank === undefined ? 'all' : `bk${b.bank + 1}`}
-            </button>
-            <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-white/40 hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
+          <div key={b.id} className={`py-1.5 border-b border-white/5 text-[12px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-40' : ''}`} data-testid="midi-binding" data-midi-key={b.target.kind === 'voices' ? 'voices' : undefined}>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-white/50 w-28 shrink-0">{b.target.kind === 'voices' ? `Ch ${b.source.channel + 1}` : sourceLabel(b.source)}</span>
+              <span className="flex-1 truncate">{targetLabel(b.target, presetName, setItemName)}</span>
+              {b.target.kind === 'setting' && b.source.kind === 'cc' && (
+                <button onClick={() => midi.setBindingMode(b.id, b.mode === 'relative' ? 'absolute' : 'relative')} className="text-[8px] uppercase text-white/40 hover:text-white" title="Absolute fader or endless encoder">{b.mode === 'relative' ? 'enc' : 'abs'}</button>
+              )}
+              <button
+                onClick={() => midi.setBindingBank(b.id, b.bank === undefined ? 1 : b.bank + 1 >= midi.banks ? undefined : b.bank + 1)}
+                className="w-8 shrink-0 text-[8px] uppercase text-white/40 hover:text-white"
+                title="Which shift layer this binding answers on — 'all' is every one"
+              >
+                {b.bank === undefined ? 'all' : `bk${b.bank + 1}`}
+              </button>
+              <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-white/40 hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
+            </div>
+            {b.target.kind === 'voices' && (() => {
+              const vt = b.target;
+              return (
+                <div className="mt-2 flex flex-col gap-1.5 rounded-lg border border-white/10 bg-white/5 p-2" data-testid={`midi-voices-${b.id}`}>
+                  <div className="flex items-center gap-2">
+                    <label className="flex flex-1 items-center gap-1.5 text-[11px] text-white/60">
+                      Tool
+                      <select
+                        value={vt.tool ?? 'dropper'}
+                        aria-label="Voice tool"
+                        onChange={e => midi.updateBinding(b.id, { ...vt, tool: e.target.value as VoiceTool })}
+                        className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-[11px] text-white outline-none"
+                        data-testid={`midi-voices-tool-${b.id}`}
+                      >
+                        <option value="dropper">Drop</option>
+                        <option value="pour">Pour</option>
+                        <option value="spray">Spray</option>
+                        <option value="splatter">Splatter</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-1 items-center gap-1.5 text-[11px] text-white/60">
+                      Liquid
+                      <select
+                        value={vt.liquid ?? ''}
+                        aria-label="Voice liquid"
+                        onChange={e => midi.updateBinding(b.id, { ...vt, liquid: e.target.value || undefined })}
+                        className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-[11px] text-white outline-none"
+                        data-testid={`midi-voices-liquid-${b.id}`}
+                      >
+                        <option value="">Look’s own</option>
+                        {DEFAULT_LIQUID_TYPES.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  {([
+                    ['attack', 'Attack', 0, 2, 0.05, vt.attack ?? VOICE_DEFAULTS.attack, (v: number) => `${v.toFixed(2)} s`],
+                    ['release', 'Release', 0, 4, 0.05, vt.release ?? VOICE_DEFAULTS.release, (v: number) => `${v.toFixed(2)} s`],
+                    ['cap', 'Voices', 1, 8, 1, vt.cap ?? VOICE_DEFAULTS.cap, (v: number) => `${Math.round(v)}`],
+                  ] as const).map(([k, lbl, min, max, step, val, fmt]) => (
+                    <label key={k} className="flex items-center gap-2 text-[11px] text-white/60">
+                      <span className="w-12 shrink-0">{lbl}</span>
+                      <input
+                        type="range" min={min} max={max} step={step} value={val}
+                        aria-label={lbl}
+                        onChange={e => midi.updateBinding(b.id, { ...vt, [k]: Number(e.target.value) })}
+                        className="h-5 flex-1 accent-white"
+                        data-testid={`midi-voices-${k}-${b.id}`}
+                      />
+                      <span className="w-11 text-right font-mono text-[11px] text-white/80">{fmt(val)}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         ))}
         {/* What the music is bound to, in the same list: one set of bindings, whichever hand is on them. */}

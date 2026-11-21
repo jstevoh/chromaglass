@@ -317,7 +317,7 @@ check('the layer pickers offer the back plate while it has a look (the desk, pho
   /const stageLayers = Math\.max\(1, settings\.layerCount \?\? 1, backLook \? 2 : 1\);/.test(app)
   && (app.match(/layers=\{stageLayers\}/g) ?? []).length === 2
   && /layers=\{stageLayers\}/.test(app.slice(app.indexOf('<Desk\n'), app.indexOf('\n        />', app.indexOf('<Desk\n')))) && /Math\.min\(stageLayers - 1, l \+ dir\)/.test(app)
-  && /if \(activeLayer >= stageLayers\)/.test(app) && !/settings\.layerCount - 1/.test(app));
+  && /setStageLayers\(stageLayers\)/.test(app) && /setActiveLayer\(l => \(l >= n \? Math\.max\(0, n - 1\) : l\)\)/.test(app) && !/settings\.layerCount - 1/.test(app));
 check('Follow the front keeps the back plate on the stage while it fades back, then lets it go',
   /setBackLook\(b => \(b && seconds > 0 \? \{ \.\.\.b, leaving: true \} : null\)\);/.test(app)
   && /setTimeout\(\(\) => \{ backLeavingTimer\.current = null; setBackLook\(null\); \}, seconds \* 1000\)/.test(app));

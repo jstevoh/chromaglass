@@ -52,7 +52,7 @@ An id that is not a section number, with the file to read. The entries above are
 
 | Id | Text |
 |---|---|
-| H2c-1 to H2c-11, H2c-labels | part 1, and `docs/webgpu-plan.md` "H2c" (H2c-4 and H2c-11 shipped) |
+| H2c-1 to H2c-11, H2c-labels | part 1, and `docs/webgpu-plan.md` "H2c" (H2c-4, H2c-10, H2c-11 and H2c-labels shipped) |
 | H1 (particles), H2a (`forcesB`), H3a (a governor with a cost model) | `docs/roadmap.md`, under the same ids |
 | H4 (wide colour), H5 (the effects) | `docs/roadmap.md`; `docs/filters-plan.md` F1 to F9 |
 | H8 | this file |

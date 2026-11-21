@@ -419,7 +419,7 @@ const oldPush = (strength) => ({
 });
 const CLASSIC = {
   dt: 0.000674, visc: 1.5, nu: 0.00015, diff: 0, buoyancy: 0.4, gravity: 0.006, advection: 0.35,
-  sharpness: 0, damping: 0.988, heatDecay: 0.992, turbScale: 0.576, turbDetail: 3, spin: 0.013, immiscibility: 0.02296,
+  sharpness: 0, damping: 0.988, heatDecay: 0.992, turbScale: 0.576, turbDetail: 3, immiscibility: 0.02296,
   phaseSharp: 0.35, phaseTension: 0.18, gapSpring: 0.0003, gapMemory: 0.998, platePressure: 0.25,
   vibIntensity: 0.0048, vibFrequency: 0.288, drip: 0.15, currentDamp: 0.988, currentBuoy: 0.12, currentGrav: 0.03,
   meanDensity: 0.38, maxCurrent: 16.7, gravityReach: 0.21,   // no twist: the motor's stir went in PLAN 22j
@@ -544,7 +544,7 @@ const measure = (r) => ({
   moments of the show's clock 15 s apart, since the noise drifts with it (the lab's
   plate starts at 0, so without `setTime` every replay would be the same
   first second). The step is the one the check asks for: Classic with the
-  motor off (it no longer stirs the current anyway, PLAN 22j), silent (spin 0, Classic's vibration at silence,
+  motor off (it no longer stirs the current anyway, PLAN 22j), silent (Classic's vibration as it was in silence,
   0.0036), no turbulence or rain, the current's ceiling recomputed for the
   app's dt as the app does, at the dt the phone's plate stepped at in the
   diagnostic (0.0011). What a held Drop lays is the app's with Water in the
@@ -566,7 +566,7 @@ const HELD = [[[81, 45], [68, 120]], [[113, 46], [76, 126]]];
 const MOMENTS = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135];
 const HELD_DT = 0.0011;
 const HELD_STEP = {
-  ...CLASSIC, turbScale: 0, spin: 0, vibIntensity: 0.0036, drip: 0, dt: HELD_DT,
+  ...CLASSIC, turbScale: 0, vibIntensity: 0.0036, drip: 0, dt: HELD_DT,
   maxCurrent: 0.75 / (HELD_DT * CLASSIC.advection * 190), meanDensity: 0.012,
 };
 const held = (page) => page.evaluate(async ([pairs, moments, over]) => {

@@ -151,7 +151,7 @@ export function useCheckHooks({
       (title: string, artist: string) => showFor(songShowsRef.current, { title, artist });
     window.chromaglassSongStop = () => songRuntimeRef.current?.stop();
     window.chromaglassPourText =
-      (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => wallRef.current?.pourText(rows, opts);
+      (rows: { text: string; weight?: number }[], opts?: { colour?: string }) => wallRef.current?.pourText(rows, opts);
     window.chromaglassBench =
       (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
   }, []);

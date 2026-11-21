@@ -1,5 +1,5 @@
 # 22. Spin the plate
-**Partly shipped** (#223, #252, #258, #261): the Spin tool, Auto Spin, the one dish under a plate, the cut of the swirl's projection and the look's motor retune are in. The shortcuts and what is open are below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#223, #252, #258, #261, 22n): the Spin tool, Auto Spin, the one dish under a plate, the cut of the swirl's projection and the look's motor retune are in. The shortcuts and what is open are below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 Asked 2026-09-28: "spin the plate on command, or set it to spin automatically at some
 rate (or a rate controlled by some other factor, like music tempo); give me a control
@@ -59,8 +59,42 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
     this change. Still over the check's half of the old plate's 0.534, but by 15% where it
     was by more than double. Find what moved it (#248 Thin Gap everywhere, #255 the thin
     forces, or the lab's own plate) and either restore it or write down why it moved.
+- ~~**22n. A spun plate's liquid did not heap, lag or overshoot.**~~ **Shipped**
+  (`npm run spinslosh`, `npm run sloshgpu` case 6). Story in `docs/plan-shipped.md` §22n.
+  Its shortcut, named so it is replaced: the open dish's flow is the glass's frame's
+  and is laid over the solver's, whose frame turns with the thin gap's liquid (ω_l),
+  so while the thin gap's liquid lags the glass (a third of a second on water, a
+  sixtieth on the thick liquid) the two frames differ by that lag. Properly one
+  liquid has one lag: when the open dish runs, its own turn should be the frame's.
+- ~~**22n-1. Five looks woke the open dish in their opening.**~~ **Shipped** (`npm run
+  spinslosh` 7, `npm run startup` on the Mac). 22n woke the dish on a change of speed past
+  0.25 rad/s²; deploy 835 on the owner's Mac found Fractal Dream, Velvet Underground, Cell
+  Bloom, Chemical Clock and Clock Glass asking for the dish's kernels in their opening with
+  no list naming them: a frame stalled while the opening compiled moves the dish to its
+  motor (0.02 to 0.09 rad/s) in one step, which read as several rad/s². Now the dish wakes
+  on the liquid's lag behind a change (summed, let go at the dish's drag) past the speed a
+  steady spin needs, so no motor wakes it however the frames fall and a flick still does.
+- **22o. The open dish's staircase rim brakes a turning flow.** The slosh dish is a
+  Cartesian 64² grid inside a circle; its rim is cell faces, and a flow going round
+  the rim meets each step face-on, is turned back and loses energy in the jumps it
+  makes there. With no drag at all a lag of 2 rad/s loses 12% of itself in its first
+  0.4 s, and a hard stop's overshoot is 74% of Ω/k on water and the default Thickness
+  (`npm run spinslosh` 4 prints the share). A cut-cell rim (the face's normal the
+  circle's, its length the wetted part) or a polar grid would take it out.
+- **22p. The open dish's rim has no wall drag.** A real dish's side wall holds the
+  liquid beside it to the glass (a boundary layer √(ν/Ω) thick, under a millimetre);
+  the slosh's rim is free-slip. It is small beside the floor's drag on 6 mm of water,
+  and smaller than 22o's numerical loss, so it waits for 22o.
 - **22i. The hand reads its angle, not its grip.** A hand turns the dish at its
   angular speed round the middle, held to a turn and a half a second, because near
   the middle a small move is a large angle. A hand's real torque is its friction
   times its lever arm: weight each hand by its radius and let a thick liquid's drag
   push back (22e).
+
+- **22q. `npm run flick`'s "the solver is handed the dish's drag" reads a step that does not
+  move.** On GitHub's Mac (18c-2's PR, 2026-11-14) the last step's `spinDish` read 0.732 rad/s
+  on two branches, at 0.34 s and at 0.44 s after the flick, while the frame's Ω − ω_l fell
+  from 0.623 to 0.475, so the line passed or failed (ratio 1.17, 1.54; bar 1.5) on how late
+  the read landed. Either the plate takes no step between the flick's first and the read while
+  frames draw, or `lastStep` is not the latest; find which, and read the step and the frame
+  from the same step.

@@ -1009,7 +1009,7 @@ try {
       // a FAIL that says what the sheet had, not a sixty-second timeout.
       const pressIf = async (testId) => { if (await visible(page, testId)) await tap(page, testId); };
       const plateSays = (st) => `${st.two ? 'Front/Back' : 'one'}${st.add ? ' +add' : ''}${st.off ? ' +off' : ''} (${st.solvers ?? 'no'} solvers)`;
-      for (const [id, plates] of [['lumia', 1], ['classic', 2]]) {
+      for (const [id, plates] of [['roy', 1], ['classic', 2]]) {
         await tap(page, 'phone-open-looks');
         await tap(page, `phone-look-${id}`);
         await page.waitForTimeout(1500);

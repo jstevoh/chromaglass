@@ -26,6 +26,14 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
+
+/**
+ * `?lean=0` opens on the whole display, as before `displayLean.ts`: the
+ * other way for `npm run openingtime -- --variants ",lean=0"` to time
+ * against, on one build and interleaved.
+ */
+const LEAN_OFF = (() => { try { return new URLSearchParams(window.location.search).get('lean') === '0'; } catch { return false; } })();
 import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
@@ -103,6 +111,41 @@ export interface Opening {
    * then as before. Off the thin gap the dish is never stepped (`stepSlosh`).
    */
   slosh: boolean;
+  /**
+   * The clear film (PLAN §20b): carried, its pressure and its update, from
+   * the first step, when the look lays a film (Clear Film above nought).
+   * Added with Saffron Lace (PLAN 28l), the first look to lay one: `npm run
+   * startup` on the Mac found it asking for all three in its first steps
+   * with no list naming them. The film's level change (filmSplat) is a hand
+   * on the control mid-show, never an opening, so it stays behind the show.
+   */
+  film: boolean;
+  /**
+   * The sealed bottle (PLAN 27f-9): a thin gap stood up (Plate Upright above
+   * nought) takes its weight as the closed cell's circulation from the first
+   * step (sealSource, hsLiftRelax, sealFlow), where every other look builds
+   * them behind the show with the oil's lift. Added with the seal: `npm run
+   * startup` on the Mac found Lava Lamp asking for all three in its first
+   * steps with no list naming them. Until they are built the plate takes its
+   * weight on the open rim, so nothing was compiled on a frame, but the look
+   * opened on the leak the seal is there to stop.
+   */
+  sealed: boolean;
+  /**
+   * The frame's soap film (PLAN 32d): its solver's five kernels and the
+   * plate's three that drive it (the air, the re-dip's state and its lay),
+   * from the first step, when the look hangs a frame (Soap Film above
+   * nought). Added with the film: `npm run startup` on the Mac found Soap
+   * Film asking for all eight in its first steps with no list naming them.
+   * Every other look builds them behind the show, for the hand that turns
+   * Soap Film up mid-set.
+   */
+  soap: boolean;
+  /**
+   * The display's effects this look can reach (`displayLean.ts`): the
+   * opening compiles a display with only these, and the whole one behind it.
+   */
+  display: number;
 }
 
 /**
@@ -154,6 +197,12 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     chemistry: on(s.chemistry),
     gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
     slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
-      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
+      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway))
+        // The Tilt knobs tip it too, either way (lib/handTilt.ts).
+        || (on(s.slosh) && (on(s.plateUpright) || on(Math.abs(s.plateTiltX ?? 0)) || on(Math.abs(s.plateTiltY ?? 0))))),
+    film: (s.clearFilm ?? 0) > 0.001,
+    sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
+    soap: (s.soapFilm ?? 0) > 0.001,
+    display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
   };
 }

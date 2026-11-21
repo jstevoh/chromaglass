@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself (continued)
 
-Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
+Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
 
 - **19aa-9. Bottles' Splat with the Ferrofluid bottle, "not at its mirror" (read 2026-10-25).**
   3 reds of 183 Mac runs in the week, all on the Splat and on no other tool or the replays
@@ -117,6 +117,21 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
     2.02, still red, so 7b is not a change to the check alone and stays open: the next step
     is what in the page's first second stretches four frames over 0.85 s after a fast device.
     Merged with 7a's fix in the same PR; judge on `npm run flakes` a week on as above.
+  - **19aa-7d. Shipped 2026-11-15: the control's compile, when one frame got through.** Main's
+    deploys 832 and 839 (both on the owner's second Mac runner) went red on 1b's first two
+    lines with the control pricing no compile: "0.00 s compiling ... (0 stops), 8.55 s the
+    page's own". The control built its 59 on its first step (0.81 s), its page was held from
+    then on (its timer on time for about 0.16 s of the next 1.72 s), one frame got through at
+    2.53 s, and the frames then stopped 6.61 s with the page silent: the stop began 1.72 s
+    after the builds, outside the second, and the first-use rule rightly will not vouch for a
+    stop the page stood still through. A build now also sits in the first stop after it when
+    that stop began under two seconds after it, the page never ran (ticks and frames no more
+    than a quarter second apart) for half a second at a time between, and its timer was on
+    time for half of the second before the build; read from the build: `scripts/compilestop.mjs`
+    (`buildsIn`, beside startup.mjs at its ceiling), `npm run compilestop` on thirteen made-up
+    openings. Not asked: whether one long task covered the stretch (the log does not print
+    the control's long tasks after its first step). 839's control reads 8.33 s of compile and 0.23 s its own. Not #861 (?prepare=0
+    returns before the prepare). Judge on the next deploys' `open` shard on both owner runners.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
@@ -185,6 +200,23 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
   under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
   with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-6, open** (E, S): **`mirror`'s "and nowhere else" reads at its bar on main since 2026-11-14.**
+  Red once on a GitHub Mac (`show`, the closeup pull request for 38u, head b7c33e8): "Classic, calm,
+  layer 1 turned a quarter: and nowhere else", 28.5 past its drift where 27.4 was allowed, 95.4 under
+  the drop, each of the four drops alike (30.7 30.0 25.6 29.8 against a drift of 2.2 1.1 1.1 1.3), so
+  not one unlucky drop. The line is judged in silence at the plate's own zoom, which that pull
+  request's diff (the closeup's drawing, the treble's shake of a bubble) does not reach, and it was
+  green on its three earlier heads. Main's own deploy 839 (c258561, the owner's Mac) is as close
+  without it: `layer 1` 27.6 of 33.1 allowed, `layer 1 turned a quarter` 18.2 of 22.9. This line's
+  history is 0.4 to 11 (19ac-4, and #225/#238 in `docs/plan-shipped.md`), so one of the nine merges
+  between adcbe3f and c258561 roughly doubled what a drop leaves beyond its reach: the spun plate's
+  dish (22n), the two-dye line gone (18e-5: the picture under and round a drop is brighter, and the
+  bar is a share of the reading under the drop), or Velvet's stir. *Do:* run `npm run mirror` on the
+  Mac at adcbe3f and at each merge after it and name the one that moved it; then decide whether the
+  drop really spreads further (a fault in that change) or the picture changed and the reach or the
+  bar's share was set on the old one (then re-measure DROP_REACH as 19ac-4 did, never widen the bar
+  to fit). *Measure:* twenty Mac runs, GitHub's and the owner's, read under half the allowance on
+  all three scenes; a drop mirrored where it should not be is still red.
 - **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
   and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
   the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
@@ -423,12 +455,42 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   own (no runner worker among its ancestors), waits two minutes, then
   fails listing it; the watchdog reads that step's failure and moves the deploy to
   GitHub's Macs at once (`npm run macguard`). Recovery that night: the deploy run by hand
-  with `hosted`. Open: **19ah-9a**, work begun mid-shard still shares the GPU (a shard
-  could look again before its timing checks); **19ah-9b**, `startup` prints "nothing built
-  behind it" when its 45 s wait for the half behind the show ran out with it still
-  building, which read as the show asking for nothing (the script is over 100 KB, so the
-  wording waits for its split); and the 45 s wait has 7 s to spare on GitHub's Macs
-  (38.45 s behind on deploy 671).
+  with `hosted`. **19ah-9a** built below. **19ah-9b** shipped 2026-11-14
+  (`docs/plan-shipped.md`): startup waits for the half behind the show while the app says
+  its builds still come in, and that half builds two at a time. Open: **19ah-9c**, below.
+- **19ah-9c. Open: a look changed to while the half behind the show is building.** That
+  half is 113 builds now (it was fifty-odd in October), and until it is done a look that
+  needs one of them builds it on the frame, the freeze `gpu/prepare.ts` exists to take
+  away. On GitHub's Macs it took 28 to 46 s one at a time; 19ah-9b builds it two at a
+  time. No check changes look inside that window: startup's "no pipeline was built on a
+  frame" changes looks only once the half is done. Wanted: the half's time on the owner's
+  Mac after 19ah-9b (startup's line prints its pace against the opening's), a look change
+  at a few seconds into the half to see what it costs, and whether the half should be
+  asked in the order looks are likeliest to need it (the set list's next look first).
+- **19ah-9a. Built: work begun mid-shard waits for the deploy, or hands it back.** Main's
+  deploy of 2026-11-08 began its Mac shards at 18:16Z, each past its first look, and then
+  sessions began GPU work on the Mac: filming the hero, `lampzero.mjs`, `renders.mjs` in
+  Antigravity's clone, a driver of the app. `startup` went red on the Mac ("no pipeline was
+  built on a frame"), the tools shard's first look refused the Mac, and the deploy went to
+  GitHub's Macs to queue behind pull requests. Built, both sides: the first step now marks
+  the Mac held from its first line (`~/.chromaglass-runner/deploy-<runner>.json`) and a new
+  last step, "The owner's Mac stayed free of other work" (`always()`), marks it ended;
+  `launchChromium` and `npm run desktop` wait while a shard holds the Mac and for 120 s after
+  one ends, for the next shard (`scripts/macdeploy.mjs`; a mark whose runner worker exited,
+  older than 30 minutes, or from a shard that gave up holds nothing; only on a Mac, never in
+  a job). What does not read the mark, `scripts/checks.mjs` looks for before each check and
+  after the last (`macbusy.sh --again`): still there after two minutes, or there at all right
+  after a red check, the shard stops and its last step fails, which the watchdog reads as
+  busy; so the watchdog now watches until every Mac shard has finished, not until each is
+  past its first step. Checked by `npm run macguard` (the hold rule, `macbusy.sh`'s marks
+  read back, the last step's failure, the watchdog's new cases) and by hand in a session: a
+  red check beside a busy fake headless shell stopped its shard and failed the last step,
+  and a launch held by a mark ended 112 s ago went on 10 s later. Open: the first deploy on
+  the Mac with a session working beside it (read the harness's "a deploy holds the owner's
+  Mac" line and the shard's checks green). Found along the way, **19ah-9c**: a session's
+  script that launches Playwright itself (`detail.mjs`, `webgpu-smoke.mjs`, and scratch
+  drivers) skips the mark and is caught only by the look between checks; and a deploy handed
+  back queues behind pull requests' Mac runs, which a hosted deploy could jump.
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
@@ -528,10 +590,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
   measure over a fixed number of plate steps, not wall time, so its bar means the same on
   every runner.
+  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
 - **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
-  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
-  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
+  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
+  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
+  circle's edge; find whether the red runs read a lit edge
   (the sample too close) or a frame not yet drawn (the read too early), and measure the
   feature, not the moment.
 - **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
@@ -564,3 +628,15 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
   prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
   (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
+- **19ak-8. Open: the three quarantines renewed 2026-11-15, to 2026-12-06.** The first
+  three quarantines (19aa-7, 19aj-1, 19aj-2) ended on 2026-11-15 with none of the three
+  fixes shipped. That morning about half the open PRs (a count of PRs, not of runs) went
+  red on startup's "moving for good no later than the old way", the show's own wait 2.8
+  to 4.3 s against the control's 1.0 to 1.5 s plus its second, on PRs that do not touch
+  the opening; the Blow stroke's and the wall's lines block again too. Each is renewed
+  for the 21 days the rule allows; no bar moved, and main's deploys still hold all three to their bars. Two things
+  to read before 2026-12-06: whether the startup line got worse after #861 (19ah-9b's
+  two behind lanes, `LATER_LANES` 2, sharing the GPU with the show's opening; deploy 849
+  at 37bae99, which carries #861, passed it), and whether 19aa-7d (#878, the control's
+  compile stop priced) moves the control's side of the line. A second renewal is not
+  the answer: fix the item or take the line out of the bar with its own reasons.

@@ -94,7 +94,7 @@ const SECTIONS: Section[] = [
           ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Classic Light Show</Em> preset — slow luminous blobs, the meditative 1960s look.</>],
           ['2. Give it sound', <>The quickest is <Em>Band</Em>: a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Mic</Em>, <Em>System</Em> and <Em>File</Em> are the real inputs.</>],
           ['3. Pick a preset palette', <>Click the name under the ChromaGlass title. The preset palettes come in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
-          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw (held still on layer 1 it blows a bubble that grows while you hold, its rim breaking into fingers), <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
+          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> is your breath: drag and it runs along the surface the way you dragged, a long plume ahead of your hand that keeps going that way while you hold; press without moving on layer 1 and it is a straw, one round bubble that grows while you hold, <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
         <H>Your first show, in order</H>
         <P>
@@ -386,7 +386,7 @@ const SECTIONS: Section[] = [
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
           ['Music Sync', <>The camera cuts on kicks. Its punch on the bass, push with the energy and tremor from the treble are the frame moving with the music, so they ride Frame Sway (Show), which is 0 unless you turn it up.</>],
           ['Paint Cells / Cell Size', <>Opt-in, off by default: synthesised cells at magnification, the rings a pour painting makes. No shipped look turns them on.</>],
-          ['Macro Lacing / Edge Detail / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Edge Detail is the fine boundary structure, and Relief the apparent thickness of the film, which is always on.</>],
+          ['Macro Lacing / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Relief is the apparent thickness of the film, which is always on.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],
         ]} />
         <Note>
@@ -507,8 +507,9 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Second display</Em> opens a window on a projector that mirrors this canvas pixel
           for pixel — one render, at the projector's own resolution, with the laptop
-          keeping the controls. <Em>Network display</Em> gives an address any browser on the
-          same Wi-Fi can open. <Em>Chromecast</Em> uses Chrome's own picker.
+          keeping the controls. <Em>Network display</Em> gives an https address any browser on
+          the same Wi-Fi can open; its browser warns once that the connection is not private
+          (Advanced, then Proceed), since the GPU runs only on a secure page. <Em>Chromecast</Em> uses Chrome's own picker.
         </P>
       </>
     ),

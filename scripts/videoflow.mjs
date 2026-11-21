@@ -184,7 +184,7 @@ function open(withPass, pours = true) {
   const sim = new FluidSimulation(L, 0, 0, 0.1);
   const gpu = keeper({ video: withPass, pours });
   sim.attachGpu(gpu);
-  sim.step(settings, null, 0, noise);                // the first flush, whole, as attachGpu leaves it
+  sim.step(settings, 0, noise);                // the first flush, whole, as attachGpu leaves it
   sim.flushDeltas(0.01);                             // and one with nothing, which sends those rows back as zeros
   gpu.log.bytes = 0;
   gpu.log.steps.length = 0;
@@ -196,20 +196,20 @@ const pour = (o, src) => pourVideoFrame(o.sim, src, o.state, read);
 // ── The loop, as the WebGL solver still runs it: the reference ─────────
 const cpu = open(false);
 const cpuWay = [pour(cpu, video('a.mp4', 0)), pour(cpu, video('a.mp4', 1))];
-cpu.sim.step(settings, null, 0, noise);
+cpu.sim.step(settings, 0, noise);
 const refTwo = { dye: cpu.gpu.tex.dye.slice(), vel: cpu.gpu.tex.vel.slice(), bytes: cpu.gpu.log.bytes };
 cpu.gpu.log.bytes = 0;
 pour(cpu, video('a.mp4', 2));
-cpu.sim.step(settings, null, 0, noise);
+cpu.sim.step(settings, 0, noise);
 const refThird = { dye: cpu.gpu.tex.dye.slice(), vel: cpu.gpu.tex.vel.slice(), bytes: cpu.gpu.log.bytes };
 // The next video on the same element: its first frame pours dye and no flow, though the last video's frame is at hand.
 pour(cpu, video('b.mp4', 0));
 const nextVideoFlow = cpu.sim.vx.some((v) => v !== 0) || cpu.sim.vy.some((v) => v !== 0), nextVideoDye = cpu.sim.density.some((v) => v !== 0);
-cpu.sim.step(settings, null, 0, noise);
+cpu.sim.step(settings, 0, noise);
 // The last frame alone (the control's reference): differenced against the first, as above, and nothing added before it.
 const lone = open(false);
 pourVideoFrameCpu(lone.sim, frames[1], frames[0], L);
-lone.sim.step(settings, null, 0, noise);
+lone.sim.step(settings, 0, noise);
 const refLast = { dye: lone.gpu.tex.dye.slice(), vel: lone.gpu.tex.vel.slice() };
 
 const cells = (a, per, k) => { let n = 0; for (let i = 0; i < AREA; i++) if (a[i * per + k] !== 0) n++; return n; };
@@ -300,19 +300,19 @@ check('control: the card turned over lands the other way on both', loopTurned.up
 const gpu = open(true);
 const gpuWay = [pour(gpu, video('a.mp4', 0)), pour(gpu, video('a.mp4', 1))];
 const untouched = rest(gpu.sim);
-gpu.sim.step(settings, null, 0, noise);
+gpu.sim.step(settings, 0, noise);
 const stepTook = gpu.gpu.log.steps.slice(-1)[0];
 const videoBytes = gpu.gpu.log.bytes;
 gpu.gpu.log.bytes = 0;
 // A frame with a tool's few cells in it: only their rows go.
 pour(gpu, video('a.mp4', 2));
 for (let x = 90; x < 96; x++) gpu.sim.addDensity(x, 40, 0.3, 1, 0.4, 0.2);
-gpu.sim.step(settings, null, 0, noise);
+gpu.sim.step(settings, 0, noise);
 const toolBytes = gpu.gpu.log.bytes;
 gpu.gpu.log.bytes = 0;
 // And a step with no frame and no tool: nothing to flush, as before any video.
 const flushesBefore = gpu.gpu.log.flushes;
-gpu.sim.step(settings, null, 0, noise);
+gpu.sim.step(settings, 0, noise);
 const after = gpu.gpu.log.steps.slice(-2), idleFlushes = gpu.gpu.log.flushes - flushesBefore;
 // The next video, and the same one handed in again (the app forgets the source): each starts fresh.
 pour(gpu, video('b.mp4', 0));
@@ -344,7 +344,7 @@ for (let k = 0; k < 30; k++) {
   const t0 = performance.now();
   pourVideoFrameCpu(timer.sim, frames[(k + 1) % 3], frames[k % 3], L);
   t.push(performance.now() - t0);
-  timer.sim.step(settings, null, 0, noise);
+  timer.sim.step(settings, 0, noise);
 }
 t.sort((a, b) => a - b);
 console.log(`  the loop's CPU time a frame, median of 30: ${t[15].toFixed(2)} ms (and a 192² getImageData and a 147 KB copy in the browser); with the pass: none`);

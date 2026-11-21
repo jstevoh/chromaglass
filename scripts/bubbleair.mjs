@@ -4,7 +4,7 @@
  * 15g-8c, 15g-8e, 15g-8f and 15g-8g in docs/plan/15-tools-on-liquids.md).
  *
  *   npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press
- *                             (the lab: any adapter that computes; in Measure's lab4 part)
+ *                             (the lab: any adapter that computes; in Measure's lab8 part)
  *
  * Each line under an id is printed as owed while what it asks for is absent,
  * and is red the day it passes with its id still listed (the convention of
@@ -297,7 +297,10 @@ try {
   line('oldplate', '15g-8c: the CPU paints no ring back from the mirror: no depositBubbleRims left in src/', !deposit.length, deposit.length ? `still in ${deposit.join(', ')}` : 'gone', oldPlateExclude);
 
   // ── species, mix, maze (15g-8e) ──
-  const MAIN_LEFT = { species: 0.343, mix: 0.203, maze: 0.0315 };
+  // What main leaves in a bubble's middle. The mix's was 0.203 with the quartic well; the deep
+  // quench (PLAN 38f-2) pulls the oil a bubble's carry leaves behind into its pool, so main
+  // leaves 0.149 with no air carry built (the owed bar, the colour's own 0.011, is unchanged).
+  const MAIN_LEFT = { species: 0.343, mix: 0.149, maze: 0.0315 };
   // The colour's own carry under the same bubble on the same plate, the bar each other carry is held to.
   const control = await runIn(page, { kind: 'whole' });
   const bar = Math.min(LEFT_MOST, control.held.inside + MATCH_MOST);

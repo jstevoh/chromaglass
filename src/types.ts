@@ -1,5 +1,6 @@
 import type { SourceName } from './lib/audioFeatures';
 import type { HitFeature } from './lib/hitSource';
+import type { NoteFeature } from './lib/noteVoices';
 
 export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
@@ -207,7 +208,7 @@ export type SceneFeature =
  * (`lib/hitSource.ts`). Its own source because its features are its own
  * names, and Sound Impact is its master too.
  */
-export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape';
+export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'notes' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -236,7 +237,7 @@ export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
   /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName | HitFeature;
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature | NoteFeature;
   /**
    * Any numeric setting — the same list a MIDI fader can learn — or, on a
    * cord aimed at an area, what the hand does there (`AreaTarget`).
@@ -312,6 +313,31 @@ export interface VisualizerSettings {
   stockWeave: number;
   stockGate: number;
   onNewSong: OnNewSongMode;
+  /*
+    The song's title painted as ink, then swept away (PLAN 37x-10,
+    lib/inkTitle.ts). `inkTitle` is the switch: when the identified song
+    changes, its title and artist are poured into the dye at the solver's
+    grid, and a wash (a real flow, added to the step's velocity) drifts and
+    stirs them until the letters break up. `inkTitleColor` is '' for the
+    look's own first colour or a '#rrggbb'; `inkTitleSize` runs from a small
+    credit to the plate's width (a long title shrinks to fit);
+    `inkTitleY` is where it lands, up the plate; `inkTitleSweep` is the
+    wash: at 0.01 a drift that leaves it readable past six seconds, at 0.5
+    read for three and gone by twelve, at 1 gone in two.
+  */
+  inkTitle: boolean;
+  inkTitleColor: string;
+  inkTitleSize: number;
+  inkTitleY: number;
+  inkTitleSweep: number;
+  /*
+    The logo melted at the start of a film or a stream (PLAN 37x-11,
+    lib/logoMelt.ts): when the Live Show goes on air or the Record button
+    starts a take, the ChromaGlass wordmark is poured big across the plate as
+    thick ink, held for a couple of seconds, then rinsed through and stirred
+    until it melts into the show's first colour. Off keeps today's films.
+  */
+  logoMelt: boolean;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -492,6 +518,16 @@ export interface VisualizerSettings {
     two drops merge the moment their edges meet.
   */
   filmHold: number;
+  /**
+    Oil Weight (PLAN 27f-9c): the oil's density against the water when cold,
+    −1 to 1. Below 0 it is lighter and floats up a standing plate (−0.05 is
+    the light mineral oil every oil look had); above 0 it is heavier and
+    sinks, as a lava lamp's wax does. Every oil swells with heat more than
+    water, so a warmed body of heavy oil turns light and rises
+    (gpu/fluid/constants.ts OIL_RHO, OIL_EXPAND). Needs Oil Tension, and a
+    standing plate (Gravity) for the weight to act.
+  */
+  oilWeight: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
@@ -544,6 +580,19 @@ export interface VisualizerSettings {
    * Optional so a look saved before it reads as 0.
    */
   slosh?: number;
+  /**
+   * A hand tipping the flat plate on the projector, left and right (PLAN
+   * 18a-13m): −1 to 1, 0 level. Up dips the right edge and the colour runs
+   * right. Two knobs on a controller are what it is for. Not Gravity: the
+   * plate stays flat on the lamp, and on a thin gap heavy dye slides down the
+   * tip and light oil rises (lib/handTilt.ts says why it is that tilt, eased,
+   * with a level middle). Added to the remote phone's tilt. A hand's alone:
+   * never the sound's or Evolve's. Optional so a look saved before it reads
+   * as level.
+   */
+  plateTiltX?: number;
+  /** The same, top and bottom: up dips the top edge and the colour runs up the screen. */
+  plateTiltY?: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -575,6 +624,8 @@ export interface VisualizerSettings {
     exists is reachable through Buoyancy, and boiling is unbuilt.
   */
   evaporationRate: number;
+  /** The projector lamp's thermal power (PLAN 36e-2): 0 is off (every look opens as today); up to 1 heats the dish under the lamp so a held finger blocking the fan's air boils the spot. */
+  heat?: number;
   
   // Manual/Interaction
   airVelocity: number;
@@ -706,7 +757,7 @@ export interface VisualizerSettings {
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
   blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
-  boundaryContrast: number;   // bright edge-line strength where two dye colors meet
+  boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and now only shades that step in the closeup (18e-7)
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
   colourBody?: number;
@@ -765,6 +816,9 @@ export interface VisualizerSettings {
   filmKey: number;            // luminance below which the film is transparent (a black key)
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
   filmImpact: number;         // master depth over every mapping, read from the film instead of the room
+  filmZoom: number;           // the film's frame on the plate: 1 fills it (cover-fit), above crops in, below shows it smaller with black round it
+  filmX: number;              // the film's frame slid across, in plate widths (0 centred)
+  filmY: number;              // the film's frame slid up, in plate heights (0 centred)
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -898,6 +952,20 @@ export interface VisualizerSettings {
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
+  soapFilm: number;           // the frame's draining soap film over the plate, its reflection 0 (off) to 1 (PLAN 32d)
+  soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
+  soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
+  glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
+  lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
+  sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
+  sideLightHue: number;       // the side lamp's colour as a hue, degrees (30 amber, 0 red, 320 magenta)
+  sideLightAngle: number;     // where round the dish the side lamp stands, degrees from the right, counter-clockwise
+  tank: number;               // a tank of water seen through its side instead of the dish: 0 off, else the dye's glow (PLAN 47n)
+  tankFeed: number;           // the nozzle's speed, cm/s: how fast dye is fed in at the surface (47n)
+  tankWeight: number;         // how much heavier the dye is than water, %: what gravity pulls it down with (47n)
+  tankNozzle: number;         // where the nozzle sits across the tank, 0..1 (a held finger carries it too) (47n)
+  tankDrain: number;          // the share of the fed water drained through the floor, 0..1; the rest raises the level and the dye pools (47n)
+  tankHue: number;            // the dye's glow, degrees of hue (47n)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -921,8 +989,7 @@ export interface VisualizerSettings {
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
-  macroDepth: number;         // dome shading, contact shadow and shallow depth of field
-  macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
+  macroDepth: number;         // the closeup camera's depth of field (it was also a drawn dome shading, contact shadow and paper grain until PLAN 38u-2)
   macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
@@ -934,6 +1001,14 @@ export interface VisualizerSettings {
   soundImpact: number;        // master depth over every patch whose source is the sound
   /** Master depth over every patch driven by an LFO or an envelope. */
   shapeImpact: number;
+  /** Cycle length in bars (0.25..16), shape index (`LFO_SHAPES`) and restart trigger (`LFO_TRIGGERS`) per LFO. */
+  lfo1Bars: number; lfo1Shape: number; lfo1Restart: number;
+  lfo2Bars: number; lfo2Shape: number; lfo2Restart: number;
+  lfo3Bars: number; lfo3Shape: number; lfo3Restart: number;
+  lfo4Bars: number; lfo4Shape: number; lfo4Restart: number;
+  /** Attack and decay in seconds, and trigger source index (`ENVELOPE_TRIGGERS`) per envelope. */
+  env1Attack: number; env1Decay: number; env1On: number;
+  env2Attack: number; env2Decay: number; env2On: number;
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time
@@ -964,6 +1039,13 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     keeps the look unless someone asks for more. `npm run music` holds this.
   */
   onNewSong: 'off',
+  // Off: no song is titled until Settings > Logo & Titles or the phone's Title switch turns it on (PLAN 37x-10).
+  inkTitle: false,
+  inkTitleColor: '',
+  inkTitleSize: 0.5,
+  inkTitleY: 0.5,
+  inkTitleSweep: 0.5,
+  logoMelt: false,
   beatPrediction: 0.7,
   beatLead: 80,
   /*
@@ -1024,6 +1106,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
+  oilWeight: -0.05,         // the light mineral oil every oil look had: it floats up a standing plate
   surfactantFlow: 0,
   soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
@@ -1032,6 +1115,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
+  plateTiltX: 0,            // level: the hand's tip of the flat plate (lib/handTilt.ts)
+  plateTiltY: 0,
   slosh: 0,                 // the plate as it was: a tilt changes the level and the liquid does not slop (lib/slosh.ts)
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
@@ -1097,6 +1182,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
+  heat: 0,                  // off: every look opens as today, byte for byte (PLAN 36e-2)
   cometSpeed: 0.0,
   cometAngle: 0.0,
   // Enough to be felt without the plate ever looking like it is pulsing to a
@@ -1110,7 +1196,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
   blobSurfaceTension: 0.3,  // colours hold apart loosely
-  boundaryContrast: 0.45,   // bright interface line between dye colors
+  boundaryContrast: 0.45,   // the optical path's contrast; no line between two dyes (18e-5)
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
   benDay: 0,
@@ -1150,6 +1236,20 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   microDroplets: 0,
   thinFilm: 0,
   filmPhysics: 0,           // the rainbow: the film every look was made with
+  soapFilm: 0,              // no film in the frame: every look but Soap Film
+  soapFilmRate: 1,
+  soapFilmAngle: 0,
+  glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
+  lensStop: 4,
+  sideLight: 0,
+  sideLightHue: 30,
+  sideLightAngle: 160,
+  tank: 0,                  // the dish from above: every look but the tank's
+  tankFeed: 1.5,
+  tankWeight: 0.5,
+  tankNozzle: 0.5,
+  tankDrain: 1,
+  tankHue: 205,
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,
@@ -1176,6 +1276,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // this existed shows the same picture and moves the same way.
   filmDrive: 0,
   filmImpact: 0,
+  // The frame as it always landed: cover-fit, centred (PLAN 14ag).
+  filmZoom: 1,
+  filmX: 0,
+  filmY: 0,
   lampWarmth: 0,
   transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,
@@ -1231,7 +1335,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroCellScale: 0.5,
   macroLacing: 0,
   macroDepth: 0.5,
-  macroEdgeDetail: 0.6,
   macroRelief: 0.7,
   sceneDrive: 0,            // the room does nothing to the plate until it is asked to
   sceneHands: 0,
@@ -1242,6 +1345,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // source whose master starts at zero makes a patch you just made look broken.
   soundImpact: 1,
   shapeImpact: 1,
+  lfo1Bars: 8, lfo1Shape: 0, lfo1Restart: 0,
+  lfo2Bars: 2, lfo2Shape: 0, lfo2Restart: 0,
+  lfo3Bars: 1, lfo3Shape: 1, lfo3Restart: 0,
+  lfo4Bars: 0.25, lfo4Shape: 3, lfo4Restart: 0,
+  env1Attack: 0.012, env1Decay: 0.28, env1On: 0,
+  env2Attack: 0.09, env2Decay: 1.6, env2On: 0,
   sceneMappings: [],
   sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
   sceneSmooth: 0.35,

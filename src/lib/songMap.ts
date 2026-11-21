@@ -6,6 +6,7 @@
 import { SongMap, SongSection } from './musicTypes';
 import { putFingerprint } from './musicDb';
 import { TrackFingerprint } from './localFingerprint';
+import { shiftSongMap, shiftFingerprintFrames } from './songMapLead.ts';
 
 const ANALYSIS_SAMPLE_RATE = 22050;
 
@@ -126,12 +127,19 @@ export interface GeneratedSongMap {
   fingerprint: TrackFingerprint | null;
 }
 
-/** Run the offline analysis worker over a recorded listen. */
+/**
+ * Run the offline analysis worker over a recorded listen. `leadSec` is how far
+ * into the song the recording began (`songSecAt` at the recorder's start): the
+ * map and its fingerprint come back in the song's seconds, not the
+ * recording's (PLAN 28h-9, `songMapLead.ts` says why the map moves and not
+ * the clock).
+ */
 export async function generateSongMap(
   isrc: string,
   recording: Blob,
   meta?: { title?: string; artist?: string },
   maxDurationSec?: number,
+  leadSec = 0,
 ): Promise<GeneratedSongMap | null> {
   // maxDurationSec trims audio recorded past the track boundary (the recorder
   // keeps rolling until the next identification confirms a track change); it
@@ -170,14 +178,14 @@ export async function generateSongMap(
       title: meta?.title,
       artist: meta?.artist,
       hashes: result.fpHashes,
-      frames: result.fpFrames,
-      durationSec: result.fpDurationSec ?? result.durationSec,
+      frames: shiftFingerprintFrames(result.fpFrames, leadSec),
+      durationSec: (result.fpDurationSec ?? result.durationSec) + leadSec,
       createdAt: Date.now(),
     };
     await putFingerprint(fingerprint);
   }
 
-  const map: SongMap = {
+  const map: SongMap = shiftSongMap({
     isrc,
     title: meta?.title,
     artist: meta?.artist,
@@ -188,8 +196,8 @@ export async function generateSongMap(
     frameRate: result.frameRate,
     chroma: result.chroma,
     generatedAt: Date.now(),
-  };
-  
+  }, leadSec);
+
   return { map, fingerprint };
 }
 
