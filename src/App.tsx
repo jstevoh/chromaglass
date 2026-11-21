@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
+import type { EarView } from './hooks/useEarView';
+import { EarMeters, EarPercent } from './components/EarLeaves';
 import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
@@ -574,7 +576,6 @@ export default function App() {
     audioSource === 'microphone',
     earContext,
   );
-  const liveAudio = ear.audioData;
   /*
     What the show hears: the room, or a song being rendered.
 
@@ -601,7 +602,10 @@ export default function App() {
   const readLevel = useCallback(() => hear()?.volume ?? null, [hear]);
   const [renderHold, setRenderHold] = useState(false);
   const renderHoldRef = useRef(false);
-  const audioData = renderAudio ?? liveAudio;
+  // What renders a level: the ear's view, a render's reading in its place. A store its
+  // readers subscribe to, never state here (hooks/useEarView.ts, PLAN.md 46f).
+  const earOwn = ear.view;
+  const earView = useMemo<EarView>(() => ({ get: () => renderAudioRef.current ?? earOwn.get(), subscribe: earOwn.subscribe }), [earOwn]);
 
   // ── Music intelligence ──────────────────────────────────────────
   const [showTrackPanel, setShowTrackPanel] = useState(false);
@@ -647,7 +651,7 @@ export default function App() {
     });
   }, []);
 
-  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings, ear.onReading);
+  const musicIntel = useMusicIntelligence(audioStream, earLive, musicSettings, settings, ear.onReading);
   /*
     Performances, started and stopped by hand: T on either desk, the
     Performance dot in the desk header, or the Track panel. The note after a
@@ -680,7 +684,9 @@ export default function App() {
   const [perfNow, setPerfNow] = useState(0);
   useEffect(() => {
     if (!musicIntel.performance.live) return;
-    const t = window.setInterval(() => setPerfNow(performance.now()), 500);
+    // Told only when the shown second changes: twice a second it rendered the shell twice for one new digit (PLAN.md 46f).
+    const t0 = musicIntel.performance.live.startedAtMs, sec = (t: number) => Math.floor(Math.max(0, t - t0) / 1000);
+    const t = window.setInterval(() => setPerfNow((was) => { const now = performance.now(); return sec(now) === sec(was) ? was : now; }), 500);
     return () => window.clearInterval(t);
   }, [musicIntel.performance.live]);
   const perfClock = musicIntel.performance.live
@@ -721,7 +727,8 @@ export default function App() {
   useEffect(() => {
     // Not into a render: the lyric clock is the room's, not the film's.
     if (musicIntel.trigger && !renderHoldRef.current) {
-      const energy = audioData ? Math.min(1, audioData.energy) : 0.6;
+      const heard = hear();
+      const energy = heard ? Math.min(1, heard.energy) : 0.6;
       wallRef.current?.triggerTheme(musicIntel.trigger.trigger.theme, Math.max(0.35, energy));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1328,7 +1335,7 @@ export default function App() {
   const markUrlRef = useRef<string | null>(null);
 
   const {
-    wallLook, ridePlate, drafting, walled, wallEngineRef, sendToWallRef, wallSettings, lookFor,
+    wallLook, ridePlate, drafting, walled, wallEngineRef, sendToWallRef, wallSettings, lookSince,
   } = useWallLook({
     isCasting, mirrorCount, designing, musicIntel, ride, wallRef, visualizerRef, settingsRef,
     pinnedPresetId, activePresetId, presetSeq, seedCount, clearTrigger, drainTrigger, spinFlick,
@@ -1578,8 +1585,7 @@ export default function App() {
     wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
     clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
     mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
-    isCasting, ear, hear, audioData, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
-    liveAudio,
+    isCasting, ear, hear, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
   });
 
   const [, setLicenseTick] = useState(0);
@@ -1618,9 +1624,9 @@ export default function App() {
 
   const {
     recorder, showRecordPanel, setShowRecordPanel, recordChoice, setRecordChoice, toggleRecording,
-    recordingAny, recordSeconds,
+    recordingAny, recordSeconds, phoneRecording,
   } = useRecording({
-    audioStream, perfLive, stopPerformance, startPerformance, musicIntel, perfNow,
+    audioStream, perfLive, stopPerformance, startPerformance, musicIntel, perfNow, wallRef, stageRef, phone,
   });
 
   // ── The phone's own hands: a pinch on the closeup, and Tilt ──
@@ -1987,7 +1993,8 @@ export default function App() {
   */
   const earDeaf = ear.deaf && audioSource !== 'none' && !renderHold;
   const deskAudioLine = audioSource === 'none' ? 'silent'
-    : `${earDeaf ? 'not hearing · ' : ''}${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}${songLine ? ` · ${songLine}` : ''}`;
+    : `${earDeaf ? 'not hearing · ' : ''}${audioSource === 'simulated' ? 'band' : audioSource}`;
+  const deskAudio = audioSource === 'none' ? deskAudioLine : <>{deskAudioLine}<EarPercent view={earView} />{songLine ? ` · ${songLine}` : ''}</>;
 
   /** The dyes on the desk's tray: the bottles that are colours, not behaviours. */
   const trayDyes = useMemo(() => liquidTypes.filter(l => !l.behaviour).map(l => l.color), [liquidTypes]);
@@ -2099,7 +2106,7 @@ export default function App() {
       onSongDetection={(on) => updateMusicSettings({ enabled: on })}
       settings={settings}
       onUpdate={updateSettings}
-      calibration={audioData?.calibration ?? null}
+      earView={earView}
       onRecalibrate={() => setCalibrateNonce(n => n + 1)}
       onFlickPlate={flickPlate}
       engineStatus={engineStatus}
@@ -2180,7 +2187,7 @@ export default function App() {
       <LiquidVisualizer
         ref={wallEngineRef}
         onBackLookCleared={backLookCleared}
-        audioData={audioData} hear={hear}
+        audioData={null} hear={hear} heardNews={earOwn.subscribe}
         settings={walled ? wallSettings : effectiveSettings} ride={ridePlate.wall}
         seedCount={wallLook ? wallLook.seedCount : seedCount} spinFlick={wallLook ? wallLook.spinFlick : spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer}
@@ -2227,7 +2234,7 @@ export default function App() {
           key="draft"
           ref={visualizerRef}
           draft
-          audioData={audioData} hear={hear} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
+          audioData={null} hear={hear} heardNews={earOwn.subscribe} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
           selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
           onAim={aimMacro}
           toolAmount={toolAmount}
@@ -3192,7 +3199,7 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
-            recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice }}
+            recording={phoneRecording}
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
             onHide={hideOverlays}
@@ -3600,7 +3607,7 @@ export default function App() {
           onOpenSettings={openAllSettings}
           onOpenAccount={openAccount}
           status={{
-            audio: deskAudioLine,
+            audio: deskAudio,
             engine: engineStatus?.label ?? '',
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
@@ -3613,7 +3620,7 @@ export default function App() {
           blackout={blackout}
           plateRef={preview.ref}
           liveName={liveLookName}
-          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
+          liveSince={lookSince}
           lookName={docName}
           edited={docDirty}
           dirty={docDirty}
@@ -3830,26 +3837,7 @@ export default function App() {
       )}
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
-      {isActive && audioData && !isMinimized && overlayUp && (
-        <div className="absolute bottom-16 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
-          {[
-            { label: 'B', value: audioData.bass },
-            { label: 'M', value: audioData.mid },
-            { label: 'T', value: audioData.treble },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex flex-col items-center gap-1">
-              <div className="w-1.5 h-16 bg-white/10 rounded-full overflow-hidden relative">
-                <motion.div
-                  className="absolute bottom-0 w-full bg-white/80 rounded-full"
-                  animate={{ height: `${Math.min(100, value)}%` }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                />
-              </div>
-              <span className="text-[7px] uppercase font-bold opacity-60">{label}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {isActive && !isMinimized && overlayUp && <EarMeters view={earView} />}
 
       {/* ── Background Glow ────────────────────────────────────── */}
       <div className="fixed inset-0 pointer-events-none z-0">

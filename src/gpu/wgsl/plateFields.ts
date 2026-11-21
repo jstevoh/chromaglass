@@ -53,7 +53,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'beads', type: 'f32', note: 'how much of them' },
   { name: 'beadDrops', type: 'f32', note: 'rings (0) to coloured, domed, packed drops (1)' },
   { name: 'blendMode', type: 'i32' },
-  { name: 'boundaryContrast', type: 'f32', note: 'bright interface line between dye colors' },
+  { name: 'boundaryContrast', type: 'f32', note: 'gain on the optical path and the back plate rim; no two-dye line (18e-5)' },
   { name: 'bubbleCount', type: 'i32' },
   { name: 'bubbleStrength', type: 'f32' },
   { name: 'camZoom', type: 'f32', note: '1 = whole plate, 12 = extreme magnification' },
@@ -108,8 +108,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'macroOn', type: 'f32', glsl: 'u_macro', note: '0 = off, 1 = macro detail pass enabled' },  // `macro` is reserved in WGSL
   { name: 'macroCellScale', type: 'f32', note: 'cell size' },
   { name: 'macroCells', type: 'f32', note: 'paint-cell / bubble structure amount' },
-  { name: 'macroDepth', type: 'f32', note: 'dome shading, contact shadow, depth of field' },
-  { name: 'macroEdge', type: 'f32', note: 'fractal silhouette warp' },
+  { name: 'macroDepth', type: 'f32', note: 'the closeup camera\'s depth of field' },
   { name: 'macroLacing', type: 'f32', note: 'dark lacing filaments along dye boundaries' },
   { name: 'macroRelief', type: 'f32', note: 'surface relief: per-pixel normals, specular, occlusion' },
   { name: 'markOn', type: 'f32', note: '1 when there is one loaded' },

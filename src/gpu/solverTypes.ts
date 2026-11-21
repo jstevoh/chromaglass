@@ -330,6 +330,8 @@ export interface PlateSolver {
   /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
   readonly coverUnits?: number;
   pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
+  /** Whether a pour's volume can be laid now without compiling on the frame that asks: its kernel is built behind the show (fluid.ts), and until it is, a drop is laid as a stamp (sim/dropSplash.ts). */
+  pourReady?(): boolean;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
   /**
