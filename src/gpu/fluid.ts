@@ -180,6 +180,7 @@ export class WebGPUFluid extends FluidCover {
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       ['liquidForces', [VEL], false],
+      ['liquidDrive', [VEL], false],
       ['soapThin', [dye], false],
       /*
         The dye across faces is also how the dye moves wherever the maze
@@ -684,6 +685,7 @@ export class WebGPUFluid extends FluidCover {
     stage('thin gap keep', (pass) => {
       this.run(pass, 'scaleDye', this.ensureThinGap(), [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
     }, thin);
+    stage('liquid drive', (pass) => this.driveLiquids(pass, p, disp), thin && this.liquidsLive && Math.hypot(p.rockX, p.rockY) > 1e-5);
 
     // 4. Project, 5. advect velocity by itself, 6. project again
     /*
