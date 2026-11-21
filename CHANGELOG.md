@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A clear oil drop** and a bubble in clear liquid are drawn with the same dark ring as in dyed
   liquid (it was a third and 0.7 of it); the clear oil's tint fades over the meniscus.
 - **Polarity** pushes unlike colours apart the same everywhere; a noise had pulled them together in patches.
+### Added — Polarised light (PLAN 31p-1)
+
+- **Polarisers** (Settings → Lamp & Light, MIDI, the desks and the phone): sheets under the
+  plate and at the lens. Where the liquid's flow stretches it, it lights in rainbow bands in
+  the real Michel-Levy order; still liquid stays dark between crossed sheets.
+- **Analyser** turns the top sheet from crossed (dark field) to parallel (white field,
+  opposite colours); **Quarter Wave** (on by default) takes the dark lines out of the bands,
+  and turned down brings back the dark pinwheel arms; **Birefringence** sets how high the
+  colours climb.
+
 ### Added — tilt the plate from two knobs (PLAN 18a-13m)
 
 - **Tilt Left/Right** and **Tilt Up/Down** (`plateTiltX`, `plateTiltY`, Settings → Tilt & Rock under

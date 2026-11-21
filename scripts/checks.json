@@ -1577,6 +1577,25 @@
       ]
     },
     {
+      "name": "Polarised light",
+      "shard": "lab9",
+      "run": "npm run polar",
+      "timeout": 6,
+      "why": [
+        "PLAN 31p-1 (lib/polar.ts, gpu/wgsl/platePolar.ts): the plane-sheet and quarter-wave",
+        "laws against Jones matrices; the shader's three table colours against T integrated",
+        "wavelength by wavelength; crossed black and parallel white with nothing retarded,",
+        "the two complements; the Michel-Levy order; isoclinics black with plane sheets and",
+        "gone with quarter-wave plates; the flow's stretch from simple shear and none from",
+        "solid rotation. Then the real shaders: off is off to the byte and each dial reaches",
+        "the picture; a still plate crossed is black and parallel the open plate; a laid vortex",
+        "held pixel by pixel (crossed and parallel add in light to the open plate, every pixel",
+        "on the chart, the isoclinics swap when the plate is turned 45 degrees, the turning",
+        "middle dark); stirred it lights, black at Birefringence 0; plane sheets leave twice",
+        "the dark of the quarter-wave plates."
+      ]
+    },
+    {
       "name": "The tank on the GPU (SwiftShader)",
       "shard": "lab5",
       "run": "npm run tankgpu",
@@ -2157,6 +2176,21 @@
       ]
     },
     {
+      "name": "The webpage's films",
+      "shard": "browser",
+      "run": "npm run landingfilms",
+      "why": [
+        "The webpage's looks as films (scripts/landingfilms.mjs, PLAN.md 34a-6):",
+        "each card's loop and still are there and small, each record is credited",
+        "and published in the US before 1926 with its transfer's checksum in",
+        "SOURCES.md, no loop is asked for before a card plays, a",
+        "pointer plays a card's loop and leaving stops it, a click opens its",
+        "whole film from the channel with the credit under it, a phone plays the",
+        "card in view and a tap opens it, and reduced motion keeps the stills.",
+        "No GPU."
+      ]
+    },
+    {
       "name": "The security headers",
       "shard": "browser",
       "run": "node scripts/csp.mjs",
@@ -2176,6 +2210,7 @@
       "shard": "browser",
       "run": "node scripts/intro.mjs",
       "env": {"PW_WEBGPU":"1"},
+      "quarantine": [{ "line": "9c. its loading line says what the show waits for", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before",
         "the app has arrived, taken into the plate's frame on the desk and the",
@@ -2273,6 +2308,22 @@
         "the display's settings. No GPU: the display's socket, settings and",
         "fades run on its \"needs WebGPU\" screen. The phone's step above built",
         "dist/, which the show server serves, so this runs the script alone."
+      ]
+    },
+    {
+      "name": "A palette from a picture or video",
+      "shard": "browser2",
+      "run": "npm run picturepalette",
+      "timeout": 5,
+      "why": [
+        "PLAN 43d (lib/picturePalette.ts): a picture's four main colours become the palette's",
+        "dyes and nothing else changes. In node on pictures made in the script: four blocks give",
+        "their four colours, a black sleeve's pink title leads (the commonest-pixel picker it",
+        "replaced runs as a control and fails that line), a small accent stays and a speck does",
+        "not, every dye 40 from black and white (28b), the slots after the 24 named dyes are the",
+        "only ones written and the dice's count is unchanged. Then in Chromium through its own",
+        "decoders: a PNG and a JPEG, and a recorded WebM, orange then blue, that does not say its",
+        "length, which must give both colours. No app build, a few seconds."
       ]
     },
     {
@@ -3748,6 +3799,7 @@
       "shard": "tools",
       "run": "node --experimental-strip-types scripts/drawwall.mjs --app",
       "timeout": 4,
+      "quarantine": [{ "line": "the control: through the camera without the dish", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md",
         "8-draw-a): the laptop's own frames reach the pad, the plate's colour,",

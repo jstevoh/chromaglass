@@ -640,3 +640,65 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   at 37bae99, which carries #861, passed it), and whether 19aa-7d (#878, the control's
   compile stop priced) moves the control's side of the line. A second renewal is not
   the answer: fix the item or take the line out of the bar with its own reasons.
+- **19ak-9. Open: the quarantines of 2026-11-21, to 2026-12-06 (intro 9c, the drawwall
+  control).** Reported: "The PR runs keep failing. All the time." Measured over the
+  `Checks` runs of pull requests from 2026-11-14 to 11-21 (none ran 11-16 to 11-20): 52
+  red of 93 that finished. On 11-21, 11 of 26 were red, and 8 of the 11 were the intro's
+  9c on `Measure · browser` (ubuntu), "N changes during the 4 render compiles", red on
+  main's own deploy too (run 44895188598, ec9dfd0), on PRs that do not touch the loading
+  line. 3 of those 8 were also 9 and 9b's "no opening in the prepare log", the check not
+  finding the log, which #900 (14v-12b) fixes and which is not quarantined: its line reads
+  "never", and a line that read nothing is not the flake. Two more were the drawwall
+  control, "lands on the wall elsewhere ... median ~390, centre none", the same numbers on
+  every run since the 11-21 merges, so a change of behaviour (8-draw-a-7, #900 prints
+  the display's own account of it), not noise. Both are quarantined on pull requests
+  from 2026-11-21 to 2026-12-06 so unrelated PRs stop going red on main's reds; no bar
+  moved, main's deploys still run both lines, and the line still prints in full as a
+  warning. The PR that fixes each (#897 for 9c, the 8-draw-a-7 fix for drawwall) takes
+  its entry out. *Found 2026-11-21 (PR #679's run 44927401897): 9c's entry never held,
+  because `scripts/intro.mjs` printed "1 of 14 FAILED" and never the "13/14 checks
+  passed" tally that `quarantined()` in `scripts/checks.mjs` needs before it honours a
+  line; the films PR adds the tally line (the drawwall harness already printed one).*
+- **19ak-10. Decided: a deploy still trusts a PR run that was green through a
+  quarantine.** `deploygate.sh` rules 4 and 5 trust a PR's green `Checks` run, and a run a
+  quarantine held green is green, so a line red on the merged tree can go live on the PR's
+  word; docs/ci.md said main's deploy holds every line to its bar, which held only for a
+  deploy that ran its own checks. On 2026-11-21, 7 of the 15 green PR runs were held
+  green by startup's quarantined line (19aa-7) and one by the wall's (19aj-2): the
+  job's `Quarantined: <check>` warning annotation says so, and a gate could read it and
+  run the checks itself. Put to the owner the same day with the cost: the site would stop
+  updating until the startup line and 9c are fixed. The owner chose to keep trusting
+  them. docs/ci.md now says so.
+- **19ak-11. Open, found by 19ak-9: the film's "at 0, every film is the rainbow every look
+  was made with, to the bit" goes red by one pixel on GitHub's Macs.** Four runs in a
+  week (11-15 three times, 11-21 once), each a different render one pixel off
+  (`closeup00`, `film0`, `plate00`): `scripts/filmlook.mjs` compares two labs, the real
+  shader and a control compiled with Film Physics taken out, each running the solver from
+  scratch. One pixel is either Metal compiling the two shaders' shared arithmetic
+  differently (a fused multiply-add in one and not the other) or the solver not
+  repeating itself to the bit between two pages. Find which (print the pixel and both
+  values; render the control's shader on the real lab's state), then make the claim the
+  one that holds, never a tolerance picked to pass.
+- **19ak-12. Open, found by 19ak-9: the live stream with AAC on GitHub's Macs.** Three
+  runs (11-15 twice, 11-21 on #893, which does not touch the stream): "the audio covers
+  the stream — 29.95 s of them against 30.57 s streamed", "the sound is where the page
+  made it ... 85, 65, 58, 58, 56 ms" against ±31 ms, and once 3 clicks of 5. The same
+  shape as 37x-4g-1 (the audio encoder's queue has no bound, so a loaded Mac emits AAC
+  late), so it may be the app, not the check: read the run's `audioQueue` before
+  touching the bar.
+- **19ak-13. Open, found by 19ak-9: Pour's "spreads it out from where it lands" reads the
+  runner's frame rate.** `scripts/tools.mjs` holds each pouring tool for 1200 ms of wall
+  time and settles 700 ms, so the plate takes however many solver steps the runner
+  manages in that time, and the share of dye from 0.02 to 0.07 moves with it: red once
+  on 11-21 (Pour 75% against Drop's 78%, a PR that does not touch the tools). Hold and
+  settle over a fixed number of plate steps, as 19aj-1 asks of the Blow stroke.
+- **19ak-14. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
+  keeps the heat" reads ×0.9997, 0.9748 and 0.9657 where its bar wants the heat held. Not yet
+  run down: either Heat Spread at 2 now loses heat it kept (a real regression in the heat
+  field's diffusion) or the check reads a quantity that a later change made swing. Find which
+  before touching the bar.
+- **19ak-15. Open, found 2026-11-08: `oscout`'s `plate >= 10` is a fixed floor under a count
+  that swings with load.** A main deploy went red on 9 kicks in 15 s; on the Mac the same count
+  ran 10 to 24 before 14d-2. *Fix:* assert what the feature promises (each kick the ear hears
+  goes out as a message), by counting the ear's kicks over the same window and holding the OSC
+  count to them, not to a number. *Measure:* the ratio on a loaded and an idle run.
