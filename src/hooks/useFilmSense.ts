@@ -70,9 +70,11 @@ export function useFilmSense(opts: FilmSenseOptions): {
   const { enabled, hz = DEFAULT_HZ } = opts;
 
   useEffect(() => {
+    const debug = new URLSearchParams(window.location.search).has('debug');
     if (!enabled) {
       reading.current = null;
       setState(IDLE);
+      if (debug) window.__cgFilmSense = () => ({ enabled: false, src: null, ready: false, energy: 0 });
       return;
     }
     const sampler = new VideoSampler();
@@ -118,6 +120,17 @@ export function useFilmSense(opts: FilmSenseOptions): {
       }
     };
 
+    /*
+      Which video it reads and what it read, for `npm run myvideo` (PLAN
+      14ag): that a poured video with nothing on the projector is the one
+      read, by its address, and gives a reading that moves.
+    */
+    if (debug) {
+      window.__cgFilmSense = () => ({
+        enabled: true, src: learning?.currentSrc ?? null,
+        ready: !!reading.current?.ready, energy: reading.current?.energy ?? 0,
+      });
+    }
     const timer = setInterval(tick, Math.max(20, Math.round(1000 / Math.max(1, hz))));
     return () => {
       clearInterval(timer);

@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   knob left near its centre does not drain the plate. Right stays the screen's right on a look
   whose dish turns. Not Gravity: the plate stays flat and is not stood up as a bottle. The sound,
   the patch bay and Evolve never move them. `npm run handtilt`.
+### Changed — Your own video: played, poured, read and framed (PLAN 14ag)
+
+- **The demo videos are gone**: the three demo loops and the cartoon shelf no longer ship.
+- **One video, two uses**: a video you load (Settings → Video's Video file, the Dyes panel's
+  Pour a video…, or the phone's A video as dye) gets a row with **Play** (through the
+  projector, under the dye) and **Pour** (into the dish as dye), either or both.
+- **The plate reacts to a poured video**: Film Drive and the film's patches read the video
+  pouring when nothing is on the projector.
+- **Video Zoom, Video Across and Video Up** frame the video on the plate (zoom 0.25 to 4,
+  the slides −1 to 1), with **Fit**; MIDI-learnable, and `set` from the assistant.
+- **Film is now Video**, and its panel is on the Perform tab. The assistant's `film` and
+  `pour_file` take `loaded` (the video loaded) where they took `cartoon`.
 
 ### Removed — what the closeup drew over the liquid (PLAN 38u-1, 38u-2, 38u-3)
 

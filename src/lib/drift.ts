@@ -119,6 +119,8 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
 const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle']);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
+  // Where the video sits on the plate (PLAN 14ag): a hand frames it, nothing wanders it.
+  'filmZoom', 'filmX', 'filmY',
   // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
   'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
