@@ -478,13 +478,14 @@ export class FluidInputs extends FluidPasses {
    * autocatalyst to start from (addReagent's kernel, and why).
    */
   addReagent(x: number, y: number, radius: number, amount: number, pattern_val: number): void {
+    const chem = this.ensureChem();
     const enc = this.device.createCommandEncoder({ label: 'add reagent' });
     const pass = enc.beginComputePass({ label: 'add reagent' });
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    this.run(pass, 'addReagent', this.chem.write, [this.chem.read],
+    this.run(pass, 'addReagent', chem.write, [chem.read],
       this.arg('reagent splat', [x, y, radius, amount, pattern_val, 0, 0, 0]), this.N);
-    this.chem.swap();
+    chem.swap();
     pass.end();
     this.submit(enc);
     this.chemLive = true;
@@ -492,13 +493,14 @@ export class FluidInputs extends FluidPasses {
   }
 
   seedChemistry(x: number, y: number, radius: number): void {
+    const chem = this.ensureChem();
     const enc = this.device.createCommandEncoder({ label: 'seed chemistry' });
     const pass = enc.beginComputePass({ label: 'seed chemistry' });
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    this.run(pass, 'seedChem', this.chem.write, [this.chem.read],
+    this.run(pass, 'seedChem', chem.write, [chem.read],
       this.arg('seedChem splat', [x, y, radius, 0, 0, 0, 0, 0]), this.N);
-    this.chem.swap();
+    chem.swap();
     pass.end();
     this.submit(enc);
     this.chemLive = true;
@@ -532,6 +534,7 @@ export class FluidInputs extends FluidPasses {
    */
   stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0, drift = 0, clock = 0): void {
     if (!this.chemLive) return;
+    const chem = this.ensureChem();
     const s = (this.N / CHEM_REF) ** 2;
     const du = Du * s, dv = Dv * s;
     const sub = Math.max(1, Math.ceil(Math.max(du, dv) / CHEM_STABLE));
@@ -544,8 +547,8 @@ export class FluidInputs extends FluidPasses {
     // drift: how far the feed/kill map wanders (grayScott), at `clock` seconds on the reaction's slow clock.
     const args = this.arg('chem rates', [du, dv, feed, kill, bath, 1 / sub, drift, clock]);
     for (let i = 0; i < n; i++) {
-      this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
-      this.chem.swap();
+      this.run(pass, 'grayScott', chem.write, [chem.read], args, this.N);
+      chem.swap();
     }
     pass.end();
     this.submit(enc);
@@ -897,7 +900,7 @@ export class FluidInputs extends FluidPasses {
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     // Gray–Scott too: it was left out, so a look's coral kept growing, and
     // depositing, under the next look, in that look's colours.
-    for (const t of [this.chem.a, this.chem.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.chem) for (const t of [this.chem.a, this.chem.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     pass.end();
     this.submit(enc);
     this.mixLive = false;
@@ -954,8 +957,10 @@ export class FluidInputs extends FluidPasses {
       device: this.device,
       phase: copy(this.phase, this.phaseLive),
       mix: copy(this.mix, this.mixLive),
+      chem: copy(this.chem, this.chemLive),
       rxn: copy(this.rxn, this.rxnLive),
       lies: copy(this.lies, this.liesLive),
+      reagentLive: this.reagentLive,
       oilPoured: this.oilPoured,
       destroy: () => { for (const t of made.splice(0)) t.destroy(); },
     };
@@ -997,6 +1002,13 @@ export class FluidInputs extends FluidPasses {
       this.mixLive = true;
       this.oilPoured = carry.oilPoured;
       this.oilDyeStale = true;
+    }
+    if (carry.chem) {
+      const ch = this.ensureChem();
+      this.run(pass, 'carryArea', ch.write, [carry.chem], this.arg('carry chem', [carry.n, this.N, 0, 0]));
+      ch.swap();
+      this.chemLive = true;
+      this.reagentLive = carry.reagentLive;
     }
     pass.end();
     const same = (from: GPUTexture | null, to: PingPong) => {

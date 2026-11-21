@@ -135,6 +135,28 @@ export class FluidFields extends FluidCore {
    */
   get airDisplacing(): number { return this.airPush > 0 ? this.airCover : 0; }
 
+  /*
+    The reaction's field in the dye's format, made on the first step that sets
+    chemLive (PLAN 46n): full floats wherever the GPU can filter them (every Mac,
+    and SwiftShader). It was half floats, and a half float's step just under 1 is
+    1/2048: the substrate's refill, feed × (1 − u) a step, falls under that step
+    before the dish is full, so the stored u stopped rising there. How far short
+    depends on how the GPU rounds a stored half float: SwiftShader rounds to
+    nearest and stopped 0.003 to 0.005 short (measured); the Mac's, by the widths
+    it drew, rounds toward zero and drops every step under 1/2048, so it stops
+    about twice as far short. The pattern's wavelength follows the substrate, so
+    CI's Mac drew the labyrinth's stripe 3.08%, 3.35% and 3.51% of the plate at
+    256², 384² and 512², 14% apart, where SwiftShader drew 3.06%, 3.12% and
+    3.19%; the lab, rounding toward zero by hand, drew the Mac's widths to the
+    hundredth. In full floats the dish fills to within 5e-6 of its reservoir, as
+    the arithmetic says it should (`npm run turing`, line 1). A GPU that cannot
+    filter full floats keeps half floats (PLAN 26d-5).
+  */
+  protected ensureChem(): PingPong {
+    if (!this.chem) this.chem = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'chem');
+    return this.chem;
+  }
+
   protected ensureMix(): PingPong {
     if (!this.mix) {
       this.mix = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'mix');
@@ -440,7 +462,7 @@ export class FluidFields extends FluidCore {
       lies: this.liesLive && this.lies ? this.lies.read : null,
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
-      chem: this.chemLive ? this.chem.read : null,
+      chem: this.chemLive && this.chem ? this.chem.read : null,
       /*
         The oil's own share of the dye (Oil Bodies, bodyPartition), or null
         when the oil carries no colour of its own or the plate shows a print:

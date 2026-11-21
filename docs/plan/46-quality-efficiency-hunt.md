@@ -190,7 +190,9 @@ again ten times a second for three meters and a percentage.
   `sim`); the flash guard's probe encoding both dispatches with every ring slot busy and
   making its args and groups again each frame; the post chain writing its uniforms up to
   three times before one submit; `readbackAsync` rewriting the 224-byte `sim` (with H2c-7);
-  `activeMat` (two grids, never read or written) and `chem` allocated with chemistry off;
+  ~~`activeMat` (two grids, never read or written) and `chem` allocated with chemistry off~~
+  (**shipped**: `activeMat` deleted and `chem` made on the first step that sets `chemLive`,
+  a plain 512² plate 52 textures alive → 48);
   the aux target stored where nothing reads it (`storeOp: 'discard'`, an interim to H2c-6);
   derive drawn on frames H2c-9 skips the pack; `packDye` and `packVel` as one kernel.
   `framereads`, `framegroups`, `encode`, `samelook`.
