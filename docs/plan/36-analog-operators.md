@@ -151,6 +151,16 @@ button, making it look good. Every item here is held to those.
     temperature in `boilAlpha.g` (`rg32float`) writes `vel.z` (`rgba16float`) while taking
     external writes to `vel.z` only when they differ from `boilAlpha.g` by more than one
     half-float ULP (so sub-ULP external writes are rounded to the boil's float32 copy).
+    38v (2026-11-21): the gap's heat capacity is wrong for the boil: `lampBoil.ts:819-828`,
+    with C at `:889` counting the glass, so the vapour front runs at 5.6 m/s, about 240 cells
+    a frame at 512². The liquid's share of the heat is (1 − α)ρ_l c_l d/C. Weight the minmod
+    fluxes by it and step α in CFL substeps. Check: in `npm run plateboil`, the pulse moves at
+    the weighted fraction, Σα holds within 1%, and Heat 0 stays bit-identical. (From RS-1.)
+  - **36e-4b. The boil's bubbles are a fixed size** (*open*, S–M; Low). `AIR_BOIL_FILM` 0.533
+    and `AIR_BOIL_R` 0.0175 (`air.ts:55-56`), a hash (`:202-217`) and `bubbleShape.ts:127-137`
+    set them. A vapour bubble in a gap is a pancake of r = √(V/πb), and leaves the hot glass
+    at Fritz's 1–3 mm. Size them from the vapour made. Check: the bubbles' area within 10% of
+    the vapour's volume over the gap. (38v, from RS-16.)
   - **36e-5. The open plate's boil was never looked at** (*open*, found with 46r,
     2026-11-13). With Thin Gap off the lasting current did not read the boil at all at
     Depth Drag 0 until 46r, so Heat on that plate has had no check and no eye. The lab's
@@ -160,6 +170,13 @@ button, making it look good. Every item here is held to those.
     the bands are the boil's first-order carry, the current's coarser grid or the open
     plate's wall, and either give the open plate a `plateboil` part of its own or say in
     the Heat control that the boil is the thin gap's. No shipped look runs the open plate.
+  - **36e-6. Hot water's lift is capped, and its viscosity is not gated** (*open*, S; Medium).
+    Buoyancy (`forces.ts:254-289`) is added after the `maxCur` clamp at `:277`, so a hot plume
+    never reaches its speed; `heatVisc` (`fluid.ts:645-668`) runs when the heat carry
+    (`fluid.ts:1199`) is gated off by `!boilLive`; and `tempAt` (`lampBoil.ts:750-757`) reads
+    a half-float. Exempt buoyancy from the cap or move it into `hsBody` (38f), and gate
+    `heatVisc` with the carry. Check: an upright plate at 80 °C rises at over 0.9 of U_buoy,
+    and a 50 K spot cools the same at Double Diffusion 0 and 1. (38v, from RS-2.)
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
   Glenn McKay's crew described it as "painting with three or four hands". Build the guest

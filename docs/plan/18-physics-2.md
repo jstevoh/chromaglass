@@ -11,6 +11,9 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 - **18b-2. The dark ground the physical way.** A look that stays dark should get there
   with a dense base dye in the dish or a dimmed lamp, not with the black ground, once
   the owner has picked; then the black ground can go.
+  38v (2026-11-21): `blendMode` is read only at `plate.ts:3055`, so on the lamp a layer's
+  blend is a filter, as here; additive and exclusion show only on the twelve two-layer looks
+  on the black ground. (From RS-52.)
 - **18b-3. The painted edges on the lamp (shortcut, until 18e).** The meniscus, the
   boundary line, lacing, cells, gloss and the closeup's detail are drawn on the dye's
   tint; on the lamp ground what they did is carried over as the ratio of the tint's
@@ -60,6 +63,12 @@ Left, each its own PR:
   `splatter`), and their dye, as volume, as 18c-2 made the drop: a kick is curl-free and the
   solve deletes it. The spray and the streak stamp with no volume too. 18c-3's splash crown is
   done (its ring kick deleted, its satellites gated on K = We·Oh^−0.4 past Cossali's threshold).
+  38v (2026-11-21): Drop Height defaults to 0 (`types.ts:1137`), so the stamp
+  (`LiquidVisualizer.tsx:3464-3502`) is the drop on the desk; `layDrop` (`1195-1200`,
+  `1280-1284`) and `triggerTheme` (`1915-1975`) still reach `applyRadialImpulse`
+  (`fluidSimulation.ts:3685-3700`). A drop of volume V on a gap h spreads to the disc r =
+  √(V/πh) and pushes only the liquid it displaces. Check: a mouse drop and the same drop sent
+  by the show's tools lay the same radius and displace the same volume. (From RS-39.)
 - **18c-6** The window's rim fingers. The reference's about twenty dark spokes at the window's
   rim are not drawn and do not come yet: between two glasses a thin liquid driven into a thicker
   one fingers (Saffman–Taylor), and the solver has that (`npm run flush`'s water into glycerine),
@@ -79,6 +88,22 @@ Left, each its own PR:
   `lib/dropImpact.ts`) are numerical: a one-step source mixes its cell, 1/(1 + f). Replace
   with the drop's real entry over its capillary time τ = √(ρD³/σ), in seconds rather than steps,
   once the window's edge can be compared with the reference on the Mac.
+- **18c-10** The splash is water's, whatever liquid falls, and makes dye (S; Medium–High).
+  `dropImpact.ts:82` carries water's ρ, σ and μ, so Cossali's K gates the satellites with
+  water's numbers for oil or glycerine; `dropSplash.ts:114` ignores the gap; the satellites
+  (`:119-134`) add 22% more dye than the drop held; the trickle (`:75-80`) carries no mass;
+  the crater (`:66`) is a fixed size. A splash needs K = We·Oh^-0.4 over about 2100 with the
+  falling liquid's own properties, and a drop splits its volume, it does not add to it. Read
+  the bottle's ρ, σ, μ, take the gap, and split the drop's dye and volume among crater, crown
+  and satellites. Check: total dye and volume after a splash within 0.5% of the drop's; an oil
+  drop from the same height does not splash. (38v, from RS-13.)
+- **18c-11** The idle plate lays dye and heat by itself (S–M; High). With nothing touched,
+  `ambientSeedRef` (`LiquidVisualizer.tsx:839`) runs orbits at `3911-3933` that lay 0.05 of
+  dye and 0.02 of heat a frame, so a still plate fills and warms. A plate left alone only
+  spreads what is on it; nothing pours itself. The emergency seed at `4568-4572` (an empty
+  plate) is fine, and `EVOLVE_FLOODS` is already false (`stepping.ts:137`). Remove the orbits'
+  laying, keep the emergency seed. Check: with no input, total dye flat or falling over 60 s.
+  (38v, from RS-38.)
 - **18c-4** An oil drop as a lens or a film by the spreading coefficient
   S = γ_w − γ_o − γ_ow (the bottles carry σ now, 18d-1), with 18d-3.
 - **18c-5** The held pour's rate is one number, a dropper's 0.5 mL/s (`HELD_POUR`,
@@ -116,6 +141,11 @@ Left, each its own PR:
 - **18d-7** Milk's `repel`. Milk is a miscible emulsion, so this goes to 18j (scattering).
 - **18d-8** Retire the CPU fields (soap, body, repel at 192²) and their pass once 18d-2 to
   18d-7 have moved each to the GPU.
+  38v (2026-11-21): the stir and the polarity still live here, and the edge they leave depends
+  on the grid: `forces.ts:30-109` holds Polarity, `liquidPhase.ts:258-299` the stir with
+  15e-10's 0.002, and the floor at `liquidProps.ts:84-99` never engages; the comment at
+  `bottles.ts:51` has the sign backwards. Check: an edge's width within 15% at 128², 256² and
+  512², with no axis bias. (From RS-8, RS-19.)
 - ~~**18d-9**~~ #355 The index into 18e's refraction: the derive pass's optical path reads the species' Σ share·n (`pouredDn`), measured against the shelf's own indices by `npm run derive`. The display's deflection does not read it yet: 18e-2.
 - **18d-10** The species is not in FieldCarry, so a rebuilt solver loses it, and now that
   nothing fades it the loss shows: a governor's move drops every poured liquid. Carry it.
@@ -151,6 +181,13 @@ Left, each its own PR:
   - **18d-12c** Milk is laid as a white body (its `scatter`), which is milk seen by
     reflected light on the black ground. On the lamp's ground real milk throws a warm grey
     shadow, and a dye in milk is a pastel, not the dye: both are 18j's scattering.
+- **18d-13** Each dye takes its own side of the oil (M; Low–Medium). `bodyLand`
+  (`oil.ts:143-155`) and `bodyPartition` (`:230-335`) split every dye by the oil fraction
+  alone, so all colours sit in water and oil the same way. A real dye has a partition
+  coefficient K between oil and water: oil-soluble dyes go into the oil, food dyes stay in the
+  water. Give each bottle a log K from −3 to +3 and partition by it at each cell. Check: a dye
+  of log K +3 keeps over 95% of itself in the oil after a stir, and K = 1 spreads evenly
+  within 5%. Corrects 18-physics-3's "Already physical". (38v, from RS-14.)
 - **Found:** at the plate's 6 mm rest gap, a liquid as thin as water has a drag time of
   about 3 s, so for a second or so it moves as a free liquid, not a Hele-Shaw one. Alcohol
   in a thick look read 14 times a pool of colour, where Darcy's bound is 2. That is right
@@ -199,12 +236,16 @@ Left, each its own PR:
 - **18e-1. Layer 1's painted boundary line (a painted shortcut until 31a separates the two dishes' heights).** On projected looks with `derivedOn > 0.5`, Layer 1 keeps a painted boundary line (`edge1 * boundaryContrast * 1.6` from `smoothstep(0.1, 0.6, length(near1.xy))`, gated on `fluid1.a > 0.03`) alongside `refractionOptics(near1, 0.0, 0.0, 0.0)`. At default `projectorFocus = 0.5`, both dishes currently sit at Δz = 0 so the shadowgraph Becke term is 1 and `refractionOptics` only darkens by pupil loss; without the painted line on Layer 1, the back plate's Screen vs Multiply separation in `npm run mixer` falls to 9.9 (bar > 10, 11.0 on main, 10.3 with the line), while applying that brightening to Layer 0 clips the 90th-percentile thin-dye rim in `mixer`'s single-dish mid-grey contrast check (`129.5 → 136.4` without it, `130.9 → 134.7` with it). Replace the painted line when **31a** gives the upper dish its inter-dish focal offset Δz₁ in the projector cone.
 - **18e-2. A clear pour's edge, and the deflection from the optical path.** The aperture's deflection is worked out from the dye's air-masked slope (`θ ≈ |∇density| · 0.35`, weighted by Edge Relief × plateAmt, refractionOptics note 1; the term that stood beside it at a two-dye boundary went in 18e-5), and `refractionOptics` returns early where both are flat. So an edge with no dye across it, glycerine poured clear into water (Δn 0.14) or the oil's rim, reaches ∇²OPL in the derive pass but draws no line on the wall. #355 took the oil's painted rim (`|∇oil|·2.2`) off projected looks, so a clear oil drop with no dye across its rim has no rim line there until this ships (its 8% lens brightening went in 38h; since 38h-3 the out-of-focus half is done: the shadowgraph is the whole column's ∇²OPL, so a clear pour's and an oil drop's Becke lines draw at any Focus off its middle, `npm run nolight` line 9; what is left is the in-focus rim, the pupil's loss). Deflect by ∇OPL instead, then retune the dye's stand-in index against it. The derive pass's `.z` (its 9-tap ∇²OPL) is read by nothing on the projected plate since 38h-3 (the shadowgraph takes its Laplacian from `.w`, the path), only by `npm run derive`'s doublet line, so `.z` is free to carry |∇OPL| (that line moves with it); the dye's slope stays in `.xy` for the normal, and the camera looks keep theirs. A look change: every look's edges move.
   - **Its checks, written first (2026-11-08):** `npm run nolight -- --owed=rim` line 14 (at Focus 0.5 the clear pour, the clear oil drop and the pour on clear water with no dye each darken over a quarter of their rim's ring, 0.8 to 1.2 radii, by 8+ levels; each with no rim pixel brighter and its middle and the ground round it unmoved, and the same glycerine poured with its index matched to water's drawing nothing; main: nothing moves on any of them) and `npm run derive -- --owed=grad` (the pass writes |∇OPL| in `.z`: never negative, peaking on each clear pool's rim and at 0.6 of that peak or more on the step itself, where a Laplacian crosses zero, under 5% of that in the pools' middles and in clear water, syrup's rim over glycerine's as their index steps within 15%; owed only while `.z` still follows the path's Laplacian; main: `.z` min −18.6, 0.03 of its peak on the step, r = 0.994 with the Laplacian). A throwaway build passed all of them (`.z` = |Sobel of the path|, a pupil loss on `outColor` beside `defocusShadow`). The build takes `rim` and `grad` out of `--owed`. Traps: the plate's rim term is gated on `fluid0.a > 0.03`, so a pour into clear water draws nothing until that gate goes; and `.z` is not free everywhere: the closeup reads it as its Laplacian (`macroDetail(…, near0.z / max(1.0, near0.w))`, 38h-7's `lapK`), so that read takes its Laplacian from `.w` the way `defocusShadow` does, and `npm run closeupdepth` and `macroview` hold it. Lines 7 and 13 read the lens out of focus against what the drop does in focus (`lensOnly`), so a pupil loss that stays put as Focus turns leaves them as they are; one blurred with the defocus brings an even part back and can turn them red. And derive's doublet line now reads the path's Laplacian from `.w` itself, so it holds whatever `.z` carries.
+  - 38v (2026-11-21): the moiré's bend is a fixed index, `MOIRE_N` 1.40 (`plateMoire.ts:51`,
+    used at `:220-237`), and `gradNormal` (`plate.ts:450`) carries a gain of 0.9. Check: the
+    bend is over 1 px across a lens and under 0.2 px across flat dye. (From RS-34.)
 - **18e-3. The heat's index.** Water's index falls about 10⁻⁴ per kelvin, which is what makes a lamp's convection shimmer on the wall. The derive pass does not read the heat; with 18f.
 - **18e-4. Edge Relief does not decide whether light bends.** On a projected look with the derive pass on, the meniscus slope's pupil loss is scaled by `reliefK = edgeRelief × plateAmt`, and is zero when Edge Relief is under 0.005 (`plate.ts`: `reliefK0` before the front plate's `refractionOptics` call, which scales the aperture's `smoothstep(0, 1, u) · reliefK`). So Edge Relief 0 draws no refraction at a slope, though a slope in the gap bends the lamp's light whatever a dial says. Edge Relief was the painted meniscus's strength; on projected looks the slope's loss should come from the optics alone (`plateAmt` and the pupil's NA), and Edge Relief either leave projected looks or become a named contrast on top of that. A look change at Edge Relief 0 only; with 18e-2, which moves the same term onto ∇OPL. *Measure:* the lab's `derive` or `holeline` at Edge Relief 0 and 1 draws the same slope's loss within a stated share.
 - ~~**18e-5**~~ #857 No line where two dyes meet: Boundary Contrast's two-dye line (a dark band since 38h-2, the owner's "super thick black lines around things" on Comet River) is off the wall and the photographed look. The closeup's relief still reads the colour step: 18e-7. `npm run holeline`.
 - **18e-6. What Boundary Contrast is for now** (S; found doing 18e-5). The dial (Boundary Glow on the desks) draws nothing in focus on the front plate since 18e-5 (in the closeup it still scales the relief's colour step, 18e-7). What it still scales: the dye's stand-in index in the derive pass (`dyeGain = max(1, 3 × dial)`, so the fringes out of focus), `defocusShadow`'s gain, and the back plate's painted bright rim (18e-1). Every look still carries a value, 0 to 0.9, tuned first for a bright seam and then living with a dark one; Lucky, drift, the evolution and the music's complexity still turn it. Decide it with **18e-2**: once the in-focus rim comes from ∇OPL the dial is the gain on a rim where the index really steps (oil, glycerine, air), named for that and its values retuned on the Mac, or it is retired and its three gains become constants. Until then `shaderdials`' owed `glow` line (27h-3, "still changes the picture in its last quarter") cannot be met in focus: in the lab 0→0.5 now moves 0.00 levels (0.34 on main). The dial's help text says what it does today.
 - **18e-7. The closeup's relief has never read the optical path, and still draws the two-dye line** (M; found doing 18e-5; the owner's black lines, up close). 38h-7 made the closeup's depth a shadowgraph, `camShadow(lapK)` with `lapK` the path's curvature over the path (`near0.z / max(1, near0.w)`), but the derive pass's camera branch has only ever returned the two-dye colour step in `.z` and 0 in `.w`. So what shades a closeup is the colour step: a band up to half darker where two dyes meet at the default Macro Relief 0.7 (26 levels at one depth in the lab, the dial at 1), nothing on a swell, and Boundary Contrast scaling it. 18e-5 took the line off the wall and the photographed look and left this, because both replacements failed: nothing in `.z` reads relief 0 on every look in `npm run macroview` (a flat closeup, and that check's line 2 has been passing on the colour step), and the wall's path with its nine-tap Laplacian blew up to 17% of a closeup frame to flat white on the Mac round a cluster of bubbles on pink dye (air's index step is a spike at that scale, and `camShadow` may brighten 2.5 times) and drew a doublet 119 levels darker and 99 brighter at a step in the dye's depth (the dye's stand-in index, note 6 of `refractionOptics`; a real dye step bends almost nothing). The build: write the path in the camera branch's `.w` and read its curvature at the lens's scale as `defocusShadow` does (ring means, not a cell stencil), leave the air's wall to the traced bubble (`closeupDepth.ts`), and decide the dye's stand-in index for the camera; then `boundaryDiff` and the hue it reads go. *Measure:* `npm run holeline`'s printed closeup lines become judged (the dial moves nothing up close; a seam at one depth within 8 levels of its two dyes), a swell's middle brighter than its flanks with the frame's mean kept within 2%, no pixel round a bubble clipped, and `macroview`'s relief line held on the path and not on the colour step. Filmed on the Mac before it merges; the takes from 18e-5's thread (the flat closeup, the white patch) are in the owner's films folder under `black-lines-18e5`.
 - **18e-8. A closeup's frame-locked render takes a different plate when only the drawing changes** (S to find, found filming 18e-5 on the Mac). Two frame-locked renders of Comet River in the closeup (zoom 4, camera held, seed 2, 384², 30 fps), one of main and one of a branch that changed only the plate's drawing (`plate.ts`, `plateTransmit.ts`), matched frame for frame (PSNR 52 to 60 dB) until about 9.5 s and then the bubbles took different paths (PSNR about 19 by 13 s). Main rendered twice was bit-identical, and the same pair plate-wide matched on every one of 720 frames, so it is the closeup alone and it is repeatable. Physics must not depend on how the plate is drawn. Not yet found; the first suspect is a readback that lands a frame apart when the draw costs more or less: the dye budget in `fluidSimulation.ts` regulates on `meanDensity`, which arrives through the readback ring (`collect` in `src/gpu/kit.ts`), and the closeup pulls that budget down hard (`targetMean`). **Build:** in the frame-locked render, wait for each readback to land before the next step (or step the regulator on a fixed lag), the live plate unchanged. **Measure:** a check that renders the closeup twice with a drawing-only uniform changed and asserts the solver's fields digest the same at 15 s. Until then a before and after film of a closeup compares the same dye and different bubbles past 9 s.
+- **18e-9. The optical path's height runs backwards over a clear drop** (S; Medium). `calcOpl` (`wgsl/plate.ts:1310-1319`) takes h = hScale·(1 − 0.5·v.z), so a clear drop's path reads −0.62 where it should add +0.087, from #355. The optical path through a gap is OPL = (n_water + 0.087·film)·h, longer where the liquid is deeper. Rebuild it from the real height. Check: a clear drop's bright rim falls inside its disc, not outside; the owner judges the look. (38v, from RS-26.)
 
 ## 18f. Heat comes from the lamp, and a level plate has no "up"
 
@@ -217,6 +258,9 @@ Open follow-ups:
 - **18f-2. Bénard–Marangoni cells:** surface stress −∇T inside an existing force pass (replacing separate marangoniFlux dispatch) so that cellular convection patterns emerge without breaking soap/oil conservation.
 - **18f-3. Convection shimmer (18e):** pack velocity channel z export into plate shader shadowgraph taps to render hot plume optical refraction and shimmer without disturbing raw `(u, v)` reads in `cellride`.
 - **18f-4. Warm water thins only the water (a named shortcut, #352):** `tempVisc = exp(-0.02 T)` in `thinGap.ts` hsPrep multiplies the whole thin-gap mobility, so a warm cell of oil or glycerine speeds up as much as warm water. Water's viscosity really falls about 2%/K, but each liquid has its own slope (glycerine's is about four times steeper near room temperature, a mineral oil's roughly twice), and in a layered cell the temperature belongs on each layer's own viscosity inside the two-layer Poiseuille sum that already builds `filmDrag`, not on the product. Move the factor onto the water layer's viscosity in that sum (and give each liquid its own slope beside its viscosity in `src/lib/chemistry.ts`), and have `npm run heat` show a warm oil-over-water cell speeding up by less than a warm water-only one.
+  - 38v (2026-11-21): the factor itself is off: `thinGap.ts:641` takes exp(−0.02·clamp(ΔT, 0,
+    50)), 0.368 at the cap, where Vogel's law for water, μ = 2.414e-5·10^(247.8/(T − 140)),
+    gives 0.279. Check: 3.58× thinner at ΔT = 80 K within 2%. (From RS-10.)
 
 ## 18g. Colour leaves by flushing, not by fading
 
@@ -281,6 +325,16 @@ Left from 18h, each its own item:
 
 **Partly shipped** (#358): Bretherton lubrication, agitation-driven wander, Saffman–Taylor fingers on the Straw, Reynolds film-drainage merge and the beads' pancake lag (`npm run bubblephysics`). Story in `docs/plan-shipped.md` §18i (moved 2026-10-29, 19m-2). Its two open items closed with 38b (#603): there is no timed mode left to expose, a pocket
 between glasses has no clock, and a pocket reaching the open round rim empties through it.
+
+- **18i-2** The beads still run on dials, not on the gap (M; Medium–High). `beads.ts:420-445`
+  slides them by tiltX·500; `viscosityRatio` is 1.5 (`:209`); they merge at 0.02 a step
+  (`:579`), repel at 0.25 (`:639`), age by `innerLife` (`:146`), are clamped (`:675`), and are
+  populated every 30 frames (`:300-349`, `LiquidVisualizer.tsx:4417`), though `MERGE_TAU_S` is
+  already Paterson's. A pancake between glasses lags the liquid at 2U/(1 + λ), slides at Δρ g
+  sinθ b²/(12μ(1 + λ)), and merges on Paterson's τ = 2μR³/(b²σ). Write each rate as 1 −
+  exp(−dt/τ), make beads only from pours and break-up, and let them leave over the rim. Check:
+  a bead's slide within 15% of that speed, and the merge count the same at 30 and 60 steps a
+  second. With 15g-17. (38v, from RS-11.)
 
 ## 18j. Milky liquids scatter (shipped)
 
