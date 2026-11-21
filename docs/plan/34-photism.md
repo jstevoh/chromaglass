@@ -27,7 +27,6 @@ dropped picture or 3D model driven by the music as its own look does not.
 because our free site asks for a login and needs its own reason to (saves your looks);
 a grid of generic stock thumbnails: ours are the plate itself.
 
-- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped.md` §34a (moved 2026-10-29, 19m-2).
 - **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
   video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
   the app's own frames, because a cloud session cannot film the app and the lab's plate barely
@@ -87,8 +86,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
   MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
   sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
   Found along the way:
-  - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
-    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
   - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
     a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
     packets are ignored; the menu could instead show the item disabled with an upgrade line, read
@@ -110,15 +107,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
     the set beside the page as a download.
-  - **34a-7f. The rig's wires, checked without the rig.** **Shipped** (`npm run rig`, `scripts/rig.mjs`):
-    the real show server with a Pro key; every OSC address on `/pro`, sent as Resolume, TouchDesigner
-    and Max send it, arrives as the message the page acts on; the page's `lights` leaves as an
-    ArtDmx universe at the set rate; a desk's universe arrives as settings; and in the built app an
-    OSC setting, a desk fader, a MIDI fader (past soft takeover) and a DAW's 120 BPM clock move the
-    page, and an OSC setting lights the controller's ring. All 33 lines green: no
-    claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
-    need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
-    programs themselves are `docs/judging.md` §93, one sitting with free versions.
   - **34a-7g. Resolume sends its own OSC addresses.** **Page half shipped** (`/pro`'s "OSC in" card and
     `docs/guide.md` § OSC, "From Resolume"). Resolume's manual allows what was needed: its OSC output
     mirrors its own address space (`/composition/layers/1/video/opacity`), and a custom output address per

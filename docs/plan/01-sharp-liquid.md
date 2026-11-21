@@ -3,9 +3,6 @@
 **Shipped**: sharpening retired, granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ## 1a. The grain at the dye's edge made the plate look digital (shipped)
-
-**Shipped.** Story in `docs/plan-shipped.md` §1a (moved 2026-10-29, 19m).
-
 - **1b. Agate's Liesegang rings are dots on a 128² lattice** (lane C, `liesStep` in
   wgsl/fluid.ts, `LIES_GRID`). The precipitate nucleates once per cell of its own grid, so
   at a laptop's size Agate shows a regular grid of dots where real Liesegang bands are
@@ -63,8 +60,6 @@
   Measure with `npm run map` (the lab, `PW_WEBGPU=1`): a pinned surface at a half and a
   quarter of its size, a fixed picture panned a fraction of a texel a frame, and how
   much each wall pixel flickers beyond the pan itself (shimmer) before and after, and the outline's width in wall pixels. Unbuilt; nothing to judge yet.
-- **1i. Thin Film's fringes were faceted at the grid's cells** (shipped 2026-10-31). Story in
-  `docs/plan-shipped.md` §1i; `npm run filmrings`.
 - **1j. The gooey blur reads the dye bilinear, so the dye's own edge has a corner at every
   texel** (found 2026-10-31 building 1i). `blurAlpha` takes plain bilinear taps a fraction of
   a cell apart, and the gooey edge's contrast (1.2 + 4 × Gooey) steepens the result two to

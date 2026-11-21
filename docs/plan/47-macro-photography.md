@@ -159,11 +159,6 @@ lamp's cone set as an annulus outside the pupil. *Measure:* `nolight`-style lab 
 Dark field a flat dye with no gradient reads black within 2 levels, a front's ring reads
 brighter than either side by at least 30 levels, and Rheinberg's ring takes the ring's hue.
 
-~~**47b-1** A side lamp~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): Side Light, Side Colour and Side Angle, a second coloured
-lamp raking in low from one side over the glow (the Microlab films' amber or magenta over
-blue), lighting the pigment by single back-scatter, the glasses' slopes by Fresnel and the
-glitter by the mirror law, falling off by the inverse square across the stage (`npm run glint`).
-
 - **47b-2. Open: the side lamp casts no shadows.** Its light reaches every height of the
   dye undimmed: a thick blob should shade the dye behind it from a lamp this low, and the
   lit side of a front should be brighter than its far side by the dye's own transmission
@@ -211,13 +206,6 @@ radius A·|z − z_f|/z_f on linear light so glints become discs. Built under 38
 it. *Measure:* 31f-3's DoF law within 10 % in the lab, and a glint's disc at the radius the
 law gives for its depth.
 
-~~**47d-1** The glitter's depth of field and the iris's stars~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): each flake has
-its height in the gap; the lens (magnification 0.27 × zoom on a full-frame sensor, Lens Stop
-f/1.4 to f/22, focal plane at Projector Focus) draws it as its aperture's disc, a hexagon
-from a six-bladed iris stopped down and a circle wide open, of diameter |z − z_f|·gap·m/(N(1+m)),
-in linear light; and stopped down, its Airy core grows (1.22 λ N (1+m)/m, per colour) and
-six diffraction spikes reach out from it, fading as the flake leaves focus.
-
 - **47d-2. Open: discs and stars on every highlight.** Only the glitter is drawn through the
   lens; the beads' and bubbles' speculars and the softbox's glints on the dye stay sharp and
   starless. The whole-plate disc kernel above is the rest of 47d.
@@ -239,12 +227,6 @@ orientation is quasi-steady (the stretching axis), not an integrated Jeffery orb
 to integrate it if the shimmer reads wrong. *Measure:* glint count follows the population,
 and in a shear flow the mica's brightness correlates with the strain's direction as the
 mirror law predicts (lab).
-
-~~**47e** Sparkle, its glitter half~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): Glitter puts up to 32,768 polystyrene
-flakes in the liquid, riding the dye's own flow at their height in the gap (Poiseuille's
-profile), turning in integrated Jeffery orbits (the shortcut above is not taken), settling
-by Stokes and lying flat where they land, and flashing where the side lamp or the softbox
-meets the mirror angle; dark specks on a lamp ground.
 
 - **47e-1. Open: microbubbles.** The other half: bubbles far smaller than a cell, each a
   convex mirror returning a glint of the same brightness whatever its size, beside the flakes.
@@ -336,12 +318,6 @@ median 0.013, a jump to 0.029 at the landing). The owner asked for it on 2026-11
 its own solver over standing the plate up (the plate's glass drag eats the momentum a jet and
 a curling head need).
 
-~~**47n-1** The tank~~ (shipped; story in `docs/plan-shipped.md` §47n-1): Tank, a vertical
-slice of water with heavy dye falling from a nozzle (`src/lib/tank.ts`, `src/gpu/tank.ts`,
-drawn in the plate's place by `src/gpu/tankDraw.ts`), with Feed, Dye Weight, Nozzle, Drain
-and Glow Hue on the desk, the phone and MIDI; a held finger carries the nozzle.
-`npm run tank`, `npm run tankgpu`.
-
 - **47n-2. Open: momentum carried with less smearing.** The momentum is carried
   semi-Lagrangian, which smears it by about u·dx/2, about three times water's own viscosity
   at a centimetre a second on 0.94 mm cells: the slice behaves like slightly thicker water,
@@ -382,30 +358,11 @@ and Glow Hue on the desk, the phone and MIDI; a held finger carries the nozzle.
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 
-~~**47w-1** The download half~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1): the
-cause was yt-dlp handed a bare `ffmpeg` as `--ffmpeg-location`; the tool now passes the full
-path, joins a picture-and-sound pair itself and refuses an audio-only fetch.
-
-~~**47w-2** Dissolves~~ (shipped; story in `docs/plan-shipped.md` §47w-2-47v-2-47v-3): a run
-of raised change whose ends differ by a cut's worth, whose frames are mixes of its ends and
-whose new picture the take never showed (`scripts/watchcuts.mjs`); 12 found in the Joshua
-Light Show film, each a superimposition on the sheets.
-
 - **47w-3. Open: *Streams II* again.** The film that showed the miss is on the owner's Mac
   (`~/chromaglass-films/watch/`); watch it once with this tool and write its cuts a minute
   beside the 7 counted by eye. Needs a thread with the Mac connected.
 
 ## 47v. Watching any link: a design read, a physics read and the techniques (S–M)
-
-~~**47v**~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1). Asked 2026-11-12: point
-Claude at any video or animation and get meaningful feedback on colour and form, a physics
-read, and the techniques used, and judge our own visuals the same way.
-
-~~**47v-2** A reference library~~ and ~~**47v-3** the physics read's real-footage bars~~
-(shipped; story in `docs/plan-shipped.md` §47w-2-47v-2-47v-3): `--keep`, `--refs` and `--vs
-<name>` over `/mnt/project-files/references/` (`scripts/watchrefs.mjs`); two performance films
-read and kept, their numbers in `REAL_SHOWS` (`scripts/watchphysics.mjs`) and printed beside
-each band.
 
 - **47v-4. Open: the third real show.** Tried 2026-11-12 with Liquid Light Lab, fetched on the
   owner's Mac, and none of their films makes a plain row. Their own films (*Melt Your Face
@@ -545,10 +502,6 @@ The physics, in the order to build (each its own thread and PR):
 Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
 page, add one build and a note:
 
-- ~~**47z-5. A packed foam whose films meet at 120°**~~ (shipped; story in `docs/plan-shipped.md`
-  §47z-5): the look **Foam Cells**, a packed emulsion laid pressed across the dish whose junctions
-  the oil's tension turns to Plateau's 120° (`npm run foam`). Asked again 2026-11-13 with the
-  Microlab films' cellular networks ("Ok let's do this all"). What it found, still open:
 - **47z-6. A crowd that packs itself.** Foam Cells is laid pressed; a crowd of round drops does not
   press itself into polygons, because nothing presses it: in open water a held crowd has room to
   stay round (Splodascope's bowed glass gathers it, but at 0.45 not past touching in six seconds).
