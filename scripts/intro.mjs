@@ -159,8 +159,10 @@ async function open(query, { viewport = { width: 1440, height: 900 }, phone = fa
   page.on('pageerror', (e) => console.log(`   page error: ${e.message}`));
   // What the app says of its own opening ("ChromaGlass: …", a warning when
   // the pipelines were not all built ahead), kept to print beside a failure.
+  // A lost device too: its line does not name the app, and a loss rebuilds
+  // the whole setup, the one sign of it from outside (PLAN 14v-12b).
   page.cgSaid = [];
-  page.on('console', (m) => { if (/ChromaGlass/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
+  page.on('console', (m) => { if (/ChromaGlass|device lost/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
   if (slow) {
     const cdp = await context.newCDPSession(page);
     await cdp.send('Network.enable');

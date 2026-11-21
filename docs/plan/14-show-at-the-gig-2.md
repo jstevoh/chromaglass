@@ -209,6 +209,18 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   loaded and started on mobile web ... we should have the loading state present if there
   are no visuals and some kind of loading updates"). Story in `docs/plan-shipped.md` §14v-12;
   `npm run leandisplay`, `openingtime -- --variants ",lean=0"`.
+- **14v-12b. Shipped in part: the prepare log is the page's, so the intro can always read
+  it** (2026-11-21, the main-green thread). `npm run intro` 9, 9b and 9c failed together
+  on #897's run 44906726305 and #891's 44907201603 (and once in about twelve cloud runs)
+  with "no opening to read: 65 debug keys, pipelines undefined", the plate already
+  stepped. `pipelines` (`pipelinesSeen`, module state in `gpu/prepare.ts`) reached
+  `chromaglassDebug()` only through the renderer's spread, so the hook on `window` had a
+  setup with no renderer: the setup effect had run again (its deps are `noise2D` and
+  `glEpoch`, which only a lost device or a failed restart bumps) and the new run was still
+  building. It now sits at the hook's top level. Intro's console capture also keeps
+  "WebGPU device lost" (the app's loss line does not say ChromaGlass, so it never showed
+  in "the app said"). **Open:** read the next run that prints it and find why software
+  WebGPU loses its device during the opening, or what else re-runs the effect.
 - **14v-13. Found: the phone's own numbers are unread.** Every number in 14v-12 is software
   WebGPU's (all CPU, the nearest thing to a phone's compiler in a cloud session) or a Mac's.
   The loading line now prints the seconds beside each stage; read them on the owner's

@@ -15,3 +15,10 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
   need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
   programs themselves are `docs/judging.md` §93, one sitting with free versions.
+- **34a-6a. The channel's ids.** *Shipped (2026-11-08): all six on the channel, Public, ids
+  in `siteFilms.ts`; story in `docs/plan-shipped.md` §34a-6.*
+- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
+  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
+- **34a-8a. The films themselves on the page.** *Shipped with 34a-6 (PR #679, carried from #729): the row
+  "Six records from the 1920s" sits under the looks, and each card opens its film from the
+  channel on the page itself.*
