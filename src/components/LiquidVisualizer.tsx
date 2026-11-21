@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
-import { airTaken, spawnsOf, strawFlow, WIND_SPAWNS_PER_SECOND } from '../lib/breath';
+import { strawFlow } from '../lib/breath';
+import { BLOW_LEASH, blowStep, blowGoing, blowHeld, blowAim, type BlowDir } from '../lib/blowAim';
 import { BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -16,7 +17,7 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
-import { forgetReadbacks, readbacksLanded, trackReadbacks, PipelineCache } from '../gpu/kit';
+import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
@@ -27,7 +28,7 @@ import { WebGPUPadGrab } from '../gpu/padGrab';
 import { WebGPUPostChain, type PostTest } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
-import { prepareLog, prepareShow } from '../gpu/prepare';
+import { pipelinesSeen, prepareShow } from '../gpu/prepare';
 import { openingOf } from '../gpu/opening';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
@@ -69,12 +70,12 @@ import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
-import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '../lib/intro';
+import { adoptIntro, introOut, introPlateFrame, introQuiet } from '../lib/intro';
 import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
@@ -82,16 +83,17 @@ import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 
 interface LiquidVisualizerProps {
-  /** The sound as React last saw it (ten times a second from the room's ear; every frame from a render). */
+  /** The sound as a prop; the app's own plates are handed null (46f). */
   audioData: AudioData | null;
   /**
-   * The sound now, asked for at the top of each frame (PLAN.md §14f). The
-   * room's ear makes a reading every frame but tells React only ten times a
-   * second, so a plate that read only `audioData` would move in steps. A
+   * The sound now, asked for at the top of each frame (PLAN.md §14f): the
+   * room's ear makes a reading every frame and renders nothing for it. A
    * plate without one (the cast receiver, whose sound arrives as messages)
    * reads `audioData`.
    */
   hear?: () => AudioData | null;
+  /** The ear's view's `subscribe`: a call at each reading it publishes (PLAN.md 46f). */
+  heardNews?: (fn: () => void) => () => void;
   settings: VisualizerSettings;
   /**
    * The settings now, with a MIDI fader's moves that React has not rendered
@@ -275,7 +277,7 @@ export type { LiquidVisualizerHandle };
 
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, hear, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
+  audioData, hear, heardNews, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand, onFerrofluidPoured,
@@ -777,11 +779,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   hearRef.current = hear;
   /*
     The sound the live show hears now: the app's ear asked directly, else the
-    prop. It used to be the prop alone, copied into `audioDataRef` by an
-    effect after each render, so the plate heard every reading one frame late
-    (the frame that made it had already drawn by the time the render that
-    carried it committed), and the whole App re-rendered once per reading to
-    deliver it. Asked at the top of the frame, it is this frame's reading.
+    prop. Asked at the top of the frame it is this frame's reading; copied
+    from the prop by an effect it was a frame late.
   */
   const liveHeard = () => (hearRef.current ? hearRef.current() : audioDataPropRef.current);
   /**
@@ -1179,28 +1178,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     switch (g.tool) {
       case 'blow':
-        // The wind moves the colour and the oil, as the mouse's does
-        // (blowWind's carries, PLAN.md §15c; a remote's wind is not yet
-        // air on the film, 15g-5); a directed one erased 15% a step at
-        // its middle, a puff 20% everywhere under it.
+        // The wind is the mouse's: air on the film on a thin gap, held
+        // between this hand's messages (blowWind, PLAN.md 15g-5), and the
+        // carries off one. A puff with no direction keeps the carries (15g-2).
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
-          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy, false);
+          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy, true);
           af.blowPhase(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
         } else {
           af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
           af.blowPhase(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
         }
-        // The air it tears in, as the mouse's (lib/breath.ts, airTaken): 0.15 a message at the default, none from a gentle breath.
-        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
-          const taken = airTaken(amt);
-          const n = taken > 0 ? spawnsOf(0.15 * taken, DICE.hands.float()) : 0;
-          if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
-        }
+        // It lays no bubbles, as the mouse's wind lays none (lib/breath.ts).
         break;
       case 'drop': {
         const liq = selectedLiquidRef.current;
         if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
-        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose);
+        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose, !liq?.behaviour);
         af.addTemp(x, y, 0.6 * amt);
         break;
       }
@@ -1282,7 +1275,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       default: { // dropper
         const liq = selectedLiquidRef.current;
-        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
+        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
         layBottle(af, x, y, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), liq, kTool);
       }
     }
@@ -1984,8 +1977,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
   }));
 
-  // Outside a render: a harness's `pour` between frames reads the ref too.
-  useEffect(() => { if (!renderingRef.current) audioDataRef.current = liveHeard(); }, [audioData]);
+  // Between frames too (the opening, a covered window, a harness's `pour`): at each reading
+  // the ear publishes, with no render (`npm run ears` reads this copy), and at each new prop.
+  useEffect(() => {
+    const take = () => { if (!renderingRef.current) audioDataRef.current = liveHeard(); };
+    take();
+    return heardNews?.(take);
+  }, [audioData, heardNews]);
   useEffect(() => {
     settingsPropRef.current = settings;
     settingsRef.current = rideRef.current ? rideRef.current(settings) : settings;
@@ -3319,90 +3317,42 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 /*
-                  Held still on the lead plate, the Blow is a straw: one
-                  bubble on the end of it, growing while the breath goes on,
-                  its rim breaking into fingers and shedding a ring of small
-                  ones (bubbles.ts, blow). Moving, it is the wind it was.
-                */
-                // One straw (bubbles.ts keeps a single straw bubble), so the
-                // first finger blows it and any other finger is the wind.
-                const still = Math.hypot(strokeDx, strokeDy) < 0.75;
-                /*
-                  And the ferrofluid, held or moved, straw or wind (PLAN.md
-                  §9n). Moved, it pushes along the way the hand last went
-                  (BlowDir): the stroke is nothing on every step after a
-                  frame's first, and on a frame the pointer did not move, and
-                  read afresh each step a slow drag swept then puffed then
-                  swept, leaving a trench of holes and not a pushed tongue.
+                  A press held and never moved, on the lead plate, is a
+                  straw: one round bubble on the end of it, growing while
+                  the breath goes on (bubbles.ts, blow). A hand that has
+                  moved is the wind, a jet along the surface the way the
+                  hand has come (lib/blowAim.ts; lib/breath.ts),
+                  for as long as it is down. One straw (bubbles.ts keeps a
+                  single straw bubble), so the first finger blows it.
                 */
                 const now = performance.now();
-                // The press counts as a move, with no direction (BLOW_STRAW_FRAMES).
-                // The press step starts the frame count at 0 rather than counting itself.
-                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now, still: 0, moved: true };
-                else if (!hand.blowDir) hand.blowDir = { x: 0, y: 0, at: now, still: 0, moved: false };
-                else if (simStep === 0) hand.blowDir.still++;
-                const going = now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
-                const held = !going && hand.blowDir.still >= BLOW_STRAW_FRAMES;
-                af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
-                /*
-                  The straw only when the hand is held, not moved, by the same
-                  clock the ferrofluid goes by and a few frames with no move
-                  (BLOW_STRAW_FRAMES). Asked of `still` (no move this step), a
-                  drag blew the straw on every step after a frame's first and
-                  on every frame the pointer did not report a move, which is
-                  most of them: a drag left a string of straw bubbles and ran
-                  the wind a step a frame at best, so the wind's carry
-                  (PLAN.md §15c) waited on the rare step that was both a wind
-                  step and a fresh reading of the dye.
-                */
-                if (activeLayerRef.current === 0 && held && primary) {
+                const dir = hand.blowDir = blowStep(hand.blowDir, x, y, strokeDx, strokeDy, now, simStep === 0, BLOW_LEASH * GRID_SCALE);
+                const aim = blowAim(dir, now, af.thinGap);
+                // The ferrofluid, straw or wind (PLAN.md §9n): along the hand's way while the wind has one (and for the hold's moment after, off a thin gap), a hole under a breath with none.
+                const way = aim || blowGoing(dir, now);
+                af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, way ? dir.x : 0, way ? dir.y : 0);
+                if (activeLayerRef.current === 0 && primary && blowHeld(dir, now)) {
                   // A volume a second through the straw, as the breath's speed (lib/breath.ts, strawFlow), not its stress.
                   bubblesRef.current.blow(x, y, simStepS, strawFlow(k));
                   blowStepsRef.current.straw++;
-                  // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
-                  if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
+                  // Before the hand's first move: a press held (tools.mjs).
+                  blowStepsRef.current.strawFirst++;
                 } else {
-                  // The wind: moving on a thin gap, the breath's air on the
-                  // film, whose flow takes the colour, the oil and the
-                  // ferrofluid the way the hand last went (PLAN.md §15g);
-                  // held still, or off a thin gap, it carries them (§15c).
-                  // It used to erase them.
                   /*
-                    Along the way the hand last went until the hand is held,
-                    not only for the 150 ms the ferrofluid's push keeps it
-                    (BLOW_DIR_HOLD_MS). Between the two the wind was a puff,
-                    and a puff carries the colour under the hand out onto a
-                    ring a palm and more across: on a runner whose moves came
-                    120 ms apart, a stroke's three or four puffs moved 80 to
-                    106 of a pool of 210 to 244 out round the hand, which
-                    near the pool's leading edge is backwards, and the
-                    stroke out to the left moved the pool -0.26% against the
-                    air's push (`npm run tools` on #300). A pointer that is
-                    late is not a hand that stopped; a hand that stopped is
-                    held within BLOW_STRAW_FRAMES and blows the straw, or on
-                    a plate that is not the lead, the puff.
+                    The wind. On a thin gap it is the breath's air on the
+                    film, whose flow takes the colour, the oil and the
+                    ferrofluid (PLAN.md §15g), and it lays no bubbles: air
+                    over a film this thin pushes it aside and folds none in
+                    (lib/breath.ts). With no way to blow (a press not yet
+                    the straw, a second finger held still) it is a puff,
+                    which on a thin gap waits on the jet's dimple (15g-2).
                   */
-                  const aim = going ?? (hand.blowDir.moved && hand.blowDir.still < BLOW_STRAW_FRAMES ? hand.blowDir : null);
-                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, aim ? aim.x : 0, aim ? aim.y : 0);
+                  const carried = aim || !af.thinGap ? af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, aim ? dir.x : 0, aim ? dir.y : 0) : 0;
                   blowStepsRef.current.carried += carried;
                   blowStepsRef.current.wind++;
-                  if (going) blowStepsRef.current.directed++;
+                  if (aim) blowStepsRef.current.directed++;
                   if (carried > 0) blowStepsRef.current.carries++;
-                  // On a thin gap the moving wind is air on the film and carries nothing by hand (PLAN.md §15g).
                   if (af.lastBlowAired) blowStepsRef.current.aired++;
-                  /*
-                    The air the breath tears into the liquid: none below the
-                    speed the surface holds against (a gentle breath), as
-                    often as it always was at the default, more in a gale,
-                    and so many a second, not a count every sixth step
-                    whatever the Amount (PLAN.md QA-20; lib/breath.ts,
-                    airTaken, has the physics and the numbers).
-                  */
-                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
-                    const taken = airTaken(k);
-                    const n = taken > 0 ? spawnsOf(WIND_SPAWNS_PER_SECOND * taken * simStepS, DICE.hands.float()) : 0;
-                    if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
-                  }
                 }
 
               } else if (tool === 'finger') {
@@ -3510,17 +3460,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 layBottle(af, x, y, bottleReach(liq, 2 * GRID_SCALE), liq, k);
 
               } else if ((currentSettings.dropHeight ?? 0) > 0.02) {
-                // The dropper held above the plate lets go of drops rather than
-                // pouring a stream: one as the press lands, then one every
-                // DROP_EVERY steps while it is held, each carrying the dye the
-                // stream would have laid in that time and each landing with its
-                // splash (autoInject's drop reads the height).
+                // Held above the plate the dropper lets go of drops, not a
+                // stream: one as the press lands, then one every DROP_EVERY
+                // steps, each with the dye the stream would have laid, landing
+                // from the height (sim/dropSplash.ts).
                 hand.laid.steps++;
                 if (hand.clock % DROP_EVERY === 0) {
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   hand.laid.drops++;
                   hand.laid.dye += amt * poured.dose;
-                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
+                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
                   if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k, DROP_EVERY * af.dtSeconds);
                 }
@@ -3948,7 +3897,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const ry = DICE.lay.int(GRID_SIZE - 20) + 10;
                 const color = harmonyColor(harmonyOf(li));
                 const style = DICE.lay.pick(styles);
-                fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
+                fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5, false, 1, false);
                 fluid.addTemp(rx, ry, 2.0);
                 // A fresh plate is laid with its liquids, not dosed into them.
                 doseLiquid(fluid, liquidsOf(li), rx, ry, 1.4);
@@ -4561,7 +4510,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }
                 bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + DICE.music.int(3), 3 * GRID_SCALE);
               }
-              stepPlateBubbles(bubbles, fluidsRef.current[0], currentSettings, simStepS, tiltX, tiltY, currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0);
+              stepPlateBubbles(bubbles, fluidsRef.current[0], currentSettings, simStepS, tiltX, tiltY);
             }
             rock.lastBass = bass01;
           }
@@ -6176,8 +6125,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // What the look now up turns on: the opening's, or the one on when a
         // lost device is replaced mid-show (`gpu/opening.ts`).
         // The intro held still until the opening is built (`Quiet` in
-        // gpu/prepare.ts says why).
-        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current));
+        // gpu/prepare.ts says why), and the builds counted on its line.
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: introQuiet }, openingOf(settingsRef.current));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }
@@ -6844,7 +6793,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
            * one built on a frame on any device this page has had (`npm run
            * startup` reads it).
            */
-          pipelines: () => ({ prepared: prepareLog[0] ?? null, prepares: prepareLog, ledger: PipelineCache.ledger() }),
+          pipelines: pipelinesSeen,
           /**
            * Twelve red-black sweeps against twenty-four Jacobi passes on one
            * divergence field, by the residual each leaves (H2). The claim

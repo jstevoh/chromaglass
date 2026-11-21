@@ -54,7 +54,7 @@ export const CONTROL_HELP: Record<string, string> = {
   grainScale: 'How fine that speckle is. Higher is a finer grain.',
   blobSurfaceTension: 'How hard two colours hold apart at their edge, so they bead up instead of blending.',
   layerScaleVariety: 'Shows the second layer magnified and drifting, so one frame carries two scales of pattern.',
-  boundaryContrast: 'A bright line where two colours meet.',
+  boundaryContrast: 'How strongly edges show out of focus, and the back plate\'s bright rim. Draws no line where two colours meet, except in the closeup.',
   glossiness: 'How steep the liquid\'s surface reads to the lens. Zero is the real surface; up, ripples and edges bend more light away.',
   colourBody: 'How solid the colour reads. Zero is the dye\'s own thin tint, one is an opaque body of colour.',
   postBlurRadius: 'A final soft blur over the picture that makes the shapes run together.',
@@ -136,8 +136,7 @@ export const CONTROL_HELP: Record<string, string> = {
   macroCells: 'How much paint-cell and bubble structure shows up close.',
   macroCellScale: 'How big those cells are. Small is many tiny cells.',
   macroLacing: 'Dark filaments along the edges of the dye, seen up close.',
-  macroDepth: 'Dome shading, contact shadow and a shallow depth of field in the close-up.',
-  macroEdgeDetail: 'Breaks up smooth, blown-up edges with a fractal warp so a silhouette stays ragged and real.',
+  macroDepth: 'The close-up camera\'s depth of field: how fast the liquid goes soft away from the point it is focused on.',
   macroRelief: 'Depth up close: focused just past the liquid, swells gather the light from beneath and hollows spread it; steep walls go dark.',
 
   // Mirror rig

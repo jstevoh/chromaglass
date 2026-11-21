@@ -744,7 +744,7 @@ export interface VisualizerSettings {
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
   blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
-  boundaryContrast: number;   // bright edge-line strength where two dye colors meet
+  boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and now only shades that step in the closeup (18e-7)
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
   colourBody?: number;
@@ -974,8 +974,7 @@ export interface VisualizerSettings {
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
-  macroDepth: number;         // dome shading, contact shadow and shallow depth of field
-  macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
+  macroDepth: number;         // the closeup camera's depth of field (it was also a drawn dome shading, contact shadow and paper grain until PLAN 38u-2)
   macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
@@ -1180,7 +1179,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
   blobSurfaceTension: 0.3,  // colours hold apart loosely
-  boundaryContrast: 0.45,   // bright interface line between dye colors
+  boundaryContrast: 0.45,   // the optical path's contrast; no line between two dyes (18e-5)
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
   benDay: 0,
@@ -1316,7 +1315,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroCellScale: 0.5,
   macroLacing: 0,
   macroDepth: 0.5,
-  macroEdgeDetail: 0.6,
   macroRelief: 0.7,
   sceneDrive: 0,            // the room does nothing to the plate until it is asked to
   sceneHands: 0,

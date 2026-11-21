@@ -710,6 +710,20 @@ export const PRESETS: Preset[] = [
       blendMode: 'overlay',
       gooeyEffect: 0.55,
       rotationSpeed: 0.27,       // 28i-2: above lookMotorRate's 0.1 vertex (~0.086 rad/s, ~1.2 min/turn) so the three pools clear M >= 0.02 at 20 and 40 s
+      /*
+        No hand stirring the dish (PLAN 28i-7c). The look never named
+        Turbulence, so it ran the default 0.5: a curl noise added to the flow
+        everywhere, every step (forcesB), which no liquid between two glasses
+        2 mm apart does by itself (its Reynolds number is far under one; the
+        gap's drag stops any flow nothing drives within milliseconds). It
+        stirred the three pools into a veil between them: on the owner's Mac
+        the glycerine kept 38% of its dye in 90 s, the soap 71%, and the dish
+        never lost any (0.43 to 0.42), so no dye, exposure or lamp brought
+        them back. Off, they keep 97%, 96% and 95%, and what moves them is
+        what really would: the motor, the rock and each area's paddle on its
+        own band (`npm run pools`).
+      */
+      turbulenceScale: 0,
       // Flat: a concave dish slid all three pools into one in the middle. The
       // pools are its areas of the dish now (lib/plateAreas.ts).
       centerGravity: 0.0,
@@ -1054,7 +1068,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.45,
       macroLacing: 0,
       macroDepth: 0.6,
-      macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
       beads: 0.7,             // each a lens on the colour under it
       globalSpeed: 0.06,
@@ -1126,7 +1139,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.6,
       macroLacing: 0,
       macroDepth: 0.5,           // 28i-7: at 0.7 the shallow focus blurred the pools' edges
-      macroEdgeDetail: 0.75,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
       globalSpeed: 0.045,
       surge: 0.5,
@@ -1198,7 +1210,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.55,
       macroLacing: 1.0,          // lacing is the subject here
       macroDepth: 0.6,
-      macroEdgeDetail: 0.9,      // maximum silhouette crinkle
       macroRelief: 0.65,
       globalSpeed: 0.07,
       surge: 0.6,         // quick — this one rushes
@@ -2097,7 +2108,6 @@ export const PRESETS: Preset[] = [
       macroCells: 0,
       macroLacing: 0,
       macroDepth: 0,
-      macroEdgeDetail: 0,
       macroRelief: 0,
       /*
         Flat comic inks in the dish, with no beads or gloss (PLAN 28i-3b):

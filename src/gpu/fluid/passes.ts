@@ -323,7 +323,7 @@ export class FluidPasses extends FluidFields {
     if (!this.slosh.ready()) { this.sloshTex = null; return; }
     // The oil is the mix's, while the look has Oil Tension and the mix is made (lib/slosh.ts: the lens floats at its capillary thickness).
     const oil = this.mix && (p.oilTension ?? 0) > 0 ? { tex: this.mix.read, n: this.N } : null;
-    this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'));
+    this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'), drive.spin, drive.spinRate);
     this.sloshLevel = false;
     this.sloshTex = this.slosh.flow;
   }
@@ -1131,6 +1131,40 @@ export class FluidPasses extends FluidFields {
     }
     this.run(pass, 'curGradient', this.cur.write, [this.cur.read, this.curP.read], m, this.M);
     this.cur.swap();
+  }
+
+  /**
+   * The poured liquids' two fields, carried as the step carries the dye
+   * (`how`: the thin gap's substepped carry, MacCormack, or the old plate's
+   * bodyAdvect), or not at all while nothing has been poured since the plate
+   * was last cleared (liquidsLive).
+   *
+   * Read in the code (2026-11-13): every step carried both, at every look,
+   * though most never pour a liquid: two MacCormack advections (three
+   * dispatches each) or two substepped carries (a dispatch a substep and the
+   * glass's drift) of fields that are zero. Every one of those kernels is a
+   * carry, a sum of the field's own values times weights (fluxes, a
+   * bilinear backtrace and its correction clamped to the neighbours' range,
+   * airShed's gather of what dry cells hold), so a field of zeros comes out
+   * zeros, and skipping it leaves the same zeros in whichever half of the
+   * pair is read. Nothing else reads the carry's side effects: airGive's
+   * shares are worked out again, from the air, before every carry that takes
+   * them. The gate is the one stepLiquids has for the liquids' forces
+   * (15e-1) and chemLive is for the reaction's grid. `npm run encode` holds
+   * both ways of it: no carry on a plate never poured on or cleared, and
+   * the carries back, open plate and thin gap, after one drop.
+   */
+  protected carryLiquids(pass: GPUComputePassEncoder, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp = 0, at?: GPUBuffer[]): void {
+    if (!this.liquidsLive) return;
+    this.carryLiquid(pass, this.liquids0, how, args, disp, at);
+    this.carryLiquid(pass, this.liquids1, how, args, disp, at);
+  }
+
+  private carryLiquid(pass: GPUComputePassEncoder, f: PingPong, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp: number, at?: GPUBuffer[]): void {
+    if (how === 'mac') { this.macCormack(pass, f, this.velForced, disp, 'dye'); return; }
+    if (how === 'thin') { this.carrySubsteps(pass, 'bodyAdvect', f, args!, undefined, at); return; }
+    this.runPressed(pass, 'bodyAdvect', f.write, [f.read, this.velForced], args!);
+    f.swap();
   }
 
   protected macCormack(pass: GPUComputePassEncoder, field: PingPong, velTex: GPUTexture, disp: number, label: string): void {
