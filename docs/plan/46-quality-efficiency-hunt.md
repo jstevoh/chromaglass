@@ -64,10 +64,11 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   in the opening; every look opens on only what it waited for; nothing a first step asks for
   left out) and `physics`/`thingap` for any fused kernel. The owner's Mac's number to beat:
   first step 15.48 s cold, read from main's deploy after merge.
-- **46a-2 · A smaller display** (Antigravity, after 46a): the display's compile, 6.77 s of a
-  cold opening on the owner's Mac, split by what a look turns on so Classic compiles only
-  what it draws. Held by `samelook` (byte-level after five steps), `plate`, `nolight`,
-  `filmlook`, `bubblelook`; numbers from `openingtime`'s "slowest" line before and after.
+- **46a-2 · A smaller display: shipped by 14v-12** (2026-11-14, a Claude thread, not
+  Antigravity's: the owner's report of a thirty-second start on a phone). The opening
+  compiles the display with only the effects its look can reach and builds the whole one
+  behind the show; every look the same bytes (`npm run leandisplay`). Story in
+  `docs/plan-shipped.md` §14v-12; what is left of it is 14v-14 and 14v-16.
 - **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, H2c-6, H2c-9
   (briefs of 2026-11-07), then H2c-8 and H2c-5, then H2c-2 once H2c-3 and H2c-1 merge. Each
   takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
@@ -167,6 +168,10 @@ again ten times a second for three meters and a percentage.
   object built every frame to be compared, a projector source's copy of all 251 settings a
   frame. Each is the same arithmetic into memory kept; the check for each is `eargc`'s
   pattern (heap bytes a call, old against new, the result bit for bit).
+  - *First three call sites inspected (check first — `scripts/eargc.mjs` currently imports only `AudioFeatures`, `AnalyserEmulator` and `OnsetDetector` from `src/lib/audioFeatures.ts` and has no subjects yet for these three):*
+    1. `BubbleField.step` (`src/lib/bubbles.ts:498`, called from `stepPlateBubbles` in `src/sim/speciesPoll.ts:93`): `stepPlateBubbles` allocates a `(bx, by) => [vx, vy]` closure each step, and `BubbleField.step` calls `velocity(x, y)` 8 times on the ring (`b.r + 1.5`) per bubble plus 4 strain taps per large bubble (`tau2 > 1e-3`), allocating a 2-number tuple each call.
+    2. `squishDisc` under the bass hand (`src/sim/fluidSimulation.ts:2190` `pressBass` → `BassPress.follow` in `src/lib/squish.ts:710` → `squishDisc` in `src/lib/squish.ts:180` → `FluidSimulation.squishCell` in `src/sim/fluidSimulation.ts:2199`): `spokesAt` allocates `{ count: 0, phase: 0, seed: 0 }`, `BassPress.follow` allocates `{ x, y, r: radius, thin }`, and `squishDisc`'s inner loop calls `cell(idx, -3 * amount * q * q, 0, 0, 1)` per disc cell.
+    3. The tempo `estimate` (`BarGrid.estimate` / `estimatePeriod` / `median` in `src/lib/barGrid.ts:144,229,378`, called from `BarGrid.step` at `src/lib/barGrid.ts:360`, and `BeatClock.step` in `src/lib/beatClock.ts:212`, called every frame at `src/components/LiquidVisualizer.tsx:2601`): `BarGrid.estimate` allocates `all`, `gaps` of `{ dt, w }` objects, a `score` closure, `.filter`/`.map` arrays, and `a.slice().sort((x, y) => x - y)` in `median`; `BeatClock.step` allocates `ivs: number[] = []` and runs `ivs.sort((a, b) => a - b)` on every frame once `onsets.length >= 4` even when no onset arrived or expired.
 - **46k · `dyeDisperse` runs as an exact no-op where diffusion is zero** (S; Classic and
   thirteen other looks): its gate passes whenever the plate moves, and with `dm = 0` and
   `kappaT = 0` every flux is ±0. One full-grid dispatch a step, 25 loads of the rgba32f dye
