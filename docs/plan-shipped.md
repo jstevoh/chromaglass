@@ -7261,6 +7261,105 @@ the compression pass's margin was `15.0` cells on Metal and `13.4` on software a
 `LAG_BAR` `2.15 → 1.89` and `HALF_BAR` `47 → 94` (midway), `DLAG_BAR` `0.13 → 0.16` (half the gap),
 `DHALF_BAR` kept at `13` (gap `23.8`).
 
+## 31p-1. Polarised light (PLAN 31p)
+
+**Polarisers, Analyser, Quarter Wave, Birefringence** (Settings → Lamp & Light, MIDI, the
+desks' lamp pins and the phone's remote). Shipped in the PR that wrote this, from the
+owner's photograph of dishes between polarisers (2026-11-14).
+
+- The law (`src/lib/polar.ts`): polariser at 0, the liquid a linear retarder of retardation
+  G at axis theta, analyser at alpha, T = cos^2 alpha - sin 2theta sin 2(theta - alpha)
+  sin^2(pi G / lambda); with a quarter-wave plate after the polariser and one crossed before
+  the analyser, T = (1 + cos 2alpha cos delta + sin 2alpha cos 2theta sin delta) / 2. Both
+  are A + B S + C N with two spectra that depend on G alone, so two tables (S and N, every
+  20 nm to 3000 nm, through the soap film's lamp, eye and white balance, `lampLinear` in
+  `filmTable.ts`) give the colour exactly up to the 20 nm interpolation (worst 0.004 of
+  white against T integrated wavelength by wavelength).
+- The liquid (`src/gpu/wgsl/platePolar.ts`): flow birefringence by the stress-optic law,
+  retardation in proportion to the principal strain rate read from the solver's packed flow
+  (`vel0`) by central differences, slow axis along the stretch, carried to the wall through
+  the screen's axes in the plate's uv, air taking its share away. Called once in the display
+  main on the finished stage, before the film projector. plate.ts did not grow: the include
+  swapped for `VIEW_OPTICS` (the thin film's block and this one) and three blank lines'
+  trailing spaces went.
+- The scale: set on the app, filmed on the owner's Mac. At 1000 nm per unit of the solver's
+  strain rate (the lab's calibration) the app drew a contour map of third-order bands at the
+  default; its readback speeds matched the lab's (fastest cell 0.70 against 0.75) but its
+  plate's flow is steeper at the solver's own grid. A sweep on a lamp ground put broad first-
+  and second-order bands at 0.12 to 0.15 of that scale, so Birefringence 1 is 400 nm per
+  unit and the default 0.3 lands there. The lab's check asks 0.75 for the same brightness.
+- Light coloured by dye stays the dye's colour: on a dye-on-black look the sheets cut its
+  light into bands of its own colour (physics: a red light through the chart can only be
+  dark or red); the Michel-Levy colours need white light, a lamp ground with clear or pale
+  liquid, as in the photograph.
+- Quarter Wave defaults to 1: between plane sheets every place where the stretch lines up
+  with a sheet is black whatever its retardation, and a stirred liquid is full of those thick
+  dark worms; the plates take them out, as photoelasticity labs do. At 0 the pinwheel arms of
+  the photograph come back.
+- `npm run polar` 24/24: both laws against Jones matrices (worst 7e-16), the tables against
+  the spectrum (worst 0.004), crossed black and parallel white, complements, the Michel-Levy
+  order, the isoclinic and its removal, shear and rotation; then the lab: off is off to the
+  byte and every dial reaches the picture; a still plate crossed is black (max 0) and
+  parallel the open plate (1 level); a laid vortex pixel by pixel: crossed plus parallel is
+  the open plate in light (mean 1.6 levels, worst 9.6), every pixel on the chart (worst 5.9),
+  the isoclinics on the diagonals and lit axes swap when the plate turns 45 degrees, the
+  turning middle dark; a stirred plate lights (mean 229, 84% coloured), black at
+  Birefringence 0, plane sheets 7.4% near-black against 0.0%. Without the encode, with the
+  axis not carried, or with light from speed instead of stretch, it goes red (one skeptic
+  pass found the first version could not tell those apart).
+
+## 31p-3. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
+
+**Dish Stress** (Settings → Lamp & Light under Polarisers, MIDI, the desks' lamp pins and the
+phone's remote). Shipped in the PR that wrote this, from the owner's photograph of moulded
+petri dishes between polarisers (2026-11-14), after 31p-1 gave the liquid's own colours.
+
+- The dish (`src/lib/polarDish.ts`, its WGSL in `platePolar.ts`): an injection-moulded dish
+  freezes stress about its gate in the base's middle, falling off as the melt spread, with
+  its principal axes radial and hoop; its retardation is taken as 1200 nm times Dish Stress
+  times half the rim's radius over the radius (1/r, held at 4% of the radius about the gate),
+  slow axis along the hoop, and the wall's far greater retardation (6000 nm, the moulding's
+  last and fastest-cooled plastic, past the chart's orders so it reads as the photograph's
+  pale rims) in a band 3% of the radius wide at the rim, nothing outside it.
+- The series (`seriesTransmission`, `polarSeries`): the dish and the liquid are two linear
+  retarders at different axes, light through the dish first. On the Poincare sphere each is
+  a rotation about its axis by its retardation; the light through the analyser is
+  (1 + a.R2 R1 s) / 2. Multiplied out, it is nine terms, each a weight from the two axes and
+  the analyser times cos or sin at G1, G2, G1 + G2 or G1 - G2, and each of those is a column
+  of 31p-1's two tables (cos = white - 2 S, sin = N). So the exact two-retarder light costs
+  four table reads, no new table, and at G1 = 0 it is 31p-1's light to the bit. Plane sheets
+  and quarter-wave plates are blended by Quarter Wave as before.
+- What it looks like: with Quarter Wave at 1 the dish alone is coloured rings, tightening
+  toward the gate; at 0 its dark cross lies along the sheets (the hoop axis is parallel to a
+  sheet there) and the rings light on the diagonals, the photograph's pinwheel. With the
+  liquid moving, the liquid's stretch adds to the dish's where it runs along the hoop and
+  takes from it across, so the rings wobble and shift colour where the liquid flows.
+- At 0 (the default) the branch is not taken: the plate is the look as before, to the byte.
+- `npm run polar` 39/39 (15 new): the series law against Jones matrices, plane and with the
+  plates (worst 8e-16), the nine weights against the rotations (2e-15), the table series
+  against the spectrum within the tables (0.005 of white), G1 = 0 is the liquid's own law,
+  two retarders along one axis add and across it subtract, the dish's 1/r, hoop axis, wall
+  and outside; then the lab: Dish Stress changes no byte at Polarisers 0 and reaches the
+  picture at 1; on a still plate with the plates in, each ring is the law's colour at its
+  radius times the open plate (worst 0.8 levels along the axes and diagonals); between plane
+  sheets the cross along the sheets is dark (at most 4 levels) and the diagonals lit
+  (81 to 128), and stays on the sheets with the plate turned 45 under them; on a gentle flow
+  with the dish in, analyser at 60 and the plates half in, each pixel is the series law with
+  the dish first (mean 4.85, 95th percentile 12.2 levels; the liquid alone misses its own law
+  by 4.3, the strain being read one texture away from the display's); a laid flow with the
+  dish in, crossed plus parallel is the open plate (worst 2.7, mean 0.8 levels over the 80%
+  of pixels in gamut) and the dish moves 80% of them against the same sheets without it.
+- The check review found the first lab checks blind to the dish's axis, the order of the two
+  retarders and a dropped liquid. Mutants of the shader against the final checks: the
+  retarders swapped (mean 22.5), a K term's sign flipped (18.1), the liquid's strain dropped
+  with the dish in (36.9), the dish's axis left in the plate's uv (the turned cross lands on
+  the diagonals): each fails one line.
+- Two things found: the look's saturation grade comes after the sheets (plate.ts packs
+  `saturationBoost`, default 1.45, applied after `polar()`), so law-exact lab checks render
+  with it at 1; and the high orders the dish brings are partly outside sRGB (a negative
+  primary in the spectrum's own light), so the shader's clip at 0 takes up to 0.3 of white
+  from a crossed plus parallel sum. The sum is checked only where no channel clipped.
+
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (#403)

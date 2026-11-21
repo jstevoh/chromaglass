@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Dish Stress: moulded dishes between the polarisers (PLAN 31p-3)
+
+- **Dish Stress** (under Polarisers in Settings → Lamp & Light, MIDI, the desks and the
+  phone): the plastic dish's own frozen moulding stress between the sheets, in series with
+  the liquid. Coloured rings round the middle and a pale rim; with Quarter Wave down, the dark
+  cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
+  to the dish's and the rings shift. 0 leaves the look as it was.
+
+### Added — Polarised light (PLAN 31p-1)
+
+- **Polarisers** (Settings → Lamp & Light, MIDI, the desks and the phone): sheets under the
+  plate and at the lens. Where the liquid's flow stretches it, it lights in rainbow bands in
+  the real Michel-Levy order; still liquid stays dark between crossed sheets.
+- **Analyser** turns the top sheet from crossed (dark field) to parallel (white field,
+  opposite colours); **Quarter Wave** (on by default) takes the dark lines out of the bands,
+  and turned down brings back the dark pinwheel arms; **Birefringence** sets how high the
+  colours climb.
+
 ### Added — tilt the plate from two knobs (PLAN 18a-13m)
 
 - **Tilt Left/Right** and **Tilt Up/Down** (`plateTiltX`, `plateTiltY`, Settings → Tilt & Rock under

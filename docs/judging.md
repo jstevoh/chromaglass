@@ -2896,3 +2896,43 @@ private; choose Advanced, then Proceed (Safari: Show Details, then visit this we
 plate should then come up and follow the laptop, as a projector on HDMI does. Say which
 browsers took it, and whether the warning came back on a later visit (it should not on the same
 device, unless the laptop's Wi-Fi address changed).
+
+## 137. Polarised light (PLAN 31p-1)
+
+**Judged 2026-11-14.** The owner watched the Mac films (lamp and dye looks, before and after) and approved the look.
+
+The check (`npm run polar`) proves the laws against Jones matrices and the spectrum, that off
+is off to the byte, that a still plate between crossed sheets is black and a stirred one
+lights in colour, and that the quarter-wave plates take the dark lines out, on the lab's
+software WebGPU at one frame. How the bands move with the music at sixty frames is only seen
+here.
+
+1. Open any look with Turbulence up (or the music on, which stirs it through its cord).
+   Settings → Lamp & Light → **Polarisers** to 1. Good: rainbow bands where the liquid moves,
+   broad and smooth like the photograph's dishes, flowing with the liquid and darker where it
+   is calm. Bad: a flat tint everywhere, bands that slide over still dye, speckle or noise.
+2. **Analyser** from 90 down to 0: the dark field turns white and every band swings to its
+   opposite colour. Bad: a jump, or bands that do not change.
+3. **Quarter Wave** to 0: dark curving arms appear through the bands; back to 1, they go.
+4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
+   pinks and greens. The default 0.3 should feel like the photograph.
+5. Polarisers at 0 on any look: the look exactly as before.
+
+## 138. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
+
+The check (`npm run polar`) proves the two-retarder law against Jones matrices, that each
+ring of a still dish is the law's colour at its radius, the dark cross between plane sheets,
+and that crossed plus parallel still add up with the dish in, on the lab's software WebGPU.
+How the rings read with a moving liquid at sixty frames is only seen here.
+
+1. Any look on a lamp ground, Settings → Lamp & Light → **Polarisers** 1, then **Dish
+   Stress** up from 0. Good: coloured rings round the plate's middle, tight near the middle
+   and broad toward the rim, a thin pale rim at the dish's wall, like the photograph's dishes.
+   Bad: a flat tint, rings that slide with the liquid, a hard edge at the gate.
+2. **Quarter Wave** to 0: a dark four-armed cross along the screen's axes, the rings lit on
+   the diagonals (the photograph's pinwheel); back to 1, the cross goes and the rings stay.
+3. Stir the liquid (Turbulence or the music): the rings wobble and change colour where the
+   liquid flows, and stay put where it is calm. Bad: rings that do not react, or that move
+   with still liquid.
+4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
+5. Dish Stress at 0: the look exactly as before.
