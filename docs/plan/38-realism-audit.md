@@ -549,9 +549,12 @@ written first. Line numbers are as read on main at d07ac31.
     and turns a moving cover into flow at the rim; pours add to it; the main readers of the rest
     gap follow it; the dials are on the sheet, the desks, MIDI and the phone's remote. Open:
     - **38r-16. The pinch and the air edge** (M-L; part 2, its own thread). *Design pass and
-      checks written 2026-11-08* (`npm run gap -- --owed=puddle,settle,lift,pinch`, lines 19–23;
-      `npm run airedge -- --owed=rim,front,fingers`; a throwaway proof of the ledger half passes
-      every gap line but the wiring). Built by Antigravity from the brief in the project's files.
+      checks written 2026-11-08*. ~~**G1** (the ledger and the pinch, `npm run gap` lines 1–23,
+      `puddle`, `settle`, `lift`, `pinch` all green)~~ built on `antigravity/38r-16-pinch`
+      (Liquid range 1–150 mL, `lib/cover.ts` puddle ledger + RK4 substepping, `lib/playGesture.ts`
+      `pinchHand`/`PINCH_SPAN`/`playHand` span, `components/coverPinch.ts`, `PhonePlay.tsx`).
+      **G2** (`npm run airedge -- --owed=rim,front,fingers`, the Saffman–Taylor fingers on the
+      GPU solver) remains open.
       - *The pinch.* A two-finger pinch on the desk (trackpad: wheel + ctrlKey over the plate,
         outside the closeup, scale ×exp(−deltaY/100) an event) and the phone (two fingers whose
         span changes past `PINCH_SPAN`, 1.2, told from Blow's pair moving together in

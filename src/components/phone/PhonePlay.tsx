@@ -36,8 +36,9 @@ import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
  *                and Shuffle, Clear plate and Share clip; Save at the top
  *
  * With Drop on the tray a touch picks its own hand, the way a hand reads a
- * dish (lib/playGesture.ts): a tap drops, a drag streaks, two fingers blow,
- * a still hold presses. The hint over the tray says so on the first visits.
+ * dish (lib/playGesture.ts): a tap drops, a drag streaks, two fingers blow
+ * (or pinch the cover glass once their span changes past PINCH_SPAN), a still
+ * hold presses. The hint over the tray says so on the first visits.
  *
  * It is the same app underneath, as PhoneStage is: every control here calls
  * the handler the desks and the full phone layout call, so a look picked or
@@ -172,20 +173,27 @@ export function PhonePlay(p: PhonePlayProps) {
     well as on moves, since a finger held still sends no moves.
   */
   useEffect(() => {
-    const down = new Map<number, { x0: number; y0: number; t0: number; travel: number }>();
+    const down = new Map<number, { x0: number; y0: number; x: number; y: number; t0: number; travel: number }>();
     let hand: PlayHand = pickedRef.current;
+    let d0 = 0;
     let timer = 0;
     const apply = () => {
       const now = performance.now();
-      const next = playHand(pickedRef.current, hand, [...down.values()].map(f => ({ travel: f.travel, ms: now - f.t0 })), pinchesRef.current);
-      if (next !== hand) { hand = next; onToolRef.current(next); }
+      let span = 1;
+      if (down.size >= 2) {
+        const [a, b] = down.values();
+        if (d0 === 0) d0 = Math.max(10, Math.hypot(a.x - b.x, a.y - b.y));
+        span = Math.hypot(a.x - b.x, a.y - b.y) / d0;
+      }
+      const next = playHand(pickedRef.current, hand, [...down.values()].map(f => ({ travel: f.travel, ms: now - f.t0 })), pinchesRef.current, span);
+      if (next !== hand) { hand = next; onToolRef.current(next === 'pinch' ? pickedRef.current : next); }
     };
     const onStart = (e: TouchEvent) => {
       if (!(e.target instanceof Element) || e.target.id !== 'liquid-canvas') return;
       const now = performance.now();
       // A new touch starts from the tray's hand, which is the app's at rest.
       if (down.size === 0) hand = pickedRef.current;
-      for (const t of Array.from(e.changedTouches)) down.set(t.identifier, { x0: t.clientX, y0: t.clientY, t0: now, travel: 0 });
+      for (const t of Array.from(e.changedTouches)) down.set(t.identifier, { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, t0: now, travel: 0 });
       setTouched(true);
       apply();
       window.clearTimeout(timer);
@@ -196,6 +204,8 @@ export function PhonePlay(p: PhonePlayProps) {
       for (const t of Array.from(e.changedTouches)) {
         const f = down.get(t.identifier);
         if (!f) continue;
+        f.x = t.clientX;
+        f.y = t.clientY;
         f.travel = Math.max(f.travel, Math.hypot(t.clientX - f.x0, t.clientY - f.y0));
         any = true;
       }
@@ -203,6 +213,7 @@ export function PhonePlay(p: PhonePlayProps) {
     };
     const onEnd = (e: TouchEvent) => {
       for (const t of Array.from(e.changedTouches)) down.delete(t.identifier);
+      if (down.size < 2) d0 = 0;
       if (down.size === 0) window.clearTimeout(timer);
       apply();
     };
@@ -387,7 +398,7 @@ export function PhonePlay(p: PhonePlayProps) {
         )}
         {showHint && (
           <div className={`mb-2 rounded-full px-3 py-1 text-[12px] text-text-2 ${GLASS_PILL}`} data-testid="play-hint">
-            {zoom > 1.05 ? 'tap drops · drag streaks · pinch zooms · hold presses' : 'tap drops · drag streaks · two fingers blow · hold presses'}
+            {zoom > 1.05 ? 'tap drops · drag streaks · pinch zooms · hold presses' : 'tap drops · drag streaks · two fingers blow · pinch squeezes · hold presses'}
           </div>
         )}
         {!sheet ? (
