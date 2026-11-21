@@ -655,7 +655,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   from 2026-11-21 to 2026-12-06 so unrelated PRs stop going red on main's reds; no bar
   moved, main's deploys still run both lines, and the line still prints in full as a
   warning. The PR that fixes each (#897 for 9c, the 8-draw-a-7 fix for drawwall) takes
-  its entry out.
+  its entry out. *Found 2026-11-21 (PR #679's run 44927401897): 9c's entry never held,
+  because `scripts/intro.mjs` printed "1 of 14 FAILED" and never the "13/14 checks
+  passed" tally that `quarantined()` in `scripts/checks.mjs` needs before it honours a
+  line; the films PR adds the tally line (the drawwall harness already printed one).*
 - **19ak-10. Decided: a deploy still trusts a PR run that was green through a
   quarantine.** `deploygate.sh` rules 4 and 5 trust a PR's green `Checks` run, and a run a
   quarantine held green is green, so a line red on the merged tree can go live on the PR's
@@ -689,3 +692,13 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   manages in that time, and the share of dye from 0.02 to 0.07 moves with it: red once
   on 11-21 (Pour 75% against Drop's 78%, a PR that does not touch the tools). Hold and
   settle over a fixed number of plate steps, as 19aj-1 asks of the Blow stroke.
+- **19ak-14. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
+  keeps the heat" reads ×0.9997, 0.9748 and 0.9657 where its bar wants the heat held. Not yet
+  run down: either Heat Spread at 2 now loses heat it kept (a real regression in the heat
+  field's diffusion) or the check reads a quantity that a later change made swing. Find which
+  before touching the bar.
+- **19ak-15. Open, found 2026-11-08: `oscout`'s `plate >= 10` is a fixed floor under a count
+  that swings with load.** A main deploy went red on 9 kicks in 15 s; on the Mac the same count
+  ran 10 to 24 before 14d-2. *Fix:* assert what the feature promises (each kick the ear hears
+  goes out as a message), by counting the ear's kicks over the same window and holding the OSC
+  count to them, not to a number. *Measure:* the ratio on a loaded and an idle run.

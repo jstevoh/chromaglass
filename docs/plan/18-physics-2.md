@@ -56,7 +56,9 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 `docs/plan-shipped.md` §18c). **18c-2 shipped and 18c-3 the splash crown's part shipped** (a colour
 drop is a pour of its volume and opens a window of its own colour; the splash's ring kick gone,
 satellites only past Cossali's K; `npm run dropwindow`; story in `docs/plan-shipped.md` §18c).
-Left, each its own PR:
+**18c-9 and 18c-10 shipped** (a drop enters over its capillary time; a hand's drop from any bottle,
+and a stream held on the plate, lay their colour with their own volume; story in
+`docs/plan-shipped.md` §18c). Left, each its own PR:
 
 - ~~**18c-2**~~ The colour's own drops as volume. Shipped (see above).
 - **18c-3b** The Pour's and the Splatter's radial velocity kicks (`autoInject`'s `pour` and
@@ -84,11 +86,19 @@ Left, each its own PR:
 - **18c-8** A small window is square-ish on the grid: a source a few cells wide on the
   collocated grid piles the pushed dye on its four diagonals (dark lobes at 192² for a drop of
   amount 10, gone by amount 30). With 18a-8's carry.
-- **18c-9** The drop's contact patch and steps (`DROP_CORE` 0.7, about 5 steps,
-  `lib/dropImpact.ts`) are numerical: a one-step source mixes its cell, 1/(1 + f). Replace
-  with the drop's real entry over its capillary time τ = √(ρD³/σ), in seconds rather than steps,
-  once the window's edge can be compared with the reference on the Mac.
-- **18c-10** The splash is water's, whatever liquid falls, and makes dye (S; Medium–High).
+- ~~**18c-9**~~ The drop's entry over its capillary time τ = √(ρD³/σ). Shipped (see above).
+- ~~**18c-10**~~ A hand's drop and a held stream lay their colour with their volume. Shipped (see above).
+- **18c-11** The held stream's strength. A stream held on the plate lays its colour at the
+  strength of a column of the same bottle's drop (`dropColumnDye`), which at the default bottle is
+  about three quarters of the old stamp's dye a step, spread flatter; the old stamp was a number
+  with no liquid behind it. Once 18c-5 makes the Amount the rate, the colour a second should be
+  the bottle's concentration times that rate, not a drop's column.
+- **18c-12** The drop's dome is a parabola take·(1 − d²) laid over the window's radius at once
+  (`pourVolume`), not the spreading of a drop squeezed between two glasses (a Hele-Shaw source
+  whose front is set by the pressure the drop's own weight and surface tension give). Measure the
+  window's growth on the Mac's grid against R(t) of a Hele-Shaw drop, then lay the drop at a
+  point and let the solver spread it.
+- **18c-13** The splash is water's, whatever liquid falls, and makes dye (S; Medium–High).
   `dropImpact.ts:82` carries water's ρ, σ and μ, so Cossali's K gates the satellites with
   water's numbers for oil or glycerine; `dropSplash.ts:114` ignores the gap; the satellites
   (`:119-134`) add 22% more dye than the drop held; the trickle (`:75-80`) carries no mass;
@@ -96,8 +106,10 @@ Left, each its own PR:
   falling liquid's own properties, and a drop splits its volume, it does not add to it. Read
   the bottle's ρ, σ, μ, take the gap, and split the drop's dye and volume among crater, crown
   and satellites. Check: total dye and volume after a splash within 0.5% of the drop's; an oil
-  drop from the same height does not splash. (38v, from RS-13.)
-- **18c-11** The idle plate lays dye and heat by itself (S–M; High). With nothing touched,
+  drop from the same height does not splash. Lines are at 801a815e; after #905 the water constants
+  sit at `dropImpact.ts:89` and the satellites at `dropSplash.ts:193-207`, each still laying 0.22
+  of the drop's dye. (38v, from RS-13.)
+- **18c-14** The idle plate lays dye and heat by itself (S–M; High). With nothing touched,
   `ambientSeedRef` (`LiquidVisualizer.tsx:839`) runs orbits at `3911-3933` that lay 0.05 of
   dye and 0.02 of heat a frame, so a still plate fills and warms. A plate left alone only
   spreads what is on it; nothing pours itself. The emergency seed at `4568-4572` (an empty

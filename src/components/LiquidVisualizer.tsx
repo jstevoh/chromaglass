@@ -76,6 +76,7 @@ import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
+import { dropBottle, layStream } from '../sim/dropSplash';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
@@ -1194,8 +1195,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         break;
       case 'drop': {
         const liq = selectedLiquidRef.current;
-        if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
-        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose, !liq?.behaviour);
+        dropBottle(af, x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), amt);
         af.addTemp(x, y, 0.6 * amt);
         break;
       }
@@ -1277,8 +1277,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       default: { // dropper
         const liq = selectedLiquidRef.current;
-        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
-        layBottle(af, x, y, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), liq, kTool);
+        dropBottle(af, x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), kTool, af.dtSeconds);
       }
     }
   };
@@ -3471,34 +3470,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   hand.laid.drops++;
                   hand.laid.dye += amt * poured.dose;
-                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
+                  dropBottle(af, x, y, amt, rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE), k, DROP_EVERY * af.dtSeconds);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
-                  if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k, DROP_EVERY * af.dtSeconds);
                 }
               } else {
-                // dropper (default)
-                // Wider as well as denser: a held drop fills to the plate's
-                // density ceiling in its middle, so more dye there alone would
-                // not show; a drop with more in it spreads further.
+                // dropper (default). Wider as well as denser: a held drop fills
+                // to the plate's density ceiling in its middle, so a drop with
+                // more in it spreads further. On a thin gap its colour comes
+                // in with its volume (sim/dropSplash.ts, layStream), and the
+                // properties of soap, milk or glycerine on the same disc.
                 const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
                 const amt = (liq?.injectAmount ?? 0.8) * k * poured.dose;
                 hand.laid.steps++;
-                for (let dy = -r; dy <= r; dy++) {
-                  for (let dx = -r; dx <= r; dx++) {
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist > r) continue;
-                    const nx = x + dx, ny = y + dy;
-                    if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
-                    const w = (1 - dist / r) ** 2;
-                    hand.laid.dye += amt * w;
-                    af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
-                    if (heat > 0) af.addTemp(nx, ny, heat * w);
-                  }
-                }
-                // Soap, milk, silicone and glycerine put their properties into
-                // the plate on the same disc as their colour, and the plate
-                // keeps acting on them long after the drop.
-                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k, af.dtSeconds);
+                hand.laid.dye += layStream(af, x, y, r, amt, poured.dose * (liq?.injectAmount ?? 0.8) / 0.8, rgb.r, rgb.g, rgb.b, heat, liq?.behaviour, k);
               }
             }
             // Counted after the step it was read on (see the clock above).
@@ -5651,6 +5635,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // under `?debug`.
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
+        /** What `prepareShow` built ahead and each pipeline built on a frame; the page's, so a setup with no renderer yet (a lost device's) still has it (PLAN 14v-12b). */
+        pipelines: pipelinesSeen,
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
         padPicture: padPictureSender()?.debug ?? null,
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
@@ -6782,13 +6768,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           },
           /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
           kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
-          /**
-           * How the show's pipelines were built: what `prepareShow` built
-           * ahead for the opening (and for every device since), and every
-           * one built on a frame on any device this page has had (`npm run
-           * startup` reads it).
-           */
-          pipelines: pipelinesSeen,
           /**
            * Twelve red-black sweeps against twenty-four Jacobi passes on one
            * divergence field, by the residual each leaves (H2). The claim

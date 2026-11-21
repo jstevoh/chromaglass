@@ -1577,6 +1577,25 @@
       ]
     },
     {
+      "name": "Polarised light",
+      "shard": "lab9",
+      "run": "npm run polar",
+      "timeout": 6,
+      "why": [
+        "PLAN 31p-1 (lib/polar.ts, gpu/wgsl/platePolar.ts): the plane-sheet and quarter-wave",
+        "laws against Jones matrices; the shader's three table colours against T integrated",
+        "wavelength by wavelength; crossed black and parallel white with nothing retarded,",
+        "the two complements; the Michel-Levy order; isoclinics black with plane sheets and",
+        "gone with quarter-wave plates; the flow's stretch from simple shear and none from",
+        "solid rotation. Then the real shaders: off is off to the byte and each dial reaches",
+        "the picture; a still plate crossed is black and parallel the open plate; a laid vortex",
+        "held pixel by pixel (crossed and parallel add in light to the open plate, every pixel",
+        "on the chart, the isoclinics swap when the plate is turned 45 degrees, the turning",
+        "middle dark); stirred it lights, black at Birefringence 0; plane sheets leave twice",
+        "the dark of the quarter-wave plates."
+      ]
+    },
+    {
       "name": "The tank on the GPU (SwiftShader)",
       "shard": "lab5",
       "run": "npm run tankgpu",
@@ -2154,6 +2173,21 @@
         "picture is in, and for the GPU only at Play (14v-9). The order is",
         "what is judged, so no GPU is needed and a runner's speed cannot move",
         "it."
+      ]
+    },
+    {
+      "name": "The webpage's films",
+      "shard": "browser",
+      "run": "npm run landingfilms",
+      "why": [
+        "The webpage's looks as films (scripts/landingfilms.mjs, PLAN.md 34a-6):",
+        "each card's loop and still are there and small, each record is credited",
+        "and published in the US before 1926 with its transfer's checksum in",
+        "SOURCES.md, no loop is asked for before a card plays, a",
+        "pointer plays a card's loop and leaving stops it, a click opens its",
+        "whole film from the channel with the credit under it, a phone plays the",
+        "card in view and a tap opens it, and reduced motion keeps the stills.",
+        "No GPU."
       ]
     },
     {

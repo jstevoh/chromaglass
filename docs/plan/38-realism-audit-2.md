@@ -23,10 +23,10 @@ cost, then Low.
 | 1 | 29a-10 | Every ferrofluid closeup draws the plate through white milk (RS-25) | `29-ferro-drop.md` | S | High, live bug | new |
 | 2 | 9ac | Ferrofluid is weightless under Plate Rock and on a standing plate (RS-22) | `09-ferrofluid.md` | S | Medium, live bug | new |
 | 3 | 15g-17 | The pointer shoves bubbles and beads; a pop pushes and swirls (RS-37) | `15-tools-on-liquids.md` | S | High | new |
-| 4 | 18c-11 | The ambient seed pours dye and heat into every look (RS-38) | `18-physics-2.md` | S–M | High | new |
+| 4 | 18c-14 | The ambient seed pours dye and heat into every look (RS-38) | `18-physics-2.md` | S–M | High | new |
 | 5 | 18c-3b | The mouse's dye stamp and the themes' kicks lay no volume (RS-39) | `18-physics-2.md` | M | High | updates |
 | 6 | 38v-1 | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | new |
-| 7 | 18c-10 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
+| 7 | 18c-13 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
 | 8 | 9ad | The domes rise on \|B\|, not on its normal part (RS-20) | `09-ferrofluid.md` | S–M | Medium–High | new |
 | 9 | 18i-2 | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | new |
 | 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | new |
