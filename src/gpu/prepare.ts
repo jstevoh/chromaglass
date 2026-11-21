@@ -273,6 +273,31 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     compile was asked 1.12 s after the device was given (job 132612767004),
     against 0.06 s on main, and `npm run startup` counted it the page's own.
   */
+  /*
+    And told on the next animation frame, not as the build settles. Told as
+    it settled, the loading line changed its words in the same task in which
+    the lane went on to ask the next render pipeline (a lane loops straight
+    from one settle to its next `take`, and a lane waiting on `renderBusy`
+    resumes the moment the last render pipeline is done): `rendering` read 0,
+    the words changed, and microseconds later the compile was asked, so that
+    picture was painted with the compile already under way and waited in the
+    GPU process behind it, the very stall the hold is for. `npm run intro`
+    line 9c went red on main's deploy 854 with 4 changes in its 4 render
+    compiles; read to the hundredth of a millisecond on two cloud runs, a
+    change fell 0.03 to 1.1 ms before each of the four asks, inside the
+    compile or not by how its millisecond rounded (deploys 852 and 853 were
+    the lucky roundings). Told in an animation frame, `rendering` is read in
+    the frame the words would be painted in, so a compile asked in that task
+    holds them and one asked later comes after their paint. One frame at a
+    time is all the line can show anyway. A hidden page draws no frames: the
+    last word is told before `go` (below), whatever has been drawn.
+  */
+  let told = 0;
+  const tell = (): void => {
+    if (!quiet?.progress || told) return;
+    if (typeof requestAnimationFrame !== 'function') { quiet.progress(progress.settled, progress.asked, progress.rendering); return; }
+    told = requestAnimationFrame(() => { told = 0; quiet.progress?.(progress.settled, progress.asked, progress.rendering); });
+  };
   // Each lane takes the next build in the list when its last one settles, so
   // the order they are asked in is the list's, as it was with one, but for
   // the one render pipeline at a time (`renderBusy`, below).
@@ -372,7 +397,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
         void waited.then(() => { if (fillLeft > 0 && --fillLeft === 0) fillsDone?.(); });
       } else if (prep.kind === 'render') {
         progress.rendering++;
-        renderBusy = waited.then(() => { renderBusy = null; progress.rendering--; quiet?.progress?.(progress.settled, progress.asked, progress.rendering); });
+        renderBusy = waited.then(() => { renderBusy = null; progress.rendering--; tell(); });
       }
       const settled = await waited;
       const now = performance.now();
@@ -380,7 +405,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       lastSettled = now;
       progress.settled++;
       progress.lastAt = Math.round(now);
-      quiet?.progress?.(progress.settled, progress.asked, progress.rendering);
+      tell();
       times.push([prep.key, Math.round(from), Math.round(now - from)]);
       const c = stamps.compiled;
       raw.push([prep.key, Math.round(b0), c == null ? null : Math.round(c - b0), c == null || stamps.used == null ? null : Math.round(stamps.used - c)]);
@@ -417,6 +442,9 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       useWait = Math.round(performance.now() - w0);
     }
   } finally {
+    // The count's last word before the first frame's, in order, with
+    // nothing of the opening left compiling.
+    if (told) { cancelAnimationFrame(told); told = 0; quiet?.progress?.(progress.settled, progress.asked, progress.rendering); }
     quiet?.go();
   }
   const done: Prepared = {
@@ -483,8 +511,9 @@ export interface Quiet {
   still(): Promise<void>;
   go(): void;
   /**
-   * How far the opening has got, each time a build settles and each time a
-   * render pipeline finishes (never before the first): the loading line's count
+   * How far the opening has got, on the animation frame after a build
+   * settles or a render pipeline finishes (never before the first), and once
+   * more before `go` if that frame has not come: the loading line's count
    * (`introStage` in `lib/intro.ts`), which holds its words while
    * `rendering` is up, for the reason above.
    */

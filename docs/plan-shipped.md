@@ -2942,6 +2942,25 @@ each file in the browser and holds its flag to its picture (0.0 colourfulness fo
 huge chunk on the canvas. It shouldn't do that. I want to pour it on myself. Same with
 all of the other liquids."
 
+- **Shipped, 14v-18: the loading line's words are told on the next animation frame**
+  (2026-11-21). What was seen: `npm run intro` line 9c ("holds its words while a render
+  pipeline compiles") red on main's deploy 854 with 4 changes in the opening's 4 render
+  compiles, and on #872's first run; deploys 852 and 853 passed it on the same code. What
+  was measured, on software WebGPU in a cloud session, the change stamps and the compiles'
+  asks read to the hundredth of a millisecond: on two runs every render compile but the
+  first was asked 0.03 to 1.1 ms after a word change, in the same task (a lane loops from
+  a settle, which told the line, straight to its next `take`; a lane waiting on
+  `renderBusy` resumes the moment the last render is done, which told the line too). So
+  each of those pictures was painted with the compile under way, which is the stall the
+  hold exists to avoid, and whether 9c saw it depended on how the stamp's millisecond
+  rounded (Math.round of a change at 6588.6 ms reads 6589, after an ask at 6588.7). Before:
+  red on 1 of 8 runs here (2 changes in 4 compiles), and every compile but the first had
+  a change within 3 ms before it. What changed: `src/gpu/prepare.ts` tells
+  `quiet.progress` on the next animation frame (one at a time), so `rendering` is read in
+  the frame the words would be painted in; a last word not yet told is told before `go`.
+  `introStage` stamps its record to the hundredth of a millisecond. After: 12 of 12 runs
+  with 0 changes in the 4 compiles and none within 3 ms of an ask or an end; 15 to 18
+  counts instead of 27 to 29, the last always 67 of 67.
 - **Cause.** Picking the Ferrofluid bottle turned Ferrofluid (`phaseAmount`) up to 0.6 so
   the drops would show (the plate draws the second phase only with it up). Only the
   frame's "turned up on a bare plate" pour knew that rise was for the bottle. Everything

@@ -290,7 +290,10 @@ export function introStage(stage: IntroStage, done = 0, of = 0): void {
   const share = stage === 'load' ? 0.04 : stage === 'gpu' ? 0.12 : stage === 'build' ? 0.15 + 0.8 * (of > 0 ? Math.min(1, done / of) : 0) : 0.97;
   el.querySelector<HTMLElement>('.cg-bar > i')?.style.setProperty('transform', `scaleX(${share.toFixed(3)})`);
   const stages = (record.stages ??= []);
-  if (stages.length < 400) stages.push([Math.round(performance.now()), stage, done, of]);
+  // To the hundredth of a millisecond: `npm run intro` line 9c sets each
+  // change against the render compiles' own asks, and a change told in the
+  // frame before an ask, rounded to the millisecond, could read as after it.
+  if (stages.length < 400) stages.push([Math.round(performance.now() * 100) / 100, stage, done, of]);
 }
 
 /**
