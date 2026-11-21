@@ -52,8 +52,10 @@ on:
   workflow_run:
     workflows: [Checks]
     types: [completed]
+  # A push, and the PR being marked ready, which starts the run that decides
+  # (19ak-14): until it is green, no head of it is ready.
   pull_request:
-    types: [synchronize]
+    types: [synchronize, ready_for_review]
 
 # Read-only at the top (`npm run cisecrets` holds every workflow to it); each
 # job asks for the one write it needs, a label and a comment on the PR.
@@ -71,6 +73,10 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
+      # The run's jobs and its reach job's notices: a draft's run is not a
+      # ready head (19ak-14).
+      actions: read
+      checks: read
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -81,6 +87,7 @@ jobs:
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           RUN_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
         run: |
@@ -107,6 +114,30 @@ jobs:
 
           gh label create ready-for-review --color 0e8a16 \
             --description "Checks are green on the PR's current head" 2>/dev/null || true
+
+          # A draft's green run (PLAN.md 19ak-14) skipped the Mac shards its
+          # diff reaches: `reach` leaves a `draft` notice when it did. Such a
+          # head is not ready to merge. Marking the PR ready starts the run
+          # that runs them, and that run's green labels it. Read from the run
+          # itself, not from the PR, which may have been marked ready since
+          # this run started (its own run is then the one that decides).
+          if [ "$CONCLUSION" = success ]; then
+            reach=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
+              --jq '.jobs[] | select(.name == "What the change reaches") | .id' | head -1)
+            draft=""
+            if [ -n "$reach" ]; then
+              draft=$(gh api "repos/$GH_REPO/check-runs/$reach/annotations" \
+                --jq '.[] | select(.title == "draft") | .message' | head -1)
+            fi
+            # Neither labelled nor un-labelled: a draft's run re-run after the
+            # PR was marked ready replays the draft's event, and must not take
+            # off the label the full run put on the same head. A push and a
+            # red run take it off already.
+            if [ -z "$reach" ] || [ -n "$draft" ]; then
+              echo "#$pr: head $head passed a draft's run, without the Mac or all of Measure (${draft:-no reach job to read}); marking it ready runs them"
+              exit 0
+            fi
+          fi
 
           if [ "$CONCLUSION" != success ]; then
             gh pr edit "$pr" --remove-label ready-for-review 2>/dev/null || true

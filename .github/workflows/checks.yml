@@ -46,7 +46,14 @@ on:
       local:
         type: string
         default: '[]'
+  # GitHub's three by default (opened, a push, reopened), and the PR being
+  # marked ready: a draft's runs skip the Mac and run only the Measure checks
+  # the diff reaches (`reach` below, PLAN.md 19ak-14), so marking it ready
+  # starts the run with Measure in full and the Mac, the one a merge waits
+  # for and the deploy gate can trust. Every push after that is a ready
+  # PR's and runs the same.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # A second push to a branch makes the first push's run pointless, and these are
 # expensive: three runners, one of them for most of an hour. Superseded pull
@@ -85,6 +92,10 @@ jobs:
   # diff is only check scripts and documents (19k-4, below). A deploy
   # (`workflow_call`) reaches the Mac unless its gate passed `mac: false`
   # (deploygate.sh rule 5), and the gate never trusts a run that skipped it.
+  # A draft's push (PLAN.md 19ak-14) reaches no Mac and only the Measure
+  # checks that read what it changed; marking it ready runs the rest.
+  # The Mac shards stay on GitHub's machines for every pull request while the
+  # repository is public (`webgpu` below says why).
   reach:
     name: What the change reaches
     runs-on: ubuntu-latest
@@ -126,6 +137,9 @@ jobs:
           ESBUILD_MODULE: ${{ runner.temp }}/esbuild/node_modules/esbuild/lib/main.js
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          # Whether the PR was a draft when this run's event fired (19ak-14):
+          # then no Mac, and Measure only what the diff reaches.
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
           GH_TOKEN: ${{ github.token }}
           CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
