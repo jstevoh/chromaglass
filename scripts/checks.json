@@ -160,6 +160,20 @@
       ]
     },
     {
+      "name": "The Tilt knobs tip the plate as a hand would",
+      "shard": "logic",
+      "run": "npm run handtilt",
+      "why": [
+        "PLAN 18a-13m (scripts/handtilt.mjs, lib/handTilt.ts): the owner asked to tilt",
+        "the plate from two MIDI knobs. A knob at its middle (CC 62-66) is level and its",
+        "ends the phone's full tip; a throw end to end is eased (under 0.02 in its first",
+        "sixtieth, past 0.9 by 0.4 s, never past the knob) and the same at 30, 60 and 120",
+        "steps a second; turned into each dish as downhill() turns Tilt Direction, as far at",
+        "every angle; within the phone's reach; the old frame loop's exactly at 0; and",
+        "learnable over -1..1 in Tilt & Rock, out of sound mapping, the patch bay and Evolve."
+      ]
+    },
+    {
       "name": "The spun dish",
       "shard": "logic",
       "run": "npm run spinslosh",
@@ -759,6 +773,17 @@
       "run": "npm run setlist",
       "why": [
         "The set list file: a show's running order reads back as it was written."
+      ]
+    },
+    {
+      "name": "Which frame stops the control's builds sat in",
+      "shard": "logic",
+      "run": "npm run compilestop",
+      "why": [
+        "Startup 1b's attribution of the old way's compile to its frame stops",
+        "(scripts/compilestop.mjs, PLAN.md 19aa-7d), on made-up openings: a stop",
+        "the page was held into from the builds is theirs (main's deploys 832 and",
+        "839), a stall after a page that ran freely, or with no timer read, is not."
       ]
     },
     {
@@ -2264,6 +2289,19 @@
         "linked, the phones counted by the relay, Link another while they are;",
         "on a static host, the code of the page's own address. No GPU; dist/ is",
         "the phone step's build."
+      ]
+    },
+    {
+      "name": "The network display over https",
+      "shard": "browser2",
+      "run": "node scripts/netdisplay.mjs",
+      "why": [
+        "A network display over https (scripts/netdisplay.mjs, PLAN.md 14m-https):",
+        "the show server serves https beside http with a certificate it makes,",
+        "and a network display at the https address it prints is a secure page",
+        "with WebGPU that joins the relay; at the http address it is not secure;",
+        "with the https port taken the show still starts, http only, and says",
+        "why. No GPU; dist/ is the phone step's build."
       ]
     },
     {

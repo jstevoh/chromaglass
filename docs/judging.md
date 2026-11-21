@@ -2887,7 +2887,17 @@ Video file. Its row shows Play and Pour.
 4. Bad: Play or Pour that does not start, a zoomed-out frame with a stretched border, a drive
    that does nothing with only the pour on.
 
-## 136. Polarised light (PLAN 31p-1)
+## 136. A network display over https (PLAN 14m-https)
+
+Start the show on the Mac (`npm run remote` or the Mac app) and open the network display address
+it prints, `https://<laptop-ip>:3443/?cast=true&key=…`, on a second computer, a tablet or a
+TV's browser on the same Wi-Fi. The browser should warn once that the connection is not
+private; choose Advanced, then Proceed (Safari: Show Details, then visit this website). The
+plate should then come up and follow the laptop, as a projector on HDMI does. Say which
+browsers took it, and whether the warning came back on a later visit (it should not on the same
+device, unless the laptop's Wi-Fi address changed).
+
+## 137. Polarised light (PLAN 31p-1)
 
 **Judged 2026-11-14.** The owner watched the Mac films (lamp and dye looks, before and after) and approved the look.
 

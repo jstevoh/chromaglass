@@ -4,7 +4,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 
 ## Start here
 
-- `remote-server.js` (54 KB, grep it): the show server (`npm run remote`): serves the built app on the LAN, relays the remote's messages between laptop and phones over WebSocket (and a TV's WebRTC handshake with the laptop, the `tv` role, PLAN 12-tv, and its pairing by four digits, 12-tv-2), takes OSC, Art-Net and Ableton Link, sends OSC out. Exports `setOsc`/`oscState`, `setOscOut`/`oscOutState` and `stopBonjour` for the Mac app.
+- `remote-server.js` (65 KB, grep it): the show server (`npm run remote`): serves the built app on the LAN over http and, for network displays, https on `PORT + 443` with a self-signed certificate it makes in `TLS_DIR` (default `server/.tls`; PLAN 14m-https), relays the remote's messages between laptop and phones over WebSocket (and a TV's WebRTC handshake with the laptop, the `tv` role, PLAN 12-tv, and its pairing by four digits, 12-tv-2), takes OSC, Art-Net and Ableton Link, sends OSC out. Exports `setOsc`/`oscState`, `setOscOut`/`oscOutState` and `stopBonjour` for the Mac app.
 - `license-worker.js` (38 KB, grep it): the licence Worker: merchant webhooks, keys, machine seats, cloud sync.
 - `tv-code.js`: the licence Worker's `/tv/` routes, a TV's sign-in by a short code and its 30-day `cgtv1.` pass (`handleTv`, `signTvPass`, `verifyTvPass`, `normalizeTvCode`, `TV_PASSES_PER_ACCOUNT`); never the licence key, so a TV takes no seat.
 - `report-worker.js`: where the crash log's Send goes. Limited by /64 in memory (`ALL_PER_HOUR` for everyone), 1 MB bodies.

@@ -768,6 +768,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <Slider label="Melody Walk" field="melodyWalk" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
+          {/* The two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a look saved before them reads level, not the slider's −1. */}
+          <Slider label="Tilt Left/Right" field="plateTiltX" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltX') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Tilt Up/Down" field="plateTiltY" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltY') ?? 0) as number} {...sliderProps} connected={connected} />
           <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The dish's own turning (PLAN.md §22): Auto Spin's mode and its

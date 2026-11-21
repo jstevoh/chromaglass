@@ -580,6 +580,19 @@ export interface VisualizerSettings {
    * Optional so a look saved before it reads as 0.
    */
   slosh?: number;
+  /**
+   * A hand tipping the flat plate on the projector, left and right (PLAN
+   * 18a-13m): −1 to 1, 0 level. Up dips the right edge and the colour runs
+   * right. Two knobs on a controller are what it is for. Not Gravity: the
+   * plate stays flat on the lamp, and on a thin gap heavy dye slides down the
+   * tip and light oil rises (lib/handTilt.ts says why it is that tilt, eased,
+   * with a level middle). Added to the remote phone's tilt. A hand's alone:
+   * never the sound's or Evolve's. Optional so a look saved before it reads
+   * as level.
+   */
+  plateTiltX?: number;
+  /** The same, top and bottom: up dips the top edge and the colour runs up the screen. */
+  plateTiltY?: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -1106,6 +1119,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
+  plateTiltX: 0,            // level: the hand's tip of the flat plate (lib/handTilt.ts)
+  plateTiltY: 0,
   slosh: 0,                 // the plate as it was: a tilt changes the level and the liquid does not slop (lib/slosh.ts)
   doubleDiffusion: 0,
   ferroLabyrinth: 0,

@@ -117,6 +117,21 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
     2.02, still red, so 7b is not a change to the check alone and stays open: the next step
     is what in the page's first second stretches four frames over 0.85 s after a fast device.
     Merged with 7a's fix in the same PR; judge on `npm run flakes` a week on as above.
+  - **19aa-7d. Shipped 2026-11-15: the control's compile, when one frame got through.** Main's
+    deploys 832 and 839 (both on the owner's second Mac runner) went red on 1b's first two
+    lines with the control pricing no compile: "0.00 s compiling ... (0 stops), 8.55 s the
+    page's own". The control built its 59 on its first step (0.81 s), its page was held from
+    then on (its timer on time for about 0.16 s of the next 1.72 s), one frame got through at
+    2.53 s, and the frames then stopped 6.61 s with the page silent: the stop began 1.72 s
+    after the builds, outside the second, and the first-use rule rightly will not vouch for a
+    stop the page stood still through. A build now also sits in the first stop after it when
+    that stop began under two seconds after it, the page never ran (ticks and frames no more
+    than a quarter second apart) for half a second at a time between, and its timer was on
+    time for half of the second before the build; read from the build: `scripts/compilestop.mjs`
+    (`buildsIn`, beside startup.mjs at its ceiling), `npm run compilestop` on thirteen made-up
+    openings. Not asked: whether one long task covered the stretch (the log does not print
+    the control's long tasks after its first step). 839's control reads 8.33 s of compile and 0.23 s its own. Not #861 (?prepare=0
+    returns before the prepare). Judge on the next deploys' `open` shard on both owner runners.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
