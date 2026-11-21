@@ -86,6 +86,8 @@ const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeIm
   'frameSway',
   // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).
   'slosh',
+  // And the Tilt knobs (lib/handTilt.ts): the plate tipped on the beat is the sound moving the whole picture.
+  'plateTiltX', 'plateTiltY',
   ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>

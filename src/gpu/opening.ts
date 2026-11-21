@@ -26,6 +26,14 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
+
+/**
+ * `?lean=0` opens on the whole display, as before `displayLean.ts`: the
+ * other way for `npm run openingtime -- --variants ",lean=0"` to time
+ * against, on one build and interleaved.
+ */
+const LEAN_OFF = (() => { try { return new URLSearchParams(window.location.search).get('lean') === '0'; } catch { return false; } })();
 import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
@@ -133,6 +141,11 @@ export interface Opening {
    * Soap Film up mid-set.
    */
   soap: boolean;
+  /**
+   * The display's effects this look can reach (`displayLean.ts`): the
+   * opening compiles a display with only these, and the whole one behind it.
+   */
+  display: number;
 }
 
 /**
@@ -184,9 +197,12 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     chemistry: on(s.chemistry),
     gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
     slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
-      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
+      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway))
+        // The Tilt knobs tip it too, either way (lib/handTilt.ts).
+        || (on(s.slosh) && (on(s.plateUpright) || on(Math.abs(s.plateTiltX ?? 0)) || on(Math.abs(s.plateTiltY ?? 0))))),
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
+    display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
   };
 }

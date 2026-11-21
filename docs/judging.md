@@ -1574,7 +1574,7 @@ at a show, through the microphone in the room as well as through the laptop:
 Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
 the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).
 
-## 66. The cartoons, poured and filmed (PLAN 14ac)
+## 66. The cartoons, poured and filmed (PLAN 14ac) — withdrawn 2026-11-13: the shelf is gone (14ag)
 
 On the desk, the Dye panel has a Cartoons shelf under Image… and Video…; on the phone, it is at
 the bottom of the dye sheet. Each cartoon has Pour and Film.
@@ -1935,7 +1935,7 @@ until the app next goes online (no grace period, PLAN 23.17h).
 4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
    hot reds acceptable, or should the end hold only half the brightness back?
 
-## 85. The colour cartoons (PLAN 14ac, 14ac-4)
+## 85. The colour cartoons (PLAN 14ac, 14ac-4) — withdrawn 2026-11-13: the shelf is gone (14ag)
 
 Five cartoons in colour on the Cartoons shelf (the desk's Dye panel, the phone's dye sheet), marked "colour":
 Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Travels.
@@ -2851,3 +2851,48 @@ tall MP4 with sound, with the plate drawn tall while it records. A phone opens o
    Portrait 9:16 and the clip is the middle of the screen, 9:16.
 7. Decide: is losing the plate's size on your own screen for the length of a clip acceptable on a laptop mid-set, or should it
    record the slice and keep the screen as it is (cheaper, but a crop, 34f-2)?
+
+## 134. A faster start, and a loading line until the plate shows (PLAN 14v-12)
+
+The show now compiles a display for the look it opens on, without every other look's
+effects, and builds the whole one just after the plate appears. On software WebGPU (all
+CPU, as on a phone) the first frame came about a fifth to a third sooner; nothing about any
+look's picture changed (`npm run leandisplay`: every look the same bytes). Under the mark,
+while nothing is drawn yet, a line now says what the wait is: "Loading", "Starting the
+graphics", "Compiling shaders 23 of 67", "Pouring the first frame", each with the seconds
+since the page opened, over a thin bar.
+
+1. On the phone, open chromaglass.art fresh (after a deploy, so the shaders are cold) and
+   again a second time. Write down the seconds the line shows at each stage and when the
+   plate appears, both times. This is the reading PLAN 14v-13 waits on.
+2. Does the line read clearly on the phone, under the mark and above the dock? Good: legible
+   at arm's length, steady (not blinking). Bad: too faint, too small, or under the dock.
+3. The count sometimes pauses for a second or two and then jumps: that is a render pipeline
+   compiling, when changing the words would stall the page's frames. Say if it looks stuck.
+4. Within the first seconds after the plate appears, change to a look with something
+   different (Ben-Day dots, Lacing, Lumia): the effect may come in a second or two late,
+   never a frozen plate. Say if anything looks wrong in those seconds.
+
+## 135. Your own video: played, poured, read and framed (PLAN 14ag)
+
+Load a video of your own in the Video panel (on the Perform tab's deck, or Settings → Video):
+Video file. Its row shows Play and Pour.
+
+1. **Pour** while it plays: both lit, the picture through the dye and poured into it at once.
+2. **Video Zoom** at 0.5 with a 16:9 clip: the whole frame, smaller, with no picture round it
+   and no smeared edge. At 2, pushed in. **Across** and **Up** slide it; **Fit** puts it back.
+   Try a portrait phone clip and a 4:3 reel: can you frame each where it reads?
+3. **Film Drive** at about 0.5 with the film off and only the pour running: does the poured
+   footage stir the dish it pours into?
+4. Bad: Play or Pour that does not start, a zoomed-out frame with a stretched border, a drive
+   that does nothing with only the pour on.
+
+## 136. A network display over https (PLAN 14m-https)
+
+Start the show on the Mac (`npm run remote` or the Mac app) and open the network display address
+it prints, `https://<laptop-ip>:3443/?cast=true&key=…`, on a second computer, a tablet or a
+TV's browser on the same Wi-Fi. The browser should warn once that the connection is not
+private; choose Advanced, then Proceed (Safari: Show Details, then visit this website). The
+plate should then come up and follow the laptop, as a projector on HDMI does. Say which
+browsers took it, and whether the warning came back on a later visit (it should not on the same
+device, unless the laptop's Wi-Fi address changed).

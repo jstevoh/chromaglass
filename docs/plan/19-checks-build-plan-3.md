@@ -117,6 +117,21 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
     2.02, still red, so 7b is not a change to the check alone and stays open: the next step
     is what in the page's first second stretches four frames over 0.85 s after a fast device.
     Merged with 7a's fix in the same PR; judge on `npm run flakes` a week on as above.
+  - **19aa-7d. Shipped 2026-11-15: the control's compile, when one frame got through.** Main's
+    deploys 832 and 839 (both on the owner's second Mac runner) went red on 1b's first two
+    lines with the control pricing no compile: "0.00 s compiling ... (0 stops), 8.55 s the
+    page's own". The control built its 59 on its first step (0.81 s), its page was held from
+    then on (its timer on time for about 0.16 s of the next 1.72 s), one frame got through at
+    2.53 s, and the frames then stopped 6.61 s with the page silent: the stop began 1.72 s
+    after the builds, outside the second, and the first-use rule rightly will not vouch for a
+    stop the page stood still through. A build now also sits in the first stop after it when
+    that stop began under two seconds after it, the page never ran (ticks and frames no more
+    than a quarter second apart) for half a second at a time between, and its timer was on
+    time for half of the second before the build; read from the build: `scripts/compilestop.mjs`
+    (`buildsIn`, beside startup.mjs at its ceiling), `npm run compilestop` on thirteen made-up
+    openings. Not asked: whether one long task covered the stretch (the log does not print
+    the control's long tasks after its first step). 839's control reads 8.33 s of compile and 0.23 s its own. Not #861 (?prepare=0
+    returns before the prepare). Judge on the next deploys' `open` shard on both owner runners.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
@@ -575,10 +590,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
   measure over a fixed number of plate steps, not wall time, so its bar means the same on
   every runner.
+  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
 - **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
-  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
-  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
+  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
+  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
+  circle's edge; find whether the red runs read a lit edge
   (the sample too close) or a frame not yet drawn (the read too early), and measure the
   feature, not the moment.
 - **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
@@ -611,12 +628,24 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
   prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
   (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
-- **19ak-8. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
+- **19ak-8. Open: the three quarantines renewed 2026-11-15, to 2026-12-06.** The first
+  three quarantines (19aa-7, 19aj-1, 19aj-2) ended on 2026-11-15 with none of the three
+  fixes shipped. That morning about half the open PRs (a count of PRs, not of runs) went
+  red on startup's "moving for good no later than the old way", the show's own wait 2.8
+  to 4.3 s against the control's 1.0 to 1.5 s plus its second, on PRs that do not touch
+  the opening; the Blow stroke's and the wall's lines block again too. Each is renewed
+  for the 21 days the rule allows; no bar moved, and main's deploys still hold all three to their bars. Two things
+  to read before 2026-12-06: whether the startup line got worse after #861 (19ah-9b's
+  two behind lanes, `LATER_LANES` 2, sharing the GPU with the show's opening; deploy 849
+  at 37bae99, which carries #861, passed it), and whether 19aa-7d (#878, the control's
+  compile stop priced) moves the control's side of the line. A second renewal is not
+  the answer: fix the item or take the line out of the bar with its own reasons.
+- **19ak-9. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
   keeps the heat" reads ×0.9997, 0.9748 and 0.9657 where its bar wants the heat held. Not yet
   run down: either Heat Spread at 2 now loses heat it kept (a real regression in the heat
   field's diffusion) or the check reads a quantity that a later change made swing. Find which
   before touching the bar.
-- **19ak-9. Open, found 2026-11-08: `oscout`'s `plate >= 10` is a fixed floor under a count
+- **19ak-10. Open, found 2026-11-08: `oscout`'s `plate >= 10` is a fixed floor under a count
   that swings with load.** A main deploy went red on 9 kicks in 15 s; on the Mac the same count
   ran 10 to 24 before 14d-2. *Fix:* assert what the feature promises (each kick the ear hears
   goes out as a message), by counting the ear's kicks over the same window and holding the OSC

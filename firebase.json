@@ -11,6 +11,11 @@
         "source": "/films/:file",
         "destination": "https://github.com/jstevoh/chromaglass/releases/download/tv-films-1/:file",
         "type": 302
+      },
+      {
+        "source": "/loops/:file",
+        "destination": "https://github.com/jstevoh/chromaglass/releases/download/tv-loops-1/:file",
+        "type": 302
       }
     ],
     "rewrites": [
