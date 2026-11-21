@@ -99,10 +99,6 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
 
 **Shipped** (#199): the clock hears the kick's onset, by its time (`npm run kicks`); counting heard kicks in the app on the Mac is 10.4's. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-## 14d-2. No kick drum, no beat: the 1920s records (shipped)
-
-**Shipped**: the ear's `beat` is the kick where a kick keeps time and the band's whole-range attack (SuperFlux, 60 Hz–4 kHz) where none does, entrained to the band's period; Kick hit and the beat clock follow it (`npm run pulse`). The six 1920s song films went from 3–22 beats a minute to 37–109. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
-
 ## 14d-3. The smoothed levels sit at 1 on a loud record
 
 **Measured 2026-11-07** on the six 1920s films (scratch beat statistics, frame by frame as
@@ -374,10 +370,6 @@ the room's lights, a load-in card and the show kit `docs/rig-plan.md` (R4, R5, R
 the checks and the build §19.
 
 ## ~~14m. Anyone on the venue's network can drive the show~~
-
-**Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped.md`.
-Left open from it:
-
 - **14m-guest** (*proposed*, M; moved up by §36f, with a plate per performer): a **guest key**, now that the server has roles: a key
   whose socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto
   a chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
@@ -389,9 +381,6 @@ Left open from it:
   unchanged, which no cloud session can confirm (`npm run showkey` asks it with the
   headers cloudflared is documented to send). *Measure:* on the Mac, a phone through the
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
-- ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- ~~**14m-https**~~ (M): a network display at a Wi-Fi address starts, over https on `PORT + 443` with a self-signed certificate. **Shipped** (`npm run netdisplay` 3 → 11 of 11). Story in `docs/plan-shipped.md`. Left: **14m-https-wall** (S, the Mac): a TV's or a second Mac's browser takes the warning once and draws the plate (judging §136).
 - **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
   address, the server refuses new joins from everyone but the laptop for 60 s. That is
   what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years
@@ -399,23 +388,13 @@ Left open from it:
   phones out (phones already in, the laptop and its display are untouched). If a venue
   ever meets that, the fix is a longer key for the tunnel, not a looser budget.
 
-## ~~14n. One malformed message can end the plate~~
-
-**Shipped, #322.** Story in `docs/plan-shipped.md`.
-
 ## ~~14o. The song-ID Worker is open to anyone~~
-
-**Shipped, this PR** (`npm run fingerprint-worker`: 7 of 19 on the old Worker, 19 of 19 now).
-Story in `docs/plan-shipped.md`. Left open from it:
-
 - **14o-count** (S): the counters are in Workers KV, which takes one write a second per
   key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
   free plan meters about 500 lookups a day, and a second lookup from one address in the
   same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
   (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
   plan's quota. *Measure:* the same harness with a store that allows one write a second.
-- ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24. Story in `docs/plan-shipped.md` §14o-smoke (moved 2026-10-29, 19m-2). Left: whether a well-known commercial track comes back named, which needs a recording no cloud session should send.
-
 ## 14p. Show night runs whatever merged last
 
 **Read in the code.** `npm run show` is `npm run update && npm run remote`, and `update`

@@ -1,0 +1,95 @@
+# Archive: 18. The physics under the look: where the plate imitates a result instead of simulating it (continued)
+
+The closed items of [`docs/plan/18-physics-2.md`](../18-physics-2.md), moved here whole by `node scripts/planarchive.mjs`
+and kept for reference. Ids are unchanged: `grep -rn '<id>' docs/plan/` finds an item here or
+in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`, under the same numbers.
+- **18b-6. Light through a film, not the whole gap (for 20b).** *Shipped with 20b
+  (#259) for the dye: the front plate's dye path is the gap less the clear film
+  (`gapScale *= 1 − film` in the plate, from the packed view).* The path is the dye's
+  amount times the gap (Layer Depth). Once a film of clear liquid sits in the gap
+  (20b), the water's path is the gap less the film, which is where the reference's
+  faint pink and lavender in the white come from. A drop's or bubble's "through"
+  colour (the lamp through the clear gap, `through` in the bubbles) is still the old
+  tint-towards-white estimate, read off the ring round it (which is on the lamp
+  ground now).
+- **18b-10. Two projectors.** *Shipped (behind Two Projectors, on in Fillmore; `npm run lamp`).*
+  The Two Projectors setting models two projectors aimed at the same screen, each
+  filtered by its own plate. Shortcut: each projector's exposure is simply halved
+  (exposure normalisation) so clear glass stays at one lamp's level. Outside the back
+  plate's disc, the second projector still lights the screen there.
+
+## 18c. A pour adds liquid, not only colour
+
+**18c-1 shipped** (a bottle's pour is volume on a thin gap; `npm run flush`, judging §43; story in
+`docs/plan-shipped.md` §18c). **18c-2 shipped and 18c-3 the splash crown's part shipped** (a colour
+drop is a pour of its volume and opens a window of its own colour; the splash's ring kick gone,
+satellites only past Cossali's K; `npm run dropwindow`; story in `docs/plan-shipped.md` §18c).
+Left, each its own PR:
+
+- ~~**18c-2**~~ The colour's own drops as volume. Shipped (see above).
+
+## 18d. Each liquid has its real properties (replaces the property scalars)
+
+**18d-1 shipped** (each poured liquid's own viscosity on a thin gap; `npm run thick`, judging §42; story in
+`docs/plan-shipped.md` §18d). The rest of 18d is these items, each its own PR:
+
+- ~~**18d-2**~~ Flushing, not fading: shipped with 18c-1 (`npm run flush`). Nothing fades
+  the species; it leaves over the open rim when pours push it there, and the
+  automation's headroom for a thick bottle reads the GPU's share (`speciesShare`, once a
+  second). The colour still fades (18g), and the CPU's body still fades on the old plate.
+- ~~**18d-9**~~ #355 The index into 18e's refraction: the derive pass's optical path reads the species' Σ share·n (`pouredDn`), measured against the shelf's own indices by `npm run derive`. The display's deflection does not read it yet: 18e-2.
+- ~~**18d-11c**~~ shipped: `npm run thick` compares the two carries over one step from the
+  same plate, not thirty steps that grow a last bit (story in `docs/plan-shipped.md`).
+
+## 18e. Edges come from refraction (replaces the painted rims and highlights)
+
+- ~~**18e-5**~~ #857 No line where two dyes meet: Boundary Contrast's two-dye line (a dark band since 38h-2, the owner's "super thick black lines around things" on Comet River) is off the wall and the photographed look. The closeup's relief still reads the colour step: 18e-7. `npm run holeline`.
+
+## 18g. Colour leaves by flushing, not by fading
+
+**18g-1 shipped** (the open circular rim, $r \ge 0.5$, into the overflow trough; `npm run flush`, story in `docs/plan-shipped.md` §18g; #362). The rest of 18g is these items, each its own PR:
+
+- ~~**18g-1**~~ Flushing, not fading: the open rim (#362). Shipped; story in
+  `docs/plan-shipped.md` §18g-1 (moved 2026-10-29, 19m).
+- ~~**18g-6**~~ An oil body touching the open rim no longer drains through it by its own surface tension: the rim is held at the oil's Laplace pressure, not the water's zero (CAPILLARY, rimLaplace; `npm run rimhold`, a lens at the rim 9.6% → 97.1% kept over six seconds). Story in `docs/plan-shipped.md` §18g.
+- ~~**18g-7**~~ A lens against the rim on the diagonal lost about 0.13% of its oil a second whatever its tension: the mix's Cahn–Hilliard relaxation (mixRelax, mixMu, mixUpdate) and its overfull share read their neighbours past the open rim with no rim condition. They now take zero flux across it (`RIM_SIDE`, `wgsl/fluid/oil.ts`): the tilted lens's oil past the rim 1.71 → 0.03 at 27 s, `npm run oillift`'s rim lens 94.0% → 98.1% before mixRelax's share was added (#641, with 38r part 2). Story in `docs/plan-shipped.md` §38r.
+- ~~**18g-9**~~ The lip: across the open rim the oil goes only with an overflow (`lipHolds` in
+  `wgsl/fluid/carry.ts`, #650). At 2 mm a lens against the rim leaked its Cahn–Hilliard foot out
+  with the water (level, diagonal) and drifted through the rim into the held strip (tilted): rimhold's
+  diagonal 0.6% → 0.17% a reading in the probe, oillift's rim lens 98.1% → 100.0%. Story in §38r.
+- ~~**18g-12**~~ An overflow takes the body, not the foot (`lipHolds`, #655): the lip let oil over
+  wherever p′ > 0, and a level lens at the grid's edge turns water out over the rim beside it, which
+  took the profile's foot (rimhold edge 98.5%, 0.9% in its last 3 s on the Mac). Only a cell of the
+  body (c ≥ ½) crosses now: edge 100.0%, diagonal 0.01% a reading. Story in §38r.
+
+- **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
+  applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's
+  `standing` pump, and soap's dye multiply.
+- **The shortcuts:** dye over the budget is removed everywhere, in proportion to the
+  square of the overage. "Evaporation" removes dye, not water. A bubble destroys the
+  dye under it by a multiply, a CPU rim deposit puts some back, and a bubble sitting
+  still keeps pumping liquid out of itself every step.
+- **The real phenomenon:**
+  - Nothing removes dye from a sealed plate. Old colour leaves a real plate by being
+    flushed out of the open rim as new liquid goes in (18c).
+  - Evaporation removes solvent: the concentration rises and the dye is left in a
+    coffee ring.
+  - A bubble is a volume with no liquid, so the dye is excluded by volume fraction.
+- **What it takes:** 18a's open rim as the outflow, pours as volume (18c), the dye
+  carried as concentration × liquid fraction with air as a phase, and evaporation
+  acting on a carrier-thickness field (bubbles-plan F's wet carrier). A safety cap
+  stays, named as one.
+- **Cost:** about 0.3 ms (one r16f texture and a flux pass).
+- **Gain:** a show ages the way a real plate does. It turns over, and it can dry.
+
+## 18i. Bubbles and beads live by physics, not timers (shipped)
+
+**Partly shipped** (#358): Bretherton lubrication, agitation-driven wander, Saffman–Taylor fingers on the Straw, Reynolds film-drainage merge and the beads' pancake lag (`npm run bubblephysics`). Story in `docs/plan-shipped.md` §18i (moved 2026-10-29, 19m-2). Its two open items closed with 38b (#603): there is no timed mode left to expose, a pocket
+between glasses has no clock, and a pocket reaching the open round rim empties through it.
+
+## 18j. Milky liquids scatter (shipped)
+
+Shipped in #353 (2026-10-10): optical scattering packed into `vel.w` from species channel 2
+with conserved flux-form advection; Kubelka–Munk diffuse backscattering on black ground
+yielding opaque white milk and pastel food dyes (PLAN §4); two-flux forward extinction with
+Rayleigh-Gans wavelength … Story in `docs/plan-shipped.md` §18j (moved 2026-10-29, 19m).
