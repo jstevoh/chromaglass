@@ -362,6 +362,7 @@
     "presskit": "node --experimental-strip-types scripts/presskit.mjs",
     "tvfilms": "node --experimental-strip-types scripts/tvfilms.mjs",
     "loopseam": "node --experimental-strip-types scripts/loopseam.mjs",
+    "tvloops": "node --experimental-strip-types scripts/tvloops.mjs",
     "tvvideo": "node scripts/tvvideo.mjs"
   },
   "dependencies": {
