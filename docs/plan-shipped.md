@@ -3735,6 +3735,41 @@ the day they pass.
     the phone's pad down, 0.9 at 180°.
   - What it cannot see here: the liquid. The scheme is `npm run slosh`'s, the kernels
     `sloshgpu`'s, the look at sixty frames the Mac's (judging §58, §64, and the owner's film).
+- **18a-13m, tilt the plate from two knobs (shipped 2026-11-15).**
+  - What was asked: the owner, 2026-11-15, "I want to be able to control the tilt of the
+    plate from my midi controller. Maybe two knobs?" Gravity and Tilt Direction were
+    pinnable but not MIDI-learnable, and as a pair they are a compass, not two hands:
+    Direction does nothing at Gravity 0 and wraps at the end of its knob.
+  - What changed: two settings, Tilt Left/Right and Tilt Up/Down (`plateTiltX`,
+    `plateTiltY`, −1..1, default 0), learnable, in Tilt & Rock under Slosh, on the desks,
+    the remote and the phone's Motion sheet. `lib/handTilt.ts` turns them into the tilt
+    the frame loop hands the solver, added to the remote phone's.
+  - Why that tilt and not Gravity: Gravity stands the plate up, and past a thousandth the
+    solver makes it a sealed bottle with a lamp under its floor (27f-9). A knob is a hand
+    nudging the flat dish on the projector, which is the rock's path the phone already
+    took: on a thin gap the colour's weight down the tipped plate (Darcy, hsBody,
+    ROCK_FALL), light oil lifted the other way (27f-5), the dish sloshing as far as Slosh
+    lets it, the cover glass sliding as far as Frame Sway does. Nothing new in the solver.
+  - Eased: a critically damped follow at 12 rad/s, stepped exactly so the solver's rate
+    does not change it (a CC arrives in 1/127 steps, and the slosh dish and cover took
+    each as a knock); the middle 4% of the travel is level, since CC 64 reads 0.008 and a
+    knob put back by hand lands a step or two off, which over a set drains the plate.
+  - Turned into each plate's dish by its own `plateAngle`, as `downhill()` turns Tilt
+    Direction (`tipPlate`, once per layer, since Rotation is per layer): that path reached
+    the dish unturned, the reason the Tip pad wrote Gravity instead (18a-13j). The phone's
+    own stays unturned until 18a-13k is checked. Phone and knobs together are limited by
+    length (√2, the phone's own corner), not axis by axis after the turn, which would have
+    cut a corner tip by up to 29% four times a turn on a spinning dish (found in review).
+  - A hand's alone: out of the patch bay, sound mapping and Evolve, like Slosh.
+  - Measured (`npm run handtilt`, 24 lines): CC 62–66 level, CC 0/127 the full tip; a
+    throw end to end moves 0.018 in its first sixtieth, 0.95 by 0.4 s, never past; the
+    same 0.874311 at 0.3 s at 30, 60 and 120 steps a second; turned as `downhill()` to
+    machine precision; both knobs at full 1.414 long and at 45.0° on the screen at five
+    dish angles; with the knobs at 0 every plate's tilt, rock and slosh tilt are the old
+    frame loop's from the phone alone, to 2e-16, over phone ages 0 to 3.2 s on a swinging,
+    turned dish.
+  - What it cannot see: the liquid's answer, which is the rock's (`npm run rides`,
+    `oillift`, `slosh`), and the look at sixty frames, the Mac's.
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the

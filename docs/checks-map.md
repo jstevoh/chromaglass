@@ -19,6 +19,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | Velvet Underground's settings or areas, Turbulence (`turbulenceScale`, `forcesB`'s curl noise) | `pools` (Mac: the app's GPU solver; three pools keep 85% over a minute, the old stir as control) |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser; `deskreach` (the Rides at 1280, the scrollers' marks, the deck's Macro panel, the iPad app's Laptop remote; owed until 35c-6a, 35c-6b and 12 step 4a) |
 | the Tip pad (`src/components/ui/TipPad.tsx`, `src/lib/tipPad.ts`, the Tools panel in `DeskPanels.tsx`, Tilt & Rock, the phone's Motion sheet) | `tippad`, `phone`, `layout` |
+| the Tilt knobs (`src/lib/handTilt.ts`, `plateTiltX`/`plateTiltY` in Tilt & Rock, the remote, the phone's Motion sheet) | `handtilt`, `panel`, `desk`, `phone` |
 | Preview's copy (`drafting`, `wallRef` in `src/app/useWallLook.ts`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`, `lib/audioFeatures.ts`, `lib/handSounds.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading), `kicks`, `clicks` (a click on the laptop is not a beat; `-- --app` in a browser) |

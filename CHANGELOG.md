@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — tilt the plate from two knobs (PLAN 18a-13m)
+
+- **Tilt Left/Right** and **Tilt Up/Down** (`plateTiltX`, `plateTiltY`, Settings → Tilt & Rock under
+  Slosh; MIDI, the desks, the remote and the phone's Motion sheet): a hand tipping the flat plate on
+  the projector, −1 to 1 with the middle level. Learn them on two knobs and the plate tips as you
+  turn: on a thin gap heavy colour slides down the tip and light oil rises the other way, the
+  dish sloshes as far as Slosh lets it, and the cover glass slides as far as Frame Sway does. The
+  knob is eased (a critically damped follow, nine tenths of the way in a third of a second), so a
+  quick twist does not knock the liquid, and the middle twenty-fifth of the travel is level so a
+  knob left near its centre does not drain the plate. Right stays the screen's right on a look
+  whose dish turns. Not Gravity: the plate stays flat and is not stood up as a bottle. The sound,
+  the patch bay and Evolve never move them. `npm run handtilt`.
 ### Changed — Your own video: played, poured, read and framed (PLAN 14ag)
 
 - **The demo videos are gone**: the three demo loops and the cartoon shelf no longer ship.

@@ -40,6 +40,8 @@ export const CONTROL_HELP: Record<string, string> = {
   turbulenceDetail: 'How many sizes of swirl are stirred in, from broad eddies only to fine curls on top.',
   plateRock: 'A hand tips the dish with the beat, and the heavier colour runs downhill each way.',
   frameSway: 'Lets the music move the whole frame, not just the liquid. Kept at zero unless you want the picture itself to move.',
+  plateTiltX: 'A hand tipping the flat plate: up dips the right edge, so heavy colour runs right and light oil rises. The middle is level.',
+  plateTiltY: 'A hand tipping the flat plate: up dips the top edge, so heavy colour runs up the screen. The middle is level.',
   slosh: 'How much the dish\'s own momentum carries when it is tilted: the colour piles on the low edge and a wave rings back.',
   bubbles: 'Trapped air bubbles on the plate. A few go a long way.',
   saturationBoost: 'Colour strength of the finished picture, from washed out to vivid.',
