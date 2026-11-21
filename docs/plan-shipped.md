@@ -14754,7 +14754,7 @@ both ways): 27 gate, 11 owed.
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
 
-## 14ag-3. The video as the lamp under the dish (shipped 2026-11-14)
+## 14ag-3. The video as the lamp under the dish (shipped 2026-11-21)
 
 Of the four ways put to the owner for a video and the liquid to meet (2026-11-13), the owner
 chose the video as the lamp under the dish (2026-11-14), as a show sets its dish on a light

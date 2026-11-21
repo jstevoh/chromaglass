@@ -104,14 +104,14 @@ Open, found building it:
 - **14ag-2** (S) *The video's own sound as a source.* "React to the video" could also mean its
   soundtrack: a Video entry in Sound's Source that plays the loaded file's audio into the ear.
   The film and the pour are muted today. Ask the owner before building.
-- **14ag-3** (M) *The video as the lamp under the dish.* Shipped 2026-11-14 (`docs/plan-shipped.md`
+- **14ag-3** (M) *The video as the lamp under the dish.* Shipped 2026-11-21 (`docs/plan-shipped.md`
   14ag-3): the film can go under the front plate, where it is a picture in the lamp house, seen
   through the liquid (Lamp on the video's row, desk and phone). Check: `npm run videolamp`.
 - **14ag-5** (S) *How far under the liquid the picture is.* `VIDEO_LAMP_DEPTH_M` (2 cm, in
   `wgsl/plateLamp.ts`) sets how strongly the liquid's lenses bend the video under it: a drop's
   power over the picture grows with the gap. A constant today; a Lamp Depth slider (0 to 10 cm,
   MIDI, desk and phone, a default that keeps 2 cm) if the owner wants the lenses stronger or calmer
-  after judging (`docs/judging.md` §133).
+  after judging (`docs/judging.md` §136).
 - **14ag-6** (M) *The other three ways a video and the liquid meet.* Of the four put to the owner
   (2026-11-13), the lamp is built (14ag-3). Left: the video poured as ink that the flow carries
   and thins (part of it is 14ag-1's framed pour), its brightness as heat (buoyant and Marangoni
