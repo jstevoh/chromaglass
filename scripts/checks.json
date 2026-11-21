@@ -776,6 +776,17 @@
       ]
     },
     {
+      "name": "Which frame stops the control's builds sat in",
+      "shard": "logic",
+      "run": "npm run compilestop",
+      "why": [
+        "Startup 1b's attribution of the old way's compile to its frame stops",
+        "(scripts/compilestop.mjs, PLAN.md 19aa-7d), on made-up openings: a stop",
+        "the page was held into from the builds is theirs (main's deploys 832 and",
+        "839), a stall after a page that ran freely, or with no timer read, is not."
+      ]
+    },
+    {
       "name": "The opening's wait for its frames",
       "shard": "logic",
       "run": "npm run stillwait",
