@@ -24,6 +24,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `camera.ts`, `cameraFields.ts`: camera pass.
 - `ferroDrop.ts`: closeup drop. `standing.ts`: domes.
 - `plateFilm.ts`: `FILM_FRAME_WGSL`, the film projector's frame on the plate (`filmFrame`, `filmOver`): Video Zoom, Across and Up, the frame's edge, its key and blend (PLAN 14ag).
+- `plateLamp.ts`: `LAMP_MIX_WGSL`, the lamp under the front plate (`mixLamp`, moved from `plate.ts`) with the video as one of its rows, and `lampBendAt`, the liquid's refraction of the picture under it (thin-prism, grad((n − 1)h) from the derive pass's path and the view's depth), and `VIDEO_LAMP_DEPTH_M` (PLAN 14ag-3; `npm run videolamp`).
 - `plateThinFilm.ts`: `THIN_FILM_WGSL`, Thin Film's rings over the plate, the film's amount read through a B-spline (PLAN 1i; `npm run filmrings`).
 - `plateBenDay.ts`: `BENDAY_OUTLINE_WGSL` (`benDayStrength`, `benDayEdge`), the Ben-Day print's pen line round each plate's shapes and seams, kept beside `plate.ts` (PLAN 21b; `npm run benday`).
 - `lampField.ts`: `LAMP_FIELD_WGSL`, `lampField`, `pupilPass`: the projector's light on the stage (the lamp lever, the aperture), with the CPU twin `npm run lampfield` reads.

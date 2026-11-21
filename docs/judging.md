@@ -2886,3 +2886,20 @@ Video file. Its row shows Play and Pour.
    footage stir the dish it pours into?
 4. Bad: Play or Pour that does not start, a zoomed-out frame with a stretched border, a drive
    that does nothing with only the pour on.
+
+## 136. The video as the lamp under the dish (PLAN 14ag-3)
+
+The check (`npm run videolamp`) proves the dye filters the video's light by the same share it
+takes of a white lamp, that bare water shows the video, and that a glycerine pool's rim moves a
+striped picture, on the lab's software WebGPU at one frame. Whether it reads as a lamp under a
+dish, and how strong the lenses should be, is only seen here.
+
+1. Load a video, Play it, press **Lamp** on its row. Good: the video is the light; where the dye
+   is thick it goes dark and tinted, where the water is clear it shows plainly, and the colours
+   mix like gels over a light table. Bad: the video laid on top of the dye, or the plate gone flat
+   white with the video faint.
+2. An oil look (Splodascope, Oil & Water): the picture under each drop should be bent and
+   magnified a little, and slide as the drops move. Say if the bending is too weak to notice or
+   too strong (14ag-5 gives it a slider if so).
+3. Film Mix from 1 down to 0: the look fades back to its own ground with no jump at 0.
+4. Press Lamp again: the video goes back over the plate, as Play showed it before.
