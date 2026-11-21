@@ -46,6 +46,12 @@ closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
   payments, sign-in or Worker paths; anything else keeps `ready-for-review` for a
   Claude session. Check: a stubbed-`gh` harness over the five PRs of 2026-11-09 (four
   merge, P7-cpu stays) in `scripts/checks.json`.
+- **19al-8. Shipped (docs):** the written rule matches the owner's of 2026-11-15: a
+  green Antigravity PR merges with no Claude Code review, before or after, except
+  sign-in, keys, payments, licences, the Workers and security (`docs/handoff.md`,
+  "Ready, review, merge"; `CLAUDE.md`; `AGENTS.md`). The sampled pass after merge is
+  gone; `sampled` on an older PR reads as `none`. `ready.yml` and 19al-7's auto-merge
+  are unchanged by this.
 
 ## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
 

@@ -8,7 +8,7 @@ import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
 import { pumpShowIntervals } from '../lib/showClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
 import { installLiveConsole, setLiveAudio } from '../lib/liveShow';
-import { canUseProFeature } from '../lib/tierGates';
+import { canUseHomeFeature } from '../lib/tierGates';
 import { createEarView, type EarView } from './useEarView';
 
 export interface AudioData {
@@ -172,8 +172,9 @@ export function useAudioAnalyzer(
     37x-4d): `window.__cgLive.start({ url, keyName })` streams the plate's
     canvas and this stream, the one the show hears, whichever source it is
     (lib/liveStream.ts; the panel and the console share lib/liveShow.ts). Installed from here because this hook is where the
-    show's sound and the plate meet; App.tsx is at its size ceiling. Pro
-    only, asked at each start; absent on the website, where there is no RTMPS
+    show's sound and the plate meet; App.tsx is at its size ceiling. A Home
+    or Pro licence, asked at each start (Pro only until the owner moved it to
+    Home on 2026-11-15, PLAN.md 23.21, beside Home's drop to $29); absent on the website, where there is no RTMPS
     client to hand the packets to (`installLiveConsole` does nothing there).
   */
   const streamRef = useRef<MediaStream | null>(stream);
@@ -182,7 +183,7 @@ export function useAudioAnalyzer(
     installLiveConsole({
       canvas: () => document.getElementById('liquid-canvas') as HTMLCanvasElement | null,
       audio: () => streamRef.current,
-      allowed: () => canUseProFeature(),
+      allowed: () => canUseHomeFeature(),
     });
   }, []);
   // A source chosen on air reaches the stream at once, not at the next Go (37x-4f-2). Does nothing with no stream running.
