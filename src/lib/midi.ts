@@ -602,6 +602,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // ride between a verse and a chorus.
   { key: 'filmDrive',       label: 'Film Drive',       min: 0, max: 1 },
   { key: 'filmImpact',      label: 'Film Impact',      min: 0, max: 1 },
+  // The video framed by hand mid-show (PLAN 14ag): a knob to push in on a
+  // face, two to slide a 4:3 reel or a portrait phone clip where it reads.
+  { key: 'filmZoom',        label: 'Video Zoom',       min: 0.25, max: 4 },
+  { key: 'filmX',           label: 'Video Across',     min: -1, max: 1 },
+  { key: 'filmY',           label: 'Video Up',         min: -1, max: 1 },
   { key: 'soundImpact',     label: 'Sound Impact',     min: 0, max: 1 },
   // The fourth master, over the LFOs and envelopes. It had a setting and a
   // reader and no control anywhere, so a shape patch could not be pulled down
