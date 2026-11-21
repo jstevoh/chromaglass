@@ -966,6 +966,8 @@ export interface VisualizerSettings {
   tankNozzle: number;         // where the nozzle sits across the tank, 0..1 (a held finger carries it too) (47n)
   tankDrain: number;          // the share of the fed water drained through the floor, 0..1; the rest raises the level and the dye pools (47n)
   tankHue: number;            // the dye's glow, degrees of hue (47n)
+  faradayHz: number;          // Shaker: the dish on a speaker, its drive's frequency in Hz; 0 is no shaker (PLAN 48f)
+  faraday: number;            // Shake: the dish's peak acceleration, g; past the liquid's threshold it stands up in Faraday waves (48f)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -1250,6 +1252,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   tankNozzle: 0.5,
   tankDrain: 1,
   tankHue: 205,
+  faradayHz: 0,             // no shaker under the dish: every look until a performer turns it on
+  faraday: 0,
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,

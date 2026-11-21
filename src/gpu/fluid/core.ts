@@ -11,6 +11,7 @@ import type { SloshDrive } from '../../lib/slosh';
 import { WebGPUSlosh } from '../slosh';
 import type { SoapFilmPlate } from '../soapFilmPlate';
 import type { TankPlate } from '../tankPlate';
+import type { FaradayPlate } from '../faraday';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
@@ -107,6 +108,8 @@ export class FluidCore {
   protected soapPlate: SoapFilmPlate | null = null;
   /** The tank's side view (PLAN 47n), made while Tank is up. */
   protected tankPlate: TankPlate | null = null;
+  /** The shaken dish's standing waves (PLAN 48f), made while Shaker is up. */
+  protected faradayPlate: FaradayPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;
@@ -712,6 +715,8 @@ export class FluidCore {
     this.resetFilm();
     // And the tank's water clear again (PLAN 47n): the performer's wipe is the tank emptied and refilled.
     this.tankPlate?.reset();
+    // And the shaken dish's water still again (PLAN 48f).
+    this.faradayPlate?.reset();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
     // The sim buffer only needs its grid sizes for a fill, and the cover's gap

@@ -819,6 +819,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
+          {/* The dish on a speaker (PLAN 48f): Shaker's frequency, and while it is on, how hard it shakes. */}
+          <Slider label="Shaker" field="faradayHz" step={1} format={(v) => (v > 0 ? `${Math.round(v)} Hz` : 'Off')} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.faradayHz ?? 0) > 0 && (
+            <Slider label="Shake" field="faraday" step={0.01} format={(v) => `${v.toFixed(2)} g`} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+          )}
           {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
           <Slider label="Tank" field="tank" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.tank ?? 0) > 0.001 && (

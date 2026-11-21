@@ -14890,3 +14890,37 @@ creating a palette from it." It was 43d, "the cover sets the colours".
   within ΔE 0.5, the file saying its length was Infinity). `npm run phone`: the Dye
   sheet's button makes "From picture" the palette in the picture's four colours.
 
+
+### 48f. Faraday waves: the music's shake stands up as a pattern (shipped 2026-11-21)
+
+*The owner, 2026-11-21: "lest do anything that can be impacted by the music itself. Like
+the standing-wave patterns for example." §48's idea 48f; its open items are in §30.*
+
+- **What shipped.** Shaker (`faradayHz`, the speaker's frequency, 0 off) and Shake
+  (`faraday`, its peak acceleration in g) in Settings → Tilt & Rock, MIDI, the desks, the
+  remote and the phone's Sound sheet, with Music Shake on the phone (lib/shakeCord.ts),
+  the depth of a cord from the bass onto Shake; on the desk it is that cord in Patches.
+  The sound reaches the dish only through that cord.
+- **The physics** (src/lib/faraday.ts, src/gpu/faraday.ts, wgsl/faraday.ts). A 3 mm water
+  layer: the dispersion relation ω² = (gk + σk³/ρ) tanh kh; damping 2νk² plus the floor's
+  boundary layer; the Mathieu equation's first tongue. The step carries the standing
+  wave's amplitude u (the surface is u cos Ωt/2) on 256² over the plate, its linear
+  growth applied exactly mode by mode in Fourier space (ETD1, a radix-2 FFT in workgroup
+  memory), and a cubic that saturates it: the curvature's own for ripples and u³ for
+  gravity waves, by the capillary share, scaled to a real wave's steepness (the scale is
+  the shortcut, 48f-2). White noise of 0.1 µm/√s is the dish's own disturbance. Two
+  guards found by the dial's top: the spectrum is held to a real field's (k and −k
+  stepped together; the anti-Hermitian part the cubic never sees grew at 8/s under a
+  150 Hz lattice and blew it up), and the cubic's stiffest rate, gathered each substep,
+  goes into the exact step (its curvature part is a diffusion an explicit step cannot
+  hold at the grid's finest waves: a 10 Hz pattern at 2 g blew up at a slope of 0.3).
+- **The light** (wgsl/plateFaraday.ts, display binding 25). The projector is focused on
+  the dye 3 mm under the surface, so the wall shows the Jacobian of the refraction's map
+  back, det(I + D′H), D′ = D(1 − 1/n): light moved, never made, with the aperture's loss
+  on steep slopes. Drawn as a camera locked to the wave at its crest, so it never strobes.
+- **Measured** (`npm run faraday`, SwiftShader): at 0.7 of the threshold 0.022 µm r.m.s.
+  after 5 s and no light; at 3× the threshold growth 1.66/s against the Mathieu rate's
+  1.85/s; the wavelength 19.94, 9.72 and 5.87 mm against the dispersion relation's 19.93,
+  9.73 and 5.87 mm at 20, 50 and 100 Hz; saturated at k u 0.19 to 0.22; the ring-down
+  1.01/s against the damping's 1.07/s; at the dial's top (2 g) k u 0.83 at 10 Hz and
+  0.25 at 150 Hz, held for 4 s, and the same at 10 Hz stepped in tenths of a second.

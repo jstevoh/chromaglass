@@ -207,6 +207,12 @@ const NOT_THE_LOOK = new Set([
     dials it reached for before (they were not in it, being new).
   */
   'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
+  /*
+    The dish on a speaker (PLAN 48f): whether there is a shaker and how
+    hard it shakes are the performer's and the music's (through its cord),
+    never a wander of Evolve's.
+  */
+  'faradayHz', 'faraday',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

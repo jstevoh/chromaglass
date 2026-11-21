@@ -2926,11 +2926,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  // Thin Film (1i), and the frame's soap film (32d): plateThinFilm.ts.
+  // Thin Film (1i), the soap film (32d), a shaken dish (48f): plateThinFilm.ts.
   if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
     outColor = thinFilmOver(outColor, film0, bare0, layer0, fuv0, blurFluid, useBlur, dof);
   }
-  if (U.soapFilm > 0.001) { outColor = soapFilmOver(outColor, fuv0); }
+  outColor = coversOver(outColor, fuv0);
 
   // ── The mixer: the front plate's grade and level ─────────────────
   // Its level fades the plate back to the bare lamp under it.
