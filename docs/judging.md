@@ -2936,3 +2936,19 @@ here.
 4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
    pinks and greens. The default 0.3 should feel like the photograph.
 5. Polarisers at 0 on any look: the look exactly as before.
+
+## 139. Three physics fixes: Rain Drip needs a tilt, the clear drop's lens, colours push apart (PLAN 38u-7, 38u-12, 38u-14)
+
+Looks change here on purpose. Judge from the film (before and after, same looks).
+
+1. Acid Trip, Neon Coral Reef (Rain Drip 0.4 to 0.6, now on a plate tipped
+   about 15 degrees): the streaks run down at a quarter of the old pull. Good: still streaks,
+   slower, with the heavy colour sinking in fingers. Bad: nothing runs, or the tilt's buoyancy
+   changes the look past what you want (then raise Rain Drip, or set Gravity lower).
+2. Classic on a level plate: no downhill streaks at all now (its Rain Drip 0.15 had a trace).
+   Velvet Underground on a plate tipped about 3 degrees (its 0.6 streaked its pools, which should
+   stay pools): the three pools stay apart and drift slowly, no streaks running out of them.
+3. Pour a clear drop (no dye) on bare water, projected: its dark ring is as strong as a dyed
+   drop's, thin and clear, not a faint ghost. A bubble in clear liquid has the same ring.
+4. Two colours side by side with Polarity up: the line between them stays an even edge, no
+   patches where they smear into each other.
