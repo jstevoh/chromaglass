@@ -14753,3 +14753,39 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+## 38u-10. The dye bends light at its real strength, and a dial says when it is more (2026-11-14)
+
+The third pass (38u) found the dye's index a stand-in: the derive pass added d·0.015·max(1,
+3·Boundary Contrast) to water's 1.333, so a pool of dye stepped the optical path by 0.015 to
+0.06, and its Becke lines out of focus were drawn at a strength the dial chose. The owner,
+2026-11-14: "real strength (measured dn/dc), plus a dial named as a boost", in every look.
+
+- `wgsl/dyeIndex.ts`: tartrazine, a yellow food dye, has a molar absorptivity of 25.0
+  L/(mmol·cm) at its peak and a dn/dc of 0.41 mL/g (arXiv 2503.05105). A dissolved absorber
+  raises the index in proportion to how much it absorbs (Kramers–Kronig), so the dye's index
+  rise is its summed absorbance across the three channels times 1.78e-5 per stored unit. A
+  dye that takes 96% of one channel's light across the gap raises the index by 2e-5; the old
+  stand-in was 300 to 600 times that.
+- **Dye Index Boost** (×1 real to ×1000; Settings → Look, MIDI, the desks, the phone's Looks
+  sheet) multiplies it, named as a boost past real. Default ×1 in every look. Boundary
+  Contrast no longer touches the dye's index (18e-6 updated).
+- **Dye Index Boost** is also on the phone remote (`?remote`), and Evolve's drift leaves it
+  alone (`lib/drift.ts`): a look that ships real stays real.
+- **38u-18 with it.** The derive pass stored the whole path (about 1.333) in a half float, whose
+  step there is 1e-3, ten times a real dye's rise: the review found the wall's shadowgraph out
+  of focus seeing the dye at ×1 as a stair of one whole step (0.44% of the light at Focus 1,
+  where the real index makes 0.04%). `.w` now holds the path less clear water's 1.333, where a
+  half float steps by under 1e-7; the shadowgraph's Laplacian ignores the offset and the
+  closeup's only other read of `.w` is on camera views, which write 0.
+- `npm run derive`: the path's rise over the dye reads 1.011e-4 against 1.009e-4 predicted
+  from the paper's numbers (0.2%) at ×1000, and 1.012e-4 (0.3%) read straight off `.w` at ×1
+  (38u-18's line; one rounding step, 9.77e-4, before); linear in the dial (0.1% off from ×1 to
+  ×1000); clear water 1.3330; and the plate's own shadowgraph stencil on the stored path at
+  Focus 1 and Boundary Contrast 1 changes the light by 0.087% at ×1 (under one byte's step) and
+  140% at ×1000. The Becke doublet line is asked at ×500.
+
+What changes on the wall: at ×1 a dye-only look shows no Becke lines out of focus, as a real
+dye in water would not; they come back with the dial. Left open: one dn/dc for every dye and no
+dispersion (38u-17).
+

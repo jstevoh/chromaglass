@@ -70,6 +70,10 @@ const LIGHT_STACK = new Set([
   // The projector lens's focal plane (PLAN 18e): 0.5 is sharp focus on the
   // plate, so drifting it around 0.5 would defocus looks that ship sharp.
   'projectorFocus',
+  // The dye's index (PLAN 38u-10): ×1 is the dye's measured strength, and
+  // anything past it a boost the performer chooses; Evolve wandering it would
+  // put bright and dark lines at every edge of a look that ships real.
+  'dyeIndexBoost',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',

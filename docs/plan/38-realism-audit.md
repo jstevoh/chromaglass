@@ -27,6 +27,16 @@ at the foot of this file):
   cord once as it is read (`sanitizeSettings`), with a mark in the saved look that says it
   has been asked, so a cord the owner pulls stays pulled. Check: `musicstir` gains a saved
   look from before, read back with its cord, and one with the mark and no cord, left alone.
+- **38u-17. Every dye bends light as tartrazine does, at one wavelength** (S; Low, found doing
+  38u-10). `DYE_DN_PER_ABSORBANCE` is tartrazine's dn/dc (0.41 mL/g, arXiv 2503.05105) over its
+  peak absorptivity, applied to every dye's summed absorbance; and the index is one number, not
+  one per channel. A dye's dn/dc follows its own absorption band (Kramers–Kronig): red light
+  is bent more beside a blue-absorbing dye's band than blue light is, a coloured fringe on a
+  defocused edge. Measured dn/dc for the palette's dyes (food dyes, ink) and an index per
+  channel carried through the derive pass (it writes one path today). Check: `derive` asks two
+  dyes of equal absorbance to step the path by their own ratio. none.
+- ~~**38u-18. The derived path is stored in half floats, so a real dye's step rounds away**~~ shipped
+  2026-11-14 with 38u-10: `.w` holds the path less clear water's. `npm run derive`'s 38u-18 line.
 
 How it is ranked: what a person would see change on the wall, against what it costs to
 build and what it adds to the frame. S is under a day, M a few days, L a week or more.
@@ -779,10 +789,12 @@ On in every look, or nearly:
   real thing is a concentration the solver carries below the grid (the particles, the fine
   dye of 47a). Until then the choice is the owner's: default 0, or keep it named as a
   shortcut. 38h-9 holds only its scale at zoom. none.
-- **38u-10. The dye's refractive index is three times a stand-in** (S; Medium, changes the
-  Becke lines on every dye-only look). calcOpl adds d·0.015·max(1, 3·Boundary Contrast). A
-  few percent of dye raises water's index by about 1e-3 (dn/dc near 0.15 mL/g). A measured
-  dn/dc for each dye, and any boost a dial that says so. none (beside 18e-2).
+- ~~**38u-10. The dye's refractive index is three times a stand-in**~~ — **Shipped, this PR**
+  (the owner's call, 2026-11-14: "real strength (measured dn/dc), plus a dial named as a
+  boost", in every look). The dye raises the path by tartrazine's measured dn/dc over its
+  summed absorbance (`wgsl/dyeIndex.ts`, 2e-5 for a dye that takes 96% of a channel), and
+  **Dye Index Boost** (×1 real to ×1000) is the dial that says it is past real; Boundary
+  Contrast no longer scales it. `npm run derive`'s 38u-10 line. Left: **38u-17**.
 - **38u-11. Glass Smear slides the cover glass along a noise path, always** (S; Medium).
   `fluidSimulation.ts:3129-3133`, noise2D(0.3 t), Glass Smear 0.3 by default and in 17 looks;
   uniform, so the liquid leaves by the rim on one side and comes back on the other (18a-2).

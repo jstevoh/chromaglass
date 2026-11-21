@@ -40,8 +40,9 @@
  *
  *   0. the dial is live in these pictures: out of focus (Focus 0.8), where
  *      it scales the optical path's contrast, it moves the pool's rim by
- *      more than LIVE levels on average. So "moves nothing" below is the
- *      shader's answer and not a setting the lab dropped
+ *      more than LIVE levels on average, at Dye Index Boost 500 (the dye's
+ *      real index is too faint to see the dial by). So "moves nothing" below
+ *      is the shader's answer and not a setting the lab dropped
  *   1. round holes of 1.8 to 14 cells in one flat dye: no pixel in a ring
  *      from half the hole's radius to HALO_OUT cells past its rim is moved
  *      by more than MAX_MOVE levels in any channel
@@ -211,7 +212,13 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   const rimRing = (x, y) => Math.abs(Math.hypot(x - C, y - C) - R) < HALO_OUT / N && Math.abs(y - 0.5) > 0.1;
   const rim = dialled(plateA, rimRing, 0);
   // Line 0: out of focus the dial scales the optical path's contrast, and the pool's rim shows it.
-  const live = share(await shot(1, { projectorFocus: 0.8 }), await shot(0, { projectorFocus: 0.8 }), rimRing, 0).mean;
+  // Dye Index Boost 500 in both shots: since 38u-10 the dye bends light at
+  // its real index, a hundredth of a level out of focus, and the dial no
+  // longer scales that index, only the defocus shadow's gain. ×500 is where
+  // the old stand-in index sat, so the control asks what it always asked:
+  // does the dial reach the shader on this plate.
+  const LIT = { projectorFocus: 0.8, dyeIndexBoost: 500 };
+  const live = share(await shot(1, LIT), await shot(0, LIT), rimRing, 0).mean;
 
   // Plate B: two dyes meeting down the middle.
   const band = (x, y) => Math.abs(x - 0.5) < 4 / N && y > 0.25 && y < 0.75;

@@ -570,6 +570,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
+  // A cube on the travel: 1 to 1000 is three decades, and real (1) to the
+  // old stand-in's 300 to 600 has to be reachable in the bottom two thirds.
+  { key: 'dyeIndexBoost',   label: 'Dye Index Boost',  min: 1, max: 1000, curve: 3 },
   { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 3, wanderSpan: 1 },
