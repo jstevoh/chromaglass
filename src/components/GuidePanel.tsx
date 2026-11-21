@@ -495,7 +495,7 @@ const SECTIONS: Section[] = [
         <H>The keyboard</H>
         <Rows items={[
           ['B', <>Blackout — fades the plate down and back. The panic button, and the one to leave your hand near.</>],
-          ['+ / −', <>Macro zoom, 1× to 16×. <C>+</C> with the closeup off turns it on gently at 2×; <C>−</C> never turns it off.</>],
+          ['+ / −', <>Macro zoom, 1× to 16×, the closeup's one control. <C>+</C> from the plate comes in gently; <C>−</C> down to 1× is the whole plate again.</>],
           ['[ / ]', <>Less or more of the tool in hand: the dye a drop lays, the pressure of a press, the wind, the drag, the magnet's pull. Each tool keeps its own <Em>Amount</Em>; 1× is the usual.</>],
           ['Alt-drag', <>In the closeup, pans the camera; <C>Alt</C>-click fixes it on the spot under the pointer. <Em>Hold</Em>, <Em>Follow</Em> and <Em>Auto</Em> on the zoom chip say who moves it.</>],
           ['?', <>This manual.</>],

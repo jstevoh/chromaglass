@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed — the Close-up button; the Macro Zoom is the way in and out (PLAN QA-32c)
+
+- The **Close-up** button on the desk, the side rail's **Macro**, the remote's Closeup switch,
+  the palette's "Macro closeup", the **Macro** pad action and the gamepad's R3 are gone. Push
+  the **Macro Zoom** up to come in (it still lands on the nearest liquid) and down to 1× for
+  the whole plate. On the phone the microscope opens the Macro Zoom slider, and the side rail
+  has a Zoom slider where its Macro button was.
+- A controller's factory map keeps every button where it was: the pad that was Macro is Tap
+  Tempo (Watch the Room on the APC40).
+
 ### Removed — what the closeup drew over the liquid (PLAN 38u-1, 38u-2, 38u-3)
 
 - **Edge Detail** is gone (Settings → Macro, the desks, the phone). It read the closeup through

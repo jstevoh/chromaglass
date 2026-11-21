@@ -4864,13 +4864,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           fade in over it instead of switching. Fully in by two times, which is
           about where a bead is big enough for any of them to read.
 
-          `macroMode` is still honoured for the looks and saved shows that set
-          it: on with a zoom nobody moved means the framing it has always meant.
+          And the zoom alone: `macroMode` no longer floors it at 4x (PLAN
+          QA-32c, the Close-up button gone; see macroZoomOf).
         */
-        // The slider and the zoom keys write macroMode = (zoom > 1.05) alongside
-        // the zoom, so a floor of 4x under macroMode made every zoom from 1.05
-        // to 4 render at 4x. The floor is only for a look that turns macroMode
-        // on and leaves the zoom where it was.
         const wantZoom = macroZoomOf(currentSettings);
         const macroAmount = macroAmountOf(currentSettings);
         const macroOn = wantZoom > 1.005;
