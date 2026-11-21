@@ -141,6 +141,8 @@ export interface Opening {
    * Soap Film up mid-set.
    */
   soap: boolean;
+  /** The water's glow (PLAN 48c, gpu/glow.ts): its one pipeline ahead when the look opens glowing, behind the show otherwise. */
+  glow: boolean;
   /**
    * The display's effects this look can reach (`displayLean.ts`): the
    * opening compiles a display with only these, and the whole one behind it.
@@ -203,6 +205,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
+    glow: (s.glow ?? 0) > 0.001,
     display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
   };
 }

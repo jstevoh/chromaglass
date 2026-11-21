@@ -485,6 +485,24 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
             />
           </>
         )}
+        {/* The water's glow (PLAN 48c): plankton in the plate's water flash
+            blue where a stroke shears it past Glow Shear, and spend their
+            light doing it, refilling over Glow Recharge seconds. It is
+            light the liquid makes, so it shows with the lamp low; the
+            music's hands (Patches) make the strokes. */}
+        <Slider label="Glow" value={settings.glow ?? 0} min={0} max={2} step={0.05} onChange={(v: number) => onUpdate({ glow: v })}
+          settingKey="glow"
+        />
+        {(settings.glow ?? 0) > 0.001 && (
+          <>
+            <Slider label="Glow Shear" value={settings.glowShear ?? 30} min={5} max={200} step={1} onChange={(v: number) => onUpdate({ glowShear: v })}
+              settingKey="glowShear"
+            />
+            <Slider label="Glow Recharge" value={settings.glowRecharge ?? 8} min={0.5} max={60} step={0.5} onChange={(v: number) => onUpdate({ glowRecharge: v })}
+              settingKey="glowRecharge"
+            />
+          </>
+        )}
         {/* Glitter suspended in the liquid, and while there is any the lens's
             stop (PLAN 47e, 47d): the specks ride the gap's flow at their own
             depth, flip in its shear and glint in the side lamp; off the focal

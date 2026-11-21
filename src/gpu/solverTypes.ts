@@ -198,6 +198,12 @@ export interface GpuStepParams {
   soapFilm?: number;
   /** The film's drain rate, its seconds per show second (default 1; PLAN 32i's time dial). */
   soapFilmRate?: number;
+  /** Glow (0 off, else the light's brightness, 1 a fully charged sea at the stage's strength): the water's dinoflagellates flash where the flow shears them (PLAN 48c, gpu/glow.ts). The front plate's only. */
+  glow?: number;
+  /** The shear rate that fires them, per second (default 30, 0.03 Pa in seawater). */
+  glowShear?: number;
+  /** The seconds a fired cell takes to recharge (default 8). */
+  glowRecharge?: number;
   /** The tank's side view (PLAN 47n, gpu/tankPlate.ts): Tank (0 off, else its glow), Feed cm/s, Dye Weight % heavier than water, Nozzle 0..1 across, Drain 0..1, Glow Hue degrees. The front plate's only. */
   tank?: number;
   tankFeed?: number;

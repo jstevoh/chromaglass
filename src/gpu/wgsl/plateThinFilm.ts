@@ -12,6 +12,7 @@
  */
 import { SOAP_LUT_STEP_NM } from '../../lib/soapFilm';
 import { SOAP_FRAME_LO, SOAP_FRAME_SPAN } from '../soapFrame';
+import { GLOW_PLATE_WGSL } from './plateGlow';
 
 export const THIN_FILM_WGSL = /* wgsl */ `
 /*
@@ -215,5 +216,14 @@ fn soapFilmOver(c: vec3f, fuv: vec2f) -> vec3f {
   let film = soapEncode(lin);
   let reflected = min(1.0, dot(film, vec3f(0.2126, 0.7152, 0.0722)));
   return mix(c, c * (1.0 - reflected) + film, U.soapFilm);
+}
+${GLOW_PLATE_WGSL}
+// What lies over the plate's colour once it is drawn: the water's own light
+// (48c, plateGlow.ts), then the frame's soap film in front of it all (32d).
+fn coversOver(c: vec3f, fuv: vec2f) -> vec3f {
+  var o = c;
+  if (U.glow > 0.001) { o = glowOver(o, fuv); }
+  if (U.soapFilm > 0.001) { o = soapFilmOver(o, fuv); }
+  return o;
 }
 `;

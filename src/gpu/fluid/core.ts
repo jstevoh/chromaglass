@@ -11,6 +11,7 @@ import type { SloshDrive } from '../../lib/slosh';
 import { WebGPUSlosh } from '../slosh';
 import type { SoapFilmPlate } from '../soapFilmPlate';
 import type { TankPlate } from '../tankPlate';
+import type { GlowPlate } from '../glow';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
@@ -107,6 +108,8 @@ export class FluidCore {
   protected soapPlate: SoapFilmPlate | null = null;
   /** The tank's side view (PLAN 47n), made while Tank is up. */
   protected tankPlate: TankPlate | null = null;
+  /** The water's glow (PLAN 48c, gpu/glow.ts), made while Glow is up. */
+  protected glowPlate: GlowPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;

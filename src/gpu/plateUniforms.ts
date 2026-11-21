@@ -378,6 +378,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('soapFilm', Number.isFinite(s.soapFilm) ? clamp01(s.soapFilm) : 0);
     const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
+    // The water's glow (PLAN 48c): its light's brightness, past the real one up to twice the stage's.
+    pack.set('glow', Number.isFinite(s.glow) ? Math.max(0, Math.min(2, s.glow as number)) : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they
