@@ -160,6 +160,20 @@
       ]
     },
     {
+      "name": "The Tilt knobs tip the plate as a hand would",
+      "shard": "logic",
+      "run": "npm run handtilt",
+      "why": [
+        "PLAN 18a-13m (scripts/handtilt.mjs, lib/handTilt.ts): the owner asked to tilt",
+        "the plate from two MIDI knobs. A knob at its middle (CC 62-66) is level and its",
+        "ends the phone's full tip; a throw end to end is eased (under 0.02 in its first",
+        "sixtieth, past 0.9 by 0.4 s, never past the knob) and the same at 30, 60 and 120",
+        "steps a second; turned into each dish as downhill() turns Tilt Direction, as far at",
+        "every angle; within the phone's reach; the old frame loop's exactly at 0; and",
+        "learnable over -1..1 in Tilt & Rock, out of sound mapping, the patch bay and Evolve."
+      ]
+    },
+    {
       "name": "The spun dish",
       "shard": "logic",
       "run": "npm run spinslosh",
@@ -536,6 +550,21 @@
       ]
     },
     {
+      "name": "The TV's calm loops: their judge",
+      "shard": "sound",
+      "run": "npm run tvloops -- --controls",
+      "why": [
+        "The TV's half-hour loops (PLAN 12-tv-loops) are made on a Mac by the",
+        "app's own render and cut into a loop by ffmpeg; this shows the judge",
+        "that holds them, through the same makeLoop, each fault on films it",
+        "makes itself: a plain cut fails the seam, a silent audio track the",
+        "audio line, a body seeked a second late the joint line, a still",
+        "picture the moving line, a fade to black or to",
+        "a flat grey the light line, a short loop the length line, and the",
+        "crossfaded loop passes all six. Needs ffmpeg (installed above)."
+      ]
+    },
+    {
       "name": "The ladder's shape",
       "shard": "logic",
       "run": "npm run rungs -- --owed=120hz",
@@ -759,6 +788,17 @@
       "run": "npm run setlist",
       "why": [
         "The set list file: a show's running order reads back as it was written."
+      ]
+    },
+    {
+      "name": "Which frame stops the control's builds sat in",
+      "shard": "logic",
+      "run": "npm run compilestop",
+      "why": [
+        "Startup 1b's attribution of the old way's compile to its frame stops",
+        "(scripts/compilestop.mjs, PLAN.md 19aa-7d), on made-up openings: a stop",
+        "the page was held into from the builds is theirs (main's deploys 832 and",
+        "839), a stall after a page that ran freely, or with no timer read, is not."
       ]
     },
     {
@@ -1984,14 +2024,15 @@
       ]
     },
     {
-      "name": "The cartoons",
+      "name": "Your own video",
       "shard": "browser",
-      "run": "npm run cartoons",
+      "run": "npm run myvideo",
       "why": [
-        "The cartoons that ship (PLAN 14ac): small, silent, recorded in",
-        "SOURCES.md, and on a phone page they pour without the pour pausing",
-        "every frame (14ab-1), loop, are what the plate and the projector hold,",
-        "and stop. No GPU needed: the hand-over is the same without a plate."
+        "A video of one's own (PLAN 14ag), loaded through the file chooser on a",
+        "phone and on the desk: it pours without pausing every frame (14ab-1),",
+        "plays as the film from the same row, the film sense reads a pour with",
+        "no film, and Video Zoom, Across and Up are there with Fit; no demo loop",
+        "or cartoon ships. No GPU needed: the hand-overs are the same without a plate."
       ]
     },
     {
@@ -2135,6 +2176,7 @@
       "shard": "browser",
       "run": "node scripts/intro.mjs",
       "env": {"PW_WEBGPU":"1"},
+      "quarantine": [{ "line": "9c. its loading line says what the show waits for", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before",
         "the app has arrived, taken into the plate's frame on the desk and the",
@@ -2235,6 +2277,22 @@
       ]
     },
     {
+      "name": "A palette from a picture or video",
+      "shard": "browser2",
+      "run": "npm run picturepalette",
+      "timeout": 5,
+      "why": [
+        "PLAN 43d (lib/picturePalette.ts): a picture's four main colours become the palette's",
+        "dyes and nothing else changes. In node on pictures made in the script: four blocks give",
+        "their four colours, a black sleeve's pink title leads (the commonest-pixel picker it",
+        "replaced runs as a control and fails that line), a small accent stays and a speck does",
+        "not, every dye 40 from black and white (28b), the slots after the 24 named dyes are the",
+        "only ones written and the dice's count is unchanged. Then in Chromium through its own",
+        "decoders: a PNG and a JPEG, and a recorded WebM, orange then blue, that does not say its",
+        "length, which must give both colours. No app build, a few seconds."
+      ]
+    },
+    {
       "name": "The phone link",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/phonelink.mjs",
@@ -2244,6 +2302,19 @@
         "linked, the phones counted by the relay, Link another while they are;",
         "on a static host, the code of the page's own address. No GPU; dist/ is",
         "the phone step's build."
+      ]
+    },
+    {
+      "name": "The network display over https",
+      "shard": "browser2",
+      "run": "node scripts/netdisplay.mjs",
+      "why": [
+        "A network display over https (scripts/netdisplay.mjs, PLAN.md 14m-https):",
+        "the show server serves https beside http with a certificate it makes,",
+        "and a network display at the https address it prints is a secure page",
+        "with WebGPU that joins the relay; at the http address it is not secure;",
+        "with the https port taken the show still starts, http only, and says",
+        "why. No GPU; dist/ is the phone step's build."
       ]
     },
     {
@@ -3244,6 +3315,20 @@
       ]
     },
     {
+      "name": "A colour drop pushes the dye aside into a window of its own colour, and splashes only past Cossali's K",
+      "shard": "fifth",
+      "run": "npm run dropwindow",
+      "timeout": 6,
+      "why": [
+        "PLAN 18c-2 and 18c-3: a colour drop on a thin gap is a pour of its",
+        "volume, so it opens a window in a pool of dye, keeps what it pushed in",
+        "a collar, holds it open and fills it with its own colour, where a stamp",
+        "with no volume (the control) does not; and the sim's layDrop throws",
+        "satellites only past Cossali's threshold and lays no ring kick. Two",
+        "192² plates of about two seconds and a node part; beside dropcolour."
+      ]
+    },
+    {
       "name": "A packed foam's junctions turn to 120°",
       "shard": "fifth",
       "run": "npm run foam",
@@ -3478,7 +3563,7 @@
       "name": "The show opens without stopping",
       "shard": "open",
       "run": "npm run startup",
-      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-01", "until": "2026-11-15" }],
+      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "The show opens without stopping (scripts/startup.mjs): what the look",
         "opens with is built before it opens and the rest behind it, none is",
@@ -3645,7 +3730,7 @@
       "name": "Every tool does what it says",
       "shard": "tools",
       "run": "node scripts/tools.mjs",
-      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-01", "until": "2026-11-15" }],
+      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "Every other tool in the hand (asked for: \"check all of the tools to",
         "make sure they work in expected ways\"): each does what it says and",
@@ -3680,6 +3765,7 @@
       "shard": "tools",
       "run": "node --experimental-strip-types scripts/drawwall.mjs --app",
       "timeout": 4,
+      "quarantine": [{ "line": "the control: through the camera without the dish", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md",
         "8-draw-a): the laptop's own frames reach the pad, the plate's colour,",
@@ -3801,7 +3887,7 @@
       "name": "The wall",
       "shard": "tools",
       "run": "npm run wall -- --owed=quarter,red,rung",
-      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-01", "until": "2026-11-15" }],
+      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
         "how many times a second the whole screen is allowed to change.",

@@ -315,6 +315,8 @@ const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', '
   'frameSway',
   // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
   'slosh',
+  // So are the Tilt knobs: a kick routed to them would be the sound tipping the plate (lib/handTilt.ts).
+  'plateTiltX', 'plateTiltY',
   // Tank is whether the picture is a tank or the dish (PLAN 47n): the whole frame, never the beat's (sceneMap NOT_A_TARGET).
   'tank',
   ...FADE_CONTROLS.map(c => String(c.key))]);
@@ -536,6 +538,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
   { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
+  // A hand's tip of the flat plate, on two knobs (lib/handTilt.ts, PLAN 18a-13m): the middle is level.
+  { key: 'plateTiltX',      label: 'Tilt Left/Right',  min: -1, max: 1 },
+  { key: 'plateTiltY',      label: 'Tilt Up/Down',     min: -1, max: 1 },
   { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 4, curve: 1.5, wanderSpan: 1.5 },
   { key: 'melodyWalk',      label: 'Melody Walk',      min: 0, max: 2, wanderSpan: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
@@ -602,6 +607,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // ride between a verse and a chorus.
   { key: 'filmDrive',       label: 'Film Drive',       min: 0, max: 1 },
   { key: 'filmImpact',      label: 'Film Impact',      min: 0, max: 1 },
+  // The video framed by hand mid-show (PLAN 14ag): a knob to push in on a
+  // face, two to slide a 4:3 reel or a portrait phone clip where it reads.
+  { key: 'filmZoom',        label: 'Video Zoom',       min: 0.25, max: 4 },
+  { key: 'filmX',           label: 'Video Across',     min: -1, max: 1 },
+  { key: 'filmY',           label: 'Video Up',         min: -1, max: 1 },
   { key: 'soundImpact',     label: 'Sound Impact',     min: 0, max: 1 },
   // The fourth master, over the LFOs and envelopes. It had a setting and a
   // reader and no control anywhere, so a shape patch could not be pulled down

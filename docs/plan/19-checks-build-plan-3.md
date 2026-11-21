@@ -117,6 +117,21 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
     2.02, still red, so 7b is not a change to the check alone and stays open: the next step
     is what in the page's first second stretches four frames over 0.85 s after a fast device.
     Merged with 7a's fix in the same PR; judge on `npm run flakes` a week on as above.
+  - **19aa-7d. Shipped 2026-11-15: the control's compile, when one frame got through.** Main's
+    deploys 832 and 839 (both on the owner's second Mac runner) went red on 1b's first two
+    lines with the control pricing no compile: "0.00 s compiling ... (0 stops), 8.55 s the
+    page's own". The control built its 59 on its first step (0.81 s), its page was held from
+    then on (its timer on time for about 0.16 s of the next 1.72 s), one frame got through at
+    2.53 s, and the frames then stopped 6.61 s with the page silent: the stop began 1.72 s
+    after the builds, outside the second, and the first-use rule rightly will not vouch for a
+    stop the page stood still through. A build now also sits in the first stop after it when
+    that stop began under two seconds after it, the page never ran (ticks and frames no more
+    than a quarter second apart) for half a second at a time between, and its timer was on
+    time for half of the second before the build; read from the build: `scripts/compilestop.mjs`
+    (`buildsIn`, beside startup.mjs at its ceiling), `npm run compilestop` on thirteen made-up
+    openings. Not asked: whether one long task covered the stretch (the log does not print
+    the control's long tasks after its first step). 839's control reads 8.33 s of compile and 0.23 s its own. Not #861 (?prepare=0
+    returns before the prepare). Judge on the next deploys' `open` shard on both owner runners.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
@@ -575,10 +590,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
   measure over a fixed number of plate steps, not wall time, so its bar means the same on
   every runner.
+  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
 - **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
-  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
-  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
+  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
+  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
+  circle's edge; find whether the red runs read a lit edge
   (the sample too close) or a frame not yet drawn (the read too early), and measure the
   feature, not the moment.
 - **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
@@ -611,3 +628,64 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
   prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
   (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
+- **19ak-8. Open: the three quarantines renewed 2026-11-15, to 2026-12-06.** The first
+  three quarantines (19aa-7, 19aj-1, 19aj-2) ended on 2026-11-15 with none of the three
+  fixes shipped. That morning about half the open PRs (a count of PRs, not of runs) went
+  red on startup's "moving for good no later than the old way", the show's own wait 2.8
+  to 4.3 s against the control's 1.0 to 1.5 s plus its second, on PRs that do not touch
+  the opening; the Blow stroke's and the wall's lines block again too. Each is renewed
+  for the 21 days the rule allows; no bar moved, and main's deploys still hold all three to their bars. Two things
+  to read before 2026-12-06: whether the startup line got worse after #861 (19ah-9b's
+  two behind lanes, `LATER_LANES` 2, sharing the GPU with the show's opening; deploy 849
+  at 37bae99, which carries #861, passed it), and whether 19aa-7d (#878, the control's
+  compile stop priced) moves the control's side of the line. A second renewal is not
+  the answer: fix the item or take the line out of the bar with its own reasons.
+- **19ak-9. Open: the quarantines of 2026-11-21, to 2026-12-06 (intro 9c, the drawwall
+  control).** Reported: "The PR runs keep failing. All the time." Measured over the
+  `Checks` runs of pull requests from 2026-11-14 to 11-21 (none ran 11-16 to 11-20): 52
+  red of 93 that finished. On 11-21, 11 of 26 were red, and 8 of the 11 were the intro's
+  9c on `Measure · browser` (ubuntu), "N changes during the 4 render compiles", red on
+  main's own deploy too (run 44895188598, ec9dfd0), on PRs that do not touch the loading
+  line. 3 of those 8 were also 9 and 9b's "no opening in the prepare log", the check not
+  finding the log, which #900 (14v-12b) fixes and which is not quarantined: its line reads
+  "never", and a line that read nothing is not the flake. Two more were the drawwall
+  control, "lands on the wall elsewhere ... median ~390, centre none", the same numbers on
+  every run since the 11-21 merges, so a change of behaviour (8-draw-a-7, #900 prints
+  the display's own account of it), not noise. Both are quarantined on pull requests
+  from 2026-11-21 to 2026-12-06 so unrelated PRs stop going red on main's reds; no bar
+  moved, main's deploys still run both lines, and the line still prints in full as a
+  warning. The PR that fixes each (#897 for 9c, the 8-draw-a-7 fix for drawwall) takes
+  its entry out.
+- **19ak-10. Decided: a deploy still trusts a PR run that was green through a
+  quarantine.** `deploygate.sh` rules 4 and 5 trust a PR's green `Checks` run, and a run a
+  quarantine held green is green, so a line red on the merged tree can go live on the PR's
+  word; docs/ci.md said main's deploy holds every line to its bar, which held only for a
+  deploy that ran its own checks. On 2026-11-21, 7 of the 15 green PR runs were held
+  green by startup's quarantined line (19aa-7) and one by the wall's (19aj-2): the
+  job's `Quarantined: <check>` warning annotation says so, and a gate could read it and
+  run the checks itself. Put to the owner the same day with the cost: the site would stop
+  updating until the startup line and 9c are fixed. The owner chose to keep trusting
+  them. docs/ci.md now says so.
+- **19ak-11. Open, found by 19ak-9: the film's "at 0, every film is the rainbow every look
+  was made with, to the bit" goes red by one pixel on GitHub's Macs.** Four runs in a
+  week (11-15 three times, 11-21 once), each a different render one pixel off
+  (`closeup00`, `film0`, `plate00`): `scripts/filmlook.mjs` compares two labs, the real
+  shader and a control compiled with Film Physics taken out, each running the solver from
+  scratch. One pixel is either Metal compiling the two shaders' shared arithmetic
+  differently (a fused multiply-add in one and not the other) or the solver not
+  repeating itself to the bit between two pages. Find which (print the pixel and both
+  values; render the control's shader on the real lab's state), then make the claim the
+  one that holds, never a tolerance picked to pass.
+- **19ak-12. Open, found by 19ak-9: the live stream with AAC on GitHub's Macs.** Three
+  runs (11-15 twice, 11-21 on #893, which does not touch the stream): "the audio covers
+  the stream — 29.95 s of them against 30.57 s streamed", "the sound is where the page
+  made it ... 85, 65, 58, 58, 56 ms" against ±31 ms, and once 3 clicks of 5. The same
+  shape as 37x-4g-1 (the audio encoder's queue has no bound, so a loaded Mac emits AAC
+  late), so it may be the app, not the check: read the run's `audioQueue` before
+  touching the bar.
+- **19ak-13. Open, found by 19ak-9: Pour's "spreads it out from where it lands" reads the
+  runner's frame rate.** `scripts/tools.mjs` holds each pouring tool for 1200 ms of wall
+  time and settles 700 ms, so the plate takes however many solver steps the runner
+  manages in that time, and the share of dye from 0.02 to 0.07 moves with it: red once
+  on 11-21 (Pour 75% against Drop's 78%, a PR that does not touch the tools). Hold and
+  settle over a fixed number of plate steps, as 19aj-1 asks of the Blow stroke.

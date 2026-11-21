@@ -270,17 +270,24 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved f
   const vis = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
   const solver = readFileSync('src/sim/fluidSimulation.ts', 'utf8');
   const rock = readFileSync('src/lib/plateRock.ts', 'utf8');
+  const hand = readFileSync('src/lib/handTilt.ts', 'utf8');
   /*
     Since PLAN 38r-9 the step's rock goes through plateRock's rockStep (the
     sinθ each way, plateSin as before, and the slider's past-real gain), and
     the lift is × that gain, so the same chain is read through it: the gain
     is 1 at and below the default Plate Rock and multiplies the tilt, never
     stands in for it, so the phone's tilt still lifts the oil.
+
+    Since PLAN 18a-13m the frame loop's rock is lib/handTilt.ts's tipPlate,
+    called for every plate: the phone's tilt, faded, joins the Tilt knobs'
+    and the swing there (rockX = swingX + x × 1.1, x the phone's plus the
+    knobs'), so the chain is read through it.
   */
   check('the phone\'s tilt lifts the oil too: the step lifts by its rockX, and the frame loop\'s rockX carries the phone\'s tilt',
-    /lift \* rockGain \* p\.rockX, lift \* rockGain \* p\.rockY/.test(fluid) && /const rockX = swingX \+ ext\.x/.test(vis)
+    /lift \* rockGain \* p\.rockX, lift \* rockGain \* p\.rockY/.test(fluid) && /tipPlate\(fluid, hand, swingX, swingY\)/.test(vis)
+      && /h\[PHONE_X\] = ext\.x \* k/.test(hand) && /let x = h\[PHONE_X\] \+/.test(hand) && /p\.rockX = swingX \+ x \* 1\.1/.test(hand)
       && /rockStep\(this\.tiltX, this\.tiltY, this\.rockX, this\.rockY/.test(solver) && /rockX: plateSin\(holdX, swingX\)/.test(rock),
-    'fluid.ts hands hsBody lift × rockGain × p.rockX; LiquidVisualizer: rockX = swingX + ext.x…; sim/fluidSimulation.ts: the step rockStep(tiltX, …, rockX, …), lib/plateRock.ts: rockX = plateSin(tiltX, rockX)');
+    'fluid.ts hands hsBody lift × rockGain × p.rockX; LiquidVisualizer: tipPlate(fluid, hand, swingX, swingY), lib/handTilt.ts: rockX = swingX + (phone + knobs) × 1.1; sim/fluidSimulation.ts: the step rockStep(tiltX, …, rockX, …), lib/plateRock.ts: rockX = plateSin(tiltX, rockX)');
 }
 
 const failed = checks.filter((c) => !c.ok);

@@ -43,6 +43,7 @@ import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFra
 import { stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
+import { levelHandTilt, makeHandTilt, stepHandTilt, tipPlate } from '../lib/handTilt';
 import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, rockPast, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -555,6 +556,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
+  const handTiltRef = useRef(makeHandTilt());
   const chemRef = useRef(new ChemistryField(GRID_SIZE));
   /**
    * The steady part of the room's flow, learned and subtracted. Two floats a
@@ -643,11 +645,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
   /** Told when a captured window is taken away from the browser's side. */
   const filmEndedRef = useRef<(() => void) | null>(null);
-  /** Frames the plate's loop found a poured video ready to read, for `npm run cartoons`. */
+  /** Frames the plate's loop found a poured video ready to read, for `npm run myvideo`. */
   const videoPourReadsRef = useRef(0);
   /*
     What the plate holds as its pour and its film, under `?debug`, so
-    `npm run cartoons` can ask whether the video it watched play is the one the
+    `npm run myvideo` can ask whether the video it watched play is the one the
     plate reads, not only that some video played. Set apart from
     `chromaglassDebug` (which waits for the GPU) because the hand-over is the
     same with or without one.
@@ -657,7 +659,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     stopped in the GL effect's cleanup, which also runs on a rebuild (a lost
     device, a resolution change: `glEpoch`), so a loop, the camera or a
     window went dark on the projector while the panel still said it was
-    playing. Found by `npm run cartoons` on software WebGPU (PW_WEBGPU=1):
+    playing. Found by the cartoons check on software WebGPU (PW_WEBGPU=1):
     a second and a half after Film the projector held no film and the video
     had been reset; with the stop moved here, it plays on (16/16).
   */
@@ -1194,7 +1196,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'drop': {
         const liq = selectedLiquidRef.current;
         if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
-        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose);
+        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose, !liq?.behaviour);
         af.addTemp(x, y, 0.6 * amt);
         break;
       }
@@ -1276,7 +1278,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       default: { // dropper
         const liq = selectedLiquidRef.current;
-        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
+        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
         layBottle(af, x, y, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), liq, kTool);
       }
     }
@@ -3125,7 +3127,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (p.age < HAND_SETTLE && !p.fresh) continue;
             const speed = Math.hypot(p.vx, p.vy);
             const size = Math.min(1, p.area * 8);
-            const color = harmony.length ? PALETTE[harmony[p.id % harmony.length]].hex : undefined;
+            const color = PALETTE[harmony[p.id % harmony.length]]?.hex; // a 43d picture dye: none
 
             if (p.fresh) {
               performGesture({ tool: 'drop', x: p.x, y: p.y, color, layer: 0, amount: roomHands * (0.35 + 0.4 * size) });
@@ -3461,17 +3463,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 layBottle(af, x, y, bottleReach(liq, 2 * GRID_SCALE), liq, k);
 
               } else if ((currentSettings.dropHeight ?? 0) > 0.02) {
-                // The dropper held above the plate lets go of drops rather than
-                // pouring a stream: one as the press lands, then one every
-                // DROP_EVERY steps while it is held, each carrying the dye the
-                // stream would have laid in that time and each landing with its
-                // splash (autoInject's drop reads the height).
+                // Held above the plate the dropper lets go of drops, not a
+                // stream: one as the press lands, then one every DROP_EVERY
+                // steps, each with the dye the stream would have laid, landing
+                // from the height (sim/dropSplash.ts).
                 hand.laid.steps++;
                 if (hand.clock % DROP_EVERY === 0) {
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   hand.laid.drops++;
                   hand.laid.dye += amt * poured.dose;
-                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
+                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
                   if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k, DROP_EVERY * af.dtSeconds);
                 }
@@ -3899,7 +3900,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const ry = DICE.lay.int(GRID_SIZE - 20) + 10;
                 const color = harmonyColor(harmonyOf(li));
                 const style = DICE.lay.pick(styles);
-                fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
+                fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5, false, 1, false);
                 fluid.addTemp(rx, ry, 2.0);
                 // A fresh plate is laid with its liquids, not dosed into them.
                 doseLiquid(fluid, liquidsOf(li), rx, ry, 1.4);
@@ -4361,22 +4362,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
             stepRock(rock, simStepS);
             const [swingX, swingY] = rockSwing(rock, R, ...swayAt(noise2D, time));
-            // A phone held by the projectionist: its tilt is the plate's, fading
-            // out a couple of seconds after the last reading if the link drops.
-            const ext = externalTiltRef.current;
-            const extAge = showNow() * 0.001 - ext.at;
-            const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
-            const tiltX = swingX * HOLD_TILT + ext.x * 0.0045 * extK;
-            const tiltY = swingY * HOLD_TILT + ext.y * 0.0045 * extK;
             /*
               The plate takes the swing itself (±1–2 at full), scaled by the
-              slider; the phone's tilt joins it. On a thin gap that is the
-              plate tipped (× CUR_ROCK, sinθ), and a phone held tipped slides
-              the colour downhill while held, as a dish tipped in the hand
-              does (PLAN 27a).
+              slider, and a hand's tip joins it: the phone's and the Tilt
+              knobs' (lib/handTilt.ts). On a thin gap that is the plate
+              tipped (× CUR_ROCK, sinθ), PLAN 27a.
             */
-            const rockX = swingX + ext.x * 1.1 * extK;
-            const rockY = swingY + ext.y * 1.1 * extK;
+            const hand = handTiltRef.current;
+            stepHandTilt(hand, externalTiltRef.current, showNow() * 0.001, currentSettings.plateTiltX, currentSettings.plateTiltY, simStepS);
+            for (const fluid of fluidsRef.current) { tipPlate(fluid, hand, swingX, swingY); fluid.rockGain = rockPast(R); fluid.swingX = swingX; fluid.swingY = swingY; }
+            // The lead plate's, for the cover, the beads and the bubbles.
+            const lead = fluidsRef.current[0];
+            const tiltX = lead ? lead.tiltX : swingX * HOLD_TILT, tiltY = lead ? lead.tiltY : swingY * HOLD_TILT;
+            const rockX = lead ? lead.rockX : swingX, rockY = lead ? lead.rockY : swingY;
             /*
               And the cover glass slides on its film as the pair tips, and
               drags the liquid with it (lib/plateRock.ts, PLAN 27a-1), so a
@@ -4393,12 +4391,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             stepCover(cover, plateSin(tiltX, rockX), plateSin(tiltY, rockY),
               coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS, 1000, currentSettings.coverWeight, fluidsRef.current[0]?.gpu?.coverMetres), simStepS,
               coverRoom(currentSettings.frameSway));
-            for (const fluid of fluidsRef.current) {
-              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; fluid.rockGain = rockPast(R);
-              fluid.coverX = cover.vx; fluid.coverY = cover.vy;
-              fluid.extTiltX = ext.x * extK; fluid.extTiltY = ext.y * extK;
-              fluid.swingX = swingX; fluid.swingY = swingY;
-            }
+            for (const fluid of fluidsRef.current) { fluid.coverX = cover.vx; fluid.coverY = cover.vy; }
 
             // ── Oil beads ───────────────────────────────────────
             {
@@ -5331,6 +5324,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         onBackLookClearedRef.current?.();
       }
       externalTiltRef.current = { x: 0, y: 0, at: -1e9 };
+      levelHandTilt(handTiltRef.current);
       journeyRef.current.lastAt = -1;
       flashRef.current.reset();
       flashGainRef.current = 1;

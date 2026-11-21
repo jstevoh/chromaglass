@@ -289,7 +289,20 @@ its frame rate live. "Free" means no new passes or texture reads.
       that went up. The in-app Tilt (`tiltReading`) has it the right way, and `npm run
       tippad` ties the pad to that one. Not yet seen on a phone; check by hand with the
       remote on a tipped plate before changing the sign, and fold it into 18a-13e's turn
-      into the dish's frame.
+      into the dish's frame. (The Tilt knobs, 18a-13m, already turn theirs into the dish:
+      `stepHandTilt`'s `angle`, the place to turn the phone's too once its sign is checked.)
+    - **18a-13m. Tilt the plate from two knobs: shipped** (2026-11-15; the owner: "control
+      the tilt of the plate from my midi controller. Maybe two knobs?"). Tilt Left/Right
+      and Tilt Up/Down (`plateTiltX`, `plateTiltY`): the flat plate tipped by a hand, the
+      remote phone's rock path, eased and turned into the dish (`lib/handTilt.ts`); MIDI,
+      Tilt & Rock, the desks, the remote and the phone's Motion sheet. `npm run handtilt`.
+      Story in `docs/plan-shipped.md` §18a-13m. Open: 18a-13n.
+    - **18a-13n. How far a full knob tips.** Full is the phone's full tip, sinθ about 0.27
+      (rock 1.1 × CUR_ROCK plus the hold), which on a thin gap slides a pool of heavy dye
+      about 6% of the plate a second at the default Speed (ROCK_FALL's own measure). If
+      the owner finds two knobs at full too gentle for a show, the knob's reach can go past
+      the phone's toward Plate Rock's strong-kick swing (rock about 2), still on the same
+      law; judge it on the Mac first (docs/judging.md).
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
