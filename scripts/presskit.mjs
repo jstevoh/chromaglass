@@ -244,7 +244,7 @@ const tvShots = fs.existsSync(TV_SHOTS) ? fs.readdirSync(TV_SHOTS).filter((f) =>
 const badShots = tvShots.filter((f) => { const j = jpegSize(fs.readFileSync(path.join(TV_SHOTS, f))); return !j || j.w !== 1920 || j.h !== 1080; });
 check('the TV listing has 1 to 8 screenshots, each a 1920×1080 JPEG', tvShots.length >= 1 && tvShots.length <= 8 && badShots.length === 0, `${tvShots.length} found${badShots.length ? `; wrong size: ${badShots.join(', ')}` : ''}`);
 // The TV app's sample films (androidtv/…/Sample.java, PLAN 12-tv-2f) are the
-// channel's six 1920s films, the same list the TV page plays (src/lib/tvFilms.ts):
+// channel's six song films, the same list the TV page plays (src/lib/tvFilms.ts):
 // a film named differently in the two would play on one screen and not the
 // other, and a TV app cannot be fixed without a new release through Play. Each
 // is fetched from the site's /films/ address, which firebase.json redirects to

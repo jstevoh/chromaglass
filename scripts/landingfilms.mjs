@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * The webpage's films (PLAN.md 34a-6; src/lib/siteFilms.ts, LandingFilms.tsx):
- * that every card has its loop and its still, that each record is credited
- * and its public-domain basis written down, and that the cards do what the
+ * that every card has its loop and its still, that each piece is credited
+ * and its licence written down, and that the cards do what the
  * owner asked for, on a laptop and on a phone.
  *
  *   npm run landingfilms
@@ -15,9 +15,11 @@
  *   1. the files: the page shows the films row, each film is played by a
  *      look that is a preset under the name the card gives it, and each has
  *      a loop as MP4 and WebM of LOOP_SECONDS with no sound, under 1.5 MB the
- *      two, and a 640 × 400 still; each record is an Internet Archive transfer
- *      with a checksum, and public/landing/films/SOURCES.md gives its address,
- *      its checksum and why it is in the public domain;
+ *      two, and a 640 × 400 still; each piece is a file with a checksum, and
+ *      public/landing/films/SOURCES.md gives its page, its checksum and its
+ *      licence, CC BY 4.0 (no NonCommercial, no NoDerivatives: the films
+ *      sell the app and are derivatives); the channel's album films too,
+ *      each piece's look a preset under the name its chapter gives it;
  *   2. the page asks for no loop before a card is played, so the first
  *      screen costs what it did;
  *   3. a pointer over a card plays its loop (its clock moves), and leaving
@@ -40,7 +42,7 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join, extname, resolve } from 'node:path';
-import { SITE_FILMS, LOOP_SECONDS, PUBLIC_DOMAIN, archiveUrl } from '../src/lib/siteFilms.ts';
+import { SITE_FILMS, CHANNEL_ALBUMS, LOOP_SECONDS, LICENCE } from '../src/lib/siteFilms.ts';
 import { PRESETS } from '../src/presets.ts';
 
 const checks = [];
@@ -73,7 +75,16 @@ const FILM_IDS = SITE_FILMS.map((f) => f.id);
   check('1. the page shows the films row, and each film\'s look is a preset under the name its card gives it',
     section.includes('<SiteFilms') && SITE_FILMS.length >= 3 && new Set(FILM_IDS).size === FILM_IDS.length && !misnamed.length,
     `${SITE_FILMS.length} films${section.includes('<SiteFilms') ? '' : ', no <SiteFilms /> in section#films'}${misnamed.length ? '; ' + misnamed.join('; ') : ''}`);
-  check('1. SOURCES.md gives the public-domain basis the credit names', sources.includes('17 U.S.C. § 1401') && sources.includes(PUBLIC_DOMAIN.name), sources ? '' : 'no public/landing/films/SOURCES.md');
+  check('1. SOURCES.md gives the licence the credit names, CC BY 4.0', LICENCE.url === 'https://creativecommons.org/licenses/by/4.0/' && sources.includes(LICENCE.url) && sources.includes(LICENCE.name), sources ? '' : 'no public/landing/films/SOURCES.md');
+  // A piece is under the licence because its own page says so; SOURCES.md
+  // records that page and the file's checksum, so a piece added to the code
+  // without its record here, or a file swapped under the same name, is red.
+  const recorded = (m) => /^https:\/\//.test(m.file) && /^https:\/\//.test(m.page) && /^[0-9a-f]{64}$/.test(m.sha256) && m.seconds > 30 && sources.includes(m.page) && sources.includes(m.sha256) && sources.includes(m.title);
+  for (const a of CHANNEL_ALBUMS) {
+    const bad = a.pieces.filter((p) => PRESETS.find((x) => x.id === p.look)?.name !== p.lookName || !recorded(p.music)).map((p) => p.music.title);
+    check(`1. the channel's album ${a.title}: every piece's look is a preset under its name, and SOURCES.md gives its page and checksum`,
+      a.pieces.length > 1 && !bad.length, bad.length ? bad.join(', ') : `${a.pieces.length} pieces`);
+  }
   for (const f of SITE_FILMS) {
     const mp4 = `public/landing/films/${f.id}.mp4`, webm = `public/landing/films/${f.id}.webm`, still = `public/landing/films/${f.id}.webp`;
     const have = [mp4, webm, still].every(existsSync);
@@ -86,11 +97,8 @@ const FILM_IDS = SITE_FILMS.map((f) => f.id);
     check(`1. ${f.id}: a loop of ${LOOP_SECONDS} s with no sound, as MP4 and WebM under 1.5 MB, and a 640 × 400 still`,
       have && secs !== null && Math.abs(secs - LOOP_SECONDS) < 0.1 && !sound && w?.readUInt32BE(0) === 0x1a45dfa3 && kb < 1536 && size?.[0] === 640 && size?.[1] === 400,
       have ? `${secs?.toFixed(2)} s${sound ? ', has sound' : ''}, ${kb.toFixed(0)} KB, still ${size?.join(' × ') ?? 'unreadable'}` : `missing ${[mp4, webm, still].filter((p) => !existsSync(p)).join(', ')}`);
-    // Published before 1926 is the whole of the basis (siteFilms.ts), so the year in `published` is held to it.
-    const year = Number(/\b(1[89]\d\d)\b/.exec(f.record.published)?.[1] ?? 9999);
-    check(`1. ${f.id}: "${f.record.title}" (${year}) is the archive's transfer with a checksum, and SOURCES.md gives its address and checksum`,
-      year < 1926 && /\.flac$/.test(f.record.file) && /^[0-9a-f]{64}$/.test(f.record.sha256) && sources.includes(archiveUrl(f)) && sources.includes(f.record.sha256) && sources.includes(f.record.title),
-      sources ? '' : 'no public/landing/films/SOURCES.md');
+    check(`1. ${f.id}: "${f.music.title}" by ${f.music.artist} is a file with a checksum, and SOURCES.md gives its page and checksum`,
+      recorded(f.music), sources ? '' : 'no public/landing/films/SOURCES.md');
   }
 }
 
@@ -183,8 +191,8 @@ try {
       return { n: d.length, src: d[0]?.querySelector('iframe')?.getAttribute('src') ?? '', credit: d[0]?.querySelector('[data-cg-credit]')?.textContent ?? '' };
     });
     const film = SITE_FILMS.find((f) => f.id === first);
-    check('4. a click opens the film from youtube-nocookie.com, the film\'s own id, the record credited',
-      dlg.n === 1 && dlg.src.startsWith(`https://www.youtube-nocookie.com/embed/${IDS[first]}?`) && dlg.credit.includes(film.record.title) && dlg.credit.includes(film.record.performer) && dlg.credit.includes(PUBLIC_DOMAIN.name) && asked.embeds.length === 1,
+    check('4. a click opens the film from youtube-nocookie.com, the film\'s own id, the music credited',
+      dlg.n === 1 && dlg.src.startsWith(`https://www.youtube-nocookie.com/embed/${IDS[first]}?`) && dlg.credit.includes(film.music.title) && dlg.credit.includes(film.music.artist) && dlg.credit.includes(LICENCE.name) && asked.embeds.length === 1,
       `${dlg.n} dialog, ${dlg.src.slice(0, 70)}; "${dlg.credit.trim().slice(0, 80)}"`);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);

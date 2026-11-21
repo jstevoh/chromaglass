@@ -77,8 +77,8 @@ public class ShowsTest {
     @Test public void everySampleFilmComesFromTheSiteAndSaysWhatItPlays() {
         assertEquals(6, Sample.CLIPS.length);
         for (Sample.Clip c : Sample.CLIPS) {
-            assertEquals(c.url, true, c.url.matches("https://chromaglass\\.art/films/[a-z]+\\.mp4"));
-            assertEquals(c.look, true, !c.look.isEmpty() && c.credit.matches("\u201c.+\u201d, .+ \\(19[0-2][0-9]\\)"));
+            assertEquals(c.url, true, c.url.matches("https://chromaglass\\.art/films/[a-z-]+\\.mp4"));
+            assertEquals(c.look, true, !c.look.isEmpty() && c.credit.matches("\u201c.+\u201d, .+ \\(20[0-9][0-9]\\), CC BY 4\\.0"));
         }
     }
 
