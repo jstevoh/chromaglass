@@ -689,3 +689,29 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   manages in that time, and the share of dye from 0.02 to 0.07 moves with it: red once
   on 11-21 (Pour 75% against Drop's 78%, a PR that does not touch the tools). Hold and
   settle over a fixed number of plate steps, as 19aj-1 asks of the Blow stroke.
+- **19ak-14. Shipped: a draft's push runs no Mac, and only the Measure checks its diff
+  reaches** (the owner's go, 2026-11-21: step 1 of moving every check onto the owner's own
+  Macs and taking the repository private). The week of 9 to 15 November spent 904 hours
+  of GitHub's Macs (833 on pull requests) and 1,394 of its ubuntu, about ten whole runs a
+  PR; two Macs at home give about seventy Mac-hours a day. Every PR here is opened as a
+  draft and stays one while it is worked on, so nearly all of those runs were drafts'.
+  Now `reach.mjs` reads `PR_DRAFT`: on a draft, the Mac shards are skipped (a `draft`
+  notice on the reach job, which `ready.yml` reads so that a draft's green is never
+  labelled ready) and Measure runs `npm run quick`'s rule, the checks whose scripts or
+  bundles read each changed file and, for a file the site is built from, those that
+  build or serve it (`checkReads`' new `built`). `checks.yml` also runs on
+  `ready_for_review`: marking the PR ready runs Measure in full and the Mac shards the
+  diff reaches, as every run did before, and so does each push after it. A draft cannot
+  merge, and `deploygate.sh` already passes over a run that skipped the Mac or ran part
+  of Measure, so nothing reaches main on a draft's run alone. Replayed over main's last
+  60 merges (`scratch/draftsim.mjs`, against today's manifest): a draft's push runs
+  6,557 of the 11,580 Measure check-runs a full run would (57%), 591 of 780 parts, and
+  no Mac shard where 53 of the 60 reached one. PR jobs stay on GitHub's Macs while the
+  repository is public (`macrunner-hook.sh`).
+- **19ak-15. Open, from 19ak-14: measure the week after.** Re-count GitHub's Mac and
+  ubuntu hours on pull requests for the seven days after 19ak-14 merged, day by day as
+  the 2026-11-21 count was (`gh api` runs and jobs, `&page=N` by hand), against the
+  targets (under 30 Mac-hours and 40 ubuntu-hours a day). Ubuntu will still be over: a
+  draft's Measure is 57% of a full one, because most site changes reach the solver that
+  every lab check bundles. The next lever there is the nine `lab` parts on SwiftShader,
+  which `npm run quick` already runs in the session before a push.

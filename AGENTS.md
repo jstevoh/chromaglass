@@ -51,8 +51,12 @@ merge"):
 - After a second `CHANGES` on the same PR, label it `handoff` and stop: Claude Code
   finishes it on your branch.
 - Your summary comment at the end of each run starts `Pushed #<n> <item> head <sha>`.
+- Run `npm run quick` before every push. A draft's push runs no Mac and only the Measure
+  checks its diff reaches (PLAN.md 19ak-14). When that run is green, mark the PR ready
+  (`gh pr ready <n>`): that runs Measure in full and the Mac, once.
 - Never post a `READY` line or add `ready-for-review` yourself: when `Checks` goes green
-  on the head, `ready.yml` adds the label and comments `READY #<n> <item> head <sha>`.
+  on a ready PR's head, `ready.yml` adds the label and comments `READY #<n> <item> head <sha>`.
+  A draft's green run gets neither.
   A review answers `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>` and a numbered
   list.
 - A PR that owes a review before merge is merged by the Claude reviewer on its `PASS`,

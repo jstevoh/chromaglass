@@ -131,7 +131,9 @@ a run or a deploy needs explaining. When CI is red, use the `steward` skill.
 
 ## Branches, PRs, deploys
 
-- One PR per piece of work, a draft until CI is green. Squash-merge.
+- One PR per piece of work, opened as a draft. A draft's push runs no Mac and only the
+  Measure checks its diff reaches (PLAN.md 19ak-14); when that is green, mark it ready,
+  which runs everything once, and merge when that run is green. Squash-merge.
 - Every PR updates the plan: what it shipped marked shipped in its section file under
   `docs/plan/` (and its row in `PLAN.md`'s running order), and anything found along the
   way that needs fixing or adding written in as an item in the section it belongs to.

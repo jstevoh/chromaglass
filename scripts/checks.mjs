@@ -274,7 +274,11 @@ const DOC = /^[^/]+\.md$|^docs\/|^\.claude\/|^LICENSE[^/]*$/;
 // The site's own files, which a Mac check reads either through the lab's
 // bundles or by opening the built app (`checkReads`, 19ak-2).
 const SITE_OWN = /^(src|public)\/|^index\.html$/;
-function selectCore(files, { before, after, root = ROOT, docs = false, readsOf = null, mac = false }) {
+// `whole(info)` says which checks a site file selects whatever it is: the
+// Mac's are those `checkReads` calls `site` (anything but the lab's bundles
+// alone); a draft's Measure (`selectMeasure` with `readsOf`, PLAN.md 19ak-14)
+// passes its own, narrower test.
+function selectCore(files, { before, after, root = ROOT, docs = false, readsOf = null, mac = false, whole = (i) => i.site, draft = false }) {
   const hit = [];
   const why = [];
   const site = [];
@@ -309,6 +313,18 @@ function selectCore(files, { before, after, root = ROOT, docs = false, readsOf =
       }
       continue;
     }
+    if (draft && f !== 'package-lock.json') {
+      // A draft's Measure (19ak-14) is `npm run quick`'s rule: the checks
+      // whose scripts or bundles read the file, and for a file the site is
+      // built from, every check that reads the whole site. A file no check
+      // reads selects none (the `always` ones still run); the lockfile is
+      // still every check, since it moves what every one of them runs on.
+      const built = /^(src|public)\/|^index\.html$|^vite\.config\.[cm]?[jt]s$|^tsconfig[^/]*\.json$|^firebase\.json$/.test(f);
+      const cs = after.manifest.checks.filter((c) => { const i = readsOf.get(c); return !i || reads(i.reads, f) || (built && whole(i)); });
+      hit.push(...cs);
+      if (cs.length) site.push(f);
+      continue;
+    }
     if (SHARED.includes(f)) return every(`${f} is shared by every app or lab check`);
     if (mac && /^server\//.test(f)) {
       // The Workers' and the remote's code (19ak-2). Nothing under src/
@@ -334,7 +350,7 @@ function selectCore(files, { before, after, root = ROOT, docs = false, readsOf =
       continue;
     }
     if (readsOf && SITE_OWN.test(f)) {
-      const cs = after.manifest.checks.filter((c) => { const i = readsOf.get(c); return !i || i.site || reads(i.reads, f); });
+      const cs = after.manifest.checks.filter((c) => { const i = readsOf.get(c); return !i || whole(i) || reads(i.reads, f); });
       hit.push(...cs);
       site.push(f);
       continue;
@@ -342,8 +358,11 @@ function selectCore(files, { before, after, root = ROOT, docs = false, readsOf =
     return every(f);
   }
   if (site.length) {
-    const cs = [...new Set(hit.filter((c) => after.manifest.checks.includes(c) && readsOf.has(c) && !readsOf.get(c).site))];
-    why.push(`${site.length} site file${site.length === 1 ? '' : 's'} (${site.slice(0, 3).join(', ')}${site.length > 3 ? ', …' : ''}): the checks that open the app, and ${cs.length} lab check${cs.length === 1 ? '' : 's'} importing them`);
+    const cs = [...new Set(hit.filter((c) => after.manifest.checks.includes(c) && readsOf.has(c) && !whole(readsOf.get(c))))];
+    const named = `${site.slice(0, 3).join(', ')}${site.length > 3 ? ', …' : ''}`;
+    why.push(draft
+      ? `a draft: ${site.length} file${site.length === 1 ? '' : 's'} (${named}), each selecting the checks that read it`
+      : `${site.length} site file${site.length === 1 ? '' : 's'} (${named}): the checks that open the app, and ${cs.length} lab check${cs.length === 1 ? '' : 's'} importing them`);
   }
   return { all: false, hit, why: why.join('; ') || 'nothing that reaches a check' };
 }
@@ -376,9 +395,16 @@ export function selectShards(files, ctx) {
 export function selectMeasure(files, ctx) {
   const m = ctx.after.manifest;
   const measure = m.shards.measure;
-  // Measure keeps running in full for the site's files: it is not behind the
-  // Mac's queue, and its harnesses read src/ in ways no bundle shows.
-  const r = selectCore(files, { ...ctx, docs: true, readsOf: null, mac: false });
+  // Measure keeps running in full for the site's files on a PR that is ready
+  // (and on every deploy): its harnesses read src/ in ways no bundle shows (a
+  // check that greps the whole of src/, which the trace does not count as
+  // reading it). A draft's run (PLAN.md 19ak-14) passes `readsOf`, and then
+  // each file selects what `npm run quick` would run for it: the checks whose
+  // scripts or bundles read it, and for a file the site is built from every
+  // check that serves the app, builds the site or reads dist/, or that
+  // esbuild could not read. What that misses the ready run's full Measure
+  // finds, before the merge, once.
+  const r = selectCore(files, { ...ctx, docs: true, readsOf: ctx.readsOf ?? null, mac: false, whole: (i) => i.unread || i.built, draft: Boolean(ctx.readsOf) });
   if (r.all) return { all: true, names: [], parts: [...measure], why: r.why };
   const keys = new Set(r.hit.map((c) => `${c.shard}\u0000${c.name}`));
   const picked = m.checks.filter((c) => measure.includes(c.shard) && (c.always || keys.has(`${c.shard}\u0000${c.name}`)));
@@ -1087,9 +1113,14 @@ export async function checkReads(man, scripts, esbuild, root = ROOT) {
       for (const i of meta ?? []) if (/^(scripts|server)\//.test(i)) own.add(i);
     }
     const cmds = [c.run, ...[...npmScriptsOf(c.run, scripts)].map((n) => scripts[n] ?? '')].join('\n');
-    const whole = unread || !own.has('scripts/lab.mjs') || /\bnpm run build\b|\bvite build\b/.test(cmds)
+    // `built`: the check builds the site, serves it or reads dist/ (by its
+    // own scripts), so it reads every site file; a draft's Measure takes it
+    // for any of them (19ak-14). `unread` is any of its scripts esbuild could
+    // not read, which leaves its `reads` short.
+    const built = /\bnpm run build\b|\bvite build\b/.test(cmds)
       || [...own].some((f) => SERVES_APP.test(text(f)) || /['"`/]dist['"`/]/.test(text(f)));
-    out.set(c, { reads: r, files, app: files.some((f) => SERVES_APP.test(text(f))), site: whole });
+    const whole = unread || !own.has('scripts/lab.mjs') || built;
+    out.set(c, { reads: r, files, app: files.some((f) => SERVES_APP.test(text(f))), site: whole, built, unread });
   }
   return out;
 }

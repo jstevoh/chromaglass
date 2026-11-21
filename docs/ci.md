@@ -46,6 +46,14 @@ deploy:
   19ak-10, 2026-11-21): a deploy that trusts a PR's green run (`deploygate.sh` rules 4
   and 5) trusts it even when a quarantine held it green, so it does not run the
   quarantined line itself; only a deploy that runs its own checks holds it.
+- **A draft runs no Mac** (PLAN.md 19ak-14, the owner's choice of 2026-11-21): on a
+  draft PR's push, `reach` skips the Mac shards (a `draft` notice says so) and Measure
+  runs only the checks that read the changed files, `npm run quick`'s rule. Marking the
+  PR ready (`ready_for_review`, which `checks.yml` now runs on) runs Measure in full and
+  the Mac shards the diff reaches, as every run did before, and so does each push after.
+  That run is the merge's evidence and the one the deploy gate can trust; a draft cannot
+  merge, and `ready.yml` never labels a draft's run `ready-for-review`. So: open as a
+  draft, run `npm run quick` before pushing, mark ready once the draft's run is green.
 - **The Mac waits for the typecheck** (`Compiles, before the Mac`, PLAN.md 19ak-3c):
   `tsc --noEmit` on ubuntu beside `reach`; a PR that does not compile takes no Mac.
 - **A whole run re-run skips the shards that passed** (PLAN.md 19ak-3a): on attempt 2

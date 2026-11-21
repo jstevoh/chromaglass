@@ -334,7 +334,7 @@ async function selftest() {
   const childEnv = (extra) => ({ ...process.env, GITHUB_RUN_ATTEMPT: '1', GITHUB_RUN_ID: '', ...extra });
   // And `--diff` itself, on a scratch repository with GitHub's shape: a base,
   // a PR branch, and a merge commit whose second parent is the PR's head.
-  const runDiff = (changes, prHead, base = () => {}) => {
+  const runDiff = (changes, prHead, base = () => {}, env = {}) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reach-'));
     const git = (...a) => execFileSync('git', a, { cwd: dir }).toString().trim();
     git('init', '-q', '-b', 'main');
@@ -357,14 +357,17 @@ async function selftest() {
     const out = path.join(dir, 'out');
     fs.writeFileSync(out, '');
     try {
-      execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], {
+      const stdout = execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], {
         cwd: dir,
         stdio: 'pipe',
         // No base branch, so carry() answers at once without the network: the
         // carry is driven by its own cases below, against a mocked API.
-        env: childEnv({ GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out }),
+        env: childEnv({ GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out, PR_DRAFT: 'false', ...env }),
       });
-      return fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ');
+      // The `draft` notice is what ready.yml reads (19ak-14), so it is part
+      // of the answer; no other case's answer changes.
+      const notice = /::notice title=draft::/.test(stdout.toString()) ? ' notice=draft' : '';
+      return fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ') + notice;
     } catch {
       return 'refused';
     } finally {
@@ -421,6 +424,46 @@ async function selftest() {
   ];
   for (const [mut, want, what] of MEASURE) {
     const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1').replace(/ maconly=.*$/, '');
+    if (got !== want) bad++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
+  }
+  // A draft (PLAN.md 19ak-14): no Mac, whatever the diff reaches, and a site
+  // file runs only the Measure checks that read it (E imports src/x.ts, C
+  // does not) and the always ones, where a ready PR's runs them all. The
+  // controls: the same diffs on a PR that is not a draft, and a draft whose
+  // diff reaches no Mac shard, which answers as any PR's does.
+  // F builds the site (`vite build` in its npm script), so every file the
+  // site is built from selects it on a draft, whether or not it imports it.
+  const withDraft = (dir) => {
+    withManifest(dir);
+    fs.writeFileSync(path.join(dir, 'scripts/e.mjs'), "import { x } from '../src/x.ts';\nconsole.log(x);\n");
+    fs.writeFileSync(path.join(dir, 'scripts/f.mjs'), 'export const f = 1;\n');
+    fs.writeFileSync(path.join(dir, 'vite.config.ts'), 'export default {};\n');
+    fs.mkdirSync(path.join(dir, 'server'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'server/worker.ts'), 'export const w = 1;\n');
+    const p = path.join(dir, 'scripts/checks.json');
+    const m = JSON.parse(fs.readFileSync(p, 'utf8'));
+    m.checks.push({ name: 'E', shard: 'm', run: 'node scripts/e.mjs' }, { name: 'F', shard: 'm', run: ['npm', 'run', 'f'].join(' ') });
+    fs.writeFileSync(p, JSON.stringify(m));
+    const k = path.join(dir, 'package.json');
+    const j = JSON.parse(fs.readFileSync(k, 'utf8'));
+    j.scripts.f = 'vite build && node scripts/f.mjs';
+    fs.writeFileSync(k, JSON.stringify(j));
+  };
+  const DRAFT = { PR_DRAFT: 'true' };
+  const N = ' notice=draft';
+  for (const [mut, env, want, what] of [
+    [touch('src/x.ts'), DRAFT, `mac=false ${ALL} parts=["m"] only=["D","E","F"]${N}`, "a draft's source file runs no Mac, and in Measure the checks that import it or build the site"],
+    [touch('src/x.ts'), {}, 'mac=true shards=["x","y"] parts=["m"] only=', 'the same source file on a ready PR runs the Mac and Measure in full, with no draft notice'],
+    [touch('src/x.ts'), { PR_DRAFT: '' }, 'mac=true shards=["x","y"] parts=["m"] only=', 'a run with no draft flag at all answers as a ready PR\'s'],
+    [touch('vite.config.ts'), DRAFT, `mac=false ${ALL} parts=["m"] only=["D","F"]${N}`, "a draft's build config runs the checks that build the site"],
+    [touch('scripts/a.mjs'), DRAFT, `mac=false ${ALL} parts=["m"] only=["D"]${N}`, "a draft's Mac check script runs no Mac"],
+    [touch('scripts/c.mjs'), DRAFT, `mac=false ${ALL} parts=["m"] only=["C","D"]${N}`, "a draft's Measure check script selects as a ready PR's, and still says it is a draft"],
+    [touch('server/worker.ts'), DRAFT, `mac=false ${ALL} parts=["m"] only=["D"]${N}`, "a draft's file no Mac shard reaches still carries the notice ready.yml reads"],
+    [touch('scripts/never-traced.mjs'), DRAFT, `mac=false ${ALL} parts=["m"] only=["D"]${N}`, "a draft's file no check reads runs only the always ones (its ready run, the rest)"],
+    [(git, dir) => fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}'), DRAFT, `mac=false ${ALL} parts=["m"] only=${N}`, "a draft's lockfile still runs Measure in full"],
+  ]) {
+    const got = runDiff(mut, undefined, withDraft, env).replace(/ maconly=[^ ]*/, '');
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
   }
@@ -588,11 +631,38 @@ if (!isMain) {
     }
     const files = git('diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD').split('\n').filter(Boolean);
     const reaching = files.filter(reachesMac);
+    // A draft (PLAN.md 19ak-14, the owner's choice of 2026-11-21): the week
+    // of 9 to 15 November spent 833 hours of GitHub's Macs and most of 1,394
+    // of its ubuntu on pull requests, about ten whole runs a PR, nearly all of
+    // them pushes to drafts, which is how every PR here is opened and stays
+    // until it is green. Two Macs at home give about seventy a day. So a
+    // draft's push runs only what its diff reaches on ubuntu, as
+    // `npm run quick` would, and no Mac; marking the PR ready
+    // (`ready_for_review`) starts the run that is the merge's evidence:
+    // Measure in full and the Mac shards the diff reaches, and so does every
+    // push after it. A draft cannot be merged, and the deploy gate never
+    // trusts a run that skipped the Mac or ran part of Measure, so nothing
+    // reaches main on a draft's run alone.
+    const draft = process.env.PR_DRAFT === 'true';
+    const site = (fs_) => fs_.some((f) => /^(src|public)\/|^index\.html$/.test(f));
+    // What each check reads (checks.mjs `checkReads`), built at most once and
+    // only for a diff with site files in it. Null when esbuild did not load
+    // (its install in the job failed): then every check such a file could
+    // reach runs, as before 19ak-2.
+    let readsMemo;
+    const readsFor = async (manifest, pkg) => {
+      if (readsMemo !== undefined) return readsMemo;
+      const esbuild = await loadEsbuild();
+      if (!esbuild) console.log('::warning title=reach::esbuild did not load, so every check runs for the site\'s files');
+      readsMemo = esbuild ? await checkReads(manifest, pkg?.scripts ?? {}, esbuild, process.cwd()) : null;
+      return readsMemo;
+    };
     {
       const before = atCommit('HEAD^1', git), after = atCommit('HEAD', git);
       if (after.manifest) {
         parts = after.manifest.shards.measure;
-        const m = selectMeasure(files, { before, after, root: process.cwd() });
+        const readsOf = draft ? await readsFor(after.manifest, after.pkg) : null;
+        const m = selectMeasure(files, { before, after, root: process.cwd(), readsOf });
         console.log(`Measure: ${m.all ? `every check (${m.why})` : m.why}`);
         if (!m.all && m.parts.length) {
           parts = m.parts;
@@ -616,12 +686,7 @@ if (!isMain) {
       // the checks that read them rather than every Mac check (PLAN.md
       // 19ak-2). Without esbuild (its install in the job failed) there is no
       // map, and such a file selects every shard as before.
-      let readsOf = null;
-      if (after.manifest && reaching.some((f) => /^(src|public)\/|^index\.html$/.test(f))) {
-        const esbuild = await loadEsbuild();
-        if (esbuild) readsOf = await checkReads(after.manifest, after.pkg?.scripts ?? {}, esbuild, process.cwd());
-        else console.log('::warning title=reach::esbuild did not load, so every Mac check runs for the site\'s files');
-      }
+      const readsOf = after.manifest && site(reaching) ? await readsFor(after.manifest, after.pkg) : null;
       const picked = after.manifest
         ? selectShards(reaching, { before, after, root: process.cwd(), readsOf })
         : { shards: MAC_SHARDS, names: null, why: 'every shard: the tree has no manifest of checks' };
@@ -636,6 +701,19 @@ if (!isMain) {
         // the Mac's checks is not evidence for a whole tree.
         console.log(`::notice title=mac::partial: ${picked.names.length} of ${total} Mac checks in ${shards.join(', ')}`);
       }
+    }
+    // A draft's run names what the Mac would run, and runs none of it. The
+    // notice is what `ready.yml` reads, so that a green draft is not
+    // labelled ready for a merge it has no Mac evidence for.
+    // On every draft's run, whether or not its diff reaches a shard: its
+    // Measure is narrower than a ready PR's even for a file no Mac reads (a
+    // Worker under server/, desktop/, a workflow), and such a merge is one
+    // the deploy publishes without checking (deploygate.sh rule 6), so the
+    // ready run is the only full one it gets.
+    if (draft) {
+      if (mac) why = `${why}; a draft, so none of it runs until the PR is marked ready`;
+      mac = false;
+      console.log('::notice title=draft::a draft: no Mac and only the Measure checks its diff reaches; marking the PR ready runs them all');
     }
     // A run of some Mac checks is not carried from, or onto (19ak-2): the
     // earlier run's names were its own diff's, and main may since have moved
