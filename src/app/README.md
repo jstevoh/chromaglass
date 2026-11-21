@@ -14,11 +14,11 @@ comments, which moved with it.
 | `useAmbientMode` | Ambient TV mode's switch |
 | `useSoundState` | what the show listens to, as state |
 | `useSongLine` | the song's shape, the bar and the heard tempo, for the status lines |
-| `usePour` | an image or a film poured into the dish |
+| `usePour` | an image or a film poured into the dish, and the one video loaded (`LoadedVideo`, `loaded`, `pourLoaded`, PLAN 14ag) |
 | `useSoundSource` | changing what the show hears; the music player; the drone |
 | `useBench` | the engine's status, Calibrate and the grid sweep (`?bench`) |
 | `useToast` | the one-line notice |
-| `useFilm` | the film that drives the plate: a file, a cartoon, a camera, a window |
+| `useFilm` | the film that drives the plate: a file, a camera, a window; and `video`, the row that plays and pours the video loaded (`VideoShelfProps`, PLAN 14ag) |
 | `useSceneSource` | the room camera as a sensor |
 | `usePaletteLock` | the palette held across looks |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |

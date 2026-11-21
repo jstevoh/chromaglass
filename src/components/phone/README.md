@@ -13,7 +13,7 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 
 - `App.tsx` owns the settings and passes them in as props, like the desk.
 - What a finger does is read in `lib/playGesture.ts`; the touch handlers on the plate are in `LiquidVisualizer.tsx`; tilt is `hooks/useDeviceTilt`.
-- Imports `src/lib`, `src/types`, `../ui`, `hooks/useEscape`, `hooks/useDeskLayout`, `desk/TabStrip`, `settings/FeedbackPane` (the More sheet's Feedback, the same pane as Settings) and a few siblings (`MixerPanel`, `CartoonShelf`, `SongScore`, `PanelGuard`). Never `src/gpu`.
+- Imports `src/lib`, `src/types`, `../ui`, `hooks/useEscape`, `hooks/useDeskLayout`, `desk/TabStrip`, `settings/FeedbackPane` (the More sheet's Feedback, the same pane as Settings) and a few siblings (`MixerPanel`, `VideoShelf`, `SongScore`, `PanelGuard`). Never `src/gpu`.
 - `settings/PatchesSection.tsx` reuses `BandStrip` and `AreaPicker` on the laptop.
 - Every feature ships its phone version in the same PR.
 
@@ -29,4 +29,4 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 
 ## Checks
 
-`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Cartoons: `cartoons`. Feedback: `feedbackpane`, `feedback-worker`. Areas and cords: `areacords`. Linking a TV: `tvcode` (the Worker's routes and `lib/tvCode.ts`'s code format).
+`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Your own video (the dye sheet's row): `myvideo`. Feedback: `feedbackpane`, `feedback-worker`. Areas and cords: `areacords`. Linking a TV: `tvcode` (the Worker's routes and `lib/tvCode.ts`'s code format).

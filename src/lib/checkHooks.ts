@@ -53,8 +53,10 @@ declare global {
     __cgRiding?: unknown;
     /** Turn the plates to given angles in radians, to reproduce a report's plate exactly. */
     chromaglassRotation?: (angles: number[]) => void;
-    /** The video pour and the film's video, for `npm run cartoons`. */
+    /** The video pour and the film's video, for `npm run myvideo`. */
     __cgVideo?: () => unknown;
+    /** The film sense (hooks/useFilmSense.ts): whether it runs, the video it reads, and its reading, for `npm run myvideo`. */
+    __cgFilmSense?: () => { enabled: boolean; src: string | null; ready: boolean; energy: number };
 
     // ── The show and the desks (App's hooks in `src/app/`, most in `useCheckHooks.ts`; `?debug`) ──
 
@@ -108,8 +110,8 @@ declare global {
     chromaglassCastState?: () => unknown;
     /** What a render could leave running in the live show: fades and glides on the film's clock. */
     chromaglassRenderPending?: () => { lookFade: boolean; dimmerFade: boolean; glides: number };
-    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app` and `npm run loopseam`. */
-    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number; loop?: { seconds: number; crossfade?: boolean; startSec?: number } }) => Promise<unknown>;
+    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app` and `npm run loopseam`; `toDisk` writes through the save picker instead of memory, for `npm run tvloops`. */
+    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number; loop?: { seconds: number; crossfade?: boolean; startSec?: number }; toDisk?: boolean; hashFrames?: boolean }) => Promise<unknown>;
     /** The MIDI input and the gamepad as the desk sees them. */
     chromaglassInputs?: () => unknown;
 

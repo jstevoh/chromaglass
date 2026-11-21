@@ -173,9 +173,17 @@ export function useSongRendering({
     window.chromaglassRenderPending = () => ({
       lookFade: lookFadeRef.current !== null, dimmerFade: fadeRef.current !== null, glides: glidesRef.current.size,
     });
+    /*
+      `toDisk` (PLAN 12-tv-loops): a film too long to hold in memory, such as
+      the TV's half-hour loops (`npm run tvloops`), goes to the file the page's
+      save picker opens, as a person's render does, and the script that drives
+      it stands in for the picker; `hashFrames: false` spares a long render a
+      digest of every frame it does not need.
+    */
     window.chromaglassRender = async (o: {
       song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number;
       loop?: { seconds: number; crossfade?: boolean; startSec?: number };
+      toDisk?: boolean; hashFrames?: boolean;
     }) => {
       const s = settingsRef.current;
       const song = o.song ? new Blob([o.song]) : musicFileRef.current?.url;
@@ -196,7 +204,7 @@ export function useSongRendering({
       }
       const r = await fullRender.start({
         song, name: 'check', width: o.width, height: o.height, fps: o.fps, seed: o.seed, levels,
-        test: { keepInMemory: true, hashFrames: true, maxFrames: o.maxFrames },
+        test: { keepInMemory: !o.toDisk, hashFrames: o.hashFrames ?? true, maxFrames: o.maxFrames },
       });
       let b64: string | null = null;
       if (r.bytes) {

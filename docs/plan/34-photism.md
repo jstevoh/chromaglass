@@ -103,8 +103,9 @@ a grid of generic stock thumbnails: ours are the plate itself.
     variables when the show server starts, which a Finder launch never sets, though
     `desktop/README.md` says it works "with no terminal". A Show menu item or a Settings → Wall
     card for host, universe, fixtures, order and the in-map, kept in the app's settings.
-  - **34a-7d. Network displays cannot start over the Wi-Fi.** A `?cast` page at an `http://`
-    address gets no WebGPU (14m-https, #443), so "more screens on other computers" is not sold yet.
+  - **34a-7d. Network displays cannot start over the Wi-Fi.** The show server now serves them over
+    https (14m-https, shipped); "more screens on other computers" can be sold once the owner has seen
+    a TV or a second computer take it (judging §136).
   - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
@@ -211,6 +212,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
   are what a producer and a VJ pay for, and Photism has both. No change in scope, but
   13.7 is the one a music-maker audience (Home's buyers) asks for first: when the signed
   Mac app (13.1-sign) is out, take 13.7 before 13.3.
+
+- **34j. The second look: the clips, watched (2026-11-15).** The owner sent a Photism Instagram ad;
+  this time its nineteen scene clips (photism.app/clips/, 4 to 16 s, silent) were watched with
+  `npm run watch`. Notes and a poster mosaic: the project's shared `references/photism-2026-11-15/`.
+  It is shader art, not fluid: fractals, raymarched tunnels, lasers, particles on a swirl, a chrome
+  bust, and one reaction-diffusion maze (Morphogen). Its hero (Anemone) pumps the whole frame's
+  brightness on the beat (luminance 0.06 to 0.28 at 2.0 s and 6.0 s), the whole-frame reaction our
+  rule forbids. Morphogen is the one picture to aim at: a crisp lit labyrinth, edges 0.71% of the
+  width, stripes about 1.2% apart, about 213 forms a frame; kept as the reference
+  `photism-morphogen` for Ferro Labyrinth's fingers (38d, the fingers thread's PR #838), where the
+  maze must come from the magnetic instability, not a reaction-diffusion formula. New on its page
+  since 10-22: cover art builds a scene's palette (ours is being built from any image or video,
+  17 and 43), and 1,000+ users became 3,000+. The owner's calls: Home to $29 with the Live Show
+  and the DAW bridge (23.21); the page's refund line and phone-to-computer email are not taken.
 
 **Order.** 34a first (it needs no engine work and the site is the demo), then ~~34f~~ (shipped) and 34g
 (small), then 34b and 34c; 34d, 34e and 34h are for when the planned VJ and DAW steps
