@@ -37,7 +37,7 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
 import { clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS, findPreset, livePresetId } from './presets';
+import { PRESETS, findPreset, livePresetId, NEW_LOOK } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
@@ -987,7 +987,7 @@ export default function App() {
     setDocId(null);
     setDocDirty(false);
     setPinnedPresetId(null);
-    applyPreset('default', DEFAULT_SETTINGS);
+    applyPreset('default', NEW_LOOK);
   };
 
   const saveLook = () => setShowSave(true);
@@ -1023,7 +1023,7 @@ export default function App() {
     rowFades.clear();
     rowFades.forget(FADE_ROWS);
     setRowFading({});
-    setSettings({ ...DEFAULT_SETTINGS });
+    setSettings({ ...NEW_LOOK });
     setClearTrigger(v => v + 1);
     visualizerRef.current?.setHarmonyLock(null);
     setPinnedPresetId(null);

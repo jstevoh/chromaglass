@@ -2,6 +2,9 @@ import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
 import { layMoireLooks } from './presetsMoire';
 import { FOAM_CELLS } from './presetsFoam';
 import { layStirCords } from './lib/stir';
+import { layMusicCords } from './lib/musicCords';
+export { NEW_LOOK } from './lib/musicCords';
+import { PRESET_AREAS } from './lib/plateAreas';
 
 export interface Preset {
   id: string;
@@ -2357,9 +2360,12 @@ export const PRESETS: Preset[] = [
 ];
 
 // The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
-// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5). In that order.
+// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5), then the
+// music's hands as cords on every look, from its own wiring and areas (lib/musicCords.ts, PLAN 38v-1).
+// In that order.
 layMoireLooks(PRESETS);
 layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
+layMusicCords(PRESETS, id => PRESET_AREAS[id] ?? null);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).

@@ -18,7 +18,7 @@
  *     timed on the sim's own step; and a cord with none of the three set
  *     follows its reading exactly, which is every cord saved before this.
  *  2. The tables. Every area cord a look ships names an area that look has,
- *     one of the hand's four acts, and a feature its source really has, from
+ *     one of the hand's five acts, and a feature its source really has, from
  *     the fast sources only (hits, bands): `getAudioValue` reads an unknown
  *     name as 0, so a cord on a typo plays as nothing and looks fine in a
  *     review (28f found four). A cord with an area and a setting, or an act
@@ -76,7 +76,8 @@
  *     as many places as the look has areas that pour, the middle's one.
  */
 import { readFileSync } from 'node:fs';
-import { CordGate, AreaHands, isAreaCord, AREA_TARGETS, GATE_HYSTERESIS, AREA_PADDLE_ORBIT, AREA_STIR_TURN_S } from '../src/lib/areaCords.ts';
+import { CordGate, AreaHands, isAreaCord, isPlateHand, gated, AREA_TARGETS, GATE_HYSTERESIS, AREA_PADDLE_ORBIT, AREA_STIR_TURN_S } from '../src/lib/areaCords.ts';
+import { isMusicCord } from '../src/lib/musicCords.ts';
 import { PatchBay, cordReading } from '../src/lib/sceneMap.ts';
 import { PRESET_AREAS, areaFamily, areasForBand, areaForBand, areaDye, layAngle } from '../src/lib/plateAreas.ts';
 import { indicatorPH, indicatorScale, PH_WGSL } from '../src/lib/phIndicator.ts';
@@ -183,9 +184,18 @@ const DT = 1 / 60;
       if (m.area === undefined && !String(m.setting).startsWith('area')) continue;
       cords++;
       const areas = PRESET_AREAS[p.id];
-      if (!isAreaCord(m)) bad.push(`${p.id}: ${m.setting} on area ${m.area} is not an area cord`);
-      if (!areas || !areas[m.area]) bad.push(`${p.id}: area ${m.area}, and the look has ${areas?.length ?? 0}`);
-      if (!FAST.has(m.source)) bad.push(`${p.id}: ${m.source} is not a fast reading`);
+      /*
+        A hand with no area works the whole plate (38v-1), so it needs no area
+        of the look's; one with an area still needs that area. The music's
+        follow hands read the smoothed band the block they replaced read
+        (lib/musicCords.ts), as a follow cord on the plate does; a fast
+        reading is what a gate needs to open on the hit, so every gated cord,
+        the music's bloom included, is still held to one.
+      */
+      const onPlate = isPlateHand(m);
+      if (!onPlate && !isAreaCord(m)) bad.push(`${p.id}: ${m.setting} on area ${m.area} is not an area cord`);
+      if (!onPlate && (!areas || !areas[m.area])) bad.push(`${p.id}: area ${m.area}, and the look has ${areas?.length ?? 0}`);
+      if (!FAST.has(m.source) && (gated(m) || !isMusicCord(m))) bad.push(`${p.id}: ${m.source} is not a fast reading`);
       if (m.source === 'bands' && !SOURCE_NAMES.includes(m.feature)) bad.push(`${p.id}: bands has no ${m.feature}`);
       if (m.source === 'hits' && !HIT_FEATURES.includes(m.feature)) bad.push(`${p.id}: hits has no ${m.feature}`);
       if (m.threshold !== undefined && !(m.threshold > 0 && m.threshold < 1)) bad.push(`${p.id}: threshold ${m.threshold}`);
@@ -259,14 +269,15 @@ const DT = 1 / 60;
 
   const old = [{ source: 'room', feature: 'motion', setting: 'turbulenceScale', depth: 0.5 }, { source: 'hits', feature: 'kickHit', setting: 'plateRock', depth: 0.5, layer: 'all' }];
   const area = { source: 'hits', feature: 'kickHit', setting: 'areaStir', area: 1, depth: 0.6, threshold: 0.3, attack: 0.05, release: 0.5 };
+  // An act with no area was dropped until 38v-1; it is a hand on the whole plate now, and loads as it was.
+  const plateHand = { source: 'hits', feature: 'kickHit', setting: 'areaStir', depth: 0.6 };
   const wrong = [
     { source: 'hits', feature: 'kickHit', setting: 'turbulenceScale', area: 1, depth: 0.6 },
-    { source: 'hits', feature: 'kickHit', setting: 'areaStir', depth: 0.6 },
     { source: 'hits', feature: 'kickHit', setting: 'areaStir', area: -1, depth: 0.6 },
   ];
-  const out = sanitizePatch({ sceneMappings: [...old, area, ...wrong] }).sceneMappings ?? [];
-  check('a saved cord loads as it was; an area cord with its gate loads; a setting with an area, or an act with none, is dropped',
-    JSON.stringify(out) === JSON.stringify([...old, area]), `${out.length} of ${old.length + 1 + wrong.length} kept`);
+  const out = sanitizePatch({ sceneMappings: [...old, area, plateHand, ...wrong] }).sceneMappings ?? [];
+  check('a saved cord loads as it was; an area cord with its gate loads, and a hand with no area (the whole plate); a setting with an area, or an act on an area that cannot be, is dropped',
+    JSON.stringify(out) === JSON.stringify([...old, area, plateHand]), `${out.length} of ${old.length + 2 + wrong.length} kept`);
 
   /*
     The fold and an area: a cord with an area aimed at a real setting (which
@@ -330,7 +341,7 @@ const DT = 1 / 60;
     check('an area cord on a dragged band reads alike held and made new every frame, as a look fade makes it (and the old path, handed no range, stays silent)',
       held > 0.9 && Math.abs(fresh - held) < 0.02 && old < 0.1, `peak ${held.toFixed(3)} held, ${fresh.toFixed(3)} new each frame; old path ${old.toFixed(3)}`);
   }
-  check('the patch bay offers the hand\'s four acts', AREA_TARGETS.map(t => t.key).join() === 'areaHeat,areaStir,areaPour,areaHue');
+  check('the patch bay offers the hand\'s five acts', AREA_TARGETS.map(t => t.key).join() === 'areaHeat,areaStir,areaPour,areaHue,areaPress');
 }
 
 // ── 2b. Colour that answers the music (PLAN 25i) ─────────────────────
@@ -375,8 +386,8 @@ const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
   check('a master turns a level down, not a note into another: the same note at Sound Impact 0.4, none at 0, and no MIDI fader rides it',
     scaled.length === 0 && cordReading(ctxAt(0), noteCord, 0) === null && !MAPPABLE_SOURCES.includes('noteClass'), scaled[0] ?? 'alike');
 
-  // Poster's own cords: the kick's pour and the note's Bottle, on area 0.
-  const poster = PRESETS.find(p => p.id === 'poster-1969').settings.sceneMappings.filter(m => isAreaCord(m) && m.area === 0);
+  // Poster's own cords: the kick's pour and the note's Bottle, on area 0 (the music's hands there, 38v-1, pour bottles of their own and are not what this holds).
+  const poster = PRESETS.find(p => p.id === 'poster-1969').settings.sceneMappings.filter(m => isAreaCord(m) && m.area === 0 && !isMusicCord(m));
   const pArea = PRESET_AREAS['poster-1969'];
   const n = areaFamily(pArea[0]).length;
   const want = MELODY.map(m => bottleOf(m, n));
@@ -403,7 +414,8 @@ const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
   const wrongDrop = [];
   for (const id of ['red-cabbage', 'chemical-clock']) {
     const areas = PRESET_AREAS[id];
-    const shipped = PRESETS.find(p => p.id === id).settings.sceneMappings.filter(m => isAreaCord(m) && m.setting === 'areaPour');
+    // The look's own reagent cords; the music's pours there (38v-1) are held by `npm run musiccords`.
+    const shipped = PRESETS.find(p => p.id === id).settings.sceneMappings.filter(m => isAreaCord(m) && m.setting === 'areaPour' && !isMusicCord(m));
     const pours = id === 'chemical-clock' ? [...shipped, touch] : shipped;
     if (shipped.length < (id === 'chemical-clock' ? 1 : 2)) wrongDrop.push(`${id}: ${shipped.length} pour cords`);
     for (const m of pours) {
@@ -432,7 +444,8 @@ const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
   */
   const tools = readFileSync('src/sim/tools.ts', 'utf8'), viz = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
   if (!/export const areaSink = \(fluid: FluidSimulation\): AreaSink => fluidSink\(fluid, GRID_SCALE, pourLiquid\);/.test(tools)) wrongDrop.push('sim/tools.ts areaSink does not hand fluidSink pourLiquid');
-  if (!/hands\.lay\(sink,/.test(viz) || !/sink = areaSink\(af\)/.test(viz)) wrongDrop.push('the visualizer does not lay the area cords through areaSink');
+  // Since 38v-1 the area sink is wrapped by the music's (its drops and doses), and still the one made by areaSink.
+  if (!/hands\.lay\(sink,/.test(viz) || !/sink = (musicSink\(af, )?areaSink\(af\)/.test(viz)) wrongDrop.push('the visualizer does not lay the area cords through areaSink');
   // Chemical Clock's places: every one activator and on the bass, so successive kicks take them in turn.
   const clock = PRESET_AREAS['chemical-clock'];
   const turns = [0, 1, 2].map(k => clock.indexOf(areaForBand(clock, 'bass', k)));
@@ -455,7 +468,8 @@ const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
     the plate's mean over the look's target, which its source is read for.
   */
   {
-    const posterCords = PRESETS.find(p => p.id === 'poster-1969').settings.sceneMappings.filter(m => isAreaCord(m) && m.area === 0);
+    // Poster's own kick pour and note (the music's hands there, 38v-1, ride the same regulators and are held by `npm run musiccords`).
+    const posterCords = PRESETS.find(p => p.id === 'poster-1969').settings.sceneMappings.filter(m => isAreaCord(m) && m.area === 0 && !isMusicCord(m));
     const pAreasN = PRESET_AREAS['poster-1969'];
     const laidAt = (cords, fill) => {
       const hands = new AreaHands(), feats = { noteClass: 0.5 / 12 };
@@ -504,7 +518,8 @@ const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
     const heldFree = laidAt(heldCords, 0), heldAt1 = laidAt(heldCords, 1);
     const vizSrc = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
     const handed = /const fill = af\.meanDensity \/ Math\.max\(0\.06, dyeLookTarget\(af\.seedMean, currentSettings\.dyeBudget \?\? 0\.85, af\.seedBudget\)\);/.test(vizSrc)
-      && /hands\.lay\(sink, GRID_SIZE, simStepS, \([^)]*\) => [^\n]*, fill\);/.test(vizSrc);
+      // The call spans lines since 38v-1 (the whole plate's bottles, and its options last).
+      && /hands\.lay\(sink, GRID_SIZE, simStepS, \([^)]*\) => [\s\S]{0,300}?, fill, opts\);/.test(vizSrc);
     console.log(`  Poster's kicks with the regulator live: dye laid ${(at96 / free).toFixed(2)} of a free plate's at 0.96 full, ${(at1 / free).toFixed(2)} at its target, ${(over / free).toFixed(2)} at 1.2; a held pour ${(heldAt1 / Math.max(1e-9, heldFree)).toFixed(2)} at its target; a minute of kicks peaks at fill ${settle.fill.toFixed(3)}, where a hit pours ${settle.room.toFixed(2)} of itself`);
     check('Poster: with the regulator live, each kick still pours on a plate at its own fill target (at least 0.9 of itself) and a minute of kicks later (at least 0.7), none 20% over it, and a held pour none at its target (the control)',
       free > 0 && at96 >= 0.9 * free && at1 >= 0.9 * free && settle.room >= 0.7 && over === 0 && heldFree > 0 && heldAt1 === 0 && handed,
