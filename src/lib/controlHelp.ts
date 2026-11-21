@@ -113,6 +113,7 @@ export const CONTROL_HELP: Record<string, string> = {
   soapFilm: 'A real soap film in the frame: it drains, swirls with the flow, goes black from the top and is drawn again.',
   soapFilmRate: 'How fast the soap film runs: drains, swirls and is drawn again. One is a real film\'s pace sped up for the stage.',
   soapFilmAngle: 'The angle the soap film is seen from. Leaning it moves every band of colour to a thicker film.',
+  soapFilmTilt: 'How the soap film\'s frame is held: 90 hangs it, so gravity drains it into level bands; toward 0 it lies flat, and it keeps its swirls.',
   glitter: 'Glitter in the liquid: flakes that ride the flow, flip and glint in the Side Light and the closeup\'s softbox. Dark specks on the lamp.',
   lensStop: 'The lens\'s f-number. Wide open, glitter out of focus is big soft discs; stopped down, small discs and long six-pointed stars.',
   sideLight: 'A coloured lamp low beside the dish: glints on the glitter, its colour on the dye and the walls facing it. Clear liquid is untouched.',

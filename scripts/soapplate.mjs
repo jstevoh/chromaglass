@@ -55,6 +55,16 @@
  *   6. The angle is Snell's: drawn at Film Angle 45 the plate follows the CPU
  *      reference at cosI = cos 45° more closely than it follows the reference
  *      straight on (the bands move to a thicker film as you lean).
+ *
+ *   7. Big motions run and small ones crawl (PLAN 32k, 2026-11-13: about 12
+ *      forms a frame on the Mac against the owner's photograph's 55, and no
+ *      folded streaks). The same 20 nm of unevenness laid frame-wide turns
+ *      over at ten times the speed Darcy's law with the tuned ζ allows any
+ *      motion, and laid as 6 mm patches stays within twice it; and with the
+ *      frame tilted 12° from flat (Frame Tilt, 32h) at sin 12° of that speed.
+ *
+ *   8. The film stirs its own air (32d-1): on a plate with no flow at all,
+ *      the air over the frame moves, because the film's plumes drag it.
  */
 import { build } from 'esbuild';
 import { openLab } from './lab.mjs';
@@ -146,6 +156,38 @@ try {
     await lab.step(60, { soapFilm: 1 });
     o.hKept = Array.from((await film().read()).h);
     o.sums = [sum(o.hStir), sum(o.hStill)];
+
+    // 7: big motions run, small ones crawl. The same 20 nm of unevenness,
+    // laid once as one frame-wide tilt (thick on the left, thin on the right)
+    // and once as patches 6 mm across, at a slow drain rate so the film has
+    // barely moved when its velocity is read (the big swirls' solve is warm-
+    // started, so it is given twenty steps to settle).
+    const mobility = async (shape, tilt = 90) => {
+      await lay();
+      await lab.step(1, { soapFilm: 1, soapFilmTilt: tilt });
+      const h = new Float32Array(N * N);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) h[j * N + i] = 500 + 20 * shape(i + 0.5, j + 0.5);
+      film().film.write(h);
+      await lab.step(20, { soapFilm: 1, soapFilmRate: 0.25, soapFilmTilt: tilt });
+      const r = await film().film.read();
+      let q = 0; for (const v of r.uf) q += v * v; for (const v of r.vf) q += v * v;
+      // Which way the halves go: vf is down the film (rows run down), on the
+      // nx × (ny + 1) horizontal faces.
+      let left = 0, right = 0;
+      for (let j = 1; j < N; j++) for (let i = 0; i < N; i++) { if (i < N / 2) left += r.vf[j * N + i]; else right += r.vf[j * N + i]; }
+      return { rms: Math.sqrt(q / (r.uf.length + r.vf.length)), left, right };
+    };
+    o.mobBig = await mobility((x) => Math.cos(Math.PI * x / N));
+    o.mobPatch = await mobility((x, y) => Math.cos(2 * Math.PI * x / 6) * Math.cos(2 * Math.PI * y / 6));
+    o.mobTilt = await mobility((x) => Math.cos(Math.PI * x / N), 12);
+
+    // 8: the film's own plumes stir the air. No dye and nothing stirred, so
+    // the plate has no flow at all: whatever turns the air is the film.
+    await lab.create(N);
+    lab.flush();
+    await lab.step(30, { soapFilm: 1, soapFilmRate: 4 });
+    o.airStill = film().air ? Array.from(await film().air.read()) : null;
+    { const r = await film().film.read(); let q = 0; for (const v of r.uf) q += v * v; for (const v of r.vf) q += v * v; o.filmStill = Math.sqrt(q / (r.uf.length + r.vf.length)); }
     return o;
   }, { N, R });
 } finally {
@@ -324,6 +366,61 @@ const reported = (px) => {
   const r45 = corr(plate45, cpuRgb(cpuPicture(res.h, Math.cos(Math.PI / 4))));
   const r0 = corr(plate45, cpuRgb(cpu0));
   check('leaning the film is Snell\'s law: at 45° the plate follows the reference at 45° better than straight on', r45 > r0 + 0.2 && r45 > 0.85, `r = ${r45.toFixed(3)} against ${r0.toFixed(3)}`);
+}
+
+// ── 7. Big motions run, small ones crawl ─────────────────────────────
+/*
+  The film is a two-dimensional Brinkman fluid (gpu/soapAir.ts, PLAN 32k):
+  the air's drag on its faces resists a motion of any size alike, its surface
+  viscosity resists a small one far more. Darcy's law with the solver's one
+  tuned ζ (wgsl/soapFilm.ts) moves no part of the film faster than
+  ρ g Δh / ζ, 0.13 mm/s for these 20 nm, at any size: the swirls the frame
+  had before this were the size of the laid patches. Now the frame-wide
+  imbalance must turn over at ten times that, while the 6 mm patches stay
+  within twice it (their speed was the tuned one, and is kept).
+*/
+{
+  const ceiling = (1000 * 9.81 * 20e-9) / 1.5;
+  const big = res.mobBig, patch = res.mobPatch;
+  // And the right way round: the thick left half sinks (down the film, +vf) and the thin right half rises.
+  check('big motions run: a frame-wide 20 nm imbalance turns over at ten times the tuned Darcy ceiling, thick side sinking', Number.isFinite(big.rms) && big.rms > 10 * ceiling && big.left > 0 && big.right < 0,
+    `${(big.rms * 1e3).toFixed(2)} mm/s rms against a ceiling of ${(ceiling * 1e3).toFixed(2)}; left half ${big.left > 0 ? 'sinks' : 'rises'}, right ${big.right < 0 ? 'rises' : 'sinks'}`);
+  // Two-sided: a frozen film would pass an upper bound alone. Main's patches
+  // read 0.037 mm/s; the air the patches stir adds to it (the air loop), so the
+  // band is a tenth of the ceiling to twice it.
+  check('and small ones crawl: 6 mm patches of the same 20 nm move, at a tenth to twice that ceiling', Number.isFinite(patch.rms) && patch.rms > 0.1 * ceiling && patch.rms < 2 * ceiling,
+    `${(patch.rms * 1e3).toFixed(3)} mm/s rms`);
+  // Frame Tilt (32h): gravity along a frame tilted θ from flat is g sin θ,
+  // and the film's speed is linear in its weight, so at 12° the same
+  // imbalance turns over at sin 12° = 0.21 of the hanging speed.
+  const ratio = res.mobTilt.rms / big.rms, want = Math.sin(12 * Math.PI / 180);
+  check('and a frame tilted 12° from flat turns the same imbalance over at sin 12° of that (within 5%)', Math.abs(ratio - want) / want < 0.05,
+    `${ratio.toFixed(3)} of the hanging speed, sin 12° = ${want.toFixed(3)}`);
+}
+
+// ── 8. The film stirs its own air ────────────────────────────────────
+/*
+  The air over the frame is a fluid of its own (gpu/soapAir.ts, 32d-1): the
+  film's draining plumes drag it, and it keeps the motion. On a plate with no
+  dye and no stir the plate's flow is zero, so any air moving is the film's
+  doing. Before the air layer there was no air to read (a film that only
+  copied the plate's flow would read 0 here).
+*/
+{
+  const a = res.airStill;
+  let q = 0, n = 0;
+  if (a) for (let k = 0; k < a.length; k += 2) { q += a[k] * a[k] + a[k + 1] * a[k + 1]; n++; }
+  const rms = n ? Math.sqrt(q / n) : 0;
+  // Not just moving: tied to the film's own motion. Held steady the air would
+  // take kFilm / (kFilm + λ) = 2/3 of the film's speed; a fresh film's plumes
+  // are fastest in its first second and slow as it sorts, and the air keeps
+  // what they gave it (its memory, 1/λ ≈ 2 s), so two seconds in it reads
+  // about the film's own speed (1.07 when written). The band, 0.3 to 2, is
+  // that share and not a stray stir or a leaking texture, which would not be
+  // tied to the film's speed at all.
+  const share = rms / res.filmStill;
+  check('the film\'s own plumes set the air over it moving (no plate flow): air at 0.3 to 2 times the film\'s speed', Number.isFinite(share) && share > 0.3 && share < 2,
+    `air ${(rms * 1e3).toFixed(3)} mm/s, film ${(res.filmStill * 1e3).toFixed(3)} mm/s, ${share.toFixed(2)}`);
 }
 
 console.log(`\n${passed}/${passed + failed} checks passed`);

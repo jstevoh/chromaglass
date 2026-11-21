@@ -17,7 +17,7 @@ import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
-import { SoapFilmPlate, SOAP_PLATE_DX } from '../soapFilmPlate';
+import { SoapFilmPlate, SOAP_PLATE_DX, soapLean } from '../soapFilmPlate';
 import { TankPlate } from '../tankPlate';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
@@ -305,7 +305,9 @@ export class FluidPasses extends FluidFields {
       if (this.soapPlate) { this.soapPlate.dispose(); this.soapPlate = null; }
       return;
     }
-    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device);
+    const lean = soapLean(p.soapFilmTilt);
+    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device, undefined, lean);
+    this.soapPlate.lean = lean;
     const rate = Math.max(0, p.soapFilmRate ?? 1);
     // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement), in the frame's metres.
     const travel = p.dt * p.advection * ((this.N - 2) / this.N) * this.soapPlate.field.nx * SOAP_PLATE_DX / SOAP_FRAME_SPAN;

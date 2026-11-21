@@ -108,6 +108,7 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['soapFilm', 0.05],
   ['soapFilmRate', 0.25],
   ['soapFilmAngle', 1],
+  ['soapFilmTilt', 1],
   ['glitter', 0.05],
   ['lensStop', 0.5],
   ['sideLight', 0.05],
