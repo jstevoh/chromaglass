@@ -276,7 +276,7 @@ const DOC = /^[^/]+\.md$|^docs\/|^\.claude\/|^LICENSE[^/]*$/;
 const SITE_OWN = /^(src|public)\/|^index\.html$/;
 // `whole(info)` says which checks a site file selects whatever it is: the
 // Mac's are those `checkReads` calls `site` (anything but the lab's bundles
-// alone); a draft's Measure (`selectMeasure` with `readsOf`, PLAN.md 19ak-14)
+// alone); a draft's Measure (`selectMeasure` with `readsOf`, PLAN.md 19ak-16)
 // passes its own, narrower test.
 function selectCore(files, { before, after, root = ROOT, docs = false, readsOf = null, mac = false, whole = (i) => i.site, draft = false }) {
   const hit = [];
@@ -314,7 +314,7 @@ function selectCore(files, { before, after, root = ROOT, docs = false, readsOf =
       continue;
     }
     if (draft && f !== 'package-lock.json') {
-      // A draft's Measure (19ak-14) is `npm run quick`'s rule: the checks
+      // A draft's Measure (19ak-16) is `npm run quick`'s rule: the checks
       // whose scripts or bundles read the file, and for a file the site is
       // built from, every check that reads the whole site. A file no check
       // reads selects none (the `always` ones still run); the lockfile is
@@ -398,7 +398,7 @@ export function selectMeasure(files, ctx) {
   // Measure keeps running in full for the site's files on a PR that is ready
   // (and on every deploy): its harnesses read src/ in ways no bundle shows (a
   // check that greps the whole of src/, which the trace does not count as
-  // reading it). A draft's run (PLAN.md 19ak-14) passes `readsOf`, and then
+  // reading it). A draft's run (PLAN.md 19ak-16) passes `readsOf`, and then
   // each file selects what `npm run quick` would run for it: the checks whose
   // scripts or bundles read it, and for a file the site is built from every
   // check that serves the app, builds the site or reads dist/, or that
@@ -1115,7 +1115,7 @@ export async function checkReads(man, scripts, esbuild, root = ROOT) {
     const cmds = [c.run, ...[...npmScriptsOf(c.run, scripts)].map((n) => scripts[n] ?? '')].join('\n');
     // `built`: the check builds the site, serves it or reads dist/ (by its
     // own scripts), so it reads every site file; a draft's Measure takes it
-    // for any of them (19ak-14). `unread` is any of its scripts esbuild could
+    // for any of them (19ak-16). `unread` is any of its scripts esbuild could
     // not read, which leaves its `reads` short.
     const built = /\bnpm run build\b|\bvite build\b/.test(cmds)
       || [...own].some((f) => SERVES_APP.test(text(f)) || /['"`/]dist['"`/]/.test(text(f)));

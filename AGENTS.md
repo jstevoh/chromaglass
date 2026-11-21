@@ -52,7 +52,7 @@ merge"):
   finishes it on your branch.
 - Your summary comment at the end of each run starts `Pushed #<n> <item> head <sha>`.
 - Run `npm run quick` before every push. A draft's push runs no Mac and only the Measure
-  checks its diff reaches (PLAN.md 19ak-14). When that run is green, mark the PR ready
+  checks its diff reaches (PLAN.md 19ak-16). When that run is green, mark the PR ready
   (`gh pr ready <n>`): that runs Measure in full and the Mac, once.
 - Never post a `READY` line or add `ready-for-review` yourself: when `Checks` goes green
   on a ready PR's head, `ready.yml` adds the label and comments `READY #<n> <item> head <sha>`.

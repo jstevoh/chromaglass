@@ -2915,3 +2915,24 @@ settings are the look's. A video's colours are taken from eight frames across it
 4. A video of a few seconds with changing scenes: are colours from its later scenes in
    the palette, not only the first shot's?
 5. Reload the page: "From picture" is still the palette, in the same four colours.
+
+## 138. Polarised light (PLAN 31p-1)
+
+**Judged 2026-11-14.** The owner watched the Mac films (lamp and dye looks, before and after) and approved the look.
+
+The check (`npm run polar`) proves the laws against Jones matrices and the spectrum, that off
+is off to the byte, that a still plate between crossed sheets is black and a stirred one
+lights in colour, and that the quarter-wave plates take the dark lines out, on the lab's
+software WebGPU at one frame. How the bands move with the music at sixty frames is only seen
+here.
+
+1. Open any look with Turbulence up (or the music on, which stirs it through its cord).
+   Settings → Lamp & Light → **Polarisers** to 1. Good: rainbow bands where the liquid moves,
+   broad and smooth like the photograph's dishes, flowing with the liquid and darker where it
+   is calm. Bad: a flat tint everywhere, bands that slide over still dye, speckle or noise.
+2. **Analyser** from 90 down to 0: the dark field turns white and every band swings to its
+   opposite colour. Bad: a jump, or bands that do not change.
+3. **Quarter Wave** to 0: dark curving arms appear through the bands; back to 1, they go.
+4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
+   pinks and greens. The default 0.3 should feel like the photograph.
+5. Polarisers at 0 on any look: the look exactly as before.

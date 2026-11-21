@@ -169,6 +169,11 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'glitter', type: 'f32', note: 'how much of SPECK_MAX glitter is suspended in the liquid, 0 none' },
   { name: 'lensStop', type: 'f32', note: "the lens's f-number: the specks' defocus discs shrink and their diffraction spikes grow as it rises" },
   { name: 'sideLight', type: 'f32', note: "the side lamp's radiance against the lamp ground's white, 0 off" },
+  /* Polarised light (lib/polar.ts, wgsl/platePolar.ts; PLAN 31p-1). At polariser 0 the display takes a branch and is as it was. */
+  { name: 'polariser', type: 'f32', note: 'how far the polarising sheets are in the beam, 0 out, 1 in' },
+  { name: 'analyserAngle', type: 'f32', note: "the analyser's turn against the polariser, radians (pi/2 crossed)" },
+  { name: 'quarterWave', type: 'f32', note: 'how far the two quarter-wave plates are in, 0 plane sheets, 1 circular (no isoclinics)' },
+  { name: 'birefringence', type: 'f32', note: "retardation, nm, per unit of the solver's principal strain rate" },
   { name: 'lensFinish', type: 'i32', note: "what finishInMain was: the lens pass lays the display's finish when it runs" },
 ];
 

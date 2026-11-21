@@ -364,7 +364,7 @@ async function selftest() {
         // carry is driven by its own cases below, against a mocked API.
         env: childEnv({ GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out, PR_DRAFT: 'false', ...env }),
       });
-      // The `draft` notice is what ready.yml reads (19ak-14), so it is part
+      // The `draft` notice is what ready.yml reads (19ak-16), so it is part
       // of the answer; no other case's answer changes.
       const notice = /::notice title=draft::/.test(stdout.toString()) ? ' notice=draft' : '';
       return fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ') + notice;
@@ -427,7 +427,7 @@ async function selftest() {
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
   }
-  // A draft (PLAN.md 19ak-14): no Mac, whatever the diff reaches, and a site
+  // A draft (PLAN.md 19ak-16): no Mac, whatever the diff reaches, and a site
   // file runs only the Measure checks that read it (E imports src/x.ts, C
   // does not) and the always ones, where a ready PR's runs them all. The
   // controls: the same diffs on a PR that is not a draft, and a draft whose
@@ -631,7 +631,7 @@ if (!isMain) {
     }
     const files = git('diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD').split('\n').filter(Boolean);
     const reaching = files.filter(reachesMac);
-    // A draft (PLAN.md 19ak-14, the owner's choice of 2026-11-21): the week
+    // A draft (PLAN.md 19ak-16, the owner's choice of 2026-11-21): the week
     // of 9 to 15 November spent 833 hours of GitHub's Macs and most of 1,394
     // of its ubuntu on pull requests, about ten whole runs a PR, nearly all of
     // them pushes to drafts, which is how every PR here is opened and stays

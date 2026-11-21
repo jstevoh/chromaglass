@@ -159,8 +159,10 @@ async function open(query, { viewport = { width: 1440, height: 900 }, phone = fa
   page.on('pageerror', (e) => console.log(`   page error: ${e.message}`));
   // What the app says of its own opening ("ChromaGlass: …", a warning when
   // the pipelines were not all built ahead), kept to print beside a failure.
+  // A lost device too: its line does not name the app, and a loss rebuilds
+  // the whole setup, the one sign of it from outside (PLAN 14v-12b).
   page.cgSaid = [];
-  page.on('console', (m) => { if (/ChromaGlass/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
+  page.on('console', (m) => { if (/ChromaGlass|device lost/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
   if (slow) {
     const cdp = await context.newCDPSession(page);
     await cdp.send('Network.enable');
@@ -541,4 +543,12 @@ await browser.close();
 server.close();
 const failed = checks.filter((c) => !c.ok).length;
 console.log(failed ? `\n${failed} of ${checks.length} FAILED` : `\nall ${checks.length} ok`);
+// The runner (scripts/checks.mjs) honours a quarantined line (PLAN.md 19ak-1)
+// only when the harness also says how many of its lines passed, in its own
+// words, so a crash after the quarantined line cannot pass for it. This
+// harness never printed that tally, so 19ak-9's quarantine of 9c could never
+// hold: every pull request that ran the browser shard went red on 9c alone
+// (found 2026-11-21 on the webpage films' run). The tally is the same count
+// as the line above, in the form the runner reads.
+console.log(`${checks.length - failed}/${checks.length} checks passed`);
 process.exit(failed ? 1 : 0);

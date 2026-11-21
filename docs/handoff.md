@@ -250,7 +250,7 @@ still hold a moved bar to its stated reason; what changed is only that no one wa
 reading of the diff. (Until 2026-11-15 physics, taste and check changes owed a review
 before merge and the rest a sampled one after; an older PR's `sampled` reads as `none`.)
 
-**1. Green.** A draft's run skips the Mac and runs part of Measure (PLAN.md 19ak-14), so
+**1. Green.** A draft's run skips the Mac and runs part of Measure (PLAN.md 19ak-16), so
 when it is green the author marks the PR ready, which runs everything once. When `Checks`
 finishes green on a ready Antigravity PR's head (or any ready PR labelled `review-owed`),
 `.github/workflows/ready.yml` adds `ready-for-review` and posts

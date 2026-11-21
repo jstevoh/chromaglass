@@ -53,7 +53,7 @@ on:
     workflows: [Checks]
     types: [completed]
   # A push, and the PR being marked ready, which starts the run that decides
-  # (19ak-14): until it is green, no head of it is ready.
+  # (19ak-16): until it is green, no head of it is ready.
   pull_request:
     types: [synchronize, ready_for_review]
 
@@ -74,7 +74,7 @@ jobs:
       issues: write
       pull-requests: write
       # The run's jobs and its reach job's notices: a draft's run is not a
-      # ready head (19ak-14).
+      # ready head (19ak-16).
       actions: read
       checks: read
     runs-on: ubuntu-latest
@@ -115,7 +115,7 @@ jobs:
           gh label create ready-for-review --color 0e8a16 \
             --description "Checks are green on the PR's current head" 2>/dev/null || true
 
-          # A draft's green run (PLAN.md 19ak-14) skipped the Mac shards its
+          # A draft's green run (PLAN.md 19ak-16) skipped the Mac shards its
           # diff reaches: `reach` leaves a `draft` notice when it did. Such a
           # head is not ready to merge. Marking the PR ready starts the run
           # that runs them, and that run's green labels it. Read from the run
