@@ -53,10 +53,16 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 - **18c-8** A small window is square-ish on the grid: a source a few cells wide on the
   collocated grid piles the pushed dye on its four diagonals (dark lobes at 192² for a drop of
   amount 10, gone by amount 30). With 18a-8's carry.
-- **18c-9** The drop's contact patch and steps (`DROP_CORE` 0.7, about 5 steps,
-  `lib/dropImpact.ts`) are numerical: a one-step source mixes its cell, 1/(1 + f). Replace
-  with the drop's real entry over its capillary time τ = √(ρD³/σ), in seconds rather than steps,
-  once the window's edge can be compared with the reference on the Mac.
+- **18c-11** The held stream's strength. A stream held on the plate lays its colour at the
+  strength of a column of the same bottle's drop (`dropColumnDye`), which at the default bottle is
+  about three quarters of the old stamp's dye a step, spread flatter; the old stamp was a number
+  with no liquid behind it. Once 18c-5 makes the Amount the rate, the colour a second should be
+  the bottle's concentration times that rate, not a drop's column.
+- **18c-12** The drop's dome is a parabola take·(1 − d²) laid over the window's radius at once
+  (`pourVolume`), not the spreading of a drop squeezed between two glasses (a Hele-Shaw source
+  whose front is set by the pressure the drop's own weight and surface tension give). Measure the
+  window's growth on the Mac's grid against R(t) of a Hele-Shaw drop, then lay the drop at a
+  point and let the solver spread it.
 - **18c-4** An oil drop as a lens or a film by the spreading coefficient
   S = γ_w − γ_o − γ_ow (the bottles carry σ now, 18d-1), with 18d-3.
 - **18c-5** The held pour's rate is one number, a dropper's 0.5 mL/s (`HELD_POUR`,

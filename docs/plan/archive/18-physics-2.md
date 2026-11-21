@@ -93,3 +93,17 @@ Shipped in #353 (2026-10-10): optical scattering packed into `vel.w` from specie
 with conserved flux-form advection; Kubelka–Munk diffuse backscattering on black ground
 yielding opaque white milk and pastel food dyes (PLAN §4); two-flux forward extinction with
 Rayleigh-Gans wavelength … Story in `docs/plan-shipped.md` §18j (moved 2026-10-29, 19m).
+
+## 18c. A pour adds liquid, not only colour
+
+**18c-1 shipped** (a bottle's pour is volume on a thin gap; `npm run flush`, judging §43; story in
+`docs/plan-shipped.md` §18c). **18c-2 shipped and 18c-3 the splash crown's part shipped** (a colour
+drop is a pour of its volume and opens a window of its own colour; the splash's ring kick gone,
+satellites only past Cossali's K; `npm run dropwindow`; story in `docs/plan-shipped.md` §18c).
+**18c-9 and 18c-10 shipped** (a drop enters over its capillary time; a hand's drop from any bottle,
+and a stream held on the plate, lay their colour with their own volume; story in
+`docs/plan-shipped.md` §18c). Left, each its own PR:
+
+- ~~**18c-2**~~ The colour's own drops as volume. Shipped (see above).
+- ~~**18c-9**~~ The drop's entry over its capillary time τ = √(ρD³/σ). Shipped (see above).
+- ~~**18c-10**~~ A hand's drop and a held stream lay their colour with their volume. Shipped (see above).

@@ -564,7 +564,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   from 2026-11-21 to 2026-12-06 so unrelated PRs stop going red on main's reds; no bar
   moved, main's deploys still run both lines, and the line still prints in full as a
   warning. The PR that fixes each (#897 for 9c, the 8-draw-a-7 fix for drawwall) takes
-  its entry out.
+  its entry out. *Found 2026-11-21 (PR #679's run 44927401897): 9c's entry never held,
+  because `scripts/intro.mjs` printed "1 of 14 FAILED" and never the "13/14 checks
+  passed" tally that `quarantined()` in `scripts/checks.mjs` needs before it honours a
+  line; the films PR adds the tally line (the drawwall harness already printed one).*
 - **19ak-10. Decided: a deploy still trusts a PR run that was green through a
   quarantine.** `deploygate.sh` rules 4 and 5 trust a PR's green `Checks` run, and a run a
   quarantine held green is green, so a line red on the merged tree can go live on the PR's
