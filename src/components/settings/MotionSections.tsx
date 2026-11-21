@@ -136,6 +136,25 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ slosh: v })}
           settingKey="slosh"
         />
+        {/* A hand's tip of the flat plate, two knobs' worth (lib/handTilt.ts, PLAN 18a-13m): the middle is level. */}
+        <Slider
+          label="Tilt Left/Right"
+          value={settings.plateTiltX ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ plateTiltX: v })}
+          settingKey="plateTiltX"
+        />
+        <Slider
+          label="Tilt Up/Down"
+          value={settings.plateTiltY ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ plateTiltY: v })}
+          settingKey="plateTiltY"
+        />
         <Slider
           label="Plate Rock"
           value={settings.plateRock ?? 0.45}

@@ -65,6 +65,17 @@
  *      is still building behind the show, a drop is the stamp it was, its
  *      whole dye and no pour (asking sooner compiled it in the opening:
  *      `npm run startup` read it as the show's own wait)
+ *  10. a bottle's drop (`dropBottle`, syrup and ink) is queued with its
+ *      liquid in every pour (its species for syrup, none for ink), lays the
+ *      stamp's whole dye with its volume, and tells the bottle's deposit the
+ *      volume came already (push false); with the pour not built it is the
+ *      stamp and the deposit pours (push true); and the hand's three drop
+ *      paths in LiquidVisualizer call it, none stamping with volume false
+ *      (the Mac's grid showed those opening no window, PLAN 18c-10)
+ *  11. a stream held on the plate (`layStream`) pours one share a step, the
+ *      held share pourShare gives, and lays its colour with that volume at
+ *      the strength of a column of the same bottle's drop (dropColumnDye, to
+ *      1e-6 a cell), its deposit pushing nothing; with no pour, the stamp
  *
  * Measured (SwiftShader, 2026-11-14): see the commit that added it.
  */
@@ -88,17 +99,19 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
 {
   const out = 'node_modules/.cache/dropwindow-drop.mjs';
   await build({
-    stdin: { contents: "export * from './src/sim/dropSplash.ts'; export * from './src/lib/dropImpact.ts';", resolveDir: '.', loader: 'ts' },
+    stdin: { contents: "export * from './src/sim/dropSplash.ts'; export * from './src/lib/dropImpact.ts'; export { speciesOf } from './src/lib/liquidProps.ts'; export { LiquidPhase } from './src/lib/liquidPhase.ts'; export { DISH_METRES } from './src/lib/turntable.ts';", resolveDir: '.', loader: 'ts' },
     bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
   });
   const D = await import(`../${out}`);
   let seed = 7;
   const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
-  const plate = (dropHeight) => {
+  const plate = (dropHeight, dtSeconds = 1 / 60) => {
     const p = {
-      size: 192, dropHeight, dropFingering: 0.5, thinGap: true, drops: D.makeDropQueue(),
+      size: 192, dtSeconds, dropHeight, dropFingering: 0.5, thinGap: true, drops: D.makeDropQueue(),
       laid: [], vel: 0, squish: 0, pours: [], ready: true,
-      gpu: { pour: (x, y, r, share) => p.pours.push({ x, y, r, share }), pourReady: () => p.ready },
+      gpu: { pour: (x, y, r, share, sp, volume, what) => p.pours.push({ x, y, r, share, sp, what, volume }), pourReady: () => p.ready },
+      deposits: [], liquid: { deposit: (x, y, r, what, amount, seconds, volume = true) => p.deposits.push({ what, volume }) },
+      addTemp() {},
       rng: { float: rand, angle: () => rand() * Math.PI * 2 },
       addDensity(x, y, a) { p.laid.push([x, y, a]); },
       addVelocity() { p.vel++; },
@@ -128,13 +141,24 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
   const R0 = Math.round(3 * 1.5);
   let m0 = 0; for (let j = -R0; j <= R0; j++) for (let i = -R0; i <= R0; i++) { const dd = Math.hypot(i, j); if (dd <= R0) m0 += (1 - dd / R0) ** 2; }
   const sch = D.dropSchedule(AMOUNT, 192);
-  const pourAt = (x) => {
-    const q = plate(0);
-    D.layDrop(q, x, 96, AMOUNT, 1, 1, 0.1, 1, true);
+  const pourAt = (x, amount = AMOUNT, dt = 1 / 60, s = sch) => {
+    const q = plate(0, dt);
+    D.layDrop(q, x, 96, amount, 1, 1, 0.1, 1, true);
     let guard = 0;
     while (D.dropsLive(q.drops) && guard++ < 50) D.stepPlateDrops(q);
-    return { n: q.pours.length, shares: q.pours.every((p) => Math.abs(p.share - sch.share) < 1e-6 && Math.abs(p.r - sch.radius) < 1e-6), dye: q.laid.reduce((s, l) => s + l[2], 0) };
+    return { n: q.pours.length, shares: q.pours.every((p) => Math.abs(p.share - s.share) < 1e-6 && Math.abs(p.r - s.radius) < 1e-6 && p.volume === true), dye: q.laid.reduce((s, l) => s + l[2], 0) };
   };
+  /*
+    The schedule against numbers worked out by hand, not against itself: a
+    drop of amount 5 (0.07 mL, D 5.1 mm) has τ = √(1000 · D³ / 0.072) ≈ 43 ms;
+    a drop of amount 8 stepped at 1/120 s takes ⌈τ/dt⌉ = 7 steps, where the
+    whole column's floor alone (the old numerical schedule's kind) gives 4; and
+    a plate stepped at 1/120 s must pour it in those 7 (layDrop passes the
+    plate's own step, not 1/60).
+  */
+  const tau5 = D.dropEntrySeconds(5), sch8 = D.dropSchedule(8, 192, 1 / 120);
+  const fast = pourAt(96, 8, 1 / 120, sch8);
+  const capillary = tau5 >= 0.040 && tau5 <= 0.046 && sch8.steps === 7 && Math.abs(sch8.radius - D.dropDiameter(8) / 2 / D.DISH_METRES) < 1e-9 && fast.n === 7 && fast.shares;
   const mid = pourAt(96), edge = pourAt(2), want = m0 * AMOUNT;
   // A frozen plate (no steps) dropped on forty times: nothing reaches it until it steps (moving's freeze).
   const frozen = plate(0);
@@ -148,10 +172,80 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
   let firstFall = -1;
   for (let k = 0; k < 200 && firstFall < 0; k++) { D.layDrop(t, 96, 96, 0.05, 1, 1, 0.1, 1, true); if (D.dropsLive(t.drops)) firstFall = k; }
   check('9. a drop pours in its schedule and lays all its dye, middle and edge, and the trickle falls as one drop when it has a drop\'s worth',
-    mid.n === sch.steps && mid.shares && edge.n === sch.steps && Math.abs(mid.dye / want - 1) < 1e-3 && Math.abs(edge.dye / want - 1) < 1e-3
+    capillary && mid.n === sch.steps && mid.shares && edge.n === sch.steps && Math.abs(mid.dye / want - 1) < 1e-3 && Math.abs(edge.dye / want - 1) < 1e-3
       && firstFall > 0 && Math.abs((firstFall + 1) * 0.05 - D.DROP_TATE) < 0.051 && frozen.laid.length === 0
       && !D.dropsLive(cold.drops) && cold.pours.length === 0 && Math.abs(coldDye / want - 1) < 1e-3,
-    `${mid.n} pours of ${sch.share.toFixed(3)} (schedule ${sch.steps}); dye laid ${(mid.dye / want).toFixed(4)} of the stamp's at the middle, ${(edge.dye / want).toFixed(4)} at the edge; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE}); forty drops on a frozen plate laid ${frozen.laid.length} cells; with the pour not yet built, ${cold.pours.length} pours and the stamp's ${(coldDye / want).toFixed(4)}`);
+    `τ ${(tau5 * 1000).toFixed(1)} ms at amount 5; amount 8 at 1/120 s: schedule ${sch8.steps} steps, ${fast.n} poured (shares and volume ${fast.shares}); ${mid.n} pours of ${sch.share.toFixed(3)} (schedule ${sch.steps}); dye laid ${(mid.dye / want).toFixed(4)} of the stamp's at the middle, ${(edge.dye / want).toFixed(4)} at the edge; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE}); forty drops on a frozen plate laid ${frozen.laid.length} cells; with the pour not yet built, ${cold.pours.length} pours and the stamp's ${(coldDye / want).toFixed(4)}`);
+  /*
+    10–11: a bottle's drop and a held stream (PLAN 18c-10). Filmed on the
+    owner's Mac (2026-11-21), the hand's Dropper opened no window: it stamped
+    its dye with `volume` false and let the bottle's deposit pour the volume
+    on its own, so the colour was laid first and pushed out by the clear
+    liquid after it. The checks hold the wiring the window needs: the drop
+    goes through the queue with its liquid in it, the deposit is told the
+    volume came already, and the hand calls these (LiquidVisualizer's own
+    paths, read from its source, since the hand needs the whole app).
+  */
+  const SYRUP = { viscosity: 50, density: 1.3 }, INK = { tension: 0.05 };
+  const bottle = (what, ready = true) => {
+    const q = plate(0); q.ready = ready;
+    D.dropBottle(q, 96, 96, AMOUNT, 1, 1, 0.1, 1, what, 4, 1);
+    let guard = 0;
+    while (D.dropsLive(q.drops) && guard++ < 50) D.stepPlateDrops(q);
+    return { n: q.pours.length, sp: q.pours.every((p) => !!p.sp === !!D.speciesOf(what) && p.what === what && p.volume === true), dye: q.laid.reduce((s, l) => s + l[2], 0), push: q.deposits.map((d) => d.volume) };
+  };
+  const syrup = bottle(SYRUP), ink = bottle(INK), coldB = bottle(SYRUP, false);
+  const fs = await import('node:fs');
+  const lv = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  /*
+    The hand's source, pinned whole rather than by the old line's exact text:
+    three dropBottle calls, each handing its bottle's liquid on; the four
+    autoInject('drop') calls left are the music's drops (no bottle in the
+    hand); and no liquid.deposit of the hand's own, which would push the
+    volume a second time. A drop path added or renamed fails here loudly.
+  */
+  const calls = lv.match(/dropBottle\(af,[^;]*;/g) ?? [];
+  const handDrops = calls.filter((c) => c.includes('liq?.behaviour')).length;
+  const musicDrops = (lv.match(/autoInject\('drop'/g) ?? []).length, handDeposits = (lv.match(/liquid\.deposit\(/g) ?? []).length;
+  /*
+    The deposit's half of the double pour lives in two places the plate stub
+    above cannot reach: LiquidPhase.deposit must hand `volume` on to its
+    onDeposit, and the sim's onDeposit must pour only when push is not false.
+    The first runs here for real; the second is pinned by its text, so a
+    rename fails rather than passes.
+  */
+  const phase = new D.LiquidPhase(192);
+  const forwarded = [];
+  phase.onDeposit = (...a) => forwarded.push(a[6]);
+  phase.deposit(96, 96, 4, SYRUP, 1, 1 / 60, false);
+  phase.deposit(96, 96, 4, SYRUP, 1, 1 / 60);
+  const simSrc = fs.readFileSync('src/sim/fluidSimulation.ts', 'utf8');
+  const guard = /this\.thinGap && g\.pour && push !== false/.test(simSrc);
+  check('10. a bottle\'s drop comes in through the queue with its liquid, its deposit pushes nothing, and the hand\'s three drops are bottle drops',
+    syrup.n === sch.steps && syrup.sp && Math.abs(syrup.dye / want - 1) < 1e-3 && syrup.push.join() === 'false'
+      && ink.n === sch.steps && ink.sp && ink.push.join() === 'false'
+      && coldB.n === 0 && coldB.push.join() === 'true' && Math.abs(coldB.dye / want - 1) < 1e-3
+      && calls.length === 3 && handDrops === 3 && musicDrops === 4 && handDeposits === 0 && /layStream\(af,[^;]*liq\?\.behaviour/.test(lv)
+      && forwarded.join() === 'false,true' && guard,
+    `syrup ${syrup.n} pours (schedule ${sch.steps}) carrying its species ${syrup.sp}, dye ${(syrup.dye / want).toFixed(4)} of the stamp's, deposit push ${syrup.push}; ink ${ink.n} pours, push ${ink.push}; with the pour not built, ${coldB.n} queued pours (the deposit pours it: push ${coldB.push}) and the stamp's ${(coldB.dye / want).toFixed(4)}; the hand: ${calls.length} dropBottle calls, ${handDrops} with the bottle's liquid, ${musicDrops} autoInject drops (the music's 4), ${handDeposits} deposits of its own; LiquidPhase forwards push ${forwarded}, the sim's guard ${guard ? 'there' : 'missing'}`);
+  // The stream: one pour a step at the held share, its colour laid with that volume at the drop's strength.
+  const st = plate(0), R = 5, DYE = 0.7, k = 1;
+  const laid = D.layStream(st, 96, 96, R, 0.8, DYE, 1, 1, 0.1, 0, SYRUP, k);
+  const share = st.pours[0]?.share ?? 0, C = D.dropColumnDye(192);
+  const perCol = st.laid.map(([i, j, a]) => a / (share * (1 - ((i - 96) ** 2 + (j - 96) ** 2) / (R * R))));
+  // Every cell inside the stream's disc gets colour (an empty list would pass `every`), and the total is the dome's.
+  let inside = 0, dome = 0;
+  for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) { const d2 = i * i + j * j; if (d2 < R * R) { inside++; dome += 1 - d2 / (R * R); } }
+  const flat = st.laid.length === inside && perCol.every((c) => Math.abs(c / (C * DYE) - 1) < 1e-6) && Math.abs(laid / (C * DYE * share * dome) - 1) < 1e-6;
+  // The drop's own strength: its dye over the column-cells its pours put down, π(r N)²/2 each.
+  const dropStrength = want / (sch.steps * sch.share * Math.PI * (sch.radius * 192) ** 2 / 2);
+  const coldS = plate(0); coldS.ready = false;
+  const coldLaid = D.layStream(coldS, 96, 96, R, 0.8, DYE, 1, 1, 0.1, 0, SYRUP, k);
+  check('11. a held stream pours its volume each step and lays its colour with it, at the strength of the same bottle\'s drop; with no pour, the stamp',
+    st.pours.length === 1 && share > 0 && st.pours[0].sp && st.pours[0].volume === true && flat && Math.abs(C / dropStrength - 1) < 1e-3 && st.deposits[0]?.volume === false
+      && Math.abs(laid - st.laid.reduce((s, l) => s + l[2], 0)) < 1e-9
+      && coldS.pours.length === 0 && coldS.deposits[0]?.volume === true && Math.abs(coldLaid / (0.8 * m0) - 1) < 1e-6,
+    `share ${share.toFixed(4)} a step, ${st.laid.length} cells of the disc's ${inside} at ${(C * DYE).toFixed(3)} a column (a drop's ${dropStrength.toFixed(3)} at dye 1, ${C.toFixed(3)} the stream's), ${laid.toFixed(2)} laid, deposit push ${st.deposits[0]?.volume}; cold: ${coldS.pours.length} pours, the stamp's ${(coldLaid / (0.8 * m0)).toFixed(4)}`);
 }
 
 // ── 1–6, on the solver ──

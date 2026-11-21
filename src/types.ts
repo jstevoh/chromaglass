@@ -580,6 +580,19 @@ export interface VisualizerSettings {
    * Optional so a look saved before it reads as 0.
    */
   slosh?: number;
+  /**
+   * A hand tipping the flat plate on the projector, left and right (PLAN
+   * 18a-13m): −1 to 1, 0 level. Up dips the right edge and the colour runs
+   * right. Two knobs on a controller are what it is for. Not Gravity: the
+   * plate stays flat on the lamp, and on a thin gap heavy dye slides down the
+   * tip and light oil rises (lib/handTilt.ts says why it is that tilt, eased,
+   * with a level middle). Added to the remote phone's tilt. A hand's alone:
+   * never the sound's or Evolve's. Optional so a look saved before it reads
+   * as level.
+   */
+  plateTiltX?: number;
+  /** The same, top and bottom: up dips the top edge and the colour runs up the screen. */
+  plateTiltY?: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -947,6 +960,10 @@ export interface VisualizerSettings {
   sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
   sideLightHue: number;       // the side lamp's colour as a hue, degrees (30 amber, 0 red, 320 magenta)
   sideLightAngle: number;     // where round the dish the side lamp stands, degrees from the right, counter-clockwise
+  polariser: number;          // polarising sheets under the plate and at the projector's head, 0 (out) to 1 (in): the stretched liquid shows Michel-Levy colours (PLAN 31p-1)
+  analyserAngle: number;      // the analyser's turn against the polariser, degrees: 90 crossed (dark field), 0 parallel (white field, complementary colours)
+  quarterWave: number;        // quarter-wave plates with the sheets, 0 (plane: dark pinwheel arms where the stretch lines up with a sheet) to 1 (circular: colour bands only)
+  birefringence: number;      // how strongly the liquid's stretch retards the light, 0 to 1 (400 nm per unit of the solver's strain rate at 1)
   tank: number;               // a tank of water seen through its side instead of the dish: 0 off, else the dye's glow (PLAN 47n)
   tankFeed: number;           // the nozzle's speed, cm/s: how fast dye is fed in at the surface (47n)
   tankWeight: number;         // how much heavier the dye is than water, %: what gravity pulls it down with (47n)
@@ -1102,6 +1119,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
+  plateTiltX: 0,            // level: the hand's tip of the flat plate (lib/handTilt.ts)
+  plateTiltY: 0,
   slosh: 0,                 // the plate as it was: a tilt changes the level and the liquid does not slop (lib/slosh.ts)
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
@@ -1229,6 +1248,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   sideLight: 0,
   sideLightHue: 30,
   sideLightAngle: 160,
+  polariser: 0,             // no sheets in the beam: every look as it was, to the bit (the shader's branch)
+  analyserAngle: 90,        // crossed, the classic: dark until the liquid moves
+  quarterWave: 1,           // circular: the bands with no black lines through them (the owner dislikes thick black outlines)
+  birefringence: 0.3,       // a Turbulence-0.35 stir in broad first- and second-order bands on the Mac (lib/polar.ts)
   tank: 0,                  // the dish from above: every look but the tank's
   tankFeed: 1.5,
   tankWeight: 0.5,

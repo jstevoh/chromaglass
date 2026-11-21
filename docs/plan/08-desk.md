@@ -86,6 +86,19 @@ Open from Desk v2, each its own thread (the UI lane):
       press (the same head read median 4 on its first run). Hold the control to a
       quiet wall (median change under a bar, as the turned reading is) and re-take the
       window when it is not, rather than reading the press against a moving plate.
+    - **8-draw-a-7** (S) Found 2026-11-21 (the main-green thread), beside 8-draw-a-6:
+      the control's red is not the plate's noise. Four GitHub Mac runs on two heads
+      (#896's branch ad85989 twice, #893's f1e11db) read the same numbers, "cell 21:
+      292 to 294, most changed 33 (499 to 505), median 383 to 392, centre none"; the
+      runs that pass read median 3 or 4 there, and the turned press just before read
+      median 3 or 4 on every run. Something moves the whole picture, the same way, in
+      the window after an old-style controller says hello and drops four times. The
+      heads share no commit the green heads lack (#896 is the tilt knobs; #893 carries
+      #872's slosh wake and #700's https), so the two may be one mechanism reached two
+      ways, the liquid tipped or sloshed. The control now prints what the display did
+      over its window (its own frame's median change, the lead plate's tip and rock,
+      the dishes' spin, the rung, the steps). Read the next red and fix the cause; do
+      not re-take the window until it is known.
   - **8-draw-b** (S) The phone's Draw has no bottle, Spin or Tilt (the design's four
     tools only); they are in Controls. A bottle tile on the phone, or a long press on
     Drop for the bottle list, would put soap on the plate from Draw.
