@@ -1145,8 +1145,12 @@ check('and a new song does not repaint a look being built', /if \(designing\) re
 
 check('saving can write over the look in hand', /const saveOver = useCallback/.test(presetHook));
 check('and saving is no longer a download', !/upsert\(p\);\n    downloadText/.test(presetHook) && /const exportPreset/.test(presetHook));
+// Nothing is the defaults with the music's hands on them since 38v-1 (lib/musicCords.ts
+// NEW_LOOK): a new look answers the music as it did when its hands were the app's own.
+const musicCordsSrc = readFileSync(join(root, 'src/lib/musicCords.ts'), 'utf8');
 check('and there is a way to start from nothing',
-  /const newLook = \(\) => \{/.test(app) && /setSettings\(\{ \.\.\.DEFAULT_SETTINGS \}\)/.test(app));
+  /const newLook = \(\) => \{/.test(app) && /setSettings\(\{ \.\.\.NEW_LOOK \}\)/.test(app)
+    && /export const NEW_LOOK: VisualizerSettings = withMusicCordsOnce\(DEFAULT_SETTINGS\);/.test(musicCordsSrc));
 check('and the document says when it is unsaved', /setDocDirty\(true\)/.test(app) && /edited=\{docDirty\}/.test(app));
 // One flag, not two: `lookEdited` was derived from the pinned preset and could
 // not be true of an empty plate somebody had since painted.
