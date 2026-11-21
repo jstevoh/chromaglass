@@ -3259,6 +3259,20 @@
       ]
     },
     {
+      "name": "A colour drop pushes the dye aside into a window of its own colour, and splashes only past Cossali's K",
+      "shard": "fifth",
+      "run": "npm run dropwindow",
+      "timeout": 6,
+      "why": [
+        "PLAN 18c-2 and 18c-3: a colour drop on a thin gap is a pour of its",
+        "volume, so it opens a window in a pool of dye, keeps what it pushed in",
+        "a collar, holds it open and fills it with its own colour, where a stamp",
+        "with no volume (the control) does not; and the sim's layDrop throws",
+        "satellites only past Cossali's threshold and lays no ring kick. Two",
+        "192² plates of about two seconds and a node part; beside dropcolour."
+      ]
+    },
+    {
       "name": "A packed foam's junctions turn to 120°",
       "shard": "fifth",
       "run": "npm run foam",
@@ -3493,7 +3507,7 @@
       "name": "The show opens without stopping",
       "shard": "open",
       "run": "npm run startup",
-      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-01", "until": "2026-11-15" }],
+      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "The show opens without stopping (scripts/startup.mjs): what the look",
         "opens with is built before it opens and the rest behind it, none is",
@@ -3660,7 +3674,7 @@
       "name": "Every tool does what it says",
       "shard": "tools",
       "run": "node scripts/tools.mjs",
-      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-01", "until": "2026-11-15" }],
+      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "Every other tool in the hand (asked for: \"check all of the tools to",
         "make sure they work in expected ways\"): each does what it says and",
@@ -3816,7 +3830,7 @@
       "name": "The wall",
       "shard": "tools",
       "run": "npm run wall -- --owed=quarter,red,rung",
-      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-01", "until": "2026-11-15" }],
+      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
         "how many times a second the whole screen is allowed to change.",
