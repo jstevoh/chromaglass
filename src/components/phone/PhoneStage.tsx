@@ -26,7 +26,7 @@ import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
-import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
+import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { canShareClip, shareClip } from '../../lib/shareClip';
@@ -41,6 +41,7 @@ import { TabStrip } from '../desk/TabStrip';
 import type { TabEdit } from '../../hooks/useDeskLayout';
 import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
+import { SiteLink } from '../SiteLink';
 import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 import { PicturePaletteButton } from '../PicturePaletteButton';
 
@@ -172,8 +173,8 @@ export interface PhoneStageProps {
   onVideoDye: () => void;
   /** A picture or video file's colours as the palette (usePaletteLock, PLAN 43d): the desk's own call. */
   onPicturePalette?: (file: File) => Promise<string | null>;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -891,12 +892,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
-          {/* Not closed on a press, unlike the two above: Pour and Film are
-              each a toggle someone may want both of, and Stop is here too. */}
-          {p.cartoons && (
+          {/* The video loaded (PLAN 14ag), by this sheet's "A video as dye" or
+              the Video section's Video file: not closed on a press, unlike the
+              two above, since Play and Pour are each a toggle someone may want
+              both of, and Pour's Stop is here too. */}
+          {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
-              <CartoonShelf {...p.cartoons} size="phone" />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" />
             </div>
           )}
           </PanelGuard>
@@ -1340,6 +1343,8 @@ export function PhoneStage(p: PhoneStageProps) {
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
           </div>
+          {/* The website's free visuals, in the apps only (SiteLink.tsx renders nothing on the site). */}
+          <div className="mt-3"><SiteLink look="sheet" /></div>
           {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
           <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
             <SectionLabel>Record makes</SectionLabel>

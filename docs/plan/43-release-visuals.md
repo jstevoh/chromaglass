@@ -53,7 +53,7 @@ nothing. A loop that needs less of a crossfade (a periodic stir locked to the ba
   the done-for-you test at about $49 a single and $129 an EP, capped at ten orders a month
   (43f); (c) is not built. Three shapes, from the
   research: (a) a self-serve **Release kit** in the app, in Home, with no per-track
-  charge ("every release's visuals for $35, once"); (b) a done-for-you **Render for
+  charge ("every release's visuals for $29, once"; Home was $35 until 23.21); (b) a done-for-you **Render for
   release** service at about $49 a single and $129 an EP, fulfilled with (a) on the
   owner's Mac and approved by the owner before it is sent; (c) a per-track unlock on the
   free site at $5 to $9. The research recommends (a) first and (b) as a small paid test on

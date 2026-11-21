@@ -642,11 +642,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
   /** Told when a captured window is taken away from the browser's side. */
   const filmEndedRef = useRef<(() => void) | null>(null);
-  /** Frames the plate's loop found a poured video ready to read, for `npm run cartoons`. */
+  /** Frames the plate's loop found a poured video ready to read, for `npm run myvideo`. */
   const videoPourReadsRef = useRef(0);
   /*
     What the plate holds as its pour and its film, under `?debug`, so
-    `npm run cartoons` can ask whether the video it watched play is the one the
+    `npm run myvideo` can ask whether the video it watched play is the one the
     plate reads, not only that some video played. Set apart from
     `chromaglassDebug` (which waits for the GPU) because the hand-over is the
     same with or without one.
@@ -656,7 +656,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     stopped in the GL effect's cleanup, which also runs on a rebuild (a lost
     device, a resolution change: `glEpoch`), so a loop, the camera or a
     window went dark on the projector while the panel still said it was
-    playing. Found by `npm run cartoons` on software WebGPU (PW_WEBGPU=1):
+    playing. Found by the cartoons check on software WebGPU (PW_WEBGPU=1):
     a second and a half after Film the projector held no film and the video
     had been reset; with the stop moved here, it plays on (16/16).
   */
@@ -1193,7 +1193,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'drop': {
         const liq = selectedLiquidRef.current;
         if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
-        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose);
+        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose, !liq?.behaviour);
         af.addTemp(x, y, 0.6 * amt);
         break;
       }
@@ -1275,7 +1275,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       default: { // dropper
         const liq = selectedLiquidRef.current;
-        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
+        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
         layBottle(af, x, y, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), liq, kTool);
       }
     }
@@ -3460,17 +3460,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 layBottle(af, x, y, bottleReach(liq, 2 * GRID_SCALE), liq, k);
 
               } else if ((currentSettings.dropHeight ?? 0) > 0.02) {
-                // The dropper held above the plate lets go of drops rather than
-                // pouring a stream: one as the press lands, then one every
-                // DROP_EVERY steps while it is held, each carrying the dye the
-                // stream would have laid in that time and each landing with its
-                // splash (autoInject's drop reads the height).
+                // Held above the plate the dropper lets go of drops, not a
+                // stream: one as the press lands, then one every DROP_EVERY
+                // steps, each with the dye the stream would have laid, landing
+                // from the height (sim/dropSplash.ts).
                 hand.laid.steps++;
                 if (hand.clock % DROP_EVERY === 0) {
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   hand.laid.drops++;
                   hand.laid.dye += amt * poured.dose;
-                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
+                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
                   if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k, DROP_EVERY * af.dtSeconds);
                 }
@@ -3898,7 +3897,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const ry = DICE.lay.int(GRID_SIZE - 20) + 10;
                 const color = harmonyColor(harmonyOf(li));
                 const style = DICE.lay.pick(styles);
-                fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
+                fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5, false, 1, false);
                 fluid.addTemp(rx, ry, 2.0);
                 // A fresh plate is laid with its liquids, not dosed into them.
                 doseLiquid(fluid, liquidsOf(li), rx, ry, 1.4);

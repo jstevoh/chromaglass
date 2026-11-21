@@ -1,4 +1,4 @@
-import type { CartoonShelfProps } from '../CartoonShelf';
+import type { VideoShelfProps } from '../VideoShelf';
 import type { ReactNode, Ref } from 'react';
 import type { MixTakes } from '../../lib/mixFade';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -195,8 +195,8 @@ export interface DeskProps {
   onPicturePalette?: (file: File) => Promise<string | null>;
   onImageDye: () => void;
   onVideoDye: () => void;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   tool: string;
   onTool: (t: string) => void;
   amountOf?: (tool: string) => number;
