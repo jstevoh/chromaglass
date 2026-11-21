@@ -53,8 +53,10 @@ declare global {
     __cgRiding?: unknown;
     /** Turn the plates to given angles in radians, to reproduce a report's plate exactly. */
     chromaglassRotation?: (angles: number[]) => void;
-    /** The video pour and the film's video, for `npm run cartoons`. */
+    /** The video pour and the film's video, for `npm run myvideo`. */
     __cgVideo?: () => unknown;
+    /** The film sense (hooks/useFilmSense.ts): whether it runs, the video it reads, and its reading, for `npm run myvideo`. */
+    __cgFilmSense?: () => { enabled: boolean; src: string | null; ready: boolean; energy: number };
 
     // ── The show and the desks (App's hooks in `src/app/`, most in `useCheckHooks.ts`; `?debug`) ──
 

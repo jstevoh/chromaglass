@@ -397,7 +397,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                 >
                   <div className="flex items-center justify-between text-[13px] font-medium text-text">
                     <span>Home → Pro</span>
-                    <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$164</span> once</span>
+                    <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$170</span> once</span>
                   </div>
                   <p className="mt-1 text-[12px] leading-snug text-text-2">
                     Pay the difference for OSC, Art-Net, the 1024² grid and cloud sync.
@@ -413,8 +413,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                     className="flex flex-col rounded-lg border border-border-strong bg-elevated p-3 text-left transition-colors hover:bg-hover"
                   >
                     <span className="text-[13px] font-medium text-text">Home</span>
-                    <span className="text-[12px] text-muted"><span className="font-mono font-medium text-text-2">$35</span> once</span>
-                    <span className="mt-1.5 text-[12px] leading-snug text-muted">Full-length recording, 4K renders, system audio, phone remote.</span>
+                    <span className="text-[12px] text-muted"><span className="font-mono font-medium text-text-2">$29</span> once</span>
+                    <span className="mt-1.5 text-[12px] leading-snug text-muted">Full-length recording, 4K renders, system audio, phone remote, Live Show.</span>
                   </a>
                   <a
                     href={buildCheckoutUrl(CHECKOUT_PRO_URL, checkoutEmail)}
