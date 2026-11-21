@@ -106,3 +106,38 @@ the post's video, which zooms the whole frame on the sound: frame motion, off by
 ChromaGlass itself as an AUv3 inside AUM: the plate needs WebGPU and more memory than an
 audio extension gets (inferred), the same reason as §13's "not doing a plugin inside
 the host"; 13.7-ipad is the part of it that fits.
+
+## 48f. Faraday waves: the music's shake stands up as a pattern (shipped 2026-11-21)
+
+Idea 48f of the visuals the music moves, picked by the owner 2026-11-21 ("anything that can be impacted by the music
+itself. Like the standing-wave patterns"), written here beside the cords because it is
+one: the music reaches it only through Music Shake, a cord from the bass onto Shake. The
+story is in `docs/plan-shipped.md` under 48f. Open:
+
+- **48f-2. The saturation's coefficients, derived** (M). The cubic that stops the
+  pattern growing (wgsl/faraday.ts) is the curvature's own for ripples and u³ for
+  gravity waves, weighted by the capillary share, scaled so a wave settles at a real
+  pattern's steepness (S0 = 0.6). Replace the scale with Zhang and Viñals' (1997)
+  coefficients for the layer, so which pattern stands (stripes, squares, hexagons,
+  quasi-patterns at two frequencies) is the liquid's too. `npm run faraday` prints the
+  peaks round the ring today (6, 3 and 9 at 20, 50, 100 Hz: a disordered lattice after a
+  few seconds, not yet the squares experiments show for ripples); hold them once derived.
+- **48f-3. The dish's wall** (M). The grid is periodic over the plate's square; a real
+  dish's rim pins the pattern and launches its own meniscus waves at the drive's own
+  frequency. Lay the rim (lib/rimMask) as a wall in the step.
+- **48f-4. The drive follows the music's pitch** (S–M). Shaker is a dial; the music only
+  moves Shake. A cord from the bass line's pitch onto Shaker would put the big cells
+  under low notes and the fine ones under high, which the patch bay has no source for
+  yet (a pitch reading as a cord source).
+- **48f-5. Two frequencies** (M). A real speaker playing music shakes at many at once;
+  two drive frequencies make quasi-crystal patterns (Edwards and Fauve 1993). The step
+  takes one.
+- **48f-6. The strobe's phase** (S). The light is drawn as a camera locked to the wave at
+  its crest (wgsl/plateFaraday.ts), so it holds still; a dial that detunes that lock
+  slowly would let the crests and troughs trade places over seconds, as a detuned strobe
+  shows them, without ever flickering.
+- **48f-7. A look that opens shaken** (S). No look sits on the shaker yet, so every look
+  opens as it did; a look built for it (Shaker on, Music Shake set) would show the
+  feature without a hand on the desk. Needs the owner's judging first (docs/judging.md
+  §139).
+

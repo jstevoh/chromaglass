@@ -208,6 +208,12 @@ const NOT_THE_LOOK = new Set([
   */
   'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
   /*
+    The dish on a speaker (PLAN 48f): whether there is a shaker and how
+    hard it shakes are the performer's and the music's (through its cord),
+    never a wander of Evolve's.
+  */
+  'faradayHz', 'faraday',
+  /*
     Polarised light (PLAN 31p-1): the sheets are put into the beam and the
     analyser turned by a hand at the projector. Wandering in, the sheets
     would black the plate out under nobody's hand (crossed, a still plate

@@ -94,6 +94,8 @@ const SECTION_OF: Record<string, string> = {
   frameSway: 'look',
   slosh: 'tilt',
   plateTiltX: 'tilt',
+  faradayHz: 'tilt',
+  faraday: 'tilt',
   plateTiltY: 'tilt',
   beatSqueeze: 'show',
   kickBloom: 'show',
