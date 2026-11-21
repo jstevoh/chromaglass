@@ -85,8 +85,17 @@ a grid of generic stock thumbnails: ours are the plate itself.
     all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
     about 30 days). Until one is won, a visitor in a blocked country who opens
     that card gets YouTube's own notice in the player, not the film.
-  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills; more records
-    as each year's recordings enter the public domain (1926's on 1 January 2027).
+  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills.
+  - **34a-6d. The films to modern ambient music.** *(The owner, 2026-11-21: "we need to move
+    all of the demo videos off of the old recordings. The quality is just too low.")* In
+    progress (this thread's PR): the webpage's six, the TV samples and their channel copies to
+    Scott Buckley's CC BY 4.0 library, each on the look its record had; a long channel film of
+    Chris Zabriskie's *Cylinders* (CC BY 4.0), a look a piece (`npm run sitefilms -- --album
+    cylinders`). `public/landing/films/SOURCES.md` has each page, licence line and checksum.
+    The 1920s films stay on the channel and 34a-6c's disputes stand.
+  - **34a-6e. Open: a TV build with the new films.** The Android TV app names its sample films
+    in `Sample.java`; a TV on build 24 or older keeps playing the 1920s films (they stay in the
+    `tv-films-1` release) until the next build reaches Play.
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
   synth people, producers and artists, who need the technical capabilities before they pay.)*
   `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
