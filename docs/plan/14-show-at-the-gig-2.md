@@ -204,6 +204,39 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   startup's "no stop in the opening" 0.13 s after (2.35 s from 8.70 s). `Quiet.go` now comes
   once the opening's last build has settled and its first uses are paid; `npm run intro`
   lines 9 and 9b hold it to that. The Mac's `startup` check 4 is the real test.
+- **Shipped, 14v-12: the opening compiles a display for its own look, and the intro says
+  what it is waiting for** (2026-11-14, the owner: "Things take like 30 seconds to get
+  loaded and started on mobile web ... we should have the loading state present if there
+  are no visuals and some kind of loading updates"). Story in `docs/plan-shipped.md` §14v-12;
+  `npm run leandisplay`, `openingtime -- --variants ",lean=0"`.
+- **14v-13. Found: the phone's own numbers are unread.** Every number in 14v-12 is software
+  WebGPU's (all CPU, the nearest thing to a phone's compiler in a cloud session) or a Mac's.
+  The loading line now prints the seconds beside each stage; read them on the owner's
+  phone (cold, after a deploy that changed the display, and warm), and on an Android
+  phone, and write where the thirty seconds went. If the chunks' download is a large share
+  (the app is two 1.2 MB scripts, 391 and 370 kB gzipped), that is 14v-15.
+- **14v-14. Found: the flipped displays are still whole.** The camera's, the film stock's
+  and the lens pass's scene display are built behind the show whole (one 5 to 8 s compile
+  each on software WebGPU); a look that opens on the camera (`open.camera`) or film stock
+  (`open.stock`) waits for one whole display in its opening. A lean flipped display for
+  those looks is the same mechanism with `toTexture`; `leandisplay` would need a flipped
+  draw.
+- **14v-15. Found: on a slow phone network the intro gives way to "Still loading" at 8 s.**
+  `main.tsx`'s `Loading` turns into the stale-copy message and takes the intro down after
+  eight seconds of download, which a phone on a weak signal can take for the app's 760 kB
+  gzipped. Read the download's share on a phone first (14v-13); then either a longer wait
+  on a slow connection (`navigator.connection`) or the loading line saying "Loading" with
+  the bytes so far.
+- **14v-16. Found: three moiré tests are true on every look.** `U.moireSheetA > 0.5`,
+  `U.moireSheetB > 0.5` and `U.moireFlip > 0.5` test the sheets' names, which every look
+  has, while the ink's amount (`moireAmount`, 0 on all but the moiré looks) is what turns
+  them off, inside `moireSheets`. Testing the amount at the call would let the lean display
+  leave the moiré out on 34 of 41 looks (`displayLean.ts` cannot gate a test every look passes).
+- **14v-17. Found: a lost device's rebuild is a grey line on black.** "rebuilding the
+  plate…" (`LiquidVisualizer.tsx`, `gl-lost`) is all a viewer sees while a replacement
+  device opens, which is the whole opening again; it should be the intro's mark and its
+  loading line. `LiquidVisualizer.tsx` is over its size ceiling, so the caption moves to a
+  small component first.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do

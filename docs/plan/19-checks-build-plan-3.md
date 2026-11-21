@@ -575,10 +575,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
   measure over a fixed number of plate steps, not wall time, so its bar means the same on
   every runner.
+  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
 - **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
-  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
-  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
+  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
+  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
+  circle's edge; find whether the red runs read a lit edge
   (the sample too close) or a frame not yet drawn (the read too early), and measure the
   feature, not the moment.
 - **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
@@ -611,3 +613,15 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
   prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
   (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
+- **19ak-8. Open: the three quarantines renewed 2026-11-15, to 2026-12-06.** The first
+  three quarantines (19aa-7, 19aj-1, 19aj-2) ended on 2026-11-15 with none of the three
+  fixes shipped. That morning about half the open PRs (a count of PRs, not of runs) went
+  red on startup's "moving for good no later than the old way", the show's own wait 2.8
+  to 4.3 s against the control's 1.0 to 1.5 s plus its second, on PRs that do not touch
+  the opening; the Blow stroke's and the wall's lines block again too. Each is renewed
+  for the 21 days the rule allows; no bar moved, and main's deploys still hold all three to their bars. Two things
+  to read before 2026-12-06: whether the startup line got worse after #861 (19ah-9b's
+  two behind lanes, `LATER_LANES` 2, sharing the GPU with the show's opening; deploy 849
+  at 37bae99, which carries #861, passed it), and whether 19aa-7d (#878, the control's
+  compile stop priced) moves the control's side of the line. A second renewal is not
+  the answer: fix the item or take the line out of the bar with its own reasons.

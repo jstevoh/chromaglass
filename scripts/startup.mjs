@@ -103,7 +103,7 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { engineQuery } from './frame.mjs';
 import { heldStretches, selfCheck } from './pagehold.mjs';
-import { behindSaid, halvesWhole, waitBehind } from './startupbehind.mjs';
+import { asOldWay, behindSaid, halvesWhole, waitBehind } from './startupbehind.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -1226,14 +1226,13 @@ const gpuTime = (o) => {
   its first build under that name only (`gpu/prepare.ts`). Both include each
   pipeline's first use, which the old way paid on its frames as well
   (`gpu/kit.ts`, firstUse). What the show waited for beyond the old way's
-  list is not priced out: it is the show's own wait.
+  list is its own wait.
 
-  Moving for good is read off steps sampled every quarter second, on both
-  sides, so the two own waits are each good to about a quarter second. The
+  Moving for good is read off steps sampled every quarter second on both
+  sides, so each own wait is good to about a quarter second. The
   seventy runs' logs printed only each control's longest frame stop and each
   show's whole build, so the replay of them (-0.90 to +0.31 s) is a proxy
-  for this rule; every run now
-  prints the stop it chose and where it began, to read it against.
+  for this rule; every run now prints the stop it chose and where it began.
 */
 const waitOf = (x, oldWay) => {
   if (x.steadyFrom == null) return null;
@@ -1251,7 +1250,8 @@ const waitOf = (x, oldWay) => {
   const priced = [];
   if (x.prepared) {
     const seen = new Set();
-    for (const [key, at, ms] of x.prepared.builds ?? []) {
+    for (const [b, at, ms] of x.prepared.builds ?? []) {
+      const key = asOldWay(b);
       if (!oldWay.includes(key) || seen.has(key) || at / 1000 >= steady) continue;
       seen.add(key);
       compile += Math.min(ms / 1000, steady - at / 1000);
@@ -1568,7 +1568,7 @@ try {
   check(`and it built the old way's pipelines no slower than the old way compiled them on its frames (at most ${COMPILE_RATIO}×)`,
     rate != null && rate <= COMPILE_RATIO,
     rate == null ? `nothing to compare${cDevices === 1 ? '' : ` (the control had ${cDevices} devices)`}` : `${oWait.compile.toFixed(2)} s building ${oWait.shared} of the ${oldWay.length} ahead, against ${cWait.compile.toFixed(2)} s stopped for them: ${rate.toFixed(2)}×`);
-  const notWaited = p ? oldWay.filter((k) => !p.keys.includes(k)) : oldWay;
+  const notWaited = p ? oldWay.filter((k) => !p.keys.map(asOldWay).includes(k)) : oldWay;
   check('every pipeline it asked for ahead was built ahead, before it opened and behind it, on the device it opened on',
     !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && halvesWhole(p, b),
     !p ? 'nothing was prepared (no `pipelines` in chromaglassDebug)'
