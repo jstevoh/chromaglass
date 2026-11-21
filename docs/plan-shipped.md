@@ -2608,6 +2608,31 @@ never join with. `npm run phonelink` asks all of it, with a WebSocket count that
 the localhost desk's socket so that "opens no socket" cannot pass by counting nothing:
 29 of 36 on the code before, 36 of 36 now.
 
+### 14m-https. A network display could not start
+
+**Shipped** (after 14m-mark). Found while doing 14m-lan: a browser gives WebGPU only to a
+secure page (https, or localhost), and the address the show server printed for a projector's
+browser or a second computer was `http://<laptop-ip>:3000/?cast=true&key=…`, so the network
+display stopped at its first shader module ("GPUTextureUsage is not defined"), in Chromium
+and by the same rule in Safari. The show server (`server/remote-server.js`) now also serves
+the same files and the same relay over https on `HTTPS_PORT` (`PORT + 443`, 3443 beside
+3000), with a self-signed certificate made by the system's `openssl` on the first launch
+and kept in `server/.tls` (the Mac app keeps it in its own data folder, `TLS_DIR`). Each
+display's browser warns once (Advanced, then Proceed), and from then on the page is a secure
+context with WebGPU: measured in Chromium, a page whose certificate warning was accepted is
+secure and has `navigator.gpu`. One WebSocketServer takes upgrades from both ports, so every
+count and broadcast sees an https display and an http phone alike; a socket to another path
+is still refused. An https port that is taken, or no `openssl`, leaves the show on http and
+says why. Why not the alternatives: a certificate browsers trust outright needs a public name
+and an authority a room's Wi-Fi lacks; a home-made authority installed per device is the same
+warning made into a setup step; the tunnel leaves the room; a WebGL copy of the plate would be
+a second renderer. The server prints and the desk's Cast menu shows the https address with the
+warning's words; the phone's remote stays on http (it needs no GPU and so no warning).
+The address list sits in `src/components/NetworkDisplayAddresses.tsx`, since `App.tsx` may not
+grow. `npm run netdisplay`: 11 of 11; on main's server before it, 3 of 11 (eight fail: no
+https port, no certificate, the display never opens, no http-only fallback said). Built in #443, closed while idle drafts
+were cleared, and carried onto main in the PR that shipped it.
+
 ### 14o. The song-ID Worker is open to anyone
 
 **Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an
@@ -3710,6 +3735,41 @@ the day they pass.
     the phone's pad down, 0.9 at 180°.
   - What it cannot see here: the liquid. The scheme is `npm run slosh`'s, the kernels
     `sloshgpu`'s, the look at sixty frames the Mac's (judging §58, §64, and the owner's film).
+- **18a-13m, tilt the plate from two knobs (shipped 2026-11-15).**
+  - What was asked: the owner, 2026-11-15, "I want to be able to control the tilt of the
+    plate from my midi controller. Maybe two knobs?" Gravity and Tilt Direction were
+    pinnable but not MIDI-learnable, and as a pair they are a compass, not two hands:
+    Direction does nothing at Gravity 0 and wraps at the end of its knob.
+  - What changed: two settings, Tilt Left/Right and Tilt Up/Down (`plateTiltX`,
+    `plateTiltY`, −1..1, default 0), learnable, in Tilt & Rock under Slosh, on the desks,
+    the remote and the phone's Motion sheet. `lib/handTilt.ts` turns them into the tilt
+    the frame loop hands the solver, added to the remote phone's.
+  - Why that tilt and not Gravity: Gravity stands the plate up, and past a thousandth the
+    solver makes it a sealed bottle with a lamp under its floor (27f-9). A knob is a hand
+    nudging the flat dish on the projector, which is the rock's path the phone already
+    took: on a thin gap the colour's weight down the tipped plate (Darcy, hsBody,
+    ROCK_FALL), light oil lifted the other way (27f-5), the dish sloshing as far as Slosh
+    lets it, the cover glass sliding as far as Frame Sway does. Nothing new in the solver.
+  - Eased: a critically damped follow at 12 rad/s, stepped exactly so the solver's rate
+    does not change it (a CC arrives in 1/127 steps, and the slosh dish and cover took
+    each as a knock); the middle 4% of the travel is level, since CC 64 reads 0.008 and a
+    knob put back by hand lands a step or two off, which over a set drains the plate.
+  - Turned into each plate's dish by its own `plateAngle`, as `downhill()` turns Tilt
+    Direction (`tipPlate`, once per layer, since Rotation is per layer): that path reached
+    the dish unturned, the reason the Tip pad wrote Gravity instead (18a-13j). The phone's
+    own stays unturned until 18a-13k is checked. Phone and knobs together are limited by
+    length (√2, the phone's own corner), not axis by axis after the turn, which would have
+    cut a corner tip by up to 29% four times a turn on a spinning dish (found in review).
+  - A hand's alone: out of the patch bay, sound mapping and Evolve, like Slosh.
+  - Measured (`npm run handtilt`, 24 lines): CC 62–66 level, CC 0/127 the full tip; a
+    throw end to end moves 0.018 in its first sixtieth, 0.95 by 0.4 s, never past; the
+    same 0.874311 at 0.3 s at 30, 60 and 120 steps a second; turned as `downhill()` to
+    machine precision; both knobs at full 1.414 long and at 45.0° on the screen at five
+    dish angles; with the knobs at 0 every plate's tilt, rock and slosh tilt are the old
+    frame loop's from the phone alone, to 2e-16, over phone ages 0 to 3.2 s on a swinging,
+    turned dish.
+  - What it cannot see: the liquid's answer, which is the rock's (`npm run rides`,
+    `oillift`, `slosh`), and the look at sixty frames, the Mac's.
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the
@@ -9499,8 +9559,8 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   255 and no pixel lit, for as long as it was in. Coming in, Hold and Follow now check
   their aim (`src/lib/macroLanding.ts`, beside the camera, which is near the size the repo
   warns at); if its frame holds under a tenth of the plate's average dye, they go to the
-  nearest frame holding at least half what the plate's fullest does, centred on the dye in
-  it, and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
+  nearest liquid (since the follow-up below, the nearest pool), centred on the dye in it,
+  and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
   and lands on the first pour; a hand moving the aim during the closeup is obeyed onto
   glass, and a mode switch mid-closeup is not a landing (`npm run holdjump`). It stops
   asking once fully in or after 1.5 s (a pinch let go at 1.5x otherwise cut across the
@@ -9512,7 +9572,14 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   button flipped `macroMode` alone, so the plate went to 4x while the Macro Zoom knob
   beside it read 1.00x; it is now the M key's press (`closeupToggle`), in by the zoom and
   out with both, and so are the phone's Zoom, the remote's Closeup switch and the
-  command palette's, whose lit states and a pad's light read `closeupIn`.
+  command palette's, whose lit states and a pad's light read `closeupIn`. Then, on the
+  owner's film of it (2026-11-14), it chose the blue pool over the orange one, and asked
+  nearest or biggest, the owner said "go to the nearest pool": the nearest frame that
+  held a pool had been measured to that frame's middle, and a 16:10 frame reaches a pool
+  beside the aim from nearer its middle, so a pool 0.179 off to the side beat one 0.160
+  above the aim. It now reads the plate in pool-sized boxes, joins the touching boxes of
+  liquid into pools (a box under a quarter of the fullest box is a wash or a fringe), and
+  goes to the pool whose middle is nearest the aim (`closeupland` line 12, red before).
 
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
@@ -11184,6 +11251,36 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   way: 19k-16 (`draftwall --frames` painted 0 on #734's run), with the line printing what the
   projector window says of itself.
 
+#### 19k-20. The ear behind the wall: windows the runner can fill
+
+- **19k-20** (E, S): **shipped** (2026-11-14). After 19k-15 `npm run ears` went red three more
+  times on GitHub's hosted Macs (MacCloud, westus), each on a different line and each on a
+  fixed two-second window the runner could not fill: deploy 729's "covered with no wall" read
+  15 ticks and 7 levels (bars more than 20 and 10; the page was free about 7 times a second),
+  #718's "uncovered" 19 frames (bar more than 20, its 17 ticks all in stalls past 250 ms), #744's
+  "visible with the wall asking" 7 frames stamped (bar 10). Main's deploys 732 and 733 passed.
+  The check measured the runner. Reproduced in a cloud session two ways the check now takes:
+  `--slow=16` (Chromium's CPU throttle on the page and the wall) put four lines red on 8 to 12
+  frames; `--busy=130` (a 130 ms long task every 140 ms) put two red (15 asks, 16 frames).
+  Now each window lasts at least 2 s, so a free runner measures exactly as before, then until
+  the runner has *offered* 30 of what the line is judged on (frames the page drew, frames the
+  wall asked for, page turns of a 16 ms timer, level samples), never the readings judged, at
+  most 15 s. Every bar is the one it was. Slowed, the covered line then went red on a bar that
+  was wrong: it held asks plus ticks to the frames drawn within 2, but a tick reads and draws
+  nothing (`askFrame` and `render` are the only callers of `draw()`), so with the wall's asks
+  more than 250 ms apart its ticks counted against it (32 asks, 9 ticks, 32 frames). Now exact
+  both ways: no more ask readings than frames drawn, and frames past them only one per tick (an
+  ask within EAR_MIN_GAP_MS of a tick's reading is that reading; #718's 44, 1, 45 on 11-08).
+  The check-skeptic found that "one per tick" excused asks the ear never got (a build deaf to
+  every ask in the first half of each second went green at 31 asks, 49 ticks, 61 frames), so
+  each excused ask is now found by its own time, stamped on the wall's side within 6 ms after a
+  tick's reading (that build: red). And since a stretched window makes a fixed count easier,
+  the tick line is also held to ten readings a second over its window, or half the page's own
+  turns where the page got fewer (half the turns alone went red on a GitHub Mac whose worker ran
+  at half the page's rate: 48 ticks, 99 turns, 2.1 s), and "uncovered" to every frame drawn, as the visible lines.
+  Cloud: 26/26 at full speed (2 s windows, 21 s run), `--slow=16`, 32 and `--busy=130` (up to
+  100 s; a window that reaches the 15 s cap says so).
+
 #### 21. Looks after painters (found along the way, for §14b)
 
 *Found along the way (for §14b's owner, not this section's):* on this PR's two Mac
@@ -11227,7 +11324,9 @@ over a second (`originGap >= 1000`).
   the centrifugal force as a paraboloid floor −Ω²r²/2g (the scheme's well-balancing holds
   the heap at rest exactly), and the Euler force −Ω̇ ẑ×r and the Coriolis force −2Ω ẑ×u on
   both layers, in the TypeScript reference and the GPU kernels alike. A spin over 0.34 rad/s
-  (a heap of a hundredth of the depth) or a change of speed over 0.25 rad/s² wakes the dish;
+  (a heap of a hundredth of the depth) or the liquid's lag behind a change of speed over the
+  same 0.34 rad/s wakes the dish (22n-1: first a change over 0.25 rad/s², which a frame
+  stalled in the opening read in five looks' motors and woke the dish on the owner's Mac);
   the looks' own motors (0.31 rad/s at most) do not, so a look nobody spins costs what it
   did. The step shortens with the spin and with what the liquid still carries after a stop
   (sloshSpinFast), so a hard stop from the hand's top speed holds. Measured (`npm run spinslosh`): the paraboloid

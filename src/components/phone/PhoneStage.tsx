@@ -26,7 +26,7 @@ import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
-import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
+import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { canShareClip, shareClip } from '../../lib/shareClip';
@@ -170,8 +170,8 @@ export interface PhoneStageProps {
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -879,12 +879,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
-          {/* Not closed on a press, unlike the two above: Pour and Film are
-              each a toggle someone may want both of, and Stop is here too. */}
-          {p.cartoons && (
+          {/* The video loaded (PLAN 14ag), by this sheet's "A video as dye" or
+              the Video section's Video file: not closed on a press, unlike the
+              two above, since Play and Pour are each a toggle someone may want
+              both of, and Pour's Stop is here too. */}
+          {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
-              <CartoonShelf {...p.cartoons} size="phone" />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" />
             </div>
           )}
           </PanelGuard>
@@ -1181,6 +1183,17 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-3">
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
               display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+          </div>
+          {/*
+            The desk's two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a hand's tip of
+            the flat plate that stays where it is put, for a phone on a stand. Not the
+            phone's own Tilt, which stands the plate up (Gravity), so both can be on.
+          */}
+          <div className="mt-3">
+            <Slider label="Tilt left/right" value={p.mixer.settings.plateTiltX ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltX: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltX ?? 0) * 100)}%`} touch testId="phone-tilt-x" midiKey="setting:plateTiltX" />
+            <Slider label="Tilt up/down" value={p.mixer.settings.plateTiltY ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltY: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltY ?? 0) * 100)}%`} touch testId="phone-tilt-y" midiKey="setting:plateTiltY" />
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
