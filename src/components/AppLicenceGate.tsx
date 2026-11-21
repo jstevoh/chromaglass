@@ -316,7 +316,7 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
               data-cg-app-licence-checkout="home"
               className={`${button} flex items-center justify-center border border-white/15 bg-white/10 text-neutral-100 hover:bg-white/15`}
             >
-              Buy Home · $35 once
+              Buy Home · $29 once
             </a>
             <a
               href={buildCheckoutUrl(CHECKOUT_PRO_URL, email)}

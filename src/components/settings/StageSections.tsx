@@ -326,7 +326,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
                   rel="noopener noreferrer"
                   className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-amber-300"
                 >
-                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $164' : 'Get Pro — $199'}
+                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $170' : 'Get Pro — $199'}
                 </a>
                 <button
                   type="button"
