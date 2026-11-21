@@ -798,9 +798,10 @@ On in many looks:
 - ~~**38u-12. Rain Drip pulls heavy dye "down" a level plate**~~ — **Shipped (2026-11-13).**
   Rain Drip is now the dye's weight along the plate, scaled by the tilt (`dripOf`: the dial times
   Gravity, `plateUpright`; g sin θ, nothing flat). The seven looks that set Rain Drip at 0.2 or more
-  (not Velvet Underground, whose pools stay pools, `npm run pools`: the tilt's buoyancy and heat
-  broke them on a Mac run twice) got `plateUpright: 0.25`, a plate tipped about 15 degrees, so they
-  still streak, at a quarter of the pull; the weak ones (Classic 0.15, Stardust Collapse, Home Movie 0.1) now streak only when
+  got `plateUpright: 0.25`, a plate tipped about 15 degrees, so they still streak, at a quarter of
+  the pull; Velvet Underground got 0.05, about 3 degrees, so its pools stay pools and still move
+  (`npm run pools` on the Mac: level, they moved 8.9% against frozen's 8.5%, under the 1.5x bar; at
+  0.05 they keep 95/93/93% and move 44% against 11%; at 0.10 and 0.15 two pools drain to 39–70%); the weak ones (Classic 0.15, Stardust Collapse, Home Movie 0.1) now streak only when
   tipped. A plate rocked by a hand has its own weight in the rock's term. `npm run forces` 7. Open
   for the owner's eye: the tilt turns on the buoyancy and the lamp's heat a standing plate has
   (docs/judging.md §135), and the thick (non-thin-gap) path still runs along -y, not Tilt Direction.

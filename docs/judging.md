@@ -2881,8 +2881,9 @@ Looks change here on purpose. Judge from the film (before and after, same looks)
    about 15 degrees): the streaks run down at a quarter of the old pull. Good: still streaks,
    slower, with the heavy colour sinking in fingers. Bad: nothing runs, or the tilt's buoyancy
    changes the look past what you want (then raise Rain Drip, or set Gravity lower).
-2. Classic and Velvet Underground on a level plate: no downhill streaks at all now (Classic's Rain
-   Drip 0.15 had a trace; Velvet Underground's 0.6 streaked its pools, which should stay pools).
+2. Classic on a level plate: no downhill streaks at all now (its Rain Drip 0.15 had a trace).
+   Velvet Underground on a plate tipped about 3 degrees (its 0.6 streaked its pools, which should
+   stay pools): the three pools stay apart and drift slowly, no streaks running out of them.
 3. Pour a clear drop (no dye) on bare water, projected: its dark ring is as strong as a dyed
    drop's, thin and clear, not a faint ghost. A bubble in clear liquid has the same ring.
 4. Two colours side by side with Polarity up: the line between them stays an even edge, no

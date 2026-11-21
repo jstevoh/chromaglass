@@ -14765,9 +14765,11 @@ From the third physics pass (38u). Each is a look change on purpose.
 - **38u-12, Rain Drip.** Its weight along the plate was the same on a level plate as on the wall.
   Gravity along a plate is g sin θ: the dial now scales by the tilt (`plateUpright`, `dripOf` in
   `gpu/fluid/constants.ts`; the CPU twin and the deep plate's force read it the same). Seven looks
-  that set Rain Drip at 0.2 or more got a tilt of 0.25 (Velvet Underground stays level: its pools
-  stay pools, `npm run pools`, which went red with the tilt's buoyancy and heat on it twice); Rain Drip's help and guide line say it
-  needs Gravity.
+  that set Rain Drip at 0.2 or more got a tilt of 0.25; Velvet Underground got 0.05, about 3 degrees
+  (`npm run pools` on the Mac: at 0.25 the tilt's buoyancy and heat broke its pools twice; level, they
+  moved 8.9% against frozen's 8.5%, under the 1.5x bar; at 0.05 they keep 95.3/92.9/93.1% and move
+  44.0% against 11.1%; at 0.10 and 0.15 two pools drain to 39–70%); Rain Drip's help and guide line
+  say it needs Gravity.
 - **38u-14, the clear drop.** `plate.ts` drew the oil drop's band at 0.35 when there was no dye
   under it and a bubble's at 0.7 in clear liquid; the band is the meniscus bending light out of the
   aperture and does not need dye. Both at full strength; the clear oil's flat warm tint is now
