@@ -11251,6 +11251,36 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   way: 19k-16 (`draftwall --frames` painted 0 on #734's run), with the line printing what the
   projector window says of itself.
 
+#### 19k-20. The ear behind the wall: windows the runner can fill
+
+- **19k-20** (E, S): **shipped** (2026-11-14). After 19k-15 `npm run ears` went red three more
+  times on GitHub's hosted Macs (MacCloud, westus), each on a different line and each on a
+  fixed two-second window the runner could not fill: deploy 729's "covered with no wall" read
+  15 ticks and 7 levels (bars more than 20 and 10; the page was free about 7 times a second),
+  #718's "uncovered" 19 frames (bar more than 20, its 17 ticks all in stalls past 250 ms), #744's
+  "visible with the wall asking" 7 frames stamped (bar 10). Main's deploys 732 and 733 passed.
+  The check measured the runner. Reproduced in a cloud session two ways the check now takes:
+  `--slow=16` (Chromium's CPU throttle on the page and the wall) put four lines red on 8 to 12
+  frames; `--busy=130` (a 130 ms long task every 140 ms) put two red (15 asks, 16 frames).
+  Now each window lasts at least 2 s, so a free runner measures exactly as before, then until
+  the runner has *offered* 30 of what the line is judged on (frames the page drew, frames the
+  wall asked for, page turns of a 16 ms timer, level samples), never the readings judged, at
+  most 15 s. Every bar is the one it was. Slowed, the covered line then went red on a bar that
+  was wrong: it held asks plus ticks to the frames drawn within 2, but a tick reads and draws
+  nothing (`askFrame` and `render` are the only callers of `draw()`), so with the wall's asks
+  more than 250 ms apart its ticks counted against it (32 asks, 9 ticks, 32 frames). Now exact
+  both ways: no more ask readings than frames drawn, and frames past them only one per tick (an
+  ask within EAR_MIN_GAP_MS of a tick's reading is that reading; #718's 44, 1, 45 on 11-08).
+  The check-skeptic found that "one per tick" excused asks the ear never got (a build deaf to
+  every ask in the first half of each second went green at 31 asks, 49 ticks, 61 frames), so
+  each excused ask is now found by its own time, stamped on the wall's side within 6 ms after a
+  tick's reading (that build: red). And since a stretched window makes a fixed count easier,
+  the tick line is also held to ten readings a second over its window, or half the page's own
+  turns where the page got fewer (half the turns alone went red on a GitHub Mac whose worker ran
+  at half the page's rate: 48 ticks, 99 turns, 2.1 s), and "uncovered" to every frame drawn, as the visible lines.
+  Cloud: 26/26 at full speed (2 s windows, 21 s run), `--slow=16`, 32 and `--busy=130` (up to
+  100 s; a window that reaches the 15 s cap says so).
+
 #### 21. Looks after painters (found along the way, for §14b)
 
 *Found along the way (for §14b's owner, not this section's):* on this PR's two Mac
@@ -14822,3 +14852,41 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+## 43d. A palette from any picture or video (2026-11-15)
+
+`src/lib/picturePalette.ts`, `src/app/usePaletteLock.ts`, `src/components/PicturePaletteButton.tsx`,
+the Dyes panel (`DeskPanels.tsx`), the phone's Dye sheet (`PhoneStage.tsx`), the cast state.
+
+The owner, 2026-11-15, after the competitor study ("Study Photism for ideas worth borrowing"):
+"I like the general idea of taking video, image, album art or whatever visual input and
+creating a palette from it." It was 43d, "the cover sets the colours".
+
+- **The picture picks the dyes and nothing else.** A palette colour is a dye's
+  transmission through one unit, per band (lib/dye.ts, 18l), so the picture's colours
+  become four dyes the solver pours, carries, mixes and absorbs as it does Warm
+  Sunset's. Nothing of the picture is drawn on the plate; no motion comes from it.
+- **Which colours.** k-means in CIELAB over the picture (128 px on its long side, a
+  video's eight frames spread across it), clusters ranked by the square roots of their
+  share and their chroma together: a black sleeve with a pink title gives the pink first,
+  where a commonest-pixel picker gives the black (that picker is the check's control).
+  Four taken at least ΔE 18 apart; black and white are the paper and the ink and come in
+  only when a picture has no colour; fewer than four colours fill with lighter and
+  darker strengths of the ones there are; a black-and-white cover gives two greys.
+- **Seen on both grounds.** Each dye is moved in lightness only to 40 from black and
+  from white, 28b's rule for every palette, so it shows on a lamp look and a dark one.
+- **Four slots after the 24 named dyes.** Every dye on the plate is an index into
+  `PALETTE_RGB`, so the picture's are four slots there, written only by
+  `setPictureDyes`, and "From picture" is the lock one past the 21 named harmonies
+  (a saved named lock keeps its index). The named dyes, `PALETTE` and the dice's count
+  are untouched, so no seeded plate moves. The colours are kept beside the lock, so the
+  entry survives a reload, and travel with it to a projector window (`pictureDyes` in
+  the cast state). A recorded WebM that does not say its length (MediaRecorder's, the
+  app's own takes) is seeked past its end first so its eight frames span the film.
+- **Measured** (`npm run picturepalette`, 18 lines): four blocks back within ΔE 0.1;
+  the sleeve's pink first (control fails); a 2% red tail light kept and a 0.1% speck
+  not; every dye 40 from both grounds; the slots the only ones written; a PNG, a JPEG
+  and a recorded orange-then-blue WebM through Chromium's own decoders (both colours
+  within ΔE 0.5, the file saying its length was Infinity). `npm run phone`: the Dye
+  sheet's button makes "From picture" the palette in the picture's four colours.
+

@@ -550,6 +550,21 @@
       ]
     },
     {
+      "name": "The TV's calm loops: their judge",
+      "shard": "sound",
+      "run": "npm run tvloops -- --controls",
+      "why": [
+        "The TV's half-hour loops (PLAN 12-tv-loops) are made on a Mac by the",
+        "app's own render and cut into a loop by ffmpeg; this shows the judge",
+        "that holds them, through the same makeLoop, each fault on films it",
+        "makes itself: a plain cut fails the seam, a silent audio track the",
+        "audio line, a body seeked a second late the joint line, a still",
+        "picture the moving line, a fade to black or to",
+        "a flat grey the light line, a short loop the length line, and the",
+        "crossfaded loop passes all six. Needs ffmpeg (installed above)."
+      ]
+    },
+    {
       "name": "The ladder's shape",
       "shard": "logic",
       "run": "npm run rungs -- --owed=120hz",
@@ -2161,6 +2176,7 @@
       "shard": "browser",
       "run": "node scripts/intro.mjs",
       "env": {"PW_WEBGPU":"1"},
+      "quarantine": [{ "line": "9c. its loading line says what the show waits for", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before",
         "the app has arrived, taken into the plate's frame on the desk and the",
@@ -2258,6 +2274,22 @@
         "the display's settings. No GPU: the display's socket, settings and",
         "fades run on its \"needs WebGPU\" screen. The phone's step above built",
         "dist/, which the show server serves, so this runs the script alone."
+      ]
+    },
+    {
+      "name": "A palette from a picture or video",
+      "shard": "browser2",
+      "run": "npm run picturepalette",
+      "timeout": 5,
+      "why": [
+        "PLAN 43d (lib/picturePalette.ts): a picture's four main colours become the palette's",
+        "dyes and nothing else changes. In node on pictures made in the script: four blocks give",
+        "their four colours, a black sleeve's pink title leads (the commonest-pixel picker it",
+        "replaced runs as a control and fails that line), a small accent stays and a speck does",
+        "not, every dye 40 from black and white (28b), the slots after the 24 named dyes are the",
+        "only ones written and the dice's count is unchanged. Then in Chromium through its own",
+        "decoders: a PNG and a JPEG, and a recorded WebM, orange then blue, that does not say its",
+        "length, which must give both colours. No app build, a few seconds."
       ]
     },
     {
@@ -3733,6 +3765,7 @@
       "shard": "tools",
       "run": "node --experimental-strip-types scripts/drawwall.mjs --app",
       "timeout": 4,
+      "quarantine": [{ "line": "the control: through the camera without the dish", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md",
         "8-draw-a): the laptop's own frames reach the pad, the plate's colour,",

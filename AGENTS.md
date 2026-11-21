@@ -41,8 +41,9 @@ merge"):
   a day. Merge `main` in once, as the last push before review, not on every new commit
   to `main`.
 - The PR body's handoff block starts `Plan item: <id>`, and its `Review owed:` line starts
-  `before-merge`, `sampled` or `none`. Add the `review-owed` label when you open the PR if
-  that line is not `none`.
+  `before-merge` or `none`. Since 2026-11-15 only sign-in, keys, payments, licences, the
+  Workers and security changes owe a review (`before-merge`, with the `review-owed` label
+  when you open the PR); everything else is `none` and merges as soon as it is green.
 - Build what has a number to hit: UI with its phone version, presets, settings, GPU and
   shader tuning, and physics only from a Claude brief whose check is red on `main`. Never
   write, loosen or move a check yourself, and leave sign-in, keys, payments, Workers, the

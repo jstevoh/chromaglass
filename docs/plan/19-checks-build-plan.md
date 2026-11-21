@@ -308,6 +308,7 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-15** (E, S): **shipped**, `ears`'s covered line holds each tick to the wall's ask
   before it (more than 250 ms after, EAR_ASK_HOLD_MS) rather than wanting none; red on GitHub's
   Macs on #718 and #734 at one tick each. Story in `docs/plan-shipped.md` §19k-15.
+- **19k-20, shipped** (E, S): `ears`'s windows last until the runner has offered enough (30 frames, asks, page turns or level samples; 2 to 15 s), bars unchanged; the covered line counts asks against frames drawn without the ticks. Story in `docs/plan-shipped.md` §19k-20
 - **19k-16, shipped** (E, S): `draftwall --frames` opened the wall before the show's first step, so its 8 s count of painted frames could end before the opening did (0 painted on 5 of 54 runs); it waits for the show now (docs/plan-shipped.md, 19k-16).
 - **19k-16a, open** (E, S). **A projector opened during a cold start is asked for frames the show cannot draw.** Found
   with 19k-16: until the wall engine's renderer starts (`startWith`), the projector's rAF asks
