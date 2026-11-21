@@ -55,7 +55,8 @@ export type ActionWhat =
   | { do: 'lights-up'; over: number }                 // and back
   | { do: 'set'; key: keyof VisualizerSettings; value: number; over: number } // any setting, glided
   | { do: 'title' }                                   // pour the song's title into the plate
-  | { do: 'signoff' };                                // pour ChromaGlass into the plate
+  | { do: 'signoff' }                                 // ChromaGlass in the corner caption (poured as ink until 37x-10m)
+  | { do: 'pour'; color: string; amount: number; x?: number; y?: number; wall?: true }; // a drop of this dye, at a point (the middle if none; `wall`: the point is the wall's, as the picture shows it)
 
 export interface SongAction {
   id: string;
@@ -113,7 +114,8 @@ export function describeWhat(a: ActionWhat, lookName: (l: SongLook) => string = 
     case 'lights-up': return `Lights up over ${a.over} s`;
     case 'set': return `${String(a.key)} → ${a.value}${a.over > 0 ? ` over ${a.over} s` : ''}`;
     case 'title': return 'Pour the title';
-    case 'signoff': return 'Pour the ChromaGlass name';
+    case 'signoff': return 'Show the ChromaGlass name';
+    case 'pour': return `Pour ${a.color}${a.x !== undefined && a.y !== undefined ? ` at ${Math.round(a.x * 100)}%, ${Math.round(a.y * 100)}%` : ''}`;
   }
 }
 
@@ -138,7 +140,7 @@ export const COMMON_ACTIONS: CommonAction[] = [
   { label: 'Switch look at the bridge', when: { at: 'section', section: 'bridge' }, what: { do: 'look', look: { kind: 'preset', id: 'galaxy', name: 'Galaxy' }, fade: 4 } },
   { label: 'Switch look at 1:00', when: { at: 'time', sec: 60 }, what: { do: 'look', look: { kind: 'preset', id: 'classic', name: 'Classic Light Show' }, fade: 4 } },
   { label: 'Drain 8 s before the end', when: { at: 'before-end', sec: 8 }, what: { do: 'drain' } },
-  { label: 'Pour the name 6 s before the end', when: { at: 'before-end', sec: 6 }, what: { do: 'signoff' } },
+  { label: 'Show the name 6 s before the end', when: { at: 'before-end', sec: 6 }, what: { do: 'signoff' } },
   { label: 'Fade to black 4 s before the end', when: { at: 'before-end', sec: 4 }, what: { do: 'blackout', over: 4 } },
 ];
 
@@ -255,8 +257,46 @@ function parseWhat(raw: unknown): ActionWhat | null {
     case 'lights-up': return { do: 'lights-up', over: num(a.over, 0, 30, 2) };
     case 'set': return typeof a.key === 'string' && typeof a.value === 'number'
       ? { do: 'set', key: a.key as keyof VisualizerSettings, value: a.value, over: num(a.over, 0, 60, 0) } : null;
+    case 'pour': {
+      if (typeof a.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(a.color)) return null;
+      const at = typeof a.x === 'number' && typeof a.y === 'number' ? { x: num(a.x, 0, 1, 0.5), y: num(a.y, 0, 1, 0.5), ...(a.wall === true ? { wall: true as const } : {}) } : {};
+      return { do: 'pour', color: a.color.toLowerCase(), amount: num(a.amount, 0.05, 1, 0.6), ...at };
+    }
     default: return null;
   }
+}
+
+/**
+ * One action from outside the app (the owner's assistant, PLAN 44f), read
+ * with the same rules as an action in a file: a *when* or a *what* this build
+ * does not know is refused, not guessed, and every number is held to its range.
+ */
+export function parseSongAction(raw: { when?: unknown; what?: unknown }): SongAction | null {
+  const when = parseWhen(raw?.when);
+  const what = parseWhat(raw?.what);
+  return when && what ? { id: newId('act'), when, what } : null;
+}
+
+/**
+ * A pour action as the plate's hand makes it: a drop of the dye at the point,
+ * on the wall's own coordinates, through `applyGesture` as a pad's Drop
+ * goes. Here, pure, so `npm run songs` can check what the runner lays.
+ *
+ * A drop and not a dye change plus a press (the first way 44f was written):
+ * a pour is dye arriving in the oil, and the plate's drop is where that is
+ * simulated, the dye spreading by the plate's own flow and diffusion. The
+ * colour is laid as it comes, as a take's recorded pour is: "blue on the
+ * drop" is blue, whatever bottle the performer has in hand.
+ */
+export function pourGesture(
+  a: Extract<ActionWhat, { do: 'pour' }>,
+  wallToPlate?: (x: number, y: number) => { x: number; y: number },
+): { tool: 'drop'; x: number; y: number; layer: number; amount: number; color: string } {
+  // A wall point is turned onto the plate when it fires, not when it was
+  // added: the plate may have turned, or the closeup moved, since.
+  const p = a.x === undefined || a.y === undefined ? { x: 0.5, y: 0.5 }
+    : a.wall && wallToPlate ? wallToPlate(a.x, a.y) : { x: a.x, y: a.y };
+  return { tool: 'drop', x: p.x, y: p.y, layer: 0, amount: a.amount, color: a.color };
 }
 
 function parseActions(raw: unknown): SongAction[] {
@@ -297,6 +337,26 @@ export function parseSets(raw: unknown): ActionSet[] {
 }
 
 // ── The scheduler ─────────────────────────────────────────────────────
+
+/**
+ * How often a running show (hooks/useSongShows.ts) asks what is due: once a
+ * frame, reading the song's position at the tick, so a section's action fires
+ * on the frame the section starts (PLAN 44f; `npm run songs` plays a drop
+ * through it at this tick).
+ */
+export const SONG_SHOW_TICK_MS = 1000 / 60;
+
+/**
+ * Where the running show is in its song, in seconds, at a tick: a show
+ * started by hand on its own clock, a followed one on the song's position
+ * read at the tick (`positionNow`), and only where nothing can read it on
+ * the position the music hook last set (every 500 ms; up to 558 ms late on a
+ * section's action, PLAN 44f). Here, pure, so `npm run songs` plays the
+ * runtime's own reading.
+ */
+export function songShowTime(run: { manual: boolean; startedAt: number }, nowMs: number, positionSec: number, positionNow?: () => number): number {
+  return run.manual ? (nowMs - run.startedAt) / 1000 : Math.max(0, positionNow?.() ?? positionSec);
+}
 
 /** Where the song is, as the runtime knows it. */
 export interface SongClock {

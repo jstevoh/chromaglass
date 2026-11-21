@@ -51,13 +51,13 @@ import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { watchVideo, WatchError, findFfmpeg } from './watch.mjs';
 import { AUTOPLAY, withBand, untilRunning } from './recorder.mjs';
 
-const PORT = Number(process.env.SHOWREEL_PORT ?? 4353);
+const PORT = port(4353, 'SHOWREEL_PORT');
 const OUT = path.resolve(process.env.SHOWREEL_OUT ?? 'showreel');
 const ONLY = process.env.SHOWREEL_ONLY ? process.env.SHOWREEL_ONLY.split(',').map(s => s.trim()).filter(Boolean) : null;
 const SONG = process.env.SHOWREEL_SONG ?? 'showreel-song.mp3';

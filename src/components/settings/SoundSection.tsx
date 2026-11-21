@@ -8,6 +8,38 @@ import { OscOutRow } from '../ui/OscOutRow';
 import { linkLine, tempoSourceName } from '../../lib/tempo';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
+import type { AudioData } from '../../hooks/useAudioAnalyzer';
+import { useEarView, type EarView } from '../../hooks/useEarView';
+
+/*
+  The room calibration's readout, a component of its own so it alone renders
+  as the room is heard (hooks/useEarView.ts, PLAN.md 46f). The calibration is
+  a new object on every reading, so whoever reads it renders ten times a
+  second: it was a prop from App(), which rendered the whole shell for it.
+*/
+const roomOf = (a: AudioData | null) => a?.calibration ?? null;
+function RoomReadout({ view }: { view: EarView }) {
+  const calibration = useEarView(view, roomOf);
+  if (!calibration) return <span className="text-[12px] opacity-40">Waiting for audio</span>;
+  return (
+    <>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[12px] opacity-60">
+          {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
+        </span>
+        <span className="text-[12px] font-mono opacity-50">
+          {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
+        </span>
+      </div>
+      <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
+          style={{ width: `${Math.round(calibration.progress * 100)}%` }}
+        />
+      </div>
+    </>
+  );
+}
 
 /*
   Feed: Sound, the section that was the longest on its own (the device, the room's
@@ -22,11 +54,30 @@ import type { SectionCtx } from './props';
 */
 export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
   const {
-    settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, audioSource,
-    onAudioSource, audioInputs, audioInputId, onAudioInput, tempo, onTap, readTempo, onTempoClear,
-    onTempoBpm, onLink, oscOut, onOscOut, midiClocked, timecode, focusSection, midi, onOpenSound, keep, shown, goTo, listens,
+    settings, onUpdate, songDetection, onSongDetection, earView, onRecalibrate,
+    audioInputs, audioInputId, onAudioInput, tempo, onTap, readTempo, onTempoClear,
+    onTempoBpm, onLink, oscOut, onOscOut, onLinkTransport, midiClocked, timecode, focusSection, midi, soundSources, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
+  /* The input: a USB interface fed from the desk, not the laptop's own microphone.
+     Drawn under the Mic tile when the sources are here (PLAN 35c-7), else on its own. */
+  const inputPicker = onAudioInput && (
+    <div className="mb-3.5 mt-3 flex flex-col gap-1.5">
+      <span className="text-[13px] font-medium text-text">Input</span>
+      <select
+        value={audioInputId}
+        onChange={(e) => onAudioInput(e.target.value)}
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+        data-testid="audio-input"
+      >
+        <option value="">Default microphone</option>
+        {audioInputs.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+      </select>
+      <Info>
+        On stage, ask the sound desk for an aux send into a USB audio interface and pick it here: a clean feed heavy on kick, snare and bass drives the plate better than a microphone hearing the room.
+      </Info>
+    </div>
+  );
   return (
     <>
 
@@ -34,8 +85,21 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
       {keep('audio-input') && (
       <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('audio-input')} data-section="audio-input">
         <h3 className={TITLE}>
-          <Activity size={12} /> Audio Input
+          <Activity size={12} /> Sound
         </h3>
+        {/*
+          One page for sound (PLAN 35c-7, the owner 2026-11-10: "I don't
+          understand why there are two sound settings pages - can we put
+          these all together and simplify things?"). Where the sound comes
+          from first, the way a set-up goes: the sources, the shelf, the
+          player and the drone, which were the Sound sheet (SoundPanel.tsx,
+          whose comment has the history), with the Mic's input under the Mic.
+          Then what the sound does to the plate, then the room, the beat and
+          the songs. The sheet's "Change…" and this section's "Change in
+          Sound…" each sent you to the other for half a job; both are gone.
+        */}
+        {soundSources ? soundSources(inputPicker) : inputPicker}
+        <p className="mb-2 mt-1 text-[11px] font-bold uppercase tracking-widest text-muted">How it drives the plate</p>
         {/*
           Sound Drive: how hard the music moves the plate at all. First in
           Sound, which it joined with the rest of Sound Mappings (2026-10-10):
@@ -85,63 +149,6 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ bassBoost: v })}
           settingKey="bassBoost"
         />
-
-        {/*
-          What is listening, said here and chosen in the Sound sheet.
-
-          The five-way switch that stood here was the second drawing of the
-          sheet's six, which also has the plate as an instrument; two homes
-          meant one could be changed while the other was read. The sheet is
-          the superset, so it is the home, and this row is the state and the
-          way there. The device below stays: it is where the Mic dot lands.
-        */}
-        {onAudioSource && (
-          <div className="mb-3.5 flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-text">Source</span>
-            <div className="flex items-center gap-2">
-              <div
-                className={`flex h-8 flex-1 items-center rounded-lg border px-3 text-[13px] font-medium ${audioSource === 'none' ? 'border-white/10 bg-white/5 text-white/60' : LIT}`}
-                role="status"
-                data-testid="audio-source-state"
-                data-source={audioSource}
-              >
-                {({ none: 'Off', microphone: 'Mic', system: 'System', file: 'File', simulated: 'Band', drone: 'Instrument' } as const)[audioSource]}
-              </div>
-              {onOpenSound && (
-                <button
-                  onClick={onOpenSound}
-                  className="h-8 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-medium transition-colors hover:bg-white/10"
-                  title="Choose what the plate listens to: the mic, a tab, a file, the band or the plate as an instrument"
-                  data-testid="audio-source-open"
-                >
-                  Change in Sound…
-                </button>
-              )}
-            </div>
-            <Info>
-              <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
-            </Info>
-          </div>
-        )}
-
-        {/* The input: a USB interface fed from the desk, not the laptop's own microphone */}
-        {onAudioInput && (
-          <div className="mb-3.5 flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-text">Input</span>
-            <select
-              value={audioInputId}
-              onChange={(e) => onAudioInput(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
-              data-testid="audio-input"
-            >
-              <option value="">Default microphone</option>
-              {audioInputs.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
-            </select>
-            <Info>
-              On stage, ask the sound desk for an aux send into a USB audio interface and pick it here: a clean feed heavy on kick, snare and bass drives the plate better than a microphone hearing the room.
-            </Info>
-          </div>
-        )}
 
         {/* Room calibration */}
         <div className="mb-3 mt-2">
@@ -238,6 +245,18 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
                   Link
                 </button>
                 <span className="text-[12px] opacity-50" data-testid="tempo-link-says">{linkLine(tempo.link)}</span>
+                {/* Live's play and stop on the Sequence (13.5-link-transport): off until asked for. */}
+                {tempo.link.on && onLinkTransport && (
+                  <button
+                    onClick={() => onLinkTransport(!tempo.link?.follows)}
+                    aria-pressed={!!tempo.link.follows}
+                    data-testid="tempo-link-transport"
+                    title="A stop in Live pauses the running Sequence, and Live's next play resumes it"
+                    className={`ml-auto min-h-9 flex-none rounded-lg border px-3 text-[13px] font-medium transition-all ${tempo.link.follows ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                  >
+                    Play/Stop
+                  </button>
+                )}
               </div>
             )}
             {/* OSC out (PLAN.md 13.5-osc): offered, like Link, only where a show server is there to send it. */}
@@ -247,7 +266,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
               {' '}<span className="text-white/70">MIDI clock</span> needs nothing set up: if the desk is sending it down the cable the faders are already on, the show locks to it{midiClocked ? ' \u2014 and it is arriving now' : ''}.
               {' '}<span className="text-white/70">Tap</span> sets the tempo *and* the bar, so tap on the downbeats and the plate is pressed on the downbeats; one tap on its own re-phases a tempo that is already running, which is how to get back on the bar after a fill.
               {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
-              {tempo?.link?.available && <>{' '}<span className="text-white/70">Link</span> follows the tempo and the bar of Live, Bitwig, Traktor or an iPad's AUM on the same network, with no cable, and wins over the others while a session is playing; Listen switches it off.</>}
+              {tempo?.link?.available && <>{' '}<span className="text-white/70">Link</span> follows the tempo and the bar of Live, Bitwig, Traktor or an iPad's AUM on the same network, with no cable, and wins over the others while a session is playing; its bar line is the plate's one from the first bar. <span className="text-white/70">Play/Stop</span> lets Live's stop pause a running Sequence and its next play resume it (off, a stop between two tracks changes nothing). Listen switches Link off.</>}
               {oscOut && <>{' '}<span className="text-white/70">OSC out</span> goes the other way: it sends the plate's colour, the sound's levels and each beat the plate presses on to a VJ app, so its effects follow the plate (every address: docs/osc.md).</>}
               {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
             </Info>
@@ -312,26 +331,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         </div>
         {settings.autoCalibrate !== false && (
           <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
-            {calibration ? (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[12px] opacity-60">
-                    {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
-                  </span>
-                  <span className="text-[12px] font-mono opacity-50">
-                    {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
-                  </span>
-                </div>
-                <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
-                    style={{ width: `${Math.round(calibration.progress * 100)}%` }}
-                  />
-                </div>
-              </>
-            ) : (
-              <span className="text-[12px] opacity-40">Waiting for audio</span>
-            )}
+            {earView ? <RoomReadout view={earView} /> : <span className="text-[12px] opacity-40">Waiting for audio</span>}
             <button
               onClick={() => onRecalibrate?.()}
               className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[13px] font-medium opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"

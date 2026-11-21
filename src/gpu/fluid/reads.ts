@@ -24,8 +24,9 @@ export class FluidReads extends FluidInputs {
    * dropped and its stage stops running.
    */
   async speciesShare(): Promise<number> {
-    if (!this.species || !this.speciesLive) return 0;
+    if (!this.species || !this.speciesLive) { this.speciesSnap = null; return 0; }
     const pours = this.speciesQuiet;
+    const clears = this.speciesClears;
     this.shareRead ??= new RimRead(this.device, this.disposer, 'species share');
     const share = await this.shareRead.read(this.L, this.rbRow, this.readTarget, (enc) => {
       this.simF[0] = this.N; this.simF[1] = this.L;
@@ -34,8 +35,26 @@ export class FluidReads extends FluidInputs {
       this.run(pass, 'downsample', this.readTarget, [this.speciesLive ? this.species!.read : this.blank('rgba')], this.arg('none', [0, 0, 0, 0]), this.L);
       pass.end();
     });
-    if (share < 1e-6 && pours === this.speciesQuiet) this.speciesLive = false;
+    if (clears !== this.speciesClears) { this.speciesSnap = null; return 0; }
+    if (share < 1e-6 && pours === this.speciesQuiet) { this.speciesLive = false; this.speciesSnap = null; return share; }
+    const data = this.shareRead.data;
+    this.speciesSnap = data && this.speciesPoured ? { L: this.L, data, poured: this.speciesPoured } : null;
     return share;
+  }
+
+  /**
+   * The species field downsampled to the logical grid (L × L × 4, rgba32float)
+   * and the last poured species' surface tension and density (`pouredOf`,
+   * PLAN 33f), shared with `speciesShare`'s one-second read so only one GPU
+   * read runs. Null when no species is live or when a plate clear landed
+   * before or during the read.
+   */
+  async speciesSnapshot(): Promise<{ L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null> {
+    if (!this.species || !this.speciesLive || !this.speciesPoured) { this.speciesSnap = null; return null; }
+    const clears = this.speciesClears;
+    await this.speciesShare();
+    if (clears !== this.speciesClears || !this.speciesLive || !this.speciesPoured) return null;
+    return this.speciesSnap;
   }
 
   /**

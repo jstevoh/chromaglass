@@ -61,6 +61,7 @@ const LINK_ONLY = {
   'creativecommons.org': "each track's licence, as a link",
   'github.com': 'links to the source, and the name LRCLIB asks clients to send',
   'www.w3.org': 'the SVG namespace string; nothing is fetched from it',
+  'www.youtube.com': "the landing page links to the channel (PLAN 34a-8), opened in a new tab by the visitor's click; nothing is fetched or embedded from it",
 };
 /** Hosts the page names by the service's name rather than its address. */
 const NAMED_AS = { 'api.audd.io': 'AudD', 'audd.io': 'AudD', 'api.resend.com': 'Resend' };
@@ -98,6 +99,7 @@ const TEMPLATE_HOSTS = {
   'info.hosts[0]': 'own network: the show server\'s LAN address, for the phone',
   'raw': 'own network: the laptop address the person types into the phone',
   'host': 'own network: the show server printing its LAN address at start',
+  'lanHost': 'own network: the show server\'s LAN address in the Cast menu, for a network display (14m-https)',
 };
 /** What every visitor reaches whatever the code says: the hosts of the site itself and its fonts. */
 const ALWAYS = ['fonts.gstatic.com', 'Firebase Hosting', 'Cloudflare'];

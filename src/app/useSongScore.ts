@@ -1,5 +1,9 @@
-import { useCallback, useRef, useMemo, type RefObject, type Dispatch, type SetStateAction } from 'react';
-import { type SongAction, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId } from '../lib/songShows';
+import { useCallback, useEffect, useRef, useMemo, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { type SongAction, type SongLook, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId, pourGesture } from '../lib/songShows';
+import { setSongCueSink } from './songCue';
+import { publishSongs, setSongsDoor, showBrief } from './songShowNow';
+import { showSongTitle } from './songTitle';
+import { showSongCaption } from '../lib/songCaption';
 import { unhandled } from '../lib/unhandled';
 import { useSongShows } from '../hooks/useSongShows';
 import { PRESETS } from '../presets';
@@ -38,6 +42,22 @@ interface SongScoreDeps {
   tempoLabel: { source: string | null; bpm: number; taps: number; };
 }
 
+/**
+ * The look playing, as a song's show names one: a saved look, or a built-in
+ * (Classic when neither is known). A show made for the song playing (a cue
+ * pinned on the score, a song Listen named) takes the look that is up, so
+ * that starting it changes nothing on the plate.
+ */
+export function lookPlaying(activePresetId: string | null, pinnedPresetId: string | null, saved: readonly { id: string; name: string }[]): SongLook {
+  const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
+  const mine = saved.find(u => u.id === lookId);
+  const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
+  return mine ? { kind: 'saved', id: mine.id, name: mine.name } : { kind: 'preset', id: preset?.id ?? 'classic', name: preset?.name };
+}
+
+/** How many actions the owner's assistant may add to one song's show (PLAN 44f). */
+const ASSISTANT_SONG_ACTIONS = 24;
+
 export function useSongScore({
   wallRef, goLookNow, runActionRef, setSettings, glideSetting, songShows, followSongs, designing,
   renderHold, musicIntel, isActive, currentSong, songShowsRef, setSongShows, activePresetId,
@@ -63,10 +83,14 @@ export function useSongScore({
       case 'blackout': glideSetting('dimmer', 0, a.over); break;
       case 'lights-up': glideSetting('dimmer', 1, a.over); break;
       case 'set': glideSetting(a.key, a.value, a.over); break;
-      // In an ink that reads against the plate as it is: a title poured into a
-      // full, bright plate in the look's own dye does not show.
-      case 'title': v?.pourText(titleRows(show.song), { colour: 'contrast' }); break;
-      case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
+      // The corner caption (app/songTitle.ts, 37x-10j); the ink's rows ride along, dormant, since the ink was shelved (37x-10m).
+      case 'title': showSongTitle(show.song, { rows: titleRows(show.song), colour: 'contrast' }); break;
+      // The show's name in the corner as the song ends. It was poured as ink
+      // until the owner shelved the poured words (37x-10m): on a busy look the
+      // flow smeared the word before it could be read, as it did the titles.
+      case 'signoff': showSongCaption({ artist: '', title: 'ChromaGlass' }); break;
+      // A drop of this dye, as a pad's Drop lays it (lib/songShows.ts pourGesture).
+      case 'pour': v?.applyGesture(pourGesture(a, (x, y) => v.wallToPlate(x, y, 0, true))); break;
       // A show that names something this build cannot do says so, rather
       // than running the stage and appearing to have done it.
       default: unhandled("a song show's action", a);
@@ -80,6 +104,7 @@ export function useSongScore({
     follow: followSongs && !designing && !renderHold,
     track: musicIntel.state.track,
     positionSec: musicIntel.state.positionSec,
+    positionNow: musicIntel.positionNow,
     songMap: musicIntel.state.songMap,
     isActive,
     kicks: () => wallRef.current?.kicks() ?? 0,
@@ -101,24 +126,81 @@ export function useSongScore({
     slider moved, a fader ridden), which a fade would take back.
   */
   const currentShow = useMemo(() => showFor(songShows, currentSong), [songShows, currentSong]);
-  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat) => {
+  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat, idPrefix = 'act') => {
     if (!currentSong) return;
-    const action: SongAction = { id: newId('act'), when, what };
+    const action: SongAction = { id: newId(idPrefix), when, what };
     const shows = songShowsRef.current;
     const existing = showFor(shows, currentSong);
     if (existing) { setSongShows(shows.map(s => (s.id === existing.id ? { ...s, actions: [...s.actions, action] } : s))); return; }
-    const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
-    const saved = userPresets.presets.find(u => u.id === lookId);
-    const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
-    const look = saved ? { kind: 'saved' as const, id: saved.id, name: saved.name } : { kind: 'preset' as const, id: preset?.id ?? 'classic', name: preset?.name };
+    const look = lookPlaying(activePresetId, pinnedPresetId, userPresets.presets);
     const id = newId('song');
     songRuntimeRef.current.keepLook(id);
     setSongShows([...shows, { id, song: currentSong, look, actions: [action] }]);
   }, [currentSong, setSongShows, activePresetId, pinnedPresetId, userPresets.presets]);
+  /*
+    The owner's assistant's song actions (PLAN 44f, app/songCue.ts) land as a
+    pinned cue does. With no song playing there is no show to put it in, and
+    the assistant is told so rather than the action being kept for a song
+    nobody named. Its actions carry ids of their own (`asst-`), and it adds
+    no more than ASSISTANT_SONG_ACTIONS to one song's show: one in a loop must
+    not grow the saved shows without end, nor stack a hundred pours on one
+    second of the song (the guard paces the adding, not the firing).
+  */
+  const pinRef = useRef(pinScoreCue);
+  pinRef.current = pinScoreCue;
+  const songRef = useRef(currentSong);
+  songRef.current = currentSong;
+  useEffect(() => {
+    setSongCueSink((when, what) => {
+      if (!songRef.current) return 'no song is playing: the action goes into the show of the song playing now';
+      const mine = showFor(songShowsRef.current, songRef.current)?.actions.filter(x => x.id.startsWith('asst-')).length ?? 0;
+      if (mine >= ASSISTANT_SONG_ACTIONS) return `the assistant has already added ${ASSISTANT_SONG_ACTIONS} actions to this song's show`;
+      pinRef.current(when, what, 'asst');
+      return null;
+    });
+    return () => setSongCueSink(null);
+  }, [songShowsRef]);
   const removeScoreCue = useCallback((actionId: string) => {
     setSongShows(songShowsRef.current.map(s => (s.actions.some(a => a.id === actionId) ? { ...s, actions: s.actions.filter(a => a.id !== actionId) } : s)));
   }, [setSongShows]);
   const { nudgePosition, nudgeToSection, resetNudge } = musicIntel;
+
+  /*
+    The owner's assistant reads the song shows and drives them through the
+    Songs panel's own callbacks (app/songShowNow.ts, PLAN 44k-5): Run and
+    Stop, a cue taken off the score, the score's nudges. A nudge says why not
+    where the score's button would do nothing in silence (no song, or a song
+    with no map to find a section in).
+  */
+  const { showId: runningId, song: runningSong, manual: runningManual } = songRuntime.status;
+  const currentShowId = currentShow?.id ?? null;
+  useEffect(() => {
+    publishSongs({
+      follow: followSongs, current: currentShowId, shows: songShows.map(showBrief),
+      running: runningId ? { showId: runningId, song: runningSong, manual: runningManual } : null,
+    });
+  }, [followSongs, currentShowId, songShows, runningId, runningSong, runningManual]);
+  const trackRef = useRef(musicIntel.state.track);
+  trackRef.current = musicIntel.state.track;
+  const mapRef = useRef(musicIntel.state.songMap);
+  mapRef.current = musicIntel.state.songMap;
+  const currentIdRef = useRef(currentShowId);
+  currentIdRef.current = currentShowId;
+  useEffect(() => {
+    const noSong = () => (trackRef.current ? null : 'no song is playing: a nudge moves the song\'s clock');
+    setSongsDoor({
+      shows: () => songShowsRef.current,
+      current: () => currentIdRef.current,
+      remove: removeScoreCue,
+      start: (id) => songRuntimeRef.current.start(id),
+      stop: () => songRuntimeRef.current.stop(),
+      running: () => songRuntimeRef.current.status.showId !== null,
+      nudge: (kind) => noSong() ?? (mapRef.current ? (nudgeToSection(kind), null) : 'the song has no map yet, so its sections are not known: nudge by seconds'),
+      nudgeBy: (sec) => noSong() ?? (nudgePosition(sec), null),
+      resetNudge: () => noSong() ?? (resetNudge(), null),
+    });
+    return () => setSongsDoor(null);
+  }, [songShowsRef, removeScoreCue, nudgeToSection, nudgePosition, resetNudge]);
   const scoreProps = useMemo<SongScoreProps>(() => ({
     songName: currentSong ? songLabel(currentSong) : null,
     map: musicIntel.state.songMap,

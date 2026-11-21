@@ -83,31 +83,32 @@ Left from it, so none of it is lost:
   Whether the 0.7 is a choice to keep, or a bug (a hole in clear water should be as dark
   at its rim as one in dye), is for 33f's per-liquid pass to settle with a picture.
 
-## 33f. Bubbles that know their liquid (M)
+## 33f. Bubbles that know their liquid (M) — **Motion shipped** (`src/lib/bubbleLiquid.ts`, `BubbleField.species` in `src/lib/bubbles.ts`, `speciesSnapshot` in `src/gpu/fluid/reads.ts`, `src/sim/speciesPoll.ts`; `npm run bubbleliquid` 9/9; 33f-2 to 33f-4 open). Story in `docs/plan-shipped.md` §33f (moved 2026-11-07).
 
-The bubbles' motion reads one plate-wide viscosity and surface tension
-(`liquidMu`, `liquidSigma` in `src/lib/bubbles.ts`; 18i), and their drawing one
-index. The species field (`src/lib/liquidProps.ts`, 18d) already carries each cell's
-viscosity, density and index. Read them under each bubble:
-- *Speed and film:* Ca = μU/σ from the cell's μ; Bretherton's speed-up
-  1.5/(1 + 2.26 Ca^(2/3)) (18i) with that Ca, so a bubble in glycerine lags the
-  flow and one in alcohol runs ahead of it.
-- *Shape:* the Saffman–Taylor fingering and a sheared bubble's stretch from the same Ca.
-- *Merging:* the film's drainage time ∝ (μ/σ)·R (18i) per cell, so bubbles in syrup
-  sit touching far longer than in water.
-- *Optics:* 33e's band from the cell's index (oil about 1.47, water 1.33, alcohol
-  1.36, glycerine 1.47); in ferrofluid the liquid is opaque, so a bubble is a bright
-  window in black and its band the meniscus's thinning; in a milky liquid the
-  middle is the brightest thing on the plate.
-- A surface-tension table per liquid (water 72, oils about 30, alcohol 22, soapy
-  water about 30 mN/m) added to the bottle's behaviour, defaulting to today's
-  `liquidSigma` so every look keeps its motion.
-Shortcuts to name: one σ per liquid (no surfactant moving along the rim, no Marangoni
-flow), and the wetting film's thickness not drawn as colour.
-*Check:* `npm run bubblephysics` extended: one bubble pushed through water, oil and
-glycerine: the speed ratios follow Bretherton's law within 10 %, the drainage times
-follow μ/σ within 20 %, and (with 33e) the band width oil against water follows u*
-within 15 %; on the plate's own liquid, every number today's check prints unchanged.
+Left from it, so none of it is lost:
+- **33f-2. The drawing per liquid** (33e's band from the cell's index, ferrofluid's
+  window, milk's bright middle): not in `bubbleliquid`; blocked by the 11-bit air-alpha
+  pack and the 16-sampled-texture ceiling (found on #420).
+- **33f-3. The species readback's rows against the bubbles' y on a GPU.** `local` holds
+  the CPU side (row 0 first, y = row·grid/L); that the GPU's read lands the same way up
+  is a Metal run, not yet made.
+- **33f-4. Per-cell σ and ρ when two miscible bottles are on the plate at once.** The
+  species field carries share and Σ share·ln(ν/ν_w) in channels r and g, while channel b
+  was traded from ρ to milk's scatter μs′ (18d-4a) and channel a holds refractive index n,
+  so the field holds no σ or ρ of its own; `pouredOf` records the last-poured species
+  bottle's σ and ρ and `liquidAtCell` blends `(1 − r)·plate + r·poured` (exact for one
+  poured liquid; when two miscible bottles sit on the plate together, the earlier pool's
+  viscosity ν stays its own in channel g while its σ and ρ read the newer bottle's).
+  Carry Σ share·ρ and Σ share·σ per cell once 18d-4a gives scatter its own home.
+- **33f-5. A bottle the owner made with no tension, on a water plate.** `pour` in
+  `src/gpu/fluid/inputs.ts` hands `pouredOf` the oil's σ (`LIQUID_SIGMA`, 30 mN/m) as
+  the plate's, since the solver does not know the look's carrier: on a water look
+  (72 mN/m) such a bottle's pool reads 30, not the plate's 72. Every shelf bottle that
+  lays a species names its tension, so only Liquid Designer bottles meet it. Fix: the
+  app passes the BubbleField's `liquidSigma` into `pour` (found in review of #715).
+*Check (for 33f-2):* `npm run bubblephysics` or `bubblelook` extended: the band width oil
+against water follows u* from the cell's index within 15 %, ferrofluid draws a bright
+window and milk a bright middle.
 
 ## ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped** (Paint Cells and Macro Lacing default to 0; `npm run macroview`; 20c-1 is closed by it)
 

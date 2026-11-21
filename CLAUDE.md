@@ -122,7 +122,7 @@ not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 
 ## CI
 
-`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, seven parts) and
+`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, eight parts) and
 `WebGPU (macOS)` (Metal, sharded). What each part runs is `scripts/checks.json`; what
 skips the Mac is `scripts/reach.mjs`; when a deploy trusts a PR's run, or skips the
 checks, is `scripts/deploygate.sh`; the owner's Mac takes main's deploy shards when idle
@@ -147,9 +147,14 @@ a run or a deploy needs explaining. When CI is red, use the `steward` skill.
   sessions do not rebuild the same thing; keep to your own branch and PR.
 - **Some of those sessions are Antigravity's** (branches `antigravity/…`). How work is
   claimed and handed between the two tools, the handoff block in every PR body, and
-  the light review pass a Claude Code session owes Antigravity's PRs (the
-  `review-owed` label, about one per session) are in `docs/handoff.md`. Check that
-  label at the start of a session.
+  which of Antigravity's PRs still owe a review are in `docs/handoff.md` ("Ready, review,
+  merge"). Since 2026-11-15 a green Antigravity PR merges without a Claude Code review,
+  pinned to its green head; only sign-in, keys, payments, licences, the Workers under
+  `server/` and security changes still owe one (label `review-owed`). At the start of a
+  session, check `gh pr list --label ready-for-review --label review-owed` (up to three a
+  session). A verdict's first line is `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>`;
+  on a `PASS` the reviewer squash-merges the PR itself, pinned to that head, and confirms
+  the deploy.
 
 ## Agents and skills in this repo
 

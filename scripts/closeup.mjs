@@ -19,17 +19,17 @@
  * deliberately random choice is not a measurement.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { installFrameReader, frameOf } from './frame.mjs';
 
-const PORT0 = Number(process.env.CLOSEUP_PORT ?? 4660);
+const PORT0 = port(4660, 'CLOSEUP_PORT');
 const LOOKS = (process.env.CLOSEUP_LOOKS ?? 'soap-film,classic,oil-and-water,galaxy').split(',');
 const RUNS = Number(process.env.CLOSEUP_RUNS ?? 3);
 /** Over this much of the frame in one colour is the fault, not a dark passage. */
 const BAR = 0.5;
 
-let server = null, port = PORT0, leaving = false;
+let server = null, served = PORT0, leaving = false;
 for (let t = 0; t < 6 && !server; t++) {
   const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT0 + t), '--strictPort'],
     { detached: true, stdio: ['ignore', 'ignore', 'ignore'] });
@@ -37,7 +37,7 @@ for (let t = 0; t < 6 && !server; t++) {
   child.on('exit', () => { died = true; });
   await new Promise(r => setTimeout(r, 2500));
   if (died) continue;
-  server = child; port = PORT0 + t;
+  server = child; served = PORT0 + t;
 }
 if (!server) { console.error('no free port'); process.exit(2); }
 const stop = () => { leaving = true; try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
@@ -71,7 +71,7 @@ try {
     const worsts = [], medians = [];
     let dye = 0;
     for (let run = 0; run < RUNS; run++) {
-      await page.goto(`http://localhost:${port}/?debug&gpu=mid&tier=local&look=${look}`, { waitUntil: 'load' });
+      await page.goto(`http://localhost:${served}/?debug&gpu=mid&tier=local&look=${look}`, { waitUntil: 'load' });
       await page.waitForTimeout(800);
       // The band only starts on a gesture, and a silent plate pours far less —
       // it would never fill, which is the whole condition being tested.

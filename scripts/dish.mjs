@@ -125,9 +125,15 @@ try {
     // 4. Oil in water, on a flat plate.
     await fresh(0);
     lab.solver().addMix(0.7, 0.5, 0.06, { oil: 1 });
-    // Water's rest drag is 3 s and the oil's 0.06: after 1.5 s the oil has
-    // long since caught the dish and the water has barely begun.
-    await lab.step(90, spin(A, 0, WATER));
+    /*
+      Read a quarter of a second in: long after the oil has caught the dish
+      (its drag time in the 2 mm rest gap is 7 ms, PLAN 38r) and before the
+      disc, going round with the dish at about A r, has carried itself off
+      the spot it is read at (its own radius, 0.06, at 0.2 a second is 0.3 s).
+      This read at 1.5 s while the gap was 6 mm; at 2 mm the disc by then
+      had gone 0.1 of the plate round and inward, and the spot read 0.27.
+    */
+    await lab.step(15, spin(A, 0, WATER));
     const so = await lab.swirl();
     out.oil = { inside: sample(so, disc(0.7, 0.5, 0.025)).az, water: sample(so, disc(0.3, 0.5, 0.04)).az, scale: A * 0.2 };
 
@@ -144,6 +150,7 @@ try {
     out.spun = await centrifuge(3, THICK);
     out.still = await centrifuge(0, THICK);
     out.thinner = await centrifuge(3, THICK / 4);
+    out.tau = { thick: drag(THICK), thinner: drag(THICK / 4) };
 
     // 7. Stop and let the tail run out: the swirl is emptied.
     await fresh(0);
@@ -221,15 +228,17 @@ try {
   check('and oil drawn inward', r.spun.light < 0, `radial ${r.spun.light.toExponential(2)}`);
   check('with nothing spinning, neither moves', r.still.max === 0, `max |w| ${r.still.max}`);
   /*
-    Not simply four. 45 steps is 0.75 s, and the thinner liquid's drag time at
-    the rest gap is 0.6 s, so it is still getting up to speed (the thick one,
-    0.15 s, has long since arrived): each drift is its steady speed times
-    1 − e^(−t/τ). The first version asked for 3 to 5.3 and read 2.84, which
-    is that factor exactly; so the check asks for the answer with it in,
-    which is sharper than waiting for both to settle while the discs move.
+    Not simply four. 45 steps is 0.75 s, and each drift is its steady speed
+    times 1 − e^(−t/τ). In the 6 mm gap this was written on the thinner
+    liquid's drag time was 0.6 s, still getting up to speed (the thick one,
+    0.15 s, had long since arrived): the first version asked for 3 to 5.3
+    and read 2.84, which is that factor exactly; so the check asks for the
+    answer with it in. The drag times are worked out from the rest gap
+    (PLAN 38r: at 2 mm they are 0.067 and 0.017 s, both settled, and the
+    answer is four to a part in 10⁴), not written in as numbers.
   */
   const settle = (tau) => 1 - Math.exp(-0.75 / tau);
-  const want = 4 * settle(0.6) / settle(0.15);
+  const want = 4 * settle(r.tau.thinner) / settle(r.tau.thick);
   const ratio = r.thinner.heavy / Math.max(1e-12, r.spun.heavy);
   check(`the drift scales with the drag time: four times thinner, ${want.toFixed(2)}× faster by 0.75 s, to 5%`,
     Math.abs(ratio / want - 1) < 0.05, `${ratio.toFixed(3)}×`);

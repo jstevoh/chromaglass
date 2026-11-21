@@ -62,15 +62,7 @@ is live after the third track); `npm run music` with a `finalizeListen` that thr
   three quarters of a beat off. (Start and a clock dropout are 14e's.) 14-bit pairs and
   NRPN (CC 99/98/6/38) are not decoded either, so learn and auto-map bind the coarse
   byte or the parameter number.
-- *Program Change is dropped* (**14t-pc**, from §30). `parseMidi` (`midi.ts`) returns
-  CC and note on/off and nothing else, so a 0xC0 message never reaches learn. AUM's
-  MIDI matrix, the Elektron boxes and most hardware sequencers send Program Change (and
-  Bank Select, CC 0/32) when the pattern changes, and Imaginando's VS switches patches
-  on it. A `program` binding kind in `MidiTarget`, bound either to set-list item n or
-  to a named preset, played with the item's own fade. On the phone, the bindings are
-  listed on its MIDI page. *Measure:* beside `npm run desk`'s MIDI lines, a recorded
-  run of Program Change messages lands on the bound look every time, none doubled,
-  with the item's fade.
+- ~~*Program Change is dropped* (**14t-pc**, from §30).~~ **Shipped** (`npm run soundowed`, id `pc` out of `--owed`; story in `docs/plan-shipped.md` §14t-pc).
 - *The decks already know the bar* (*proposed*). Pioneer's Pro DJ Link (a CDJ's beat
   packets carry the beat within the bar and the tempo) and Denon's StageLinQ are on the
   network the show server already listens on for OSC and Art-Net. They give the true
@@ -212,6 +204,39 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   startup's "no stop in the opening" 0.13 s after (2.35 s from 8.70 s). `Quiet.go` now comes
   once the opening's last build has settled and its first uses are paid; `npm run intro`
   lines 9 and 9b hold it to that. The Mac's `startup` check 4 is the real test.
+- **Shipped, 14v-12: the opening compiles a display for its own look, and the intro says
+  what it is waiting for** (2026-11-14, the owner: "Things take like 30 seconds to get
+  loaded and started on mobile web ... we should have the loading state present if there
+  are no visuals and some kind of loading updates"). Story in `docs/plan-shipped.md` §14v-12;
+  `npm run leandisplay`, `openingtime -- --variants ",lean=0"`.
+- **14v-13. Found: the phone's own numbers are unread.** Every number in 14v-12 is software
+  WebGPU's (all CPU, the nearest thing to a phone's compiler in a cloud session) or a Mac's.
+  The loading line now prints the seconds beside each stage; read them on the owner's
+  phone (cold, after a deploy that changed the display, and warm), and on an Android
+  phone, and write where the thirty seconds went. If the chunks' download is a large share
+  (the app is two 1.2 MB scripts, 391 and 370 kB gzipped), that is 14v-15.
+- **14v-14. Found: the flipped displays are still whole.** The camera's, the film stock's
+  and the lens pass's scene display are built behind the show whole (one 5 to 8 s compile
+  each on software WebGPU); a look that opens on the camera (`open.camera`) or film stock
+  (`open.stock`) waits for one whole display in its opening. A lean flipped display for
+  those looks is the same mechanism with `toTexture`; `leandisplay` would need a flipped
+  draw.
+- **14v-15. Found: on a slow phone network the intro gives way to "Still loading" at 8 s.**
+  `main.tsx`'s `Loading` turns into the stale-copy message and takes the intro down after
+  eight seconds of download, which a phone on a weak signal can take for the app's 760 kB
+  gzipped. Read the download's share on a phone first (14v-13); then either a longer wait
+  on a slow connection (`navigator.connection`) or the loading line saying "Loading" with
+  the bytes so far.
+- **14v-16. Found: three moiré tests are true on every look.** `U.moireSheetA > 0.5`,
+  `U.moireSheetB > 0.5` and `U.moireFlip > 0.5` test the sheets' names, which every look
+  has, while the ink's amount (`moireAmount`, 0 on all but the moiré looks) is what turns
+  them off, inside `moireSheets`. Testing the amount at the call would let the lean display
+  leave the moiré out on 34 of 41 looks (`displayLean.ts` cannot gate a test every look passes).
+- **14v-17. Found: a lost device's rebuild is a grey line on black.** "rebuilding the
+  plate…" (`LiquidVisualizer.tsx`, `gl-lost`) is all a viewer sees while a replacement
+  device opens, which is the whole opening again; it should be the intro's mark and its
+  loading line. `LiquidVisualizer.tsx` is over its size ceiling, so the caption moves to a
+  small component first.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -264,6 +289,11 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
+- ~~**14y-2** The Mac app keeps System audio across a relaunch or an update.~~ **Shipped**
+  2026-11-10 (the owner: "I shouldn't have to click the system audio ever"). Only System audio,
+  only in the Mac app; every other source still opens on Off. `npm run opensource` (3 new lines).
+  Story in `docs/plan-shipped.md` §14y-2. The owner was asked on a card whether every source
+  should be kept instead; the default (System audio only) shipped while that waits.
 
 ## 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 
@@ -299,6 +329,10 @@ Open, found doing it:
 - **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
   `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
   the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.
+  Its check is written (46e, `npm run rungs -- --owed=120hz`): measured, it is Poster's
+  sixty given up late or never at 120 Hz. Not necessarily via `drawGate.refreshMs`: once
+  every frame steps and takes two refreshes, that median reads the loop's pace (16.7 ms),
+  not the screen's.
 - **14aa-6** (open): `npm run stutter` runs by hand on the Mac (the watcher). Whether it joins
   a Mac shard depends on what the CI runner's GPU makes of Poster, which no run has asked yet.
 
@@ -398,20 +432,29 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   the GPU, `applyDeltas` still upsamples the three delta grids and folds them over the
   whole plate each flush; a dispatch over the written bands' rows (scaled to N) would do.
   `npm run frameuploads` holds whichever writer moves to rows to its own scan.
+  *Part shipped (2026-11-13):* every writer through `squishCell` (a press, a lift, a
+  splash, a bubble's press, a kick's hold and give-back, the bass's hand) marks its
+  cell's row (`DeltaRows.cell`); frameuploads' new frames read 1.327 MB a step → 0.04
+  to 0.24 MB for them. The liquids' step with the GPU holding the liquids asks for no
+  flush at all (since 15e-1 nothing of the liquids' is left in the fold): 1.327 MB a
+  step → 0, and no fold. Still
+  whole: the room's and film's stir, the rhythm sheet, a carry, and the GPU's
+  whole-plate fold in `applyDeltas`.
+- ~~**14ab-16** *The GPU liquids' forces ran only on a step that flushed.*~~ **Shipped** as
+  15e-1, the standing item it turned out to be: the liquids act in the solver's own step
+  (`stepLiquids`), behind `liquidsLive`. Story in `docs/plan-shipped.md`, "15e-1 (met again
+  as 14ab-16) and 46r".
 
-## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
+## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24; the shelf removed 2026-11-13)
 
-**Shipped** (2026-10-24): four public domain cartoons, each the whole film looping, poured
-as dye or played as the film from a Cartoons shelf on the desk's Dye panel and the phone's
-dye sheet (`src/lib/cartoons.ts`, `CartoonShelf.tsx`; sources and licences in
-`public/video/cartoons/SOURCES.md` … Story in `docs/plan-shipped.md` §14ac (moved
-2026-10-29, 19m).
+**Shipped** (2026-10-24): public domain cartoons, poured as dye or played as the film from a
+shelf. Story in `docs/plan-shipped.md` §14ac (moved 2026-10-29, 19m). **Removed** (2026-11-13,
+14ag, the owner's call: "people can figure out their own videos"): the shelf, the files and
+`npm run cartoons`; 14ab-1's fix (the pour handed over once) stays and `npm run myvideo` holds it.
+14ac-1 (a poured file has no Stop) is shipped by 14ag's row; 14ac-3 to -7 went with the shelf.
 
-Open, found building it:
+Open:
 
-- **14ac-1** *A poured file has no Stop.* The desk's Video… and the phone's "A video as dye"
-  pour a file, looping, and nothing in the app stops it short of reloading; only the shelf's
-  cartoons have a Stop. One Stop for whatever is pouring, beside Video… and on the phone.
 - **14ac-2** *The pour's dye is the picture's light, a shortcut.* The pour keys out dark
   pixels and lays every lighter one as dye of its own colour, and pushes the plate along the
   picture's brightness gradient where the frame changed (`LiquidVisualizer.tsx`, "Video
@@ -420,32 +463,8 @@ Open, found building it:
   like this: a film there is projected through the dish (which is what Film does), not
   dissolved into it. Two ways to look at: an Ink key that pours the picture's *dark* lines
   as dye (the ink of a cartoon is its drawing), and the picture as light on the plate rather
-  than as dye in it. Judge first (§66), then pick.
-- **14ac-3** *More films for the shelf.* Walter Ruttmann's *Lichtspiel Opus I–IV*
-  (1921–25) are abstract hand-tinted animation, made for exactly this, public domain in
-  the US by date and in Germany since 2012 (Ruttmann died 1941). The Archive's copies are
-  re-uploads of modern restorations or carry an uploader's CC BY claim; they need a print
-  or a transfer whose source is known before they ship. Ub Iwerks' *Fiddlesticks* (1930)
-  and the 1930 Silly Symphonies joined the US public domain in 2026, with the same check.
-  Every addition gets a row in `SOURCES.md` first; `npm run cartoons` refuses one without.
-  *2026-10-27:* Fiddlesticks (1930) is on the shelf, with four later colour films (see above).
-  Still open: Lichtspiel and *The Adventures of Prince Achmed* (1926, tinted), which are free by
-  date and need a print whose source is known; the 1930 Silly Symphonies (black and white);
-  and the Popeye colour specials, the Superman shorts and *Poor Cinderella*, left off for the
-  characters' trademarks, not their copyright (`SOURCES.md`, "Considered and left off").
-- **14ac-4** *The cartoons are grey.* **Shipped for colour** (2026-10-27): five are in colour,
-  and the pour lays each pixel's own colour, so no code changed. Whether the look's palette
-  should tint the grey four or the colour five (Film's grade already can, in the Mixer) is
-  still the owner's call in §66 and §85.
-- **14ac-5** *Colour that is two-strip or Cinecolor.* These prints have two colours (red-orange
-  and blue-green), not three: no true yellow, blue or purple. The pour lays what the print
-  has; judge in §85 whether a look's palette should fill in what a two-colour print cannot.
-- **14ac-6** *A feature on the shelf is a 27 MB file.* Gulliver's Travels is a quarter of the
-  shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
-  data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
-  lower bitrate; the check holds a feature under 30 MB.
-- **14ac-7** *The cartoons were not in Settings → Film.* **Shipped** (2026-10-29): the Film
-  section lists the shelf under its demo loops. Story in `docs/plan-shipped.md` §14ac.
+  than as dye in it. Judge first (§66), then pick. The shortcut is the same for a video of one's own; 14ag-3 is
+  where the real alternatives were put to the owner.
 
 ## 14ae. One Record button (shipped, asked 2026-10-24)
 

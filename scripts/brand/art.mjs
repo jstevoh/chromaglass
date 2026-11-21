@@ -204,6 +204,54 @@ export function shareCard(words) {
 }
 
 /**
+ * Google Play's feature graphic (PLAN.md 12.6): the share card's drawing at the
+ * 1024 × 500 the Play listing asks for, the block of mark, name and line moved
+ * up to sit in the middle of the shorter card and the burst pulled in from an
+ * edge that Play may crop behind its own buttons. Drawn here and not cropped
+ * from the share card, because a crop of 1200 × 630 to Play's wider shape cuts
+ * the tagline's second line in half.
+ */
+export function featureGraphic(words) {
+  const W = 1024, H = 500;
+  const back = burst({ cx: 820, cy: 250, s: 1.3, id: 'fk', detail: 'high' });
+  const scale = 0.7, lx = 72, ly = 105;
+  const inner = lockup(words, { detail: 'high' }).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\n$/, '');
+  const [line1, line2] = words.tagline;
+  const textX = r1(lx + 236 * scale);
+  const defs = radial('feature', [['0%', '#0a3a5c'], ['60%', '#031627'], ['100%', '#00070f']], 'cx="30%" cy="35%" r="90%"') + back.defs;
+  const body = `<rect width="${W}" height="${H}" fill="url(#feature)"/>`
+    + `<g opacity="0.28">${back.body}</g>`
+    + `<g transform="translate(${lx} ${ly}) scale(${scale})">${inner}</g>`
+    + `<g fill="#d9f3f7" opacity="0.72">`
+    + `<path transform="translate(${textX} ${ly + 205})" d="${line1.d}"/>`
+    + `<path transform="translate(${textX} ${ly + 257})" d="${line2.d}"/></g>`;
+  return svg(`0 0 ${W} ${H}`, defs, body);
+}
+
+/**
+ * The Android TV banner (PLAN 12-tv-2b), drawn once at 16:9 for both places
+ * that ask for it: the 320 × 180 launcher banner the TV's home screen shows
+ * (androidtv/…/drawable-xhdpi/banner.png) and the 1280 × 720 TV banner of the
+ * Play listing. Google's rule for both is the app's name, legible at the small
+ * size, on an opaque ground, with no other words; so the share card's ground
+ * and burst, the lockup alone, centred and as wide as the margins allow.
+ */
+export function tvBanner(words) {
+  const W = 1280, H = 720;
+  const back = burst({ cx: 1060, cy: 360, s: 1.6, id: 'tk', detail: 'high' });
+  const full = lockup(words, { detail: 'high' });
+  const [, , lw, lh] = full.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+  const scale = (W * 0.8) / lw;
+  const lx = r1((W - lw * scale) / 2), ly = r1((H - lh * scale) / 2);
+  const inner = full.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\n$/, '');
+  const defs = radial('tvb', [['0%', '#0a3a5c'], ['60%', '#031627'], ['100%', '#00070f']], 'cx="35%" cy="40%" r="90%"') + back.defs;
+  const body = `<rect width="${W}" height="${H}" fill="url(#tvb)"/>`
+    + `<g opacity="0.28">${back.body}</g>`
+    + `<g transform="translate(${lx} ${ly}) scale(${r1(scale * 1000) / 1000})">${inner}</g>`;
+  return svg(`0 0 ${W} ${H}`, defs, body);
+}
+
+/**
  * The intro's three layers (src/lib/intro.ts), apart, because they move
  * apart: the burst turns, the hub with its C stays upright over it, and the
  * name sits under both. Drawn on no ground: the intro's own liquid is the

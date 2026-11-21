@@ -7,7 +7,7 @@ import {
   Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
-  Crosshair, LayoutGrid, Plus,
+  Crosshair, LayoutGrid, Plus, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
@@ -15,14 +15,22 @@ import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
+import { musicStirOf, withMusicStir } from '../../lib/stir';
 import { PIN_RANGE } from '../../lib/deskPins';
+import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
+import { PhoneMoire } from './PhoneMoire';
+import { PhoneInkTitle } from './PhoneInkTitle';
+import { findPreset } from '../../presets';
+import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
-import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
+import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { canShareClip, shareClip } from '../../lib/shareClip';
+import type { ClipShape } from '../../lib/clipFrame';
 import { OscOutRow } from '../ui/OscOutRow';
 import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -33,6 +41,7 @@ import { TabStrip } from '../desk/TabStrip';
 import type { TabEdit } from '../../hooks/useDeskLayout';
 import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
+import { SiteLink } from '../SiteLink';
 import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 
 /**
@@ -92,7 +101,7 @@ type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs' | 
  * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
  * reordered, added and taken away the same way, each tab's panels stacked in
  * one sheet. A settings section or one of the screens (Songs, Sequences,
- * Music & Drone) is drawn in it whole; the desk's own panels (the bottles,
+ * Sound with its player and drone) is drawn in it whole; the desk's own panels (the bottles,
  * the set list, the rides) were built for a mouse, and the phone has its own
  * of each, so their card opens that sheet instead.
  */
@@ -161,8 +170,8 @@ export interface PhoneStageProps {
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -232,6 +241,8 @@ export interface PhoneStageProps {
   onTap: () => void;
   /** Ableton Link on or off at the show server, offered while one is there (PLAN.md 13.5-link). */
   onLink?: (on: boolean) => void;
+  /** Live's play and stop move the Sequence (13.5-link-transport), as on the desk. */
+  onLinkTransport?: (on: boolean) => void;
   /** OSC out at the show server (PLAN.md 13.5-osc), the desk's own row at a phone's size; null until a server is there. */
   oscOut?: OscOutLabel | null;
   onOscOut?: (on: boolean, target?: string) => boolean;
@@ -332,9 +343,10 @@ export interface PhoneStageProps {
    * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
    * lace. On the Dye sheet, under the bottles, because it is a liquid
    * poured: the Oil and Alcohol bottles then thicken it and punch holes in it.
+   * With its dye (PLAN 20b-13) beside it, so the settings come as one piece.
    */
-  clearFilm: number;
-  onClearFilm: (v: number) => void;
+  film: Pick<VisualizerSettings, 'clearFilm' | 'clearFilmDye' | 'clearFilmDyeColor'>;
+  onFilm: (patch: Partial<VisualizerSettings>) => void;
   // Slosh: how far a tilt sloshes the liquid (lib/slosh.ts), beside the Tilt tile.
   slosh: number;
   onSlosh: (v: number) => void;
@@ -349,7 +361,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
-  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
+  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void; shape: ClipShape; onShape: (s: ClipShape) => void; take: { blob: Blob; filename: string; url: string } | null };
   onHide: () => void;
   onFullLayout: () => void;
   /** The desk's tabs, on the phone (More → Tabs). */
@@ -708,7 +720,7 @@ export function PhoneStage(p: PhoneStageProps) {
             className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? LIT : 'border-transparent text-text-2 active:bg-active'}`}
           >
             {/* The bottle in hand, filled to what is left of the Dye Budget (PLAN 35e); it leans while its sheet is open. */}
-            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} />
+            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} testId="phone-dye-bottle" />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
@@ -771,10 +783,29 @@ export function PhoneStage(p: PhoneStageProps) {
           ))}
           {liquid?.description && <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-liquid-description">{liquid.description}</p>}
 
+          {(liquid?.id === 'soap' || (p.mixer?.settings.soapBreakdown ?? 0) > 0.001) && p.mixer && (
+            <div className="mt-3">
+              <Slider label="Soap Breakdown" value={p.mixer.settings.soapBreakdown ?? 0} min={0} max={1} step={0.01}
+                onChange={v => p.mixer!.onSetting({ soapBreakdown: v })}
+                display={readSetting('soapBreakdown', p.mixer.settings.soapBreakdown ?? 0, 0, 1)}
+                touch testId="phone-soap-breakdown" midiKey="setting:soapBreakdown" />
+            </div>
+          )}
+
           <div className="mt-3">
-            <Slider label="Clear Film" value={p.clearFilm} min={0} max={1} step={0.05} onChange={p.onClearFilm}
-              display={`${Math.round(p.clearFilm * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
+            <Slider label="Clear Film" value={p.film.clearFilm ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
+              display={`${Math.round((p.film.clearFilm ?? 0) * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+            {(p.film.clearFilm ?? 0) > 0.001 && (
+              <div className="mt-3 flex items-end gap-3">
+                <div className="flex-1">
+                  <Slider label="Film Dye" value={p.film.clearFilmDye ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.onFilm({ clearFilmDye: v })}
+                    display={`${Math.round((p.film.clearFilmDye ?? 0) * 100)}%`} touch testId="phone-film-dye" midiKey="setting:clearFilmDye" />
+                </div>
+                <input type="color" aria-label="Film dye colour" data-testid="phone-film-dye-colour" value={p.film.clearFilmDyeColor ?? '#ffd21a'}
+                  onChange={(e) => p.onFilm({ clearFilmDyeColor: e.target.value })} className="mb-5 h-11 w-11 cursor-pointer rounded-lg border-0 bg-transparent p-0" />
+              </div>
+            )}
           </div>
 
           <SectionLabel>{liquid ? `${liquid.name}'s colour` : 'Colour'}</SectionLabel>
@@ -848,12 +879,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
-          {/* Not closed on a press, unlike the two above: Pour and Film are
-              each a toggle someone may want both of, and Stop is here too. */}
-          {p.cartoons && (
+          {/* The video loaded (PLAN 14ag), by this sheet's "A video as dye" or
+              the Video section's Video file: not closed on a press, unlike the
+              two above, since Play and Pour are each a toggle someone may want
+              both of, and Pour's Stop is here too. */}
+          {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
-              <CartoonShelf {...p.cartoons} size="phone" />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" />
             </div>
           )}
           </PanelGuard>
@@ -892,6 +925,7 @@ export function PhoneStage(p: PhoneStageProps) {
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
+          <PhoneMoire settings={p.mixer.settings} onSetting={p.mixer.onSetting} />
           <div className="mt-3">
             <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
               display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
@@ -901,6 +935,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Projector Focus" value={p.projectorFocus} min={0} max={1} step={0.05} onChange={p.onProjectorFocus}
               display={`${Math.round(p.projectorFocus * 100)}%`} touch testId="phone-projector-focus" midiKey="setting:projectorFocus" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
+          </div>
+          <div className="mt-3">
+            <Slider label="Heat" value={p.mixer.settings.heat ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.mixer.onSetting({ heat: v })}
+              display={`${Math.round((p.mixer.settings.heat ?? 0) * 100)}%`} touch testId="phone-heat" midiKey="setting:heat" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">The projector lamp&apos;s heat in the dish: hold a finger on the glass to block the fan&apos;s air and boil the spot.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">
@@ -938,7 +977,9 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
+                        // A pack's look without the pack opens the account sheet (PLAN 45a).
+                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
                       }}
@@ -1060,6 +1101,16 @@ export function PhoneStage(p: PhoneStageProps) {
                 Link
               </button>
               <span className="text-[12px] leading-snug text-dim">{linkLine(p.tempo.link)}</span>
+              {p.tempo.link.on && p.onLinkTransport && (
+                <button
+                  onClick={() => p.onLinkTransport?.(!p.tempo.link?.follows)}
+                  aria-pressed={!!p.tempo.link.follows}
+                  data-testid="phone-tempo-link-transport"
+                  className={`ml-auto min-h-11 flex-none rounded-xl border px-4 text-[14px] font-medium ${p.tempo.link.follows ? LIT : 'border-white/10 bg-white/5'}`}
+                >
+                  Play/Stop
+                </button>
+              )}
             </div>
           )}
           {p.oscOut && p.onOscOut && (
@@ -1069,6 +1120,25 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
           </div>
+          {/*
+            Music Stir: the depth of the look's cord from the sound's mids
+            onto Turbulence, which is how the music stirs the liquid since
+            the solver stopped reading the analyser itself (PLAN 38u-4,
+            38u-5). The desk has it in Patches, as the cord it is, where its
+            depth is set and it is pulled like any other; the phone has no
+            patch bay, so this slider is that cord's control here
+            (lib/stir.ts `musicStirOf`, `withMusicStir`, on the settings and
+            setter the sheets already share as `mixer`). At 0 the cord is
+            pulled and the band stirs nothing; raised on a look saved
+            before the cord existed, it puts one in.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Music Stir" value={musicStirOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
+                onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicStir(p.mixer!.settings.sceneMappings, v) })}
+                display={`${Math.round(musicStirOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-stir" />
+            </div>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}
@@ -1113,6 +1183,17 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-3">
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
               display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+          </div>
+          {/*
+            The desk's two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a hand's tip of
+            the flat plate that stays where it is put, for a phone on a stand. Not the
+            phone's own Tilt, which stands the plate up (Gravity), so both can be on.
+          */}
+          <div className="mt-3">
+            <Slider label="Tilt left/right" value={p.mixer.settings.plateTiltX ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltX: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltX ?? 0) * 100)}%`} touch testId="phone-tilt-x" midiKey="setting:plateTiltX" />
+            <Slider label="Tilt up/down" value={p.mixer.settings.plateTiltY ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltY: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltY ?? 0) * 100)}%`} touch testId="phone-tilt-y" midiKey="setting:plateTiltY" />
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
@@ -1227,6 +1308,16 @@ export function PhoneStage(p: PhoneStageProps) {
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
+          {/*
+            Song titles as ink (PLAN 37x-10): the desk's Logo & Titles switch,
+            on the phone. Above the tiles, not after Record makes where it
+            first went: Songs, Settings, Guide and the rest close this sheet
+            to open their own, so anything below them is a sheet the hand (and
+            `npm run switches`, which walks the sheet in order and found the
+            switch gone by the time it reached it) has to open again. The
+            switch is the one thing here changed mid-set; the tiles lead away.
+          */}
+          {p.mixer && <div className="mb-3"><PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} /></div>}
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
@@ -1250,6 +1341,8 @@ export function PhoneStage(p: PhoneStageProps) {
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
           </div>
+          {/* The website's free visuals, in the apps only (SiteLink.tsx renders nothing on the site). */}
+          <div className="mt-3"><SiteLink look="sheet" /></div>
           {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
           <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
             <SectionLabel>Record makes</SectionLabel>
@@ -1262,6 +1355,31 @@ export function PhoneStage(p: PhoneStageProps) {
               testId="phone-record-makes-segmented"
             />
             <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
+            {/* The clip's frame (lib/clipFrame.ts, PLAN 34f): 9:16 to post, or the screen as it is. */}
+            <SectionLabel>Clip frame</SectionLabel>
+            <Segmented
+              value={p.recording.shape}
+              options={[['portrait', 'Portrait 9:16'], ['plate', 'Screen as it is']] as const}
+              onChange={p.recording.onShape}
+              height={44}
+              fill
+              testId="phone-record-shape"
+            />
+            <p className="text-[12px] text-dim">
+              {p.recording.shape === 'portrait'
+                ? 'The middle 9:16 of the screen, with sound, as an MP4 where this phone can write one: ready for Reels and TikTok.'
+                : 'The whole screen, as it is.'}
+            </p>
+            {p.recording.take && !p.recording.on && canShareClip(p.recording.take) && (
+              <button
+                type="button"
+                onClick={() => { void shareClip(p.recording.take!); }}
+                data-testid="phone-share-clip"
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-[14px] font-medium text-text active:bg-hover"
+              >
+                <Share2 size={16} />Share the last clip
+              </button>
+            )}
           </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">

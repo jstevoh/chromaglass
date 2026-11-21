@@ -54,6 +54,25 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/*
+  Owed lines (PLAN 19k's pattern, as rungs-owed.mjs and soapbreak.mjs hold
+  them): an id in `--owed=` in scripts/checks.json is printed as owed while its
+  line fails in main's state, the thing it asks for absent; it is red once it
+  passes while still listed (take the id out), and red if what it is owed for
+  has been built and misses. The build's PR takes its id out of `--owed` and
+  never edits the line.
+*/
+const BENDAY_OWED = ['back'];
+const owedFlag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(owedFlag ? owedFlag.slice('--owed='.length).split(',').filter(Boolean) : []);
+for (const id of owed) if (!BENDAY_OWED.includes(id)) check(`--owed names a line of benday.mjs`, false, `unknown id "${id}" (known: ${BENDAY_OWED.join(', ')})`);
+const owedLine = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
+
 const SIZE = 512;
 const ROWS = Number(/const BENDAY_ROWS: f32 = ([\d.]+);/.exec(readFileSync('src/gpu/wgsl/plate.ts', 'utf8'))?.[1]);
 const DOT = Number(/const BENDAY_DOT: f32 = ([\d.]+);/.exec(readFileSync('src/gpu/wgsl/plate.ts', 'utf8'))?.[1]);
@@ -370,10 +389,60 @@ try {
       h > from[0] && h < from[1] && on.ink === name && (on.share[name] ?? 0) > 0.9 && dist(on.mean, off.mean) > 30,
       `at 0 ${off.mean.join(',')} (hue ${h.toFixed(0)}°); printed ${on.mean.join(',')} (${on.ink}, ${dist(on.mean, off.mean).toFixed(0)} from the unprinted), ${pct(on.share[name] ?? 0)} of its middle the ${name}`);
   }
+
+  // ── 8. The second plate is outlined too (PLAN 21b, owed) ─────────────
+  /*
+    The line is drawn from the front plate's dye, so a second plate is
+    printed in the inks and the dots but its pools are never outlined: a
+    look with two plates gets a comic whose back half has no pen. Roy has one
+    plate, so this is asked of the print, not of Roy: one red pool on the lab's
+    plate at (0.3, 0.5), drawn again as the back plate turned half a turn, so
+    the back's copy lies at (0.7, 0.5) on clear glass, nowhere near the
+    front's. Laid over the front by multiply: Roy's own screen over its white
+    paper lays any back plate as white (read: 254,254,254 where the back's red
+    pool lies, at every turn of it), which no print could outline, so the back
+    is laid the way a second screen of ink is, over the first. Each pool's
+    middle is found from its own red pixels (the left
+    half's and the right half's), and asked the ring question of line 4: the
+    first black within 3 px of where the red ends, on 180 rays. The front's
+    pool is the control, so a render that lost its outline everywhere is not
+    read as the back being fine; and the back must be red at all (printed),
+    which it is on main, so what is owed is the line, not the print.
+  */
+  {
+    const lone = [[0.3, 0.5, 0.1, RED, 2.5]];
+    const two = await render(lone, { layerCount: 2, blendMode: 'multiply' }, { backPlate: true, backRotation: Math.PI });
+    const ring = (px, x0, x1) => {
+      let sx = 0, sy = 0, sn = 0;
+      for (let y = 0; y < SIZE; y++) for (let x = x0; x < x1; x++) if (isRed(at(px, x, y))) { sx += x; sy += y; sn++; }
+      if (!sn) return { sn, n: 0 };
+      const mx = sx / sn, my = sy / sn;
+      let n = 0;
+      for (let k = 0; k < 180; k++) {
+        const a = (k / 180) * 2 * Math.PI;
+        let lastRed = -1, found = false;
+        for (let r = 2; r < 0.3 * SIZE; r += 0.5) {
+          const x = Math.round(mx + r * Math.cos(a)), y = Math.round(my + r * Math.sin(a));
+          if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) break;
+          const c = at(px, x, y);
+          if (isRed(c)) lastRed = r;
+          else if (lastRed >= 0 && isBlack(c)) { found = r - lastRed <= 3; break; }
+          else if (lastRed >= 0 && r - lastRed > 3) break;
+        }
+        if (found) n++;
+      }
+      return { sn, n, mx, my };
+    };
+    const front = ring(two, 0, SIZE >> 1), back = ring(two, SIZE >> 1, SIZE);
+    owedLine('back', 'a second plate\'s pool is outlined in black the whole way round too, as the front\'s is (21b)',
+      front.n >= 176 && back.sn > 500 && back.n >= 176,
+      `the front's pool ringed on ${front.n} of 180 rays; the back plate's (${back.sn} red px, middle ${back.sn ? `${back.mx.toFixed(0)},${back.my.toFixed(0)}` : 'none'}) on ${back.n}`,
+      front.n >= 176 && back.sn > 500 && back.n < 18);
+  }
 } finally {
   await close();
 }
 
 const failed = checks.filter((c) => !c.ok).length;
-console.log(failed ? `\n${failed} of ${checks.length} failed` : `\nall ${checks.length} ok`);
+console.log(failed ? `\n${failed} of ${checks.length} failed` : `\nall ${checks.length} ok${owed.size ? ` (${owed.size} owed)` : ''}`);
 process.exit(failed ? 1 : 0);

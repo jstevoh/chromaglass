@@ -26,6 +26,27 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/*
+  A line written ahead of its build (PLAN 18e-2), printed as owed while it
+  fails and red the day it passes with its id still listed (the convention
+  of timers.mjs and wallflash.mjs): an owed line is excused only while what
+  it asks for is absent (here, while .z is still the signed Laplacian), and a
+  build that is there and misses is red.
+
+    npm run derive -- --owed=grad
+*/
+const IDS = ['grad'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknown = [...owed].filter((id) => !IDS.includes(id));
+if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
+
 const { page, close } = await openLab();
 try {
   const r = await page.evaluate(async () => {
@@ -64,11 +85,39 @@ try {
     const { w, h } = one;
     let sum = 0, sx = 0, sy = 0;
     let minLap = 1e9, maxLap = -1e9;
+    /*
+      The Laplacian of the path, worked out here from the path the pass
+      writes in .w, with the pass's own stencil: taps 3 cells of the logical
+      grid out (3 / 192 of the plate), the diagonals at half weight, times 25.
+      It used to be read from .z, which carried that Laplacian, but since
+      38h-3 nothing on the projected plate reads .z (the shadowgraph takes its
+      Laplacian from .w itself), and PLAN 18e-2 gives .z to |∇OPL|. Taken
+      from .w, the line asks the same of the path whatever .z carries; on
+      main the two agree (the PR that moved this line printed both).
+    */
+    const k = 3 * w / 192;
+    const wAt = (fx, fy) => {
+      const cx = Math.min(Math.max(fx, 0), w - 1), cy = Math.min(Math.max(fy, 0), h - 1);
+      const x0 = Math.min(Math.floor(cx), w - 2), y0 = Math.min(Math.floor(cy), h - 2), ax = cx - x0, ay = cy - y0;
+      return (one.at(x0, y0, 3) * (1 - ax) + one.at(x0 + 1, y0, 3) * ax) * (1 - ay)
+        + (one.at(x0, y0 + 1, 3) * (1 - ax) + one.at(x0 + 1, y0 + 1, 3) * ax) * ay;
+    };
+    let minZ = 1e9, maxZ = -1e9;
+    // How closely .z follows that Laplacian (Pearson's r): main's .z is it, so the grad line is owed only while r stays high.
+    let cn = 0, cz = 0, cl = 0, czz = 0, cll = 0, czl = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const g = Math.hypot(one.at(x, y, 0), one.at(x, y, 1));
-      const l = one.at(x, y, 2);
-      if (l < minLap) minLap = l;
-      if (l > maxLap) maxLap = l;
+      const z = one.at(x, y, 2);
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+      if (x >= k && y >= k && x < w - k && y < h - k) {
+        const c = one.at(x, y, 3);
+        const l = ((wAt(x - k, y) + wAt(x + k, y) + wAt(x, y - k) + wAt(x, y + k) - 4 * c)
+          + 0.5 * (wAt(x - k, y - k) + wAt(x + k, y - k) + wAt(x - k, y + k) + wAt(x + k, y + k) - 4 * c)) * 25;
+        if (l < minLap) minLap = l;
+        if (l > maxLap) maxLap = l;
+        cn++; cz += z; cl += l; czz += z * z; cll += l * l; czl += z * l;
+      }
       if (!(g > 0)) continue;
       sum += g; sx += g * (x + 0.5) / w; sy += g * (y + 0.5) / h;
     }
@@ -127,7 +176,71 @@ try {
       { id: 'water', n: N_WATER, read: pathAt(0.72, 0.72) },
     ].map((p) => ({ ...p, expected: p.n * thickness }));
 
-    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, paths, thickness };
+    /*
+      What .z carries (PLAN 18e-2, owed): |∇OPL|, the slope of the path that
+      deflects the light out of the projector's pupil at an edge, so a clear
+      pour's rim draws in focus. Read on the two clear pools, scale-free: it
+      is never negative (a magnitude), it peaks on each pool's rim (0.085 to
+      0.115 of the plate from its middle, the pools' radius 0.1), it is under
+      5% of that peak in each pool's flat middle (within 0.05) and in clear
+      water away from everything (round 0.72, 0.72), and the syrup's rim peak
+      stands to glycerine's as their index steps over water do. On main .z is
+      still the Laplacian: negative inside every rim. Owed only while it is:
+      while .z follows the Laplacian of .w worked out above (Pearson's r over
+      0.9 on the first plate), so a .z rebuilt as anything else and missing is
+      red, not owed (a signed ∂x would keep the sign test's excuse).
+    */
+    const ringPeak = (cx, cy) => {
+      let m = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const d = Math.hypot((x + 0.5) / w - cx, (y + 0.5) / h - cy);
+        if (d >= 0.085 && d <= 0.115) m = Math.max(m, two.at(x, y, 2));
+      }
+      return m;
+    };
+    const flatMost = (cx, cy, r) => {
+      let m = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (Math.hypot((x + 0.5) / w - cx, (y + 0.5) / h - cy) <= r) m = Math.max(m, Math.abs(two.at(x, y, 2)));
+      }
+      return m;
+    };
+    /*
+      And where on the rim: a slope is largest on the step itself, where the
+      path is halfway between the pool's and the water's, while a Laplacian
+      crosses zero there and peaks on the step's shoulders. So on the step's
+      own pixels (the path 0.35 to 0.65 of the way from the water's to the
+      pool's, at least 8 of them) .z is asked at 0.6 of its rim peak or more.
+      A Laplacian with its negative lobe clamped away, or its absolute value,
+      would pass the lines above and reads near nothing here. (A first try
+      asked where the pixels near the peak sat in the step, as a mean and
+      then pixel by pixel: the mean let |Laplacian|'s two lobes average to a
+      half, the check-skeptic's review; pixel by pixel failed a true slope,
+      whose stencil spreads one sharp step's peak over pixels wholly in or
+      out of it, 3% of them mid-step in the throwaway build.)
+    */
+    const midStep = (p, peak) => {
+      const inside = pathAt(p.x, p.y), outside = pathAt(0.72, 0.72);
+      let sum = 0, k = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const d = Math.hypot((x + 0.5) / w - p.x, (y + 0.5) / h - p.y);
+        if (d < 0.07 || d > 0.13) continue;
+        const f = (two.at(x, y, 3) - outside) / (inside - outside);
+        if (f < 0.35 || f > 0.65) continue;
+        sum += two.at(x, y, 2); k++;
+      }
+      return { n: k, at: k && peak > 0 ? sum / k / peak : 0 };
+    };
+    let zMin = 1e9;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) zMin = Math.min(zMin, two.at(x, y, 2));
+    const grad = {
+      zMin,
+      rims: pools.map((p) => { const peak = ringPeak(p.x, p.y); return { id: p.id, dn: indexOf(p.id) - N_WATER, peak, middle: flatMost(p.x, p.y, 0.05), ...midStep(p, peak) }; }),
+      water: flatMost(0.72, 0.72, 0.05),
+    };
+
+    const corr = (cn * czl - cz * cl) / Math.sqrt(Math.max(1e-12, (cn * czz - cz * cz) * (cn * cll - cl * cl)));
+    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, corr, paths, thickness, grad };
   });
   const at = (x, y) => `${x.toFixed(2)},${y.toFixed(2)}`;
   check('the derive pass finds slopes at all', r.sum > 0, `weight ${r.sum.toFixed(1)}`);
@@ -144,10 +257,21 @@ try {
     0 and this fails.
   */
   check('Becke line doublet present in Laplacian', r.minLap < -0.07 && r.maxLap > 0.18,
-    `Laplacian min ${r.minLap.toFixed(3)}, max ${r.maxLap.toFixed(3)}`);
+    `Laplacian of the path (.w) min ${r.minLap.toFixed(3)}, max ${r.maxLap.toFixed(3)}; .z min ${r.minZ.toFixed(3)}, max ${r.maxZ.toFixed(3)}`);
   const worst = Math.max(...r.paths.map((p) => Math.abs(p.read - p.expected)));
   check('optical path is each liquid\'s own index times its depth (glycerine, syrup, water)', worst < 0.005,
     `${r.paths.map((p) => `${p.id} ${p.read.toFixed(4)} against ${p.n} × ${r.thickness.toFixed(2)} = ${p.expected.toFixed(4)}`).join('; ')}`);
+  {
+    const g = r.grad, [gl, sy] = g.rims;
+    const peak = Math.min(gl.peak, sy.peak);
+    const ratio = (sy.peak / Math.max(1e-9, gl.peak)) / (sy.dn / gl.dn);
+    const flat = Math.max(gl.middle, sy.middle, g.water);
+    const atStep = g.rims.every((p) => p.n >= 8 && p.at >= 0.6);
+    line('grad', '18e-2: the pass writes |∇OPL| in .z: never negative, peaking on each clear pool\'s rim and on the step itself (0.6 of the peak or more where the path is 0.35 to 0.65 of the step), under 5% of that in their middles and in clear water, syrup\'s rim over glycerine\'s as their index steps (within 15%)',
+      g.zMin > -1e-3 && peak > 0 && atStep && flat < 0.05 * peak && ratio > 0.85 && ratio < 1 / 0.85,
+      `.z min ${g.zMin.toFixed(4)}; rim peaks ${g.rims.map((p) => `${p.id} ${p.peak.toFixed(4)}, ${p.at.toFixed(2)} of it on the step (${p.n} px) (Δn ${p.dn.toFixed(3)}, middle ${p.middle.toFixed(4)})`).join(', ')}; clear water ${g.water.toFixed(4)}; syrup over glycerine ${ratio.toFixed(2)} of the index steps' ratio; .z against the path's Laplacian r = ${r.corr.toFixed(3)}`,
+      r.corr > 0.9);
+  }
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

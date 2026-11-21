@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import { blackbodyHex, kelvinLabel, warmthKelvin } from '../../lib/lampKelvin';
 import { FORM_S, dripFallFor } from '../../lib/dripPace';
 import { HUB_CM, reelsAt } from '../../lib/tapeReels';
@@ -25,6 +25,9 @@ import type { TempoReading } from '../../lib/tempo';
 /** The bottle in its own frame: a neck, a shoulder, a body from y 7.3 to 21. */
 const BOTTLE = 'M6 1.6h4v3.1l2.4 2.6v12.2a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6V7.3L6 4.7z';
 const BODY_TOP = 7.3, BODY_BOTTOM = 21;
+/** Where a bottle's liquid stands, in its own frame, for a level 0 to 1. */
+const surfaceOf = (level: number) => BODY_BOTTOM - (BODY_BOTTOM - BODY_TOP) * Math.max(0, Math.min(1, level));
+
 /** How far it leans when picked, degrees: far enough to read as tipped, short of pouring out. */
 const TIP_DEG = -26;
 const PIVOT = '8px 18px';
@@ -37,18 +40,21 @@ const PIVOT = '8px 18px';
  * `colour` is the liquid's own, or transparent for clear liquid, which is then
  * drawn as a faint tint so there is something to see rise and fall.
  */
-export function Bottle({ colour, level, tipped = false, height = 20, testId }: {
+export function Bottle({ colour, level, tipped = false, height = 20, testId, svgRef }: {
   colour: string; level: number; tipped?: boolean; height?: number; testId?: string;
+  /** The drawn bottle, for one that moves its own level (`LiveBottle`). */
+  svgRef?: Ref<SVGSVGElement>;
 }) {
   const id = useId();
   const clipId = `cg-bottle-${id.replace(/:/g, '')}`;
   const lv = Math.max(0, Math.min(1, level));
-  const surface = BODY_BOTTOM - (BODY_BOTTOM - BODY_TOP) * lv;
+  const surface = surfaceOf(lv);
   const clear = colour === 'transparent';
   const lean = tipped ? TIP_DEG : 0;
   const frame = (deg: number) => ({ transform: `rotate(${deg}deg)`, transformOrigin: PIVOT }) as const;
   return (
     <svg
+      ref={svgRef}
       viewBox="0 0 16 22" width={height * 16 / 22} height={height}
       aria-hidden overflow="visible" className="shrink-0"
       data-testid={testId} data-level={lv.toFixed(2)} data-tipped={tipped ? 'true' : 'false'}
@@ -57,8 +63,8 @@ export function Bottle({ colour, level, tipped = false, height = 20, testId }: {
         <clipPath id={clipId}><path d={BOTTLE} /></clipPath>
         <g clipPath={`url(#${clipId})`}>
           <g className="cg-tip" style={frame(-lean)}>
-            <rect x="-8" y={surface} width="32" height="30" fill={clear ? 'currentColor' : colour} opacity={clear ? 0.4 : 1} />
-            {clear && <path d={`M-8 ${surface}h32`} stroke="currentColor" strokeWidth="0.9" opacity="0.85" />}
+            <rect data-liquid x="-8" y={surface} width="32" height="30" fill={clear ? 'currentColor' : colour} opacity={clear ? 0.4 : 1} />
+            {clear && <path data-surface d={`M-8 ${surface}h32`} stroke="currentColor" strokeWidth="0.9" opacity="0.85" />}
           </g>
         </g>
         <path d={BOTTLE} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -68,27 +74,54 @@ export function Bottle({ colour, level, tipped = false, height = 20, testId }: {
 }
 
 /**
- * The reading `read` gives, polled while mounted: how much of the Dye Budget is
- * left. Only the picked bottle asks, a few times a second, and it re-renders
- * only when the level moves a twentieth past a wobble (`shownRoom`), so a
- * plate at rest costs nothing and nothing above it re-renders (`npm run renders`).
+ * The picked bottle: tipped, and filled to what is left of the Dye Budget as
+ * `read` gives it, polled a few times a second while mounted and moved a
+ * twentieth at a time past a wobble (`shownRoom`).
+ *
+ * It moves its own liquid, on the drawn SVG, and never re-renders for it
+ * (PLAN 19aa-14). It held the level in React state until 2026-11-07, and a
+ * change was a commit of its own, without the App: `npm run renders`' quiet
+ * Perform desk read 2.0 and 2.3 commits a second against the App's 1.3 on
+ * GitHub's Macs (#595, #670), and its gamepad windows 1.6 and 1.7 (#605,
+ * #640, #669), never where no plate draws. The hysteresis in `shownRoom`
+ * (October) cut the flipping of a reading at rest on a rounding boundary, but
+ * a plate whose mean density drifts or hunts by more than the few thousandths
+ * it was measured against still crosses a step now and then; and React's
+ * state hook commits twice for a change, once for it and once more on the
+ * next poll that sets the same value (its quick bail-out is skipped while the
+ * fiber still carries the last update's lane). The bottle is 20 pixels of
+ * the desk: it should cost the page nothing, as the VU needle's ref does. So
+ * the level lives in a ref and the poll writes the three attributes the
+ * level draws (the liquid's top, a clear liquid's surface line and
+ * `data-level`), and a render of the desk around it draws it at that same
+ * level, so React and the page never disagree.
  */
-export function useDyeRoom(read: (() => number) | undefined): number {
-  const [room, setRoom] = useState(1);
+export function LiveBottle({ colour, read, height, tipped = true, testId }: { colour: string; read: (() => number) | undefined; height?: number; tipped?: boolean; testId?: string }) {
+  const svg = useRef<SVGSVGElement>(null);
+  const shown = useRef(1);
+  const draw = () => {
+    const node = svg.current;
+    if (!node) return;
+    const y = surfaceOf(shown.current);
+    node.dataset.level = shown.current.toFixed(2);
+    node.querySelector('[data-liquid]')?.setAttribute('y', String(y));
+    node.querySelector('[data-surface]')?.setAttribute('d', `M-8 ${y}h32`);
+  };
+  // After any render of the desk around it, the page shows the level the poll last drew (a render that read an older one cannot leave it standing).
+  useLayoutEffect(draw);
   useEffect(() => {
-    if (!read) return;
-    const poll = () => { const r = read(); setRoom(prev => shownRoom(prev, r)); };
+    if (!read) { shown.current = 1; return; }
+    const poll = () => {
+      const next = shownRoom(shown.current, read());
+      if (next === shown.current) return;
+      shown.current = next;
+      draw();
+    };
     poll();
     const id = setInterval(poll, 400);
     return () => clearInterval(id);
   }, [read]);
-  return read ? room : 1;
-}
-
-/** The picked bottle: tipped, and filled to what is left of the Dye Budget as `read` gives it. */
-export function LiveBottle({ colour, read, height, tipped = true, testId }: { colour: string; read: (() => number) | undefined; height?: number; tipped?: boolean; testId?: string }) {
-  const room = useDyeRoom(read);
-  return <Bottle colour={colour} level={room} tipped={tipped} height={height} testId={testId} />;
+  return <Bottle colour={colour} level={read ? shown.current : 1} tipped={tipped} height={height} testId={testId} svgRef={svg} />;
 }
 
 // ── Drip ─────────────────────────────────────────────────────────────

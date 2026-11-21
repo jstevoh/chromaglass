@@ -13,14 +13,17 @@
  *  1. The surface is the sessile drop's (wgsl/ferroDrop.ts): its middle
  *     stands at 2 sin(θ/2) (1 − 1/I0(a)) l_c for the contact angle Relief /
  *     3D asks and its radius a, which is the balance's own solution for a
- *     round drop; nothing stands where there is no ferrofluid; and the top
+ *     round drop, with the plateau no higher than the top glass (0.95 of
+ *     the 2 mm gap, 1.49 l_c, PLAN 38r); nothing stands where there is no ferrofluid; and the top
  *     is reached over about l_c from the edge, not at the edge (a surface
  *     that only followed the phase would be a step).
  *  2. The magnet moves the drop's volume toward itself: with the hand's
  *     magnet just off its right side (where the field falls off fastest)
- *     the right shoulder stands a tenth taller than with no field and the
- *     left lower, and the volume is the same within a tenth (the field
- *     moves the liquid, it does not add any).
+ *     the left shoulder stands lower than with no field and the right a
+ *     tenth taller, or, where the drop is already pressed to the top glass
+ *     (this drop in the 2 mm gap, PLAN 38r), held at the glass; the lean
+ *     between the two is 1.15 either way, and the volume is the same within
+ *     a tenth (the field moves the liquid, it does not add any).
  *  3. The picture: in the closeup the drop's inside is no longer one black.
  *     The spread of its light (the 98th percentile less the 5th) is wide at
  *     Relief / 3D 0.7 and nearly nothing at 0, which is the flat drawing as
@@ -38,6 +41,7 @@
  * minutes on a cloud box, seconds on the Mac.
  */
 import { openLab } from './lab.mjs';
+import { DISH_GAP_METRES, DISH_METRES } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -136,7 +140,16 @@ try {
   let edge = mid;
   while (edge < n - 1 && ph[edge + 1] >= 0.5) edge++;
   const lcCells = LC * n;
-  const plateau = 2 * Math.sin((0.7 * 160 * Math.PI) / 180 / 2);
+  /*
+    The sessile plateau, 2 sin(θ/2) = 1.66 l_c at 112°, unless the top glass
+    is lower: the plate's 2 mm rest gap (PLAN 38r) is 1.57 l_c, and a drop
+    that tall touches it, so gpu/ferroDrop.ts lets a drop stand to 0.95 of
+    the gap and no more. In the 6 mm gap this was written on (4.7 l_c) the
+    glass was far above every drop and the plateau was the sessile one.
+  */
+  const sessile = 2 * Math.sin((0.7 * 160 * Math.PI) / 180 / 2);
+  const glass = 0.95 * (DISH_GAP_METRES / DISH_METRES) / LC;
+  const plateau = Math.min(sessile, glass);
   const top = still[mid];
   const at1 = still[Math.round(edge - lcCells)];
   /*
@@ -149,9 +162,9 @@ try {
   let i0 = 0, term = 1;
   for (let k = 0; k < 40; k++) { i0 += term; term *= (a / 2) ** 2 / ((k + 1) ** 2); }
   const want = plateau * (1 - 1 / i0);
-  check('the drop stands as the sessile balance says for its contact angle and size (θ 112° at Relief / 3D 0.7)',
+  check('the drop stands as the sessile balance says for its contact angle and size (θ 112° at Relief / 3D 0.7), up to the top glass',
     Math.abs(top - want) < 0.06 * want,
-    `${top.toFixed(3)} l_c in the middle against ${want.toFixed(3)} (2 sin θ/2 = ${plateau.toFixed(3)}, times 1 − 1/I0(${a.toFixed(2)})), the drop ${a.toFixed(1)} l_c in radius`);
+    `${top.toFixed(3)} l_c in the middle against ${want.toFixed(3)} (the lower of 2 sin θ/2 = ${sessile.toFixed(3)} and the glass ${glass.toFixed(3)}, times 1 − 1/I0(${a.toFixed(2)})), the drop ${a.toFixed(1)} l_c in radius`);
   check('nothing stands where there is no ferrofluid', result.outside < 0.02, `highest outside the drop ${result.outside.toFixed(4)} l_c`);
   check('the top is reached over about l_c from the edge, not at it',
     at1 > 0.35 * top && at1 < 0.9 * top,
@@ -160,9 +173,25 @@ try {
   // Each side against itself with no field, since the drop's middle falls between cells.
   const half = Math.round((edge - mid) / 2);
   const right = leaned[mid + half] / still[mid + half], left = leaned[mid - half] / still[mid - half];
-  check('a magnet off the drop\'s right side stands that side taller and the far side lower',
-    right > 1.1 && left < 1 && right > 1.15 * left,
-    `right shoulder ${(right * 100).toFixed(0)}% of its height with no field, left ${(left * 100).toFixed(0)}%`);
+  /*
+    Under a top glass the drop cannot stand taller on the magnet's side:
+    this drop's sessile top (1.66 l_c) is above the 2 mm gap's glass (1.49
+    l_c, PLAN 38r), so with no field it already stands at the glass, and
+    the magnet's lean, which the solve clamps to the glass (gpu/ferroDrop.ts
+    A.more.y), can only take the far side down. That is the physics of a
+    sandwich: the volume the magnet draws toward itself comes off the far
+    side, and the near side stays pressed to the glass. So here the near
+    shoulder holds its height (within 2%) while the far one falls, and the
+    lean between them is the same 1.15 as before. On a gap the sessile top
+    clears (the 6 mm dish this was written on: 138% and 78%) the near
+    shoulder rises a tenth, as it did.
+  */
+  const pinned = sessile > glass;
+  check(pinned
+    ? 'a magnet off the drop\'s right side, the drop pressed to the top glass, holds that side at the glass and takes the far side lower'
+    : 'a magnet off the drop\'s right side stands that side taller and the far side lower',
+    (pinned ? right > 0.98 : right > 1.1) && left < 1 && right > 1.15 * left,
+    `right shoulder ${(right * 100).toFixed(0)}% of its height with no field, left ${(left * 100).toFixed(0)}%${pinned ? ` (the sessile top ${sessile.toFixed(2)} l_c is above the glass's ${glass.toFixed(2)})` : ''}`);
   check('and moves the volume rather than adding to it',
     Math.abs(result.volLeaned / result.volStill - 1) < 0.1, `${(result.volLeaned / result.volStill * 100).toFixed(1)}% of the volume with no field`);
   // 3. The picture.

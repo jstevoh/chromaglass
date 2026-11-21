@@ -58,8 +58,10 @@
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { stayedFree } from './macdeploy.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.json');
@@ -69,7 +71,7 @@ const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.
 // list), and `checks.mjs` runs every shard.
 export const SHARED = [
   'scripts/chromium.mjs', 'scripts/frame.mjs', 'scripts/lab.mjs', 'scripts/lab-entry.ts',
-  'scripts/checks.mjs',
+  'scripts/checks.mjs', 'scripts/ports.mjs',
 ];
 
 /*
@@ -472,6 +474,61 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 
 const fmtSecs = (s) => (s >= 90 ? `${Math.floor(s / 60)} min ${String(Math.round(s % 60)).padStart(2, '0')} s` : `${Math.round(s)} s`);
 
+/*
+  Whether a part run on a selection must build the site first (PLAN 19aa-15).
+  A part runs its checks in the manifest's order, and in full the ones that
+  serve `dist/` without building it lean on one before them that does:
+  browser2's Mixer, phone link, Draw, input picker, Source and follow-song on
+  the iPhone remote's, the Live Show's or the shelf's `vite build`. A pull
+  request runs only the checks its diff reaches (19k-4), and #673, which
+  touched renders.mjs alone, ran that one with nothing built: red after 1 s
+  on "The directory "dist" does not exist". So the rule is the full run's
+  own: when a picked check had a builder before it in the full order and
+  none of the picked ones before it builds, the part builds once, first,
+  and every check sees the site a full run would have shown it. Read from
+  the commands (through their npm scripts), so a new check needs no field
+  to be safe. It goes by order, not need: a picked check after a builder
+  pays one build whether it serves the site or not, about a minute, and a
+  part whose picked checks build for themselves, or come before every
+  builder, pays nothing. Not where `dist/` is already there: the Mac's job
+  builds before its shard (checks.yml), and a second build is a minute of
+  its queue. A builder inside a script (clicks, renders, inputpick and the
+  others that run `vite build` themselves) is not seen; none has a check
+  after it that needs the site and has no builder on its command before.
+*/
+const buildsSite = (run, scripts) => [run, ...[...npmScriptsOf(run, scripts)].map((n) => scripts[n] ?? '')].some((r) => /\bvite(?:\.js)? build\b/.test(r));
+export function buildFirst(all, list, scripts) {
+  let builtInFull = false, builtHere = false;
+  for (const c of all) {
+    const picked = list.includes(c);
+    if (picked && builtInFull && !builtHere) return true;
+    if (buildsSite(c.run, scripts)) { builtInFull = true; if (picked) builtHere = true; }
+  }
+  return false;
+}
+/*
+  How long a shard's checks may run before the run's page says so (PLAN
+  19k-13). The jobs' bounds (`timeout-minutes` in checks.yml, 25 for both)
+  are room for a slow runner, not the line slowness is read at: a bound set
+  where the shards already ran would cancel a green shard on its next slow
+  runner, as 20 did to three Mac shards on 2026-11-07, and a bound set far
+  past them says nothing until it is hit. So the line is drawn apart from
+  the bound. On the Mac, 18 minutes of checks: with the 0:39 to 3:07 a
+  GitHub Mac spends before its first check, that is where the old 20-minute
+  bound began cancelling, and every shard ran under it but plate's slowest
+  (18:19) on those eleven attempts. In Measure, 21: 19k-11b's line for a
+  part on the slow runner tier. Past it, a warning names the shard and its
+  time; the shard stays green, and the next rebalance (or a sixth shard) is
+  read from these warnings, not from cancelled runs.
+*/
+export const ROOM = { mac: 18, measure: 21 };
+export function roomWarning(shard, secs, manifest) {
+  const kind = manifest.shards.mac.includes(shard) ? 'mac' : 'measure';
+  if (secs <= ROOM[kind] * 60) return null;
+  return `::warning title=${escProp(`${shard}: ${fmtSecs(secs)} of checks`)}::${escData(`Past the ${ROOM[kind]} minutes a ${kind === 'mac' ? 'Mac shard' : 'Measure part'}'s checks are held to (PLAN.md 19k-13); the job's bound is room for a slow runner, so move a check out before it is reached`)}`;
+}
+const SITE_BUILD = { name: 'The site, built first', run: 'node node_modules/vite/bin/vite.js build', timeout: 5 };
+
 // `only`: the names of the checks to run (reach.mjs's Measure selection,
 // CHECKS_ONLY in the job), or null for all of them. The rest are named in a
 // notice, so a log never shows a check missing without saying it was left out.
@@ -490,8 +547,29 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
     console.log(`${shard}: none of its ${all.length} checks is reached by this change`);
     return 0;
   }
+  if (only && !fs.existsSync(path.join(ROOT, 'dist', 'index.html')) && buildFirst(all, list, pkgScripts())) {
+    console.log(`${shard}: a check picked here leans on a build an unpicked one makes in a full run, so the site is built first (PLAN.md 19aa-15)`);
+    console.log(`::group::Run ${SITE_BUILD.run}`);
+    const b = await runOne(SITE_BUILD);
+    console.log('::endgroup::');
+    if (!b.ok) {
+      console.log(`::error title=${escProp(SITE_BUILD.name)}::${escData(`${SITE_BUILD.run}: exit ${b.code}`)}`);
+      return 1;
+    }
+  }
   const results = [];
+  /*
+    On the owner's Mac, a look for other work before each check and after
+    the last (PLAN.md 19ah-9a, scripts/macdeploy.mjs): work begun mid-shard
+    shares the GPU the timing lines read. Gone within two minutes, the shard
+    goes on; still there, or there at all after a red check, it stops here,
+    and its last step hands the deploy to GitHub's Macs. GitHub's own Macs
+    answer true at once.
+  */
+  const lookAgain = () => stayedFree(results.length > 0 && !results.at(-1).r.ok && !results.at(-1).q);
+  let stopped = false;
   for (const c of list) {
+    if (!lookAgain()) { stopped = true; break; }
     console.log(`::group::Run ${c.run}`);
     const r = await runOne(c);
     console.log('::endgroup::');
@@ -510,15 +588,22 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
       console.log(`::error title=${escProp(c.name)}::${escData([`${c.run}: ${how}`, ...r.fails].join('\n'))}`);
     }
   }
+  if (!stopped && results.length && !lookAgain()) stopped = true;
+  if (stopped) {
+    const left = list.filter((c) => !results.some((x) => x.c === c));
+    console.log(`::error title=${escProp(`${shard}: stopped, the owner's Mac busy`)}::${escData(`Other work drew with the owner's Mac's GPU mid-shard; the watchdog runs this deploy again on GitHub's Macs (PLAN.md 19ah-9a).${left.length ? ` Not run here: ${left.map((c) => c.name).join('; ')}` : ''}`)}`);
+  }
   const red = results.filter(({ r, q }) => !r.ok && !q);
   const held = results.filter(({ r, q }) => !r.ok && q);
   const total = results.reduce((s, { r }) => s + r.secs, 0);
   console.log(`\n${results.length - red.length - held.length} of ${results.length} checks green on ${shard} in ${fmtSecs(total)}${held.length ? `; red on quarantined lines only: ${held.map(({ c }) => c.name).join('; ')}` : ''}${red.length ? `; red: ${red.map(({ c }) => c.name).join('; ')}` : ''}`);
+  const room = roomWarning(shard, total, manifest);
+  if (room) console.log(room);
   if (process.env.GITHUB_STEP_SUMMARY) {
     const rows = results.map(({ c, r, q }) => `| ${r.ok ? '✓' : q ? '⚠' : '✗'} | ${c.name.replace(/\|/g, '\\|')} | \`${c.run.replace(/\|/g, '\\|').replace(/`/g, "'")}\` | ${Math.round(r.secs)} |`);
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length - held.length} of ${results.length} green${held.length ? `, ${held.length} red on quarantined lines only` : ''}, ${fmtSecs(total)}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length - held.length} of ${results.length} green${held.length ? `, ${held.length} red on quarantined lines only` : ''}, ${fmtSecs(total)}${room ? ' ⚠ past its room line (PLAN.md 19k-13)' : ''}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
   }
-  return red.length ? 1 : 0;
+  return red.length || stopped ? 1 : 0;
 }
 
 /*
@@ -550,8 +635,9 @@ async function selftest() {
   say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.maconly \}\}/.test(wf) && /ESBUILD_MODULE: /.test(wf), 'and the Mac\'s names are passed to the shard\'s runner, read with the esbuild the reach job installs (19ak-2)');
   say(/run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.part \}\}/.test(wf) && /run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.shard \}\}/.test(wf), 'Measure and the Mac run their shard from the manifest');
   // The workflow's own tools (which files reach, the runner, the guard on a
-  // PR's bars) are also checks with a selftest; their CI uses are not.
-  const TOOLS = ['scripts/reach.mjs', 'scripts/checks.mjs', 'scripts/checkguard.mjs'];
+  // PR's bars, whether the owner's Mac is free of other work before a shard,
+  // 19ah-9) are also checks with a selftest; their CI uses are not.
+  const TOOLS = ['scripts/reach.mjs', 'scripts/checks.mjs', 'scripts/checkguard.mjs', 'scripts/macbusy.sh'];
   const ran = new Set(man.checks.flatMap((c) => [...entryFiles(c.run, scripts)]).filter((f) => !TOOLS.includes(f)));
   const npmRan = new Set(man.checks.flatMap((c) => [...npmScriptsOf(c.run, {})]));
   const stray = [...wf.matchAll(/^\s+(?:- )?run: (.*)$/gm)].map((m) => m[1])
@@ -651,7 +737,7 @@ async function selftest() {
   const read = man.checks.find((c) => trace(entryFiles(c.run, scripts)).has('docs/handoff.md') && man.shards.measure.includes(c.shard));
   say(!read || mpick(['docs/handoff.md']).names.includes(read.name), `a document a check reads selects that check${read ? ` (docs/handoff.md: ${read.name})` : ''}`);
   say(mpick(['src/gpu/fluid.ts']).all, 'a source file runs Measure in full');
-  say(mpick(['public/video/cartoons/SOURCES.md']).all, 'and a Markdown file of the site\'s own does too');
+  say(mpick(['public/press/MEDIA.md']).all, 'and a Markdown file of the site\'s own does too');
   say(mpick(['scripts/tools.mjs', 'src/presets.ts']).all, 'a check script with a source file does');
   say(mpick(['scripts/frame.mjs']).all && mpick(['scripts/checks.mjs']).all, 'a shared helper, and this file, do');
   say(mpick(['scripts/nothing-reads-this.mjs']).all, 'a script no check traces does');
@@ -725,6 +811,20 @@ async function selftest() {
     say(ask(stub(`echo 'not json'`, 'echo []')).startsWith('partial'), 'a run whose jobs are not JSON is partial');
   }
 
+  // A selection that leaves out the build a picked check leans on builds first (19aa-15).
+  {
+    const sc = { build: 'vite build' };
+    const B = { name: 'b', run: 'npm run build && node scripts/a.mjs' }, U = { name: 'u', run: 'node scripts/u.mjs' }, U0 = { name: 'u0', run: 'node scripts/u0.mjs' };
+    const all = [U0, B, U];
+    say(buildFirst(all, [U], sc), 'a check picked without the builder before it builds first (renders on #673)');
+    say(!buildFirst(all, [B, U], sc), 'not when the builder before it is picked too');
+    say(!buildFirst(all, [U0], sc), 'nor for a check no builder comes before in a full run');
+    say(!buildFirst(all, all, sc), 'nor for a full part');
+    const b2 = man.checks.filter((c) => c.shard === 'browser2');
+    const renders = b2.filter((c) => c.name === "The sound's renders");
+    say(renders.length === 1 && buildFirst(b2, renders, pkg.scripts ?? {}), 'and browser2 with the renders alone picked builds first');
+  }
+
   // The runner: a green check, a red one with its FAIL line kept, a timeout
   // that ends a child the shell started, and the group header flakes.mjs reads.
   const fake = parseManifest(JSON.stringify({
@@ -766,6 +866,61 @@ async function selftest() {
   say(left === '', 'and it is ended with the check\'s group, so it holds no port for the next');
   say(!/other/.test(text), 'only the shard asked for runs');
   say(!/^\S*\s*(ok|FAIL)\s+(green|red|slow)/m.test(text), 'the runner\'s own lines never read as a harness\'s ok or FAIL line to flakes.mjs');
+
+  // The room line (19k-13): past it a shard warns and stays green; under it,
+  // nothing. And each job's bound leaves a slow runner's setup (three
+  // minutes, the most a GitHub Mac spent before its first check) past the
+  // line, so the warning comes on runs before a cancel would.
+  const roomMan = { shards: { measure: ['m'], mac: ['x'] } };
+  const macOver = roomWarning('x', ROOM.mac * 60 + 20, roomMan);
+  say(/^::warning title=x%3A 18 min 20 s of checks::.*Mac shard/.test(macOver ?? ''), `a Mac shard past ${ROOM.mac} minutes of checks is a warning naming it and its time (${macOver?.slice(0, 50)})`);
+  say(roomWarning('x', ROOM.mac * 60 - 20, roomMan) === null, 'and one under it is not');
+  say(roomWarning('m', ROOM.mac * 60 + 20, roomMan) === null && /Measure part/.test(roomWarning('m', ROOM.measure * 60 + 20, roomMan) ?? ''), `a Measure part is held to its own ${ROOM.measure} minutes, not the Mac's`);
+  /*
+    And the runner prints it, on the step's stdout where GitHub makes it an
+    annotation, and marks the summary's heading (the pre-push review: the
+    lines above call roomWarning alone, so a runShard that dropped it read
+    green). The fake 'm' run above took seconds, under its line; the fake Mac
+    shard 'x' is run again with the Mac's line at zero, so its one check is
+    past it.
+  */
+  say(!/::warning title=m%3A/.test(text), 'the runner prints no room warning for a shard under its line');
+  const macLine = ROOM.mac;
+  const sumFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'checks-room-')), 'summary.md');
+  const sumWas = process.env.GITHUB_STEP_SUMMARY;
+  const roomLog = [];
+  ROOM.mac = 0;
+  process.env.GITHUB_STEP_SUMMARY = sumFile;
+  process.stdout.write = (b) => { roomLog.push(String(b)); return true; };
+  let roomCode;
+  try { roomCode = await runShard('x', fake, null); } finally {
+    process.stdout.write = write;
+    ROOM.mac = macLine;
+    if (sumWas === undefined) delete process.env.GITHUB_STEP_SUMMARY; else process.env.GITHUB_STEP_SUMMARY = sumWas;
+  }
+  const sum = fs.existsSync(sumFile) ? fs.readFileSync(sumFile, 'utf8') : '';
+  say(roomCode === 0 && /^::warning title=x%3A \d+ s of checks::/m.test(roomLog.join('')), `and prints one for a shard past it, which stays green (exit ${roomCode})`);
+  say(/^### x: .*⚠ past its room line/m.test(sum), 'and marks the job summary\'s heading');
+
+  // Each job's bound, read from checks.yml, against its line.
+  const boundOf = (yml, jobName) => {
+    const at = yml.indexOf(`    name: ${jobName}`);
+    const m = at < 0 ? null : /^    timeout-minutes: (\d+)$/m.exec(yml.slice(at));
+    return m ? Number(m[1]) : null;
+  };
+  const MAC_JOB = 'WebGPU (macOS) · ${{ matrix.shard }}';
+  const roomy = (yml) => {
+    const b = { mac: boundOf(yml, MAC_JOB), measure: boundOf(yml, 'Measure · ${{ matrix.part }}') };
+    return { b, ok: b.mac >= ROOM.mac + SETUP_MIN && b.measure >= ROOM.measure + SETUP_MIN };
+  };
+  const SETUP_MIN = 3;
+  const roomNow = roomy(wf);
+  say(roomNow.ok, `each job's bound is at least ${SETUP_MIN} minutes past its room line (Mac ${roomNow.b.mac} for ${ROOM.mac}, Measure ${roomNow.b.measure} for ${ROOM.measure})`);
+  // Control: the same workflow with the Mac job's bound put back to 20.
+  const macAt = wf.indexOf(`    name: ${MAC_JOB}`);
+  const old = macAt < 0 ? wf : wf.slice(0, macAt) + wf.slice(macAt).replace(/^    timeout-minutes: \d+$/m, '    timeout-minutes: 20');
+  const was = roomy(old);
+  say(was.b.mac === 20 && was.b.measure === roomNow.b.measure && !was.ok, `control: with the Mac job's bound at 20 it reads ${was.b.mac} and is not (Measure still ${was.b.measure})`);
 
   // Quarantine (19ak-1): a check red only on a quarantined line is said and
   // does not block; every other way of being red still does.

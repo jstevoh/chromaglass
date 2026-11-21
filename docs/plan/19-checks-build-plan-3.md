@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself (continued)
 
-Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
+Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
 
 - **19aa-9. Bottles' Splat with the Ferrofluid bottle, "not at its mirror" (read 2026-10-25).**
   3 reds of 183 Mac runs in the week, all on the Splat and on no other tool or the replays
@@ -36,6 +36,26 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   reads six times across the same 600 ms and wants four held (a press laid once and not
   renewed reads one or two); the lift half is as it was. Judge with `npm run flakes --
   --check 'holding the Press lifts nothing'` a week after merge.
+- **19aa-13. `renders` and `squeeze` hold a window until it has the frames or steps its
+  line asks (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-13.
+- **19aa-14. `renders`' "the App renders for its clock and no more": the dye bottle
+  committed on its own (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-14.
+- **19aa-14b. `open()` waits up to 30 s for one second of fifteen frames (found
+  2026-11-07, open).** A page on a Mac drawing under fifteen a second waits the full 30 s
+  (it prints "never drew fifteen frames"; not yet counted in the logs). Now that each
+  window holds itself open for its 45 frames (19aa-13), it could wait only for the plate
+  to draw at all.
+- **19aa-14c. The cloud's software WebGPU loses the app's device every nine seconds or so
+  (found 2026-11-07, open).** `PW_WEBGPU=1` with the app (not the lab), under Xvfb: "WebGPU
+  device lost: destroyed" with no `destroy()` call from the page (a wrapped
+  `GPUDevice.prototype.destroy` never ran), then "A valid external Instance reference no
+  longer exists" and a `requestAdapter` that returns null for two seconds. Each loss and
+  recovery commits the plate's own `glLost`/`glEpoch` state, so `renders` with a plate
+  read there is red for that alone (1.3 renders, 2.0 commits a second). Probably
+  SwiftShader's GPU process going down under the plate's work at that rate; find which,
+  before any app check leans on software WebGPU for its commits.
+- **19aa-15. A pull request's Measure part builds the site first when a full run would
+  have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
@@ -57,6 +77,61 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   so the week after this merges is the evidence. Two more on 2026-10-30 (#550's `open` shard on one head, af60ee4): 2.09 and 2.49 s against 0.72
   and 0.74 s, the show moving for good at 14.3 and 14.6 s against 23.6 and 22.1 s; the third run
   of the shard read it green, and nothing in that diff was on the opening's path.
+  - **19aa-7a. Found: the opening sat out the frame wait's whole 1.5 s cap (2026-11-01).**
+    Read across the 116 `open` shard runs of 10-27 to 11-01 (18 red on this line): the gap
+    from the device given to the first compile asked was 0.06 to 0.18 s on 73 runs (four
+    frames drawn, as `introStill` waits for) and 1.51 to 2.77 s on 43 (the cap firing), and
+    16 of the 18 reds were among the 43, their longest "page's own" stretch 1.51 to 1.62 s
+    starting at the device. The GPU process stopped presenting just after it gave the
+    device, with nothing of ours asked of it, and the page sat free waiting for frames it
+    already held (#656's run 41317399432: compile asked at 3.82 s, frames back at 4.75 s).
+    The check was right to count that as the page's own. The fix is the app's, not the
+    bar's: the wait now ends once the page has been free (its timer on time) for half a
+    second with no frame drawn (`src/lib/stillWait.ts`, `npm run stillwait` on made-up
+    timelines; four frames still waited for whenever they come, a busy or held page never
+    read as starved, never past the old cap). On those 43 runs that asks the compile about
+    a second sooner; modelled on the same 116, the reds go from 18 to about 6. Judge with
+    `npm run flakes -- --check 'no later than the old way'` a week after merge.
+  - **19aa-7b. Open: four reds start with the page held, not free.** On four of the 18
+    the device came at 0.2 s and the page's thread was held (timer silent, no long task)
+    for 1.15 to 1.50 s from about 1 s, then the cap; the starved rule does not count held
+    time, so it changes nothing there. Of the other two, one is a starved run the rule
+    brings about 0.8 s nearer but not under (its control read 0.75 s), and one's longest
+    stretch is behind the opening, at 16.7 s. Next: what holds the page's thread just
+    after a fast device (14v-7 sets held apart for the frame gaps; 1b counts it as own).
+  - **19aa-7c. Read again 2026-11-07, when main's deploy for 1787a41 went red on it twice.**
+    The 34 `open` shard runs of 11-05 to 11-07 (PRs and main) had 14 reds on this line, two
+    in five, against 18 of 116 the week before; #661 had sat unmerged since 11-01.
+    13 of the 14 were 19aa-7a to the hundredth: the first compile asked 1.50 to 1.57 s after
+    the device was given (the cap), the show's longest "own" stretch that same 1.50 to 1.58 s
+    beginning at the device, the page's timer on time through it (2.09 to 2.54 s of each
+    show's own seen free). Taking the starved rule's second off each (500 ms of the 1.5 s
+    kept), 11 of the 13 read green, one reads 1.40 s against a bar of 1.41, and one stays
+    red (1.71 against 1.59, its control's own 0.59 s, the week's second lowest). The 14th
+    was 19aa-7b, the deploy's second attempt: device given at 0.29 s, the page's thread held
+    1.60 s from 1.14 s, the compile asked at 2.76 s. Its long animation frames say what the
+    hold is not: a 1.60 s frame from 1.14 s with no script in it and no blocking time,
+    rendering from 2.74 s, so the page ran nothing of its own and its timer did not tick;
+    and a 0.56 s frame from 0.55 s with 0.50 s blocking (two scripts, the page's own work).
+    Pricing the held stretch as Chromium's, as 4b does, would read 2.14 s against a bar of
+    2.02, still red, so 7b is not a change to the check alone and stays open: the next step
+    is what in the page's first second stretches four frames over 0.85 s after a fast device.
+    Merged with 7a's fix in the same PR; judge on `npm run flakes` a week on as above.
+  - **19aa-7d. Shipped 2026-11-15: the control's compile, when one frame got through.** Main's
+    deploys 832 and 839 (both on the owner's second Mac runner) went red on 1b's first two
+    lines with the control pricing no compile: "0.00 s compiling ... (0 stops), 8.55 s the
+    page's own". The control built its 59 on its first step (0.81 s), its page was held from
+    then on (its timer on time for about 0.16 s of the next 1.72 s), one frame got through at
+    2.53 s, and the frames then stopped 6.61 s with the page silent: the stop began 1.72 s
+    after the builds, outside the second, and the first-use rule rightly will not vouch for a
+    stop the page stood still through. A build now also sits in the first stop after it when
+    that stop began under two seconds after it, the page never ran (ticks and frames no more
+    than a quarter second apart) for half a second at a time between, and its timer was on
+    time for half of the second before the build; read from the build: `scripts/compilestop.mjs`
+    (`buildsIn`, beside startup.mjs at its ceiling), `npm run compilestop` on thirteen made-up
+    openings. Not asked: whether one long task covered the stretch (the log does not print
+    the control's long tasks after its first step). 839's control reads 8.33 s of compile and 0.23 s its own. Not #861 (?prepare=0
+    returns before the prepare). Judge on the next deploys' `open` shard on both owner runners.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
@@ -125,6 +200,23 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
   under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
   with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-6, open** (E, S): **`mirror`'s "and nowhere else" reads at its bar on main since 2026-11-14.**
+  Red once on a GitHub Mac (`show`, the closeup pull request for 38u, head b7c33e8): "Classic, calm,
+  layer 1 turned a quarter: and nowhere else", 28.5 past its drift where 27.4 was allowed, 95.4 under
+  the drop, each of the four drops alike (30.7 30.0 25.6 29.8 against a drift of 2.2 1.1 1.1 1.3), so
+  not one unlucky drop. The line is judged in silence at the plate's own zoom, which that pull
+  request's diff (the closeup's drawing, the treble's shake of a bubble) does not reach, and it was
+  green on its three earlier heads. Main's own deploy 839 (c258561, the owner's Mac) is as close
+  without it: `layer 1` 27.6 of 33.1 allowed, `layer 1 turned a quarter` 18.2 of 22.9. This line's
+  history is 0.4 to 11 (19ac-4, and #225/#238 in `docs/plan-shipped.md`), so one of the nine merges
+  between adcbe3f and c258561 roughly doubled what a drop leaves beyond its reach: the spun plate's
+  dish (22n), the two-dye line gone (18e-5: the picture under and round a drop is brighter, and the
+  bar is a share of the reading under the drop), or Velvet's stir. *Do:* run `npm run mirror` on the
+  Mac at adcbe3f and at each merge after it and name the one that moved it; then decide whether the
+  drop really spreads further (a fault in that change) or the picture changed and the reach or the
+  bar's share was set on the old one (then re-measure DROP_REACH as 19ac-4 did, never widen the bar
+  to fit). *Measure:* twenty Mac runs, GitHub's and the owner's, read under half the allowance on
+  all three scenes; a drop mirrored where it should not be is still red.
 - **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
   and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
   the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
@@ -321,6 +413,84 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
   reaches the Mac only when the owner runs setup again. A check that the installed copy
   matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
+- **19ah-6. Built: two shards at once on the owner's Mac.** Asked 2026-10-29 (the first
+  deploy on the Mac, run 40929715769, ran its five shards one after another in 51.5
+  minutes). Each runner takes one job, so a second runner on the same Mac is the whole of
+  it, but the harnesses served on fixed ports, many shared (4351: `bottles`, `mirror`,
+  `moving`, `render-app`), and `macports.sh` made a second shard wait. Closed unmerged as
+  #570 and rebuilt on main 2026-11-07, with the nine harnesses written since converted too
+  (`assistant`, `dawbridge`, `feedbackpane`, `liveshow`, `loopseam`, `openingtime`, `oscout`,
+  `rig`, `tippad`): 86 scripts on 60 ports. The open #595 (our own pull requests' Mac
+  shards on the Mac) wrote the same id; it takes 19ah-8 when it is carried onto main. Now every harness
+  asks `scripts/ports.mjs` for its port, which adds `HARNESS_PORT_SHIFT` (a block of
+  10000; unset everywhere but a runner's `.env`, so GitHub's machines and sessions keep
+  their ports); `macrunner-setup.sh --runners 2` adds `owner-mac-2` in
+  `~/actions-runner-2` with block 20000 and its own npm cache, and gives the first 10000;
+  `npm run ports` (Measure, every diff) fails a harness with a bare port and proves two
+  blocks serve one harness side by side while one block still collides. Open: the A/B on
+  the M4 (wall time against 51.5 minutes; `startup`, `squeeze`, `drawwall`'s rate and
+  `mirror` green with their bars as they are), and if a timing-heavy shard cannot share
+  the GPU, a label that keeps it alone. Found along the way: `quick.mjs` keeps checks
+  that share a port apart; giving each of its workers a block would let them run side
+  by side (they still share `dist/`).
+- **19ah-7. Open: every harness waits for its preview to answer.** Deploy 580 (2026-10-29)
+  lost `tools` to `ERR_CONNECTION_REFUSED` on localhost:4346 9.4 s after `vite preview` was
+  spawned, ports free and vite silent: the harness had slept a fixed 2.5 s. `tools.mjs` now
+  asks `untilServing` (scripts/ports.mjs) and prints how long the server took; sixty other
+  harnesses still sleep a fixed time, and with two shards on one Mac (19ah-6) the start is
+  slower. Move them to `untilServing`, and read the printed times on the Mac first to see
+  how slow a start gets.
+- **19ah-9. Built: a Mac busy with other work hands the deploy back.** Deploys 679 and 682
+  (2026-11-08, runs 42427960522 and 42436205976) went red on the owner's Mac and passed
+  the same shards on GitHub's: `startup`'s "built ahead ... nothing built behind it" twice,
+  "no pipeline was built on a frame" (particles) once, `phone` on a taken port, and every
+  other shard into its 20-minute timeout. The open shard's own lines: the opening's 65
+  builds 11.86 and 17.99 s (median 0.554 s, the display 6.77 s) against 3.43 s for 56
+  (median 0.186 s) on the same Mac's first deploy of 10-29, so the half behind the show
+  outran startup's 45 s wait for it; setup-node alone two to five minutes; and the port
+  step found another checkout serving `signin` and `tiers`. The Mac now hosts sessions and
+  Antigravity's queue running the same harnesses. Built: each Mac shard's first step
+  (`scripts/macbusy.sh`) looks for a test browser or the ChromaGlass app at work (5% of a
+  core or more, so a cancelled job's idle leftover does not count) that is not a deploy's
+  own (no runner worker among its ancestors), waits two minutes, then
+  fails listing it; the watchdog reads that step's failure and moves the deploy to
+  GitHub's Macs at once (`npm run macguard`). Recovery that night: the deploy run by hand
+  with `hosted`. **19ah-9a** built below. **19ah-9b** shipped 2026-11-14
+  (`docs/plan-shipped.md`): startup waits for the half behind the show while the app says
+  its builds still come in, and that half builds two at a time. Open: **19ah-9c**, below.
+- **19ah-9c. Open: a look changed to while the half behind the show is building.** That
+  half is 113 builds now (it was fifty-odd in October), and until it is done a look that
+  needs one of them builds it on the frame, the freeze `gpu/prepare.ts` exists to take
+  away. On GitHub's Macs it took 28 to 46 s one at a time; 19ah-9b builds it two at a
+  time. No check changes look inside that window: startup's "no pipeline was built on a
+  frame" changes looks only once the half is done. Wanted: the half's time on the owner's
+  Mac after 19ah-9b (startup's line prints its pace against the opening's), a look change
+  at a few seconds into the half to see what it costs, and whether the half should be
+  asked in the order looks are likeliest to need it (the set list's next look first).
+- **19ah-9a. Built: work begun mid-shard waits for the deploy, or hands it back.** Main's
+  deploy of 2026-11-08 began its Mac shards at 18:16Z, each past its first look, and then
+  sessions began GPU work on the Mac: filming the hero, `lampzero.mjs`, `renders.mjs` in
+  Antigravity's clone, a driver of the app. `startup` went red on the Mac ("no pipeline was
+  built on a frame"), the tools shard's first look refused the Mac, and the deploy went to
+  GitHub's Macs to queue behind pull requests. Built, both sides: the first step now marks
+  the Mac held from its first line (`~/.chromaglass-runner/deploy-<runner>.json`) and a new
+  last step, "The owner's Mac stayed free of other work" (`always()`), marks it ended;
+  `launchChromium` and `npm run desktop` wait while a shard holds the Mac and for 120 s after
+  one ends, for the next shard (`scripts/macdeploy.mjs`; a mark whose runner worker exited,
+  older than 30 minutes, or from a shard that gave up holds nothing; only on a Mac, never in
+  a job). What does not read the mark, `scripts/checks.mjs` looks for before each check and
+  after the last (`macbusy.sh --again`): still there after two minutes, or there at all right
+  after a red check, the shard stops and its last step fails, which the watchdog reads as
+  busy; so the watchdog now watches until every Mac shard has finished, not until each is
+  past its first step. Checked by `npm run macguard` (the hold rule, `macbusy.sh`'s marks
+  read back, the last step's failure, the watchdog's new cases) and by hand in a session: a
+  red check beside a busy fake headless shell stopped its shard and failed the last step,
+  and a launch held by a mark ended 112 s ago went on 10 s later. Open: the first deploy on
+  the Mac with a session working beside it (read the harness's "a deploy holds the owner's
+  Mac" line and the shard's checks green). Found along the way, **19ah-9c**: a session's
+  script that launches Playwright itself (`detail.mjs`, `webgpu-smoke.mjs`, and scratch
+  drivers) skips the mark and is caught only by the look between checks; and a deploy handed
+  back queues behind pull requests' Mac runs, which a hosted deploy could jump.
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
@@ -420,10 +590,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
   measure over a fixed number of plate steps, not wall time, so its bar means the same on
   every runner.
+  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
 - **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
-  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
-  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
+  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
+  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
+  circle's edge; find whether the red runs read a lit edge
   (the sample too close) or a frame not yet drawn (the read too early), and measure the
   feature, not the moment.
 - **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
@@ -447,3 +619,24 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   none of the 68 lab checks runs under `PW_WEBGPU=1` as its header says it should.
   `checkReads` now gives `site` from esbuild's import graph; quick should use it for
   `here`, once a session has timed the lab checks on software WebGPU.
+- **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
+  children run as a first attempt (docs/plan-shipped.md, 19ak).
+- **19ak-6. Shipped:** the iPhone build fetches Capacitor's two binaries itself (curl
+  retries, then the API's asset download) into a SwiftPM cache of its own, so a 504 from
+  GitHub's release page no longer fails it (docs/plan-shipped.md, 19ak).
+- **19ak-7. Shipped:** the other release-page downloads survive a 504 too: actionlint falls
+  back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
+  prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
+  (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
+- **19ak-8. Open: the three quarantines renewed 2026-11-15, to 2026-12-06.** The first
+  three quarantines (19aa-7, 19aj-1, 19aj-2) ended on 2026-11-15 with none of the three
+  fixes shipped. That morning about half the open PRs (a count of PRs, not of runs) went
+  red on startup's "moving for good no later than the old way", the show's own wait 2.8
+  to 4.3 s against the control's 1.0 to 1.5 s plus its second, on PRs that do not touch
+  the opening; the Blow stroke's and the wall's lines block again too. Each is renewed
+  for the 21 days the rule allows; no bar moved, and main's deploys still hold all three to their bars. Two things
+  to read before 2026-12-06: whether the startup line got worse after #861 (19ah-9b's
+  two behind lanes, `LATER_LANES` 2, sharing the GPU with the show's opening; deploy 849
+  at 37bae99, which carries #861, passed it), and whether 19aa-7d (#878, the control's
+  compile stop priced) moves the control's side of the line. A second renewal is not
+  the answer: fix the item or take the line out of the bar with its own reasons.

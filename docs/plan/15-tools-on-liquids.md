@@ -80,15 +80,22 @@ Left, each its own plan item:
 
 ## 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
-*Shipped so far* (first part): on a thin gap the moving Blow is the breath's shear on the surface, ½ρ_air C_f U², a body force for as long as the breath goes on (`src/lib/breath.ts`; `npm run airblow`), and its push and its three carries no longer run there. Story in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2). Not yet judged on the Mac (judging §44). Open, each its own PR:
+*Shipped so far* (first part): on a thin gap the moving Blow is the breath's shear on the surface, ½ρ_air C_f U², a body force for as long as the breath goes on (`src/lib/breath.ts`; `npm run airblow`), and its push and its three carries no longer run there. Since 15g-11 that stress lands as a jet along the surface, a plume ahead of the hand whose direction is kept while the hand is down, and since 15g-12 the wind lays no bubbles (`npm run blowrange`). Story in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2). Not yet judged on the Mac (judging §44). Open, each its own PR:
 
-- **15g-2 The jet's dimple.** A held puff (a Blow held still that is not the straw:
-  a second finger, a plate that is not the lead, a remote's puff) still runs the old
-  push and the Press's ring carry. Its physics is the jet's stagnation pressure, about
-  ½ρ_air U² ≈ 20 Pa at 6 m/s, which against the liquid's weight is a dimple of
-  Δh = p/ρg ≈ 2 mm in a 6 mm layer: it belongs in the gap field the Press squeezes, a
-  press at that pressure. Its outward shear is all divergence, which a rigid film moves
-  nothing by, so it waits on this. The moving wind's own dimple, travelling with it,
+- **15g-2 The jet's dimple.** A held puff (a Blow with no direction that is not the straw)
+  still runs the old push and the Press's ring carry, for the hands that ask for one: a
+  remote's undirected Blow (the pad held still, a game controller's, OSC, the assistant's)
+  and any Blow off a thin gap. The pointer's own asks for none on a thin gap since 15g-11
+  (a press that never moved is the straw, and before the straw starts it lays nothing), so
+  the desk no longer stamps them. Each carry takes 24% of the colour out of a hard-edged disc
+  six cells across and puts it in a ring, which on a still plate reads as a pale disc with a
+  dark rim (measured in the lab while looking for the owner's
+  "flower-like things" of 2026-11-13): until this item ships a remote's held puff can still
+  leave them. Its physics is the jet's stagnation pressure, about ½ρ_air U² ≈ 118 Pa at a
+  firm breath's 14 m/s, seven times the weight of a 2 mm film: it belongs in the gap field
+  the Press squeezes, a press at that pressure (`breathPressure` in `src/lib/breath.ts` is
+  the number, which only `npm run blowrange` reads until then). Its outward shear is all divergence, which a rigid film
+  moves nothing by, so it waits on this. The moving wind's own dimple, travelling with it,
   comes with it.
 - **15g-3 The film's free surface.** The solve holds the film's height as the gap (a
   rigid lid), so liquid the breath pushes ahead piles into no bow wave and the film
@@ -97,17 +104,18 @@ Left, each its own plan item:
   tension pulling it flat; shared with 18c (a pour that adds liquid).
 - **15g-4 Thin Gap off.** The old plate keeps the push and the carries (as 15b-old
   keeps the Finger's); it goes when the old plate does.
-- **15g-5 A remote's wind.** A remote hand's directed Blow (performGesture: the phone as
-  the laptop's remote, a pen, OSC, a replayed take) still runs the push and the carries:
-  its strokes arrive a message at a time, and a breath laid only on those steps would push
-  the liquid for one step in every few (the drag time is about eight steps), a fraction
-  of the mouse's. Hold the breath between messages as the pointer's direction is held
-  (BLOW_DIR_HOLD_MS), then let it blow as air (15b-remote is the same for the Finger).
+- ~~**15g-5 A remote's wind.**~~ **Shipped** with 15g-11: a remote hand's directed Blow
+  (the phone's pad, a pen, a game controller, OSC, the assistant, a replayed take) is the
+  same air as the pointer's, held a quarter of a second between its messages and laid by
+  the solver's step (`holdBreath`, `breatheHeld`, `REMOTE_BREATH_HOLD` in
+  `src/lib/breath.ts`); its push and carries no longer run on a thin gap. Story in
+  `docs/plan-shipped.md` §15g-11. Not yet driven through the app by a check (15c's last
+  note still stands: a gesture sent through the remote's link in `npm run tools`).
 - **15g-6 The breath's numbers.** 8 m/s at the surface and C_f 0.01 are a firm breath
   from a few centimetres, set so the air moves a pool about as far as the carries did on
   the Mac (at 6 m/s `npm run tools` read a third of it), not a measurement. A phone
   recording of a real breath across a dish of oil (`npm run watch`) would set the speed
-  the colour goes at, against the lab's 2.72% of the plate over a 1.5 s stroke.
+  the colour goes at, against the lab's 13.07% of the plate over a 1.5 s stroke (2.72% while the stress was a disc under the hand, before 15g-11). The jet's shape has the same standing: a core of five footprints and a spread of 0.15 are a round jet's and a wall jet's textbook numbers (`src/lib/breath.ts`), not a measurement of a breath over this dish.
 - ~~**15g-7 Blow's stroke to the right moves less than to the left in the app.**~~
   **Shipped** (#623): the pointer handler pressed the glass under the pointer (a bowl 24
   cells across) and stirred along the move on every pointer event with the button down, for
@@ -137,20 +145,43 @@ Left, each its own plan item:
     back as a ring from the readback mirror, frames behind on a slow machine. Every look runs a
     thin gap, so this is the plate switched off it; the fix is the same accounting in the old
     carries (a source where the air arrives, colour per unit of liquid), then the CPU's half goes.
-  - **15g-8d Liquid runs through a bubble in the thin solve.** The solve gives the air the
-    liquid's mobility, so a moving bubble's front (a source) drains through it to its back (a
-    sink), and a whole bubble's middle leaves through cells that are emptying too. Between two
-    glasses liquid goes round air. The carries keep every amount anyway, but what runs through
-    leaves 3.3–4.8% of the pool's colour in the bubble's middle (`npm run bubbledye`), and the
-    flow outside a moving bubble is not the flow round an obstacle. The real fix is the bubble as
-    a second phase in the solve: pressure all but uniform inside it (air's viscosity is a
-    fiftieth of water's), the liquid's flux through its faces nothing.
+    Check written first: `npm run bubbleair` id `oldplate` (Thin Gap off: a whole, drifting and
+    popped bubble keep the colour to 0.1%, main −2.6%, −6.6%, −2.6%; the hole fills to 0.5, main
+    0.000; no `depositBubbleRims` left in src/).
+  - ~~**15g-8d Liquid runs through a bubble in the thin solve.**~~ **Shipped**: standing air has
+    no mobility in the thin solve, so the liquid goes round a bubble; its drift reads the flow on a
+    ring past its rim. Lab: nothing left under a moving or growing bubble (was 6.6%, 1.0%). Story in
+    `docs/plan-shipped.md` §15g-8d.
   - **15g-8e Every carry of what the liquid holds takes the air.** With 15g-8b the colour, the
     poured liquids, the oil's colour, the reaction and the species riding with the colour move per
     unit of liquid under a bubble; the species carried alone (`passes.ts`, A.a.y 0), the maze's own
     path and the oil's mix (`mixAdvectSub`) do not. So under a bubble with Oil Bodies a body's
     colour and its edge can part, and two setups `npm run thick` holds equal differ under air.
     Give each the same accounting (airLiquid takes any amount carry), with a lab case per carry.
+    Check written first: `npm run bubbleair` ids `species`, `mix`, `maze` (no more left in a whole
+    bubble's middle than the colour's own carry leaves there, 0.005 over it at most, today a bar of
+    0.011; main 0.343 for the species alone, 0.203 for the oil's mix, 0.031 on the maze's path,
+    which takes the air but has no airShed after it).
+  - **15g-8f A popped bubble's hole fills unevenly.** The donor rule counts what comes into a cell
+    with air at the least it can be (two rings deep), so where liquid runs through cells the air is
+    leaving, a pop's hole fills to 0.6 of the pool in its middle and 1.09 a few cells out
+    (`npm run bubbledye`'s pop, 128²), and a bubble put down whole leaves 4–6% in the cells round
+    its middle, which `airShed` now hands to the rim, a correction rather than the carry getting it
+    right. The fix is a donor that mixes what comes in at what it is: the cell's own same-substep
+    balance solved across the ring, not bounded from below.
+    Check written first: `npm run bubbleair` id `donor`, in a lab with airShed's call off: under
+    0.02 left in a whole bubble of radius 0.05 and 0.08 (main 0.026, 0.040; with airShed 0.006,
+    0.033), every cell within three radii 0.95–1.05 of the pool thirty steps after the pop (main
+    0.68–1.08, 0.58–1.07; with airShed 0.60–1.09), and the airShed kernel gone.
+  - **15g-8g The app still presses the glass under every bubble.** `LiquidVisualizer` lays a
+    standing 'press' squish on each bubble's footprint "so the field flows round the bubbles". With
+    the solve's air shut (15g-8d) the liquid goes round them by itself; the press is a shortcut that
+    dents the gap under the air, a source the solve then has to answer. Measure the plate with and
+    without it (`npm run holeline`, `bubbles`, the Mac's `tools`), and take it out if the flow round
+    a bubble is the same. Measured (`npm run bubbleair`): in the lab the flow round a drifting
+    bubble is the same with the app's press and without it to 0.09%, nothing runs through it
+    either way, and the press dents the gap under it 0.0300 → 0.0273, so it goes; owed id `press`
+    (no applySquish with the presser 'bubble' left in src/). Still the Mac's `bubbles`/`tools`.
 - **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
   Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
   24-cell bowl and shove the liquid five times the move on each pointer event
@@ -164,6 +195,63 @@ Left, each its own plan item:
   ever be a false red, never a miss; found in #623's review). Give the splash its own presser
   (`Presser` in `src/lib/squish.ts`) when `fluidSimulation.ts` has the bytes: it sits at its
   size ceiling.
+
+- ~~**15g-11 The breath is a jet along the surface, with a direction.**~~ **Shipped**
+  (the owner, 2026-11-13, on the desktop app: "it doesn't blow across the surface like I
+  would expect (unless you're blowing hard), it doesn't seem to have a direction in mind").
+  The stress landed in a disc under the hand, so nothing ahead of the hand moved, and its
+  direction was each pointer move's own, which swings with every pixel and was dropped the
+  moment the hand stopped (a hand that stopped became the straw). Now the stress is a wall
+  jet's: whole over its landing and a core of five footprints, then falling as one over
+  the distance squared, spreading as it goes, 135 mm of reach on the dish
+  (`layBreath`, `jetShare`); and the direction is read from a point trailing the hand on a
+  leash and kept while the hand is down (`src/lib/blowAim.ts`). Story and numbers in
+  `docs/plan-shipped.md` §15g-11; `npm run blowrange`, `npm run airblow` (check 7).
+- ~~**15g-12 The wind lays no bubbles, and a straw's bubble is round.**~~ **Shipped** (the
+  owner, the same day: "the bubble spawning is weird at best", and flower-like things round
+  the floating bubbles after a Blow). The moving wind spawned two bubbles ten times a
+  second, a held straw's bubble shed satellites and broke into fingers at a gap 21 times
+  too small. A breath does not entrain air through a 2 mm film (it presses it aside), and
+  Paterson's fastest mode at the real gap is under one finger for the default liquid, so:
+  no bubbles from wind, one round bubble from a straw, fingers only where the liquid is
+  thick enough for two or more (`strawFingers` in `src/lib/bubbles.ts`). Story in
+  `docs/plan-shipped.md` §15g-12; `npm run blowrange`, `npm run straw`.
+- **15g-13 One held breath a plate.** A remote's breath is held in one record on the solver
+  (`FluidSimulation.held`), so two remotes blowing the same plate at once take turns at it:
+  each message replaces the other's, and the plate blows from whichever spoke last. Give
+  each remote hand its own (performGesture knows the hand's id; the solver would take a
+  small table keyed by it), and measure two pads' strokes moving two pools at once.
+- **15g-14 The plume's rows.** The breath's stress is written into the `breath` grid on
+  the CPU and uploaded by rows, and a plume crosses many more rows than the disc did
+  (`npm run frameuploads`: a slanted breath wrote 139 rows of 192, where the disc wrote
+  about 30), on every step of a stroke. It is 0.4 MB a step at worst and passes the
+  uploads check, but the jet is five numbers (landing, footprint, way, share): hand them
+  to `hsBody` as uniforms and let the shader evaluate `jetShare`, so a breath uploads
+  nothing. Measure the Mac's frame time through a long stroke before and after.
+- **15g-15 The halo round floating bubbles was not rebuilt in isolation.** The owner's
+  recording (2026-11-13, Foam Cells on the desktop) shows a big bubble ringed by small
+  ones with pale patches between them, a flower. On the Mac the same hands left about a
+  hundred bubbles (two wind spawns ten times a second, the straw's satellites) and after
+  15g-12 leave two round ones (films in the PR). What the lab ruled out as its cause by
+  themselves: the straw's bubble alone, the app's press under each bubble (15g-8g), and
+  popped holes (they heal in half a second). So the ring was the spawned crowd round the
+  straw's bubble and the puff's pale discs together, but no check holds a picture of it.
+  If it is seen again with no Blow in play (bubbles from the music, 15e), look first at
+  the bead and rim drawing in the open bubble-outline work (38h-15, 38h-17) and at
+  `depositBubbleRims`.
+
+- **15g-16 A gale blows the pool over the rim.** At Amount 2.5 the jet's plume reaches the
+  dish's rim from the middle of the plate, the rim is open (what is carried past it
+  leaves, `src/gpu/wgsl/fluid/dye.ts`), and a 1.5 s stroke from the middle sent 36.17% of
+  a pool's colour over it (`npm run airblow`, software; the disc's gale moved the pool
+  14.6% and kept it all). The breath itself keeps the colour: the same gale started 0.2
+  of the plate along moved the pool 37.06% and kept it to 0.00%, which is what check 6
+  now holds. So this is the plate as built, and a real gale does empty a dish. For the
+  owner to decide: whether a breath should empty the plate at the top of the Amount, or
+  the rim should hold the liquid back as a dish's wall does (the film piles there,
+  15g-3). Also seen and not looked into: under the same default breath a pool with
+  ferrofluid in it went 23.96% of the plate (the ferrofluid 29.89%) where the colour
+  alone went 13.07%.
 
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 
@@ -253,20 +341,17 @@ and on a still plate. SwiftShader, 2026-10-27 (effect = one less the share left)
 Neither plate's soap moves the dye it clears: the spot loses exactly what the whole plate
 loses (GPU, soap 149 to 107 at the spot and 507 to 465 on the plate; stand-in, 150 to 66
 and 507 to 423), so both clear by erasing (15e-5), and the table's soap and silicone rows
-compare two erasures. 21 lines gate; 16 are owed to the items below, print, and fail the
-run the day they pass (an owed line that reads no number fails too), so the fix that makes
-one pass also makes it gate. Briefs 11 (15e-1 and 15e-2) and 12 (15e-5) in the shared
-briefs.
+compare two erasures. 21 lines gated and 16 were owed to the items below; an owed line
+prints, and fails the run the day it passes (one that reads no number fails too), so the
+fix that makes one pass also makes it gate. Since 15e-1 shipped the still plate reads what
+the fold-every-step plate reads (the table's third column is its second), 27 lines gate
+and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
 
-- **15e-1. The liquids' forces act only on a frame something else is laid in.**
-  `liquidForces` (and soap's thinning, in `deltaDye`) run inside `foldDeltas`, which runs
-  only in `applyDeltas` and `applySplats`, and the app calls those only on a frame that is
-  `dirty` (LiquidVisualizer's step: a hand, a drop, a pour). On a still dish a spot of
-  soap pushes for the one step its own pour folds, then never again: the soap scene
-  leaves 99.6% of the dye at its spot where a fold every step leaves 72%. Glycerine is
-  the exception, as its thickness on a thin gap is the species' viscosity in the thin
-  solve, every step. Move the liquids' forces into the step, once a step, whether or not
-  the CPU sent anything. *Measure:* `npm run liquidsgpu`'s "a still plate" lines.
+- ~~**15e-1. The liquids' forces act only on a frame something else is laid in.**~~
+  **Shipped** (2026-11-13, met again as 14ab-16): the step runs them itself, once a step,
+  on any plate a bottle was poured on (`stepLiquids`); `npm run liquidpush`, and
+  `liquidsgpu`'s five "a still plate" lines owed to it gate. Story in
+  `docs/plan-shipped.md` §15e-1.
 - **15e-2. Where they act, the liquids' passes are about a fifth of the stand-in's.** The GPU
   scales each force by the solver's `dt` (0.004 in the lab; 0.0036 for the app at the
   default Speed), where liquidPhase.ts and the app's CPU before the port scaled them by
@@ -324,7 +409,7 @@ briefs.
   moves the same colour to a stated share), then drop the extra half.
 - **15e-7. A remote Blow never makes a straw bubble.** The mouse's held-still Blow is the
   straw (`strawFlow`, a real bubble blown into the dye); a remote's Blow with no direction
-  is the puff, and its only bubbles are the wind's torn-in air (`airTaken`). A held remote
+  is the puff, which lays no bubble at all (the wind's torn-in air went with 15g-12). A held remote
   Blow (a pad, the gamepad, OSC) should be the straw after the same hold, as the mouse's is.
   *Measure:* the remote's held Blow grows a straw bubble as the mouse's does (`straw`).
 - **15e-8. Weight and polarity are not yet measured on the GPU.** liquids.mjs holds the
@@ -332,6 +417,29 @@ briefs.
   oil and syrup parting where they meet and a finger mixing them; liquidsgpu has only the
   four liquids' scenes. Lay those four on the GPU the same way, with the same owed rule,
   before or with Brief 11, which changes the forces they would measure.
+- **15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**
+  `liquidForces` adds to the flow before the step keeps "the velocity from before the
+  forces" (`thin gap keep`), as it did from the fold, so a thin gap reads the push as flow
+  the liquid already had and its drag has it within the step, where the oil's tension, the
+  magnet and the maze go in after the keep and are read as a speed to drive the liquid to.
+  Measured (`npm run liquidpush`, 64², six steps, a heavy drop on a plate rocked 0.5): the
+  slide under the drop is 3.4e-2 on the open plate and −9.4e-4 on the thin gap, beside a
+  flow of 0.53: two thousandths of it, and against the rock's way. So on the plate every look uses, a
+  heavy liquid does not slide down a rocked plate and an oil does not keep to itself by
+  these forces; what a bottle does there is its species' viscosity and weight in the thin
+  solve (18d) and the soap's erasure (15e-5). Move the pass after the keep and give its
+  constants the thin solve's units (a force per unit of drag, with 15e-2's time base), or
+  retire the terms the species already carry. Not done with 15e-1 because it changes what
+  every poured bottle does in every look, and wants its own before and after. *Measure:*
+  liquidpush's thin-gap reach line asks the slide the rock's way, as the open plate's does.
+- **15e-11. The CPU's stand-aside copy of the first pour (found with 15e-1).**
+  `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so the first
+  pour on a new solver lands in the CPU's copy too, which then never decays
+  (`LiquidPhase.step` returns early), so `stepLiquid` runs its tilt and its species poll on
+  every step until a Clear for a copy nobody reads. The fold it also asked for each step
+  **shipped** with 14ab-11 (the step asks for no flush; `npm run frameuploads`). Left: set
+  `gpuNative` before the pour can land and return from `stepLiquid` when the GPU has the
+  liquids.
 - **15e-9. Two lab checks at once share one bundle.** `scripts/lab.mjs` writes the plain
   lab's page to one file in `node_modules/.cache` for every run, so two lab checks started
   together (`npm run quick` runs them side by side) can load a bundle the other is writing.

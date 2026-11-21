@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { ListMusic, Play, Square, Plus, Trash2, Download, FolderOpen, Save, ChevronUp, ChevronDown } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ListMusic, Play, Square, Plus, Trash2, Download, FolderOpen, Save, ChevronUp, ChevronDown, Ear } from 'lucide-react';
 import { Sheet, Toggle, LIT } from './ui';
 import type { SongRef } from '../lib/songRef';
 import {
@@ -7,6 +7,7 @@ import {
   COMMON_ACTIONS, actionFrom, describeWhat, describeWhen, newId, parseFile, setFile,
 } from '../lib/songShows';
 import type { SongShowStatus } from '../hooks/useSongShows';
+import type { ListenControl } from '../lib/songDesign';
 
 /**
  * Songs: a look for each song, and what happens while it plays.
@@ -32,6 +33,8 @@ interface SongsPanelProps {
   currentSong: SongRef | null;
   follow: boolean;
   onFollow: (on: boolean) => void;
+  /** Listen: name the song playing, add it, design its show once heard through (PLAN 28h-8). */
+  listen?: ListenControl;
   status: SongShowStatus;
   onRun: (showId: string) => void;
   onStop: () => void;
@@ -55,7 +58,7 @@ const WHEN_KINDS: [ActionWhen['at'], string][] = [
 const WHAT_KINDS: [ActionWhat['do'], string][] = [
   ['title', 'Pour the title'], ['burst', 'Burst'], ['zoom', 'Zoom'], ['kaleidoscope', 'Kaleidoscope'], ['dyes', 'Next dyes'],
   ['look', 'Switch look'], ['drain', 'Drain'], ['clear', 'Clear'], ['seed', 'Lay the look again'],
-  ['blackout', 'Fade to black'], ['lights-up', 'Lights up'], ['signoff', 'Pour the name'],
+  ['blackout', 'Fade to black'], ['lights-up', 'Lights up'], ['signoff', 'Show the name'],
 ];
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
@@ -90,7 +93,7 @@ function defaultWhat(d: ActionWhat['do'], looks: LookChoice[]): ActionWhat {
 const lookKey = (l: { kind: string; id: string }) => `${l.kind}:${l.id}`;
 
 export const SongsPanel: React.FC<SongsPanelProps> = ({
-  shows, onShows, sets, onSaveSet, onDeleteSet, looks, currentSong, follow, onFollow, status, onRun, onStop, onOpenSequences, exportShows, onImportLooks, onClose, embed = false,
+  shows, onShows, sets, onSaveSet, onDeleteSet, looks, currentSong, follow, onFollow, listen, status, onRun, onStop, onOpenSequences, exportShows, onImportLooks, onClose, embed = false,
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(shows[0]?.id ?? null);
   const selected = useMemo(() => shows.find((s) => s.id === selectedId) ?? null, [shows, selectedId]);
@@ -113,6 +116,11 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
   };
   const [newTitle, setNewTitle] = useState('');
   const [newArtist, setNewArtist] = useState('');
+  // The song Listen named opens, so what it filled in is what the panel shows.
+  const listenShow = listen?.showId ?? null;
+  useEffect(() => { if (listenShow) setSelectedId(listenShow); }, [listenShow]);
+  const listenPhase = listen?.state.phase ?? 'idle';
+  const listenBusy = listenPhase === 'listening' || listenPhase === 'learning';
 
   const download = (name: string, text: string) => {
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -158,6 +166,29 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
           <p className="mb-3 text-[10px] leading-relaxed opacity-50">
             A look for each song and what happens while it plays. With Follow on, a song's show starts when the song is recognised.
           </p>
+          {/*
+            Listen (PLAN 28h-8): the song ID that already runs, asked to try
+            now, and the show it hears designed into stages and cues. First in
+            the column, because naming the song is where setting one up starts.
+          */}
+          {listen && (
+            <div className="mb-3 rounded-lg border border-white/10 p-2.5" data-testid="songs-listen-box">
+              <div className="flex gap-1.5">
+                <button onClick={listenBusy ? listen.cancel : listen.start} aria-pressed={listenBusy}
+                  // Lit while it listens, as the list's chosen song is: smallBtn's own
+                  // grey fill and border would win over LIT's if both were given.
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium ${listenBusy ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`} data-testid="songs-listen"
+                  title="Name the song playing, add it here, and design its show once the show has heard it through">
+                  <Ear size={12} className={listenPhase === 'listening' ? 'animate-pulse' : ''} /> {listenBusy ? 'Stop listening' : 'Listen'}
+                </button>
+                {listenPhase === 'missed' && (
+                  <button disabled={!newTitle.trim() || !newArtist.trim()} onClick={() => listen.tag(newTitle, newArtist)}
+                    className={smallBtn} data-testid="songs-listen-tag" title="Name the song playing with the Title and Artist typed below">Name it</button>
+                )}
+              </div>
+              <p className="mt-1.5 text-[10px] leading-relaxed opacity-60" role="status" data-testid="songs-listen-status" data-phase={listenPhase}>{listen.line}</p>
+            </div>
+          )}
           <div className="mb-3">
             <Toggle label="Follow songs" on={follow} onChange={onFollow} testId="songs-follow" />
           </div>
@@ -372,6 +403,7 @@ function ActionRow({ action, looks, index, count, onChange, onRemove, onMove, lo
       <select className={inputCls} value={a.do} onChange={(e) => onChange({ what: defaultWhat(e.target.value as ActionWhat['do'], looks) })} data-testid={`songs-action-${index}-what`}>
         {WHAT_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         {a.do === 'set' && <option value="set">{describeWhat(a)}</option>}
+        {a.do === 'pour' && <option value="pour">{describeWhat(a)}</option>}
       </select>
       {a.do === 'look' && (
         <>

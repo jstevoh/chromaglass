@@ -16,9 +16,19 @@ layout is kept as a tab of its own; the phone has the same tabs in More › Tabs
 `src/lib/deskTabs.ts`; checks `npm run desklayout`, `npm run layout`, `npm run phone`).
 Open from it:
 
-- **8-tabs-a** (S) The tabs live in the browser's storage, so a phone and a laptop each
-  have their own. Carry them with the account (cloud sync, judging §72) so a venue's
-  Setup tab made on the laptop is the phone's too.
+- ~~**8-tabs-a** The tabs live in the browser's storage, so a phone and a laptop each
+  have their own~~ (shipped: `deskTabs`, a synced store in `src/lib/cloudSync.ts`, read
+  again in `useDeskTabs`; which tab is up stays the machine's; `npm run cloudsync` 14;
+  judging §110; story in `docs/plan-shipped.md` §8). Tabs reach other devices once the
+  licence Worker is redeployed with `deskTabs` in its stores (the owner's go); until
+  then the old Worker ignores the store and the manifest sends it again after.
+  - **8-tabs-a-1** (S) The list syncs as one value, newest edit wins, and every touch of
+    a layout (raising a floating panel, folding the deck) is an edit of the whole list,
+    so two devices editing at once lose one of the edits: a rename on one followed by a
+    deck fold on the other before it has pulled (about a minute, pulls come once a
+    minute while the window is visible) loses the rename on both. Merge by tab id (each
+    tab an item, the order its own item) once someone loses a tab to it. The first
+    meeting is not this: that merges (`mergeStoredTabs`, check 14d to 14g).
 - **8-tabs-b** (S) The phone draws a desk-own panel (bottles, set list, rides) as a
   button to its own sheet, not the panel itself. Draw them in place once each has a
   touch-sized body, so a tab on the phone is the whole tab.
@@ -113,6 +123,13 @@ Open from Desk v2, each its own thread (the UI lane):
   `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
 - ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
   XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
+  - ~~**8d-1** A CC on a board with no profile is a knob~~ (the owner, 2026-11-14:
+    Iridescence, learned to CC 16, sat as a full-width slider above the Recipe's knob
+    row). **Shipped**: `controlKindOf` draws an unknown board's absolute CCs as knobs; a
+    slider only where a profile knows the fader. Rides still draws every control as a
+    fader. Check `npm run desk`.
+  - **8d-2** (S) Profiles for more boards, or a per-control "knob / slider" choice in
+    MIDI learn, so a real fader on an unprofiled board can draw as one again.
 - ~~**8e** Load-in's Wall panel: the test pattern and Identify, and Output's Gain and Gamma
   as knobs~~ (shipped; checks `npm run wallpattern`, `npm run map`, `npm run layout`).
   - **8e-1** (S) The wall test from the phone. The remote has no Load-in at all (no

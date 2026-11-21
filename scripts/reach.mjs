@@ -16,12 +16,14 @@
 // can: a new directory, a new kind of file, a file that is read at run time
 // by a harness, all run the Mac. Markdown is read by people (the harnesses
 // that mention a `.md` write one or name one in a comment); `.claude/` is the
-// sessions' own; the six workflows named never run a Mac shard's steps (the
-// gallery, controls and film workflows run on a label or by hand, and the
-// iPhone and Mac apps have their own); `ios/` and `desktop/` are the native
+// sessions' own; the eight workflows named never run a Mac shard's steps (the
+// gallery, controls and film workflows run on a label or by hand, the iPhone
+// and Mac apps have their own, `ready.yml` only labels a PR after
+// `Checks` has run, PLAN.md 19al, and `hold.yml` only posts a status after a
+// deploy, PLAN.md 19am); `ios/` and `desktop/` are the native
 // apps, which `npm run build` does not read and which `ios.yml` and
-// `desktop.yml` build. Three scripts about the workflows themselves
-// (`closedruns.mjs`, `macqueue.mjs`, `deploygate.sh`) are run by Measure, the
+// `desktop.yml` build. Four scripts about the workflows themselves
+// (`closedruns.mjs`, `macqueue.mjs`, `deploygate.sh`, `mainhold.mjs`) are run by Measure, the
 // deploy or by hand, and imported by no Mac step; so is the guard that reads
 // a PR's diff for moved bars (`checkguard.mjs`), which reads code as text,
 // and `quick.mjs`, which a session runs by hand (PLAN.md 19k). `checks.yml`
@@ -62,11 +64,11 @@ const NOT_MAC = [
   /^[^/]+\.md$/,
   /^docs\/.*\.md$/,
   /^\.claude\//,
-  /^\.github\/workflows\/(closed|gallery|controls|film|ios|desktop)\.yml$/,
+  /^\.github\/workflows\/(closed|gallery|controls|film|ios|desktop|ready|hold)\.yml$/,
   /^ios\//,
   /^desktop\//,
   /^LICENSE[^/]*$/,
-  /^scripts\/(closedruns\.mjs|macqueue\.mjs|deploygate\.sh|checkguard\.mjs|quick\.mjs)$/,
+  /^scripts\/(closedruns\.mjs|macqueue\.mjs|deploygate\.sh|checkguard\.mjs|quick\.mjs|mainhold\.mjs|mainhold-deploys\.json)$/,
 ];
 
 export const reachesMac = (path) => !NOT_MAC.some((re) => re.test(path));
@@ -244,6 +246,9 @@ async function selftest() {
     ['.claude/agents/check-skeptic.md', false],
     ['.github/workflows/closed.yml', false],
     ['.github/workflows/gallery.yml', false],
+    ['.github/workflows/ready.yml', false],
+    ['.github/workflows/ready.yml.orig', true],
+    ['.github/workflows/hold.yml', false],
     ['ios/App/App/AppDelegate.swift', false],
     ['desktop/main.js', false],
     ['LICENSE', false],
@@ -251,6 +256,7 @@ async function selftest() {
     ['scripts/macqueue.mjs', false],
     ['scripts/deploygate.sh', false],
     ['scripts/checkguard.mjs', false],
+    ['scripts/mainhold.mjs', false],
     ['scripts/closedruns.mjs.bak', true],
     ['scripts/lab/closedruns.mjs', true],
     ['src/gpu/wgsl/plate.ts', true],
@@ -316,6 +322,16 @@ async function selftest() {
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}`);
   }
+  // The environment every child `--diff` below runs in. It is this job's, so
+  // the child finds node, git and the token, but never this run's attempt:
+  // on a re-run (GITHUB_RUN_ATTEMPT 2) a child that inherited it read the real
+  // run's jobs, found the Mac shards that passed in attempt 1, and dropped them
+  // from its answer, so the cases that want every shard got `mac=false` and the
+  // logic shard went red on every re-run (#656's, PLAN.md 19ak-5). The child's
+  // answer is about its scratch tree, never about this run, so it is always a
+  // first attempt of no run; the re-run skip has its own cases, on
+  // `passedEarlier` with mocked jobs.
+  const childEnv = (extra) => ({ ...process.env, GITHUB_RUN_ATTEMPT: '1', GITHUB_RUN_ID: '', ...extra });
   // And `--diff` itself, on a scratch repository with GitHub's shape: a base,
   // a PR branch, and a merge commit whose second parent is the PR's head.
   const runDiff = (changes, prHead, base = () => {}) => {
@@ -346,7 +362,7 @@ async function selftest() {
         stdio: 'pipe',
         // No base branch, so carry() answers at once without the network: the
         // carry is driven by its own cases below, against a mocked API.
-        env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out },
+        env: childEnv({ GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out }),
       });
       return fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ');
     } catch {
@@ -435,7 +451,7 @@ async function selftest() {
   const call = (env) => {
     const out = path.join(os.tmpdir(), `reach-call-${process.pid}`);
     fs.writeFileSync(out, '');
-    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], { stdio: 'pipe', env: { ...process.env, ...env, GITHUB_OUTPUT: out } });
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], { stdio: 'pipe', env: childEnv({ ...env, GITHUB_OUTPUT: out }) });
     const r = fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ');
     fs.rmSync(out);
     return r;
