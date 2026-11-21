@@ -139,6 +139,15 @@ export const APP_FEATURE_TILES: AppTileSpec[] = [
     tier: 'home',
     summary: 'In the ChromaGlass app — put your own band mark or SVG on the glass instead of the ChromaGlass mark.',
   },
+  // Pro only until 2026-11-15, when the owner dropped Home to $29 and moved
+  // the Live Show into it (PLAN.md 23.21): streamers are Home's buyers, and a
+  // $29 visualizer they compare us with streams too.
+  {
+    id: 'live-show',
+    title: 'Live Show streaming',
+    tier: 'home',
+    summary: 'In the ChromaGlass app — stream the show to YouTube, Twitch, Facebook and the rest at once.',
+  },
   // The two Pro tiles sold several projectors with edge blending and MIDI out,
   // and neither ships: the app drives one projector output (mapped into up to
   // sixteen surfaces, on every tier), and MIDI out is only a controller's LEDs
