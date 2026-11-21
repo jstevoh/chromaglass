@@ -28,7 +28,8 @@
  *   real one (lib/liveStream.ts, WebCodecs' H.264 on Chromium's software
  *   encoder), so the packets the stand-in counts are real frames of the
  *   plate. The website (no bridge) does not offer the panel; a free licence
- *   gets the Pro note and no Go live; and a phone on the remote sees the
+ *   gets the licence note and no Go live, a Home licence gets the panel
+ *   (Pro only until 2026-11-15, PLAN.md 23.21); and a phone on the remote sees the
  *   stream on Draw and on Controls, and its Stop, two taps, ends it.
  *
  * What it does not say: anything about a real platform or the real
@@ -293,13 +294,25 @@ try {
   check('the website does not offer the Live Show panel', !(await dock(site)));
   await site.context().close();
 
-  // ── Pro only ────────────────────────────────────────────────────
+  // ── Free gets the note ──────────────────────────────────────────
   const free = await open({ enforced: true, valid: false, tier: 'free' });
   const freeDocked = await dock(free);
   const freeSays = await until(free, () => document.querySelector('[data-testid="live-show-pro"]')?.textContent ?? document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase'));
   const freeGo = await free.getByTestId('live-go').count();
-  check('on a free licence the panel says it is Pro and has no Go live', freeDocked && /Pro/.test(String(freeSays)) && freeGo === 0, `docked ${freeDocked}, says "${freeSays}", Go live ${freeGo}`);
+  check('on a free licence the panel says it needs a paid licence and has no Go live', freeDocked && /Home and Pro/.test(String(freeSays)) && freeGo === 0, `docked ${freeDocked}, says "${freeSays}", Go live ${freeGo}`);
   await free.context().close();
+
+  // ── Home opens it (the owner, 2026-11-15, PLAN.md 23.21) ─────────
+  // The Live Show was Pro only until Home dropped to $29 and took it: a Home
+  // key, enforced as the Mac app enforces it, must reach the panel itself and
+  // its Go live, not the note. Read from the same panel the free line reads,
+  // so the licence in the stub is the only thing that differs.
+  const home = await open({ enforced: true, valid: true, tier: 'home' });
+  const homeDocked = await dock(home);
+  const homePhase = await until(home, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') ?? (document.querySelector('[data-testid="live-show-pro"]') ? 'note' : null));
+  const homeGo = await home.getByTestId('live-go').count();
+  check('on a Home licence the panel opens with Go live, not the licence note', homeDocked && homePhase !== 'note' && homePhase != null && homeGo > 0, `docked ${homeDocked}, phase "${homePhase}", Go live ${homeGo}`);
+  await home.context().close();
 
   // ── The Mac app, Pro ─────────────────────────────────────────────
   const page = await open(null);
