@@ -30,6 +30,11 @@ the chemical clock counted in:
 5. **48e** oil-slick rainbows from a real spreading film
 6. **48f** Faraday waves: the music's vibration stands up as a pattern, through a cord
 
+**The owner's pick, 2026-11-21:** "lest do anything that can be impacted by the music itself.
+Like lke the standing-wave patterns for example." So the music-driven ideas go first, each
+through a cord the owner patches (never the solver's step taking sound): **48f** now, then
+**48c**, **48a**, **48d** and **48i**, the ones a cord can move.
+
 ## The ideas
 
 - **48a. The chemical clock, steered by light and stirring itself** (M; builds on the BZ

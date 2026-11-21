@@ -69,7 +69,12 @@ plate shader draws only what the solver makes.
     the short list is the chemical clock steered by light (48a), every drop a lens with
     caustics on the wall (48b, with 47j), bioluminescent trails (48c), lifting the glass
     into air ferns (48d), oil-slick rainbows (48e) and Faraday waves through a cord (48f).
-    The one picked starts this week.
+    **The owner picked, 2026-11-21: "anything that can be impacted by the music itself.
+    Like the standing-wave patterns."** So **48f** Faraday waves starts this week, in its
+    own thread, and the ideas the music can move through a cord come next in this order:
+    48c (the music's cords stir, the plate glows where they shear), 48a (a cord on the
+    light that holds the clock's waves back), 48d (a cord on the lift), 48i (a cord that
+    turns the ferrofluid's field).
 
 **Parked this week, kept in the plan.** The launch, the stores and the money (§12, §23,
 §37, §39, §43), the VJ software and the gig's plumbing (§13, §14, §16, §17, §24), the
