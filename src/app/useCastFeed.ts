@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useCallback, useEffect, type RefObject } from 'react';
 import type { CastState, CastMessage } from '../lib/castProtocol';
-import { COLOR_HARMONIES } from '../constants';
+import { PICTURE_LOCK, lockHarmony, type Rgb } from '../lib/picturePalette';
 import type { RemoteMessage } from '../lib/remoteProtocol';
 import { isFreeTierGated } from '../lib/tierGates';
 import { fitMarkForCast } from '../lib/markFit';
@@ -37,6 +37,8 @@ interface CastFeedDeps {
   activePresetId: string | null;
   presetSeq: number;
   paletteLock: number | null;
+  /** The picture palette's four colours, sent while the lock is on it (PLAN 43d). */
+  pictureDyes?: Rgb[] | null;
   shownOutput: OutputConfig;
   castSend: (msg: CastMessage) => void;
   mirrorCount: number;
@@ -64,7 +66,7 @@ const roomIsCalibrating = (a: AudioData | null) => a?.calibration?.calibrating ?
 
 export function useCastFeed({
   wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
-  clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
+  clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, pictureDyes = null, shownOutput, castSend,
   mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
   isCasting, ear, hear, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
 }: CastFeedDeps) {
@@ -85,13 +87,15 @@ export function useCastFeed({
     drainTrigger: wl ? wl.drainTrigger : drainTrigger,
     presetId: wl ? wl.castPresetId : activePresetId,
     presetSeq: wl ? wl.presetSeq : presetSeq,
-    harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
+    harmonyLock: lockHarmony(paletteLock),
+    // A picture's palette (PLAN 43d) is four colours this page holds, not names a receiver knows, so they travel with the lock.
+    pictureDyes: paletteLock === PICTURE_LOCK ? pictureDyes : null,
     // With the wall test on it (8e), so a receiver that draws its own plate
     // (a Chromecast, a second machine) shows the pattern and the numbers as
     // the HDMI wall does. Identify's end is a clock time, so a receiver whose
     // clock is a second off flashes a second more or less.
     output: shownOutput,
-  }), [wl, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput]);
+  }), [wl, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, pictureDyes, shownOutput]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
   /*
     The same mark as it crosses the show server to a network display: the

@@ -88,12 +88,27 @@ nothing. A loop that needs less of a crossfade (a periodic stir locked to the ba
   Record, calling the same lib function as the desk (a render can take minutes, so it
   says so and keeps the screen awake).
   *Measure:* the check from 43b on the loop, and the cut's length, audio track and size.
-- **43d. The cover sets the colours.** *(M.)* A dropped cover picks the look's dyes from
-  the cover's own colours, and can be poured in as the first dye (`injectImage`) so a loop
-  opens on it, which Apple's motion art asks for. Nothing is painted over the plate.
-  *Measure:* the dyes of a plate from a test cover lie within a set distance of the
-  cover's main colours, and the first frame of the film is closer to the cover than to a
-  plate from the default look.
+- **43d. The cover sets the colours.** **Shipped 2026-11-15** (`npm run picturepalette`):
+  "Palette from a picture or video" on the Dyes panel and the phone's Dye sheet takes any
+  picture or video file's four main colours as the dyes, "From picture" in the palette list
+  (lib/picturePalette.ts). The story is in `docs/plan-shipped.md` §43d. Open from it:
+  - **43d-1. The loaded video's colours.** *(S, after 14ag, PR #850.)* The Video panel's
+    loaded video and the film that drives the plate get a "Use its colours" beside Play and
+    Pour, calling `paletteFromFile` with the file already loaded, so a person does not pick
+    it twice. *Measure:* `picturepalette`'s video line, through the panel.
+  - **43d-2. The song's own cover.** *(S, with 17's files.)* A played file's embedded cover
+    art (ID3 APIC, MP4 `covr`, FLAC picture) as the palette when the song starts, behind a
+    switch, off by default. *Measure:* a test file's cover gives the cover's colours.
+  - **43d-3. The assistant's picture palette.** *(S.)* `hand` takes "From picture" by name
+    (deskNow's palette lookup knows only the named 21) and a picture or video by path or
+    address, through the same call (44k). *Measure:* `npm run assistant`.
+  - **43d-4. The cover poured first, for a loop.** *(S, after 43b.)* The second half of 43d
+    as first written: on a Release kit render the cover can also be poured in as the first
+    dye (`injectImage`) so a loop opens on it, as Apple's motion art asks. *Measure:* the
+    film's first frame is closer to the cover than a plate from the default look's.
+  - **43d-5. Judge it on the Mac.** A Mac film of a look before and after a cover's palette
+    (`docs/judging.md`), whether four dyes read as the cover's on both a lamp look and a
+    dark one.
 - **43e. Apple Music motion art.** *(S, after 43c.)* A square and a 3:4 loop of equal
   length from the same render. Before building, settle the codec with the distributors'
   current pages (H.264 versus ProRes, which WebCodecs cannot write).

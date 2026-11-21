@@ -44,6 +44,8 @@ export interface CastState {
   presetSeq: number;
   /** The user's palette lock as palette indices, or null. */
   harmonyLock: number[] | null;
+  /** The picture palette's four dyes when the lock is on it (lib/picturePalette.ts, PLAN 43d): the receiver writes them into its own slots first. */
+  pictureDyes?: { r: number; g: number; b: number }[] | null;
   /**
    * The projector's geometry and grade.
    *
