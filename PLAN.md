@@ -262,6 +262,9 @@ style (§31).
   Detail, ~~38u-2~~ the closeup's drawn lamp, ~~38u-3~~ the film's clock and ~~38u-5~~ the music's stir
   through a cord (with **38u-4**'s multiplier) shipped; next, each a thread, **38u-6** (the music
   warps the clock), **38u-7**, **38u-13**, **38u-12**; **38u-8** and **38u-11** are the owner's call.
+  ~~38v-1~~ the music's own hands (pulse, press, bloom, stream, swell) are cords on every look,
+  shipped 2026-11-21; what it left outside a cord is **38w** (the kick's bubbles, the plate spin's
+  Driven by, one press a plate, a hand that moves between areas, the droppers' pace, the phone).
 - **6.11** What Liquid Light Lab's tutorials and gear showed (§42, asked 2026-11-07), each its own
   thread: **42m** the tutorials watched on the owner's Mac first, then **42a** the glass pair
   (Fast and Slow glass from real radii; after #655), **42e** the classic mixture's numbers (with

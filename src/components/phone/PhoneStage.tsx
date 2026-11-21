@@ -16,6 +16,11 @@ import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { musicStirOf, withMusicStir } from '../../lib/stir';
+import { musicHandOf, withMusicHand } from '../../lib/musicCords';
+import type { MusicRole } from '../../types';
+
+/** The music's hands the phone's Sound sheet turns (PLAN 38v-1), each shown where the look has it. */
+const HAND_SLIDERS: readonly [MusicRole, string][] = [['bloom', 'Kick Pour'], ['pulse', 'Bass Pulse'], ['press', 'Bass Press']];
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -1152,6 +1157,22 @@ export function PhoneStage(p: PhoneStageProps) {
                 display={`${Math.round(musicStirOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-stir" />
             </div>
           )}
+          {/*
+            The music's hands (PLAN 38v-1): the kick's pour, the bass's pulse
+            and the press are cords on every look now (lib/musicCords.ts),
+            each with its own depth, and the desk sets them in Patches. The
+            phone has no patch bay, so these three are those cords' depths
+            (`musicHandOf`, `withMusicHand`), 0.5 being what the old block
+            did at Sound Drive's 1x and 1 twice that; Sound Drive above is
+            still the master over all of them.
+          */}
+          {p.mixer && HAND_SLIDERS.filter(([role]) => p.mixer!.settings.sceneMappings?.some(m => m.role === role)).map(([role, label]) => (
+            <div className="mt-3" key={role}>
+              <Slider label={label} value={musicHandOf(p.mixer!.settings.sceneMappings, role)} min={0} max={1} step={0.01}
+                onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicHand(p.mixer!.settings.sceneMappings, role, v) })}
+                display={`${Math.round(musicHandOf(p.mixer!.settings.sceneMappings, role) * 200)}%`} touch testId={`phone-music-${role}`} />
+            </div>
+          ))}
           </PanelGuard>
         </PhoneSheet>
       )}
