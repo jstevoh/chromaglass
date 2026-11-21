@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed — three drawn stand-ins made physical (PLAN 38u-7, 38u-12, 38u-14)
 
 - **Rain Drip** needs the plate tipped (Gravity): the weight along a plate is g sin θ, nothing on a
-  level one. Eight looks that lean on it now sit on a plate tipped about 15 degrees.
+  level one. Seven looks that lean on it now sit on a plate tipped about 15 degrees;
+  Velvet Underground stays level, so its pools stay pools.
 - **A clear oil drop** and a bubble in clear liquid are drawn with the same dark ring as in dyed
   liquid (it was a third and 0.7 of it); the clear oil's tint fades over the meniscus.
 - **Polarity** pushes unlike colours apart the same everywhere; a noise had pulled them together in patches.

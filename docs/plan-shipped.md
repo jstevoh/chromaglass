@@ -14764,8 +14764,9 @@ From the third physics pass (38u). Each is a look change on purpose.
   A tension between two liquids does not depend on where on the glass they meet.
 - **38u-12, Rain Drip.** Its weight along the plate was the same on a level plate as on the wall.
   Gravity along a plate is g sin θ: the dial now scales by the tilt (`plateUpright`, `dripOf` in
-  `gpu/fluid/constants.ts`; the CPU twin and the deep plate's force read it the same). Eight looks
-  that set Rain Drip at 0.2 or more got a tilt of 0.25; Rain Drip's help and guide line say it
+  `gpu/fluid/constants.ts`; the CPU twin and the deep plate's force read it the same). Seven looks
+  that set Rain Drip at 0.2 or more got a tilt of 0.25 (Velvet Underground stays level: its pools
+  stay pools, `npm run pools`, which went red with the tilt's buoyancy and heat on it twice); Rain Drip's help and guide line say it
   needs Gravity.
 - **38u-14, the clear drop.** `plate.ts` drew the oil drop's band at 0.35 when there was no dye
   under it and a bubble's at 0.7 in clear liquid; the band is the meniscus bending light out of the

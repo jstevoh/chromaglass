@@ -745,7 +745,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.45,
       glassSmear: 0.22,
       rainDrip: 0.6,
-      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
+      // level: its pools stay pools, Rain Drip idle (38u-12)
       viscosity: 'thick',
       polarity: 0.9,
       evaporationRate: 0.004,
