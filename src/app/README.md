@@ -58,7 +58,7 @@ comments, which moved with it.
 | `songShowNow.ts` (not a hook) | the song shows in brief, for the remote link to report (`useSongsNow`, `publishSongs`, `showBrief`, which carries the song's own `title` for the phone controller), and the door the owner's assistant reads, edits, runs and nudges them through (`askSongs`, `readShow`, `setSongsDoor`, `setFollowDoor`, `ASSISTANT_ACTION_PREFIX`, `SONG_NUDGE_MAX_S`), set by `useSongScore` and `useShowLibrary` (PLAN 44k-5) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption only since the ink was shelved, 37x-10m; `titleCaption` deleted); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
-| `useSongRendering` | a song rendered to a film |
+| `useSongRendering` | a song rendered to a film, and `loopRender`, a seamless Canvas loop (PLAN 43b) |
 | `useControllers` | MIDI, the gamepad, the projector window |
 | `useCommandPalette` | the palette's commands and the keyboard |
 | `useCheckHooks` | the checks' `?debug` doors (`lib/checkHooks.ts` declares them) |

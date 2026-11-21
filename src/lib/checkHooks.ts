@@ -110,8 +110,8 @@ declare global {
     chromaglassCastState?: () => unknown;
     /** What a render could leave running in the live show: fades and glides on the film's clock. */
     chromaglassRenderPending?: () => { lookFade: boolean; dimmerFade: boolean; glides: number };
-    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app`; `toDisk` writes through the save picker instead of memory, for `npm run tvloops`. */
-    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number; toDisk?: boolean; hashFrames?: boolean }) => Promise<unknown>;
+    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app` and `npm run loopseam`; `toDisk` writes through the save picker instead of memory, for `npm run tvloops`. */
+    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number; loop?: { seconds: number; crossfade?: boolean; startSec?: number }; toDisk?: boolean; hashFrames?: boolean }) => Promise<unknown>;
     /** The MIDI input and the gamepad as the desk sees them. */
     chromaglassInputs?: () => unknown;
 
