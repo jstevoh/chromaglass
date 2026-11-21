@@ -3294,7 +3294,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       c = mix(c * fm, airColumn(c, rimCol, rimS, rimA, tB, R, rho) * fm * wall.x + camBounce(groundOf(bgColor), rimCol, rimS, rimA) * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
-      outColor = mix(outColor, c, opac * U.bubbleStrength);
+      outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));
       /*
         The camera pass (wgsl/camera.ts) bends the screen along this normal,
         which is the camera's dome: on the plate it would lens the window the
