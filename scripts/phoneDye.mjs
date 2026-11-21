@@ -46,7 +46,7 @@ export async function dyeSheetLines(page, tap, check) {
   */
   const harmony = await page.evaluate(() => (document.querySelector('[data-testid="needs-webgpu"]') ? null : window.chromaglassDebug?.()?.harmony ?? null));
   if (harmony != null || process.env.PHONE_GPU) {
-    check('and the plate\'s own harmony is the four picture dyes', harmony === '24,25,26,27', `harmony ${harmony}`);
+    check('and the plate\'s own harmony is the four picture dyes', String(harmony) === '24,25,26,27', `harmony ${harmony}`);
   } else console.log(' --   the plate has no WebGPU here: its harmony is not asked (PHONE_GPU=1 on the Mac shard asks it)');
   await page.locator('[data-testid="phone-sheet-dye"] button', { hasText: /^Auto$/ }).first().tap().catch(() => {});
 }
