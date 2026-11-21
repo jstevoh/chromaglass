@@ -2830,7 +2830,50 @@ at one frame. Whether the looks read better without the line is only seen here.
 5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
    at the dye's edges strengthen.
 
-## 133. Your own video: played, poured, read and framed (PLAN 14ag)
+## 133. A clip to post: Record's 9:16 frame (PLAN 34f)
+
+What changed: the Record panel (the sliders button beside Record) has a **Frame**, *As the plate is* or
+*Portrait 9:16*; on the phone it is More › Record › Clip frame. Portrait makes the one Record button write a
+tall MP4 with sound, with the plate drawn tall while it records. A phone opens on Portrait, a desk on the plate.
+
+1. On the Mac app or the site at a laptop's size, pick Portrait 9:16, press R, drop and stir for ten seconds, press R.
+   While it records the plate on your screen becomes a tall strip with bars either side (the plate drawn tall, not the
+   landscape picture); the moment you stop it should widen back with no hitch you would notice mid-set.
+2. Open the file: it should be 9:16 with the music in it. Compare an edge of the plate with the screen: a drop near the left
+   edge of your window should be in the clip, because the plate was laid out tall, not cut down.
+3. Post it: send it to your phone and put it on Instagram and TikTok as a Reel and a post. Bad: either app refusing the file
+   (say which), the sound missing, or the picture stuttering.
+4. On the free site (signed out of a licence): the clip stops at 15 seconds and the word ChromaGlass sits centred a fifth of the
+   way up from the bottom. Is it clear of Reels' caption and TikTok's account name when you look at it in the app?
+5. With a projector attached (Cast › Second display), record a Portrait clip: the wall must not change shape. The clip is the
+   middle 9:16 of the wall (a third of its width, PLAN 34f-2). Bad: the wall flickering or reshaping.
+6. On the phone, Play's Share clip: the clip should open the phone's share sheet. Check More › Record › Clip frame reads
+   Portrait 9:16 and the clip is the middle of the screen, 9:16.
+7. Decide: is losing the plate's size on your own screen for the length of a clip acceptable on a laptop mid-set, or should it
+   record the slice and keep the screen as it is (cheaper, but a crop, 34f-2)?
+
+## 134. A faster start, and a loading line until the plate shows (PLAN 14v-12)
+
+The show now compiles a display for the look it opens on, without every other look's
+effects, and builds the whole one just after the plate appears. On software WebGPU (all
+CPU, as on a phone) the first frame came about a fifth to a third sooner; nothing about any
+look's picture changed (`npm run leandisplay`: every look the same bytes). Under the mark,
+while nothing is drawn yet, a line now says what the wait is: "Loading", "Starting the
+graphics", "Compiling shaders 23 of 67", "Pouring the first frame", each with the seconds
+since the page opened, over a thin bar.
+
+1. On the phone, open chromaglass.art fresh (after a deploy, so the shaders are cold) and
+   again a second time. Write down the seconds the line shows at each stage and when the
+   plate appears, both times. This is the reading PLAN 14v-13 waits on.
+2. Does the line read clearly on the phone, under the mark and above the dock? Good: legible
+   at arm's length, steady (not blinking). Bad: too faint, too small, or under the dock.
+3. The count sometimes pauses for a second or two and then jumps: that is a render pipeline
+   compiling, when changing the words would stall the page's frames. Say if it looks stuck.
+4. Within the first seconds after the plate appears, change to a look with something
+   different (Ben-Day dots, Lacing, Lumia): the effect may come in a second or two late,
+   never a frozen plate. Say if anything looks wrong in those seconds.
+
+## 135. Your own video: played, poured, read and framed (PLAN 14ag)
 
 Load a video of your own in the Video panel (on the Perform tab's deck, or Settings → Video):
 Video file. Its row shows Play and Pour.
