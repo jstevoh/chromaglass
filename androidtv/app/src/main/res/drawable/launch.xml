@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the TV shows from the remote's press until the app's first frame: the
+  brand's blue with the logo at the size MainActivity's loading screen draws
+  it (LOGO_DP, 168), so the launch runs straight into the app instead of
+  flashing black first.
+  Android 12 and later draw their own splash over this first (values-v31).
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/screen" />
+    <item android:width="168dp" android:height="168dp" android:gravity="center"
+        android:drawable="@drawable/logo" />
+</layer-list>

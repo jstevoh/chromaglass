@@ -51,6 +51,8 @@ import { WebSocket } from 'ws';
 import { build } from 'esbuild';
 import { launchChromium, port } from './chromium.mjs';
 import { preferTvCodecs, tvStageSize, withStartBitrate, TV_MAX } from '../src/lib/tvFeed.ts';
+import { TV_FILMS, tvFilmUrl } from '../src/lib/tvFilms.ts';
+import { readFileSync } from 'node:fs';
 
 const PORT = port(4241, 'TV_PORT');
 const KEY = '7319';
@@ -192,6 +194,9 @@ async function laptopPage() {
   return { ctx, page };
 }
 
+/** A real film for the site's films address: the press page's clip, which the TV no longer plays. */
+const STAND_IN_FILM = readFileSync('public/press/clips/neon-coral-reef.mp4');
+const filmAsks = [];
 async function tvPage(opts = {}) {
   const { key = KEY, width = 1280, height = 720, phone = false } = opts;
   const ctx = await browser.newContext(phone ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width, height } });
@@ -202,6 +207,16 @@ async function tvPage(opts = {}) {
   await ctx.addInitScript(() => {
     window.__gpuAsks = 0;
     Object.defineProperty(navigator, 'gpu', { configurable: true, value: { requestAdapter() { window.__gpuAsks++; return Promise.resolve(null); }, getPreferredCanvasFormat() { window.__gpuAsks++; return 'bgra8unorm'; } } });
+  });
+  // The films come from the site (lib/tvFilms.ts, PLAN 12-tv-2f), which is
+  // the internet: answered here with a real MP4 so that what is judged is the
+  // page (it asks for the site's film, and plays it until the show comes),
+  // not this runner's network. That the site serves the six is `npm run
+  // tvfilms -- --probe`, against the live site.
+  filmAsks.length = 0;
+  await ctx.route('https://chromaglass.art/films/**', (route) => {
+    filmAsks.push(route.request().url());
+    return route.fulfill({ status: 200, contentType: 'video/mp4', body: STAND_IN_FILM });
   });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(`tv: ${e.message}`));
@@ -248,9 +263,11 @@ const tv1 = await tvPage();
   const r = await untilState(tv1.page, ['films']);
   check('no show: the TV plays films', r.state === 'films', `state ${r.state}`);
   const src = await tv1.page.getAttribute('[data-testid="tv-film"]', 'src').catch(() => null);
-  check('no show: the film is one the site ships', !!src && /^\/press\/clips\/.+\.mp4$/.test(src), String(src));
-  const film = await tv1.page.request.get(`${TV_BASE}${src}`).catch(() => null);
-  check('no show: and the show server serves it', film?.ok() === true && /video\/mp4/.test(film.headers()['content-type'] ?? ''), `${film?.status()} ${film?.headers()['content-type']}`);
+  check('no show: the film is the first of the channel\'s, from the site', src === tvFilmUrl(TV_FILMS[0]), String(src));
+  const playing = await tv1.page.waitForFunction(() => { const v = document.querySelector('[data-testid="tv-film"]'); return v && v.currentTime > 0.5; }, null, { timeout: 15_000 }).then(() => true, () => false);
+  check('no show: and it plays', playing && filmAsks.includes(src), `asked for ${filmAsks.length ? [...new Set(filmAsks)].join(', ') : 'no film'}`);
+  const logo = await tv1.page.request.get(`${TV_BASE}/brand/chromaglass-logo-512.png`).catch(() => null);
+  check('no show: the show server serves the logo the page shows', logo?.ok() === true && /image\/png/.test(logo.headers()['content-type'] ?? ''), `${logo?.status()} ${logo?.headers()['content-type']}`);
 }
 
 // ── Live ───────────────────────────────────────────────────────────────
