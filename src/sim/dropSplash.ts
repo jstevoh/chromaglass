@@ -24,11 +24,27 @@
 
   Off a thin gap (the old plate, the CPU engine) there is no volume to push,
   so a drop is the stamp it always was.
+
+  A bottle's drop is the same drop (PLAN 18c-10). The hand's Dropper, the
+  phone's and the remote's drops, and the drops a held dropper lets go from
+  a height, used to stamp their dye at once while the bottle's deposit
+  poured the volume on its own: the colour was laid first and the drop's
+  clear liquid then pushed it out into a ring, a darker collar round a
+  window of the plate's own colour, where a real drop (ink, syrup, milk:
+  the colour is in the liquid) opens a window of its own colour. Filmed on
+  the owner's Mac, 2026-11-21: the hand's drops opened no window at all
+  while the queue's opened one about three cells across, as the lab does.
+  So `dropBottle` queues the bottle's drop with its liquid, and the deposit
+  only tells the plate's other fields of it. And a stream held on the plate
+  (`layStream`) lays its colour with its volume each step, the liquid's own
+  concentration over the dome it pours, not a stamp beside a separate pour.
 */
 
 import type { FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE } from './constants';
-import { dropImpact, dropTrickle, queueDrop, stepDrops, DROP_TRICKLE } from '../lib/dropImpact';
+import { dropImpact, dropTrickle, queueDrop, stepDrops, DROP_TRICKLE, DROP_AMOUNT, DROP_DISC } from '../lib/dropImpact';
+import { pourShare, speciesOf } from '../lib/liquidProps';
+import type { LiquidDeposit } from '../lib/liquidPhase';
 
 /** A drop's dye over its disc, (1 − d/R)², at the cell (x, y), `amount` at its middle. */
 function stamp(sim: FluidSimulation, x: number, y: number, R: number, amount: number, r: number, g: number, b: number): void {
@@ -53,12 +69,29 @@ function stampMass(R: number, amount: number): number {
   return m * amount;
 }
 
+/*
+  The dye in a full column of drop liquid at `dye` 1 on an N grid: a drop's
+  dye (the stamp's mass, as it always laid) over the column-cells of volume
+  the queue pours for it, π(DROP_DISC·N)²/2 at DROP_AMOUNT. So a stream of
+  the same bottle carries its colour at the same strength as its drops.
+*/
+export function dropColumnDye(N: number): number {
+  const R = DROP_DISC * N;
+  return stampMass(Math.round(3 * GRID_SCALE), 1) * DROP_AMOUNT / (Math.PI * R * R / 2);
+}
+
+/** Whether the plate takes liquid as volume now: a thin gap with its pour kernel built (pourReady). */
+function pouring(sim: FluidSimulation): boolean {
+  return sim.thinGap && !!sim.gpu?.pour && (sim.gpu.pourReady?.() ?? true);
+}
+
 /**
  * A drop of `amount` at the cell (x, y), of colour (r, g, b), `dye` the share
- * of it that is colour. `volume` false for a drop that brings none: a fresh
- * plate's lay, or a bottle whose own pour already brought it (onDeposit).
+ * of it that is colour. `volume` false for a drop that brings none (a fresh
+ * plate's lay). `what`, a bottle's liquid, comes in with the drop's volume.
+ * True when the drop was queued to come in as volume.
  */
-export function layDrop(sim: FluidSimulation, x: number, y: number, amount: number, r: number, g: number, b: number, dye: number, volume: boolean): void {
+export function layDrop(sim: FluidSimulation, x: number, y: number, amount: number, r: number, g: number, b: number, dye: number, volume: boolean, what?: LiquidDeposit): boolean {
   const k = GRID_SCALE;
   const h = Math.max(0, Math.min(2, sim.dropHeight));
   // The crater it presses grows as the square root of the height (the speed
@@ -69,10 +102,11 @@ export function layDrop(sim: FluidSimulation, x: number, y: number, amount: numb
   const dropR = Math.round(3 * k * spread);
   // Until the pour's kernel is built (behind the show), a drop is the stamp:
   // asking for it sooner compiles it on that frame, in the opening (pourReady).
-  const pours = volume && sim.thinGap && !!sim.gpu?.pour && (sim.gpu.pourReady?.() ?? true) && amount > 0;
+  const pours = volume && amount > 0 && pouring(sim);
+  let queued = false;
   if (!pours) {
     stamp(sim, x, y, dropR, amount * dye / (spread * spread), r, g, b);
-  } else if (amount < DROP_TRICKLE) {
+  } else if (amount < DROP_TRICKLE && !what) {
     // The music's trickle: its dye as it always laid, its volume held at the
     // dropper's tip until a drop's worth falls (Tate's law, dropTrickle).
     stamp(sim, x, y, dropR, amount * dye / (spread * spread), r, g, b);
@@ -91,9 +125,50 @@ export function layDrop(sim: FluidSimulation, x: number, y: number, amount: numb
       from when the sixteen slots had filled. Sixteen drops within one
       drop's five steps is not a show running.
     */
-    queueDrop(sim.drops, sim.size, x, y, amount, mass, r, g, b);
+    queued = queueDrop(sim.drops, sim.size, x, y, amount, mass, r, g, b, sim.dtSeconds, what ? speciesOf(what) : null, what ?? null);
   }
   if (e > 0.02) splash(sim, x, y, dropR, h, e, amount, amount * dye, r, g, b);
+  return queued;
+}
+
+/**
+ * A bottle's drop at the cell (x, y): `layDrop` with the bottle's liquid
+ * `what` in its volume, then the bottle's deposit on a disc of `radius`
+ * cells (`dose`, `seconds` as liquidPhase.deposit takes them), which pours
+ * the volume itself only where the drop could not (PLAN 18c-10).
+ */
+export function dropBottle(sim: FluidSimulation, x: number, y: number, amount: number, r: number, g: number, b: number, dye: number, what: LiquidDeposit | undefined, radius: number, dose: number, seconds?: number): void {
+  const queued = layDrop(sim, x, y, amount, r, g, b, dye, true, what);
+  if (what) sim.liquid.deposit(x, y, radius, what, dose, seconds, !queued);
+}
+
+/**
+ * One step of a stream held on the plate at the cell (x, y), a disc of `R`
+ * cells: on a thin gap the bottle's liquid poured as volume, its colour
+ * (`dye`, its strength against a drop's) laid with that volume over the same
+ * dome, (1 − d²/R²); off one, the stamp (1 − d/R)² of `amount` it always
+ * laid. `heat` over the stamp's disc either way, and the bottle's deposit
+ * `what` at `k`. Returns the dye laid, for the hand's regulator.
+ */
+export function layStream(sim: FluidSimulation, x: number, y: number, R: number, amount: number, dye: number, cr: number, cg: number, cb: number, heat: number, what: LiquidDeposit | undefined, k: number): number {
+  const N = sim.size, g = sim.gpu;
+  const pours = pouring(sim) && k > 0;
+  const rc = Math.max(1.5, R);
+  const per = pours ? dropColumnDye(N) * dye * pourShare(rc / N, k, sim.dtSeconds, g!.coverMetres) : 0;
+  if (pours) g!.pour!((x + 0.5) / N, (y + 0.5) / N, rc / N, pourShare(rc / N, k, sim.dtSeconds, g!.coverMetres), what ? speciesOf(what) : null, true, what);
+  let laid = 0;
+  const E = Math.ceil(Math.max(R, rc));
+  for (let dy = -E; dy <= E; dy++)
+    for (let dx = -E; dx <= E; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 1 || nx >= N - 1 || ny < 1 || ny >= N - 1) continue;
+      const d2 = dx * dx + dy * dy, w = R > 0 && d2 <= R * R ? (1 - Math.sqrt(d2) / R) ** 2 : 0;
+      const a = pours ? per * Math.max(0, 1 - d2 / (rc * rc)) : amount * w;
+      if (a > 0) { laid += a; sim.addDensity(nx, ny, a, cr, cg, cb); }
+      if (heat > 0 && w > 0) sim.addTemp(nx, ny, heat * w);
+    }
+  if (what) sim.liquid.deposit(x, y, R, what, k, sim.dtSeconds, !pours);
+  return laid;
 }
 
 /*
@@ -138,5 +213,6 @@ function splash(sim: FluidSimulation, x: number, y: number, dropR: number, h: nu
 export function stepPlateDrops(sim: FluidSimulation): void {
   const g = sim.gpu;
   if (!g?.pour) return;
-  stepDrops(sim.drops, sim.size, (px, py, radius, share) => g.pour!(px, py, radius, share, null, true), (i, j, a, r, gg, b) => sim.addDensity(i, j, a, r, gg, b));
+  const dq = sim.drops;
+  stepDrops(dq, sim.size, (px, py, radius, share, k) => g.pour!(px, py, radius, share, dq.sp[k], true, dq.what[k] ?? undefined), (i, j, a, r, gg, b) => sim.addDensity(i, j, a, r, gg, b));
 }
