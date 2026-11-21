@@ -274,8 +274,8 @@ style (§31).
   stir bar, **47k** threads that bead; **47g**, **47h**, **47i** when wanted; ~~**47n-1**~~ the tank seen through its side (shipped, this PR), then **47n-2** to **47n-6**; **47m** the owner's reference kit; ~~**47w-1**~~ (shipped) and
   ~~**47v**~~ (shipped): any link watched with a design, physics and techniques read;
   ~~**47w-2**~~ dissolves, ~~**47v-2**~~ a reference library and ~~**47v-3**~~ real-footage bars
-  (shipped, this PR), then **47v-4** a third real show filmed square-on (Liquid Light Lab's films tried, kept as a reference only), **47v-5**
-  carried on real footage, **47v-6** a too-small crop says so, **47v-7** watching in the page where a file can't be fetched, **47w-3** *Streams II* again; **47y** what Poster 1969 against a real
+  (shipped, this PR), then **47v-4** a third real show filmed square-on (Liquid Light Lab's films tried, kept as a reference only), ~~**47v-5**~~
+  carried on real footage with the grain taken out and ~~**47v-6**~~ a too-small crop says so (shipped, this PR), then **47v-8** what still keeps carried low, **47v-7** watching in the page where a file can't be fetched, **47w-3** *Streams II* again; **47y** what Poster 1969 against a real
   projection found; **47z** a crowd of drops in vivid colour (~~47z-1~~ the drop takes the water out of the
   light, shipped; 47z-1a to 47z-1e found doing it; 47z-2 sizes from a stir, 47z-3 films that drain, 47z-4 each drop a lens, ~~47z-5~~ a packed foam at 120°, shipped as Foam Cells; then 47z-6
   a crowd that packs itself, 47z-7 films that pop by draining, 47z-8 smaller cells).
