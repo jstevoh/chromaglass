@@ -41,7 +41,8 @@
 import { readFileSync } from 'node:fs';
 import { AreaHands, plateArea, PRESS_DEPTH } from '../src/lib/areaCords.ts';
 import { cordReading } from '../src/lib/sceneMap.ts';
-import { isMusicCord, setMasters, withMusicCordsOnce, musicCordsFor } from '../src/lib/musicCords.ts';
+import { isMusicCord, setMasters, withMusicCordsOnce, musicCordsFor, NEW_LOOK } from '../src/lib/musicCords.ts';
+import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { PRESET_AREAS, areaFamily } from '../src/lib/plateAreas.ts';
 import { BASS_PRESS } from '../src/lib/squish.ts';
@@ -202,6 +203,15 @@ const total = (g) => g.dye + g.drop + g.slug + g.heat + g.liquid + g.dose + g.pr
     once.sceneMappings.length === 1 + musicCordsFor(old, null).length && twice.sceneMappings.length === once.sceneMappings.length
       && kept.length === sent.length && JSON.stringify(kept) === JSON.stringify(sent),
     `${old.sceneMappings.length} → ${once.sceneMappings.length} → ${twice.sceneMappings.length}; sanitised ${kept.length} of ${sent.length}`);
+}
+
+// ── 6b. New Look starts from the defaults with the music's hands (App.tsx newLook; `npm run panel` reads that it uses NEW_LOOK) ──
+{
+  const { sceneMappings: got, ...rest } = NEW_LOOK, { sceneMappings: _d, ...base } = DEFAULT_SETTINGS;
+  const want = musicCordsFor(DEFAULT_SETTINGS, null);
+  check('a new look is the defaults with the music\'s hands on them, and nothing else changed',
+    JSON.stringify(rest) === JSON.stringify(base) && want.length >= 6 && JSON.stringify(got) === JSON.stringify([...(DEFAULT_SETTINGS.sceneMappings ?? []), ...want]),
+    `${got?.length ?? 0} cords, ${want.length} the music's`);
 }
 
 // ── 7. A master turned down shrinks each kick's bloom; it never lifts the gate over the kicks ──
