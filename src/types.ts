@@ -580,6 +580,19 @@ export interface VisualizerSettings {
    * Optional so a look saved before it reads as 0.
    */
   slosh?: number;
+  /**
+   * A hand tipping the flat plate on the projector, left and right (PLAN
+   * 18a-13m): −1 to 1, 0 level. Up dips the right edge and the colour runs
+   * right. Two knobs on a controller are what it is for. Not Gravity: the
+   * plate stays flat on the lamp, and on a thin gap heavy dye slides down the
+   * tip and light oil rises (lib/handTilt.ts says why it is that tilt, eased,
+   * with a level middle). Added to the remote phone's tilt. A hand's alone:
+   * never the sound's or Evolve's. Optional so a look saved before it reads
+   * as level.
+   */
+  plateTiltX?: number;
+  /** The same, top and bottom: up dips the top edge and the colour runs up the screen. */
+  plateTiltY?: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -803,6 +816,9 @@ export interface VisualizerSettings {
   filmKey: number;            // luminance below which the film is transparent (a black key)
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
   filmImpact: number;         // master depth over every mapping, read from the film instead of the room
+  filmZoom: number;           // the film's frame on the plate: 1 fills it (cover-fit), above crops in, below shows it smaller with black round it
+  filmX: number;              // the film's frame slid across, in plate widths (0 centred)
+  filmY: number;              // the film's frame slid up, in plate heights (0 centred)
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -1104,6 +1120,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
+  plateTiltX: 0,            // level: the hand's tip of the flat plate (lib/handTilt.ts)
+  plateTiltY: 0,
   slosh: 0,                 // the plate as it was: a tilt changes the level and the liquid does not slop (lib/slosh.ts)
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
@@ -1268,6 +1286,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // this existed shows the same picture and moves the same way.
   filmDrive: 0,
   filmImpact: 0,
+  // The frame as it always landed: cover-fit, centred (PLAN 14ag).
+  filmZoom: 1,
+  filmX: 0,
+  filmY: 0,
   lampWarmth: 0,
   transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,
