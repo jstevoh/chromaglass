@@ -37,6 +37,7 @@ across many files goes to an Explore agent that returns paths and line numbers.
   scripts live in `scratch/` (git-ignored), never in the root.
 - **Every claim has a check.** A fix comes with the `npm run …` script that
   measures it, printed numbers before and after in the commit message.
+- **Never loosen, skip or delete a check to get green.** Find why it is red.
 - **Comments explain why, at length, in prose** (see any file in `src/gpu/`).
   Match that: what was reported, what was measured, why this and not the
   obvious thing. Short code, long reasons.
@@ -76,6 +77,10 @@ Every change: `npm run lint` (typecheck) and `npm run sizes`. Then `npm run quic
 side by side, the checks your diff from `origin/main` reaches and a cloud session can run
 (`-- --dry` says which and why). The full table, with what `quick` cannot see (agents,
 pictures, the Mac), is `docs/checks-map.md`: grep it for the paths you touched.
+A PR's CI runs only the typecheck, the build and the node harnesses; the browser, lab and
+Mac checks run on main's deploy only (19ak-20), so before pushing a change the plate draws,
+run its lab or harness yourself. What a cloud session can and cannot verify is the table in
+`.claude/rules/checks.md`; CI itself is `.claude/rules/ci.md` and `docs/ci.md`.
 
 ## Branches, PRs, deploys
 
@@ -96,7 +101,9 @@ pictures, the Mac), is `docs/checks-map.md`: grep it for the paths you touched.
 - **Some of those sessions are Antigravity's** (branches `antigravity/…`). How work is
   claimed and handed between the two tools, the handoff block in every PR body, and
   which of Antigravity's PRs still owe a review are in `docs/handoff.md` ("Ready, review,
-  merge"). At the start of a session, check `gh pr list --label ready-for-review --label review-owed`
+  merge"). Since 2026-11-15 a green Antigravity PR merges without a Claude Code review,
+  pinned to its green head; only the PRs labelled `review-owed` wait (see
+  `.claude/rules/server.md`). At the start of a session, check `gh pr list --label ready-for-review --label review-owed`
   (up to three a session); a verdict's first line is `PASS #<n> head <sha>` or
   `CHANGES #<n> head <sha>`, and on a `PASS` the reviewer squash-merges the PR itself,
   pinned to that head, and confirms the deploy.
