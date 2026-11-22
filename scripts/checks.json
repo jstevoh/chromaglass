@@ -160,6 +160,20 @@
       ]
     },
     {
+      "name": "The Tilt knobs tip the plate as a hand would",
+      "shard": "logic",
+      "run": "npm run handtilt",
+      "why": [
+        "PLAN 18a-13m (scripts/handtilt.mjs, lib/handTilt.ts): the owner asked to tilt",
+        "the plate from two MIDI knobs. A knob at its middle (CC 62-66) is level and its",
+        "ends the phone's full tip; a throw end to end is eased (under 0.02 in its first",
+        "sixtieth, past 0.9 by 0.4 s, never past the knob) and the same at 30, 60 and 120",
+        "steps a second; turned into each dish as downhill() turns Tilt Direction, as far at",
+        "every angle; within the phone's reach; the old frame loop's exactly at 0; and",
+        "learnable over -1..1 in Tilt & Rock, out of sound mapping, the patch bay and Evolve."
+      ]
+    },
+    {
       "name": "The spun dish",
       "shard": "logic",
       "run": "npm run spinslosh",
@@ -536,6 +550,21 @@
       ]
     },
     {
+      "name": "The TV's calm loops: their judge",
+      "shard": "sound",
+      "run": "npm run tvloops -- --controls",
+      "why": [
+        "The TV's half-hour loops (PLAN 12-tv-loops) are made on a Mac by the",
+        "app's own render and cut into a loop by ffmpeg; this shows the judge",
+        "that holds them, through the same makeLoop, each fault on films it",
+        "makes itself: a plain cut fails the seam, a silent audio track the",
+        "audio line, a body seeked a second late the joint line, a still",
+        "picture the moving line, a fade to black or to",
+        "a flat grey the light line, a short loop the length line, and the",
+        "crossfaded loop passes all six. Needs ffmpeg (installed above)."
+      ]
+    },
+    {
       "name": "The ladder's shape",
       "shard": "logic",
       "run": "npm run rungs -- --owed=120hz",
@@ -759,6 +788,17 @@
       "run": "npm run setlist",
       "why": [
         "The set list file: a show's running order reads back as it was written."
+      ]
+    },
+    {
+      "name": "Which frame stops the control's builds sat in",
+      "shard": "logic",
+      "run": "npm run compilestop",
+      "why": [
+        "Startup 1b's attribution of the old way's compile to its frame stops",
+        "(scripts/compilestop.mjs, PLAN.md 19aa-7d), on made-up openings: a stop",
+        "the page was held into from the builds is theirs (main's deploys 832 and",
+        "839), a stall after a page that ran freely, or with no timer read, is not."
       ]
     },
     {
@@ -1537,6 +1577,25 @@
       ]
     },
     {
+      "name": "Polarised light",
+      "shard": "lab9",
+      "run": "npm run polar",
+      "timeout": 6,
+      "why": [
+        "PLAN 31p-1 (lib/polar.ts, gpu/wgsl/platePolar.ts): the plane-sheet and quarter-wave",
+        "laws against Jones matrices; the shader's three table colours against T integrated",
+        "wavelength by wavelength; crossed black and parallel white with nothing retarded,",
+        "the two complements; the Michel-Levy order; isoclinics black with plane sheets and",
+        "gone with quarter-wave plates; the flow's stretch from simple shear and none from",
+        "solid rotation. Then the real shaders: off is off to the byte and each dial reaches",
+        "the picture; a still plate crossed is black and parallel the open plate; a laid vortex",
+        "held pixel by pixel (crossed and parallel add in light to the open plate, every pixel",
+        "on the chart, the isoclinics swap when the plate is turned 45 degrees, the turning",
+        "middle dark); stirred it lights, black at Birefringence 0; plane sheets leave twice",
+        "the dark of the quarter-wave plates."
+      ]
+    },
+    {
       "name": "The tank on the GPU (SwiftShader)",
       "shard": "lab5",
       "run": "npm run tankgpu",
@@ -2117,6 +2176,21 @@
       ]
     },
     {
+      "name": "The webpage's films",
+      "shard": "browser",
+      "run": "npm run landingfilms",
+      "why": [
+        "The webpage's looks as films (scripts/landingfilms.mjs, PLAN.md 34a-6):",
+        "each card's loop and still are there and small, each record is credited",
+        "and published in the US before 1926 with its transfer's checksum in",
+        "SOURCES.md, no loop is asked for before a card plays, a",
+        "pointer plays a card's loop and leaving stops it, a click opens its",
+        "whole film from the channel with the credit under it, a phone plays the",
+        "card in view and a tap opens it, and reduced motion keeps the stills.",
+        "No GPU."
+      ]
+    },
+    {
       "name": "The security headers",
       "shard": "browser",
       "run": "node scripts/csp.mjs",
@@ -2136,6 +2210,7 @@
       "shard": "browser",
       "run": "node scripts/intro.mjs",
       "env": {"PW_WEBGPU":"1"},
+      "quarantine": [{ "line": "9c. its loading line says what the show waits for", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before",
         "the app has arrived, taken into the plate's frame on the desk and the",
@@ -2236,6 +2311,22 @@
       ]
     },
     {
+      "name": "A palette from a picture or video",
+      "shard": "browser2",
+      "run": "npm run picturepalette",
+      "timeout": 5,
+      "why": [
+        "PLAN 43d (lib/picturePalette.ts): a picture's four main colours become the palette's",
+        "dyes and nothing else changes. In node on pictures made in the script: four blocks give",
+        "their four colours, a black sleeve's pink title leads (the commonest-pixel picker it",
+        "replaced runs as a control and fails that line), a small accent stays and a speck does",
+        "not, every dye 40 from black and white (28b), the slots after the 24 named dyes are the",
+        "only ones written and the dice's count is unchanged. Then in Chromium through its own",
+        "decoders: a PNG and a JPEG, and a recorded WebM, orange then blue, that does not say its",
+        "length, which must give both colours. No app build, a few seconds."
+      ]
+    },
+    {
       "name": "The phone link",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/phonelink.mjs",
@@ -2245,6 +2336,19 @@
         "linked, the phones counted by the relay, Link another while they are;",
         "on a static host, the code of the page's own address. No GPU; dist/ is",
         "the phone step's build."
+      ]
+    },
+    {
+      "name": "The network display over https",
+      "shard": "browser2",
+      "run": "node scripts/netdisplay.mjs",
+      "why": [
+        "A network display over https (scripts/netdisplay.mjs, PLAN.md 14m-https):",
+        "the show server serves https beside http with a certificate it makes,",
+        "and a network display at the https address it prints is a secure page",
+        "with WebGPU that joins the relay; at the http address it is not secure;",
+        "with the https port taken the show still starts, http only, and says",
+        "why. No GPU; dist/ is the phone step's build."
       ]
     },
     {
@@ -3708,6 +3812,7 @@
       "shard": "tools",
       "run": "node --experimental-strip-types scripts/drawwall.mjs --app",
       "timeout": 4,
+      "quarantine": [{ "line": "the control: through the camera without the dish", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md",
         "8-draw-a): the laptop's own frames reach the pad, the plate's colour,",

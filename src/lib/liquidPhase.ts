@@ -306,9 +306,10 @@ export class LiquidPhase {
   /**
    * Told of every pour, before anything here decides whether it matters, so
    * the GPU's own fields (oil, soap, acidity: see WebGPUFluid.addMix) hear of
-   * the same liquid on the same disc. Set by the plate.
+   * the same liquid on the same disc. Set by the plate. `push` false when
+   * the volume came in already (a queued drop, sim/dropSplash.ts).
    */
-  onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number, seconds?: number) => void;
+  onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number, seconds?: number, push?: boolean) => void;
 
   /*
     The share of the dish that is poured liquid, as the GPU last read it
@@ -335,9 +336,11 @@ export class LiquidPhase {
    * A pour of `what` on a disc. `seconds`, for a held bottle: the deposit is
    * that long of its stream (lib/liquidProps.ts, pourShare), which is what a
    * pour that is volume on a thin gap puts down; without, a one-shot dose.
+   * `volume` false when its volume came in already, with the drop or the
+   * stream that brought its colour (sim/dropSplash.ts, PLAN 18c-10).
    */
-  deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1, seconds?: number): void {
-    this.onDeposit?.(cx, cy, radius, what, amount, seconds);
+  deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1, seconds?: number, volume = true): void {
+    this.onDeposit?.(cx, cy, radius, what, amount, seconds, volume);
     if (this.gpuNative) return;
     const s = this.size;
     const r = Math.max(1, radius);

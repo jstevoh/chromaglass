@@ -111,7 +111,7 @@ Open, found building it:
   `wgsl/plateLamp.ts`) sets how strongly the liquid's lenses bend the video under it: a drop's
   power over the picture grows with the gap. A constant today; a Lamp Depth slider (0 to 10 cm,
   MIDI, desk and phone, a default that keeps 2 cm) if the owner wants the lenses stronger or calmer
-  after judging (`docs/judging.md` §136).
+  after judging (`docs/judging.md` §139).
 - **14ag-6** (M) *The other three ways a video and the liquid meet.* Of the four put to the owner
   (2026-11-13), the lamp is built (14ag-3). Left: the video poured as ink that the flow carries
   and thins (part of it is 14ag-1's framed pour), its brightness as heat (buoyant and Marangoni
