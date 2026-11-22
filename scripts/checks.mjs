@@ -999,6 +999,12 @@ async function selftest() {
   say(held('push', '2026-11-30') && held('workflow_dispatch', '2026-11-30'), 'on a push or a dispatched deploy, the day before the main cut-off, it holds');
   say(!held('push', '2026-12-01') && held('pull_request', '2026-12-01'), 'from the cut-off main holds the line to its bar, while a pull request still honours the entry to its own end');
   say(!held(undefined, '2026-11-30') && !held('', '2026-11-30'), 'a run outside CI (no GITHUB_EVENT_NAME) holds every line');
+  // The real cut-off is compared as a string, so it has to be a whole date
+  // (a '2026-12-6' would hold all December), and no later than an entry may
+  // run from today: main's hold is the time the fixes take, like an entry's.
+  const mainDays = (Date.parse(MAIN_QUARANTINE_UNTIL) - Date.parse('2026-11-22')) / 86_400_000;
+  say(/^\d{4}-\d\d-\d\d$/.test(MAIN_QUARANTINE_UNTIL) && mainDays > 0 && mainDays <= QUARANTINE_DAYS,
+    `MAIN_QUARANTINE_UNTIL (${MAIN_QUARANTINE_UNTIL}) is a whole date within ${QUARANTINE_DAYS} days of the owner's choice on 2026-11-22`);
   const refuses = (q) => { try { parseManifest(JSON.stringify({ shards: { measure: ['m'], mac: ['x'] }, checks: [{ name: 'a', shard: 'm', run: 'true', quarantine: q }, { name: 'b', shard: 'x', run: 'true' }] })); return false; } catch { return true; } };
   say(refuses([{ line: 'the flaky line', since: day(0), until: day(5) }]), 'a quarantine with no plan id is refused');
   say(refuses(qd('the flaky line', day(0), day(QUARANTINE_DAYS + 1))), `a quarantine longer than ${QUARANTINE_DAYS} days is refused`);

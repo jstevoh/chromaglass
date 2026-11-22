@@ -604,7 +604,7 @@ async function stackLines() {
     const whole = f?.grid ? barColumnOfRow(f.grid.slice(7 * f.cols, 8 * f.cols)) : null;
     const strip = trail.length ? trail[trail.length - 1].col : null;
     due(id, `${line}: its bar is somewhere else a second later`, m.ok,
-      `${m.detail}; last frame's bar at column ${strip} by the strip, ${whole} by the whole frame; ${f?.during ?? ''}`, m.ok === false && f?.blackStream === true);
+      `${m.detail}; last frame's bar at column ${strip} by the strip, ${whole} by the whole frame; ${f?.during ?? "the film's clock unread"}`, m.ok === false && f?.blackStream === true);
     return m.ok;
   };
   const STACK_LINE = 'with a film in the mixer and a keystone on the wall, the Mixer stack source\'s frames carry the film and are square';
@@ -689,7 +689,7 @@ async function stackLines() {
     await page.getByTestId('live-stop').click();
     await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
     const d = (k) => (before[k] === null || after[k] === null ? '?' : after[k] - before[k]);
-    const during = `while it was live the plate drew ${d('plate')} frames and the film's clock went ${typeof d('film') === 'number' ? d('film').toFixed(2) : '?'} s, ${d('filmFrames')} of its frames${after.paused ? ', paused' : ''}`;
+    const during = `while it was live the plate drew ${d('plate')} frames and the film's clock went ${typeof d('film') === 'number' ? d('film').toFixed(2) : 'unread'} s, ${d('filmFrames')} of its frames${after.paused ? ', paused' : ''}`;
     return { during, ...(await page.evaluate(async () => {
       const { video, desc } = window.__liveStub.calls;
       window.__liveStub.calls.keep = false;
