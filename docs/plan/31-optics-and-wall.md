@@ -266,12 +266,44 @@ lens-shaped drop, no shadow beside it.*
 - **31s-4. Retune the looks on the traced light.** Once 31s-2 draws the plate, every preset's
   brightness, contrast and rim weight moves. Retune on films from the Mac, judged by the owner
   against the reference library (watch skill).
-- **31s-5. An audit of how fields are sampled, and a check that a drop is drawn once.** The four
-  realism passes (§18, §38) asked of each effect whether it is a law or a stand-in; none asked how
-  a field is read. A sparse stencil is a correct operator on anything wider than its stride and
-  draws ghost copies of anything narrower, which is how the flower passed every audit. Pass: list
-  every shader read of a solver field at a stride over one cell, or a max/min over sparse taps,
-  with what it can ghost. Check (lab): seed single small drops (one to three cells) and moving
-  ones, render the wall, and assert one peak per drop in the picture's autocorrelation (no copies
-  at the stencil's offsets); it must fail on the old three-cell Sobel. 38w-7 (small cells as
-  rounded squares) may be the same square stencil: re-film it after 15g-15.
+- **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
+  passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
+  a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
+  a phenomenon that nobody built, or a field that is read wrongly. That is how the flower got through
+  every pass. It came from a sparse stencil, which is a correct operator on anything wider than its
+  stride and draws ghost copies of anything narrower. It also got through because no pass followed
+  the light out of the dish, so none asked what a small drop's curved surface does to it. This audit
+  turns the question round. Walk the real rig in order (lamp, condenser, glass, liquid layers, glass,
+  projection lens, wall, eye). For each stage, list what physically happens there from optics and
+  fluid texts, never from our code. Then mark each item as built (with the file), faked (with what
+  stands in for it) or missing. Six areas, each with its own list:
+  1. **Depth.** The layers have thickness: film height, meniscus, a drop's cap, oil over water, and
+     what lies at the bottom against what lies at the top. Is any of it a field, or does the dye
+     stand in for it? (31s-1 builds the height.)
+  2. **Light all the way through.** Refraction at each interface, total internal reflection, focus
+     and caustics, Beer-Lambert absorption by depth, scattering in milky dyes, Fresnel loss and
+     dispersion. Does energy add up from the lamp to the wall? (31s-2 builds the trace.)
+  3. **Lens and wall.** Depth of field across a dish that is not flat, the lamp's size against how
+     sharp an edge can be, vignetting, keystone, the wall's texture and bounce, and how bright the
+     wall is against how the eye adapts.
+  4. **Sampling.** Every shader read of a solver field at a stride over one cell, every max or min
+     over sparse taps, every place a field is drawn at another resolution, with what each can ghost
+     or alias. (31s-3 holds the known ones.)
+  5. **Dish edges.** The meniscus against the rim, wetting and contact angle, the rim's shadow and
+     its refraction, and how drops behave next to the wall of the dish.
+  6. **Time.** How fast each thing happens in a real dish (diffusion, Marangoni spreading, settling,
+     evaporation, heat from the lamp) against the solver's steps, and what the frame rate smears.
+  Checks. (a) Lab: seed single small drops (one to three cells) and moving ones, render the wall,
+  and assert one peak per drop in the picture's autocorrelation, with no copies at the stencil's
+  offsets. It must fail on the old three-cell Sobel. (b) The optical numbers of our films against
+  the real-show references kept for `npm run watch` (jls-liquid-loops-1969, bar-the-dip-2016):
+  edge width, how sharp and how high the brightest caustic peaks are, and the dark rims round drops.
+  Any number outside the references' range becomes an item in its area. The two halves check each other
+  (the owner, 2026-11-22): a number of ours outside the references' range is a symptom, and every
+  symptom must point at a rig item that explains it. A symptom nothing explains means the rig walk
+  missed a phenomenon. An item marked built whose number is still out of range is really faked. The
+  watch tool gains a ghost measure (secondary autocorrelation peaks round small forms), which would
+  have caught the flower from the films alone. Each missing or faked item
+  the audit finds becomes a plan item in the section it belongs to. Antigravity runs it after 31s-1
+  lands. 38w-7 (small cells drawn as rounded squares) may be the same square stencil, so re-film it
+  after 15g-15.
