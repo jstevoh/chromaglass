@@ -246,26 +246,38 @@ const youtubeTitle = (title, artist, look) => {
 
 /** The film's light, a frame every 30 s, 0 to 255: the least of them, and when. */
 function darkest(file, seconds) {
-  let least = 255, when = 0;
-  for (let t = 15; t < seconds - 5; t += 30) {
+  let least = 255, when = 0, n = 0;
+  for (let t = 15; t < seconds - 5; t += 30, n++) {
     const px = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', file, '-frames:v', '1', '-vf', 'scale=64:36,format=gray', '-f', 'rawvideo', '-']);
+    // A seek past the picture's end gives no bytes, and 0/0 is NaN, which no
+    // "<" ever picks: a film whose picture stopped early under its full sound
+    // read as never dark (the check-skeptic's control, 2026-11-22: 20 s of
+    // grey under 120 s of sound read 128, NaN, NaN, NaN). A frame that is not
+    // there is the film failing, not a frame to skip.
+    if (px.length !== 64 * 36) return { least: 0, when: t, missing: true };
     const mean = px.reduce((s, v) => s + v, 0) / px.length;
     if (mean < least) { least = mean; when = t; }
   }
-  return { least, when };
+  // No frame looked at is no light measured, not a film that never went dark.
+  return n ? { least, when } : { least: 0, when: 0, missing: true };
 }
 
 /** A film's length against its music's, at the size asked, with its sound; and that it never goes dark. */
 function checkFilm(id, film, seconds) {
   const p = probe(film);
   const v = p.streams.find((s) => s.codec_type === 'video'), a = p.streams.find((s) => s.codec_type === 'audio');
-  const dur = Number(p.format.duration);
+  // The picture's own length, not the file's: the file's is its longest
+  // stream, which is the sound, so a render whose frames stopped early under
+  // the whole song passed as "the music's length". Both must be the music's.
+  const dur = Number(p.format.duration), vdur = Number(v?.duration);
   check(`${id}: ${W} × ${H} at ${FPS} fps, the music's length, with its music`,
-    v?.width === W && v?.height === H && v?.r_frame_rate === `${FPS}/1` && !!a && Math.abs(dur - seconds) < 0.25,
-    `${v?.width}×${v?.height} ${v?.r_frame_rate}, ${dur.toFixed(2)} s against ${seconds} s, audio ${a ? a.codec_name : 'none'}`);
+    v?.width === W && v?.height === H && v?.r_frame_rate === `${FPS}/1` && !!a && Math.abs(dur - seconds) < 0.25 && Math.abs(vdur - seconds) < 0.25,
+    `${v?.width}×${v?.height} ${v?.r_frame_rate}, picture ${vdur.toFixed(2)} s and file ${dur.toFixed(2)} s against ${seconds} s, audio ${a ? a.codec_name : 'none'}`);
   // 6 of 255 is a plate gone black but for a glint; the looks sit at 40 to 120.
-  const { least, when } = darkest(film, dur);
-  check(`${id}: the plate never goes dark (a frame every 30 s)`, least > 6, `the darkest ${least.toFixed(1)} of 255 at ${Math.floor(when / 60)}:${String(Math.round(when % 60)).padStart(2, '0')}`);
+  // Sampled over the music's length, so a picture that ends early meets a
+  // frame that is not there and fails here too, not only on its length.
+  const { least, when, missing } = darkest(film, seconds);
+  check(`${id}: the plate never goes dark (a frame every 30 s)`, least > 6, `${missing ? 'no picture' : `the darkest ${least.toFixed(1)} of 255`} at ${Math.floor(when / 60)}:${String(Math.round(when % 60)).padStart(2, '0')}`);
 }
 
 const UPLOAD_NOTES = `UPLOAD NOTES: the music is ${LICENCE.name} (public/landing/films/SOURCES.md has each page and its licence line). Scott Buckley's own claim system skips a video whose description names him, so keep his credit line word for word; a claim that comes anyway is released with his form, https://www.scottbuckley.com.au/library/copyright-claims-release/. Chris Zabriskie uses no claim system: a claim on his music is someone else's, dispute it as licensed under ${LICENCE.long}. Category: Music. Made for kids: no. Altered or synthetic content: no (an app's render of a real recording, nothing that looks like a real person or event).`;

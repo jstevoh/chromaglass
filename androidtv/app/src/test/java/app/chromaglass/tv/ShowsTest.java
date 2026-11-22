@@ -86,7 +86,7 @@ public class ShowsTest {
     // film twice, and each named on screen by its look and its music. Since
     // 34a-6d the music is modern and under CC BY 4.0, not a pre-1926 record,
     // so the old "public domain by its year" bar is gone; in its place every
-    // film must be one of CLIPS (the same title, composer and year), the list
+    // film must be one of CLIPS (the same look, title, composer and year), the list
     // whose credits name the licence, so no film can carry music the TV does
     // not credit.
     @Test public void everyFilmIsAYouTubeIdWithItsRecordNamed() {
@@ -98,7 +98,7 @@ public class ShowsTest {
             assertEquals(f.id, false, f.look.isEmpty() || f.title.isEmpty() || f.performer.isEmpty());
             boolean credited = false;
             for (Sample.Clip c : Sample.CLIPS) {
-                credited |= c.credit.equals("\u201c" + f.title + "\u201d, " + f.performer + " (" + f.year + "), CC BY 4.0");
+                credited |= c.look.equals(f.look) && c.credit.equals("\u201c" + f.title + "\u201d, " + f.performer + " (" + f.year + "), CC BY 4.0");
             }
             assertEquals(f.id, true, credited);
         }

@@ -79,7 +79,29 @@ const FILM_IDS = SITE_FILMS.map((f) => f.id);
   // A piece is under the licence because its own page says so; SOURCES.md
   // records that page and the file's checksum, so a piece added to the code
   // without its record here, or a file swapped under the same name, is red.
-  const recorded = (m) => /^https:\/\//.test(m.file) && /^https:\/\//.test(m.page) && /^[0-9a-f]{64}$/.test(m.sha256) && m.seconds > 30 && sources.includes(m.page) && sources.includes(m.sha256) && sources.includes(m.title);
+  // Held to its own row, the one row naming its file: each field searched
+  // for anywhere in the file let two films' checksums or pages be swapped,
+  // and a piece cut to 31 s, all still green (the check-skeptic's control,
+  // 2026-11-22). A table with a Page column must have the piece's page in
+  // its row; the album's table has none, its page is in its section.
+  const rows = sources.split('\n');
+  const recorded = (m) => {
+    if (!/^https:\/\//.test(m.file) || !/^https:\/\//.test(m.page) || !/^[0-9a-f]{64}$/.test(m.sha256) || !(m.seconds > 30)) return false;
+    const at = rows.flatMap((r, i) => (r.startsWith('|') && r.split('|').map((c) => c.trim()).includes(m.file) ? [i] : []));
+    if (at.length !== 1) return false;
+    const row = rows[at[0]];
+    let h = at[0]; while (h > 0 && rows[h - 1].startsWith('|')) h--;
+    let top = at[0]; while (top > 0 && !rows[top].startsWith('## ')) top--;
+    let end = at[0]; while (end < rows.length && !(end > at[0] && rows[end].startsWith('## '))) end++;
+    const section = rows.slice(top, end).join('\n');
+    const pageOk = rows[h].includes('| Page |') ? row.includes(m.page) : section.includes(m.page);
+    // A number as SOURCES.md writes it: 290 is "290.0 s" there.
+    const num = (n) => `${String(n).replace('.', '\\.')}${Number.isInteger(n) ? '(\\.0+)?' : '0*'}`;
+    const secs = new RegExp(`(^|[^0-9.])${num(m.seconds)} s`);
+    const from = !/\bfrom\b/.test(row) || new RegExp(`from ${num(m.from)} s`).test(row);
+    return pageOk && row.includes(m.sha256) && row.includes(`| ${m.title} |`) && secs.test(row) && from;
+  };
+  check('1. the channel has its album', CHANNEL_ALBUMS.length >= 1, `${CHANNEL_ALBUMS.length} albums`);
   for (const a of CHANNEL_ALBUMS) {
     const bad = a.pieces.filter((p) => PRESETS.find((x) => x.id === p.look)?.name !== p.lookName || !recorded(p.music)).map((p) => p.music.title);
     check(`1. the channel's album ${a.title}: every piece's look is a preset under its name, and SOURCES.md gives its page and checksum`,
