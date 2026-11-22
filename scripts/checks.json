@@ -74,6 +74,16 @@
       ]
     },
     {
+      "name": "The rules stay in sync",
+      "shard": "logic",
+      "run": "npm run rules -- --check",
+      "why": [
+        "Antigravity's per-area rules under .agents/rules/ are generated from",
+        ".claude/rules/ by scripts/syncrules.mjs, so the two agents' rule files",
+        "never drift and each generated file stays under Antigravity's 24,000-byte cap."
+      ]
+    },
+    {
       "name": "What a change reaches",
       "shard": "logic",
       "run": "npm run reach",

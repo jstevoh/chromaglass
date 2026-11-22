@@ -188,6 +188,7 @@
     "mainhold": "node scripts/mainhold.mjs",
     "cisecrets": "node scripts/cisecrets.mjs",
     "sizes": "node scripts/sizes.mjs",
+    "rules": "node scripts/syncrules.mjs",
     "checkguard": "node scripts/checkguard.mjs",
     "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
