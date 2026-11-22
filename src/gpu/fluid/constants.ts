@@ -694,6 +694,20 @@ export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
   that much faster.
 */
 export const DRIP_WEIGHT = 0.5;
+/**
+  Rain Drip as the solver reads it: the look's dial times how far the plate is
+  tipped (Gravity, plateUpright, 0 flat to 1 on the wall). The in-plane share
+  of gravity is g sin θ, so a level plate has none and heavy dye there only
+  slumps (hsBody); it fell down a flat plate in every look that set it (PLAN
+  38u-12). A plate rocked by a hand has its own weight in the rock's term.
+*/
+export const dripOf = (p: { drip?: number; plateUpright?: number }): number => {
+  const d = Number.isFinite(p.drip) ? (p.drip as number) : 0;
+  const u = Number.isFinite(p.plateUpright) ? Math.max(0, Math.min(1, p.plateUpright as number)) : 0;
+  return d * u;
+};
+/** The thin gap's body-force weight of Rain Drip: DRIP_WEIGHT per unit of dripOf, nothing under 0.01. */
+export const dripWeightOf = (p: { drip?: number; plateUpright?: number }): number => (dripOf(p) > 0.01 ? DRIP_WEIGHT * dripOf(p) : 0);
 /*
   Updraft's shear, over the old push it is made from. The old push was only
   on the colour, and a pool pushed while the clear liquid round it is not
