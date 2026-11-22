@@ -54,15 +54,11 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',       // unused under the lamp (plate.ts takes the lamp's light through the dye)
       gooeyEffect: 0,            // its blur merged cells the oil keeps apart
-      rotationSpeed: 0,          // no motor: the owner wants the whole screen still between hand moves (38w-1 round 2)
+      rotationSpeed: 0,          // no motor: still between hand moves (38w-1)
       /*
-        No stirring, as Lava Lamp (PLAN 38w-1): a clock-glass dish is not
-        stirred, and Turbulence is a curl of noise laid over the whole plate,
-        not a hand. Filmed on the Mac (2026-11-21, no sound, seed 1): at the
-        default 0.5 the round cells were torn into smeared patches within the
-        first second and never came back; at 0 they stay round for the whole
-        22 s, as the lab's dish does. Turbulence at 0 also lays no music stir
-        cord here once the Sound Drive below is 0 (lib/stir.ts stirCordDepth).
+        No stirring (PLAN 38w-1): Turbulence is a curl of noise over the whole
+        plate, not a hand. Filmed at 0.5 the cells tore into smears within a
+        second; at 0 they stay round, and no music stir cord is laid.
       */
       turbulenceScale: 0,
       centerGravity: 0.05,
@@ -82,14 +78,9 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.02,
       vibrationFrequency: 0.05,
       /*
-        The music's hands off, as Lava Lamp's (PLAN 27f-9h): at 0.5 they
-        poured a dye on every pitch, burst air on the kicks and, through the
-        mids' stir cord that Sound Drive sets, kept a curl of noise over the
-        dish. Filmed with the band (2026-11-21): the water flooded red and the
-        cells dissolved into it in 25 s, with white air pockets popping up.
-        The band reaches this dish the way it reached a 1960s one, through a
-        hand: the kick presses the top glass and the mids firm the oil
-        (sceneMappings below), and the dish rocks (Plate Rock).
+        The music's hands off, as Lava Lamp's (27f-9h): at 0.5 they flooded the
+        water red and dissolved the cells in 25 s. The band reaches the dish
+        through a hand instead (sceneMappings below, Plate Rock).
       */
       audioImpact: 0,
       blobSurfaceTension: 0.45,
@@ -100,14 +91,14 @@ export const PRESETS: Preset[] = [
       secondLamp: 0.0,
       hueJourney: 0,
       dyeBudget: 0.8,            // the whole dish is dye; 0.18 kept black glass (28i-2)
-      plateCurve: 0.2,           // a flatter glass: the frame is full screen, so the cells should not all crowd the middle
+      plateCurve: 0.2,           // flatter glass, so the cells spread over the full frame
       depthDrag: 1.2,
       plateSpring: 0.35,
       plateRock: 0.55,           // a hand tips the dish: the references' swells
       edgeRelief: 0.6,           // the meniscus round every cell: a dark rim and a bright one
       bubbles: 0.2,
       transmission: 0.4,
-      dishVignette: 0,           // full screen, no Petri rim (the owner, 2026-11-21): the projected wall shows the dish filling the frame
+      dishVignette: 0,           // full screen, no Petri rim (the owner, 2026-11-21)
       granulation: 0,            // dissolved dye does not granulate; the grain read as pixelation on the wall
       lampHotspot: 0.2,          // an even lamp across the full frame, as the references light it
       // A hand on the music: the kick presses the glass, the snare shears, a mid chord rounds.
