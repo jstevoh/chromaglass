@@ -19,14 +19,14 @@
   },
   "files": {
     "docs/brand/lockup.svg": 115138,
-    "scripts/panel.mjs": 128526,
+    "scripts/panel.mjs": 128434,
     "scripts/phone.mjs": 145641,
     "scripts/qa.mjs": 123755,
-    "scripts/startup.mjs": 104330,
+    "scripts/startup.mjs": 104321,
     "scripts/wall.mjs": 135706,
-    "src/App.tsx": 204428,
-    "src/components/LiquidVisualizer.tsx": 419186,
-    "src/gpu/wgsl/plate.ts": 180818,
+    "src/App.tsx": 204214,
+    "src/components/LiquidVisualizer.tsx": 418123,
+    "src/gpu/wgsl/plate.ts": 179662,
     "src/sim/fluidSimulation.ts": 184913
   }
 }

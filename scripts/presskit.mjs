@@ -266,6 +266,33 @@ check('the site redirects /films/ to the films\' release', filmsRedirect?.destin
   JSON.stringify(filmsRedirect ?? null));
 const shadowed = TV_FILMS.filter((f) => fs.existsSync(pub(`${TV_FILMS_PATH}${f.id}.mp4`)));
 check('no file under public/films/ stands in front of the redirect', shadowed.length === 0, shadowed.map((f) => f.id).join(', '));
+// The calm loops (PLAN 12-tv-loops-2): both TV apps carry their own copy of
+// src/lib/tvLoops.ts, the list `npm run tvloops` renders, judges and uploads,
+// because a TV app reads no file from the repository. A loop named in one and
+// not the other is a black screen on one TV or a film nobody can reach, and
+// neither app can be mended without a new store release, so the three lists
+// must be one list: the same ids, titles and order, each fetched from the
+// site's /loops/ address, which firebase.json sends on to the loops' release.
+const { TV_LOOPS, TV_LOOP_ORIGIN, TV_LOOP_RELEASE } = await import('../src/lib/tvLoops.ts');
+const libLoops = TV_LOOPS.map((l) => `${l.id} | ${l.title}`);
+const loopsJava = fs.readFileSync('androidtv/app/src/main/java/app/chromaglass/tv/Loops.java', 'utf8');
+const javaLoops = [...loopsJava.matchAll(/new Loop\("([^"]+)", "([^"]+)"\)/g)].map((m) => `${m[1]} | ${m[2]}`);
+const loopsSwift = fs.readFileSync('tvos/App/Sources/CalmLoops.swift', 'utf8');
+const swiftLoops = [...loopsSwift.matchAll(/Loop\(id: "([^"]+)", title: "([^"]+)"\)/g)].map((m) => `${m[1]} | ${m[2]}`);
+check('the Google TV app\'s calm loops are tvLoops.ts\'s, in the same order', libLoops.length >= 6 && javaLoops.join('\n') === libLoops.join('\n'),
+  `${javaLoops.length} in Loops.java, ${libLoops.length} in tvLoops.ts: ${javaLoops.filter((l) => !libLoops.includes(l)).concat(libLoops.filter((l) => !javaLoops.includes(l))).join('; ') || 'same set'}`);
+check('the Apple TV app\'s calm loops are tvLoops.ts\'s, in the same order', libLoops.length >= 6 && swiftLoops.join('\n') === libLoops.join('\n'),
+  `${swiftLoops.length} in CalmLoops.swift, ${libLoops.length} in tvLoops.ts: ${swiftLoops.filter((l) => !libLoops.includes(l)).concat(libLoops.filter((l) => !swiftLoops.includes(l))).join('; ') || 'same set'}`);
+const javaOrigin = loopsJava.match(/ORIGIN = "([^"]+)"/)?.[1];
+const swiftOrigin = loopsSwift.match(/static let origin = "([^"]+)"/)?.[1];
+check('both TV apps fetch the loops from tvLoops.ts\'s address', javaOrigin === TV_LOOP_ORIGIN && swiftOrigin === TV_LOOP_ORIGIN,
+  `Loops.java ${javaOrigin}, CalmLoops.swift ${swiftOrigin}, tvLoops.ts ${TV_LOOP_ORIGIN}`);
+const loopsPath = new URL(TV_LOOP_ORIGIN).pathname;
+const loopsRedirect = (hostingConf.redirects ?? []).find((r) => r.source === `${loopsPath}:file`);
+check('the site redirects /loops/ to the loops\' release', loopsRedirect?.destination === `https://github.com/jstevoh/chromaglass/releases/download/${TV_LOOP_RELEASE}/:file` && loopsRedirect.type === 302,
+  JSON.stringify(loopsRedirect ?? null));
+const loopShadowed = TV_LOOPS.filter((l) => fs.existsSync(pub(`${loopsPath}${l.id}.mp4`)));
+check('no file under public/loops/ stands in front of the redirect', loopShadowed.length === 0, loopShadowed.map((l) => l.id).join(', '));
 
 // 6. The page in a browser, served from public/ as Hosting serves it.
 // Fonts and anything else off-site are refused so the check is the same with

@@ -26,7 +26,7 @@ import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
-import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
+import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { canShareClip, shareClip } from '../../lib/shareClip';
@@ -43,6 +43,7 @@ import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
 import { SiteLink } from '../SiteLink';
 import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { PicturePaletteButton } from '../PicturePaletteButton';
 
 /**
  * ChromaGlass on a phone.
@@ -165,13 +166,15 @@ export interface PhoneStageProps {
   onLiquid: (id: string) => void;
   dyeColors: readonly string[];
   onDyeColor: (hex: string) => void;
-  palettes: { name: string; colors: string[] }[];
+  palettes: { name: string; colours: string[] }[];
   paletteLock: number | null;
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** A picture or video file's colours as the palette (usePaletteLock, PLAN 43d): the desk's own call. */
+  onPicturePalette?: (file: File) => Promise<string | null>;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -885,12 +888,22 @@ export function PhoneStage(p: PhoneStageProps) {
                 className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] ${p.paletteLock === i ? LIT : 'border-border bg-elevated text-text-2'}`}
               >
                 <span className="flex">
-                  {pal.colors.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
+                  {pal.colours.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
                 </span>
                 <span className="whitespace-nowrap">{pal.name}</span>
               </button>
             ))}
           </div>
+
+          {p.onPicturePalette && (
+            <PicturePaletteButton
+              onFile={p.onPicturePalette}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2 disabled:opacity-60"
+              testId="phone-picture-palette"
+            >
+              <Palette size={18} /> Palette from a picture or video
+            </PicturePaletteButton>
+          )}
 
           <button
             onClick={() => { p.onImageDye(); close(); }}
@@ -904,12 +917,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
-          {/* Not closed on a press, unlike the two above: Pour and Film are
-              each a toggle someone may want both of, and Stop is here too. */}
-          {p.cartoons && (
+          {/* The video loaded (PLAN 14ag), by this sheet's "A video as dye" or
+              the Video section's Video file: not closed on a press, unlike the
+              two above, since Play and Pour are each a toggle someone may want
+              both of, and Pour's Stop is here too. */}
+          {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
-              <CartoonShelf {...p.cartoons} size="phone" />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" />
             </div>
           )}
           </PanelGuard>
@@ -1206,6 +1221,17 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-3">
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
               display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+          </div>
+          {/*
+            The desk's two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a hand's tip of
+            the flat plate that stays where it is put, for a phone on a stand. Not the
+            phone's own Tilt, which stands the plate up (Gravity), so both can be on.
+          */}
+          <div className="mt-3">
+            <Slider label="Tilt left/right" value={p.mixer.settings.plateTiltX ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltX: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltX ?? 0) * 100)}%`} touch testId="phone-tilt-x" midiKey="setting:plateTiltX" />
+            <Slider label="Tilt up/down" value={p.mixer.settings.plateTiltY ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltY: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltY ?? 0) * 100)}%`} touch testId="phone-tilt-y" midiKey="setting:plateTiltY" />
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}

@@ -5,18 +5,20 @@ drawn as a projected plate, played from a Perform desk, built on a Design desk,
 driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 
 Before starting anything that is not a bug fix, read `PLAN.md`: it is the plan's index
-(about 45 KB): the **Order of work** first (which step is next, in which lane), the running
-order, and a table of the sections. Then read only the file your step names: each section
-is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, a big one cut
-between items into parts of about 30 KB), and `grep -rn '14ab-4' docs/plan/` finds
-an item from its id. Never read every section: the open plan is about 630 KB in all, and
-see "Keeping a session small" for why that matters. What shipped is in
-`docs/plan-shipped.md`, under the same numbers: a section keeps a one-line stub per shipped
-item and only the open work, so read the archive only when an open item needs the history
-behind it. When an item ships, move its story there in the same PR and leave the stub. A
-branch that still edits the old one-file `PLAN.md` carries its edits across with
-`node scripts/planmove.mjs` after merging main (19m). The engine's own order is in
-`docs/roadmap.md`.
+(about 80 KB): **This week** first (the ranked list the owner set, 2026-11-21: beautiful
+visuals and real physics), then the **Order of work** (the standing order, which lanes are
+parked this week), the running order, and a table of the sections. Then read only the file
+your step names: each section is a file under `docs/plan/` (`00-dye-tools.md` to
+`48-ideas-visuals.md`, a big one cut between items into parts of about 30 KB), and
+`grep -rn '14ab-4' docs/plan/` finds an item from its id. Never read every section: the open
+plan is about 900 KB in all, and see "Keeping a session small" for why that matters. The
+section files hold only open work. Closed items are in `docs/plan/archive/` under the same
+file names, and stories from before 2026-11-21 in `docs/plan-shipped.md`, under the same
+numbers: read them only when an open item needs the history behind it. When an item ships,
+mark it shipped where it stands and run `node scripts/planarchive.mjs`, which moves it to
+the archive (19m-5). A branch that still edits the old one-file `PLAN.md` carries its edits
+across with `node scripts/planmove.mjs` after merging main (19m). The engine's own order is
+in `docs/roadmap.md`.
 `docs/judging.md` lists what needs the owner's eyes on a real GPU.
 
 ## Where things live
@@ -133,8 +135,9 @@ a run or a deploy needs explaining. When CI is red, use the `steward` skill.
 
 - One PR per piece of work, a draft until CI is green. Squash-merge.
 - Every PR updates the plan: what it shipped marked shipped in its section file under
-  `docs/plan/` (and its row in `PLAN.md`'s running order), and anything found along the
-  way that needs fixing or adding written in as an item in the section it belongs to.
+  `docs/plan/` (and its row in `PLAN.md`'s running order; `node scripts/planarchive.mjs`
+  then moves it to the archive), and anything found along the way that needs fixing or
+  adding written in as an item in the section it belongs to.
 - Every feature ships its phone version in the same PR.
 - Merge as soon as CI is green; the owner does not need to be asked (2026-09-27).
 - After a PR merges, a branch that carries on is restarted from `main`
@@ -147,13 +150,14 @@ a run or a deploy needs explaining. When CI is red, use the `steward` skill.
   sessions do not rebuild the same thing; keep to your own branch and PR.
 - **Some of those sessions are Antigravity's** (branches `antigravity/…`). How work is
   claimed and handed between the two tools, the handoff block in every PR body, and
-  the review a Claude Code session owes Antigravity's PRs are in `docs/handoff.md`
-  ("Ready, review, merge"). At the start of a session, check
-  `gh pr list --label ready-for-review --label review-owed` (green and waiting on a
-  review before merge, up to three a session; `ready.yml` labels them), then the sampled
-  pass on merged `review-owed` PRs (about one a session). A verdict's first line is
-  `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>`; on a `PASS` the reviewer
-  squash-merges the PR itself, pinned to that head, and confirms the deploy.
+  which of Antigravity's PRs still owe a review are in `docs/handoff.md` ("Ready, review,
+  merge"). Since 2026-11-15 a green Antigravity PR merges without a Claude Code review,
+  pinned to its green head; only sign-in, keys, payments, licences, the Workers under
+  `server/` and security changes still owe one (label `review-owed`). At the start of a
+  session, check `gh pr list --label ready-for-review --label review-owed` (up to three a
+  session). A verdict's first line is `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>`;
+  on a `PASS` the reviewer squash-merges the PR itself, pinned to that head, and confirms
+  the deploy.
 
 ## Agents and skills in this repo
 

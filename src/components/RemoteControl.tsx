@@ -767,6 +767,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <Slider label="Melody Walk" field="melodyWalk" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
+          {/* The two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a look saved before them reads level, not the slider's −1. */}
+          <Slider label="Tilt Left/Right" field="plateTiltX" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltX') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Tilt Up/Down" field="plateTiltY" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltY') ?? 0) as number} {...sliderProps} connected={connected} />
           <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The dish's own turning (PLAN.md §22): Auto Spin's mode and its
@@ -813,6 +816,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <>
               <Slider label="Side Colour" field="sideLightHue" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
               <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
+          {/* Polarised light (PLAN 31p-1), and while the sheets are in the analyser's turn and the liquid's strength, as on the desk. */}
+          <Slider label="Polarisers" field="polariser" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.polariser ?? 0) > 0.001 && (
+            <>
+              <Slider label="Analyser" field="analyserAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('analyserAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Quarter Wave" field="quarterWave" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('quarterWave') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Birefringence" field="birefringence" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('birefringence') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}

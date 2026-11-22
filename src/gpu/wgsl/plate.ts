@@ -31,10 +31,11 @@ import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
+import { VIEW_OPTICS } from './platePolar';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
 import { BEAD_SHAPE_WGSL } from './beadShape';
-import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
+import { FILM_FRAME_WGSL } from './plateFilm';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 
 /** Bindings every plate shader shares. */
@@ -1743,7 +1744,7 @@ ${TRANSMIT_WGSL}
 ${BUBBLE_SHAPE_WGSL}
 ${FILM_DYE_WGSL}
 ${DROP_LENS_WGSL}
-${THIN_FILM_WGSL}
+${VIEW_OPTICS}
 
 /*
   How near this pixel is to the air of a bubble, 0 beyond the reach of the
@@ -1993,27 +1994,7 @@ fn lumiaLight(uv: vec2f) -> vec3f {
   return lcol * (0.12 + 0.9 * sheet) * veil;
 }
 
-/** The film projector's frame where it lands, bent a little by the dye, graded. */
-fn filmFrame(uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
-  let fuvF = (uv - 0.5) * U.filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
-  return gradeMix(tex2(film, vec2f(fuvF.x, 1.0 - fuvF.y)).rgb, U.mixGrade[3]);
-}
-
-/**
- * The film projector's frame over the picture. Its own way in, as it always
- * was: through the dye it lands on, keyed on its dark by Film Key. Any other
- * blend lays the frame itself, by Film Mix, and Key keys it by Film Key too.
- */
-fn filmOver(color: vec3f, uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
-  if (U.filmOn == 0 || U.filmMix <= 0.001) { return color; }
-  let filmC = filmFrame(uv, fluid0, normal0);
-  let fm = mixBlendOf(U.mixBlend.w);
-  if (fm != 0) { return blendRowKeyed(color, filmC, U.filmMix, fm, U.filmKey); }
-  let fl = dot(filmC, vec3f(0.299, 0.587, 0.114));
-  let key = smoothstep(U.filmKey, U.filmKey + 0.18, fl);
-  let tinted = filmC * mix(vec3f(1.0), fluid0.rgb * 1.5, fluid0.a * 0.8);
-  return mix(color, color * 0.35 + tinted * 0.95, key * U.filmMix);
-}
+${FILM_FRAME_WGSL}
 
 /** Light laid over light: screened, so it adds and cannot clip past white. */
 fn screenOver(c: vec3f, light: vec3f) -> vec3f {
@@ -2278,7 +2259,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let wedge = 6.28318530718 / U.kaleido;
     var a = modf2(ang, wedge);
     if (a > wedge * 0.5) { a = wedge - a; }
-    
+
     // BPM-Synced LFOs: pulse the kaleidoscope's rotation and zoom with the
     // beat phase, as far as Frame Sway lets them. At 0, the default, the
     // rig turns on its own clock (kaleidoPhase) and holds its zoom: a whole
@@ -2287,7 +2268,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // rid of (2026-10-11; lib/plateRock.ts).
     let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
     a += U.kaleidoPhase + (beatPulse * wedge * 0.15); // Slight rhythmic rotation
-    
+
     let breathingZoom = U.kaleidoZoom * (1.0 - beatPulse * 0.1); // Rhythmic zoom
     c = vec2f(cos(a), sin(a)) * rad * breathingZoom;
     uv = clamp(c / vec2f(aspect, 1.0) + vec2f(0.5), vec2f(0.001), vec2f(0.999));
@@ -3369,8 +3350,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let inner = bm.r;
     let r = drop.z;
     let R = drop.w;
-    let inDye = smoothstep(0.015, 0.2, auxH);
-    let k = clamp(U.beads * 2.0, 0.0, 1.0) * mix(0.35, 1.0, inDye) * inner;
+    // Full strength in clear water: the band is the oil's curve (38u-14).
+    let k = clamp(U.beads * 2.0, 0.0, 1.0) * inner;
     let flat = dropFlat(R, dropRho);
     let t = dropBand(r, R, dropRho);
     // How much oil the light crosses: 1 over the flat top (or a small drop's
@@ -3409,7 +3390,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       the contact, where the meniscus is steepest and bends the most light
       out of the lens. The band and the camera's line are that rim (38h-2).
     */
-    var dropC = outColor * vec3f(0.99, 0.97, 0.93) * shade;
+    // Beer-Lambert tint (38u-14).
+    let oilTint = pow(vec3f(0.99, 0.97, 0.93), vec3f(th));
+    var dropC = outColor * oilTint * shade;
 
     /*
       Drops (beadDrops, PLAN.md batch 3): the second reference frame, where
@@ -3440,9 +3423,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let absorb = -log(clamp(dc, vec3f(0.04), vec3f(1.0)));
       let trans = exp(-absorb * th * 1.0);
       let glowC = dc * (1.0 - dot(trans, vec3f(0.3333))) * 1.15 * (1.0 - U.lampGround);
-      let body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * shade;
+      let body = (outColor * oilTint * trans + glowC) * shade;
       dropC = mix(dropC, body, U.beadDrops);
-      kDrop = clamp(U.beads * 2.0, 0.0, 1.0) * mix(mix(0.35, 1.0, inDye), 1.0, U.beadDrops) * inner;
+      kDrop = k;
     }
     outColor = mix(outColor, dropC, kDrop);
     auxB = max(auxB, inner * 0.4 * kDrop);
@@ -3464,7 +3447,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Over both plates: the film projector, and whatever else the mixer put there ──
-  outColor = mixSourcesAt(outColor, U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
+  outColor = mixSourcesAt(polar(outColor, fuv0), U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
 
   // ── Lamp warmth ──────────────────────────────────────────────────
   if (U.lampWarmth > 0.001) {

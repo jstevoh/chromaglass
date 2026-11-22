@@ -50,7 +50,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
@@ -180,6 +180,7 @@ export class WebGPUFluid extends FluidCover {
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       ['liquidForces', [VEL], false],
+      ['liquidDrive', [VEL], false],
       ['soapThin', [dye], false],
       /*
         The dye across faces is also how the dye moves wherever the maze
@@ -384,7 +385,7 @@ export class WebGPUFluid extends FluidCover {
     const thin = this.thinGapOn(p);
     f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
     f[6] = fin(p.turbScale, 0); f[7] = 0; f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
-    f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
+    f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = dripOf(p); f[13] = fin(p.air, 0);
     f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
       A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
@@ -684,6 +685,7 @@ export class WebGPUFluid extends FluidCover {
     stage('thin gap keep', (pass) => {
       this.run(pass, 'scaleDye', this.ensureThinGap(), [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
     }, thin);
+    stage('liquid drive', (pass) => this.driveLiquids(pass, p, disp), thin && this.liquidsLive && Math.hypot(p.rockX, p.rockY) > 1e-5);
 
     // 4. Project, 5. advect velocity by itself, 6. project again
     /*
@@ -811,7 +813,7 @@ export class WebGPUFluid extends FluidCover {
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
     const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
     const rockGain = p.rockGain ?? 1;
-    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
+    const thinBody = thin && (dripOf(p) > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
       /*
         The breath is laid as its stress, in pascals (lib/breath.ts), and
@@ -859,7 +861,7 @@ export class WebGPUFluid extends FluidCover {
           }
         }
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
-          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
+          this.arg('thin body', [dripWeightOf(p), AIR_SHEAR, REST_GAP, breathScale,
             rockOn ? ROCK_FALL * this.coverH2 * rockGain * p.rockX : 0, rockOn ? ROCK_FALL * this.coverH2 * rockGain * p.rockY : 0, lift * rockGain * p.rockX, lift * rockGain * p.rockY]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex, mixTex, this.hsOilMean!, this.hsLiftPsi!, oilDyeTex]);
         this.vel.swap();

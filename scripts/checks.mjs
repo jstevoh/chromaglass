@@ -737,7 +737,7 @@ async function selftest() {
   const read = man.checks.find((c) => trace(entryFiles(c.run, scripts)).has('docs/handoff.md') && man.shards.measure.includes(c.shard));
   say(!read || mpick(['docs/handoff.md']).names.includes(read.name), `a document a check reads selects that check${read ? ` (docs/handoff.md: ${read.name})` : ''}`);
   say(mpick(['src/gpu/fluid.ts']).all, 'a source file runs Measure in full');
-  say(mpick(['public/video/cartoons/SOURCES.md']).all, 'and a Markdown file of the site\'s own does too');
+  say(mpick(['public/press/MEDIA.md']).all, 'and a Markdown file of the site\'s own does too');
   say(mpick(['scripts/tools.mjs', 'src/presets.ts']).all, 'a check script with a source file does');
   say(mpick(['scripts/frame.mjs']).all && mpick(['scripts/checks.mjs']).all, 'a shared helper, and this file, do');
   say(mpick(['scripts/nothing-reads-this.mjs']).all, 'a script no check traces does');
@@ -977,8 +977,9 @@ async function selftest() {
   say(refuses(qd('the flaky line', day(0), day(QUARANTINE_DAYS + 1))), `a quarantine longer than ${QUARANTINE_DAYS} days is refused`);
   say(refuses(qd('flaky')), 'a quarantined line too short to name one FAIL line is refused');
   say(!refuses(qd('the flaky line')), 'and a whole entry is taken');
-  // The real ones: each names a check that has the line, and a plan id the plan has.
-  const planText = fs.readdirSync(path.join(ROOT, 'docs/plan')).map((f) => fs.readFileSync(path.join(ROOT, 'docs/plan', f), 'utf8')).join('\n');
+  // The real ones: each names a check that has the line, and a plan id the live plan has
+  // (docs/plan/*.md; a quarantine's debt is open work, so not docs/plan/archive/).
+  const planText = fs.readdirSync(path.join(ROOT, 'docs/plan')).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(ROOT, 'docs/plan', f), 'utf8')).join('\n');
   const qs = man.checks.flatMap((c) => (c.quarantine ?? []).map((q) => ({ c, q })));
   const noPlan = qs.filter(({ q }) => !new RegExp(`\\*\\*${q.plan.replace(/[-]/g, '\\-')}\\b`).test(planText));
   say(!noPlan.length, `every quarantined line's plan id is an item in docs/plan/ (${qs.length} lines${noPlan.length ? `; not found: ${noPlan.map(({ q }) => q.plan).join(', ')}` : ''})`);
