@@ -4,7 +4,29 @@ Moved out of `CLAUDE.md` (PLAN 19ai-1) because `CLAUDE.md` is loaded on every st
 every session; read this when a PR's checks or a deploy need explaining.
 
 `.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
-deploy:
+deploy.
+
+**A pull request runs only the fast, deterministic checks** (PLAN.md 19ak-20, the
+owner's call of 2026-11-22, after 52 of 93 PR runs in the week to 11-21 went red on
+browser, lab and Mac lines that time a page or a plate on a slow runner): the Measure
+parts `shards.pr` names in `scripts/checks.json` (`logic` and `sound`: the typecheck,
+the site's build, the scripts parsing, the workflows linted and the node harnesses),
+and no Mac shard. Every other Measure part (Chromium, the lab on SwiftShader) and every
+Mac shard runs on **main's deploy only**, and the deploy gate never trusts a PR's run
+for them, so a blank or broken plate still stops the deploy. A GPU regression is found
+on main, not on its PR: the steward of main's deploys fixes it there. Where a bullet
+below says what a PR's run does, it is history kept for its numbers.
+
+**And the deploy does not wait for them** (PLAN.md 19ak-21, the owner, 2026-11-22: "I
+would much rather release shit that crashes and deal with a couple bugs here and there.
+Let's get shit live quicker."). `deploy.yml`'s `Build and deploy` job needs only the
+gate (`verified`, a few seconds): a merge is live in minutes, built from the tree its PR
+ran the fast checks on. The `checks` job (every Measure part, every Mac shard) runs
+beside it on the same tree as a report; its red turns the run red and `hold.yml`'s
+`Main not held red` status red, but the site is already up, so a red there is a live
+bug to fix. Only the deploy job holds the `firebase-hosting-live` group; the checks hold
+`main-checks-<ref>` and a newer push cancels them. A broken build still publishes
+nothing (the build step fails first).
 
 - **Measure** (ubuntu, eight parts side by side, 6–21 min each; GitHub's runners come in
   speed tiers about 2x apart, so a part sized on a fast one can meet its 25 on a slow one,
@@ -21,13 +43,13 @@ deploy:
 - **Check changes named** (`scripts/checkguard.mjs`, under `Measure`): a PR that moves a
   check's bar or input names each change in its body under `Check changes:`, or is red.
   Re-run the failed jobs after editing the body; no push is needed.
-- **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
+- **What the change reaches** (`scripts/reach.mjs`): before 19ak-20, a PR that changed only Markdown,
   `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts
   that check the workflows (`closedruns`, `macqueue`, `deploygate`) skips the
   Mac shards (Measure still runs), and the deploy gate never trusts such a run. A PR
   whose Mac-reaching change is only check scripts, manifest entries or the npm scripts
   checks run runs only those checks' shards (PLAN 19k).
-- **The site's files on the Mac** (PLAN.md 19ak-2): a PR that changes `src/`,
+- **The site's files on the Mac** (PLAN.md 19ak-2, gone with 19ak-20): a PR that changed `src/`,
   `public/` or `index.html` runs the Mac checks that read them, not all 96: the 28 that
   open or build the app always, and of the 68 lab checks those whose bundles import the
   file (`checkReads` in `scripts/checks.mjs`, esbuild's import graph; the reach job
@@ -38,22 +60,28 @@ deploy:
   most 21 days out. Until then, on a pull request, a check red only on those lines is a
   warning (⚠ in the job summary) and its job stays green; any other FAIL line, a
   timeout, a crash, a check that stopped before its closing count, or the end date
-  passing, and it blocks as before. Main's deploy holds every line to its bar. Bars
-  never move for it, and adding one or moving its end later is a check change the PR
+  passing, and it blocks as before. Until 2026-12-06 main's deploys honour the same
+  entries (the owner's choice, PLAN.md 19ak-18: four deploys in a row were red only on
+  known flakes and the site stopped updating); from that day, set by
+  `MAIN_QUARANTINE_UNTIL` in `scripts/checks.mjs`, main's deploy holds every line to its
+  bar again, and a run outside CI always does. Since 19ak-21 a deploy publishes without
+  waiting for its checks, so on main an entry now only keeps a known flake from turning
+  the after-the-fact report red, which is what makes a red report there mean a live bug. Bars never move for it, and adding one or moving its end later is a check change the PR
   names (`checkguard`). A red run on a line the PR cannot move is re-run by its
   **failed jobs** only, never all jobs.
   One exception to "main's deploy holds every line", the owner's choice (PLAN.md
   19ak-10, 2026-11-21): a deploy that trusts a PR's green run (`deploygate.sh` rules 4
   and 5) trusts it even when a quarantine held it green, so it does not run the
-  quarantined line itself; only a deploy that runs its own checks holds it.
+  quarantined line itself; a deploy that runs its own checks holds it from 2026-12-06.
 - **The Mac waits for the typecheck** (`Compiles, before the Mac`, PLAN.md 19ak-3c):
   `tsc --noEmit` on ubuntu beside `reach`; a PR that does not compile takes no Mac.
-- **A whole run re-run skips the shards that passed** (PLAN.md 19ak-3a): on attempt 2
+- **A whole run re-run skipped the shards that passed** (PLAN.md 19ak-3a, gone with 19ak-20): on attempt 2
   or later of a PR run, `reach` drops the Mac shards an earlier attempt of the same run
   passed. "Re-run failed jobs" already starts only the red ones.
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
-- A deploy skips the checks when main's new tree is the exact tree its PR's
+- Since 19ak-20 no PR run is whole, so rules 4 and 5 below never hold and every
+  deploy that builds runs its own checks in full. Before it: a deploy skipped the checks when main's new tree is the exact tree its PR's
   `Checks` run passed on (the PR's head contained main when it merged;
   `scripts/deploygate.sh`). Since 2026-10-04 (the owner's choice) it also skips
   just the Mac shards, running Measure, when the PR's green run tested an older

@@ -92,7 +92,7 @@ if (flag('--probe')) {
     if (!exists) {
       gh('release', 'create', TV_FILMS_RELEASE, '--repo', REPO, '--prerelease', '--latest=false', '--target', 'main',
         '--title', 'TV sample films',
-        '--notes', 'The films the ChromaGlass TV app and TV page play with no show running: the channel\'s six 1920s records, each played whole by one look. Served at https://chromaglass.art/films/<id>.mp4 (PLAN 12-tv-2f). Not an app release.');
+        '--notes', 'The films the ChromaGlass TV app and TV page play with no show running: six pieces of Scott Buckley\'s ambient music (CC BY 4.0), each played whole by one look. Served at https://chromaglass.art/films/<id>.mp4 (PLAN 12-tv-2f). Not an app release.');
     }
     gh('release', 'upload', TV_FILMS_RELEASE, '--repo', REPO, '--clobber', ...ready);
     check(`uploaded ${ready.length} films to the release ${TV_FILMS_RELEASE}${exists ? '' : ' (made as a pre-release)'}`, true);

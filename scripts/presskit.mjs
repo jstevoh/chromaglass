@@ -244,7 +244,7 @@ const tvShots = fs.existsSync(TV_SHOTS) ? fs.readdirSync(TV_SHOTS).filter((f) =>
 const badShots = tvShots.filter((f) => { const j = jpegSize(fs.readFileSync(path.join(TV_SHOTS, f))); return !j || j.w !== 1920 || j.h !== 1080; });
 check('the TV listing has 1 to 8 screenshots, each a 1920×1080 JPEG', tvShots.length >= 1 && tvShots.length <= 8 && badShots.length === 0, `${tvShots.length} found${badShots.length ? `; wrong size: ${badShots.join(', ')}` : ''}`);
 // The TV app's sample films (androidtv/…/Sample.java, PLAN 12-tv-2f) are the
-// channel's six 1920s films, the same list the TV page plays (src/lib/tvFilms.ts):
+// channel's six song films, the same list the TV page plays (src/lib/tvFilms.ts):
 // a film named differently in the two would play on one screen and not the
 // other, and a TV app cannot be fixed without a new release through Play. Each
 // is fetched from the site's /films/ address, which firebase.json redirects to
@@ -260,6 +260,14 @@ const pageFilms = TV_FILMS.map((f) => [f.id, f.look, f.title, f.performer, f.yea
 const unmatched = [...javaFilms.filter((f) => !pageFilms.includes(f)), ...pageFilms.filter((f) => !javaFilms.includes(f))];
 check('the TV app\'s sample films are the TV page\'s films, in the same order', javaFilms.length >= 6 && javaFilms.join('\n') === pageFilms.join('\n'),
   `${javaFilms.length} in Sample.java, ${pageFilms.length} in tvFilms.ts${unmatched.length ? `; in one only: ${unmatched.join('; ')}` : ''}`);
+// And they are the webpage's films (src/lib/siteFilms.ts): the same id, look,
+// piece, composer and year, so the TV never plays, or credits, music the
+// site's SOURCES.md does not record (the check-skeptic, 2026-11-22: nothing
+// tied the two lists together).
+const { SITE_FILMS } = await import('../src/lib/siteFilms.ts');
+const siteFilms = SITE_FILMS.map((f) => [f.id, f.lookName, f.music.title, f.music.artist, f.music.year].join(' | '));
+check('the TV\'s sample films are the webpage\'s films, in the same order', siteFilms.length >= 6 && siteFilms.join('\n') === pageFilms.join('\n'),
+  [...siteFilms.filter((f) => !pageFilms.includes(f)), ...pageFilms.filter((f) => !siteFilms.includes(f))].join('; '));
 const hostingConf = JSON.parse(fs.readFileSync('firebase.json', 'utf8')).hosting;
 const filmsRedirect = (hostingConf.redirects ?? []).find((r) => r.source === `${TV_FILMS_PATH}:file`);
 check('the site redirects /films/ to the films\' release', filmsRedirect?.destination === `https://github.com/jstevoh/chromaglass/releases/download/${TV_FILMS_RELEASE}/:file` && filmsRedirect.type === 302,
