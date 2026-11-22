@@ -266,6 +266,19 @@ lens-shaped drop, no shadow beside it.*
 - **31s-4. Retune the looks on the traced light.** Once 31s-2 draws the plate, every preset's
   brightness, contrast and rim weight moves. Retune on films from the Mac, judged by the owner
   against the reference library (watch skill).
+- **31s-6. Open, found on main's deploy of 2026-11-22 (ebfa3324): `npm run holeline` was
+  calibrated on the stride-3 stencil 15g-15 replaced.** The dense slope (#933, `plateSlope.ts`,
+  sigma 1.5 cells) reads a hole's rim about 1.6 to 2 cells wider than the Sobel did, so
+  holeline's precondition throws before any line is judged: "the hole of 5.0 cells has its rim
+  at 6.7 cells" against `RIM_SLACK` 1.5 (bisected to ea277f3d; 61cab2c4 passes). Past it, on
+  the dense stencil, every feature line holds ("no line round a hole" at most 0 levels) and two
+  controls miss: "the control finds the glow" (3.7, wanting more than 6) and "the smallest hole
+  is partly flattened" (5.28 against 0.9 times 5.47). A narrower stencil (sigma 1.0) breaks the
+  controls further, so it is the check's yardstick that moved, not the picture. Fix: read the
+  rim the way the dense stencil spreads it (its reach, `SLOPE_REACH2`, rather than a fixed
+  slack), and set the glow control's size row from the dense slope's own response, or from
+  31s-2's traced light once it draws the plate. Never a looser bar without the owner's word;
+  until then holeline stays red on main's checks (the site deploys without them, 19ak-21).
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
