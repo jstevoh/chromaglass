@@ -194,19 +194,32 @@ async function openShow(look, { seed, viewport, scale = 1, band = false }) {
   return page;
 }
 
-/** The app's Song film of the whole piece, written to `file`. The bytes come back in slices: a 150 MB string in one message is more than the page's pipe wants. */
+/**
+ * The app's Song film of the whole piece, written to `file`. The bytes go in
+ * and come back in slices: a string of about 100 MB in one message is more
+ * than the page's pipe takes, and the page closes. Measured 2026-11-21: every
+ * piece over 400 s (a 48 kHz WAV of 77 MB, 103 MB as base64) closed the page
+ * within a minute, every one under 300 s (74 MB as base64) rendered whole.
+ */
 async function songFilm(page, wav, f, file) {
   const t0 = Date.now();
-  const meta = await page.evaluate(async ({ b64, w, h, fps, seed }) => {
-    const bin = atob(b64);
-    const song = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) song[i] = bin.charCodeAt(i);
+  const SLICE = 8 << 20;
+  const song = fs.readFileSync(wav);
+  await page.evaluate((n) => { window.__siteSong = new Uint8Array(n); }, song.length);
+  for (let at = 0; at < song.length; at += SLICE) {
+    await page.evaluate(({ at, b64 }) => {
+      const bin = atob(b64);
+      for (let i = 0; i < bin.length; i++) window.__siteSong[at + i] = bin.charCodeAt(i);
+    }, { at, b64: song.subarray(at, at + SLICE).toString('base64') });
+  }
+  const meta = await page.evaluate(async ({ w, h, fps, seed }) => {
+    const song = window.__siteSong;
+    window.__siteSong = null;
     const r = await window.chromaglassRender({ song: song.buffer, width: w, height: h, fps, seed });
     window.__siteFilm = r.bytes;
     return { phase: r.phase, message: r.message, format: r.format, length: r.bytes?.length ?? 0 };
-  }, { b64: fs.readFileSync(wav).toString('base64'), w: W, h: H, fps: FPS, seed: f.seed });
+  }, { w: W, h: H, fps: FPS, seed: f.seed });
   if (meta.phase !== 'done' || !meta.length) throw new Error(`${f.id}: the render ended ${meta.phase}: ${meta.message}`);
-  const SLICE = 8 << 20;
   const parts = [];
   for (let at = 0; at < meta.length; at += SLICE) {
     parts.push(Buffer.from(await page.evaluate(({ at, n }) => window.__siteFilm.slice(at, at + n), { at, n: SLICE }), 'base64'));
