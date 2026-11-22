@@ -5,9 +5,7 @@
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
  *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
  *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]]
- *   npm run watch -- --before A --after B [--out DIR]
- *   npm run watch -- --refs        the reference library (--vs takes a name from it)
- *   npm run watch -- --selftest
+ *   npm run watch -- --before A --after B [--out DIR]  |  --refs  |  --selftest
  *
  * Asked for: "a skill or agent that is able to better watch video … it will make
  * the evaluation of both the app better and looking at examples online". Claude
@@ -119,7 +117,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 10).map(l => l.replace(/^ \* ?/, '')).join('\n'));
+  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 9).map(l => l.replace(/^ \* ?/, '')).join('\n'));
 }
 
 // ─── tools ───────────────────────────────────────────────────────────────────
