@@ -186,6 +186,15 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   bar's share was set on the old one (then re-measure DROP_REACH as 19ac-4 did, never widen the bar
   to fit). *Measure:* twenty Mac runs, GitHub's and the owner's, read under half the allowance on
   all three scenes; a drop mirrored where it should not be is still red.
+  *Seen again 2026-11-22* on the video-lamp pull request (14ag-3, head b5bbf9a, a GitHub Mac, twice:
+  the run and its one re-run): 27.9 and 25.2 past the drift where 24.6 was allowed, 91.0 and 90.9
+  under the drop, all four drops alike (past it 14.8 28.6 31.5 27.2; 15.5 26.4 26.1 24.3), the
+  first drop's drift high both times (12.1, 11.6). The same cell, row 6 column 4, 0.164 from the
+  hand. That diff moves no solver code, and with no video loaded it draws Classic's plate from the
+  same lines (the lamp ground's line moved below the closeup's detail, where nothing between reads
+  it; `videolamp` holds Film Mix 0 to the byte). Its head before main came in (5f08157) read green
+  on a GitHub Mac. Eight other Mac runs on main since bbfded1 read 14.0 to 24.4 against 23.9 to
+  26.2 allowed, so the line sits within a few levels of its bar on most trees.
 - **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
   and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
   the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The

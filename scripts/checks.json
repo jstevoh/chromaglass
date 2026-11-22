@@ -3555,6 +3555,19 @@
       ]
     },
     {
+      "name": "The video as the lamp under the dish",
+      "shard": "fifth",
+      "run": "npm run videolamp",
+      "why": [
+        "PLAN 14ag-3: the video under the front plate is a picture in the lamp,",
+        "seen through the liquid. The dye filters its light (the plate on the",
+        "white lamp times the film's colour), bare water shows it, Film Mix 0",
+        "leaves the look to the byte, the frame's edge passes the bare lamp, and",
+        "a glycerine pool's rim moves a striped picture and not a flat one. The",
+        "lab, beside the mixer's check on the same shard."
+      ]
+    },
+    {
       "name": "Beams add, and the seam goes",
       "shard": "plate",
       "run": "npm run beams",
