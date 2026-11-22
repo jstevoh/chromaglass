@@ -381,13 +381,6 @@ and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
   oil and syrup parting where they meet and a finger mixing them; liquidsgpu has only the
   four liquids' scenes. Lay those four on the GPU the same way, with the same owed rule,
   before or with Brief 11, which changes the forces they would measure.
-- ~~**15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**~~
-  **Shipped** (2026-11-14): a bottle's weight down a rocked thin gap is a drive laid after
-  the gap keeps its flow (`liquidDrive`, `driveLiquids`), Darcy's w g sinθ h²/12ν read as
-  every body force is; a light bottle's lightness has a field of its own so the carry keeps
-  it; the soap's pull and the polar push no longer act between two glasses.
-  `npm run liquidfall` (a drop at Hele-Shaw's speed to 4%), and `liquidpush`'s thin-gap
-  reach asks the rock's way. Story in `docs/plan-shipped.md` §15e-10.
 - **15e-11. The CPU's stand-aside copy of the first pour (found with 15e-1).**
   `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so the first
   pour on a new solver lands in the CPU's copy too, which then never decays
