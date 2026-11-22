@@ -2936,3 +2936,22 @@ here.
 4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
    pinks and greens. The default 0.3 should feel like the photograph.
 5. Polarisers at 0 on any look: the look exactly as before.
+
+## 140. The water's glow (PLAN 48c)
+
+The check (`npm run glow`) proves on the lab's software WebGPU that a still plate is dark and
+keeps its charge, that a stroke lights its own path and nothing far from it, that a drift
+under the threshold lights nothing, that a second stroke within the recharge glows less and a
+path stroked five times tires, that a rest gives it back, and that the plate draws it blue.
+Whether it looks like a wake at sixty frames is only seen here.
+
+1. Any look (Lamp Ground at 0, as they ship, draws the bare water black), Settings → Camera →
+   **Glow** to 1, and work where the dye is thin. Good: nothing until a finger crosses the plate, then a blue line along the finger that
+   trails behind it and fades in a breath. Bad: a glow on still water, a flat blue tint,
+   blue where nothing moved, or a hard square grid in the light.
+2. Stroke the same path three times quickly: each fainter. Wait ten seconds and stroke it
+   again: bright as the first.
+3. **Glow Shear** to 100: only a quick stroke lights. To 10: a slow drift lights.
+4. Turn the music on with a stirring cord in Patches: the hits light wakes, the quiet
+   lets them come back.
+5. Glow at 0 on any look: the look exactly as before.

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the water's glow (PLAN 48c)
+
+- **Glow** (Settings → Camera, MIDI, the desks, the remote and the phone's Sound sheet): the
+  plate's water holds plankton that flash blue where the flow shears it, so a finger, a pour
+  or a stirring cord draws a glowing wake on a dark plate, and still water stays dark.
+- **Glow Shear** is the shear it takes to light (seawater's measured threshold by default);
+  **Glow Recharge** the seconds a spent cell takes to refill, so a path stroked again soon
+  glows less and a quiet passage lets it come back.
+
 ### Added — Polarised light (PLAN 31p-1)
 
 - **Polarisers** (Settings → Lamp & Light, MIDI, the desks and the phone): sheets under the

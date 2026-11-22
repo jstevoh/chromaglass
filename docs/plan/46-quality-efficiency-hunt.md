@@ -236,3 +236,12 @@ again ten times a second for three meters and a percentage.
   the open plate) is stepped by no count. (4) `renders`' work counter does not count a
   mount, so a leaf that remounted on every reading would cost work and count as none.
 
+- **46u · The lean display is one byte off the whole one for two looks on the owner's Mac**
+  (S; found 2026-11-21 by the 48c PR): `npm run leandisplay` on an M-series Mac reads
+  `comet (plate)` and `saffron-lace (plate)` 1 of 102400 bytes from the whole display, on
+  `origin/main` itself as well as on the 48c branch, so it is not that branch's. One byte in
+  a 160² rgba8 picture is a rounding step: the lean shader, with its gates folded to
+  constants, lets Metal's compiler order or fuse a sum differently. Find which effect's
+  folding moves it (take out one kept gate at a time), then either keep that expression's
+  order in both shaders or let the check allow one 8-bit step where a gate was folded, with
+  a control that a real dropped effect (hundreds of bytes) still fails.

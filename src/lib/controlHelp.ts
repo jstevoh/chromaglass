@@ -115,7 +115,7 @@ export const CONTROL_HELP: Record<string, string> = {
   soapFilm: 'A real soap film in the frame: it drains, swirls with the flow, goes black from the top and is drawn again.',
   soapFilmRate: 'How fast the soap film runs: drains, swirls and is drawn again. One is a real film\'s pace sped up for the stage.',
   soapFilmAngle: 'The angle the soap film is seen from. Leaning it moves every band of colour to a thicker film.',
-  glow: 'The water glows blue where it is sheared, like a wake in a bay of plankton, and tires: stir the same path again at once and it glows less. Best with the lamp low.',
+  glow: 'The water glows blue where a stroke shears it, like a wake in a bay of plankton, and tires: the same path again at once glows less.',
   glowShear: 'How hard the water must be sheared before it glows, per second. Lower lights a gentle stir; higher only a hard stroke.',
   glowRecharge: 'Seconds the glow takes to refill once it has flashed. Short and every stroke lights fully; long and a busy plate goes dark.',
   glitter: 'Glitter in the liquid: flakes that ride the flow, flip and glint in the Side Light and the closeup\'s softbox. Dark specks on the lamp.',
