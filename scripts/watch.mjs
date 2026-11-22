@@ -5,6 +5,7 @@
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
  *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
  *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]]
+ *   npm run watch -- --before A --after B [--out DIR]
  *   npm run watch -- --refs        the reference library (--vs takes a name from it)
  *   npm run watch -- --selftest
  *
@@ -76,10 +77,11 @@ import { designFrame, designSummary, designLines, compareDesign, paletteAcc, pal
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
 import { thumb, findDissolves } from './watchcuts.mjs';
 import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
+import { describe } from './watchwords.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', selftest: false, quiet: false, crop: null, vs: '', keep: '', note: '', refs: false };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, vs: '', keep: '', note: '', refs: false };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -97,6 +99,9 @@ function parseArgs(argv) {
     else if (a === '--to') opt.to = Number(v()) || 0;
     else if (a === '--at') opt.at = v().split(',').map(Number).filter(Number.isFinite);
     else if (a === '--vs') opt.vs = v();
+    else if (a === '--before') opt.before = v();
+    else if (a === '--after') opt.after = v();
+    else if (a === '--quiet') opt.quiet = true;
     // The reference library (scripts/watchrefs.mjs, 47v-2): keep this clip's
     // reads under a name, so a later `--vs <name>` needs no fetch.
     else if (a === '--keep') opt.keep = v();
@@ -114,7 +119,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 9).map(l => l.replace(/^ \* ?/, '')).join('\n'));
+  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 10).map(l => l.replace(/^ \* ?/, '')).join('\n'));
 }
 
 // ─── tools ───────────────────────────────────────────────────────────────────
@@ -713,16 +718,16 @@ async function watch() {
   const ps = physicsSummary(phys, { rate, cut: rows.map(r => !!(r.cut || r.fade)), W: w, scale: ds.scaleX?.med ?? null });
   phys.frames.length = 0;
   ds.physics = ps;
-  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds }, null, 1) + '\n');
-  const palettePng = path.join(out, 'palette.png');
-  if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
   const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, cuts.length / Math.max(1 / 60, span / 60))];
+  let refWords = null, refTitle = null;
   if (opt.vs) {
     // A path to a design.json, a folder holding one, or a kept reference's name.
     const vf = resolveRef(opt.vs);
     let ref = null;
     try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs}, and no reference of that name (npm run watch -- --refs lists them; watch the reference first, with this version of the tool)`, 2); }
-    designOut.push('', ...compareDesign(ref, ds, `the reference (${ref.title ?? vf})`, 'this'));
+    refTitle = ref.title ?? vf;
+    refWords = ref.words?.lines?.length ? ref.words : describe({ design: ref });
+    designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
     if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
   }
 
@@ -734,6 +739,13 @@ async function watch() {
     const m = f => g.reduce((s, r) => s + f(r), 0) / g.length;
     table.push(`| ${stamp(g[0].t)} | ${m(r => r.lum).toFixed(2)} | ${pct(m(r => r.dark))} | ${m(r => r.sat).toFixed(2)} | ${m(r => r.motion).toFixed(2)}${g.some(r => r.cut) ? ' cut' : ''} | ${loud ? m(r => r.loud).toFixed(0) : '–'} |`);
   }
+
+  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  const words = describe(result);
+  result.words = words;
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, words }, null, 1) + '\n');
+  const palettePng = path.join(out, 'palette.png');
+  if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
 
   const lines = [
     `# ${info?.title ?? path.basename(opt.file)}`,
@@ -747,6 +759,11 @@ async function watch() {
     `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t) + (rows[k].dissolve ? ' (dissolve)' : '')).join(', ') : 'none'}${dissolves.length ? `; ${dissolves.length} of them dissolves, ${dissolves.map(v => `${((v.to - v.from) / rate).toFixed(1)} s`).join(', ')}` : ''}`,
     ...shapeLines,
     sync ? `- sound: loudness median ${q(loud, 0.5).toFixed(0)} dB; motion vs loudness r = ${sync.r0.toFixed(2)} at no lag, best ${sync.best.toFixed(2)} with motion ${sync.lag >= 0 ? 'following' : 'leading'} the sound by ${Math.abs(sync.lag).toFixed(2)} s` : '- sound: no audio track',
+    '',
+    '## In words',
+    '',
+    ...words.lines,
+    ...(refWords ? ['', `## Reference in words (${refTitle})`, '', ...refWords.lines] : []),
     '',
     'Read first: the timeline (how it moves over the whole clip), then the sheets.',
     `- ${timeline}`,
@@ -766,7 +783,7 @@ async function watch() {
       crop: opt.crop, from: opt.from, to: opt.from + span, rate, note: opt.note || null });
     if (!opt.quiet) console.log(`\nkept as a reference: ${kept} (compare with --vs ${path.basename(kept)})`);
   }
-  return { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  return result;
 }
 
 // ─── the show's shape ────────────────────────────────────────────────────────
@@ -1369,7 +1386,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch, writePng, label };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where
@@ -1377,15 +1394,22 @@ export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation
 const main = !!process.argv[1] && path.basename(process.argv[1]) === 'watch.mjs'
   && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname;
 if (main) {
-  try {
-    parseArgs(process.argv.slice(2));
-    if (opt.selftest) await selftest();
-    else if (opt.refs) console.log(listRefs().join('\n'));
-    else if (!opt.input) { printHelp(); process.exit(2); }
-    else await watch();
-  } catch (e) {
-    if (!(e instanceof WatchError)) throw e;
-    console.error(`watch: ${e.message}`);
-    process.exit(e.code);
-  }
+  (async () => {
+    try {
+      parseArgs(process.argv.slice(2));
+      if (opt.selftest) await selftest();
+      else if (opt.refs) console.log(listRefs().join('\n'));
+      else if (opt.before || opt.after) {
+        if (!opt.before || !opt.after) fail('--before and --after are used together', 2);
+        const { watchPair } = await import('./watchpair.mjs');
+        const res = await watchPair(opt.before, opt.after, { ...opt });
+        if (!opt.quiet) console.log(res.diff.lines.join('\n'));
+      } else if (!opt.input) { printHelp(); process.exit(2); }
+      else await watch();
+    } catch (e) {
+      if (!(e instanceof WatchError)) throw e;
+      console.error(`watch: ${e.message}`);
+      process.exit(e.code);
+    }
+  })();
 }

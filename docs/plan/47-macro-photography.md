@@ -414,13 +414,10 @@ Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
 an unsteady measure says "may vary from take to take", and every word names its source.
 
-- **47x-1** the words: `scripts/watchwords.mjs` `describe()`, a "## In words" section at the
-  top of summary.md, `words` on `watchVideo`'s result. The check, `npm run watchwords`, was
-  written first, on clips made to sit at known poles.
-- **47x-2** what changed: `scripts/watchpair.mjs` `watchPair()` and
-  `npm run watch -- --before A --after B --out D`: diff.md ranks the changes in
-  just-noticeable steps and lists what held, with the two timelines stacked and frames at
-  matched times side by side.
+- ~~**47x-1** the words~~ (**shipped**): `scripts/watchwords.mjs` (`describe()`, `BANDS` table),
+  `## In words` (and reference section with `--vs`) in `summary.md`, `words` returned by `watchVideo`.
+- ~~**47x-2** what changed~~ (**shipped**): `compareReads()` in `scripts/watchwords.mjs`,
+  `scripts/watchpair.mjs` (`watchPair()`), `--before`/`--after` in `watch.mjs` writing `diff.md`, `diff-timeline.png`, `pairs.png`.
 - **47x-3** tried on real pairs (the blow-48 webm takes, the Classic closeup films), with the
   reads shown to the owner on one page.
 - **47x-4** a plan for sharing the watch tool as a Claude Code plugin (the owner decides

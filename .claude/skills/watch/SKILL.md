@@ -18,10 +18,12 @@ npm run watch -- <file or URL> --out <scratchpad>/<name>
 npm run watch -- clip.webm --out … --from 30 --to 90 --frames 36 --at 41.5,62
 npm run watch -- room.mkv --out … --crop 0.52,0.10,0.22,0.40   # only the projection
 npm run watch -- our-take.webm --out … --vs <scratchpad>/<reference>   # ours against it
+npm run watch -- --before A --after B --out <scratchpad>/<name>       # what changed between two films
 npm run watch -- film.mkv --out … --keep <name> --note "why"   # into the reference library
 npm run watch -- our-take.webm --out … --vs <name>   # against a kept reference, no fetch
 npm run watch -- --refs         # the library, with each reference's numbers
 npm run watch -- --selftest     # synthetic clips, frames and flows with known answers
+npm run watchwords              # vocabulary and before/after diff contract check
 ```
 
 ## The routine for a link the owner sends
@@ -40,8 +42,14 @@ npm run watch -- --selftest     # synthetic clips, frames and flows with known a
    sheet and run again with `--crop x,y,w,h` (fractions), or the design read
    measures the room. A circular projection inside a square crop reads some
    symmetry from the mask; say so.
-3. **Read** the timeline, the sheets, then the summary's Design, Physics and
-   Techniques sections. Take `--at` stills of what matters.
+3. **Read** the timeline, the sheets, then the summary's **In words** section
+   (every word with the number that chose it, its source in `docs/watch-words.md`,
+   and `(may vary from take to take)` on unsteady measures), followed by the Design,
+   Physics and Techniques sections. Take `--at` stills of what matters.
+   With `--vs`, a **Reference in words** section appears beside it.
+   For a before/after pair, run `--before A --after B --out <dir>` to write
+   `diff.md` (changes ranked in just-noticeable steps and what held, plus both
+   "In words" reads), `diff-timeline.png` and `pairs.png`.
 4. **Scan the pages.** Open the links the Techniques section lists
    (WebFetch), the maker's site and gear lists, for what they say they used.
    Where nothing says, the "Guessed from the footage" lines are a start: check
@@ -68,6 +76,7 @@ It prints a summary (also `summary.md`) and writes:
 | `stats.tsv` | Per sample: brightness, near-black fraction, blown fraction, saturation, motion, loudness. |
 | `palette.png` | The clip's six main colours, each as wide as its share. |
 | `design.json` | The design and physics reads, for a later `--vs`. |
+| `diff.md`, `diff-timeline.png`, `pairs.png` | Written by `--before A --after B`: `# What changed` (ranked steps, what held, both "In words" reads), stacked timelines, and matched-time frame pairs beside `before/` and `after/`. |
 
 The summary also names the dominant hues, the motion median and 90th
 percentile, and **motion vs loudness**: the correlation, and the lag at which
