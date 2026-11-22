@@ -244,4 +244,16 @@ is in the project's files).
   against the check's half (0.44 at 0.25). A held press on the floor has no squeeze, so it
   should push nothing; Classic is back at 0.25 until both are found, and the fix runs
   heldpress at 0.4 flat as well.
+- **38w-20. Warm cells still read soft in the app with Crisp Edges on** (M; High). Filmed in
+  the app on Metal (seed 1, 512² grid, 1280x800 canvas, after 12 s): the cyan cells' rims are
+  one crisp pixel, but the red and orange cells' rims are a soft three or four pixels, and
+  turning Crisp Edges off leaves them unchanged. Edge Relief adds a broad dark band just inside
+  them (it reads the solver's band at `rim0`, unmoved), but Edge Relief at 0 still leaves the
+  rim soft, so the relief is not the cause. Not measured yet, two guesses: those cells' oil band
+  is wider than 3.5 cells, which `crispInterface`'s `real` gate leaves alone on purpose as real
+  diffusion; or their dye has leaked out into the water (about 7% of it in the lab), so the
+  colour's edge is not the oil's. First read the band half-width (`eps / h.x`) and the dye
+  outside the oil at those rims in the app, then fix the cause in the solver (why warm cells
+  spread wider than cyan) and not in the plate. Once the rim is sharp, draw the meniscus as a
+  narrow line at the crisp rim (the chain rule through the warp), not as the band-wide halo.
 
