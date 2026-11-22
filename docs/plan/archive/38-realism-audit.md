@@ -166,3 +166,14 @@ On in every look, or nearly:
   liquid is still drawn at 0.7 of its ring (`mix(0.7, 1.0, filmT)` in `plate.ts`); making it whole
   moved `npm run filmlook`'s closeup00 line by one pixel on the GitHub Mac's Metal GPU (it passes in
   SwiftShader and on the owner's Mac), so it is its own item to be measured on that GPU.
+- ~~**38u-16. A look saved before 38u-5 has no stir cord**~~ — **Shipped 2026-11-22** (the
+  story is in `docs/plan-shipped.md`). A saved look from before version 3 is read with the cord
+  its own dials call for, once (`withStirCordOnce` in `userPresets.ts` `readAsNow`, not in
+  `sanitizeSettings`, which clamps every patch); the version is the mark, so a cord pulled and
+  saved stays pulled; `npm run musicstir` section 7.
+
+How it is ranked: what a person would see change on the wall, against what it costs to
+build and what it adds to the frame. S is under a day, M a few days, L a week or more.
+Every item here keeps today's look reachable until the Mac has judged the new one (the
+operating rules), and each ships from its own thread with the check that measures it
+written first. Line numbers are as read on main at d07ac31.

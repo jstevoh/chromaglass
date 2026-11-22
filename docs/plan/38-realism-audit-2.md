@@ -26,15 +26,15 @@ cost, then Low.
 | 4 | 18c-14 | The ambient seed pours dye and heat into every look (RS-38) | `18-physics-2.md` | S–M | High | new |
 | 5 | 18c-3b | The mouse's dye stamp and the themes' kicks lay no volume (RS-39) | `18-physics-2.md` | M | High | updates |
 | 6 | ~~38v-1~~ | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | shipped |
-| 7 | 18c-13 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
+| 7 | ~~18c-13~~ | ~~Every drop splashes as water, and its satellites add dye (RS-13)~~ | `18-physics-2.md` | S | Medium–High | **shipped** (`npm run dropwindow`; 18c-13b left) |
 | 8 | 9ad | The domes rise on \|B\|, not on its normal part (RS-20) | `09-ferrofluid.md` | S–M | Medium–High | new |
 | 9 | ~~18i-2~~ | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | shipped |
-| 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | new |
+| 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | `heatVisc` shipped; lift open behind 36e-7, 36e-8 |
 | 11 | 38v-2 | Comet's pull flickers with the beat, and is absent on the open plate (RS-3) | here | S | Medium | new |
-| 12 | 29a-11 | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | new |
+| 12 | ~~29a-11~~ | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | shipped |
 | 13 | 9ae | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | new |
 | 14 | 9t-11 | The domes' film has no upper wall; two magnets start nothing (RS-24) | `09-ferrofluid.md` | S | Medium | new |
-| 15 | 18e-9 | A thin film's optical path steps the wrong way (RS-26) | `18-physics-2.md` | S | Medium | new |
+| 15 | ~~18e-9~~ | A thin film's optical path steps the wrong way (RS-26) | `18-physics-2.md` | S | Medium | shipped |
 | 16 | 32d-6 | Soap film on the plate takes out 8× the light Airy allows (RS-29) | `32-soap-film.md` | S | Medium | new |
 | 17 | 38r-17 | The milk scatters through 6 mm, not the cover's gap (RS-30, RS-28) | `38-realism-audit.md` | S | Medium | updates |
 | 18 | 15g-18 | A press twists the liquid it squeezes (RS-36) | `15-tools-on-liquids.md` | S | Medium | new |
@@ -42,7 +42,7 @@ cost, then Low.
 | 20 | 9af | The magnet's strength and walk ride the music outside the cords (RS-44) | `09-ferrofluid.md` | S | Medium | new |
 | 21 | 38u-6 | The surge's speed terms, measured (RS-45) | `38-realism-audit.md` | S | Medium | updates |
 | 22 | 38v-3 | The kick pours soap and seeds the reaction (RS-46) | here | S | Medium | new |
-| 23 | 38v-4 | The spin and the cover read one viscosity and one gap for every layer (RS-50) | here | S | Medium | new |
+| 23 | ~~38v-4~~ | ~~The spin and the cover read one viscosity and one gap for every layer (RS-50)~~ | here | S | Medium | **shipped** (`spinDrag`, `npm run turntable`) |
 | 24 | 32g-2b | A ruptured cell thins on below Newton black (RS-12) | `32-soap-film.md` | S–M | Medium | new |
 | 25 | 38h-6 | The ferro glint's nine-arm star lights projected looks (RS-27) | `38-realism-audit.md` | S–M | Medium | updates |
 | 26 | 38l-5 | Bass Press lets go in one step (RS-42) | `38-realism-audit.md` | S–M | Medium | updates |
@@ -100,16 +100,14 @@ water, so it never does.
   over 60 s the soap and seed totals are the same under loud music and silence with no
   cord, and follow the cord's depth with one. (38v, from RS-46.)
 
-- **38v-4. The spin and the cover read one viscosity and one gap for every layer** (S;
-  Medium). `fluidSimulation.ts:3346-3347` takes the spin's ν from `carrierViscosity` (1e-6
-  or 2e-5 m²/s) while the thin gap solves with `thicknessViscosity(0.45)` = 22.4 cSt;
-  `LiquidVisualizer.tsx:4815` hands Layer 0's `coverUnits` to every layer, and so do
-  `LiquidVisualizer.tsx:4723`, `bubbles.ts:264` and `fluidSimulation.ts:2957`. Nine
-  'thin' looks run on that mismatch. The spin's lag time is τ = h²/(12ν), so a ν 22 times
-  off is a lag 22 times off. Read ν and the gap per layer from the one place the thin solve
-  reads them. Check: for each layer, the spin's ν equals `thicknessViscosity` and the
-  cover's gap equals that layer's; `npm run spin` stays green. (38v, from RS-50.)
-
+- **38v-4b. The cover glass and the bubbles still read Layer 0's gap (found with 38v-4)**
+  (S; Medium). 38v-4 gave the spin each layer's own ν and gap (`spinDrag`), but the cover's
+  drag (`coverDrag`, one shared cover), `LiquidVisualizer.tsx`'s cover read near the press,
+  `bubbles.ts`'s gap and `fluidSimulation.ts`'s slosh still take Layer 0's `coverUnits`. A
+  back layer under a thicker glass then drains, presses and holds its pockets at the front
+  glass's pace (Stefan's squeeze goes as h³). Read each from that layer's `gpu.coverMetres`.
+  Check: `npm run turntable` or `npm run stefan`, a two-layer plate with 1.5 mm and 3 mm
+  covers giving each layer its own squeeze time.
 - **38v-5. The chorus turns the look's dials outside the cords** (S–M; Medium).
   `useMusicIntelligence.ts:595-614`, on a chorus, adds 0.2 to turbulence, 0.15 to
   saturation and 0.2 to Impact, and scales turbulence by 0.7 + 0.6·energy;

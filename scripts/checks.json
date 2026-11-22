@@ -155,7 +155,7 @@
     {
       "name": "The turntable",
       "shard": "logic",
-      "run": "npm run turntable -- --owed=38v-4",
+      "run": "npm run turntable",
       "why": [
         "The spinning dish's CPU half: the liquid's lag behind the glass, Auto",
         "Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22)."
@@ -2781,7 +2781,7 @@
     {
       "name": "The relief",
       "shard": "plate",
-      "run": "npm run derive -- --owed=grad,height",
+      "run": "npm run derive -- --owed=grad",
       "why": [
         "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
         "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
@@ -3221,7 +3221,7 @@
     {
       "name": "The ferrofluid drop in the closeup",
       "shard": "open",
-      "run": "npm run ferrodrop -- --owed=29a-11",
+      "run": "npm run ferrodrop",
       "why": [
         "The closeup's ferrofluid drop (PLAN 29a): its surface the sessile",
         "balance's for its contact angle and size, leaned toward a magnet with",
@@ -3371,7 +3371,7 @@
     {
       "name": "The heat",
       "shard": "open",
-      "run": "npm run heat -- --owed=once",
+      "run": "npm run heat",
       "why": [
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",
@@ -3432,7 +3432,7 @@
     {
       "name": "A colour drop pushes the dye aside into a window of its own colour, and splashes only past Cossali's K",
       "shard": "fifth",
-      "run": "npm run dropwindow -- --owed=splashliquid,satellitedye",
+      "run": "npm run dropwindow",
       "timeout": 6,
       "why": [
         "PLAN 18c-2 and 18c-3: a colour drop on a thin gap is a pour of its",

@@ -111,5 +111,21 @@ and a stream held on the plate, lay their colour with their own volume; story in
 ## 18e. Edges come from refraction (replaces the painted rims and highlights)
 
 - ~~**18e-7**~~ #881 The closeup's relief reads the optical path at the lens's disc (`camLap`), not the colour step: no line where two dyes meet up close, the dial moves nothing there, a swell gathers light, bubbles left to the traced bubble. `npm run camrelief`, `holeline` 6 and 6b.
+- ~~**18e-9**~~ The optical path's height over a clear film uses the real gap `h = gap / 0.03` (with no `1 - 0.5·film` factor) in `calcOpl` (`wgsl/plate.ts`) and `lampDepthAt` (`wgsl/plateLamp.ts`), so `OPL = (n_water + 0.087·film)·h`. `npm run derive -- --owed=grad` (`height` taken out of `--owed`).
+
 ## 18i. Bubbles and beads live by physics, not timers (shipped)
 - ~~**18i-2**~~ **shipped**: `BeadField.setLiquid({ gapMetres, muOut, muIn, deltaRho, sigma })` slides by Δρ g sinθ b² / (12 μ_out (1 + λ)), every per-step drop rate is 1 − exp(−dt/τ) (Paterson coalescence, repel, attract, recolour), drops leave over the open circular rim, and `stepPlateBeads` (`src/sim/beadStep.ts`) wires the live gap and carrier/oil properties from the frame loop (`npm run drops` 33/33; story in [`docs/plan-shipped.md`](../plan-shipped.md) §18i-2). Left: retiring the 30-frame `populate` timer once presets/pours seed beads directly (currently required by `npm run webgpu` and presets with `beads > 0`), and `15g-17` (PR #914).
+
+## 18c. A pour adds liquid, not only colour
+
+- ~~**18c-13** The splash is water's, whatever liquid falls, and makes dye~~ — **Shipped** (S; Medium–High; `dropImpact` takes the bottle's ρ, σ, μ and live `coverMetres`, `layDrop` splits drop dye and volume across central drop and satellites; `npm run dropwindow`; trickle and crater left as 18c-13b).
+  `dropImpact.ts:82` carries water's ρ, σ and μ, so Cossali's K gates the satellites with
+  water's numbers for oil or glycerine; `dropSplash.ts:114` ignores the gap; the satellites
+  (`:119-134`) add 22% more dye than the drop held; the trickle (`:75-80`) carries no mass;
+  the crater (`:66`) is a fixed size. A splash needs K = We·Oh^-0.4 over about 2100 with the
+  falling liquid's own properties, and a drop splits its volume, it does not add to it. Read
+  the bottle's ρ, σ, μ, take the gap, and split the drop's dye and volume among crater, crown
+  and satellites. Check: total dye and volume after a splash within 0.5% of the drop's; an oil
+  drop from the same height does not splash. Lines are at 801a815e; after #905 the water constants
+  sit at `dropImpact.ts:89` and the satellites at `dropSplash.ts:193-207`, each still laying 0.22
+  of the drop's dye. (38v, from RS-13.)
