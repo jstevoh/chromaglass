@@ -9,7 +9,8 @@
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
     "cheap ones that hold the rest. `quarantine` (PLAN.md 19ak-1) lists a check's",
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
-    "still run and report and do not block. `scripts/checks.mjs` holds the rules."
+    "still run and report and do not block, on pull requests and, until 2026-12-06",
+    "(PLAN.md 19ak-18), on main's deploys too. `scripts/checks.mjs` holds the rules."
   ],
   "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
@@ -3693,6 +3694,10 @@
       "name": "The ear behind the wall",
       "shard": "open",
       "run": "node --experimental-strip-types scripts/ears.mjs",
+      "quarantine": [
+        { "line": "and it hears on the wall's asks", "plan": "19ad-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "covered with no wall, the worker's tick keeps the ear going", "plan": "19ad-1", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "The show keeps hearing while its window is hidden behind the wall's",
         "(scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second",
@@ -3857,6 +3862,7 @@
       "name": "The Live Show streams the picture",
       "shard": "fifth",
       "run": "npm run liveshow -- --stack --owed=stack",
+      "quarantine": [{ "line": "the Plate source's stream moves with the film", "plan": "19ak-19", "since": "2026-11-22", "until": "2026-12-06" }],
       "why": [
         "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
         "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",

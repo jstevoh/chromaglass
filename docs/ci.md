@@ -38,14 +38,17 @@ deploy:
   most 21 days out. Until then, on a pull request, a check red only on those lines is a
   warning (⚠ in the job summary) and its job stays green; any other FAIL line, a
   timeout, a crash, a check that stopped before its closing count, or the end date
-  passing, and it blocks as before. Main's deploy holds every line to its bar. Bars
-  never move for it, and adding one or moving its end later is a check change the PR
+  passing, and it blocks as before. Until 2026-12-06 main's deploys honour the same
+  entries (the owner's choice, PLAN.md 19ak-18: four deploys in a row were red only on
+  known flakes and the site stopped updating); from that day, set by
+  `MAIN_QUARANTINE_UNTIL` in `scripts/checks.mjs`, main's deploy holds every line to its
+  bar again, and a run outside CI always does. Bars never move for it, and adding one or moving its end later is a check change the PR
   names (`checkguard`). A red run on a line the PR cannot move is re-run by its
   **failed jobs** only, never all jobs.
   One exception to "main's deploy holds every line", the owner's choice (PLAN.md
   19ak-10, 2026-11-21): a deploy that trusts a PR's green run (`deploygate.sh` rules 4
   and 5) trusts it even when a quarantine held it green, so it does not run the
-  quarantined line itself; only a deploy that runs its own checks holds it.
+  quarantined line itself; a deploy that runs its own checks holds it from 2026-12-06.
 - **The Mac waits for the typecheck** (`Compiles, before the Mac`, PLAN.md 19ak-3c):
   `tsc --noEmit` on ubuntu beside `reach`; a PR that does not compile takes no Mac.
 - **A whole run re-run skips the shards that passed** (PLAN.md 19ak-3a): on attempt 2

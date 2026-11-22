@@ -219,6 +219,11 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   A third presentation on 2026-10-30 (#550, f3f052e): **68 ask, 0 frame, 0 tick over 71 frames
   asked for**, the "fewer is an ask the ear missed" side of the same line, three in two seconds
   with no stray reading against a bar of two; the same diff read the line green on four other runs.
+  *2026-11-21/22:* main's deploy 879 (492caba, GitHub's Macs) was red on this line and on its
+  neighbour "covered with no wall, the worker's tick keeps the ear going", and four or more PRs
+  that touch neither went red on them too, after #769's fix to the ear. Both lines are
+  quarantined on pull requests and main's deploys from 2026-11-22 to 2026-12-06 (19ak-18),
+  bars unmoved; the PR that finds which side is wrong takes the two entries out.
 
 - **19ad-2. The same shard failed with no check having failed, and with a check that is
   green seven times out of seven on the owner's Mac.** Two more presentations on PR
@@ -611,3 +616,27 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   ran 10 to 24 before 14d-2. *Fix:* assert what the feature promises (each kick the ear hears
   goes out as a message), by counting the ear's kicks over the same window and holding the OSC
   count to them, not to a number. *Measure:* the ratio on a loaded and an idle run.
+- **19ak-18. Decided: main's deploys honour the quarantines too, until 2026-12-06.** From
+  11-21 12:26 PM Pacific the site stayed on deploy 869 while deploys 871, 872, 879 and 881
+  were each red on a line already known to flake and that none of their changes reached:
+  startup's "moving for good" (19aa-7), intro's 9c (19ak-9), the ear behind the wall
+  (19ad-1) and the Live Show's film (19ak-19). Put to the owner on 2026-11-22 with the cost
+  (a regression on one of those lines could go live while the entry holds); the owner chose
+  to hold them on main too until 12-06. `quarantined()` in `scripts/checks.mjs` honours an
+  entry off a pull request only before `MAIN_QUARANTINE_UNTIL` (2026-12-06), whatever the
+  entry's own end date, so from that day main holds every line to its bar again without
+  anyone taking anything out; a run outside CI holds every line. The ear's two lines and
+  the Live Show film line got entries for the first time, and `scripts/liveshow.mjs` now
+  closes on "N/M checks passed", without which no entry on it could hold. *Measure:*
+  `node scripts/checks.mjs --self-test` (held on a push before the cut-off, red from it,
+  red outside CI). *Open:* each line's fix is its own item; when 12-06 comes, a line still
+  red on main is red on every deploy again, which is the point.
+- **19ak-19. Open, found 2026-11-21: the Live Show's "the Plate source's stream moves with
+  the film" goes red when the test film's own clock stalls.** On deploys 871 and 872
+  (owner-mac-2) and #900's first PR run (a GitHub Mac), the film the harness plays went 0.5
+  to 1.3 s in a 2.5 s window, so the stream rightly showed a still bar; green on 867 and
+  869. The stream is not the fault; the runner's load starves the film. *Fix:* make
+  `moving()` in `scripts/liveshow.mjs` say when the film's own clock stalled (its `during`
+  line already reads it) and hold the stream to the film it was given, then find why the
+  film stalls under load. Never a looser bar. Quarantined on PRs and main's deploys
+  2026-11-22 to 2026-12-06 (19ak-18); the fix takes the entry out.

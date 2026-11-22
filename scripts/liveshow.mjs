@@ -476,7 +476,7 @@ check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 finish();
 
 function finish() {
-  console.log(`\n${total - failed}/${total} passed`);
+  console.log(`\n${total - failed}/${total} checks passed`);
   process.exit(failed ? 1 : 0);
 }
 
@@ -593,15 +593,17 @@ async function stackLines() {
     check('the moving judgement passes every made-up moving stream and fails every frozen one, including those first-against-last read as still', p.ok,
       `${p.cases} streams; ${p.aliased} moving ones read as still by first against last; ${p.wrong.length ? `wrong on ${p.wrong.length}: ${p.wrong.slice(0, 3).join('; ')}` : 'wrong on none'}`);
   }
-  const moving = (which, f, id) => {
-    if (presentsInXvfb()) { console.log(` skip  the ${which} stream moves with the film: software WebGPU draws a few frames a minute`); return true; }
+  // `line` is written out whole at each call, so a quarantine on it
+  // (scripts/checks.json) finds its text in this file.
+  const moving = (line, f, id) => {
+    if (presentsInXvfb()) { console.log(` skip  ${line}: software WebGPU draws a few frames a minute`); return true; }
     const trail = (f?.trail ?? []).map(t => ({ ms: t.ms, col: barColumnOfRow(t.row) }));
     const m = barMoves(trail);
     // The strip's read of the last frame against the whole frame's, so a red
     // says whether the strip reader itself is wrong on this machine.
     const whole = f?.grid ? barColumnOfRow(f.grid.slice(7 * f.cols, 8 * f.cols)) : null;
     const strip = trail.length ? trail[trail.length - 1].col : null;
-    due(id, `the ${which} stream moves with the film: its bar is somewhere else a second later`, m.ok,
+    due(id, `${line}: its bar is somewhere else a second later`, m.ok,
       `${m.detail}; last frame's bar at column ${strip} by the strip, ${whole} by the whole frame; ${f?.during ?? ''}`, m.ok === false && f?.blackStream === true);
     return m.ok;
   };
@@ -775,7 +777,7 @@ async function stackLines() {
   if (decoded('Plate source\'s', plate)) {
     const p = stackJudge(plate, seen);
     due('plate', 'the Plate source\'s frames are the plate: the film, with the wall\'s keystone on it as the canvas has it', p.film && p.keystoned && p.same, p.detail, plate.blackStream);
-    moving('Plate source\'s', plate, 'plate');
+    moving("the Plate source's stream moves with the film", plate, 'plate');
   }
 
   const choice = await page.getByTestId('live-source').count();
@@ -785,7 +787,7 @@ async function stackLines() {
   if (decoded('Mixer stack source\'s', stack)) {
     const s = stackJudge(stack, seen);
     due('stack', STACK_LINE, s.film && s.square && s.same, s.detail, false);
-    moving('Mixer stack source\'s', stack, 'stack');
+    moving("the Mixer stack source's stream moves with the film", stack, 'stack');
   }
   await page.getByTestId('live-source').selectOption('plate');
 }
