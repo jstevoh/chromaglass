@@ -225,3 +225,53 @@ liquid that lights where its flow stretches it ("Let's do it!").*
   analyser at a half. *Measure:* with the sheets in and crossed, a still plate's glints are
   dimmed by the analyser and not by the polariser.
 
+
+## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
+
+*The owner, 2026-11-22, on the flower (eight grey discs round every moving drop, 15g-15):
+"why are we using stencils at all? ... and not simulating the actual physical effect of
+things?" The flower was a sampling fault: the plate's slope was read from taps three cells
+apart, so a drop narrower than that was seen once per tap and drawn eight times. The stopgap
+(15g-15) reads the slope with a dense smooth stencil instead, but the deeper fault stays:
+the light the plate draws is not the light a liquid would throw. The optical path comes from
+how much dye sits in a cell, not from the shape of the oil and water surface, and the light is
+only darkened where it is, never moved, so there are no caustics: no bright rims focused by a
+lens-shaped drop, no shadow beside it.*
+
+- **31s-1. The liquid's surface height as a solver field.** A height field h (the oil layer's
+  thickness over the water, and the water's own free surface) advected by the flow and levelled
+  by the thin-film (lubrication) equation: dh/dt + div(h u) = -div( h^3/(3 mu) grad(p) ), with
+  p = -sigma lap(h) + rho g h. Surface tension pulls a drop's edge into a meniscus whose width is
+  the capillary length (about 2 mm for oil on water, sqrt(sigma/(rho g))); gravity levels a
+  wide pool. Interfacial tension between oil and water sets the contact shape where the phases
+  meet (the phase field already knows where). *Measure (lab):* a still lens of oil keeps the
+  meniscus profile set by the capillary length (within 10%); a sine ripple of wavenumber k on a
+  layer h0 decays on tau = 3 mu / (h0^3 (sigma k^4 + rho g k^2)) (within 15%); mass of h is
+  kept to 0.1% over 600 steps.
+- **31s-2. Light traced through the surface, gathered on the wall.** Each lamp ray leaves the
+  lamp, bends at the surface by Snell's law (air, oil, water and glass indices, the slope from
+  31s-1), and lands on the wall where its new direction takes it; the wall's brightness is how
+  many rays land in each pixel (the inverse Jacobian of that map). A lens-shaped drop then
+  focuses a bright rim and throws a shadow beside it by itself, as on an overhead projector.
+  This replaces the dye-thickness optical path and the aperture darkening (refractionOptics),
+  and the stopgap's dense slope stencil (15g-15). *Measure (lab):* a plano-convex drop of
+  radius R focuses at R/(n-1) within 10%; a flat plate lights the wall evenly (1%); light is
+  kept (total on the wall within 1% of total in); no feature is drawn twice (one peak per drop
+  in the wall's autocorrelation).
+- **31s-3. The other sparse stencils.** Still reading the plate at a stride: the bubble glow's
+  airNear (a 9-tap max at 4.5 cells, plate.ts), the camera's camLap (an 8-tap max,
+  plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c) and blurAlpha (3x3). Each can draw
+  ghost copies of anything narrower than its stride the way the slope did. Replace each with the
+  traced light of 31s-2 where it is optics, or a dense stencil where it is a field read.
+- **31s-4. Retune the looks on the traced light.** Once 31s-2 draws the plate, every preset's
+  brightness, contrast and rim weight moves. Retune on films from the Mac, judged by the owner
+  against the reference library (watch skill).
+- **31s-5. An audit of how fields are sampled, and a check that a drop is drawn once.** The four
+  realism passes (§18, §38) asked of each effect whether it is a law or a stand-in; none asked how
+  a field is read. A sparse stencil is a correct operator on anything wider than its stride and
+  draws ghost copies of anything narrower, which is how the flower passed every audit. Pass: list
+  every shader read of a solver field at a stride over one cell, or a max/min over sparse taps,
+  with what it can ghost. Check (lab): seed single small drops (one to three cells) and moving
+  ones, render the wall, and assert one peak per drop in the picture's autocorrelation (no copies
+  at the stencil's offsets); it must fail on the old three-cell Sobel. 38w-7 (small cells as
+  rounded squares) may be the same square stencil: re-film it after 15g-15.
