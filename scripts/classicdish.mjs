@@ -31,10 +31,15 @@
  *   1. the dish is full of the water's dye: of the water (where the oil is
  *      not), at least DYED is dyed WET up and nearer the water's dye than
  *      any oil's, more than the old lay's share of dye on black glass
- *   2. the cells stay apart: of the oil discs laid, at least KEPT are still
- *      cells (4-connected regions of the oil over a half, SPECK cells up)
- *      after five seconds, at least CELLS_MIN of them (complexity: the
- *      round-three lay packed 75) and no more than CELLS_MAX
+ *   2. the cells stay apart: of the oil bodies laid (discs that overlap
+ *      count as one body, since the poured lay joins a pour's touching
+ *      drops, PLAN 38w-22), at least KEPT are still cells (4-connected
+ *      regions of the oil over a half, SPECK cells up) after five seconds,
+ *      at least CELLS_MIN of them (complexity: the round-three lay packed
+ *      75) and no more than CELLS_MAX
+ *   2b. the oil lies unevenly, poured, not packed: the oil's cover of 6 by 4
+ *      boxes of the frame varies by at least SPREAD of its mean (the owner,
+ *      2026-11-22: "too symmetric"; PLAN 38w-22)
  *   3. of many sizes: the median cell's diameter between 5% and 15% of the
  *      frame's height (FRAME: the wall shows the middle of the plate,
  *      uvToFluid), the biggest at least three times the smallest's and no
@@ -60,7 +65,9 @@
  *   7. the rims are crisp (Crisp Edges): drawn on a RIM_PX wall, the median
  *      10-90 rise across a rim is at most RIM_SHARP pixels at the look's
  *      Crisp Edges and at least RIM_SOFT with it off
- *   8. and the lines read the liquid, not the lay: the bare dish (the same
+ *   8. and no dark halo rings the cells: the water 2-8 px outside a rim is at
+ *      least HALO as bright as with Edge Relief off, where the old 0.6 was not
+ *   9. and the lines read the liquid, not the lay: the bare dish (the same
  *      lay with Film Hold and Oil Bodies off) fails 2 and 6.
  *
  * Measured while writing this (lab, 192², 300 steps) and printed below.
@@ -100,7 +107,7 @@ const WALL = 10 / 16;  // the wall's height over its width: the film's 1280x800
 // (plate.ts) shows H / (1.5·max(W, H)) of the plate high, 0.42 at 16:10.
 const FRAME = WALL / 1.5 / (2 * DISH);
 const KEPT = 0.9;      // of the cells laid, still apart after five seconds
-const CELLS_MAX = 300;  // the lay draws 900 (CLASSIC_DROPS) and packs what fits: 168 and 160 on the two seeds at 384²; more than that cannot be the lay
+const CELLS_MAX = 300;  // the lay draws 900 (CLASSIC_DROPS) and keeps what fits: about 140 bodies of about 210 discs at 384² since the pours (38w-22); more than that cannot be the lay
 /*
   Complexity, the owner's first word (2026-11-21). The two stills the owner
   pointed at (refsheet.jpg's first two, Liquid Loops 1969) each hold eighty
@@ -131,7 +138,16 @@ const RIM_VIEW = 1.5;
 const RIM_AA = 0.3;     // the share of the on arm's rim rises with a pixel between 10% and 90%: antialiased, not a staircase
 const RIM_KEEP = 0.9;   // the on arm keeps at least this much of the off arm's share of rims (not dropped from the median)
 const RIM_SPAN = 60;    // levels of green between the 10th and 90th percentiles
-const RIM_RELIEF = 0.7; // the meniscus's share of the picture with Crisp Edges, against without
+const HALO = 0.95;      // the water's light beside a cell, in the look against with no Edge Relief at all
+const HALO_OLD = 0.6;   // the Edge Relief Classic had before 38w-23, whose halo the instrument must see
+/*
+  The spread of the oil's cover over the frame's boxes (PLAN 38w-22). On the
+  laid discs, before any step: the round-three packing read 5 to 9% on three
+  seeds, the poured lay 30 to 43%. The bar sits between, nearer the packed
+  lay than the poured one, so it fails a dish packed edge to edge and passes
+  any lay that leaves open water somewhere in the frame.
+*/
+const SPREAD = 0.18;
 const HELD = 0.75;     // of the drops laid, still held where they were laid
 const WARM = 0.6;
 const CARRIED = 0.9;
@@ -206,7 +222,7 @@ try {
   const [dial, detail] = await page.evaluate(() => { const s = lab.look('classic').settings; return [s.turbulenceScale ?? 0, s.turbulenceDetail ?? 3]; });
   const TURB = { turbScale: app.stirOf(dial), turbDetail: Math.max(1, Math.min(4, Math.round(detail))) };
   console.log(`classic stirs at ${TURB.turbScale.toFixed(3)} (dial ${dial}, detail ${TURB.turbDetail})`);
-  const run = (which, lay, off = {}) => page.evaluate(async ({ which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP, TURB }) => {
+  const run = (which, lay, off = {}) => page.evaluate(async ({ which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP, TURB, WALL, RIM_VIEW }) => {
     await lab.create(N, N);
     const { settings: s, dyes: now } = lab.look('classic');
     const dyes = which === 'before' ? OLD : now;
@@ -330,7 +346,41 @@ try {
       const x = v % n, y = (v - x) / n;
       return Math.hypot((x + 0.5) / n - d.x, (y + 0.5) / n - d.y) <= d.r;
     }))).length;
-    const laidCells = which === 'before' ? 0 : lay.mixes.filter((d) => d.oil > 0).length;
+    /*
+      The cells laid are the bodies of oil the lay leaves, not its discs:
+      since PLAN 38w-22 drops of one pour that land touching run into one
+      body (classicDiscs), laid as overlapping discs, and the solver sees one
+      cell. Counting discs would ask the plate to keep apart drops that the
+      lay itself joined. Discs of different pours never touch (the film gap).
+    */
+    const oilDiscs = which === 'before' ? [] : lay.mixes.filter((d) => d.oil > 0);
+    const root = oilDiscs.map((_, i) => i);
+    const find = (i) => { while (root[i] !== i) i = root[i] = root[root[i]]; return i; };
+    for (let i = 0; i < oilDiscs.length; i++) for (let j = 0; j < i; j++) {
+      const a = oilDiscs[i], b = oilDiscs[j];
+      if (Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r) root[find(i)] = find(j);
+    }
+    const laidCells = oilDiscs.filter((_, i) => find(i) === i).length;
+    /*
+      Irregularity (PLAN 38w-22): the owner judged round three "too
+      symmetric". Its lay packed the dish to saturation, so every part of the
+      wall held the same share of oil. A poured dish does not: the oil lies
+      in trails and clumps along the hand's path, with open water between.
+      This reads the share of each of 6 by 4 boxes of the frame the oil
+      covers after five seconds, and their spread (standard deviation over
+      the mean). Clark-Evans' nearest-neighbour ratio was tried first and
+      read "regular" on lays that plainly clump, since drops in a clump are
+      still kept a film apart; the cover of a box sees the clump and the gap.
+    */
+    const FX = 0.5 / RIM_VIEW, FY = WALL / 2 / RIM_VIEW, BX = 6, BY = 4, boxes = [];
+    for (let j = 0; j < BY; j++) for (let i = 0; i < BX; i++) {
+      let c = 0, k = 0;
+      for (let y = Math.floor((0.5 - FY + (2 * FY * j) / BY) * n); y < (0.5 - FY + (2 * FY * (j + 1)) / BY) * n; y++)
+        for (let x = Math.floor((0.5 - FX + (2 * FX * i) / BX) * n); x < (0.5 - FX + (2 * FX * (i + 1)) / BX) * n; x++) { c += oilAt(x + y * n) ? 1 : 0; k++; }
+      boxes.push(c / k);
+    }
+    const coverMean = boxes.reduce((p, q) => p + q, 0) / boxes.length;
+    const spread = coverMean > 0 ? Math.sqrt(boxes.reduce((p, q) => p + (q - coverMean) ** 2, 0) / (boxes.length - 1)) / coverMean : 0;
     const diam = cells.map((c) => 2 * Math.sqrt(c.size / Math.PI) / (2 * DISH * n)).sort((p, q) => p - q);
     /*
       Colours: each cell is named by the laid oil dye its colour is nearest
@@ -365,9 +415,9 @@ try {
     return {
       dyed: water ? dyed / water : 0, cells: cells.length, laidCells, held, laidDrops: drops.length, colours: named.size,
       median: diam.length ? diam[diam.length >> 1] : 0, smallest: diam[0] ?? 0, biggest: diam[diam.length - 1] ?? 0,
-      warm: oilDye > 0 ? warm / oilDye : 0, carried: laidInOil > 0 ? carried / laidInOil : 0, png,
+      warm: oilDye > 0 ? warm / oilDye : 0, carried: laidInOil > 0 ? carried / laidInOil : 0, png, cover: coverMean, spread,
     };
-  }, { which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP: !!DUMP, TURB });
+  }, { which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP: !!DUMP, TURB, WALL, RIM_VIEW });
 
   const pc = (v) => `${(v * 100).toFixed(1)}%`;
   const fmt = (r) => `dyed ${pc(r.dyed)}, ${r.cells} cells of ${r.laidCells} laid (median ${pc(r.median)}, ${pc(r.smallest)}–${pc(r.biggest)} of the dish), `
@@ -401,14 +451,24 @@ try {
     plate's green must span RIM_SPAN levels, so a flat frame's one-level
     noise is not read as rims.
 
-    The meniscus: Edge Relief draws a dark and a bright line round every
-    cell, the light the curved oil surface bends. Crisp Edges must not erase
-    it (a first version did, reading the relief at the moved point, out in
-    the flat phase). The relief's share of the picture is the mean |green
-    with the look's Edge Relief - green with 0|, and with Crisp Edges on it
-    must be at least RIM_RELIEF of what it is off.
+    No halo (38w-23). This line used to ask that Edge Relief's meniscus
+    survive Crisp Edges. But Edge Relief reads the slope of the dye, not
+    the oil's edge (shortcut notes 1, 6 and 7 in wgsl/plate.ts), and in the
+    owner's round four it was what drew a wide dark ring, squared to the
+    grid, round every dye-heavy warm cell: the lattice the owner called too
+    symmetric, and the soft red rims of round three. Classic now has it at
+    0, and the claim is the one the owner can see: the water just outside
+    each cell is as bright as the water is. The ring is the water pixels
+    (oil fraction under one half) with oil within 8 px but none within 2,
+    on the solver's own mix field as above. Its mean light (Rec. 709
+    luminance) in the look's picture must be at least HALO of the same
+    pixels drawn with Edge Relief 0, so whatever comes to draw a rim later
+    (18e-2, the oil's own meniscus) may brighten it or darken it a little,
+    not ring it in black. And the instrument must see a halo when there is
+    one: with the old HALO_OLD the same ratio must fall under HALO, or the
+    ring is not where the halo was and the line proves nothing.
   */
-  await page.evaluate(({ RIM_PX, RIM_GATE, RIM_VIEW }) => {
+  await page.evaluate(({ RIM_PX, RIM_GATE, RIM_VIEW, HALO_OLD }) => {
     window.rimMeasure = async () => {
       const s = lab.look('classic').settings, n = RIM_PX, ce = s.crispEdges ?? 0;
       const m = await lab.chemistry('mix');
@@ -446,14 +506,34 @@ try {
         return { span: hi - lo, ...st, kept: st.rises / Math.max(1, st.rises + dropped), dropped, other: stats(other) };
       };
       const onG = green(await draw(ce, 0)), offG = green(await draw(0, 0));
-      const relief = async (c, G0) => { const G = green(await draw(c, s.edgeRelief ?? 0)); let d = 0; for (let q = 0; q < n * n; q++) d += Math.abs(G[q] - G0[q]); return d / (n * n); };
+      // The ring: water pixels with oil within 8 px but none within 2, by a
+      // square max filter over the oil mask at the picture's own size.
+      const O = new Uint8Array(n * n);
+      for (let y = 0; y < n; y++) {
+        const v = 0.5 - ((y + 0.5) / n - 0.5) / RIM_VIEW;
+        for (let x = 0; x < n; x++) O[y * n + x] = oil(0.5 + ((x + 0.5) / n - 0.5) / RIM_VIEW, v) >= 0.5 ? 1 : 0;
+      }
+      const near = (r) => {
+        const h = new Uint8Array(n * n), out = new Uint8Array(n * n);
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { let m = 0; for (let k = Math.max(0, x - r); k <= Math.min(n - 1, x + r) && !m; k++) m = O[y * n + k]; h[y * n + x] = m; }
+        for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) { let m = 0; for (let k = Math.max(0, y - r); k <= Math.min(n - 1, y + r) && !m; k++) m = h[k * n + x]; out[y * n + x] = m; }
+        return out;
+      };
+      const in8 = near(8), in2 = near(2), ring = [];
+      for (let q = 0; q < n * n; q++) if (!O[q] && in8[q] && !in2[q]) ring.push(q);
+      const light = async (relief) => {
+        const px = await draw(ce, relief); let t = 0;
+        for (const q of ring) t += 0.2126 * px[q * 4] + 0.7152 * px[q * 4 + 1] + 0.0722 * px[q * 4 + 2];
+        return t / Math.max(1, ring.length);
+      };
+      const bare = await light(0);
       return {
         ce, edgeRelief: s.edgeRelief ?? 0, on: widths(onG, false), off: widths(offG, false),
         offFlipped: widths(offG, true).rises,
-        reliefOn: await relief(ce, onG), reliefOff: await relief(0, offG),
+        ring: ring.length, bare, look: (await light(s.edgeRelief ?? 0)) / Math.max(1e-6, bare), old: (await light(HALO_OLD)) / Math.max(1e-6, bare),
       };
     };
-  }, { RIM_PX, RIM_GATE, RIM_VIEW });
+  }, { RIM_PX, RIM_GATE, RIM_VIEW, HALO_OLD });
   const nows = [], rims = [];
   for (let i = 0; i < SEEDS.length; i++) { nows.push(await run('now', lays[i])); rims.push(await page.evaluate(() => window.rimMeasure())); }
   const before = await run('before', null);
@@ -479,6 +559,8 @@ try {
     `${each((r) => pc(r.dyed))} of the water against ${pc(before.dyed)}`);
   check(`at least ${pc(KEPT)} of the cells laid are still apart after five seconds, and at least ${CELLS_MIN} of them`, all(complex),
     `${each((r) => `${r.cells} of ${r.laidCells}`)} (the old lay: ${before.cells})`);
+  check(`the oil lies unevenly, poured, not packed: the oil's cover of 6 by 4 boxes of the frame varies by at least ${pc(SPREAD)} of its mean (PLAN 38w-22)`, all((r) => r.spread >= SPREAD),
+    each((r) => `${pc(r.spread)} of a mean cover of ${pc(r.cover)}`));
   check(`of many sizes, the median 5–15% of the frame's height across and none over ${pc(BIGGEST_MAX)}`, all((r) => r.median / FRAME >= 0.05 && r.median / FRAME <= 0.15 && r.biggest >= 3 * r.smallest && r.biggest / FRAME <= BIGGEST_MAX),
     each((r) => `median ${pc(r.median / FRAME)} of the frame, ${pc(r.smallest / FRAME)} to ${pc(r.biggest / FRAME)}`));
   check(`at least ${pc(HELD)} of the drops of water laid in cells are still held there`, all(heldOk),
@@ -492,9 +574,9 @@ try {
     && r.on.median <= RIM_SHARP && r.on.aa >= RIM_AA && r.off.median >= RIM_SOFT && r.on.kept >= RIM_KEEP * r.off.kept && r.offFlipped < r.off.rises / 2;
   check(`the rims are crisp on a ${RIM_PX}-pixel wall: at the look's Crisp Edges the median rise across an oil rim is at most ${RIM_SHARP} px and antialiased, and at least ${RIM_SOFT} px with it off (PLAN 38w-15)`,
     rims.every(rimOk), rims.map((r, i) => r ? `seed ${SEEDS[i]}: Crisp Edges ${r.ce}: ${rimFmt(r.on)}; off: ${rimFmt(r.off)}; the gate upside down ${r.offFlipped} rims` : `seed ${SEEDS[i]}: no mix field`).join(' | '));
-  check(`and the meniscus round the cells is kept: Edge Relief's share of the picture with Crisp Edges at least ${pc(RIM_RELIEF)} of it without`,
-    rims.every((r) => r && r.edgeRelief > 0 && r.reliefOff > 0.5 && r.reliefOn >= RIM_RELIEF * r.reliefOff),
-    rims.map((r, i) => r ? `seed ${SEEDS[i]}: ${r.reliefOn.toFixed(2)} against ${r.reliefOff.toFixed(2)} levels at Edge Relief ${r.edgeRelief}` : 'none').join('; '));
+  check(`and no dark halo rings the cells: the water 2–8 px outside a rim keeps at least ${pc(HALO)} of its light without Edge Relief, where the old ${HALO_OLD} did not (PLAN 38w-23)`,
+    rims.every((r) => r && r.ring >= 10000 && r.bare > 8 && r.look >= HALO && r.old < HALO),
+    rims.map((r, i) => r ? `seed ${SEEDS[i]}: ${pc(r.look)} at Edge Relief ${r.edgeRelief}, ${pc(r.old)} at ${HALO_OLD}, over ${r.ring} px of ring at ${r.bare.toFixed(0)} levels` : 'none').join('; '));
   check('the lines read the liquid: with Film Hold and Oil Bodies off the same dish fails them', !kept(bare) && bare.carried < CARRIED,
     `${bare.cells} of ${bare.laidCells} cells apart, ${pc(bare.carried)} carried`);
 } finally {

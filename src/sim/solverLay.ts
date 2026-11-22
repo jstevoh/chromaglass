@@ -25,6 +25,7 @@ import type { PlateSolver } from '../gpu/solverTypes';
 import { layCrowd } from '../lib/oilLay';
 import { dyeAbsorbances } from '../lib/dye';
 import { OPEN_RIM } from '../lib/turntable';
+import { plateLook } from '../presetPlate';
 
 export function layClassicOnSolver(
   gpu: PlateSolver | null, S: number, rand: () => number, dyes: number,
@@ -81,6 +82,9 @@ export class SolverSeeds {
     if (s !== null) this.scale = k;
     try { return f(); } finally { this.scale = s; }
   }
+
+  /** True outside a capture and a scaled lay: a seed laid whole, at once. */
+  plain(): boolean { return this.scale === 1; }
 
   /** Run a capture's lay with no share at once; true when it laid on the solver. */
   capture(lay: () => void): boolean {
@@ -155,4 +159,92 @@ export function scaleSince(arrays: Float32Array[], before: Float32Array[], k: nu
     const a = arrays[c], b = before[c];
     for (let i = 0; i < a.length; i++) a[i] = b[i] + (a[i] - b[i]) * k;
   }
+}
+
+/*
+  A look laid before any solver is attached, owed its oil (PLAN 38w-21).
+
+  What was reported: Classic's red and orange cells kept soft rims in the app,
+  and Crisp Edges, which draws the oil's edge one pixel wide, did not change
+  them. What was measured (2026-11-22, the app on Metal, ?look=classic&seed=1,
+  14 s in): the solver held no oil at all. Its mix field had never been made
+  (mix null, mixLive false, oilPoured 0), on main and on the branch alike, and
+  the same look applied again a few seconds later laid 280 bodies of oil
+  (mixLive true, oilPoured 0.29). The app lays its opening look into the CPU
+  arrays before the GPU device is up (LiquidVisualizer seeds the first layer
+  as it makes it), and these looks lay their oil only on the solver (addMix,
+  layOil, layDye): with none attached it went nowhere, and the colours landed
+  as dye in water with no second liquid to hold an edge. A dye edge with no
+  interface under it diffuses, and there is no interface for the plate to
+  draw sharp, which is the soft rim. The lab check (classicdish) lays on a
+  solver it already has, so it never saw this.
+
+  So a plain lay of one of these looks with no solver is remembered with what
+  it put in the four dye arrays, and the first solver attached that carries no
+  plate across has that taken back out and the look laid again on it, oil and
+  all. The picture is the same look laid fresh a moment later, not the CPU's
+  layout: the CPU's dye spots were never a dish anyone saw with its oil.
+*/
+export const SOLVER_OIL_LOOKS: ReadonlySet<string> = new Set(['classic', 'clock-glass', 'splodascope', 'foam-cells', 'lava-lamp']);
+
+type Noise = (x: number, y: number) => number;
+
+export class OwedLay {
+  private owed: { look: string; noise: Noise; delta: Float32Array[] } | null = null;
+
+  /** `arrays` hands over the four dye arrays as they are now (a resize makes new ones). */
+  constructor(private readonly arrays: () => Float32Array[]) {}
+
+  /**
+   * Run a lay `f` of `look`. When `free` (no solver attached, a plain seed)
+   * and the look lays its oil on the solver, keep what `f` put in the dye
+   * arrays, to take back and lay again at the attach.
+   */
+  lay<T>(free: boolean, look: string, noise: Noise, f: () => T): T {
+    const arrays = this.arrays();
+    const before = free && SOLVER_OIL_LOOKS.has(plateLook(look)) ? arrays.map(a => a.slice()) : null;
+    const out = f();
+    if (before) {
+      const delta = arrays.map((a, c) => {
+        const d = new Float32Array(a.length), b = before[c];
+        for (let i = 0; i < a.length; i++) d[i] = a[i] - b[i];
+        return d;
+      });
+      this.owed = { look, noise, delta };
+    }
+    return out;
+  }
+
+  clear(): void { this.owed = null; }
+
+  /**
+   * At an attach: nothing is owed after it. With `relay` (no plate carried
+   * across), the owed lay's dye is taken back out of the arrays and `lay` is
+   * handed its look and noise to lay them on the solver.
+   */
+  take(relay: boolean, lay: (look: string, noise: Noise) => void): void {
+    const o = this.owed;
+    this.owed = null;
+    if (!o || !relay) return;
+    const arrays = this.arrays();
+    if (arrays.some((a, c) => a.length !== o.delta[c].length)) return; // resized since: the delta no longer lines up
+    for (let c = 0; c < arrays.length; c++) {
+      const a = arrays[c], d = o.delta[c];
+      for (let i = 0; i < a.length; i++) a[i] = Math.max(0, a[i] - d[i]);
+    }
+    lay(o.look, o.noise);
+  }
+}
+
+/** The dish's mean dye inside the open rim, each cell capped at 6 (seedPreset's measure of what a look laid). */
+export function dishMean(density: Float32Array, S: number, dishArea: number): number {
+  let s = 0;
+  for (let j = 0; j < S; j++) {
+    const v = (j + 0.5) / S - 0.5;
+    for (let i = 0; i < S; i++) {
+      const u = (i + 0.5) / S - 0.5;
+      if (u * u + v * v < OPEN_RIM * OPEN_RIM) s += Math.min(6.0, density[i + j * S]);
+    }
+  }
+  return s / Math.max(1, dishArea);
 }
