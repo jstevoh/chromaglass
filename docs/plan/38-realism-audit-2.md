@@ -32,7 +32,7 @@ cost, then Low.
 | 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | `heatVisc` shipped; lift open behind 36e-7, 36e-8 |
 | 11 | 38v-2 | Comet's pull flickers with the beat, and is absent on the open plate (RS-3) | here | S | Medium | new |
 | 12 | ~~29a-11~~ | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | shipped |
-| 13 | 9ae | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | new |
+| 13 | ~~9ae~~ | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | shipped |
 | 14 | 9t-11 | The domes' film has no upper wall; two magnets start nothing (RS-24) | `09-ferrofluid.md` | S | Medium | new |
 | 15 | ~~18e-9~~ | A thin film's optical path steps the wrong way (RS-26) | `18-physics-2.md` | S | Medium | shipped |
 | 16 | 32d-6 | Soap film on the plate takes out 8× the light Airy allows (RS-29) | `32-soap-film.md` | S | Medium | shipped #928 |
