@@ -2790,7 +2790,7 @@
     {
       "name": "The straw bubble",
       "shard": "plate",
-      "run": "npm run straw -- --owed=area",
+      "run": "npm run straw",
       "why": [
         "Held still, the Blow grows a bubble with a fingered rim and a ring of satellites."
       ]
