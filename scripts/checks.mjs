@@ -1003,8 +1003,9 @@ async function selftest() {
   say(refuses(qd('the flaky line', day(0), day(QUARANTINE_DAYS + 1))), `a quarantine longer than ${QUARANTINE_DAYS} days is refused`);
   say(refuses(qd('flaky')), 'a quarantined line too short to name one FAIL line is refused');
   say(!refuses(qd('the flaky line')), 'and a whole entry is taken');
-  // The real ones: each names a check that has the line, and a plan id the plan has.
-  const planText = fs.readdirSync(path.join(ROOT, 'docs/plan')).map((f) => fs.readFileSync(path.join(ROOT, 'docs/plan', f), 'utf8')).join('\n');
+  // The real ones: each names a check that has the line, and a plan id the live plan has
+  // (docs/plan/*.md; a quarantine's debt is open work, so not docs/plan/archive/).
+  const planText = fs.readdirSync(path.join(ROOT, 'docs/plan')).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(ROOT, 'docs/plan', f), 'utf8')).join('\n');
   const qs = man.checks.flatMap((c) => (c.quarantine ?? []).map((q) => ({ c, q })));
   const noPlan = qs.filter(({ q }) => !new RegExp(`\\*\\*${q.plan.replace(/[-]/g, '\\-')}\\b`).test(planText));
   say(!noPlan.length, `every quarantined line's plan id is an item in docs/plan/ (${qs.length} lines${noPlan.length ? `; not found: ${noPlan.map(({ q }) => q.plan).join(', ')}` : ''})`);

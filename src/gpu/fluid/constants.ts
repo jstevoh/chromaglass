@@ -694,6 +694,20 @@ export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
   that much faster.
 */
 export const DRIP_WEIGHT = 0.5;
+/**
+  Rain Drip as the solver reads it: the look's dial times how far the plate is
+  tipped (Gravity, plateUpright, 0 flat to 1 on the wall). The in-plane share
+  of gravity is g sin θ, so a level plate has none and heavy dye there only
+  slumps (hsBody); it fell down a flat plate in every look that set it (PLAN
+  38u-12). A plate rocked by a hand has its own weight in the rock's term.
+*/
+export const dripOf = (p: { drip?: number; plateUpright?: number }): number => {
+  const d = Number.isFinite(p.drip) ? (p.drip as number) : 0;
+  const u = Number.isFinite(p.plateUpright) ? Math.max(0, Math.min(1, p.plateUpright as number)) : 0;
+  return d * u;
+};
+/** The thin gap's body-force weight of Rain Drip: DRIP_WEIGHT per unit of dripOf, nothing under 0.01. */
+export const dripWeightOf = (p: { drip?: number; plateUpright?: number }): number => (dripOf(p) > 0.01 ? DRIP_WEIGHT * dripOf(p) : 0);
 /*
   Updraft's shear, over the old push it is made from. The old push was only
   on the colour, and a pool pushed while the clear liquid round it is not
@@ -795,6 +809,24 @@ export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
 export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax', 'sealSource', 'sealFlow'];
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
+/*
+  A bottle's heavy liquid sliding down the same tipped plate (PLAN 15e-10,
+  driveLiquids in fluid/passes.ts). The law is the oil's lift with the sign
+  and the density its own: a column whose density is ρ(1 + w) in a plate of
+  the reference liquid, tipped by θ, feels w ρ g sinθ more than the liquid
+  round it, and between two glasses that weight drives it at Darcy's
+  w g sinθ h₀² / 12ν_ref at the rest gap, which is how hsPrep reads a body
+  force. This is that speed in m/s per unit of w and of sinθ: 2 mm, 22 cSt,
+  about 0.15 m/s, so a syrup (w 0.35) tipped twelve degrees would go at
+  1.1 cm/s with nothing round it to push aside, before its own viscosity
+  (the species field, 18d) and the water it has to push round it (half, for
+  a drop as thin as the water; 2/(1 + λ) of that for one λ times thicker)
+  take their share. Not tuned: the liquids' field carries w as each
+  bottle's `weight` (bottles.ts, about its density less one), and the step
+  turns this into the flow's per-step speed as the breath's and the lift's
+  are turned.
+*/
+export const LIQUID_FALL = 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).
