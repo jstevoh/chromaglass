@@ -15016,6 +15016,10 @@ charge that refills with a time constant. Its open items are in §30.*
   stroke's leftover flow; off, nothing is made; the picture's blue over red in the band
   17.1, in its mirror 0 (a glow drawn upside down fails), far 0. On Metal (the owner's Mac)
   the check runs in about 25 s.
+- **The one thing on a lit plate that makes its own light.** 38h's rule is that nothing drawn on
+  a lit plate makes light: every colour is the lamp's, taken away by what it passes. The glow is
+  the exception, because the organisms are the light source; the owner agreed (2026-11-22). It
+  is added after the plate's colour and before the soap film, so a lamp at 0 draws only it.
 - **Why a second pass dims only a little.** A passing finger fires a cell for a moment and a
   flash spends only a share of the store (a Lingulodinium cell gives several flashes from
   one), so one pass dims the next by about 8%; a path stroked again and again tires
