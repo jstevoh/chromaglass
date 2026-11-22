@@ -14,7 +14,7 @@
  * GPU side alone. What it reads from the rest of `src/sim/` is the grid and
  * the solver's constants (`constants.ts`) and the step (`stepping.ts`).
  */
-import { layFinger } from '../lib/handSolid';
+import { layFinger, handEdge } from '../lib/handSolid';
 import { layBreath, holdBreath, breatheHeld, type HeldBreath } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH } from '../lib/handCarry';
 import { VisualizerSettings } from '../types';
@@ -38,7 +38,7 @@ import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
-import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
+import { RhythmSheet } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, BassPress, type Presser, type Stroke } from '../lib/squish';
 import { type Phrase } from '../lib/phrasing';
 import { stream, type Rng } from '../lib/rng';
@@ -46,7 +46,7 @@ import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
-import { SIM_STEP, stepCurrentCpu } from './stepping';
+import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
@@ -2167,10 +2167,7 @@ export class FluidSimulation {
       */
       const radius = Math.round(radii[0] * GRID_SCALE);
       this.pressLift.press('kick', x, y, radius, amount, fingering, showNow());
-      this.sheet.setLiquid(nu);
-      // No deeper than the dome's rest under it (kickRoom): where the glasses touch, a kick presses nothing.
-      const u = (x + 0.5) / this.size, v = (y + 0.5) / this.size;
-      this.sheet.pressVolume(u, v, stampedVolume(amount, radii[0] / 128), radii[0] / 128, KICK_HOLD, kickRoom(u, v, curve));
+      pressSheetKick(this.sheet, this.size, x, y, amount, radii[0], nu, curve, this.gpu.coverMetres);
     } else {
       radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
       this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
@@ -2350,7 +2347,7 @@ export class FluidSimulation {
     if (this.gpu && this.thinGap && !ferroUnasked) {
       const m = moved ?? { x: dx, y: dy };
       if (!this.hands) this.hands = new Float32Array(GRID_AREA * 4);
-      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y) > 0) { this.rows.disc(y, r); this.handsLaid = true; }
+      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y, handEdge(this.size, this.gpu.coverMetres)) > 0) { this.rows.disc(y, r); this.handsLaid = true; }
       this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
       return;
     }

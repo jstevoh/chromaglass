@@ -22,7 +22,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 - `air.ts`: air splat (`AIR_SPLAT_WGSL`, `AIR_BOIL_WGSL`), and `AIR_RIM_WGSL`, shared with the plate: a bubble's fingered rim (`rimAt`) and what the field's fourth channel says, which bubble of the list a texel is (`AIR_LOOK_*`, `AIR_LOOK_SPAN` exported, PLAN 38h-15). `splat.ts`: pours. `stats.ts`: field summaries.
 - `camera.ts`, `cameraFields.ts`: camera pass.
-- `ferroDrop.ts`: closeup drop. `standing.ts`: domes.
+- `ferroDrop.ts`: closeup drop (`gapLc(gapMetres)`). `standing.ts`: domes (`filmTop(gapMetres)`).
 - `plateFilm.ts`: `FILM_FRAME_WGSL`, the film projector's frame on the plate (`filmFrame`, `filmOver`): Video Zoom, Across and Up, the frame's edge, its key and blend (PLAN 14ag).
 - `plateThinFilm.ts`: `THIN_FILM_WGSL`, Thin Film's rings over the plate, the film's amount read through a B-spline (PLAN 1i; `npm run filmrings`).
 - `platePolar.ts`: `POLAR_WGSL`, polarised light on the finished stage (`polar`, the liquid's flow birefringence through polariser, quarter-wave plates and analyser, PLAN 31p-1; `npm run polar`), and `VIEW_OPTICS`, the thin film's block and it, which the display's VIEW includes.

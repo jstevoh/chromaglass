@@ -11,7 +11,7 @@ import type { SloshDrive } from '../../lib/slosh';
 import { DISH_GAP_RANGE, dragSeconds } from '../../lib/turntable';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
-import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
+import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, GAP_METRES, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
 import { FluidCore } from './core';
 import { WARM_FIT } from '../wgsl/thinWarm';
 
@@ -454,6 +454,8 @@ export class FluidFields extends FluidCore {
       soapFilm: this.soapPlate?.field ?? null,
       /** The tank's dye (PLAN 47n), or null when Tank is off: the plate draws it in its own place. */
       tank: this.tankPlate?.field ?? null,
+      /** The cover glass's live gap, metres (PLAN 38r-17). */
+      coverMetres: this.coverGap * GAP_METRES,
     };
   }
 
