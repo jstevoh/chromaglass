@@ -8,7 +8,7 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
-import { closeupToggle } from './lib/macroLanding';
+import { RailZoom } from './components/RailZoom';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
@@ -37,7 +37,7 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
 import { clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS, findPreset, livePresetId } from './presets';
+import { PRESETS, findPreset, livePresetId, NEW_LOOK } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
@@ -692,7 +692,7 @@ export default function App() {
     ? clockText((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000)
     : null;
 
-  const { paletteLock, selectPalette } = usePaletteLock({ bothEngines, visualizerRef });
+  const { paletteLock, selectPalette, paletteFromFile, palettes, pictureDyes } = usePaletteLock({ bothEngines, visualizerRef, setToast });
   // Lay the opening look's plate: its dyes, its seed, its injection styles and
   // its liquids. The settings above arrive with the first render, but the
   // plate is the visualizer's and it seeds Classic until told otherwise — so
@@ -987,7 +987,7 @@ export default function App() {
     setDocId(null);
     setDocDirty(false);
     setPinnedPresetId(null);
-    applyPreset('default', DEFAULT_SETTINGS);
+    applyPreset('default', NEW_LOOK);
   };
 
   const saveLook = () => setShowSave(true);
@@ -1023,7 +1023,7 @@ export default function App() {
     rowFades.clear();
     rowFades.forget(FADE_ROWS);
     setRowFading({});
-    setSettings({ ...DEFAULT_SETTINGS });
+    setSettings({ ...NEW_LOOK });
     setClearTrigger(v => v + 1);
     visualizerRef.current?.setHarmonyLock(null);
     setPinnedPresetId(null);
@@ -1582,7 +1582,7 @@ export default function App() {
     castState, relaySendRef, markLoaded, loadMark, clearMark,
   } = useCastFeed({
     wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
-    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
+    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, pictureDyes, shownOutput, castSend,
     mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
     isCasting, ear, hear, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
   });
@@ -1605,9 +1605,9 @@ export default function App() {
     return onAuthFlagChange(ask);
   }, []);
   // ── Macro zoom at will ──
-  // + and − (and the wheel over the plate, and the chip) move the closeup's
-  // magnification a step at a time; + with the closeup off turns it on at a
-  // gentle 2×, and − never turns it off (the Macro button does that).
+  // + and − (and the wheel over the plate, and the chip) move the Macro Zoom
+  // a step at a time: + from the plate comes in gently, and − all the way
+  // down is the whole plate again.
   // (settingsRef is declared above.)
   const zoomMacro = useCallback((dir: 1 | -1, amount = 1) => {
     const cur = settingsRef.current;
@@ -1793,13 +1793,6 @@ export default function App() {
       case 'play-toggle':     setIsActive(v => !v); break;
       case 'automate-toggle': setIsAutomated(v => !v); break;
       case 'overlays-toggle': if (overlaysVisible) hideOverlays(); else setOverlaysVisible(true); break;
-      case 'macro-toggle': {
-        // A pad still wants one press in and one press out. It moves the zoom,
-        // because that is the control; the flag rides along for the looks that
-        // still read it.
-        updateSettings(closeupToggle(settingsRef.current));
-        break;
-      }
       case 'seq-play-pause':  if (sequencer.status.running) sequencer.pause(); else sequencer.play(); break;
       case 'seq-next':        sequencer.next(); break;
       case 'seq-prev':        sequencer.prev(); break;
@@ -2811,18 +2804,8 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* Macro closeup */}
-                <button
-                  aria-pressed={!!settings.macroMode}
-                  onClick={() => updateSettings({ macroMode: !settings.macroMode })}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    settings.macroMode ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title="Macro closeup — magnify the plate and chase a single bead of liquid"
-                >
-                  <Microscope size={16} className={settings.macroMode ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Macro</span>
-                </button>
+                {/* The Macro button became the zoom itself (PLAN QA-32c). */}
+                <RailZoom zoom={settings.macroZoom ?? 1} onZoom={pinchZoom} />
 
                 {/* Settings */}
                 <button
@@ -3103,9 +3086,10 @@ export default function App() {
             onLiquid={setSelectedLiquidId}
             dyeColors={DROPPER_COLORS}
             onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
-            palettes={COLOR_HARMONIES.map((h, i) => ({ name: COLOR_HARMONY_NAMES[i], colors: h.slice(0, 4).map(pi => PALETTE[pi].hex) }))}
+            palettes={palettes}
             paletteLock={paletteLock}
             onPalette={selectPalette}
+            onPicturePalette={paletteFromFile}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
             video={video}
@@ -3126,7 +3110,7 @@ export default function App() {
             spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, bpm: tempoLabel.source ? tempoLabel.bpm : heardBpm, onChange: updateSettings }}
             onLucky={triggerLucky}
             zoom={settings.macroZoom ?? 1}
-            onZoom={() => runAction('macro-toggle')}
+            onZoom={pinchZoom}
             camera={settings.macroCamera ?? 'hold'}
             cameraShot={shotLabel(settings.macroHold)}
             onCamera={(c) => updateSettings({ macroCamera: c })}
@@ -3706,12 +3690,10 @@ export default function App() {
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); }}
-          palettes={COLOR_HARMONIES.map((h, i) => ({
-            name: COLOR_HARMONY_NAMES[i],
-            colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
-          }))}
+          palettes={palettes}
           paletteLock={paletteLock}
           onPalette={selectPalette}
+          onPicturePalette={paletteFromFile}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
           video={video}

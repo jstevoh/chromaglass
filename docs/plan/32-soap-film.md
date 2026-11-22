@@ -82,18 +82,10 @@ colleagues 2020.
 
 **The check: `npm run soapfilm`** (`scripts/soapfilm.mjs`, node only, 7 groups C1–C7, 23 lines; its rationale and the three look-alikes it must fail are in the script's header). Open from it: C7 has no upper bound on saturation (`sat > 0.10` only), for a check session to add that bar (32b-1). Story in `docs/plan-shipped.md` §32a (moved 2026-10-29, 19m-2).
 
-## ~~32a. The CPU reference~~ — **Shipped, #403** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a)
-
 ## ~~32b. The reflected view~~ — **Shipped, #469** (`soapFilmRgb` in `src/lib/soapFilm.ts`; the colour grade is 32b-1 below)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32b (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
-
 - **32b-1. Replace the colour grade with the soft box's solid-angle integral and camera gamut mapping.** In 32b, the 4-point path spread (`spread = 0.025`) and dark ground (`ground = 0.0004`) move C7's `t = 120` s saturation by two points (79% → 77%), while the colour grade (`notchFloor = 0.0725`, `chromaRetention = 0.67`) accounts for the rest of the drop from 77% to 13% against the photograph's 15%. Replace that grade with the real phenomenon: integrate the film's Airy reflectance over the soft box's solid angle as a quadrature in `cosI` with s and p Fresnel reflection terms at each angle and the thickness's phase `4π n d cos θ_t / λ` at each angle (which also retires the Fresnel half of shortcut (f)), then map the integrated CIE XYZ tristimulus into the camera's sRGB gamut instead of clamping negative linear channels to zero. *Measure:* the same saturation and hue numbers `npm run soapfilm` C7 prints, with the grade removed (`notchFloor = 0`, `chromaRetention = 1`), showing how much of the 77% → 15% saturation drop the solid-angle integral and camera gamut mapping recover. Also note that check C7 in `scripts/soapfilm.mjs` has no upper bound on saturation (`sat > 0.10` only, so it would pass a film far more saturated than the photograph, such as main's 79% or the ungraded 77%), for a check session to add that bar.
 
 ## ~~32c. The GPU solver~~ — **Shipped, #505** (`src/gpu/soapFilm.ts`, `src/gpu/wgsl/soapFilm.ts`; `npm run soapgpu` 29/29 on Metal)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32c (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
-
 - **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
   it on the drain, where measured, the reference with its rupture marks removed refills no cell
   either (thick film never presses on black there), so that line in `npm run soapfilm` would pass
@@ -106,9 +98,6 @@ colleagues 2020.
   `soapgpu.mjs` steps the `--selftest` control in Node without a browser.
 
 ## ~~32f. The frame drains the film (shortcut c)~~ — **Shipped** (`drainToBorder` in `src/lib/soapFilm.ts`, the border pass in `src/gpu/wgsl/soapFilm.ts`'s `soapTransport`; `npm run soapfilm` C8, five lines; `npm run soapgpu` 32f)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32f (2026-10-30).
-
 - **32f-1. The border's exchange speed is the buoyant Darcy speed at the tuned ζ.** It inherits
   32i's time compression: at a real ζ the fresh film would be thicker and slower. Re-measure C8
   when 32i lands.
@@ -116,14 +105,17 @@ colleagues 2020.
   with the liquid the borders take). `f.drained` is that liquid; r0 from it is the next step.
 
 ## ~~32g. Black spots on Vrij's clock (shortcut d)~~ — **Shipped** (`blackSpots` in `src/lib/soapFilm.ts`, the same in `soapTransport`; `npm run soapfilm` C9, four lines; `npm run soapgpu` 32g, two)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32g (2026-10-30).
-
 - **32g-1. The black front moves one cell a step.** Its speed is the grid's (2 cm/s at 1 mm and
   dt 0.05), not the spot's. Real black spots grow at a speed set by the black film's lower
   tension against the rim's drag (Mysels); that law is the next step.
 - **32g-2. Vrij's clock sits on the grid.** It does not travel with the film. It matters only
   under about 60 nm, where the film barely moves, but advecting it with h is the honest form.
+- **32g-2b. The black film's thickness is a constant, and its age is on the grid** (S–M;
+  Medium). `soapFilm.ts:394-399`, `:419-422` and `:449`, and `wgsl/soapFilm.ts:393, 415`, set
+  the black film's thickness and keep its age in place. A common black film settles at 4–8 nm
+  where the disjoining pressure balances drainage. Take the thickness from that balance and
+  advect the age with the film; buoyancy stays. Check: the black film's thickness holds within
+  1 nm over 60 s while it moves. (38v, from RS-12.)
 - **32g-3. Only van der Waals.** The double-layer repulsion that sets a common black film's
   thickness (DLVO) is left out: every spot goes straight to Newton black.
 
@@ -200,9 +192,9 @@ about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carr
   a faint dye (Dye Budget 0.3) that shows through the film's black and its thin orders. A real
   frame has nothing behind it but the dark ground; decide with the owner whether the dye stays
   as a colour under the film or goes.
+- **32d-6. The film's colours take too much light from the plate** (S; Medium; a look change).
+  `SOAP_GAIN` is 4 (`plateThinFilm.ts:172`), and `:204-217` take up to 60% of the light where
+  Airy's reflectance of a soap film is at most 7.8%; R is applied unscaled and not in linear
+  light. Use Airy's R in linear light, with any extra as an optional Lace control. Check: a
+  0–1.5 µm wedge transmits at least 92%, and black film over 99%. (38v, from RS-29.)
 
-## ~~32e. The phone~~ — **Shipped with 32d** (Soap Film, Drain Rate and Film Angle on the phone's remote, `RemoteControl.tsx`, as on the desk; `npm run phone` 366/366, `layout` 86/86)
-
-*Not doing now:* a thickness that follows the dye (the film is its own medium; mixing it
-with the pigment's opacity is 18k's old shortcut, and the reason for this section), Marangoni
-plug flow (named above), and any recorded footage as a texture.

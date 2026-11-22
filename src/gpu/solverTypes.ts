@@ -207,6 +207,9 @@ export interface GpuStepParams {
   tankNozzle?: number;
   tankDrain?: number;
   tankHue?: number;
+  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), and Shake, its peak acceleration in g. The front plate's only. */
+  faradayHz?: number;
+  faraday?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
@@ -321,6 +324,15 @@ export interface PlateSolver {
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
   /** Lay the oil cell for cell, replacing the mix (Foam Cells' pressed drops, PLAN 47z-5): `oil` is asked at each cell's middle in plate units, with the mix's size. */
   layOil?(oil: (x: number, y: number, n: number) => number): void;
+  /**
+   * A look's dye laid at the solver's own grid (PLAN 38w-8): `dye` N²×4 in the
+   * CPU's delta format (absorbance × amount per channel, then the amount),
+   * `oil` the oil's own colour of it in the same format, or null. Held until
+   * the next lay; false when the arrays are not N² (the caller then lays on
+   * the CPU's grid). `layShare(k)` adds k of it to the plate.
+   */
+  layDye?(dye: Float32Array, oil: Float32Array | null): boolean;
+  layShare?(k: number): void;
   /**
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
