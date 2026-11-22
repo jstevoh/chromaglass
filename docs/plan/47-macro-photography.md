@@ -414,14 +414,17 @@ Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
 an unsteady measure says "may vary from take to take", and every word names its source.
 
-- ~~**47x-1** the words~~ (**shipped**): `scripts/watchwords.mjs` (`describe()`, `BANDS` table),
-  `## In words` (and reference section with `--vs`) in `summary.md`, `words` returned by `watchVideo`.
-- ~~**47x-2** what changed~~ (**shipped**): `compareReads()` in `scripts/watchwords.mjs`,
-  `scripts/watchpair.mjs` (`watchPair()`), `--before`/`--after` in `watch.mjs` writing `diff.md`, `diff-timeline.png`, `pairs.png`.
-- **47x-3** tried on real pairs (the blow-48 webm takes, the Classic closeup films), with the
-  reads shown to the owner on one page.
-- **47x-4** a plan for sharing the watch tool as a Claude Code plugin (the owner decides
-  after 47x-3).
+- **47x-5** a word that flickers at a band edge. A word can be said in one read and not the
+  other while its measure held under a step (the bloom's "weight: light" and "space:
+  indirect" are only in its after read). `compareReads` should say a word came or went only
+  when its measure moved a step, or the bands need a margin either side.
+- **47x-6** the watch selftest's A, B (sound against motion lag) and D (one composition change
+  in the crossfade) fail on a Mac's ffmpeg-full 9.0.2, on main as well as this branch, and the
+  Homebrew default ffmpeg has no libvorbis, so the selftest cannot make its clips at all. Find
+  whether the encoder or the reads moved, and say in the selftest which ffmpeg it needs.
+- **47x-7** an integer measure moving by one (hues a frame 3 to 2) counts as a whole step, so a
+  film whose hue count sits at a boundary reads as changed. Use the mean over the samples, not
+  the median's integer, or hold one-unit changes of a count to a half step.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 

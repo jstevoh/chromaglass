@@ -71,3 +71,20 @@ each band.
 - ~~**47v-6. A crop too small to read says so.**~~ Shipped, this PR (story in `docs/plan-shipped.md`).
 - ~~**47v-5. Carried on real footage: the grain taken out.**~~ Shipped, this PR (story in `docs/plan-shipped.md`); it moved
   the real films' carried only from 0.187 to 0.229 and from 0.125 to 0.127, so 47v-8 is what is left.
+
+## 47x. Watching in words, and what changed between two films (S–M)
+
+- ~~**47x-1** the words~~ (**shipped**): `scripts/watchwords.mjs` (`describe()`, `BANDS` table),
+  `## In words` (and reference section with `--vs`) in `summary.md`, `words` returned by `watchVideo`.
+- ~~**47x-2** what changed~~ (**shipped**): `compareReads()` in `scripts/watchwords.mjs`,
+  `scripts/watchpair.mjs` (`watchPair()`), `--before`/`--after` in `watch.mjs` writing `diff.md`, `diff-timeline.png`, `pairs.png`.
+- ~~**47x-3** tried on real pairs~~ (**shipped**): blow-48's two webm takes, the 38u Classic
+  closeup and the cell bloom, through `--before/--after`, shown to the owner on one page. The
+  Classic closeup crashed the read: `paletteStrip` (`scripts/watchdesign.mjs`) placed each edge
+  on the last rounded one and ran a column past the strip (selftest H). The change sentences
+  read "swells more swells a minute"; each measure now has a plain sentence with a subject
+  ("the edges got softer, and became painterly, graded edges (edge width 1.81 to 7.06% of
+  width)"). The cell bloom's only change was hues a frame 3 to 2 (47x-7).
+- ~~**47x-4** a plan for sharing the watch tool as a Claude Code plugin~~ (**shipped**):
+  `docs/watch-plugin-plan.md`. Packaging waits on the owner (the name, its own repository or
+  this one, whether the liquid show references ship as examples).
