@@ -71,7 +71,7 @@
  *      dimmed by that encoded colour's luma, so up to about 60% of the light
  *      goes, and even a black film takes a share of it.
  *
- *        npm run soapplate -- --owed=wedge,black
+ *        npm run soapplate
  *
  *   8. Big motions run and small ones crawl (PLAN 32k, 2026-11-13: about 12
  *      forms a frame on the Mac against the owner's photograph's 55, and no
@@ -150,10 +150,24 @@ try {
     await lab.step(150, { soapFilm: 1, soapFilmRate: 4 });
     o.h = Array.from((await film().read()).h);
     o.on = Array.from(await lab.render(R, { ...look, soapFilm: 1 }, cam));
-    o.bare = Array.from(await lab.render(R, bare, cam));
-    o.angled = Array.from(await lab.render(R, { ...bare, soapFilmAngle: 45 }, cam));
     o.offA = Array.from(await lab.render(R, { ...look, soapFilm: 0 }, cam));
     o.faint = Array.from(await lab.render(R, { ...look, soapFilm: 0.05 }, cam));
+    /*
+      The film alone is drawn over a plate with no dye: the same film, read
+      back above, written onto a clean plate. Section 2 asks whether the
+      plate draws the film the reference draws, and the reference is the film
+      and nothing else. While the film was drawn four times brighter than
+      Airy allows (SOAP_GAIN 4) the dye laid under it was lost in it; at
+      Airy's own reflectance (PLAN 32d-6, 4% or so) the film passes 96% of
+      what is behind it, so the dye's own edges showed through and the
+      correlation measured the dye (0.894 over the dye, 0.980 without it,
+      measured on the branch). The film is the same cells either way.
+    */
+    await lab.create(N);
+    await lab.step(1, { soapFilm: 1 });
+    film().film.write(Float32Array.from(o.h));
+    o.bare = Array.from(await lab.render(R, bare, cam));
+    o.angled = Array.from(await lab.render(R, { ...bare, soapFilmAngle: 45 }, cam));
     // Turned off, the film goes (and the next time it is a fresh one).
     await lab.step(1, { soapFilm: 0 });
     o.keptOff = lab.solver().fields.soapFilm !== null;
@@ -198,6 +212,20 @@ try {
     await lab.step(60, { soapFilm: 1 });
     o.hKept = Array.from((await film().read()).h);
     o.sums = [sum(o.hStir), sum(o.hStill)];
+
+    /*
+      Section 7 starts on a clean plate. The ratio below divides out what
+      the lamp does behind the film, but not dye: the plate lays dye over the
+      LED ground in sRGB (onGround in wgsl/plate.ts), and dye does not scale
+      with the LED level, so over the dye section 5 left behind, lit − dark
+      is not the lamp's light alone and the ratio read 102% in the dye's
+      columns. That was hidden at main's film, which took 17% away; at
+      Airy's (4% or so) it pulled the wedge's mean to 98.8% and its
+      correlation with Airy to 0.38 (measured on the branch). With no dye the
+      same film reads 95.9% on average, correlated 0.94.
+    */
+    await lab.create(N);
+    await lab.step(1, { soapFilm: 1 });
 
     /*
       7: what the film lets through. The film is laid by hand and drawn with
@@ -397,8 +425,9 @@ const cpuRgb = (rgb, flip = false) => {
   greens at nearly one brightness.
 
   Why the detail: the film is drawn over the plate, and the plate behind it
-  shows through what the film does not reflect: the dye laid in the middle
-  and the lamp's fall-off. Those are broad (measured on this plate: the
+  shows through what the film does not reflect: the lamp's fall-off, and
+  before 32d-6 the dye laid in the middle (bare is now drawn on a clean
+  plate, since at Airy's 4% the dye's edges showed through). Those are broad (measured on this plate: the
   picture twice the reference's brightness in the middle, the same at the
   rim), and they took the plain correlation of a plate that drew the film
   exactly down to 0.70, where the film's own pattern, the plumes and bands a

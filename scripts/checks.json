@@ -1678,7 +1678,7 @@
     {
       "name": "The soap film on the plate",
       "shard": "lab3",
-      "run": "npm run soapplate -- --owed=wedge,black",
+      "run": "npm run soapplate",
       "why": [
         "Soap Film draws the frame's own draining film (PLAN 32d, gpu/soapFilmPlate.ts):",
         "off is the plate to the byte and makes no film; on, the plate's colours follow the",
@@ -3371,7 +3371,7 @@
     {
       "name": "The heat",
       "shard": "open",
-      "run": "npm run heat -- --owed=once",
+      "run": "npm run heat",
       "why": [
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",
@@ -3432,7 +3432,7 @@
     {
       "name": "A colour drop pushes the dye aside into a window of its own colour, and splashes only past Cossali's K",
       "shard": "fifth",
-      "run": "npm run dropwindow -- --owed=splashliquid,satellitedye",
+      "run": "npm run dropwindow",
       "timeout": 6,
       "why": [
         "PLAN 18c-2 and 18c-3: a colour drop on a thin gap is a pour of its",

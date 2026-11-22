@@ -134,13 +134,27 @@ button, making it look good. Every item here is held to those.
     the bands are the boil's first-order carry, the current's coarser grid or the open
     plate's wall, and either give the open plate a `plateboil` part of its own or say in
     the Heat control that the boil is the thin gap's. No shipped look runs the open plate.
-  - **36e-6. Hot water's lift is capped, and its viscosity is not gated** (*open*, S; Medium).
+  - **36e-6. Hot water's lift is capped, and its viscosity is not gated** (*open* — `heatVisc` half shipped, lift half stays open behind 36e-7 and 36e-8; S; Medium).
     Buoyancy (`forces.ts:254-289`) is added after the `maxCur` clamp at `:277`, so a hot plume
     never reaches its speed; `heatVisc` (`fluid.ts:645-668`) runs when the heat carry
     (`fluid.ts:1199`) is gated off by `!boilLive`; and `tempAt` (`lampBoil.ts:750-757`) reads
     a half-float. Exempt buoyancy from the cap or move it into `hsBody` (38f), and gate
     `heatVisc` with the carry. Check: an upright plate at 80 °C rises at over 0.9 of U_buoy,
     and a 50 K spot cools the same at Double Diffusion 0 and 1. (38v, from RS-2.)
+    *Shipped (heatVisc half):* `heatViscPlan` in `src/gpu/fluid/heat.ts` skips `heatVisc`
+    and resets `heatSeconds` while `boilLive` is true (`npm run heat` `once` out of `--owed`).
+    The lift half stays open behind **36e-7** and **36e-8** (which hide thermal buoyancy on a
+    standing plate).
+  - **36e-7. With the boil live on a standing plate, the heat vanishes** (*open*, found writing
+    36e-6's check). On a standing plate with the boil live (`plateUpright: 1`, `thinGap: 1`),
+    24% of the heat is kept after 0.25 s and 9% after 3 s (falling to $1/e$ in ~1.2 s),
+    where air cooling through the 2 mm water + 2 mm glass sandwich ($\rho c \cdot d \approx
+    1.26 \times 10^4\text{ J/(m}^2\cdot\text{K)}$) at $h = 10\text{–}50\text{ W/(m}^2\cdot\text{K)}$
+    a face should take about 2 minutes or more.
+  - **36e-8. Dye climbs a standing plate with no heat patch at all** (*open*, found writing
+    36e-6's check). On a standing plate with no heat patch laid, dye climbs at 16.6 mm/s (and
+    9.65 mm/s at Buoyancy 0), likely the lamp-floor kick into dye treated as wax in
+    `src/gpu/wgsl/fluid/capillary.ts` near line 426.
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
   Glenn McKay's crew described it as "painting with three or four hands". Build the guest

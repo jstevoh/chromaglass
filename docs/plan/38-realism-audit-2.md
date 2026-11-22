@@ -26,16 +26,16 @@ cost, then Low.
 | 4 | 18c-14 | The ambient seed pours dye and heat into every look (RS-38) | `18-physics-2.md` | S–M | High | new |
 | 5 | 18c-3b | The mouse's dye stamp and the themes' kicks lay no volume (RS-39) | `18-physics-2.md` | M | High | updates |
 | 6 | ~~38v-1~~ | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | shipped |
-| 7 | 18c-13 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
+| 7 | ~~18c-13~~ | ~~Every drop splashes as water, and its satellites add dye (RS-13)~~ | `18-physics-2.md` | S | Medium–High | **shipped** (`npm run dropwindow`; 18c-13b left) |
 | 8 | 9ad | The domes rise on \|B\|, not on its normal part (RS-20) | `09-ferrofluid.md` | S–M | Medium–High | new |
 | 9 | ~~18i-2~~ | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | shipped |
-| 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | new |
+| 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | `heatVisc` shipped; lift open behind 36e-7, 36e-8 |
 | 11 | 38v-2 | Comet's pull flickers with the beat, and is absent on the open plate (RS-3) | here | S | Medium | new |
 | 12 | ~~29a-11~~ | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | shipped |
 | 13 | ~~9ae~~ | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | shipped |
 | 14 | 9t-11 | The domes' film has no upper wall; two magnets start nothing (RS-24) | `09-ferrofluid.md` | S | Medium | new |
 | 15 | ~~18e-9~~ | A thin film's optical path steps the wrong way (RS-26) | `18-physics-2.md` | S | Medium | shipped |
-| 16 | 32d-6 | Soap film on the plate takes out 8× the light Airy allows (RS-29) | `32-soap-film.md` | S | Medium | new |
+| 16 | 32d-6 | Soap film on the plate takes out 8× the light Airy allows (RS-29) | `32-soap-film.md` | S | Medium | shipped #928 |
 | 17 | 38r-17 | The milk scatters through 6 mm, not the cover's gap (RS-30, RS-28) | `38-realism-audit.md` | S | Medium | updates |
 | 18 | 15g-18 | A press twists the liquid it squeezes (RS-36) | `15-tools-on-liquids.md` | S | Medium | new |
 | 19 | 15g-2 | A still breath carries the ferrofluid out (RS-40; plan text corrected) | `15-tools-on-liquids.md` | S | Medium | updates |
