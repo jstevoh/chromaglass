@@ -64,7 +64,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSyn
 import { open } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
-import { extname, join, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
@@ -116,15 +116,18 @@ function pacificParts(ms) {
   const get = (t) => Number(parts.find((p) => p.type === t).value);
   return { y: get('year'), m: get('month'), d: get('day'), h: get('hour') % 24, min: get('minute'), s: get('second') };
 }
-function nextMidnightPacificPlus10m(now) {
-  const p = pacificParts(now);
-  const targetWall = Date.UTC(p.y, p.m - 1, p.d + 1, 0, 10, 0);
+function pacificWallToMs(y, m, d, h, min, s = 0) {
+  const targetWall = Date.UTC(y, m - 1, d, h, min, s);
   let t = targetWall + 8 * 3600_000;
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     const g = pacificParts(t);
     t += targetWall - Date.UTC(g.y, g.m - 1, g.d, g.h, g.min, g.s);
   }
   return t;
+}
+function nextMidnightPacificPlus10m(now) {
+  const p = pacificParts(now);
+  return pacificWallToMs(p.y, p.m, p.d + 1, 0, 10, 0);
 }
 function formatPacific(ms) {
   return new Intl.DateTimeFormat('en-US', {
@@ -413,8 +416,19 @@ async function setThumbnail(videoId, file) {
   return 'thumbnail set';
 }
 
-async function addToPlaylist(videoId, playlistId) {
-  await api('POST', 'playlistItems', { query: { part: 'snippet' }, body: { snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } } } });
+async function addToPlaylist(videoId, playlistId, position) {
+  const snippet = { playlistId, resourceId: { kind: 'youtube#video', videoId } };
+  if (Number.isInteger(position) && position >= 0) {
+    try {
+      await api('POST', 'playlistItems', { query: { part: 'snippet' }, body: { snippet: { ...snippet, position } } });
+      recordPlaylistInManifest(videoId, { id: playlistId, position });
+      return `added to playlist ${playlistId} at position ${position}`;
+    } catch (e) {
+      if (!(e instanceof GoogleApiError && e.status === 400)) throw e;
+    }
+  }
+  await api('POST', 'playlistItems', { query: { part: 'snippet' }, body: { snippet } });
+  recordPlaylistInManifest(videoId, { id: playlistId });
   return `added to playlist ${playlistId}`;
 }
 
@@ -485,9 +499,11 @@ function jobView(job) {
     sent: `${(job.sent / 1048576).toFixed(1)} of ${(job.size / 1048576).toFixed(1)} MB (${pct}%)`,
     ...(job.key ? { key: job.key } : {}),
     ...(job.replaces ? { replaces: job.replaces } : {}),
+    ...(job.meta?.status?.publishAt ? { publish_at: job.meta.status.publishAt } : {}),
     ...(job.notBefore ? { not_before: formatPacific(Date.parse(job.notBefore)), not_before_iso: job.notBefore } : {}),
     ...(job.note ? { note: job.note } : {}),
     ...(job.video_id ? { video_id: job.video_id, url: watchUrl(job.video_id) } : {}),
+    ...(job.playlists?.length ? { playlists: job.playlists } : {}),
     ...(job.after?.length ? { then: job.after } : {}), ...(job.error ? { error: job.error } : {}),
   };
 }
@@ -512,17 +528,18 @@ async function startSession(job) {
   return at;
 }
 
-async function push(job) {
+async function push(job, onProgress) {
   const fh = await open(job.file, 'r');
   let fails = 0;
   try {
     if (!job.session) { job.session = await startSession(job); job.sent = 0; saveJob(job); }
     else {
       const o = await askOffset(job);
-      if (o.video) return o.video;
+      if (o.video) { onProgress?.(job.size, job.size); return o.video; }
       if (o.gone) { job.session = await startSession(job); job.sent = 0; } else job.sent = o.at;
       saveJob(job);
     }
+    if (job.sent > 0) onProgress?.(job.sent, job.size);
     const buf = Buffer.alloc(Math.min(CHUNK, job.size));
     for (;;) {
       const n = Math.min(CHUNK, job.size - job.sent);
@@ -531,13 +548,13 @@ async function push(job) {
       try {
         r = await fetch(job.session, { method: 'PUT', headers: { authorization: `Bearer ${await accessToken()}`, 'content-range': `bytes ${job.sent}-${job.sent + n - 1}/${job.size}` }, body: buf.subarray(0, n), signal: AbortSignal.timeout(PUT_MS) });
       } catch (e) { why = String(e?.cause?.code ?? e?.message ?? e); }
-      if (r && (r.status === 200 || r.status === 201)) return await r.json();
+      if (r && (r.status === 200 || r.status === 201)) { onProgress?.(job.size, job.size); return await r.json(); }
       if (r && r.status === 308) {
         const m = /bytes=0-(\d+)/.exec(r.headers.get('range') ?? '');
         const at = m ? Number(m[1]) + 1 : 0;
         const moved = at > job.sent;
         job.sent = at; saveJob(job);
-        if (moved) { fails = 0; continue; }
+        if (moved) { onProgress?.(job.sent, job.size); fails = 0; continue; }
         why = '308 without progress';
         r = null;
       }
@@ -575,18 +592,33 @@ function writeManifest(m) {
   writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));
 }
 
+function recordPlaylistInManifest(videoId, pl) {
+  const m = readManifest();
+  const idx = m.videos.findIndex((e) => e.videoId === videoId);
+  if (idx < 0 || !Array.isArray(m.videos[idx].playlists)) return;
+  const list = m.videos[idx].playlists.filter((p) => p.id !== pl.id);
+  list.push(pl);
+  m.videos[idx] = { ...m.videos[idx], playlists: list, updatedAt: new Date(nowMs()).toISOString() };
+  writeManifest(m);
+}
+
+const jobPlaylists = (job) => (Array.isArray(job.playlists) && job.playlists.length ? job.playlists : job.playlist_id ? [{ id: job.playlist_id }] : []);
+
 function recordUploadedManifest(job, video, finishedAt) {
   if (!job.key && !job.replaces) return;
   const m = readManifest();
   const videos = m.videos.slice();
   const idx = videos.findIndex((e) => e.videoId === video.id);
   const prev = idx >= 0 ? videos[idx] : {};
+  const pls = jobPlaylists(job);
   const entry = {
     ...prev,
     videoId: video.id,
     title: video.snippet?.title ?? job.meta.snippet.title,
     privacy: video.status?.privacyStatus ?? job.meta.status.privacyStatus,
     publishedAt: video.snippet?.publishedAt ?? finishedAt,
+    ...(job.meta.status.publishAt ? { publishAt: job.meta.status.publishAt } : {}),
+    ...(pls.length ? { playlists: pls } : {}),
     ...(job.key ? { key: job.key } : {}),
     source: job.file,
     status: 'ok',
@@ -632,15 +664,18 @@ async function syncManifest() {
   for (const id of ids) {
     const v = remote.get(id);
     const prev = byId.get(id);
-    merged.push({
+    const nextEntry = {
       ...(prev ?? {}),
       videoId: id,
       title: v?.snippet?.title ?? prev?.title ?? '',
       privacy: v?.status?.privacyStatus ?? prev?.privacy ?? '',
       publishedAt: v?.snippet?.publishedAt ?? prev?.publishedAt ?? '',
+      ...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),
       status: prev?.status ?? 'ok',
       updatedAt: prev?.updatedAt ?? nowIso,
-    });
+    };
+    if (v?.status?.publishAt) nextEntry.publishAt = v.status.publishAt; else if (v) delete nextEntry.publishAt;
+    merged.push(nextEntry);
   }
   for (const prev of cur.videos) {
     if (!seen.has(prev.videoId)) {
@@ -660,9 +695,9 @@ function formatManifestTable(list, statusFilter) {
   const rows = statusFilter ? list.filter((e) => e.status === statusFilter) : list;
   if (!rows.length) return statusFilter ? `No videos with status "${statusFilter}" in manifest.` : 'Manifest is empty (run manifest with sync: true to populate it).';
   const cell = (v) => String(v ?? '').replace(/[\r\n]+/g, ' ').replace(/\|/g, '\\|');
-  const lines = ['| key | title | id | privacy | status | replacedBy |', '| --- | --- | --- | --- | --- | --- |'];
+  const lines = ['| key | title | id | privacy | views | likes | status | replacedBy |', '| --- | --- | --- | --- | --- | --- | --- | --- |'];
   for (const e of rows) {
-    lines.push(`| ${cell(e.key)} | ${cell(e.title)} | ${cell(e.videoId)} | ${cell(e.privacy)} | ${cell(e.status)} | ${cell(e.replacedBy)} |`);
+    lines.push(`| ${cell(e.key)} | ${cell(e.title)} | ${cell(e.videoId)} | ${cell(e.privacy)} | ${cell(e.views)} | ${cell(e.likes)} | ${cell(e.status)} | ${cell(e.replacedBy)} |`);
   }
   return lines.join('\n');
 }
@@ -707,16 +742,18 @@ function markVideo(a) {
   return updated.length === 1 ? updated[0] : { updated: updated.length, status: a.status };
 }
 
-function run(job) {
+function run(job, onProgress) {
   job.state = 'uploading'; job.pid = process.pid; job.error = undefined; job.limitReason = undefined; saveJob(job);
   const p = (async () => {
     let setupErr = null;
     try {
-      const video = await push(job);
+      const video = await push(job, onProgress);
       const finishedAt = new Date(nowMs()).toISOString();
       job.video_id = video.id; job.sent = job.size; job.state = 'done'; job.finished = finishedAt;
       job.notBefore = undefined; job.note = undefined; job.after = [];
-      if (job.playlist_id) job.after.push(await addToPlaylist(video.id, job.playlist_id).catch((e) => `playlist not added: ${e.message}`));
+      for (const pl of jobPlaylists(job)) {
+        job.after.push(await addToPlaylist(video.id, pl.id, pl.position).catch((e) => `playlist ${pl.id} not added: ${e.message}`));
+      }
       if (job.thumbnail) job.after.push(await setThumbnail(video.id, job.thumbnail).catch((e) => `thumbnail not set: ${e.message}`));
       recordUploadedManifest(job, video, finishedAt);
       log(`uploaded ${job.file} as ${watchUrl(video.id)}`);
@@ -744,8 +781,60 @@ function run(job) {
 }
 
 const PRIVACY = ['private', 'unlisted', 'public'];
-function validateUploadArgs(a) {
-  const { path: file } = uploadable(a.file, MIME, 'A video');
+const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy']);
+function readUploadCard(videoPath) {
+  const ext = extname(videoPath);
+  const cardPath = `${ext ? videoPath.slice(0, -ext.length) : videoPath}.youtube.json`;
+  if (!existsSync(cardPath)) return {};
+  // Never follow a sidecar link out of the video's own folder.
+  let realCard;
+  try { realCard = realpathSync(cardPath); } catch { throw new Error(`Cannot read upload card ${cardPath}.`); }
+  if (dirname(realCard) !== dirname(videoPath) || !statSync(realCard).isFile()) {
+    throw new Error(`Upload card must live beside the video file: ${cardPath}.`);
+  }
+  let raw;
+  try { raw = JSON.parse(readFileSync(realCard, 'utf8')); } catch { throw new Error(`Upload card ${basename(cardPath)} is not valid JSON.`); }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`Upload card ${basename(cardPath)} must be a JSON object.`);
+  }
+  const unknown = Object.keys(raw).filter((k) => !SIDECAR_FIELDS.has(k));
+  if (unknown.length) {
+    throw new Error(`Unknown field${unknown.length > 1 ? 's' : ''} in upload card ${basename(cardPath)}: ${unknown.join(', ')}.`);
+  }
+  if (raw.tags !== undefined && (!Array.isArray(raw.tags) || raw.tags.some((t) => typeof t !== 'string'))) {
+    throw new Error(`Upload card ${basename(cardPath)}: tags must be an array of strings.`);
+  }
+  const dir = dirname(videoPath);
+  const out = {};
+  if (raw.title !== undefined) out.title = String(raw.title);
+  if (raw.description !== undefined) out.description = String(raw.description);
+  if (raw.tags !== undefined) out.tags = raw.tags;
+  if (raw.playlist !== undefined) {
+    if (Array.isArray(raw.playlist)) out.playlists = raw.playlist.map((id) => ({ id: String(id) }));
+    else if (typeof raw.playlist === 'string' && raw.playlist) out.playlist_id = raw.playlist;
+    else throw new Error(`Upload card ${basename(cardPath)}: playlist must be a playlist id string or array.`);
+  }
+  if (raw.thumbnail !== undefined) {
+    const tRaw = String(raw.thumbnail).trim().replace(/^~(?=$|\/)/, homedir());
+    out.thumbnail = tRaw ? resolve(dir, tRaw) : undefined;
+  }
+  if (raw.key !== undefined) out.key = String(raw.key);
+  if (raw.replaces !== undefined) out.replaces = String(raw.replaces);
+  if (raw.publish_at !== undefined) out.publish_at = String(raw.publish_at);
+  if (raw.privacy !== undefined) out.privacy = String(raw.privacy);
+  return out;
+}
+function mergeArgsWithCard(a, card) {
+  const out = { ...card };
+  for (const [k, v] of Object.entries(a)) {
+    if (v !== undefined) out[k] = v;
+  }
+  if (a.playlist_id !== undefined) delete out.playlists;
+  if (a.playlists !== undefined) delete out.playlist_id;
+  return out;
+}
+function validateUploadArgs(a, resolvedFile) {
+  const { path: file } = resolvedFile ? { path: resolvedFile } : uploadable(a.file, MIME, 'A video');
   const st = statSync(file);
   if (!a.title) throw new Error('A title is needed.');
   if (String(a.title).length > 100) throw new Error('YouTube takes a title of at most 100 characters.');
@@ -755,21 +844,28 @@ function validateUploadArgs(a) {
   return { file, st };
 }
 function buildJob(a, file, st) {
+  const playlists = Array.isArray(a.playlists)
+    ? a.playlists.map((p) => (typeof p === 'string' ? { id: p } : { id: String(p.id), ...(Number.isInteger(p.position) ? { position: p.position } : {}) }))
+    : a.playlist_id ? [{ id: String(a.playlist_id) }] : undefined;
   return {
     id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
     meta: {
       snippet: { title: a.title, description: a.description ?? '', tags: a.tags ?? [], categoryId: String(a.category_id ?? 10), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
       status: { privacyStatus: a.privacy ?? 'private', selfDeclaredMadeForKids: Boolean(a.made_for_kids ?? false), ...(a.publish_at ? { publishAt: a.publish_at } : {}) },
     },
-    playlist_id: a.playlist_id, thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined,
+    playlist_id: a.playlist_id ?? playlists?.[0]?.id,
+    ...(playlists?.length ? { playlists } : {}),
+    thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined,
     ...(a.key ? { key: String(a.key) } : {}),
     ...(a.replaces ? { replaces: String(a.replaces) } : {}),
     sent: 0, started: new Date(nowMs()).toISOString(),
   };
 }
 
-async function uploadVideo(a) {
-  const { file, st } = validateUploadArgs(a);
+async function uploadVideo(rawArgs, onProgress) {
+  const { path: resolvedFile } = uploadable(rawArgs.file, MIME, 'A video');
+  const a = mergeArgsWithCard(rawArgs, readUploadCard(resolvedFile));
+  const { file, st } = validateUploadArgs(a, resolvedFile);
   await accessToken();
   const { jobs } = readStore();
   const same = (j) => j.file === file && j.size === st.size && j.mtime === st.mtimeMs && j.meta.snippet.title === a.title;
@@ -784,13 +880,14 @@ async function uploadVideo(a) {
     if (a.key && !job.key) job.key = String(a.key);
     if (a.replaces && !job.replaces) job.replaces = String(a.replaces);
   }
-  const p = run(job);
+  let live = true;
+  const p = run(job, (sent, total) => { if (live) onProgress?.(sent, total); });
   await Promise.race([p.catch(() => {}), sleep(WAIT_MS)]);
+  live = false;
   return jobView(job);
 }
 
-function queueUpload(a) {
-  const { file, st } = validateUploadArgs(a);
+function queueUploadCore(a, file, st) {
   const { jobs } = readStore();
   const same = (j) => j.file === file && j.size === st.size && j.mtime === st.mtimeMs && j.meta.snippet.title === a.title;
   const done = jobs.find((j) => same(j) && j.state === 'done');
@@ -808,6 +905,256 @@ function queueUpload(a) {
     }
   }
   return jobView(job);
+}
+
+function queueUpload(a) {
+  const { path: resolvedFile } = uploadable(a.file, MIME, 'A video');
+  const merged = mergeArgsWithCard(a, readUploadCard(resolvedFile));
+  const { file, st } = validateUploadArgs(merged, resolvedFile);
+  return queueUploadCore(merged, file, st);
+}
+
+async function findVideoPlaylists(videoId) {
+  const allPlaylists = [];
+  let plToken;
+  for (;;) {
+    const { j } = await api('GET', 'playlists', { query: { part: 'snippet', mine: true, maxResults: 50, ...(plToken ? { pageToken: plToken } : {}) } });
+    for (const p of j.items ?? []) allPlaylists.push({ id: p.id, title: p.snippet?.title });
+    if (!j.nextPageToken || !(j.items ?? []).length) break;
+    plToken = j.nextPageToken;
+  }
+  const found = [];
+  for (const pl of allPlaylists) {
+    let itemToken;
+    for (;;) {
+      const { j } = await api('GET', 'playlistItems', { query: { part: 'snippet,contentDetails', playlistId: pl.id, maxResults: 50, ...(itemToken ? { pageToken: itemToken } : {}) } });
+      const items = j.items ?? [];
+      for (const item of items) {
+        const vid = item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId;
+        if (vid === videoId) {
+          const pos = item.snippet?.position;
+          found.push({ id: pl.id, ...(Number.isInteger(pos) ? { position: pos } : {}) });
+        }
+      }
+      if (!j.nextPageToken || !items.length) break;
+      itemToken = j.nextPageToken;
+    }
+  }
+  return found;
+}
+
+async function replaceVideo(a) {
+  const { path: resolvedFile } = uploadable(a.file, MIME, 'A video');
+  const card = readUploadCard(resolvedFile);
+  const oldId = String(a.video_id ?? card.replaces ?? '').trim();
+  if (!oldId) throw new Error('video_id is needed.');
+  const [old] = await videos([oldId]);
+  if (!old) throw new Error(`No video ${oldId} on this channel.`);
+  const m = readManifest();
+  const oldIdx = m.videos.findIndex((e) => e.videoId === oldId);
+  const oldEntry = oldIdx >= 0 ? m.videos[oldIdx] : null;
+  const playlists = Array.isArray(oldEntry?.playlists) ? oldEntry.playlists : await findVideoPlaylists(oldId);
+  const nowIso = new Date(nowMs()).toISOString();
+  if (oldIdx >= 0) {
+    m.videos[oldIdx] = { ...oldEntry, playlists, updatedAt: nowIso };
+  } else {
+    m.videos.push({
+      videoId: oldId,
+      title: old.snippet?.title ?? '',
+      privacy: old.status?.privacyStatus ?? '',
+      publishedAt: old.snippet?.publishedAt ?? '',
+      playlists,
+      status: 'ok',
+      updatedAt: nowIso,
+    });
+  }
+  writeManifest(m);
+  const base = {
+    title: old.snippet?.title,
+    description: old.snippet?.description ?? '',
+    tags: old.snippet?.tags ?? [],
+    category_id: old.snippet?.categoryId ? String(old.snippet.categoryId) : '10',
+    ...(old.snippet?.defaultLanguage ? { language: old.snippet.defaultLanguage } : {}),
+    made_for_kids: Boolean(old.status?.selfDeclaredMadeForKids ?? false),
+    ...(playlists.length ? { playlists } : {}),
+    ...(oldEntry?.key ? { key: oldEntry.key } : {}),
+    privacy: 'private',
+    replaces: oldId,
+  };
+  let merged = mergeArgsWithCard(card, base);
+  merged = mergeArgsWithCard({ ...a, replaces: oldId }, merged);
+  const { file, st } = validateUploadArgs(merged, resolvedFile);
+  const queued = queueUploadCore(merged, file, st);
+  return {
+    read: {
+      video_id: oldId,
+      title: old.snippet?.title,
+      description: old.snippet?.description ?? '',
+      tags: old.snippet?.tags ?? [],
+      category_id: old.snippet?.categoryId,
+      privacy: old.status?.privacyStatus,
+      playlists,
+      ...(oldEntry?.key ? { key: oldEntry.key } : {}),
+    },
+    queued,
+  };
+}
+
+function parseReleasePlanArgs(a) {
+  const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(a.start ?? '').trim());
+  if (!startMatch) throw new Error('start must be a date in YYYY-MM-DD (Pacific time).');
+  const y = Number(startMatch[1]), mo = Number(startMatch[2]), d = Number(startMatch[3]);
+  const checkDate = new Date(Date.UTC(y, mo - 1, d));
+  if (checkDate.getUTCFullYear() !== y || checkDate.getUTCMonth() !== mo - 1 || checkDate.getUTCDate() !== d) {
+    throw new Error(`Invalid start date: ${a.start}.`);
+  }
+  const atStr = String(a.at ?? '10:00').trim();
+  const atMatch = /^(\d{1,2}):(\d{2})$/.exec(atStr);
+  if (!atMatch) throw new Error('at must be a 24-hour Pacific clock time like "10:00".');
+  const h = Number(atMatch[1]), min = Number(atMatch[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) throw new Error(`Invalid clock time: ${atStr}.`);
+  const every = a.every === undefined ? 24 : Number(a.every);
+  if (!Number.isFinite(every) || every <= 0) throw new Error('every must be a positive number of hours.');
+  const privacy = a.privacy ?? 'public';
+  if (!PRIVACY.includes(privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
+  if (privacy !== 'public') throw new Error('YouTube only schedules a private video to become public at publishAt (privacy must be "public").');
+  return { y, mo, d, h, min, every, privacy, dryRun: Boolean(a.dry_run) };
+}
+
+async function releasePlan(a) {
+  const { y, mo, d, h, min, every, dryRun } = parseReleasePlanArgs(a);
+  const keys = Array.isArray(a.keys) ? a.keys.map(String) : [];
+  const videoIds = Array.isArray(a.video_ids) ? a.video_ids.map(String) : [];
+  if (!keys.length && !videoIds.length) throw new Error('Pass keys or video_ids.');
+
+  const store = readStoreStrict();
+  const manifest = readManifestStrict();
+  const targets = [];
+  for (const key of keys) {
+    const activeJob = store.jobs.find((j) => j.key === key && (j.state === 'queued' || j.state === 'uploading'));
+    if (activeJob) {
+      targets.push({ kind: 'job', key, job: activeJob });
+      continue;
+    }
+    const entry = manifest.videos.find((e) => e.key === key && e.status !== 'replaced' && e.status !== 'removed');
+    if (entry) {
+      targets.push({ kind: 'video', key, videoId: entry.videoId });
+      continue;
+    }
+    const anyEntry = manifest.videos.find((e) => e.key === key);
+    if (anyEntry) throw new Error(`Key "${key}" only matches a ${anyEntry.status} video (${anyEntry.videoId}).`);
+    throw new Error(`No video or queued job with key "${key}".`);
+  }
+  for (const videoId of videoIds) {
+    targets.push({ kind: 'video', videoId });
+  }
+
+  const upIds = [...new Set(targets.filter((t) => t.kind === 'video').map((t) => t.videoId))];
+  const fetched = new Map();
+  for (let i = 0; i < upIds.length; i += 50) {
+    for (const v of await videos(upIds.slice(i, i + 50))) fetched.set(v.id, v);
+  }
+  for (const id of upIds) {
+    if (!fetched.has(id)) throw new Error(`No video ${id} on this channel.`);
+  }
+
+  const slot0Ms = pacificWallToMs(y, mo, d, h, min, 0);
+  const warnings = [];
+  const plan = targets.map((t, i) => {
+    const slotMs = every % 24 === 0
+      ? pacificWallToMs(y, mo, d + i * (every / 24), h, min, 0)
+      : slot0Ms + i * every * 3600_000;
+    const publishAt = new Date(slotMs).toISOString();
+    const pacific = formatPacific(slotMs);
+    if (t.kind === 'job') {
+      const warn = t.job.state !== 'queued' ? `Job ${t.job.id} is currently ${t.job.state}; cannot change publish_at until queued or uploaded.` : undefined;
+      if (warn) warnings.push(warn);
+      return {
+        kind: 'queued_job',
+        job: t.job.id,
+        ...(t.key ? { key: t.key } : {}),
+        title: t.job.meta?.snippet?.title,
+        publish_at: publishAt,
+        pacific,
+        quota_units: 0,
+        ...(warn ? { warning: warn } : {}),
+      };
+    }
+    const v = fetched.get(t.videoId);
+    const curPrivacy = v.status?.privacyStatus;
+    const warn = curPrivacy !== 'private' ? `Video ${t.videoId} ("${v.snippet?.title}") is already ${curPrivacy}; YouTube only schedules a private video.` : undefined;
+    if (warn) warnings.push(warn);
+    return {
+      kind: 'video',
+      video_id: t.videoId,
+      ...(t.key ? { key: t.key } : {}),
+      title: v.snippet?.title,
+      current_privacy: curPrivacy,
+      publish_at: publishAt,
+      pacific,
+      quota_units: 50,
+      ...(warn ? { warning: warn } : {}),
+    };
+  });
+
+  const videoCount = plan.filter((p) => p.kind === 'video').length;
+  const jobCount = plan.length - videoCount;
+  const quotaCost = videoCount * 50;
+  const costNote = `${videoCount} live video update(s) × 50 units = ${quotaCost} quota units (${jobCount} queued job(s) × 0 units).`;
+
+  if (dryRun) {
+    return { dry_run: true, quota_cost: quotaCost, cost_note: costNote, ...(warnings.length ? { warnings } : {}), plan };
+  }
+  if (warnings.length) {
+    throw new Error(`${warnings.join(' ')} No videos or jobs were changed.`);
+  }
+
+  for (const item of plan) {
+    if (item.kind === 'video') {
+      await updateVideo({ video_id: item.video_id, publish_at: item.publish_at });
+    } else {
+      const idx = store.jobs.findIndex((j) => j.id === item.job);
+      if (idx >= 0) {
+        store.jobs[idx] = {
+          ...store.jobs[idx],
+          meta: {
+            ...store.jobs[idx].meta,
+            status: { ...store.jobs[idx].meta.status, privacyStatus: 'private', publishAt: item.publish_at },
+          },
+        };
+      }
+    }
+  }
+  if (jobCount > 0) writeStore(store);
+  if (videoCount > 0) {
+    const curManifest = readManifest();
+    let changed = false;
+    const nowIso = new Date(nowMs()).toISOString();
+    for (const item of plan) {
+      if (item.kind !== 'video') continue;
+      const idx = curManifest.videos.findIndex((e) => e.videoId === item.video_id);
+      if (idx >= 0) {
+        curManifest.videos[idx] = { ...curManifest.videos[idx], privacy: 'private', publishAt: item.publish_at, updatedAt: nowIso };
+        changed = true;
+      }
+    }
+    if (changed) writeManifest(curManifest);
+  }
+  return { dry_run: false, quota_cost: quotaCost, cost_note: costNote, updated_videos: videoCount, updated_jobs: jobCount, plan };
+}
+
+function notify(message) {
+  if (process.platform !== 'darwin') return;
+  // Only the real drain on the owner's Mac speaks. A run against a stand-in Google (the check,
+  // CHROMAGLASS_YOUTUBE_GOOGLE set) never does: on 2026-11-22 the check's early drain lines ran
+  // without NO_NOTIFY while the check and its mutants ran again and again, and every pass put a
+  // real "YouTube" notification on the owner's screen. A notification the check did not ask
+  // for is a bug in the check's reach, so the server refuses it here, not only the check's env.
+  if (process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;
+  const clean = String(message).replace(/[\r\n]+/g, ' ').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  try {
+    execFileSync('osascript', ['-e', `display notification "${clean}" with title "YouTube"`], { stdio: 'ignore' });
+  } catch { /* notification is best-effort */ }
 }
 
 async function drain() {
@@ -828,7 +1175,11 @@ async function drain() {
     if (fresh.notBefore && Date.parse(fresh.notBefore) > nowMs()) continue;
     if (!authed) { await accessToken(); authed = true; }
     await run(fresh);
-    if (fresh.state === 'queued' && fresh.notBefore) {
+    if (fresh.state === 'done') {
+      notify(`${fresh.meta.snippet.title} — ${watchUrl(fresh.video_id)}`);
+    } else if (fresh.state === 'failed') {
+      notify(`Failed: ${fresh.meta.snippet.title} — ${fresh.error ?? 'upload failed'}`);
+    } else if (fresh.state === 'queued' && fresh.notBefore) {
       const store = readStoreStrict();
       const nbMs = Date.parse(fresh.notBefore);
       let changed = false;
@@ -898,20 +1249,21 @@ function uninstallAgent() {
 
 const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the light show running.
 
-- Uploads go up PRIVATE unless you pass privacy. Make a video unlisted or public, or schedule it (publish_at), only when the owner said so in this conversation. A scheduled video is private until its time.
+- Uploads go up PRIVATE unless you pass privacy. Make a video unlisted or public, or schedule it (publish_at), or run release_plan, only when the owner said so in this conversation. A scheduled video is private until its time; YouTube only schedules a private video.
 - Before uploading, say what you will upload: the file, the title, the privacy. Credit the music's source in the description when the owner has one (where a recording came from and its date).
+- If a file has a sidecar card beside it (<file without extension>.youtube.json), upload_video, queue_upload and replace_video read it for any field the call leaves out (call wins); unknown fields in the card are refused.
 - upload_video answers within about 45 seconds: a short film is done by then; a long one answers "uploading" and carries on. Check it with upload_status. If an upload stops (the Mac slept, the app closed), ask upload_video again with the same file and title: it carries on where it stopped and never makes a second copy unless you pass again: true.
-- A job in state "queued" (from queue_upload, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: the Mac's background agent finishes it on its own after not_before (shown in Pacific time). Do not retry it by hand.
-- Use queue_upload to line up several films without uploading them immediately, and pass key (a short film id) or replaces (an old video id) so the channel manifest stays current.
-- Use manifest (with sync: true to pull all pages from the channel, 1 quota unit a page) and mark_video to track which videos are ok, need rerecord, are queued, replaced or removed.
+- A job in state "queued" (from queue_upload, replace_video, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: the Mac's background agent finishes it on its own after not_before (shown in Pacific time) and posts a macOS notification when done or failed. Do not retry it by hand.
+- Use queue_upload to line up several films without uploading them immediately, and replace_video to queue a re-rendered file carrying the old video's title, description, tags, category and playlists (without deleting or changing the old video; deleting stays in YouTube Studio).
+- Use manifest (with sync: true to pull all pages from the channel, 1 quota unit a page, including views and likes) and mark_video to track which videos are ok, need rerecord, are queued, replaced or removed.
 - YouTube processes a video for a few minutes after the upload; its upload_status in list_videos says when it is "processed".
 - Deleting is not here on purpose: tell the owner to delete in YouTube Studio.
-- Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day; reading (and each manifest sync page) costs 1.`;
+- Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day (release_plan costs 50 per live video updated, 0 per queued job — state the cost first); reading (and each manifest sync page or playlist scan) costs 1.`;
 
 const str = { type: 'string' };
 const uploadProps = {
   file: { ...str, description: 'Full path to the video file on this Mac.' },
-  title: { ...str, description: 'At most 100 characters.' },
+  title: { ...str, description: 'At most 100 characters (may come from <file>.youtube.json).' },
   description: str,
   tags: { type: 'array', items: str },
   privacy: { type: 'string', enum: PRIVACY, description: 'Default private. Only another value when the owner asked for it.' },
@@ -930,13 +1282,25 @@ const TOOLS = [
   { name: 'list_videos', description: "The channel's latest uploads, newest first: id, link, title, privacy, schedule, processing state, views.", inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 50, description: 'How many (default 10).' } } } },
   {
     name: 'upload_video',
-    description: 'Upload a video file from this Mac. Private unless privacy says otherwise. Resumes an interrupted upload of the same file and title. If YouTube answers with the daily upload limit or quota, queues the job for automatic retry on the Mac instead of failing.',
-    inputSchema: { type: 'object', required: ['file', 'title'], properties: uploadProps },
+    description: 'Upload a video file from this Mac (reads <file>.youtube.json sidecar for omitted fields; call wins). Private unless privacy says otherwise. Resumes an interrupted upload of the same file and title. If YouTube answers with the daily upload limit or quota, queues the job for automatic retry on the Mac instead of failing.',
+    inputSchema: { type: 'object', required: ['file'], properties: uploadProps },
   },
   {
     name: 'queue_upload',
-    description: 'Save a video upload job in state "queued" without uploading yet; the Mac drains the queue on its own. Refuses if the same file and title is already queued or up.',
-    inputSchema: { type: 'object', required: ['file', 'title'], properties: uploadProps },
+    description: 'Save a video upload job in state "queued" without uploading yet (reads <file>.youtube.json sidecar for omitted fields; call wins); the Mac drains the queue on its own. Refuses if the same file and title is already queued or up.',
+    inputSchema: { type: 'object', required: ['file'], properties: uploadProps },
+  },
+  {
+    name: 'replace_video',
+    description: 'Read an old video (snippet, status and playlists) and queue a replacement upload of a new file with the old title, description, tags, category, playlists and manifest key (unless overridden by call or <file>.youtube.json sidecar), privacy private, replaces = old video_id. Never deletes or modifies the old video.',
+    inputSchema: {
+      type: 'object',
+      required: ['video_id', 'file'],
+      properties: {
+        video_id: { ...str, description: 'Existing video id being replaced.' },
+        ...uploadProps,
+      },
+    },
   },
   { name: 'upload_status', description: 'How the uploads are going (or one, by its job id): MB sent, queued jobs with not_before in Pacific time (not a failure; the Mac finishes them on its own — do not retry by hand), done, failed and why, the link once up.', inputSchema: { type: 'object', properties: { job: str } } },
   {
@@ -944,13 +1308,30 @@ const TOOLS = [
     description: "Change a video's title, description, tags, category, privacy or schedule. Only the fields you pass change.",
     inputSchema: { type: 'object', required: ['video_id'], properties: { video_id: str, title: str, description: str, tags: { type: 'array', items: str }, category_id: str, language: str, privacy: { type: 'string', enum: PRIVACY }, publish_at: { ...str, description: 'ISO time to go public; empty string to unschedule.' }, made_for_kids: { type: 'boolean' } } },
   },
+  {
+    name: 'release_plan',
+    description: 'Schedule a release across private live videos and queued upload jobs, one slot apart at a Pacific clock time. Only run this without dry_run when the owner asked for that release in this conversation. Live video updates cost 50 quota units each (queued jobs cost 0); YouTube only schedules a private video.',
+    inputSchema: {
+      type: 'object',
+      required: ['start'],
+      properties: {
+        keys: { type: 'array', items: str, description: 'Manifest keys of videos or queued jobs to schedule in order.' },
+        video_ids: { type: 'array', items: str, description: 'YouTube video ids to schedule in order.' },
+        start: { ...str, description: 'First release date (YYYY-MM-DD, Pacific time).' },
+        every: { type: 'number', description: 'Hours between slots (default 24).' },
+        at: { ...str, description: 'Pacific clock time HH:MM (default "10:00").' },
+        privacy: { type: 'string', enum: PRIVACY, description: 'Target release privacy (default "public"; YouTube schedules private videos to become public).' },
+        dry_run: { type: 'boolean', description: 'Return the computed plan and quota cost without changing anything.' },
+      },
+    },
+  },
   { name: 'set_thumbnail', description: "Set a video's thumbnail from a .jpg or .png on this Mac (needs the channel phone-verified).", inputSchema: { type: 'object', required: ['video_id', 'file'], properties: { video_id: str, file: str } } },
   { name: 'list_playlists', description: "The channel's playlists: id, title, privacy, how many videos.", inputSchema: { type: 'object', properties: {} } },
   { name: 'create_playlist', description: 'Make a playlist (private unless privacy says otherwise).', inputSchema: { type: 'object', required: ['title'], properties: { title: str, description: str, privacy: { type: 'string', enum: PRIVACY } } } },
   { name: 'add_to_playlist', description: 'Add a video to a playlist.', inputSchema: { type: 'object', required: ['video_id', 'playlist_id'], properties: { video_id: str, playlist_id: str } } },
   {
     name: 'manifest',
-    description: 'Show the channel manifest table (key, title, id, privacy, status, replacedBy), optionally filtered by status. Pass sync: true to page through the whole channel and merge without overwriting local fields; sync costs 1 quota unit a page (plus 1 per 50 videos).',
+    description: 'Show the channel manifest table (key, title, id, privacy, views, likes, status, replacedBy), optionally filtered by status. Pass sync: true to page through the whole channel (including views and likes) and merge without overwriting local fields; sync costs 1 quota unit a page (plus 1 per 50 videos).',
     inputSchema: { type: 'object', properties: { sync: { type: 'boolean', description: 'Page through all uploads on the channel first (1 unit a page).' }, status: { type: 'string', enum: MANIFEST_STATUS, description: 'Filter table rows by status.' } } },
   },
   {
@@ -974,12 +1355,13 @@ const TOOLS = [
 const text = (v) => ({ content: [{ type: 'text', text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }] });
 const fail = (m) => ({ content: [{ type: 'text', text: m }], isError: true });
 
-async function call(name, a = {}) {
+async function call(name, a = {}, onProgress = null) {
   switch (name) {
     case 'channel': { const { uploads, ...c } = await channel(); return text(c); }
     case 'list_videos': return text(await listVideos(Number(a.limit ?? 10)));
-    case 'upload_video': return text(await uploadVideo(a));
+    case 'upload_video': return text(await uploadVideo(a, onProgress));
     case 'queue_upload': return text(queueUpload(a));
+    case 'replace_video': return text(await replaceVideo(a));
     case 'upload_status': {
       const { jobs } = readStore();
       const filtered = jobs.filter((j) => !a.job || j.id === a.job).map((j) => (j.state === 'uploading' && !running.has(j.id) && !busyElsewhere(j) ? { ...j, state: 'stopped (ask upload_video again with the same file and title to resume)' } : j));
@@ -991,6 +1373,7 @@ async function call(name, a = {}) {
       if (a.publish_at && a.privacy && a.privacy !== 'private') return fail('A scheduled video stays private until publish_at; leave privacy out.');
       return text(await updateVideo(a));
     }
+    case 'release_plan': return text(await releasePlan(a));
     case 'set_thumbnail': return text(await setThumbnail(String(a.video_id), String(a.file)));
     case 'list_playlists': {
       const { j } = await api('GET', 'playlists', { query: { part: 'snippet,status,contentDetails', mine: true, maxResults: 50 } });
@@ -1028,9 +1411,17 @@ async function onRequest(m) {
     }
     case 'ping': reply({}); return;
     case 'tools/list': reply({ tools: TOOLS }); return;
-    case 'tools/call':
-      try { reply(await call(params?.name, params?.arguments ?? {})); } catch (e) { reply(fail(String(e?.message ?? e))); }
+    case 'tools/call': {
+      const progressToken = params?._meta?.progressToken;
+      let openProgress = true;
+      const onProgress = (progressToken !== undefined && progressToken !== null)
+        ? (progress, total) => { if (openProgress) write({ jsonrpc: '2.0', method: 'notifications/progress', params: { progressToken, progress, total } }); }
+        : null;
+      try { reply(await call(params?.name, params?.arguments ?? {}, onProgress)); }
+      catch (e) { reply(fail(String(e?.message ?? e))); }
+      finally { openProgress = false; }
       return;
+    }
     default:
       if (method?.startsWith('notifications/')) return;
       if (id !== undefined) write({ jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${method}` } });
