@@ -53,6 +53,7 @@ import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
 import { AreaHands, musicDyeIn, plateArea, type AreaSink, type LayOptions, type MasterGains } from '../lib/areaCords';
 import { setMasters } from '../lib/musicCords';
+import { clearDrops, dropsLive } from '../lib/dropImpact';
 import { BackLook } from '../lib/backLook';
 import { type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
@@ -4927,6 +4928,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             rbB: rd?.[cell(0.7, 0.35)] ?? -1,
             rbC: rd?.[cell(0.4, 0.72)] ?? -1,
             rbVx: rvx?.[cell(0.5, 0.5)] ?? -1,
+            tip: f0 ? `${f0.drops.trickle},${dropsLive(f0.drops)}` : '',
             fxFrame: fxFrameRef.current,
           };
         }
@@ -5262,6 +5264,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // Each plate's own history, after the look has laid its angles.
           const drawn = Math.max(1, 1.5 * Math.max(o.width, o.height));
           fluidsRef.current.forEach((f, l) => f.forgetHistory(rotationAnglesRef.current[l] ?? 0, 0.5 * o.width / drawn, 0.5 * o.height / drawn));
+          /*
+            And the dropper's tip with the drops still falling (lib/dropImpact.ts
+            clearDrops, which nothing called). A pour under half a drop on the
+            thin gap is held at the tip until it makes one, so a render began
+            with whatever the last had left there and the same seed fell a drop
+            on another step: since the music's hands pour through drops (38v-1),
+            two Evolve renders of one seed parted 4.5 s in (`npm run render-app`).
+          */
+          for (const f of fluidsRef.current) clearDrops(f.drops);
         }
         // The laid plate, read back twice, so the first frame's readers (the
         // dye regulator, the beads) see this plate and not nothing.
