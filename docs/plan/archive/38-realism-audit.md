@@ -143,3 +143,26 @@ On in every look, or nearly:
   turns it into a noise curl wherever there is dye. No actuator and no cord. Either it goes,
   or it is a cord to something real: the motor, Beat Squeeze, a tap on the glass as −∂h/∂t.
   none.
+- ~~**38u-7. The force between colours changes sign in patches**~~ — **Shipped (2026-11-13).**
+  Polarity's push (`forces.ts`, and the CPU's `applyImmiscibility`) was multiplied by 1 + 2·snoise,
+  negative under −0.5: there it pulled unlike colours together. The noise is gone, so the push has
+  one sign everywhere (`npm run forces` 6: 76 of 76 rows of a straight boundary push the colours
+  apart, the spread along it 0.11 of the mean; 26 of 76 pulled them together on main). The force
+  itself is **18d-6**'s (dyes in water mix, only oil and water hold a line).
+- ~~**38u-12. Rain Drip pulls heavy dye "down" a level plate**~~ — **Shipped (2026-11-13).**
+  Rain Drip is now the dye's weight along the plate, scaled by the tilt (`dripOf`: the dial times
+  Gravity, `plateUpright`; g sin θ, nothing flat). The seven looks that set Rain Drip at 0.2 or more
+  got `plateUpright: 0.25`, a plate tipped about 15 degrees, so they still streak, at a quarter of
+  the pull; Velvet Underground got 0.05, about 3 degrees, so its pools stay pools and still move
+  (`npm run pools` on the Mac: level, they moved 8.9% against frozen's 8.5%, under the 1.5x bar; at
+  0.05 they keep 95/93/93% and move 44% against 11%; at 0.10 and 0.15 two pools drain to 39–70%); the weak ones (Classic 0.15, Stardust Collapse, Home Movie 0.1) now streak only when
+  tipped. A plate rocked by a hand has its own weight in the rock's term. `npm run forces` 7. Open
+  for the owner's eye: the tilt turns on the buoyancy and the lamp's heat a standing plate has
+  (docs/judging.md §139), and the thick (non-thin-gap) path still runs along -y, not Tilt Direction.
+- ~~**38u-14. A clear drop's lens is drawn at a third**~~ — **Shipped (2026-11-13).** The oil
+  drop's band is at full strength in clear water (it was 0.35 with no dye: 70% of the plate in the
+  band where dyed water gives 24%), and the clear oil's tint is exp(−α·thickness), the same colour on the flat top and
+  fading to the water's over the meniscus. `npm run droplens`. Left open: a bubble in clear
+  liquid is still drawn at 0.7 of its ring (`mix(0.7, 1.0, filmT)` in `plate.ts`); making it whole
+  moved `npm run filmlook`'s closeup00 line by one pixel on the GitHub Mac's Metal GPU (it passes in
+  SwiftShader and on the owner's Mac), so it is its own item to be measured on that GPU.

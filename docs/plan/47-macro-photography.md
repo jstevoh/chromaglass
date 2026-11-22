@@ -169,6 +169,12 @@ brighter than either side by at least 30 levels, and Rheinberg's ring takes the 
   and the kaleidoscope's copy are drawn without it, so glitter and the side lamp vanish when
   a source is up. Run `PlateGlint` after those paths too. *Measure:* a `glint` line with a
   source up.
+- **47b-4. Open: the glint's light is counted twice.** The disc carries all of E
+  (`glint.ts:277`) and the spikes add another 0.31·E (`:326-328`); the wall's reflectance is
+  `WALL_FRESNEL` 0.03 (`:382`, `src/lib/glint.ts:131`), and the air-glass Fresnel loss is
+  missing (`:376`; 17.5% at 70°, 33% at 78°). Scale the disc by (1 − SPIKE_SHARE·arms·π/6) and
+  apply the Fresnel loss. *Measure:* in `npm run glint`, the totals within 2% of E. (S; Low;
+  38v, from RS-28.)
 
 ## 47c. Blacklight: fluorescent dyes under a UV lamp (M)
 
@@ -355,6 +361,10 @@ a curling head need).
   disturbance (velocity noise of a few µm/s, or the nozzle wandering by a tenth of its bore),
   in the reference first, the GPU after, and let `tankgpu` measure the left-right difference
   growing where today it stays at rounding.
+- **47n-8. Open: the tank's glow is painted white.** `tankDraw.ts:57-59` adds 0.35·e² of
+  white, so the glow washes the dye's colour out. Light from the dye is the dye's colour: sum
+  it in linear light and let the shoulder roll it off. *Measure:* the chroma at glow 0.25
+  within 5% of the dye's. (S; Low; 38v, from RS-31.)
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 

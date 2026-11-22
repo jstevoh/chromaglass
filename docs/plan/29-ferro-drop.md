@@ -31,6 +31,8 @@ the code's entry points, the checks to add and the scenes to match, in
   - **29a-3.** The picture's drop is taller than the solver's layer (0.3 l_c a full
     cell); carry the drop's volume in the solver as the bead's thickness, so the drop the
     flow moves is the drop the picture draws.
+    38v (2026-11-21): the drop's height is also clipped at a fixed gap and its excess lost:
+    29a-11.
   - **29a-4.** The magnet's volume shift is held to its mean over all the ferrofluid on
     the plate, not drop by drop.
   - **29a-5.** The magnets' radius is the default Magnet Size's in the solve (the plate's
@@ -39,6 +41,11 @@ the code's entry points, the checks to add and the scenes to match, in
     and the exit losses through the glass are left out, as a photographer's flag and
     polariser would leave them; the reflected plate past total reflection is the plate
     decoded plainly, without the closeup's cells or lacing.
+    38v (2026-11-21): the reflected plate switches hard at total reflection
+    (`ferroDrop.ts:363-374`, sinθ·1.333 = 1, about a 24° slope), and `plate.ts:2755` sums the
+    linear studio light with the encoded `edgeLit`. Blend by Schlick's R_top and sum in linear
+    light. Check: adjacent pixels across slopes of 20–28° differ by no more than 3 levels. The
+    film-stock half of the look is an art grade, not physics. With 38p. (S; Low; from RS-35.)
   - **29a-7.** Its cost read on the Mac (`npm run stages` with the closeup in over a
     drop): about 18 million texel reads a frame on 384², 24 sweeps warm and 200 from cold.
   - **29a-8.** The drops' mask is 512 px across the plate (`beads.ts`), and at 6x the
@@ -49,6 +56,25 @@ the code's entry points, the checks to add and the scenes to match, in
   - **29a-9.** A drop reads the flow from its nearest cell (`beads.ts`), so its speed
     steps as it crosses a cell's edge; sample the velocity bilinearly, as the solver's
     advection does.
+  - **29a-10.** (S; High, a live bug) Every ferrofluid closeup draws the plate through white
+    milk. `packVelDrop` (`ferroDrop.ts:167-191`) writes 2 into the packed velocity's w, but
+    since 18j that channel is the milk's scatter (`pack.ts:168-178`); `plate.ts:440-490` skips
+    `packVel` on layer 0 when the drop has a height, and the plate shader reads it as
+    `milkScatter` (`sc0`, `wgsl/plate.ts:2558-2565`). A scatter of 2 is a reflectance R =
+    12/13 = 0.923: the ground goes white and the lamp's light through it falls to 16–27%, at
+    the default Relief 0.7 (`types.ts:1338`). A merge collision: #365 (29a) wrote w as
+    "solved" before #353 (18j) took the channel. Keep w as the scatter and carry "solved" as a
+    uniform (`dropSolved`, `ferroDrop.ts:266-267`). Check: a ferro closeup's ground matches
+    Relief 0's within a few levels, and milk outside a ferro domain keeps `dropSolved` 0.
+    (38v, from RS-25.)
+  - **29a-11.** (S; Medium) The drop is clipped to a fixed gap and loses volume.
+    `ferroDrop.ts:121` caps its height at 0.95·`GAP_LC`, a constant; the GPU clamps it point
+    by point (`wgsl/ferroDrop.ts:161-163`) and throws the excess away; and `packVelDrop`
+    (`:190`) writes z = h + `FILM_H0`·max(phase − 1, 0), up to 2.1 l_c over a 1.56 l_c gap, so
+    the drawn drop passes through the cover. A drop squeezed by a glass spreads and keeps its
+    volume. Push the cap's excess out to the neighbours, read the live gap, and write z =
+    min(h + domes, gap). Check: pressed to 0.8 mm, ∫h dA within 0.5% and no z over the gap.
+    Updates 29a-3. (38v, from RS-21.)
 - **29b. Dye on the drop: carried, spread, and shed off its back.** The water over the
   drop is the gap less the drop's height and is dragged with the drop's surface (no slip
   on the drop, no shear at the top glass's far side through the thin film), so its dye

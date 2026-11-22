@@ -60,6 +60,10 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       - **27a-8-2.** The camera aims from a readback of the density a frame or two old
         (`readbackAsync`), so Follow sits that far behind a fast drop. Measure the lag on
         the Mac and, if it shows, lead by the readback's age.
+      - **27a-8-3.** The plate's uniforms carry `pitchClass` and `brightness`
+        (`plateUniforms.ts:447-457`) that no shader reads. Drop them. Check: `npm run wgsl`
+        and the layout test pass, and the plate is identical at Frame Sway 0. (S; Low; 38v,
+        from RS-48.)
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick's discs span the dish (`KICK_RADII`, `kickDepth`); `npm run lift`. Story in `docs/plan-shipped.md` §27b (moved 2026-10-29, 19m-2).
   - **27b-1, open.** Let go, the ring comes back 87% of the way at the default and 79%
     at full; a squeeze film with nothing fingering should come all the way. The rest is

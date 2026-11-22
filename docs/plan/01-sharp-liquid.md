@@ -1,6 +1,6 @@
 # 1. Sharp liquid, and pigment in it
 
-**Shipped**: sharpening retired, granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**: the measured verdict retired sharpening (the pass itself still runs behind the Sharpness slider and MIDI CC15, default 0: 1k; corrected 2026-11-21, 38v), granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ## 1a. The grain at the dye's edge made the plate look digital (shipped)
 - **1b. Agate's Liesegang rings are dots on a 128² lattice** (lane C, `liesStep` in
@@ -8,6 +8,11 @@
   at a laptop's size Agate shows a regular grid of dots where real Liesegang bands are
   continuous rings. Measure: the `lock` of `npm run pixels` on Agate at the lattice's pitch
   rather than the solver's.
+  38v (2026-11-21): the rings step by steps, not seconds: `fluid.ts:1596-1621` and
+  `reactions.ts:87-111` run on `LIES_GRID` 128 with no Δx, while BZ already uses
+  `magnetSeconds`. Liesegang bands grow with D of 1–2e-9 m²/s; take Δx =
+  `PLATE_METRES`/`LIES_GRID` and the step's seconds. Check: the ring radii within 2% at 30, 60
+  and 120 Hz, and at the dial's 0.25 against 1. (From RS-4.)
 - **1c. A Retina laptop on the website opens at one device pixel per CSS pixel**
   (`platform.ts`: the hosted ladder starts on `{512, 1}`, tops out at 1.5x). The plate is
   drawn at a quarter of the panel's pixels and upscaled until the governor climbs, and
@@ -72,3 +77,9 @@
   Post Blur 0.6). The edge itself, the relief and the boundary line read the same opacity. Fix: the same B-spline in `blurAlpha`'s narrow form
   (under a cell it is the blur anyway), measured with 1i's probe on `fluid0.a` and a `look`
   crop of a dye edge at zoom 3; the cost is on every dye pixel, so time it on the Mac first.
+- **1k. Sharpening is still a live dial** (S; Low). `dye.ts:143-169` runs the sharpen pass
+  with `SHARP_FLOOR` 0.08, `fluid.ts:1624-1629` calls it, `LookSections.tsx:50-57` shows the
+  Sharpness slider and `midi.ts:1130` maps CC15, though the verdict in `docs/plan-shipped.md`
+  (§1) retired it; Evolve never raises it. Remove the pass, the slider and the CC with a
+  settings migration that drops the key. Check: `npm run panel` and `npm run desk` pass and a
+  saved look with Sharpness loads. (38v, from RS-9.)

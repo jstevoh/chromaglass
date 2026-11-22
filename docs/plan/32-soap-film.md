@@ -110,6 +110,12 @@ colleagues 2020.
   tension against the rim's drag (Mysels); that law is the next step.
 - **32g-2. Vrij's clock sits on the grid.** It does not travel with the film. It matters only
   under about 60 nm, where the film barely moves, but advecting it with h is the honest form.
+- **32g-2b. The black film's thickness is a constant, and its age is on the grid** (S–M;
+  Medium). `soapFilm.ts:394-399`, `:419-422` and `:449`, and `wgsl/soapFilm.ts:393, 415`, set
+  the black film's thickness and keep its age in place. A common black film settles at 4–8 nm
+  where the disjoining pressure balances drainage. Take the thickness from that balance and
+  advect the age with the film; buoyancy stays. Check: the black film's thickness holds within
+  1 nm over 60 s while it moves. (38v, from RS-12.)
 - **32g-3. Only van der Waals.** The double-layer repulsion that sets a common black film's
   thickness (DLVO) is left out: every spot goes straight to Newton black.
 
@@ -159,3 +165,9 @@ about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carr
   a faint dye (Dye Budget 0.3) that shows through the film's black and its thin orders. A real
   frame has nothing behind it but the dark ground; decide with the owner whether the dye stays
   as a colour under the film or goes.
+- **32d-6. The film's colours take too much light from the plate** (S; Medium; a look change).
+  `SOAP_GAIN` is 4 (`plateThinFilm.ts:172`), and `:204-217` take up to 60% of the light where
+  Airy's reflectance of a soap film is at most 7.8%; R is applied unscaled and not in linear
+  light. Use Airy's R in linear light, with any extra as an optional Lace control. Check: a
+  0–1.5 µm wedge transmits at least 92%, and black film over 99%. (38v, from RS-29.)
+

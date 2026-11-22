@@ -27,6 +27,9 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
   18a-2's forces), with no swirl field at all. 18a-2 built that drag for a glass
   sliding as a whole (Glass Smear: hsPrep's A.b.zw, the liquid driven toward U/2
   with the gap's own 12ν/h²); the dish is the same with U = ω×r a cell at a time.
+  38v (2026-11-21): the lag is still scaled by k0 (`forces.ts:422-470`) over a range of 1/50
+  to 1/1000; fold it into the gap as this item says. Check: each layer's lag within 15% of
+  h²/(12ν). (From RS-5.)
 - **22l. Nothing winds the middle against the rim now.** The stir was a differential
   rotation, and some looks read by it (galaxy's spiral arms; its preset said so). A
   steady dish under one liquid cannot make one; what does in a real show is a second,
@@ -79,3 +82,7 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
   the read landed. Either the plate takes no step between the flick's first and the read while
   frames draw, or `lastStep` is not the latest; find which, and read the step and the frame
   from the same step.
+- **22r. The spin's weight is a tanh, not the density** (S; Low). `forces.ts:270` and
+  `weightAt` (about `:438`) pass the weight through a tanh, so dye past the mean stops getting
+  heavier. Weight is linear in Δρ/ρ₀ (18m-3). Make it linear. Check: the drift linear up to 3×
+  the mean within 5%. (38v, from RS-5.)

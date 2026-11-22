@@ -69,9 +69,10 @@ Left, each its own plan item:
 - **15g-2 The jet's dimple.** A held puff (a Blow with no direction that is not the straw)
   still runs the old push and the Press's ring carry, for the hands that ask for one: a
   remote's undirected Blow (the pad held still, a game controller's, OSC, the assistant's)
-  and any Blow off a thin gap. The pointer's own asks for none on a thin gap since 15g-11
+  and any Blow off a thin gap. The pointer's own asks for no push or ring carry on a thin gap since 15g-11
   (a press that never moved is the straw, and before the straw starts it lays nothing), so
-  the desk no longer stamps them. Each carry takes 24% of the colour out of a hard-edged disc
+  the desk no longer stamps them; it does still run the ferrofluid's phase carry with no
+  direction (corrected 2026-11-21, below). Each carry takes 24% of the colour out of a hard-edged disc
   six cells across and puts it in a ring, which on a still plate reads as a pale disc with a
   dark rim (measured in the lab while looking for the owner's
   "flower-like things" of 2026-11-13): until this item ships a remote's held puff can still
@@ -81,6 +82,15 @@ Left, each its own plan item:
   the number, which only `npm run blowrange` reads until then). Its outward shear is all divergence, which a rigid film
   moves nothing by, so it waits on this. The moving wind's own dimple, travelling with it,
   comes with it.
+  38v (2026-11-21): corrected above. The local Blow before its first move, and the straw
+  always, passes dx = dy = 0 to `blowPhase` (`LiquidVisualizer.tsx:3326-3331`), which returns
+  early only when the breath moves and `airsFilm` (`fluidSimulation.ts:2554-2560`), so a still
+  breath runs the outward phase carry and pushes ferrofluid out from under the cursor in a
+  ring before any air has moved. Only with ferrofluid live: `carryPhase`
+  (`src/gpu/fluid/inputs.ts:850`) gates on `phaseLive`. Skip the carry when the breath has no
+  direction and leave the push to this item's dimple, Δp ≈ ρ_air U²/2 (§9n's hole under a
+  breath). Check: a still straw held two seconds over a ferro pool moves the phase's centroid
+  and edge no more than an idle plate does. (S; Medium; from RS-40.)
 - **15g-3 The film's free surface.** The solve holds the film's height as the gap (a
   rigid lid), so liquid the breath pushes ahead piles into no bow wave and the film
   does not thin where the air hits. Real for a covered plate, not for an open dish.
@@ -187,6 +197,30 @@ Left, each its own plan item:
   15g-3). Also seen and not looked into: under the same default breath a pool with
   ferrofluid in it went 23.96% of the plate (the ferrofluid 29.89%) where the colour
   alone went 13.07%.
+- **15g-17 The pointer shoves bubbles and beads, and a pop pushes and swirls** (S; High).
+  Every third frame the pointer calls `bubbles.disturb` and `beads.disturb`
+  (`LiquidVisualizer.tsx:3256, 3258`; `beads.ts:408-418`), which shove them at 40 or 22 cells
+  a second with a 0.22 s decay (`bubbles.ts:468-492`); a pop (`speciesPoll.ts:111-117` to
+  `popBubble`, `fluidSimulation.ts:2283-2302`) adds a push and a parity swirl (`BLOW_SWIRL`)
+  on top of the sink the thin gap already solves (`thinGap.ts:785-800`). A bubble between
+  glasses moves with the liquid at Taylor–Saffman's 2U/(1 + λ), a burst hole is a sink with no
+  curl, and a finger bursts a bubble only where it closes the gap (`OPEN_RIM`,
+  `bubbles.ts:664-668`). Delete the disturbs and the pop's push and swirl; with 18i-2. Check:
+  a bubble beside a passing finger moves no more than the liquid's Taylor–Saffman speed says,
+  and a pop leaves a curl-free sink. (38v, from RS-37.)
+- **15g-18 A press twists the liquid it squeezes** (S; Medium). The local press adds a vortex,
+  w = (1 − d/twistR)²·40·pa·kSoft (`LiquidVisualizer.tsx:3301-3317`); a remote's press
+  (`1218-1228`) has none, so the same press differs by hand. A press squeezes liquid out
+  radially, a source with no curl; the only real twist is the cover turned (Couette, 42b).
+  Delete it. Check: the curl over a press's disc stays at the idle level, local and remote
+  alike. (38v, from RS-36.)
+- **15g-19 The straw's lobes are clipped at a reach, not conserved** (S; Low). Where 15g-12
+  lets fingers form (two or more fit), each lobe reaches to `FINGER_REACH` 0.9 (`air.ts:58`),
+  `rimAt` (`:69-78`) never dips below 1, and `bubbles.ts:425-460` clips at rMax = N·0.07 and
+  drops the rest, so the bubble's area grows with its fingers. Air in a gap keeps its volume:
+  the lobes are a zero-mean change of the rim, with area A = V/b. Check: a fingered straw
+  bubble's area within 3% of its volume over the gap (`npm run straw`). §38's straw line under
+  "Also found" points here. (38v, from RS-15.)
 
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 
