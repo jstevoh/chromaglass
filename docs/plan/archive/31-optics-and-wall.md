@@ -9,6 +9,15 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 ~~**31p-1** Polarisers, Analyser, Quarter Wave, Birefringence~~ (shipped; story in
 `docs/plan-shipped.md` §31p-1; `npm run polar`).
 
-## 31s. The liquid surface height and real caustics
+## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
 
-- **31s-1. Surface height field on the solver grid.** — **Shipped.** Added a solver-owned height field `h` in metres (`src/gpu/surfaceHeight.ts`, `src/gpu/wgsl/surfaceHeight.ts`), conservatively advected in flux form, levelled by the thin-film lubrication equation (`dh/dt = div((h^3 / (3 mu)) grad(p))`, `p = -sigma lap(h) + rho g h`) via semi-implicit coupled 2×2 Red-Black multigrid V-cycles with exact face flux-divergence conservation, seeded where oil is poured (`mix.r`), and exposed read-only to the plate at `@binding(26)` (`src/gpu/wgsl/plateSurface.ts`) without drawing it yet. *Measure:* `PW_WEBGPU=1 npm run surfaceheight`.
+- **31s-1. The liquid's surface height as a solver field.** **Shipped.** A height field h (the oil layer's
+  thickness over the water, and the water's own free surface) advected by the flow and levelled
+  by the thin-film (lubrication) equation: dh/dt + div(h u) = -div( h^3/(3 mu) grad(p) ), with
+  p = -sigma lap(h) + rho g h. Surface tension pulls a drop's edge into a meniscus whose width is
+  the capillary length (about 2 mm for oil on water, sqrt(sigma/(rho g))); gravity levels a
+  wide pool. Interfacial tension between oil and water sets the contact shape where the phases
+  meet (the phase field already knows where). *Measure (lab):* a still lens of oil keeps the
+  meniscus profile set by the capillary length (within 10%); a sine ripple of wavenumber k on a
+  layer h0 decays on tau = 3 mu / (h0^3 (sigma k^4 + rho g k^2)) (within 15%); mass of h is
+  kept to 0.1% over 600 steps (`PW_WEBGPU=1 npm run surfaceheight`).

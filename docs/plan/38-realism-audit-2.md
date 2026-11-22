@@ -53,7 +53,7 @@ cost, then Low.
 | 31 | 38v-7 | Thin film and bead cores brighten a backlit plate (RS-33) | here | S | Low–Medium | new |
 | 32 | 18d-13 | A dye has no partition coefficient between liquids (RS-14; plan text corrected) | `18-physics-2.md` | M | Low–Medium | new |
 | 33 | 1b | Liesegang steps by frames and grid cells (RS-4) | `01-sharp-liquid.md` | S | Low | updates |
-| 34 | 22g, 22r | The spin's viscosity misses the glycerine; tanh on the weight (RS-5) | `22-spin.md` | S | Low | updates, new |
+| 34 | 22g, 22r | The spin's viscosity misses the glycerine; tanh on the weight (RS-5) | `22-spin.md` | S | Low | updates, 22r spin half shipped |
 | 35 | 18m-3 | The slump reads one global viscosity (RS-6) | `18-physics-3.md` | S | Low | updates |
 | 36 | 1k | Retire the sharpen pass still behind Sharpness and CC15 (RS-9; plan text corrected) | `01-sharp-liquid.md` | S | Low | new |
 | 37 | 18f-4, 38s | Vogel's law for warm glycerine; the cover's density is water's (RS-10) | `18-physics-2.md`, `38-realism-audit.md` | S | Low | updates |

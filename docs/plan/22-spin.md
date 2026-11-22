@@ -82,7 +82,4 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
   the read landed. Either the plate takes no step between the flick's first and the read while
   frames draw, or `lastStep` is not the latest; find which, and read the step and the frame
   from the same step.
-- **22r. The spin's weight is a tanh, not the density** (S; Low). `forces.ts:270` and
-  `weightAt` (about `:438`) pass the weight through a tanh, so dye past the mean stops getting
-  heavier. Weight is linear in Δρ/ρ₀ (18m-3). Make it linear. Check: the drift linear up to 3×
-  the mean within 5%. (38v, from RS-5.)
+- ~~**22r. The spin's weight is a tanh, not the density**~~ (S; Low; **spin half shipped**, `npm run dish` 10). `weightAt` in `src/gpu/wgsl/fluid/forces.ts` is now linear in `dye.a − S.meanD` (18m-3). Story in [`docs/plan-shipped.md`](docs/plan-shipped.md) §22r. Open: `currentForces` (`src/gpu/wgsl/fluid/forces.ts:325`) still passes `dye.a − S.meanD` through `tanh` for tilt (`S.rock`) and gravity (`S.curGrav`), clamped at `maxCur` and not reached by `npm run dish`. (38v, from RS-5.)

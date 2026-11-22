@@ -11544,6 +11544,20 @@ over a second (`originGap >= 1000`).
   stop with a lens on the water, to 8e-6. No new setting: Thickness already sets the drag,
   and the phone's Spin tool turns the same dish.
 
+#### 22r. The spin's weight is linear in the density gap
+
+- ~~**22r. The spin's weight is a tanh, not the density**~~ (**spin half shipped**, `npm run dish` 10).
+  `weightAt` in `src/gpu/wgsl/fluid/forces.ts` passed `bilerpN(dye, uv, S.n).a - S.meanD`
+  through `tanh(clamp(..., -10.0, 10.0))`, so dye past the plate's mean saturated instead of
+  weighing in proportion to excess density Δρ/ρ₀ (Boussinesq, 18m-3). Removing the `tanh`
+  makes `weightAt` linear in `bilerpN(dye, uv, S.n).a - S.meanD` (`S.meanD` is constant across
+  the plate so its gradient is zero and subtracting it keeps `weightAt` centred near zero).
+  Measured (`PW_WEBGPU=1 npm run dish`): 2× and 3× discs drift at `1.970×` and `2.898×` the 1×
+  disc (was `2.030×` and `2.389×`, bar within 5%), and the 1× disc drifts at `2.456e-3` plate
+  widths/s against the Hele-Shaw law's `2.475e-3` (was `1.849e-3`, 0.747 of the law, bar within
+  15%). Left open in `docs/plan/22-spin.md`: `currentForces` (`src/gpu/wgsl/fluid/forces.ts:325`)
+  still passes `dye.a − S.meanD` through `tanh` for tilt and gravity, clamped at `maxCur`.
+
 ### 23. Selling it: the site free, the app paid
 
 #### 23.16b. The address is the webpage
