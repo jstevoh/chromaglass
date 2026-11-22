@@ -193,6 +193,41 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   lively, measured by `npm run watch`'s turnover and lifetime against the reference
   library, never by speeding the clock (38u-6 is the clock's own item).
 
+  **First part shipped** (#PRNUM, `npm run pace`): five lively looks (Oil and Water, Home
+  Movie, Red Cabbage, Splodascope, Crowd Plate) run in a thin water-and-glycerine (4–8 cSt,
+  Thickness 0.2–0.3) instead of light oil (22 cSt), with a firmer Plate Rock, Beat Squeeze
+  and pours (`src/presetsPace.ts`). In the thin gap a body force moves the liquid at
+  h²Δρg sinθ/12μ and a push coasts for h²/12ν, so the thinner liquid is the real lever: the
+  harder hand alone at light oil gave a 1.07x median. Filmed on the Mac, turnover went
+  5.8→2.3, 9.6→5.8, 5.6→3.5, 3.9→2.7 and 4.0→3.8 s (median 1.58x), each keeping 90% of its
+  colourfulness and half its dark. Still slower than a real show's 1.5–2.4 s; the rest is
+  below.
+
+- **48q-1. The viscosity mode is dead on the thin gap** (S; found 2026-11-22 in 48q). With
+  the thin gap on (every look), the plate's viscosity comes from Thickness alone
+  (`thicknessViscosity`), so a look's `viscosity: 'thin'` (Galaxy's, the fixture's) does
+  nothing. Either the mode feeds the gap's liquid or it goes from the looks and the desk.
+  Check: a look's viscosity mode changes its filmed turnover, or no look carries one.
+- **48q-2. Water stirs to mud: real, or the grid?** (M; found 2026-11-22 in 48q). At 1 cSt
+  (Thickness 0) the paced looks turned over fast (Red Cabbage 1.8x, Oil and Water 3.4x) and stirred their colours
+  into one: Red Cabbage's colourfulness 83→51, Home Movie a flat yellow plate. Real water does
+  stir dyes together, but a real dish of water keeps sharp filaments far longer than the
+  plate's semi-Lagrangian advection, whose numerical diffusion grows with the speed. Measure
+  a filament's width against time at 1 cSt on two grids: if it thins with the grid it is
+  numerics (sharper advection, 32c), if not it is the stirring and the looks stay thicker.
+- **48q-3. The calm looks and the rest still to pace** (M; found 2026-11-22 in 48q). Galaxy
+  and Milk Marble did not turn over faster at light oil with a harder hand, at water, or at
+  4–8 cSt (Galaxy 7.7 s before, 8.0, 9.3, 8.0 after; Milk Marble 6.4, then 7.2, 6.4, 7.6):
+  what thins and stirs them grows their forms as fast as it speeds them. Their pace may come
+  from heat or from more, smaller pours rather than the liquid. Classic waits for #923; the
+  other slow looks in the 2026-11-12 study are not yet in `PACE`. Check: `npm run pace`
+  with `--film`, the same bars.
+- **48q-4. Comet's pace is its stream** (S; found 2026-11-22 in 48q). Comet is a torrent
+  that carries its ink off the plate, so a thinner liquid only empties it sooner: filmed at
+  5.6, 11 and 16 cSt its colourfulness fell from 33 to 3, 16 and 24 while it turned over
+  little faster (4.55 s, then 4.0 at 16 cSt). Its pace should come from `cometSpeed` and
+  the pours that feed it, held to the same film's colour bar.
+
 - **48r. Timbre and harmony as cord sources** (S–M; asked 2026-11-21 with the owner's pick:
   "what music aspects can we send through cords? ... like melody, timbre?"). A cord today
   reads the level, the kick, bass, snare and hats, the pitched part (`note`) and the
