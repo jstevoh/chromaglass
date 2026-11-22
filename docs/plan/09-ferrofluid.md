@@ -57,6 +57,8 @@ Open, from building 9e (in the order to do them):
 - **9j. Spikes that follow the music.** A real ferrofluid speaker's spikes jump on the
   kick. The spikes now answer the magnet's field, so the maze's audio breathing
   could drive their height too.
+  38v (2026-11-21): the magnet's own strength and walk still ride the music outside any cord
+  (`magnetFor`): 9af.
 
 Open, from building 9i:
 
@@ -124,6 +126,8 @@ Open, from building 9i:
     of the plate on any grid: at 0.65 and 0.9 the fingers at a pool's rim fell to
     7/5/5/4, against 11/10/9/5 with the film off, 9t-8), and each patch stepping its own magnet in turn
     where two fingers' overlap.
+    38v (2026-11-21): the patches start only on the primary magnet, and the film has no upper
+    wall: 9t-11.
   - **9t-6. The film's cost**, up to four patches of 128² on 384², eight substeps each,
     13 dispatches a substep (eight FFT passes, then pressure, flux, apply, sum and
     take), is not yet measured on a Mac or a phone.
@@ -150,6 +154,15 @@ Open, from building 9i:
     on a cold cache), and until then the pool only gathers. Starting the build at half
     the onset would build it on every Magnet Garden show, whose own magnet is there;
     starting it when the Magnet tool is picked would not.
+  - **9t-11. The domes' film has no upper wall, and two magnets together start nothing** (S;
+    Medium). `filmPressure` (`standing.ts:347-368`) has no upper wall; the film is clipped
+    afterwards in `phaseRelax` (`phaseForces.ts:206`) at `FILM_TOP`, a static 2 mm, so a press
+    thinner than that cuts volume off the domes. And the standing patches start only on the
+    primary magnet's field (`fluid.ts:461, 474-476`), so two fingers each at 0.65 of the
+    onset, well past it together, raise nothing. Add a disjoining term from the live gap to
+    the film's pressure, and start the patches on the largest |ΣB_z| over the plate. Check:
+    pressed to 0.8 mm the domes' volume holds within 0.5%; two fingers at 0.65 of the onset
+    raise domes where their fields add. Updates 9t-5 and 38k-3. (38v, from RS-24.)
 - **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
   behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
   share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls
@@ -205,3 +218,46 @@ Open, from building 9i:
   mean for the dye, which is an amount; the velocity resampled and projected),
   keeping the CPU path only for a lost device. Measure it first: the dye's fine
   structure (the `grating` or `microscope` measures) before and after one move.
+
+- **9ac. The ferrofluid is weightless when the plate tips or stands** (S; Medium, a live bug).
+  `hsBody` (`thinGap.ts:306-358`) tilts only the dye's weight and the oil's lift; the phase
+  has none there, and nothing in `phaseForces.ts` adds one. So under Plate Rock or on a
+  standing plate the ferrofluid stays put while the colour round it slides. EFH1 is 1210
+  kg/m³, 210 heavier than water and 330 heavier than a 0.88 oil: tipped 5° it slides at the
+  Hele-Shaw speed u = Δρ g sinθ b²/(12(μ_ff + μ_clear)), about 1 cm/s. Give the phase its
+  buoyancy term in the body force beside the dye's and the oil's, Δρ from the bottle, and
+  nothing more: no special case for a magnet, so the magnet's pull and the weight simply
+  compete. Check: a ferro pool tipped 5° slides within 15% of that speed; and with a magnet
+  under half of it and the plate tipped, the part over the magnet holds (the Kelvin force μ0 M
+  ∇H near a disc magnet is orders of magnitude above Δρ g sinθ), the rest slides downhill at
+  the Hele-Shaw speed, and a neck stretches between them and may pinch off. (38v, from RS-22.)
+
+- **9ad. The domes rise on |B|, not on its normal part** (S–M; Medium–High). `lift()` in
+  `standing.ts:201-206` reads the field's size (`spikes.ts:185-230`), and so does the
+  labyrinth (`labyrinth.ts:76-80`), though `magnetDiscExactVec` (`magnetDisc.ts:166-180`)
+  already returns (B_ρ, B_z). The Rosensweig instability is set by the field normal to the
+  layer, onset at M_c² = (2/μ0)(1 + 1/r0)√(gΔρσ), and a field along the layer stiffens it
+  instead (Cowley–Rosensweig), so past a disc magnet's rim, where the field lies flat, no
+  domes stand. Drive the onset and the domes' height by H_n = B_z/μ0 and let the tangential
+  part raise the threshold; the Kelvin pull keeps ∇|B|². Check: over a disc magnet, domes
+  stand inside the radius where |B_z| passes the onset and none in the ring past the rim where
+  |B| is still high. (38v, from RS-20.)
+
+- **9ae. The ferrofluid rounds at the step rate, not in seconds** (S; Medium). The
+  Cahn–Hilliard mobility in `fluid.ts:1393-1401` is 0.006 + 0.012·phaseSharp a substep,
+  `CH_SUBSTEPS` 4 (`constants.ts:392`), with no `magnetSeconds` and no grid size in it: when
+  the governor drops to 30 steps a second (`governor.ts:112`) a ferro body rounds half as fast
+  in a second, and at 384² it rounds slower than at 256². The display's rate does not matter;
+  the step's does. A drop between plates relaxes on τ = 12μR³/(b²σ). Scale the mobility by the
+  step's seconds and Δx² so the rounding time is that τ. Check: a stretched ferro body's
+  aspect ratio after 2 s within 5% at 60 against 30 steps a second and at 256² against 384².
+  38e points here. (38v, from RS-23.)
+
+- **9af. The magnet's strength and walk ride the music outside the cords** (S; Medium).
+  `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.55 +
+  0.35·energy + 0.45·env)) and speeds its walk on the music whatever the patch says (no
+  built-in look takes the stale path). An electromagnet's field is B = μ0 n I with an L/R lag
+  on the current, and a permanent magnet moves only with a hand. Make the music's share a
+  default cord on `magnetStrength` and `magnetWalk`, so Impact and the patch govern it and the
+  desk shows it. Check: with `sceneMappings` empty, `lastMagnetRef` is the same under loud
+  music and silence. 9j points here. (38v, from RS-44.)

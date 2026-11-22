@@ -174,6 +174,12 @@ glitter by the mirror law, falling off by the inverse square across the stage (`
   and the kaleidoscope's copy are drawn without it, so glitter and the side lamp vanish when
   a source is up. Run `PlateGlint` after those paths too. *Measure:* a `glint` line with a
   source up.
+- **47b-4. Open: the glint's light is counted twice.** The disc carries all of E
+  (`glint.ts:277`) and the spikes add another 0.31·E (`:326-328`); the wall's reflectance is
+  `WALL_FRESNEL` 0.03 (`:382`, `src/lib/glint.ts:131`), and the air-glass Fresnel loss is
+  missing (`:376`; 17.5% at 70°, 33% at 78°). Scale the disc by (1 − SPIKE_SHARE·arms·π/6) and
+  apply the Fresnel loss. *Measure:* in `npm run glint`, the totals within 2% of E. (S; Low;
+  38v, from RS-28.)
 
 ## 47c. Blacklight: fluorescent dyes under a UV lamp (M)
 
@@ -379,6 +385,10 @@ and Glow Hue on the desk, the phone and MIDI; a held finger carries the nozzle.
   disturbance (velocity noise of a few µm/s, or the nozzle wandering by a tenth of its bore),
   in the reference first, the GPU after, and let `tankgpu` measure the left-right difference
   growing where today it stays at rounding.
+- **47n-8. Open: the tank's glow is painted white.** `tankDraw.ts:57-59` adds 0.35·e² of
+  white, so the glow washes the dye's colour out. Light from the dye is the dye's colour: sum
+  it in linear light and let the shoulder roll it off. *Measure:* the chroma at glow 0.25
+  within 5% of the dye's. (S; Low; 38v, from RS-31.)
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 
@@ -419,10 +429,18 @@ each band.
   0.03, turnover 0.5 s and a lifetime longer than the clip, which is the stage lights and the
   camera, not the oils. Still wanted: a projected show filmed square-on and close, or a dish
   camera with no video effects (the owner's own rig filmed is the surest).
-- **47v-6. Open: a crop too small to read says so.** `--crop 0.05,0.33,0.9,0.13` on the
-  Brooklyn Bowl film decoded to 320×26, and the physics read printed dashes ("0% of textured
-  blocks matched") with no reason. When the decoded crop is under about 64 rows, print that
-  the flow read needs a taller crop, and a selftest line for it.
+- ~~**47v-6. A crop too small to read says so.**~~ Shipped, this PR (story in `docs/plan-shipped.md`).
+- ~~**47v-5. Carried on real footage: the grain taken out.**~~ Shipped, this PR (story in `docs/plan-shipped.md`); it moved
+  the real films' carried only from 0.187 to 0.229 and from 0.125 to 0.127, so 47v-8 is what is left.
+- **47v-8. Open: what still keeps carried low on real footage.** With the grain taken out the pairs
+  of the 1969 film still read carried 0.23 where the pairs with the least grain (a floor under half a grey
+  level) read about the same, 0.23, so the rest is not noise: the lamp's brightening and fading
+  across a whole shot, loops superimposed (two flows in one picture, one of which the other
+  hides), a dissolve, and flow faster than a second's search. Try, on those two films and the
+  synthetic cases, a second measure beside it: the share carried only over pairs inside one
+  shot with no whole-frame brightness change, and one with the lamp's change (the picture's
+  mean) taken out of both sides; see which of them moves real shows toward 0.5 without moving
+  the pulsing-in-place case. Keep the band's words as they are until one does.
 - **47v-7. Open: watching where the file can't be fetched.** Vimeo refuses the cloud and a
   headless browser, and a recording saved by the owner's Chrome lands in Downloads, which a
   thread may not open. What worked (2026-11-13): read the frames in the page itself, in the
@@ -431,12 +449,6 @@ each band.
   a script the watch skill keeps (`scripts/watchpage.js`, pasted into the page), printing the
   same names as `watch.mjs` so `--vs` can compare, with the run's own numbers checked
   against `watch.mjs` on one clip both can read.
-- **47v-5. Open: carried on real footage.** Real shows read carried 0.13 to 0.19 where the
-  synthetic texture slid reads 0.97: grain, a camcorder's noise in the dark, the lamp's hot
-  spot and superimposed loops all count as change the flow does not carry. Measure the
-  noise floor from the clip's own still samples and take it out of the raw change, so a
-  real plate's transport reads as transport; until then the read prints the real range and
-  the in-place guess fires only under it.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
@@ -592,7 +604,7 @@ number it moves printed before and after.
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-5, 47v-6 and 47v-7 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread
