@@ -1144,13 +1144,12 @@ async function releasePlan(a) {
 }
 
 function notify(message) {
-  if (process.platform !== 'darwin') return;
   // Only the real drain on the owner's Mac speaks. A run against a stand-in Google (the check,
   // CHROMAGLASS_YOUTUBE_GOOGLE set) never does: on 2026-11-22 the check's early drain lines ran
   // without NO_NOTIFY while the check and its mutants ran again and again, and every pass put a
   // real "YouTube" notification on the owner's screen. A notification the check did not ask
   // for is a bug in the check's reach, so the server refuses it here, not only the check's env.
-  if (process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;
+  if (process.platform !== 'darwin' || process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;
   const clean = String(message).replace(/[\r\n]+/g, ' ').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   try {
     execFileSync('osascript', ['-e', `display notification "${clean}" with title "YouTube"`], { stdio: 'ignore' });

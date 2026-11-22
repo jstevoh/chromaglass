@@ -264,7 +264,16 @@ async function scenario(server, gport) {
   await listen();
   const dir = mkdtempSync(join(tmpdir(), 'yt-'));
   const conf = join(dir, 'conf');
-  const env = { CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40', CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1' };
+  // A fake osascript and launchctl sit first on PATH for every server this check starts, so that
+  // whatever the server's own guards do, no run of the check (or of a mutant that strips those
+  // guards) can reach the real ones and put a notification on the owner's screen; the fakes leave a
+  // marker the notifyGuard line reads. Written here, before the first drain, so the marker
+  // covers every drain in the scenario and not only the last.
+  const binDir = join(dir, 'bin');
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(join(binDir, 'launchctl'), `#!/bin/sh\necho "$@" > "${join(dir, 'launchctl-ran')}"\nexit 0\n`, { mode: 0o755 });
+  writeFileSync(join(binDir, 'osascript'), `#!/bin/sh\necho "$@" > "${join(dir, 'osascript-ran')}"\nexit 0\n`, { mode: 0o755 });
+  const env = { PATH: `${binDir}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40', CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1' };
   const logs = [];
   try {
     // The override names another host: the server stops before anything.
@@ -656,6 +665,7 @@ async function scenario(server, gport) {
     await c2.tool('mark_video', { video_id: v2?.id, key: 'v2-rel' });
     const updatesBeforeL = g.updates;
     const dryPlan = await c2.tool('release_plan', { keys: ['v2-rel', 'old-ambient', 'card-key-1'], start: '2026-03-07', every: 24, at: '10:00', dry_run: true });
+    const updatesAfterDry = g.updates;
     const jobAfterDry = (readJson(join(conf, 'uploads.json')).jobs ?? []).find((j) => j.key === 'card-key-1');
     const pubPlan = await c2.tool('release_plan', { video_ids: ['vidOld'], start: '2026-03-07', every: 24, at: '10:00' });
     const realPlan = await c2.tool('release_plan', { keys: ['v2-rel', 'old-ambient', 'card-key-1'], start: '2026-03-07', every: 24, at: '10:00' });
@@ -673,10 +683,10 @@ async function scenario(server, gport) {
       && pacWall(slot1) === '2026-03-08 10:00'
       && pacWall(slot2) === '2026-03-09 10:00';
     line('releasePlan', 'release_plan dry run sends no update, refuses public targets, and real run sets publishAt at Pacific clock time across DST (2026-03-08)',
-      !dryPlan.error && dryPlan.v?.quota_cost === 100 && !jobAfterDry?.meta?.status?.publishAt
+      !dryPlan.error && dryPlan.v?.quota_cost === 100 && updatesAfterDry === updatesBeforeL && !jobAfterDry?.meta?.status?.publishAt
       && pubPlan.error && /private/.test(pubPlan.text)
       && !realPlan.error && g.updates === updatesBeforeL + 2 && realPlan.v?.quota_cost === 100 && dstOk,
-      `updates ${g.updates - updatesBeforeL}, slots ${slot0 ? pacWall(slot0) : 'none'} / ${slot1 ? pacWall(slot1) : 'none'} / ${slot2 ? pacWall(slot2) : 'none'}`);
+      `updates dry ${updatesAfterDry - updatesBeforeL} / all ${g.updates - updatesBeforeL}, slots ${slot0 ? pacWall(slot0) : 'none'} / ${slot1 ? pacWall(slot1) : 'none'} / ${slot2 ? pacWall(slot2) : 'none'}`);
 
     c2.child.stdin.end();
     await Promise.race([c2.exited, sleep(3000)]);
@@ -688,7 +698,9 @@ async function scenario(server, gport) {
     line('leak', `nothing secret is in a reply or the log (${g.secrets.size} keys, secrets and session addresses looked for)`, leaked.length === 0, `found ${leaked.map((x) => x.slice(0, 10)).join(', ')}`);
     const leakedFiles = [...g.secrets].filter((x) => manifestRaw.includes(x) || plistText.includes(x));
     line('leakFiles', 'nothing secret is in the manifest or the plist', manifestRaw.length > 0 && plistText.length > 0 && leakedFiles.length === 0, `found ${leakedFiles.map((x) => x.slice(0, 10)).join(', ')}`);
-    const keySecrets = [CLIENT_SECRET, ...g.refresh, ...g.access];
+    // Every key the stand-in ever issued (g.secrets keeps them; g.access is emptied at the expire
+    // fault), less the upload session addresses, which uploads.json holds on purpose to resume.
+    const keySecrets = [...g.secrets].filter((x) => !x.startsWith('http'));
     const leakedUploads = keySecrets.filter((x) => uploadsRaw.includes(x));
     line('leakUploads', 'no key or token is in uploads.json', uploadsRaw.length > 0 && leakedUploads.length === 0, `found ${leakedUploads.map((x) => x.slice(0, 10)).join(', ')}`);
   } catch (e) {
@@ -728,6 +740,8 @@ const MUTANTS = [
   { rule: 'progress', find: 'if (moved) { onProgress?.(job.sent, job.size); fails = 0; continue; }', replace: 'if (moved) { fails = 0; continue; }' },
   { rule: 'replaceVideo', find: 'const playlists = Array.isArray(oldEntry?.playlists) ? oldEntry.playlists : await findVideoPlaylists(oldId);', replace: 'const playlists = [];' },
   { rule: 'sidecar', find: 'if (unknown.length) {', replace: 'if (false) {' },
+  { rule: 'notifyGuard', find: "if (process.platform !== 'darwin' || process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;", replace: '' },
+  { rule: 'manifestViews', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
   { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? pacificWallToMs(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
 ];
 
