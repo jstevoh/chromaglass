@@ -376,9 +376,6 @@ a curling head need).
   0.03, turnover 0.5 s and a lifetime longer than the clip, which is the stage lights and the
   camera, not the oils. Still wanted: a projected show filmed square-on and close, or a dish
   camera with no video effects (the owner's own rig filmed is the surest).
-- ~~**47v-6. A crop too small to read says so.**~~ Shipped, this PR (story in `docs/plan-shipped.md`).
-- ~~**47v-5. Carried on real footage: the grain taken out.**~~ Shipped, this PR (story in `docs/plan-shipped.md`); it moved
-  the real films' carried only from 0.187 to 0.229 and from 0.125 to 0.127, so 47v-8 is what is left.
 - **47v-8. Open: what still keeps carried low on real footage.** With the grain taken out the pairs
   of the 1969 film still read carried 0.23 where the pairs with the least grain (a floor under half a grey
   level) read about the same, 0.23, so the rest is not noise: the lamp's brightening and fading

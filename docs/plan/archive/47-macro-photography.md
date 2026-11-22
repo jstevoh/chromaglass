@@ -65,3 +65,9 @@ each band.
   §47z-5): the look **Foam Cells**, a packed emulsion laid pressed across the dish whose junctions
   the oil's tension turns to Plateau's 120° (`npm run foam`). Asked again 2026-11-13 with the
   Microlab films' cellular networks ("Ok let's do this all"). What it found, still open:
+
+## 47v. Watching any link: a design read, a physics read and the techniques (S–M)
+
+- ~~**47v-6. A crop too small to read says so.**~~ Shipped, this PR (story in `docs/plan-shipped.md`).
+- ~~**47v-5. Carried on real footage: the grain taken out.**~~ Shipped, this PR (story in `docs/plan-shipped.md`); it moved
+  the real films' carried only from 0.187 to 0.229 and from 0.125 to 0.127, so 47v-8 is what is left.
