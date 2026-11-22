@@ -40,6 +40,7 @@ the component.
 - `frameTypes.ts`: the frame's shapes.
 - `noteVoicesStep.ts`: `handleNoteVoiceEvent`, `queueMelodyDrops`, `stepMelodyAndVoices` (MIDI note voices and Melody Walk stepped into the plate, PLAN 24.3).
 - `speciesPoll.ts`: `SpeciesPoller` (`speciesShare` and `speciesSnapshot` polled once a second on a thin gap) and `stepPlateBubbles` (handing the snapshot to `BubbleField` on a thin gap and stepping the bubbles).
+- `solverLay.ts`: `layClassicOnSolver` (Classic's dye and oil cells laid at the solver's own grid through `FluidInputs.layDye`, not on the CPU's 192² and carried up bilinearly, which blurred every rim; PLAN 38w-8) and `SolverSeeds` (which captured seeds hold such a lay, so `addSeedShare` sends each share to the solver too through `layShare`, and the dish mean the solver's lay added, which `seedPreset`'s CPU sum cannot see).
 - `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
   `resolveSimResolution`, `engineLabel`, `pressSheetKick` (sheet kick with live cover gap).
 - `tools.ts`: the hands' settle and hold, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`), `kickCenter`.

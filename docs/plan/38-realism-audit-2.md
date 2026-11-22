@@ -197,22 +197,36 @@ is in the project's files).
   roundness (perimeter² / 4π·area, or the spread of rim radius by angle) for each cell after
   classicdish's run at 192² and 384²; if it worsens with smaller cells and lifts at 384², use
   the isotropic nine-point Laplacian in the oil's chemical potential.
-- **38w-8. Classic's dye laid at the solver's grid, not the CPU's** (M; Medium). The owner asked
-  for more detail (2026-11-21), and the lay now packs about forty cells of median radius 0.026
-  (`src/lib/oilLay.ts`, CLASSIC_MEDIAN). The oil is laid at the solver's grid (`addMix`), but the
-  dye in it and the water's wash are laid on the CPU's 192 grid and carried up (applyDeltas'
-  oilAdd), so a cell's colour edge is a 192 cell soft while its oil rim is sharp at 768, and no
-  cell can be smaller than 0.018 (3.5 CPU cells) without its colour smearing into the water.
-  Lay both at the solver's grid (an oil-share pour like `pourInk` that keeps each cell's own
-  colour, not bodyLand's share by the oil, which put each drop's colour in the water: 28k-5),
-  then lower CLASSIC_MIN toward the oil's own floor in grid cells. Check: classicdish at 384²
-  with cells down to 0.01, every colour still carried.
-- **38w-9. Classic's floors in the solver's grid cells** (S; Low). CLASSIC_GAP (0.02),
-  CLASSIC_DROP_MIN (0.014) and the drop's wall are plate units measured at 192², about four
-  cells of the Cahn–Hilliard interface there; at the app's 768 they are sixteen. A film four of
-  the solver's own cells wide holds as well (the interface is a fixed number of cells), so the
-  lanes between cells could close to what the references show. Scale them by the grid the lay
-  sees, as Foam Cells' FOAM_FILM does, once classicdish can run at 384².
+- **38w-11. classicdish's size bar on the references' own measure** (S; Medium). The bar is a
+  cell diameter, 5–15% of the frame's height, a proxy chosen after the owner's call for more
+  detail; the stills were measured by the watch tool's form scale, a correlation length against
+  the width (9.0% on the round-two film, 5.1% on the stills). Render the lab plate
+  (`lab.render`), crop it to the wall's frame, run watchdesign's `corrLen` on it and bound
+  that against the stills' band, so the check and the references read the same quantity.
+- **38w-12. Splodascope and Clock Glass laid at the solver's grid too** (M; Medium). Both still
+  lay their dye on the CPU's 192 and carry it up, so their colour edges are a 192 cell soft
+  under an oil rim sharp at 768. Lay them through `SolverSeeds` as Classic is.
+- **38w-13. The solver's seed survives a regrid and a lost device** (S; Medium). Classic's
+  dye lives only in the solver's texture: a regrid (Quality) or a device loss rebuilds the
+  solver from the CPU's fields, which never held it, so the dish comes back empty. Keep the
+  laid arrays (SolverSeeds.capture) and lay them again on a rebuild.
+- **38w-14. One seed texture for every capture** (S; Low). SolverSeeds keeps a single seed, so a
+  second Classic captured later (a set list arming it twice with different seeds) overwrites the
+  first. Key the kept seed by the look's id or drop it once laid.
+- **38w-16. The dye inside Classic's cells lays as soft rounded squares** (S–M; Medium). With the
+  rims crisp, the colour inside the bigger cells still shows a soft square-cornered patch where
+  the lay put it (`classicCell` in `src/lib/oilLay.ts`). A drop of dyed oil is one colour to
+  its rim. Lay each cell's oil dye to fill its disc, and measure the dye's spread inside each
+  cell (its coefficient of variation) in classicdish.
+- **38w-17. A darker mottled network in Classic's water** (S; Medium). In the 1024 render the
+  water between cells shows a faint darker web, which the references' flat dyed water does not.
+  Suspects: the wash's dye pooling in the films between cells, or the relief's shading. Measure
+  the water's luminance spread away from the rims, find which field carries it, fix it there.
+- **38w-18. The oil/water interface sharp in the solver** (L; Low). 38w-15 draws the rim sharp
+  from the solver's tanh band; the solver still carries the band (Cahn–Hilliard's width is set
+  by the grid). A conservative level set or a volume-of-fluid interface would carry the step
+  itself, and the dye's own mixing across the band with it. Worth it only if a check finds the
+  band's mixing showing through somewhere 38w-15 cannot reach (the chemistry, the oil's dye).
 - **38w-19. A held Press on a domed gap never comes to rest** (M; Medium). 38w-1 gave Classic a
   plateCurve of 0.2 and main's deploy found `npm run heldpress` red: with the Press held on the
   thin gap, the far plate's speed stayed at 4.5e-4 against the check's 3e-4, and the bubbles'
@@ -230,3 +244,16 @@ is in the project's files).
   against the check's half (0.44 at 0.25). A held press on the floor has no squeeze, so it
   should push nothing; Classic is back at 0.25 until both are found, and the fix runs
   heldpress at 0.4 flat as well.
+- **38w-20. Warm cells still read soft in the app with Crisp Edges on** (M; High). Filmed in
+  the app on Metal (seed 1, 512² grid, 1280x800 canvas, after 12 s): the cyan cells' rims are
+  one crisp pixel, but the red and orange cells' rims are a soft three or four pixels, and
+  turning Crisp Edges off leaves them unchanged. Edge Relief adds a broad dark band just inside
+  them (it reads the solver's band at `rim0`, unmoved), but Edge Relief at 0 still leaves the
+  rim soft, so the relief is not the cause. Not measured yet, two guesses: those cells' oil band
+  is wider than 3.5 cells, which `crispInterface`'s `real` gate leaves alone on purpose as real
+  diffusion; or their dye has leaked out into the water (about 7% of it in the lab), so the
+  colour's edge is not the oil's. First read the band half-width (`eps / h.x`) and the dye
+  outside the oil at those rims in the app, then fix the cause in the solver (why warm cells
+  spread wider than cyan) and not in the plate. Once the rim is sharp, draw the meniscus as a
+  narrow line at the crisp rim (the chain rule through the warp), not as the band-wide halo.
+

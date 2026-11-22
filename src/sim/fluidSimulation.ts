@@ -49,6 +49,7 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
+import { SolverSeeds, takeBack, addShare, scaleSince } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
@@ -131,6 +132,7 @@ export class FluidSimulation {
   sparseDarkLook = false;
   /** Everything `addDensity` has been given, summed, so a frame's hand can be told from the music's. */
   private laidMass = 0;
+  private readonly seeds = new SolverSeeds();
   private handMarkMass = 0;
   /**
    * Dye a hand has laid on a seeded plate, as a mean over the dish, that the
@@ -1340,14 +1342,8 @@ export class FluidSimulation {
    */
   captureSeed(lay: () => void): Float32Array[] {
     const arrays = [this.density, this.densityR, this.densityG, this.densityB];
-    const before = arrays.map(a => a.slice());
-    lay();
-    const delta = arrays.map((a, c) => {
-      const d = new Float32Array(a.length);
-      for (let i = 0; i < a.length; i++) d[i] = a[i] - before[c][i];
-      a.set(before[c]);
-      return d;
-    });
+    const before = arrays.map(a => a.slice()), onSolver = this.seeds.capture(lay), delta = takeBack(arrays, before);
+    this.seeds.keep(delta, onSolver);
     this.dirty = true;
     return delta;
   }
@@ -1355,11 +1351,8 @@ export class FluidSimulation {
   /** Add `k` of a captured seed (see `captureSeed`) to the plate. */
   addSeedShare(seed: Float32Array[], k: number): void {
     if (!(k > 0)) return;
-    const arrays = [this.density, this.densityR, this.densityG, this.densityB];
-    for (let c = 0; c < 4; c++) {
-      const a = arrays[c], d = seed[c];
-      for (let i = 0; i < a.length; i++) a[i] += d[i] * k;
-    }
+    this.seeds.share(seed, this.gpu, k);
+    addShare([this.density, this.densityR, this.densityG, this.densityB], seed, k);
     this.dirty = true;
   }
 
@@ -1371,12 +1364,8 @@ export class FluidSimulation {
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
     const k = c01(w);
     const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
-    const harmony = this.seedPreset(presetId, noise2D);
-    const now = [this.density, this.densityR, this.densityG, this.densityB];
-    for (let c = 0; c < 4; c++) {
-      const a = now[c], b = before[c];
-      for (let i = 0; i < a.length; i++) a[i] = b[i] + (a[i] - b[i]) * k;
-    }
+    const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
+    scaleSince([this.density, this.densityR, this.densityG, this.densityB], before, k);
     this.dirty = true;
     return harmony;
   }
@@ -1951,6 +1940,8 @@ export class FluidSimulation {
           says what the references show instead.
         */
         const water = col(0);
+        const g = presetId === 'classic' && this.seeds.lay(this.gpu, S, this.rng.float, harmony.length, col, this.dishArea);
+        if (g) { this.laidMass += g; break; }
         layCrowd(presetId === 'clock-glass' || presetId === 'classic' ? presetId : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
           (x, y, d) => this.addDensity(x, y, d, water.r, water.g, water.b),
           (x, y, d, dye) => { const c = col(dye); this.addOilDensity(x, y, d, c.r, c.g, c.b); });
@@ -2035,7 +2026,7 @@ export class FluidSimulation {
       }
     }
 
-    this.seedMean = Math.max(0, dishSum() - beforeMean);
+    this.seedMean = Math.max(0, dishSum() - beforeMean + this.seeds.took());
     this.seedBudget = findPreset(look)?.settings.dyeBudget ?? 0.85;
     return harmony;
   }

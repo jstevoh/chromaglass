@@ -9,6 +9,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `thinWarm.ts`: `thinWarmKernels(HEAD, COMMON, ROWS0)`, spread into `thinGapKernels`: the thin solve's warm start fitted to each step (`hsWarmDot`, `hsWarmFit`, `hsWarmScale`; PLAN 38r-12), and `WARM_GROUPS`, `WARM_FIT` for the solver's buffer.
 - `plate.ts` (194 KB, grep it): `DISPLAY_MAIN`, `DERIVE_WGSL`, `FINISH_WGSL`, `plateWgsl`: the composite.
 - `plateFields.ts`: `PLATE_FIELDS`, `PLATE_STRUCT`, the composite's uniforms.
+- `plateInterface.ts`: `INTERFACE_WGSL`, the oil/water rim drawn one pixel wide (`crispInterface`, Crisp Edges): each pixel in the Cahn–Hilliard band is read at the pure phase on its own side, from the tanh's own distance; in the display's VIEW block after `viewAt` (PLAN 38w-15; `npm run classicdish`).
 - `spikes.ts`, `magnetDisc.ts`: the magnet's field (`MAGNET_RADIUS`) and the spikes' onset. The liquid's own onset is worked out from the ferrofluid in SI (`ferroOnsetTesla`, `SPIKE_ONSET_REAL`, the target; the plate still runs on the lab's `SPIKE_ONSET` until PLAN 38k-7; `FERRO_MS_TESLA`, `FERRO_CHI`, `FERRO_DENSITY`, `WATER_DENSITY`, `MAGNET_BR`; PLAN 38k), and the WGSL gives the field as a vector too (`magnetVec`, `magnetDiscFieldVec`) so several magnets add as fields. `standing.ts` exports `LIFT_ONSET`, the film's lift scale against the onset.
 
 ## Contracts
