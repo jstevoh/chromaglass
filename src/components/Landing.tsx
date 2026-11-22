@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
 import { SiteFilms, anyFilmOpens } from './LandingFilms';
+import { HeroLoop, MusicClip } from './LandingMotion';
+import { LANDING_LOOKS, LANDING_LOOK_SIZE } from '../lib/landingMedia';
 import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /*
@@ -36,17 +38,16 @@ const YouTubeMark: React.FC<{ className?: string }> = ({ className }) => (
  * in neither Firebase nor the engine, so the entry chunk and `npm run startup`
  * are as they were, and nothing here starts the solver: the check that the
  * plate does not start behind the sign-in (signin 3) still means what it said.
- * The hero is a slow cross-fade of five frames the app drew of its own looks,
- * not the engine running live: a visitor on a weak phone should not pay for a
- * fluid solver to read a headline, and a still paints at once while the rest of
- * the page arrives. Only opacity and transform move, which the compositor runs
- * on its own thread. What was tried first, a loop of the lab's plate as a
- * video, was set aside: the lab lays a few dye drops that barely move in the
- * seconds a hero has, and nothing in a cloud session can film the app itself
- * (PLAN.md 34a-2 asks for that film from a Mac). The looks below are frames
- * from the app's own renders of its shipped looks, with each look's own name;
- * nothing is mocked up. They are 480 × 300, so they are shown under a dark
- * scrim in the hero and at their own size in the grid.
+ * The hero is a silent loop the Mac app filmed of its own looks playing to
+ * music (LandingMotion.tsx, PLAN.md 34a-2), not the engine running live: a
+ * visitor on a weak phone should not pay for a fluid solver to read a
+ * headline. Its first frame paints at once as a still while the rest of the
+ * page arrives, and the loop joins it once the still is in. (Until 2026-11-21
+ * it was a cross-fade of five 480 × 300 stills, because nothing in a cloud
+ * session can film the app; the films come from the owner's Mac now.) The
+ * looks below are frames the app drew of its shipped looks on that Mac, at
+ * twice their card's size (`npm run landinglooks`, src/lib/landingMedia.ts),
+ * with each look's own name; nothing is mocked up.
  *
  * "Play free" mounts the sign-in over this page rather than replacing it, so
  * the card sits on the hero and a visitor who backs out of it is still on the
@@ -55,7 +56,8 @@ const YouTubeMark: React.FC<{ className?: string }> = ({ className }) => (
  * collects that redirect, so a reload with the flag set goes straight to it.
  *
  * Nothing on the page moves with sound (the owner's rule, 2026-10-11: no
- * whole-frame motion from sound), and there is no sound at all. It stops
+ * whole-frame motion from sound), and nothing makes a sound until a visitor
+ * asks: the one clip with music in it plays muted until it is tapped. It stops
  * moving for a visitor who asks for reduced motion; the first frame stands in.
  */
 
@@ -66,26 +68,6 @@ interface LandingProps {
   covered: boolean;
 }
 
-interface LookCard { id: string; name: string; line: string }
-
-// The names are the shipped looks' own (src/presets.ts); the lines are theirs,
-// shortened. The pictures are 480 × 300 frames from the app's render of each
-// look (PLAN.md 28i-1's contact sheets).
-const LOOKS: LookCard[] = [
-  { id: 'ferro-paint', name: 'Ferro Paint', line: 'Black ferrofluid worked through amber, teal and coral under a wandering magnet.' },
-  { id: 'aurora-borealis', name: 'Aurora Borealis', line: 'Curtains of jade and lime rippling across a night sky.' },
-  { id: 'cell-bloom', name: 'Lens Pools', line: 'Three pools of silicone and oil turning under a magnifier.' },
-  { id: 'poster-1969', name: 'Poster, 1969', line: 'Two opaque dyes, orange against ultramarine, flat like a Fillmore poster.' },
-  { id: 'macro-bead', name: 'Macro Bead', line: 'The camera follows one bead close up: domed, wet, razor edges.' },
-  { id: 'jellyfish-bloom', name: 'Jellyfish Bloom', line: 'Magenta and lavender bells pulsing through teal water.' },
-  { id: 'lace-run', name: 'Lacing Run', line: 'A tongue of amber dye dragging black lace behind it.' },
-  { id: 'neon-coral-reef', name: 'Neon Coral Reef', line: 'A reaction grows coral across the glass, branch by branch.' },
-];
-
-// Five of the looks above, in the order the hero shows them; each stays about
-// HERO_SLIDE_S seconds, the last quarter of it crossing into the next.
-const HERO = ['ferro-paint', 'aurora-borealis', 'jellyfish-bloom', 'neon-coral-reef', 'cell-bloom'];
-const HERO_SLIDE_S = 7;
 
 const STEPS: { n: string; title: string; body: string }[] = [
   { n: '1', title: 'Play something', body: 'The plate listens to your music through the browser and answers each kick and note.' },
@@ -97,7 +79,7 @@ const STEPS: { n: string; title: string; body: string }[] = [
 /*
   The moiré pack (PLAN.md 45a-2), $15 on Home and in Pro: four of its seven looks, each a frame
   the app drew on this Mac's GPU two dozen seconds after the look was opened (a still a page
-  load away, like LOOKS above). Kept at 960x600 for a 480x300 box: a pattern of fine lines
+  load away, like the looks above). Kept at 960x600 for a 480x300 box: a pattern of fine lines
   scaled down in the browser beats against the screen's own pixels, so these are the one set
   that must not be drawn smaller than twice their box.
 */
@@ -148,17 +130,12 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
   },
 ];
 
-function wantsStill(): boolean {
-  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
-}
-
 const btnPrimary =
   'inline-flex min-h-[48px] items-center justify-center rounded-lg bg-primary px-6 text-[15px] font-medium text-on-primary transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-bg),0_0_0_4px_var(--color-accent)]';
 const btnGhost =
   'inline-flex min-h-[48px] items-center justify-center rounded-lg border border-border-strong px-6 text-[15px] font-medium text-text-2 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-bg),0_0_0_4px_var(--color-accent)]';
 
 export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
-  const [still] = useState(wantsStill);
   const [mac] = useState(() => onMacComputer());
   const root = useRef<HTMLDivElement>(null);
 
@@ -178,30 +155,9 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       data-cg-landing=""
       className="fixed inset-0 z-40 overflow-y-auto overflow-x-hidden bg-bg font-sans text-text"
     >
-      <style>{`
-        @keyframes cg-hero-slide {
-          0% { opacity: 0; transform: scale(1); }
-          5% { opacity: 1; }
-          22% { opacity: 1; }
-          28% { opacity: 0; transform: scale(1.07); }
-          100% { opacity: 0; transform: scale(1.07); }
-        }
-        .cg-hero-slide { animation: cg-hero-slide ${HERO.length * HERO_SLIDE_S}s linear infinite; will-change: opacity, transform; }
-      `}</style>
       {/* Hero */}
       <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
-        <div aria-hidden="true" className="absolute inset-0 -z-20 overflow-hidden bg-bg">
-          {HERO.map((id, i) => (
-            <img
-              key={id}
-              src={`/landing/looks/${id}.webp`}
-              alt=""
-              decoding="async"
-              style={still ? { opacity: i === 0 ? 1 : 0 } : { animationDelay: `${i * HERO_SLIDE_S - HERO_SLIDE_S / 4}s` }}
-              className={`absolute inset-0 h-full w-full object-cover opacity-0 ${still ? '' : 'cg-hero-slide'}`}
-            />
-          ))}
-        </div>
+        <HeroLoop />
         <div
           aria-hidden="true"
           className="absolute inset-0 -z-10"
@@ -266,19 +222,33 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
           Every picture here is a frame the app drew. Each look is a different liquid with its own physics.
         </p>
-        {/* On a phone the looks are a row to swipe, so eight of them are not four screens of scrolling. */}
+        {/* On a phone the looks are a row to swipe, so twelve of them are not six screens of scrolling. */}
         <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
-          {LOOKS.map((l) => (
-            <li key={l.id} className="w-[78%] shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-surface min-[560px]:w-auto">
-              <img
-                src={`/landing/looks/${l.id}.webp`}
-                alt={`${l.name}: ${l.line}`}
-                width={480}
-                height={300}
-                loading="lazy"
-                decoding="async"
-                className="block aspect-[8/5] w-full object-cover"
-              />
+          {LANDING_LOOKS.map((l) => (
+            <li key={l.id} data-cg-still={l.id} className="w-[78%] shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-surface min-[560px]:w-auto">
+              <div className="relative">
+                <img
+                  src={`/landing/looks/${l.id}.webp`}
+                  alt={`${l.name}: ${l.line}`}
+                  width={LANDING_LOOK_SIZE[0]}
+                  height={LANDING_LOOK_SIZE[1]}
+                  loading="lazy"
+                  decoding="async"
+                  className="block aspect-[8/5] w-full object-cover"
+                />
+                {l.picture && (
+                  // The picture the dyes were taken from, small in the corner: the card is about the two together.
+                  <img
+                    src={`/landing/looks/${l.id}-source.webp`}
+                    alt="The picture its colours came from"
+                    width={240}
+                    height={150}
+                    loading="lazy"
+                    decoding="async"
+                    className="absolute bottom-2 right-2 w-[34%] rounded-md border border-white/30 shadow-lg"
+                  />
+                )}
+              </div>
               <div className="px-4 pb-4 pt-3">
                 <p className="text-[14px] font-medium">{l.name}</p>
                 <p className="mt-1 text-[13px] leading-snug text-muted">{l.line}</p>
@@ -295,6 +265,15 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           <YouTubeMark className="h-[17px] w-[24px] shrink-0" />
           Watch the looks move to 1920s records on our YouTube channel
         </a>
+      </section>
+
+      {/* Music: the plate playing to a song, muted until tapped (LandingMotion.tsx, PLAN.md 34a-2). */}
+      <section id="music" className="mx-auto w-full max-w-[1120px] px-4 pb-16 sm:px-8 sm:pb-24">
+        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">It plays to your music</h2>
+        <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
+          The app hears the song and the liquid answers: drops on the beat, swells with the chorus. Turn the sound on to hear what it heard.
+        </p>
+        <MusicClip covered={covered} />
       </section>
 
       {/* Films: six records from before 1926, each played whole by a look (LandingFilms.tsx, PLAN.md 34a-6). */}

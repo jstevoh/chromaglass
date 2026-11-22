@@ -28,24 +28,25 @@ because our free site asks for a login and needs its own reason to (saves your l
 a grid of generic stock thumbnails: ours are the plate itself.
 
 - **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped.md` §34a (moved 2026-10-29, 19m-2).
-- **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
-  video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
-  the app's own frames, because a cloud session cannot film the app and the lab's plate barely
-  moves in a hero's seconds. A 10 to 15 second loop of the real show (`npm run film` records
-  through `scripts/recorder.mjs`), 1280 wide, under 1.5 MB as WebM and MP4, would replace it: the
-  page then loads it after its first paint and keeps the stills for reduced motion. The loop is
-  filmed with the track it was filmed to (the recorder takes the audio, and the show's own music in
-  `public/music` is ours to use), and a browser will not start sound on its own: the video starts
-  muted, and a "Sound on" button (and a tap on the video) unmutes it, with the sound off again when
-  the visitor leaves for the sign-in. More than one clip (a ferrofluid, a dye pour, a close macro)
-  would be the "video examples" row under the hero, each its own filmed look with its sound.
-  *Measure:*
-  the loop's first and last frames differ by less than a frame of motion; `npm run signin` 3a still
-  true with the plate not up.
-- **34a-3. Sharper looks in the grid.** *(S.)* The cards are 480 × 300 frames from the preset
-  contact sheets (28i-1) and are soft where a Retina screen draws them at 2x. `pixels.yml` renders
-  every look one to one at a laptop's size: take the eight from it and keep the file sizes under
-  60 KB each.
+- **34a-2. A filmed hero, and a clip that plays to music.** *Shipped (2026-11-21, the owner's ask that day:
+  the hero a full-width loop filmed from the app, and a clip of the plate playing to music, muted until
+  tapped, the music Scott Buckley's CC BY tracks the rescore films to); story in `docs/plan-shipped.md`
+  §34a-2.* `npm run landingclips` cuts both from the films, `npm run landinghero` holds them.
+  - **34a-2a. Later: more than one music clip.** A row of them (a ferrofluid, a dye pour, a close
+    macro), each its own look to its own track, once the rescore has filmed more than one look whole.
+- **34a-3. Sharper looks in the grid.** *Shipped (2026-11-21): twelve cards at 960 × 600 from the app
+  on the top rung, the chemical clock, polarised light and a palette from a picture among them; story
+  in `docs/plan-shipped.md` §34a-3.* `npm run landinglooks` photographs them on a Mac.
+  - **34a-3a. The Splodascope's blue water.** Its description promises yellow, green, red and pink
+    drops "in blue water"; photographed after twenty seconds on the top rung (2026-11-21) the water
+    is the lamp's white and the drops red and green. Either the blue drains or the lamp ground eats
+    it: look at what its water dye does over the first minute and fix the look or its words.
+  - **34a-3b. A look laid under a palette lock lays its own dyes.** Found photographing the
+    picture card (2026-11-21): with a picture's palette locked, a reload or a Go lays the look's
+    first plate (`seedPreset` in LiquidVisualizer's preset laying) in the look's own colours, and
+    only later pours take the lock, so a slow look like aurora stays its own green and violet for
+    a minute or more after "From picture" is chosen. Seed the laying from the locked harmony (as
+    the Seed and drain refills already do), measured by a plate read under a lock.
 - **34a-4. Buy buttons on the landing page.** *(S; built, held for the go-live order.)* The Home
   and Pro cards carry a Buy button to the live Lemon Squeezy checkout (new tab) and the Free card
   Play free; "Buying opens soon" is gone. The links live in `lib/checkoutLinks.ts` (the landing
@@ -85,8 +86,8 @@ a grid of generic stock thumbnails: ours are the plate itself.
     all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
     about 30 days). Until one is won, a visitor in a blocked country who opens
     that card gets YouTube's own notice in the player, not the film.
-  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills; more records
-    as each year's recordings enter the public domain (1926's on 1 January 2027).
+  - **34a-6b. Later:** more records as each year's recordings enter the public domain (1926's on
+    1 January 2027). (Its other half, the hero cross-fading the loops, shipped as 34a-2's filmed loop.)
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
   synth people, producers and artists, who need the technical capabilities before they pay.)*
   `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search

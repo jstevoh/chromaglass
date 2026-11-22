@@ -7796,6 +7796,43 @@ reduced motion keeps the stills, and a card whose film is on the channel opens i
 youtube-nocookie.com with the credit under it. `npm run landingfilms` holds all of it. Not a
 GIF: 256 colours band a plate's gradients, and a GIF is ten to twenty times the bytes.
 
+### 34a-2. A filmed hero, and a clip that plays to music (2026-11-21)
+
+*(S; the owner's Mac. The owner, 2026-10-22: the video examples should be better and play with
+the music audibly; then 2026-11-21: the hero's cross-fade of five 480 × 300 stills to be a
+full-width loop filmed from the app, and a clip of the plate playing to music, muted until
+tapped, the music the modern ambient tracks the rescore (34a-6d) films the looks to.)*
+**Shipped** both, cut by `npm run landingclips` from the rescore's films (1920 × 1080 at 30 fps,
+the plate's own frames, nothing added), so the Mac's GPU films each look once: the sources are
+named in `src/lib/landingMedia.ts` (`LANDING_HERO.films`, `LANDING_MUSIC.film`). The hero is
+pieces of the films cross-faded into one another and the end blended into the start as
+sitefilms blends a card's loop, in two shapes (1280 × 720, and the film's middle 9:16 at
+720 × 1280 for a phone held upright), WebM and MP4 each under 1.6 MB at the best quality the
+constant-quality ladder fits, no sound track. `LandingMotion.tsx`: the loop's first frame is
+the one eager picture (`npm run loadtime` 4 waits for it as it waited for the five stills),
+and the loop joins the page only once that still has arrived and the browser is idle; reduced
+motion and Save-Data keep the still, and a hidden tab pauses it. The music clip, twenty seconds
+of Scott Buckley's "Undertow" (CC BY 4.0, credited with links under it) played by
+Neon Coral Reef, is asked for only when it is half in view, plays muted, and "Sound on" (or a tap
+on it) is the visitor asking to hear it; the sign-in coming up mutes it. `npm run landinghero`
+holds the files, the loop's length and seam, the order of the requests, the credit, reduced
+motion, Save-Data and the phone.
+
+### 34a-3. Sharper looks in the grid (2026-11-21)
+
+*(S. The owner, 2026-11-21: the "Real looks from the app" grid re-rendered at full size, with
+the newer looks in it.)* **Shipped** twelve cards, the 480 × 300 frames cut from 28i-1's
+contact sheets replaced by `npm run landinglooks`: each look opened by its URL in a 13-inch
+laptop's window at 2x on the top rung, photographed after 1200 drawn frames (frames, not
+seconds, so a busy Mac does not photograph a younger plate), scaled to 960 × 600 (two pixels a
+CSS pixel for the widest card) and written as WebP under 60 KB. New among them: the chemical
+clock; polarised light (31p-1), a look between crossed polarisers set through the harness's
+settings hook as the Lamp & Light panel would, so the colours are the solver's strain through
+the real Michel-Levy shader; and a palette from a picture (43d), a sunset drawn in the page
+(nothing downloaded, nobody's photograph) handed to the desk's own picture input, shown on the
+card beside the still. The list is `LANDING_LOOKS` in `src/lib/landingMedia.ts`;
+`npm run landinghero` 1 holds the cards' size, bytes and that none repeats.
+
 ### 34a-8. The YouTube channel, linked from the landing page (2026-11-08)
 
 Asked: the owner, on 2026-11-08, the day six films went public on the channel: the homepage did

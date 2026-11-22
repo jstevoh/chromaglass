@@ -2191,6 +2191,24 @@
       ]
     },
     {
+      "name": "The webpage's moving hero and music clip",
+      "shard": "browser",
+      "run": "npm run landinghero",
+      "why": [
+        "The webpage's hero loop, looks grid and music clip (scripts/landinghero.mjs,",
+        "PLAN.md 34a-2 and 34a-3): each loop is silent and small with a poster at its",
+        "size, moving and lit, its seam within 2.5 times the frame steps beside it plus a",
+        "codec floor; every look card is a full-size still of a shipped look, not flat and",
+        "unlike the others even mirrored, the picture card nearer its picture's colours than",
+        "the grid's median card; a phone's looks row scrolls sideways in a page that does",
+        "not; the loop is asked for only",
+        "after the poster arrives, never under reduced motion or saving data, and a phone",
+        "gets the tall one; the music clip asks for nothing until scrolled to, plays muted,",
+        "unmutes on a tap, goes quiet under the sign-in and credits its CC BY track.",
+        "No GPU."
+      ]
+    },
+    {
       "name": "The security headers",
       "shard": "browser",
       "run": "node scripts/csp.mjs",

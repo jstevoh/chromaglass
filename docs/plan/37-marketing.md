@@ -46,7 +46,8 @@ a post sees them in the first minute.
 - The share card: `og-card.png` is still the old card (34a-5). Every link posted to Reddit,
   HN, iMessage or Slack shows it, so it is replaced first: the hero's frame, the name and the
   headline, 1200 × 630.
-- The filmed hero with its music (34a-2), from the same Mac sitting as the look videos.
+- ~~The filmed hero with its music (34a-2)~~: shipped 2026-11-21, a silent full-width loop and a
+  clip that plays to Scott Buckley's "Effervescence", both cut from the rescore's films.
 - Smooth frames (14aa, #441, #474) and the first load after a deploy (14v): a screen
   recording catches a stutter before anything else.
 
