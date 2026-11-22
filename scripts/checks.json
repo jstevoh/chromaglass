@@ -155,7 +155,7 @@
     {
       "name": "The turntable",
       "shard": "logic",
-      "run": "npm run turntable -- --owed=38v-4",
+      "run": "npm run turntable",
       "why": [
         "The spinning dish's CPU half: the liquid's lag behind the glass, Auto",
         "Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22)."

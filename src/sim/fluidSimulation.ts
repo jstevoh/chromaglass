@@ -28,7 +28,7 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { PALETTE_RGB, pickHarmony } from '../constants';
 import { THIN_GAP_THICKNESS, thinGapViscosity, NU_REF } from '../gpu/fluid';
 import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, SloshSpin, type SloshPress } from '../lib/slosh';
-import { OPEN_RIM, carrierViscosity, dragSeconds, dyeDensityContrast } from '../lib/turntable';
+import { OPEN_RIM, dyeDensityContrast, layerSpinDrag } from '../lib/turntable';
 import { DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
 import { frameSway, rockStep } from '../lib/plateRock';
@@ -2926,6 +2926,9 @@ export class FluidSimulation {
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, spin: sp.spin, spinRate: sp.rate } : null);
   }
 
+  /** This layer's spin drag (38v-4): ν, gap (m), τ = h²/12ν. */
+  spinDrag(settings: VisualizerSettings) { return layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS); }
+
   private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
@@ -3159,6 +3162,7 @@ export class FluidSimulation {
       insurance against something that does not happen.
     */
     const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
+    const spin = layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS);
 
     return {
       dt, visc, nu,
@@ -3309,16 +3313,13 @@ export class FluidSimulation {
         note on Rotation Speed).
       */
       /*
-        The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
-        frame that turns with the liquid, the liquid's own speed (the
-        centrifuge), the bulk's drag time at the rest gap, and the liquid.
-        All but the last are zero on a dish nobody turns, and the swirl
-        does not run.
+        The spun dish (PLAN §22): the dish's speed in the liquid's frame,
+        the liquid's own, and this layer's drag (38v-4, layerSpinDrag).
       */
       spinDish: this.dishSpin - this.liquidSpin,
       spinLiquid: this.liquidSpin,
-      spinTau: dragSeconds(carrierViscosity(settings.viscosity), this.gpu?.coverUnits),
-      spinNu: carrierViscosity(settings.viscosity),
+      spinTau: spin.tau,
+      spinNu: spin.nu,
       spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
       particles: settings.particles ?? 0,
       particleLife: 4,
