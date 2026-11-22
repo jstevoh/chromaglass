@@ -183,6 +183,7 @@ try {
     await lab.create(256);
     lab.surfaceLevelling(levelOn);
     lab.solver().addMix(0.45, 0.5, 0.14, { oil: 1 });
+    const rendered = await lab.render({ size: 64 });
     const before = await lab.surfaceHeight();
     let sum0 = 0;
     let cx0 = 0;
@@ -195,10 +196,10 @@ try {
     }
     cx0 /= Math.max(sum0, 1e-12);
     for (let block = 0; block < 10; block++) {
-      lab.vel(0.42, 0.42, 0.16, [0.4, 0.25, 0, 0]);
-      lab.vel(0.58, 0.58, 0.16, [-0.4, -0.25, 0, 0]);
+      lab.vel(0.42, 0.42, 0.18, [0.8, 0.35, 0, 0]);
+      lab.vel(0.58, 0.58, 0.18, [-0.5, -0.25, 0, 0]);
       lab.flush();
-      await lab.step(60, { dt: 0.0025, advection: 1, magnetSeconds: 1 / 60, oilTension: 0.5, thinGap: 1 });
+      await lab.step(60, { dt: 0.01, advection: 1, magnetSeconds: 1 / 60, oilTension: 0.5, thinGap: 0 });
     }
     const after = await lab.surfaceHeight();
     let sum1 = 0;
@@ -215,11 +216,12 @@ try {
       }
     }
     cx1 /= Math.max(sum1, 1e-12);
-    return { sum0, sum1, relErr: Math.abs(sum1 - sum0) / Math.max(sum0, 1e-12), move: Math.abs(cx1 - cx0), nonZero, finite };
+    const frameOk = rendered.wall.length === 64 * 64 * 4 && rendered.wall.every((v) => Number.isFinite(v));
+    return { sum0, sum1, relErr: Math.abs(sum1 - sum0) / Math.max(sum0, 1e-12), move: Math.abs(cx1 - cx0), nonZero, finite, frameOk };
   }, levelOn);
   check(
     'total h is kept within 0.1% over 600 steps with flow running',
-    cons.finite && cons.sum0 > 0 && cons.relErr < 0.001 && cons.move > 1e-4,
+    cons.finite && cons.frameOk && cons.sum0 > 0 && cons.relErr < 0.001 && cons.move > 0.005,
     `relErr=${(cons.relErr * 100).toFixed(5)}% sum0=${cons.sum0.toFixed(4)} sum1=${cons.sum1.toFixed(4)} cxMove=${cons.move.toFixed(4)}`,
   );
 } finally {

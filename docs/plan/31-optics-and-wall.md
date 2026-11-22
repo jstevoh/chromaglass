@@ -225,3 +225,9 @@ liquid that lights where its flow stretches it ("Let's do it!").*
   analyser at a half. *Measure:* with the sheets in and crossed, a still plate's glints are
   dimmed by the analyser and not by the polariser.
 
+## 31s. The liquid surface height and real caustics
+
+- **31s-2. Light traced through `h` with Snell's law and gathered on the wall.** Trace lamp rays through the surface height `h` read from binding 26 and accumulate caustics on the wall.
+- **31s-3. The other sparse stencils.** Replace remaining sparse slope stencils using the true height field.
+- **31s-4. Look retune.** Retune looks once the optical path uses real surface refraction.
+
