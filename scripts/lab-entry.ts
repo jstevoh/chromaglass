@@ -428,10 +428,10 @@ const api = {
   },
   /** One cell of the splodascope's lay, as seedPreset lays it. */
   splodascopeCell,
-  /** Classic's dish as the app lays it (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
-  classicDiscs(seed: number, dyes: number) {
+  /** Classic's dish as the app lays it on an `n`-cell grid (src/lib/oilLay.ts, PLAN 38w-8: the solver's grid in the app, 192 the CPU's), from a seeded stream of the lab's own. */
+  classicDiscs(seed: number, dyes: number, n = 192) {
     let s = seed;
-    return classicDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes);
+    return classicDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes, n);
   },
   /** One cell of Classic's lay, as seedPreset lays it. */
   classicCell,

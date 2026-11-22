@@ -96,6 +96,7 @@ export const PRESETS: Preset[] = [
       plateSpring: 0.35,
       plateRock: 0.55,           // a hand tips the dish: the references' swells
       edgeRelief: 0.6,           // the meniscus round every cell: a dark rim and a bright one
+      crispEdges: 1,             // the rims a real dish shows: one pixel, not the solver's band (38w-15)
       bubbles: 0.2,
       transmission: 0.4,
       dishVignette: 0,           // full screen, no Petri rim (the owner, 2026-11-21)

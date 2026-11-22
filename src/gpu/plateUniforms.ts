@@ -282,6 +282,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('quarterWave', Number.isFinite(s.quarterWave) ? clamp01(s.quarterWave) : 1);
   pack.set('birefringence', Math.max(0, Number.isFinite(s.birefringence) ? s.birefringence : 0.3) * BIREF_NM_PER_STRAIN);
   pack.set('edgeRelief', s.edgeRelief ?? 0);
+  pack.set('crispEdges', Number.isFinite(s.crispEdges) ? clamp01(s.crispEdges as number) : 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));
   pack.set('transmission', clamp01(s.transmission ?? 1));

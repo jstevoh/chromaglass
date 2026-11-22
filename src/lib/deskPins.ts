@@ -110,6 +110,7 @@ const SECTION_OF: Record<string, string> = {
   saturationBoost: 'look',
   colourBody: 'look',
   edgeRelief: 'look',
+  crispEdges: 'look',
   projectorFocus: 'look',
   lacing: 'look',
   benDay: 'look',

@@ -184,15 +184,44 @@ export function splodascopeCell(x: number, y: number, n: number, discs: readonly
   return discCell(x, y, n, discs, SPLOD_REACH, SPLOD_WASH, SPLOD_BODY_DYE);
 }
 
+/*
+  The discs are looked up through a coarse grid of buckets, each holding the
+  indices (in lay order) of the discs that reach into it. A cell is laid
+  once per lay, but there are n² of them: Classic's dish went from about 160
+  discs to about 360 when the owner asked for complexity (2026-11-21), and
+  walking every disc for every one of the app's 768² cells took 2.4 s on the
+  Mac, every time the look was laid. The order within a bucket is the lay's
+  order, so a hole still takes the oil from the drop under it and nothing
+  else changes: classicdish and splodascope lay the same plate as before.
+*/
+const BUCKETS = 64;
+const bucketCache = new WeakMap<readonly OilDisc[], { n: number; lists: number[][] }>();
+function discBuckets(discs: readonly OilDisc[], n: number): number[][] {
+  const hit = bucketCache.get(discs);
+  if (hit && hit.n === n) return hit.lists;
+  const lists: number[][] = Array.from({ length: BUCKETS * BUCKETS }, () => []);
+  // A disc reaches half a cell past its radius (the anti-aliased edge in discCell).
+  const pad = 1 / n;
+  discs.forEach((b, q) => {
+    const x0 = Math.max(0, Math.floor((b.x - b.r - pad) * BUCKETS)), x1 = Math.min(BUCKETS - 1, Math.floor((b.x + b.r + pad) * BUCKETS));
+    const y0 = Math.max(0, Math.floor((b.y - b.r - pad) * BUCKETS)), y1 = Math.min(BUCKETS - 1, Math.floor((b.y + b.r + pad) * BUCKETS));
+    for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) lists[j * BUCKETS + i].push(q);
+  });
+  bucketCache.set(discs, { n, lists });
+  return lists;
+}
+
 /** A cell of a dish of discs laid in order (splodascopeCell, classicCell): the water's wash out to `reach` and a little past, and `bodyDye` in each disc's oil. */
 function discCell(x: number, y: number, n: number, discs: readonly OilDisc[], reach: number, wash: number, bodyDye: number): { oil: number; disc: number; water: number; dye: number } {
   let oil = 0, disc = -1;
-  discs.forEach((b, q) => {
+  const i = Math.min(BUCKETS - 1, Math.max(0, Math.floor(x * BUCKETS))), j = Math.min(BUCKETS - 1, Math.max(0, Math.floor(y * BUCKETS)));
+  for (const q of discBuckets(discs, n)[j * BUCKETS + i]) {
+    const b = discs[q];
     const c = Math.max(0, Math.min(1, (b.r - Math.hypot(x - b.x, y - b.y)) * n + 0.5));
-    if (c <= 0) return;
+    if (c <= 0) continue;
     oil = oil * (1 - c) + (b.oil > 0 ? c : 0);
     if (c > 0.5) disc = b.oil > 0 ? q : -1;
-  });
+  }
   const inDish = Math.hypot(x - 0.5, y - 0.5) < reach + 0.03;
   return { oil, disc, water: inDish ? wash * (1 - oil) : 0, dye: disc >= 0 ? bodyDye * oil : 0 };
 }
@@ -205,8 +234,8 @@ function discCell(x: number, y: number, n: number, discs: readonly OilDisc[], re
   one of them shows is a dish on an overhead projector's lamp: a coloured
   water filling the glass, and in it round cells of coloured mineral oil
   that will not mix with it, squashed flat between the two glasses, each
-  ringed by its meniscus, a frame holding eleven to nineteen of them from
-  specks to a fifth of the frame across. In the big cells sit small round
+  ringed by its meniscus, the busiest stills holding eighty to a hundred of
+  them a frame, from specks to a fifth of the frame across. In the big cells sit small round
   drops of the water, trapped when the oil was poured or squeezed, and
   those are the "bubbles inside the cells" that every still has.
 
@@ -219,8 +248,9 @@ function discCell(x: number, y: number, n: number, discs: readonly OilDisc[], re
   colour is laid in the hole by the wash (classicCell), as a drop of the
   dish's water would carry it.
 
-  Sizes: the references' forms are 5 to 15% of the frame (the watch
-  tool's form scale, 11.5% in Liquid Loops). The first lay took that of the
+  Sizes: the watch tool read eleven to nineteen forms a frame, mostly 5 to 15%
+  of it across (counted by eye; the watch tool's form scale is a correlation
+  length against the width, not a diameter). The first lay took that of the
   dish (a median radius of 0.045, twenty-six cells), and the owner judged it
   short of the references' detail (2026-11-21): the frame on the wall is not
   the dish but the middle of it, 0.42 of the plate high at 16:10 (uvToFluid),
@@ -232,14 +262,49 @@ function discCell(x: number, y: number, n: number, discs: readonly OilDisc[], re
   as far as random sequential packing goes, put about thirty-five on the
   screen with water lanes between, as the stills show.
 
-  The floor stays CLASSIC_MIN, 0.018: below it the dye, laid on the CPU's
-  192 grid and carried up to the solver's (applyDeltas), is a cell or two
-  across and smears into the water round it before the oil has its rim
-  (PLAN 38w-8 lays it at the solver's own grid). The oil itself is laid at
-  the solver's grid and is crisp at any size above it.
+  The owner's next word was "complexity and clarity" (2026-11-21): set
+  beside the stills, the frame had a third of their cells and none of the
+  specks, and every rim was soft. Both were the grid. The dye was laid on
+  the CPU's 192² and carried up to the solver's by a bilinear, so a cell
+  under 0.018 of the plate was a cell or two of colour that smeared into
+  the water before the oil had its rim, and that was the floor. Laid at the
+  solver's own grid instead (PLAN 38w-8, FluidInputs.layDye), the dye's edge
+  is the oil's, and what bounds a cell is the physics at that grid
+  (classicFloors): Cahn–Hilliard's interface is about four of the solver's
+  cells (38w-9), so a cell must be wider than its own rim to be a body of
+  oil at all, and the film between two must hold four cells for Film Hold
+  to keep it. In plate units those floors fall as the grid rises, so the
+  sizes are drawn smaller and more of them, a median of 0.018 and a sigma
+  of 0.75 that reaches from specks to a fifth of the frame: about seventy
+  cells on the screen at the app's 768², where the stills show eleven to
+  nineteen forms and as many specks again round them.
+
+  Filmed, that lay still read as a few big cells (the biggest 44% of the
+  frame's height) with the rest round them: a log-normal of sigma 0.75
+  reaches the big tail often, and packing biggest first lets the big ones
+  take the room, so 88 to 104 of the 220 drawn were placed. Set beside the
+  two stills the owner pointed at (Liquid Loops, 1969), which hold eighty
+  to a hundred round forms a frame, most a few percent across and the
+  biggest a fifth, the count of eleven to nineteen was the watch tool's
+  reading of the busiest forms, not what the eye sees. So the sizes are
+  narrower and the crowd bigger: a median of 0.0105, a sigma of 0.5 and a
+  biggest of 0.042 (a fifth of the frame's height), nine hundred drawn,
+  which packs about 235 cells and 120 drops at 768², 112 to 114 of the
+  cells on the screen, the biggest 19% of the frame (classicdish).
 */
-export const CLASSIC_DROPS = 90;
-export const CLASSIC_MEDIAN = 0.026, CLASSIC_SIGMA = 0.6, CLASSIC_MIN = 0.018, CLASSIC_MAX = 0.1;
+export const CLASSIC_DROPS = 900;
+export const CLASSIC_MEDIAN = 0.0105, CLASSIC_SIGMA = 0.5, CLASSIC_MAX = 0.042;
+/**
+ * The lay's floors on a grid of `n` (classicFloors), in its cells: at 192²
+ * they are the first lay's sizes (CLASSIC_MIN, CLASSIC_GAP, twice it for a
+ * wall, CLASSIC_DROP_MIN), and on a finer grid they shrink with the cell
+ * until the plate's own floors stop them, where a cell is six of the app's
+ * 768² cells across its radius, its rim of four and a body inside it.
+ */
+export const CLASSIC_FLOOR_CELLS = { min: 3.5, gap: 4, wall: 8, drop: 3 } as const;
+export const CLASSIC_FLOOR_PLATE = { min: 0.008, gap: 0.006, wall: 0.01, drop: 0.007 } as const;
+/** Kept for the lab and the checks that name it: the 192² floors of the first lay. */
+export const CLASSIC_MIN = 0.018;
 export const CLASSIC_GAP = 0.02;
 export const CLASSIC_REACH = 0.43;
 export const CLASSIC_WASH = 0.8;
@@ -247,10 +312,10 @@ export const CLASSIC_BODY_DYE = 1.6;
 /* The oils' shares, by the dyes after the water's: orange most, amber, yellow, and the cool accent. */
 export const CLASSIC_SHARE = [0.35, 0.3, 0.15, 0.2];
 /*
-  A cell this big (radius) or more holds drops of the water; each drop a
-  radius from CLASSIC_DROP_MIN up to a third of its cell's, and set in the
-  body of its cell, with a wall of oil round it at least twice the film
-  between cells (CLASSIC_GAP). The wall is what keeps a drop. Laid with a
+  A cell big enough holds drops of the water; each drop a radius from the
+  drop floor up to a third of its cell's, and set in the body of its cell,
+  with a wall of oil round it (CLASSIC_FLOOR_CELLS.wall; at 192² it was
+  twice the film, 0.04, about eight cells). The wall is what keeps a drop. Laid with a
   wall of one film, 0.02 of the plate (four cells, about one of the phase
   field's interfaces), most drops were gone inside five seconds, at every
   size: classicdish held 0 of 1 and 2 of 7 on its two lays (2 of 8). The wall that
@@ -260,24 +325,35 @@ export const CLASSIC_SHARE = [0.35, 0.3, 0.15, 0.2];
   film of oil between two waters drains and breaks once it is thin. With
   the wall doubled every drop held, down to the floor of 0.014 (1 of 1 and
   8 of 8, 9 of 9), so only a cell with room for a drop and its wall holds any.
+  Eight cells is the wall at any grid: the drain is a film between two
+  interfaces, and those are four cells each wherever the grid is.
 */
 export const CLASSIC_HELD = 0.06;
 export const CLASSIC_DROP_MIN = 0.014;
+
+/** Classic's floors on a solver grid of `n` cells (plate units): see CLASSIC_FLOOR_CELLS. */
+export function classicFloors(n: number): { min: number; gap: number; wall: number; drop: number; held: number } {
+  const f = (k: keyof typeof CLASSIC_FLOOR_CELLS) => Math.max(CLASSIC_FLOOR_PLATE[k], CLASSIC_FLOOR_CELLS[k] / n);
+  const min = f('min'), gap = f('gap'), wall = f('wall'), drop = f('drop');
+  // A cell holds a drop when there is room for the least one and its wall, and a little to range in (CLASSIC_HELD at 192²).
+  return { min, gap, wall, drop, held: 1.1 * (drop + wall) };
+}
 
 /**
  * Classic's dish for one lay, from `float` (a seeded stream), as
  * splodascopeDiscs lays its crowd: each cell of oil (oil 1), then the drops
  * of water held in it (oil −1). `dyes` as clockGlassBodies takes it.
  */
-export function classicDiscs(float: () => number, dyes: number): OilDisc[] {
+export function classicDiscs(float: () => number, dyes: number, n = 192): OilDisc[] {
   const others = Math.max(1, dyes - 1);
+  const fl = classicFloors(n);
   const sizes: number[] = [];
   for (let i = 0; i < CLASSIC_DROPS; i++) {
-    let r = CLASSIC_MEDIAN;
+    let r = Math.max(fl.min, CLASSIC_MEDIAN);
     for (let t = 0; t < 16; t++) {
       const z = Math.sqrt(-2 * Math.log(1 - float())) * Math.cos(2 * Math.PI * float());
       const v = CLASSIC_MEDIAN * Math.exp(CLASSIC_SIGMA * z);
-      if (v >= CLASSIC_MIN && v <= CLASSIC_MAX) { r = v; break; }
+      if (v >= fl.min && v <= CLASSIC_MAX) { r = v; break; }
     }
     sizes.push(r);
   }
@@ -289,19 +365,19 @@ export function classicDiscs(float: () => number, dyes: number): OilDisc[] {
       const a = float() * Math.PI * 2;
       const d = (CLASSIC_REACH - r) * Math.sqrt(float());
       const x = 0.5 + Math.cos(a) * d, y = 0.5 + Math.sin(a) * d;
-      if (placed.some((q) => Math.hypot(q.x - x, q.y - y) < q.r + r + CLASSIC_GAP)) continue;
+      if (placed.some((q) => Math.hypot(q.x - x, q.y - y) < q.r + r + fl.gap)) continue;
       placed.push({ x, y, r });
       let u = float(), k = 0;
       while (k < CLASSIC_SHARE.length - 1 && u >= CLASSIC_SHARE[k]) u -= CLASSIC_SHARE[k++];
       out.push({ x, y, r, oil: 1, dye: 1 + (k % others) });
-      if (r >= CLASSIC_HELD) {
+      if (r >= fl.held) {
         const held: { x: number; y: number; r: number }[] = [];
         const want = 1 + Math.floor(float() * 3);
         for (let h = 0; h < want * 8 && held.length < want; h++) {
-          const hr = CLASSIC_DROP_MIN + Math.max(0, r / 3 - CLASSIC_DROP_MIN) * float();
-          const off = (r - hr - 2 * CLASSIC_GAP) * Math.sqrt(float()), oa = float() * Math.PI * 2;
+          const hr = fl.drop + Math.max(0, r / 3 - fl.drop) * float();
+          const off = (r - hr - fl.wall) * Math.sqrt(float()), oa = float() * Math.PI * 2;
           const hx = x + Math.cos(oa) * off, hy = y + Math.sin(oa) * off;
-          if (off < 0 || held.some((q) => Math.hypot(q.x - hx, q.y - hy) < q.r + hr + CLASSIC_GAP)) continue;
+          if (off < 0 || held.some((q) => Math.hypot(q.x - hx, q.y - hy) < q.r + hr + fl.wall)) continue;
           held.push({ x: hx, y: hy, r: hr });
           out.push({ x: hx, y: hy, r: hr, oil: -1, dye: 0 });
         }
@@ -408,16 +484,83 @@ export function layCrowd(look: 'clock-glass' | 'splodascope' | 'classic', n: num
   inOil: (x: number, y: number, amount: number, dye: number) => void): void {
   const glass = look === 'clock-glass';
   const bodies: readonly (OilBody & { oil?: number })[] = glass ? clockGlassBodies(float, dyes)
-    : look === 'classic' ? classicDiscs(float, dyes) : splodascopeDiscs(float, dyes);
-  const discCellOf = look === 'classic' ? classicCell : splodascopeCell;
+    : look === 'classic' ? classicDiscs(float, dyes, n) : splodascopeDiscs(float, dyes);
   for (const b of bodies) oil(b.x, b.y, b.r, b.oil ?? 1);
+  if (!glass) {
+    const classic = look === 'classic';
+    layDiscs(n, bodies as readonly OilDisc[], classic ? CLASSIC_REACH : SPLOD_REACH,
+      classic ? classicWash(float) : () => SPLOD_WASH, classic ? CLASSIC_BODY_DYE : SPLOD_BODY_DYE, water,
+      (x, y, amount, q) => inOil(x, y, amount, bodies[q].dye));
+    return;
+  }
   for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
     const u = (x + 0.5) / n, v = (y + 0.5) / n;
-    const cell = glass ? clockGlassCell(u, v, n, bodies) : discCellOf(u, v, n, bodies as readonly OilDisc[]);
-    const which = glass ? (cell as { body: number }).body : (cell as { disc: number }).disc;
+    const cell = clockGlassCell(u, v, n, bodies);
     if (cell.water > 0) water(x, y, cell.water);
-    if (cell.dye > 0) inOil(x, y, cell.dye, bodies[which].dye);
+    if (cell.dye > 0) inOil(x, y, cell.dye, bodies[cell.body].dye);
   }
+}
+
+/**
+ * A dish of discs laid cell for cell, as discCell lays one cell, and to the
+ * same numbers: each disc walks only the cells of its own box, in the
+ * discs' order, where discCell asks every disc at every cell. At the
+ * solver's 768² Classic's two hundred discs asked at every cell were a
+ * hundred million distances, seconds of a frozen look change; walked by box
+ * they are the cells each covers, a few hundred thousand. `wash` is the
+ * water's depth of dye at a place (plate units).
+ */
+function layDiscs(n: number, discs: readonly OilDisc[], reach: number, wash: (u: number, v: number) => number, bodyDye: number,
+  water: (x: number, y: number, amount: number) => void, inOil: (x: number, y: number, amount: number, disc: number) => void): void {
+  const oil = new Float32Array(n * n), disc = new Int32Array(n * n).fill(-1);
+  discs.forEach((b, q) => {
+    // A cell is touched while (r - d)·n + 0.5 > 0: within r + 0.5/n of the middle; one cell more is safe.
+    const pad = b.r + 1 / n;
+    const x0 = Math.max(1, Math.floor((b.x - pad) * n - 0.5)), x1 = Math.min(n - 2, Math.ceil((b.x + pad) * n - 0.5));
+    const y0 = Math.max(1, Math.floor((b.y - pad) * n - 0.5)), y1 = Math.min(n - 2, Math.ceil((b.y + pad) * n - 0.5));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const c = Math.max(0, Math.min(1, (b.r - Math.hypot((x + 0.5) / n - b.x, (y + 0.5) / n - b.y)) * n + 0.5));
+      if (c <= 0) continue;
+      const i = x + y * n;
+      oil[i] = oil[i] * (1 - c) + (b.oil > 0 ? c : 0);
+      if (c > 0.5) disc[i] = b.oil > 0 ? q : -1;
+    }
+  });
+  for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
+    const u = (x + 0.5) / n, v = (y + 0.5) / n, i = x + y * n;
+    if (Math.hypot(u - 0.5, v - 0.5) < reach + 0.03) {
+      const w = wash(u, v) * (1 - oil[i]);
+      if (w > 0) water(x, y, w);
+    }
+    if (disc[i] >= 0 && oil[i] > 0) inOil(x, y, bodyDye * oil[i], disc[i]);
+  }
+}
+
+/*
+  Classic's water is not one depth of dye. In every still the magenta runs
+  from a pale rose to a red nearly black, in broad sweeps a third of the
+  frame across, where the dye was poured into the water and has not yet
+  spread: a dye's diffusion in water is about 10⁻⁹ m²/s, a millimetre in
+  fifteen minutes, so a pour stays where it fell for the whole of a show and
+  only the flow moves it. Lit through, a deeper water is a darker one
+  (Beer–Lambert), and those dark sweeps are where the references' quarter
+  of uncoloured frame comes from: the first lay's even wash coloured every
+  pixel (the watch tool's coloured share, 1.00 against Liquid Loops' 0.77).
+  So the wash is the water's base depth and four pours on it, each a broad
+  Gaussian (0.08 to 0.2 of the plate), from half of CLASSIC_WASH to about
+  twice it, never under the depth a wet dish needs (classicdish's WET).
+*/
+export const CLASSIC_POURS = 4;
+function classicWash(float: () => number): (u: number, v: number) => number {
+  const pours = Array.from({ length: CLASSIC_POURS }, () => {
+    const a = float() * Math.PI * 2, d = CLASSIC_REACH * Math.sqrt(float());
+    return { x: 0.5 + Math.cos(a) * d, y: 0.5 + Math.sin(a) * d, s: 0.08 + 0.12 * float(), k: 0.4 + 0.6 * float() };
+  });
+  return (u, v) => {
+    let w = 0.55;
+    for (const p of pours) w += p.k * Math.exp(-((u - p.x) ** 2 + (v - p.y) ** 2) / (2 * p.s * p.s));
+    return CLASSIC_WASH * Math.min(2, w);
+  };
 }
 
 /*
