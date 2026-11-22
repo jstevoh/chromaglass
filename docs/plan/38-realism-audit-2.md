@@ -42,7 +42,7 @@ cost, then Low.
 | 20 | 9af | The magnet's strength and walk ride the music outside the cords (RS-44) | `09-ferrofluid.md` | S | Medium | new |
 | 21 | 38u-6 | The surge's speed terms, measured (RS-45) | `38-realism-audit.md` | S | Medium | updates |
 | 22 | 38v-3 | The kick pours soap and seeds the reaction (RS-46) | here | S | Medium | new |
-| 23 | 38v-4 | The spin and the cover read one viscosity and one gap for every layer (RS-50) | here | S | Medium | new |
+| 23 | ~~38v-4~~ | ~~The spin and the cover read one viscosity and one gap for every layer (RS-50)~~ | here | S | Medium | **shipped** (`spinDrag`, `npm run turntable`) |
 | 24 | 32g-2b | A ruptured cell thins on below Newton black (RS-12) | `32-soap-film.md` | S–M | Medium | new |
 | 25 | 38h-6 | The ferro glint's nine-arm star lights projected looks (RS-27) | `38-realism-audit.md` | S–M | Medium | updates |
 | 26 | 38l-5 | Bass Press lets go in one step (RS-42) | `38-realism-audit.md` | S–M | Medium | updates |
@@ -100,16 +100,14 @@ water, so it never does.
   over 60 s the soap and seed totals are the same under loud music and silence with no
   cord, and follow the cord's depth with one. (38v, from RS-46.)
 
-- **38v-4. The spin and the cover read one viscosity and one gap for every layer** (S;
-  Medium). `fluidSimulation.ts:3346-3347` takes the spin's ν from `carrierViscosity` (1e-6
-  or 2e-5 m²/s) while the thin gap solves with `thicknessViscosity(0.45)` = 22.4 cSt;
-  `LiquidVisualizer.tsx:4815` hands Layer 0's `coverUnits` to every layer, and so do
-  `LiquidVisualizer.tsx:4723`, `bubbles.ts:264` and `fluidSimulation.ts:2957`. Nine
-  'thin' looks run on that mismatch. The spin's lag time is τ = h²/(12ν), so a ν 22 times
-  off is a lag 22 times off. Read ν and the gap per layer from the one place the thin solve
-  reads them. Check: for each layer, the spin's ν equals `thicknessViscosity` and the
-  cover's gap equals that layer's; `npm run spin` stays green. (38v, from RS-50.)
-
+- **38v-4b. The cover glass and the bubbles still read Layer 0's gap (found with 38v-4)**
+  (S; Medium). 38v-4 gave the spin each layer's own ν and gap (`spinDrag`), but the cover's
+  drag (`coverDrag`, one shared cover), `LiquidVisualizer.tsx`'s cover read near the press,
+  `bubbles.ts`'s gap and `fluidSimulation.ts`'s slosh still take Layer 0's `coverUnits`. A
+  back layer under a thicker glass then drains, presses and holds its pockets at the front
+  glass's pace (Stefan's squeeze goes as h³). Read each from that layer's `gpu.coverMetres`.
+  Check: `npm run turntable` or `npm run stefan`, a two-layer plate with 1.5 mm and 3 mm
+  covers giving each layer its own squeeze time.
 - **38v-5. The chorus turns the look's dials outside the cords** (S–M; Medium).
   `useMusicIntelligence.ts:595-614`, on a chorus, adds 0.2 to turbulence, 0.15 to
   saturation and 0.2 to Impact, and scales turbulence by 0.7 + 0.6·energy;
