@@ -111,3 +111,4 @@ and a stream held on the plate, lay their colour with their own volume; story in
 ## 18e. Edges come from refraction (replaces the painted rims and highlights)
 
 - ~~**18e-7**~~ #881 The closeup's relief reads the optical path at the lens's disc (`camLap`), not the colour step: no line where two dyes meet up close, the dial moves nothing there, a swell gathers light, bubbles left to the traced bubble. `npm run camrelief`, `holeline` 6 and 6b.
+- ~~**18e-9**~~ The optical path's height over a clear film uses the real gap `h = gap / 0.03` (with no `1 - 0.5·film` factor) in `calcOpl` (`wgsl/plate.ts`) and `lampDepthAt` (`wgsl/plateLamp.ts`), so `OPL = (n_water + 0.087·film)·h`. `npm run derive -- --owed=grad` (`height` taken out of `--owed`).

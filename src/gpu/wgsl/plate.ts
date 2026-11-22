@@ -1262,8 +1262,7 @@ fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
   let deltaFilm = v.z * 0.087;
   let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
   let gap = v.y;
-  let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
-  let h = hScale * (1.0 - 0.5 * v.z);
+  let h = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
   return n * h;
 }
 
