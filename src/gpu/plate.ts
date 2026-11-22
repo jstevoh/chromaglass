@@ -400,7 +400,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -452,7 +452,7 @@ export class WebGPUPlate {
     const leadView = fields[0].view;
     const dropWanted = !!leadView && leadView.width === grid
       && FerroDrop.wanted(this.pack.get('macroOn')[0], this.pack.get('macroRelief')[0], this.pack.get('phaseAmount')[0]);
-    const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets')) : null;
+    const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres) : null;
     if (!dropWanted) this.drop.cool();
     if (height) {
       const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
@@ -559,7 +559,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -594,7 +594,7 @@ export class WebGPUPlate {
     uniforms: GPUBuffer,
     /** What `uniforms` was written from: which of the display's effects this draw turns on. */
     bytes: ArrayBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,

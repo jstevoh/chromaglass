@@ -19,7 +19,7 @@
  */
 import { Disposer, PipelineCache } from './kit';
 import { groupOf } from './groupCache';
-import { DROP_KERNELS, GAP_LC } from './wgsl/ferroDrop';
+import { DROP_KERNELS, gapLc } from './wgsl/ferroDrop';
 import { SPIKE_PITCH } from './wgsl/spikes';
 import { LIFT_ONSET } from './wgsl/standing';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
@@ -177,7 +177,7 @@ export class FerroDrop {
    * before). `magnets` is the plate's uniform of four (x, y, height,
    * strength), as the display draws them.
    */
-  solve(pass: GPUComputePassEncoder, view: GPUTexture, relief: number, magnets: number[]): GPUTexture | null {
+  solve(pass: GPUComputePassEncoder, view: GPUTexture, relief: number, magnets: number[], gapMetres?: number): GPUTexture | null {
     if (!this.ready) { void this.prepare(); return null; }
     const pipes = (Object.keys(DROP_KERNELS) as (keyof typeof DROP_KERNELS)[]).map((k) => this.pipelines.computePipeline(k, DROP_KERNELS[k]));
     if (pipes.some((p) => !p)) return null;
@@ -185,7 +185,8 @@ export class FerroDrop {
     const n = view.width;
     const s = this.ensure(n);
     const args = new Float32Array(24);
-    args.set([n, LC_UV * n, dropPlateau(relief), PULL, LANGEVIN, 0.95 * GAP_LC, MAGNET_RADIUS, GAP_LC / DISH_REST_GAP]);
+    const lc = gapLc(gapMetres);
+    args.set([n, LC_UV * n, dropPlateau(relief), PULL, LANGEVIN, 0.95 * lc, MAGNET_RADIUS, lc / DISH_REST_GAP]);
     args.set(magnets.slice(0, 16), 8);
     this.device.queue.writeBuffer(s.args, 0, args);
     const groups = Math.ceil(n / 8);

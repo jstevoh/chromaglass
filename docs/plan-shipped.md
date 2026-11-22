@@ -4990,6 +4990,17 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   - **$\lambda = 1.5$ on beads**: solved back from tuned $0.8\times$ flow speed.
 - **Measured** (`npm run bubblephysics`): 11/11 checks pass. Foam stability test over 3600 frames on a resting raft yields 0 merges (stable foam).
 
+### 18i-2. Oil beads run on the gap and liquid properties (shipped)
+
+- **What was broken** (`docs/plan/18-physics-2.md` §18i-2, `src/lib/beads.ts`): beads slid by `tiltX * 500` regardless of gap, viscosity, or density sign (so heavy drops slid uphill), merged at `0.02` per step, repelled at `0.25` per step, and clamped to `[2, N - 3]` at the square border.
+- **What changed**:
+  - `BeadField.setLiquid({ gapMetres, muOut, muIn, deltaRho, sigma })` in `src/lib/beads.ts` stores the live gap $b$ and the two liquids' viscosities, density difference $\Delta\rho = \rho_{\text{drop}} - \rho_{\text{liquid}}$, and interfacial tension $\sigma$, updating `viscosityRatio = muIn / muOut`.
+  - Tilt drift in `BeadField.step` now uses the signed Hele-Shaw pancake speed $\Delta\rho\,g\,\sin\theta\,b^2 / (12\mu_{\text{out}}(1 + \lambda))$: heavy drops slide down the slope and light drops rise up it.
+  - Drop-mode (`drops > 0` or `liquidSet`) merge probability, overlap repulsion, neighbour attraction, and recolouring use $1 - \exp(-dt/\tau)$, with Paterson's $\tau = 2\mu R^3/(b^2\sigma)$ for coalescence and shape relaxation; drops crossing `OPEN_RIM * N` leave the dish instead of clamping. Legacy rings (`drops === 0` without `setLiquid`) stay bit-identical to `RINGS_FINGERPRINT` (`64fc541f:341`).
+  - `stepPlateBeads` in `src/sim/beadStep.ts` (extracted from `LiquidVisualizer.tsx`, shrinking it under its size ceiling) passes the live cover gap (`coverMetres`), carrier/oil viscosities, density contrast, and `plateSin` tilt each step.
+- **Left as follow-up**: retiring the 30-frame `populate` timer in `stepPlateBeads` once presets and oil pours seed beads directly (kept for now so presets with `beads > 0` and `npm run webgpu` continue to show beads), and `15g-17` (pointer `disturb`, in PR #914).
+- **Measured**: `npm run drops` 33/33 checks pass (`slide` no longer owed: 1.00x across $\lambda = 10, 100, 0.02$).
+
 ### 18j. Milky liquids scatter
 
 **Shipped** (2026-10-10, #353): milky liquids scatter light, turning milk into an opaque white body under diffuse backscatter and casting a warm dark projector shadow with a soft forward halo.
@@ -13117,6 +13128,37 @@ judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music stil
 slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
 saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
+
+## 38u-16. A look saved before the cord gains it, once (2026-11-22)
+
+Left open by 38u-5: the built-in looks gained the music's stir cord where they are written
+(`layStirCords`), but a saved look keeps the cords it was saved with, so every look the owner
+saved before 2026-11-13 came back with none and stirred to the band less than it had the day
+before, until Music Stir was raised. The owner asked for it on 2026-11-14 ("Do the sound cord").
+
+The saved look's version (lib/userPresets.ts `PRESET_VERSION`) goes from 2 to 3. A look read
+at a version under 3 gains the cord its own Turbulence and Sound Drive call for (lib/stir.ts
+`withStirCordOnce`, the same `stirCordDepth` a built-in look with those dials carries), unless
+it already has one, which keeps the owner's depth. A look read at 3 or later keeps its cords,
+none included, because by then a look without the cord is one the owner pulled it from. The
+version is written as the look is read, so the cord is asked for once. Every route a saved
+look takes goes through it: the saved shelf, cloud sync and an imported file (`parsePresetFile`)
+and a set list (`upgradeSaved`); the phone reads the same shelf. Not `sanitizeSettings`, as the
+item first said: that clamps every patch (the remote's, the assistant's), and a patch that
+names no cord must not gain one.
+
+The gap it leaves: a look saved between 38u-5's merge (11:27 PM PST 2026-11-13) and this one,
+at version 2, with the cord pulled on purpose, gets it back once. That is a night's window, and
+the cord is one tap to pull again (Patches, or Music Stir at 0 on the phone).
+
+Measured: `npm run musicstir` section 7, six lines, red on main (no `withStirCordOnce`) and
+green here: a look saved at version 2 with Turbulence 0.62 and Sound Drive 0.7 reads with one
+stir cord at 0.24 beside its own kick cord, and at version 1 the same; one saved at 3 without it
+stays without; one with its own at 0.15 keeps 0.15 and gains no second; read, saved and read
+again it is unchanged, and pulled and saved it stays pulled; in a set list the same, id kept;
+folded with a loud band its Turbulence goes 0.620 to 0.824. `npm run setlist`'s version line
+now reads `PRESET_VERSION` (18/18).
+
 ## 38f-2. Wax and water mix like immiscible liquids (2026-11-11)
 
 Found shipping 38f-1: with the heat carried, Lava Lamp's rising plumes left their trailing edges
@@ -15292,3 +15334,31 @@ Left open: 15e-12 (the weight goes through the dish's open rim, as the colour's 
 closed circulation the oil's lift has), 15e-13 (a bottle's polarity loses its sign to the
 same floor), 15e-14 (a thin gap reads the magnet's and the mix's forces against a different
 drag when no other body force runs that step).
+
+## 38r-17. The rest gap's other readers, part 1 (2026-11-21)
+
+Wired the seven non-optical readers of the 2 mm rest gap constant to read the solver's live
+cover gap (`coverMetres` / `coverUnits`):
+
+- `wgsl/standing.ts` exports `filmTop(gapMetres)` (`FILM_TOP = filmTop()`), and `phaseRelax`
+  in `wgsl/fluid/phaseForces.ts` reads `S.cover` (`coverUnits`) instead of interpolating
+  `${FILM_TOP}`.
+- `wgsl/ferroDrop.ts` exports `gapLc(gapMetres)` (`GAP_LC = gapLc()`); `FerroDrop.solve`
+  takes `gapMetres` from `fields[0].coverMetres` (`gpu/fluid/fields.ts`, `gpu/plate.ts`)
+  and passes `0.95 * gapLc(gapMetres)`.
+- `sim/speciesPoll.ts` sets `bubbles.gapMetres = lead?.gpu?.coverMetres ?? DISH_GAP_METRES`
+  before stepping `BubbleField`.
+- `lib/sheet.ts` makes `RhythmSheet.h0` writable and `sim/stepping.ts` (`pressSheetKick`)
+  sets `sheet.h0 = coverMetres ?? DISH_GAP_METRES` before `sheet.setLiquid(nu)`.
+- `lib/squish.ts` adds optional `gapMetres` to `kickPress(nu, sway, gapMetres?)`, passing it
+  to `dentRadius(nu, KICK_HOLD, h)`; `LiquidVisualizer.tsx` passes `leadPlate.gpu?.coverMetres`.
+- `lib/handSolid.ts` adds optional `gapMetres` to `handEdge(L, gapMetres?)`;
+  `sim/fluidSimulation.ts` passes `handEdge(this.size, this.gpu.coverMetres)` to `layFinger`.
+- `gpu/opening.ts` (`lookOpensSpinning`) computes the opening cover gap from
+  `coverNew(s.liquidMl ?? COVER_FULL_ML).h / DISH_GAP_FIELD_METRES` and passes it as the
+  second argument to `dragSeconds`.
+
+`forces.ts`'s `nominal` stays the 2 mm on purpose (the old plate's depth drag). Left open:
+the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
+Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
+`npm run sizes`, and `npm run quick`.
