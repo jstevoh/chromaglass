@@ -14957,9 +14957,9 @@ From the third physics pass (38u). Each is a look change on purpose.
   44.0% against 11.1%; at 0.10 and 0.15 two pools drain to 39–70%); Rain Drip's help and guide line
   say it needs Gravity.
 - **38u-14, the clear drop.** `plate.ts` drew the oil drop's band at 0.35 when there was no dye
-  under it and a bubble's at 0.7 in clear liquid; the band is the meniscus bending light out of the
-  aperture and does not need dye. Both at full strength; the clear oil's flat warm tint is now
-  exp(−α·thickness).
+  under it; the band is the meniscus bending light out of the aperture and does not need dye. Now at
+  full strength; the clear oil's flat warm tint is now exp(−α·thickness). The bubble's 0.7 in clear
+  liquid stays (see the section's note).
 
 *Measured* (cloud lab, software WebGPU, main then this): `npm run forces` 6, rows of a straight
 boundary pushing the colours apart, thin gap 50 of 76 → 76 of 76 (spread 2.46 → 0.11 of the mean);

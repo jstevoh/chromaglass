@@ -813,9 +813,11 @@ On in many looks:
   glasses is not shaken by the room's sound (0.083 cells of wander in two seconds → 0).
 - ~~**38u-14. A clear drop's lens is drawn at a third**~~ — **Shipped (2026-11-13).** The oil
   drop's band is at full strength in clear water (it was 0.35 with no dye: 70% of the plate in the
-  band where dyed water gives 24%), the bubble's at full strength in clear liquid (the 0.7 is
-  gone), and the clear oil's tint is exp(−α·thickness), the same colour on the flat top and
-  fading to the water's over the meniscus. `npm run droplens`.
+  band where dyed water gives 24%), and the clear oil's tint is exp(−α·thickness), the same colour on the flat top and
+  fading to the water's over the meniscus. `npm run droplens`. Left open: a bubble in clear
+  liquid is still drawn at 0.7 of its ring (`mix(0.7, 1.0, filmT)` in `plate.ts`); making it whole
+  moved `npm run filmlook`'s closeup00 line by one pixel on the GitHub Mac's Metal GPU (it passes in
+  SwiftShader and on the owner's Mac), so it is its own item to be measured on that GPU.
 - **38u-15. The drain fades the dye** (S; Low). `wgsl/fluid/dye.ts:318-328`: the inward speed
   grows with distance, the swirl is constant, the dye is scaled to 0.62 over 50 frames. A sink
   flows at Q/2πrh and conserves angular momentum (both ∝ 1/r), and the dye leaves by the

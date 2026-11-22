@@ -2949,6 +2949,6 @@ Looks change here on purpose. Judge from the film (before and after, same looks)
    Velvet Underground on a plate tipped about 3 degrees (its 0.6 streaked its pools, which should
    stay pools): the three pools stay apart and drift slowly, no streaks running out of them.
 3. Pour a clear drop (no dye) on bare water, projected: its dark ring is as strong as a dyed
-   drop's, thin and clear, not a faint ghost. A bubble in clear liquid has the same ring.
+   drop's, thin and clear, not a faint ghost.
 4. Two colours side by side with Polarity up: the line between them stays an even edge, no
    patches where they smear into each other.
