@@ -39,8 +39,8 @@ real, and the plate shader draws only what the solver makes.
    "Liquid Tapestry" reference. Built; merge on green, then film. Next in §32: **32i** real
    drag with time as its own dial, **32j** the surfactant moves (Marangoni).
 3. **Video as the lamp** (**14ag-3**, PR #899): any footage under the dish, seen through
-   the liquid, refracted and coloured by the oil. A new source for every look. Built;
-   merge on green, then film.
+   the liquid, refracted and coloured by the oil. A new source for every look. Shipped
+   by PR #899; filmed on the owner's Mac 2026-11-14 (`docs/judging.md` §141).
 4. **The liquid looks at a real show's pace** (**48q**): 25 of 33 liquid looks turn over
    several times slower than real shows, and the cause is the forcing, not the camera.
    The widest change on the list, since it touches most looks: work the liquid harder by

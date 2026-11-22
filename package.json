@@ -300,6 +300,7 @@
     "colours": "node scripts/colours.mjs",
     "lace": "node scripts/lace.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
+    "videolamp": "node --experimental-strip-types scripts/videolamp.mjs",
     "beams": "node scripts/beams.mjs",
     "wallpattern": "node --experimental-strip-types scripts/wallpattern.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
