@@ -124,10 +124,15 @@ not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 
 ## CI
 
-`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, eight parts) and
-`WebGPU (macOS)` (Metal, sharded). What each part runs is `scripts/checks.json`; what
-skips the Mac is `scripts/reach.mjs`; when a deploy trusts a PR's run, or skips the
-checks, is `scripts/deploygate.sh`; the owner's Mac takes main's deploy shards when idle
+`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, thirteen parts)
+and `WebGPU (macOS)` (Metal, sharded). **A PR runs only Measure's `logic` and `sound` (the
+typecheck, the build, the node harnesses) and no Mac shard; the browser, lab and Mac checks
+run on main's deploy only** (PLAN.md 19ak-20, the owner, 2026-11-22). So before pushing a
+change the plate draws, run its lab or harness yourself (`npm run quick`, the `look`
+skill). What each part runs is `scripts/checks.json`; what a PR runs is
+`scripts/reach.mjs`; when a deploy trusts a PR's run, or skips the
+checks, is `scripts/deploygate.sh` (which since 19ak-21 only decides whether a deploy
+publishes anything and whether its after-the-fact checks run); the owner's Mac takes main's deploy shards when idle
 and never a PR's (`docs/mac-runner.md`). The whole account is `docs/ci.md`; read it when
 a run or a deploy needs explaining. When CI is red, use the `steward` skill.
 
@@ -143,8 +148,10 @@ a run or a deploy needs explaining. When CI is red, use the `steward` skill.
 - After a PR merges, a branch that carries on is restarted from `main`
   (`git fetch origin main && git checkout -B <branch> origin/main`), never stacked
   on merged history.
-- A merge to `main` deploys (`deploy.yml`). Confirm the deploy run finished green
-  and report the time in **Pacific time**, not UTC.
+- A merge to `main` deploys (`deploy.yml`) within minutes, without waiting for the slow
+  checks, which run beside it as a report (PLAN.md 19ak-21, the owner, 2026-11-22: ship
+  fast, fix what breaks). Confirm its `Build and deploy` job finished green and report the
+  time in **Pacific time**, not UTC. A red check there means a bug is live: fix it.
 - **More than one session works on this repo at once.** Before starting, look
   at open PRs (`list_pull_requests`) and recent commits on `main` so two
   sessions do not rebuild the same thing; keep to your own branch and PR.

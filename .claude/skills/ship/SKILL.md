@@ -7,13 +7,10 @@ description: Merge a green ChromaGlass PR, confirm the Firebase deploy, report i
 
 ## Before merging
 
-- CI green on the PR's **current head** (every shard of `WebGPU (macOS)`, or
-  none when the `reach` job skipped them for a docs-only change, and `Measure`), no merge conflict, no open review thread waiting on us.
-- The head **contains main's latest commit**. If main moved, merge it in and
-  wait for green again. Then the squash is the tree the PR run measured, and
-  the deploy publishes on that run instead of running the Mac checks a second
-  time (`scripts/deploygate.sh`), where a flaky check would hold every merge
-  behind it.
+- CI green on the PR's **current head**: `Measure` (a PR runs only its `logic` and
+  `sound` parts, and no Mac shard, since PLAN.md 19ak-20), no merge conflict, no
+  open review thread waiting on us. Main moving during the run is fine; merge
+  main in only to resolve a conflict.
 - The PR's `Main not held red` status is green (`scripts/mainhold.mjs`, PLAN.md 19am).
   Red means the same check is red on main's last two deploys: only a PR labelled
   `fixes-main` merges until a deploy is green, and that label goes only on the fix.
@@ -28,12 +25,13 @@ description: Merge a green ChromaGlass PR, confirm the Firebase deploy, report i
 
 1. Squash-merge. The title is the PR's; the body is a short summary, and it
    ends with the repo's attribution lines.
-2. The merge starts `Deploy to Firebase Hosting` on `main`. Its first job,
-   "Already checked on its PR", says whether the checks are skipped (the tree
-   already passed) or run again (the head was behind main). Then it builds and
-   deploys. Watch that run, not the PR's.
-3. If the deploy's checks fail, the site did not change: treat it as a red PR
-   (the `steward` skill), on a fresh branch from `main`.
+2. The merge starts `Deploy to Firebase Hosting` on `main`. Since PLAN.md
+   19ak-21 its `Build and deploy` job runs as soon as the gate answers (a few
+   minutes), and the browser, lab and Mac checks run beside it as a report.
+   Watch the `Build and deploy` job, not the run's overall result.
+3. If that run's checks go red, the site has already changed: the bug is live.
+   Fix it on a fresh branch from `main` (the `steward` skill); a newer merge
+   cancels the older run's checks.
 4. When `Build and deploy` is green, report: what shipped, the commit, and the
    time **in Pacific time** (PDT is UTC−7, PST UTC−8).
 

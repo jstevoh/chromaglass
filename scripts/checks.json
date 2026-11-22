@@ -9,15 +9,30 @@
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
     "cheap ones that hold the rest. `quarantine` (PLAN.md 19ak-1) lists a check's",
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
-    "still run and report and do not block. `scripts/checks.mjs` holds the rules."
+    "still run and report and do not block. `scripts/checks.mjs` holds the rules.",
+    "`shards.pr` (PLAN.md 19ak-20, the owner's call of 2026-11-22) is the Measure parts a",
+    "pull request runs: the node checks, typecheck and the build. Every other Measure part",
+    "and every Mac shard runs on main's deploy only, which no PR's run stands in for."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"], "pr": ["logic","sound"] },
   "checks": [
     {
       "name": "Typecheck",
       "shard": "logic",
       "run": "npm run lint",
       "always": true
+    },
+    {
+      "name": "The site builds",
+      "shard": "logic",
+      "run": "npx --no-install vite build",
+      "always": true,
+      "why": [
+        "The live site's own build, `vite build` (PLAN.md 19ak-20). A pull request runs",
+        "only the node checks since that item, and none of them builds `dist/`: the",
+        "browser parts did, so an import `tsc` accepts and Rollup refuses would have",
+        "been found first on main's deploy. About eleven seconds."
+      ]
     },
     {
       "name": "The scripts parse",
@@ -1574,6 +1589,25 @@
         "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
         "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
         "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
+      ]
+    },
+    {
+      "name": "Faraday waves stand up from the liquid's physics (SwiftShader)",
+      "shard": "lab5",
+      "run": "npm run faraday",
+      "why": [
+        "The dish on a shaker (PLAN 48f, src/gpu/faraday.ts), the standing wave the",
+        "music's cord on Shake grows, on the app's own grid and substeps on the GPU",
+        "(scripts/faraday.mjs): no pattern at 0.7 of the threshold and its light",
+        "invisible; at 3x the threshold growth at the Mathieu equation's Floquet rate",
+        "within 20%; the pattern's wavelength within 10% of the dispersion relation's",
+        "root at 20, 50 and 100 Hz, saturated and finite under breaking steepness; and",
+        "the ring-down at the water's damping within 25% once the shake stops; the",
+        "dial's top (2 g at 10 and 150 Hz, and at 10 Hz in 0.1 s frames) finite and",
+        "unbroken; and the lab's real plate drawing it, its mean brightness held",
+        "within 2%, still again after the shaker goes off and on.",
+        "In lab5 beside the tank's GPU check: it opens the lab page and asks for a",
+        "WebGPU adapter. About twelve minutes on SwiftShader in a cloud session."
       ]
     },
     {
@@ -3626,7 +3660,6 @@
       "name": "The show opens without stopping",
       "shard": "open",
       "run": "npm run startup",
-      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "The show opens without stopping (scripts/startup.mjs): what the look",
         "opens with is built before it opens and the rest behind it, none is",
@@ -3793,7 +3826,6 @@
       "name": "Every tool does what it says",
       "shard": "tools",
       "run": "node scripts/tools.mjs",
-      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "Every other tool in the hand (asked for: \"check all of the tools to",
         "make sure they work in expected ways\"): each does what it says and",
@@ -3950,7 +3982,6 @@
       "name": "The wall",
       "shard": "tools",
       "run": "npm run wall -- --owed=quarter,red,rung",
-      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
         "how many times a second the whole screen is allowed to change.",
