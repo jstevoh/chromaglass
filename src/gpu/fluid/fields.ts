@@ -454,6 +454,8 @@ export class FluidFields extends FluidCore {
       soapFilm: this.soapPlate?.field ?? null,
       /** The tank's dye (PLAN 47n), or null when Tank is off: the plate draws it in its own place. */
       tank: this.tankPlate?.field ?? null,
+      /** The shaken dish's standing wave (PLAN 48f), or null with no shaker. */
+      faraday: this.faradayPlate?.field ?? null,
     };
   }
 
@@ -468,6 +470,8 @@ export class FluidFields extends FluidCore {
     this.soapPlate?.dispose();
     this.tankPlate?.dispose();
     this.tankPlate = null;
+    this.faradayPlate?.dispose();
+    this.faradayPlate = null;
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();

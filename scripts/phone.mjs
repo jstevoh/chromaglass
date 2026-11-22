@@ -49,6 +49,7 @@ import { coveredControls, legibility } from './layoutProbe.mjs';
 import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
 import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
 import { magnetSizeEnds, MAGNET_SIZE_TOP } from './phoneMagnet.mjs';
+import { phoneZoomIn } from './phoneZoom.mjs';
 import { dyeSheetLines } from './phoneDye.mjs';
 
 const PORT = port(4183, 'PHONE_PORT');
@@ -986,7 +987,7 @@ try {
         the look's plate count alone, and every built-in carries one or two.
         Each look is laid from the Looks sheet, its button pressed, and the
         other button pressed to put it back: on Lumia (one plate) that is add,
-        then take off; on Classic (two) the reverse. What is measured is the
+        then take off; on Comet (two) the reverse. What is measured is the
         Front and Back pickers coming and going with the buttons, which are
         App's plate count on the stage, and the solvers the engine has (built
         with or without a GPU, so asked everywhere: a missing count fails). A tap that did nothing leaves the sheet as
@@ -1006,7 +1007,7 @@ try {
       // a FAIL that says what the sheet had, not a sixty-second timeout.
       const pressIf = async (testId) => { if (await visible(page, testId)) await tap(page, testId); };
       const plateSays = (st) => `${st.two ? 'Front/Back' : 'one'}${st.add ? ' +add' : ''}${st.off ? ' +off' : ''} (${st.solvers ?? 'no'} solvers)`;
-      for (const [id, plates] of [['roy', 1], ['classic', 2]]) {
+      for (const [id, plates] of [['roy', 1], ['comet', 2]]) {
         await tap(page, 'phone-open-looks');
         await tap(page, `phone-look-${id}`);
         await page.waitForTimeout(1500);
@@ -2002,7 +2003,7 @@ try {
       await tap(page, 'phone-tool-dropper');
 
       // The closeup: two fingers are the camera.
-      await tap(page, 'phone-zoom');
+      await phoneZoomIn(page, tap, check);
       // Hold, so the closeup stays put between the reference and the check.
       await tap(page, 'phone-camera-hold');
       await settle(600);
@@ -2011,9 +2012,8 @@ try {
       // counted the thumb, and the plate zoomed toward the dock instead).
       const dockAt = await box(page, 'phone-tool-spray');
       const thumb = { x: dockAt.x + dockAt.width / 2, y: dockAt.y + dockAt.height / 2, id: 5 };
-      // Where that finger lands alone, once the closeup has come to rest:
-      // the zoom eases in after the tap, so two readings a moment apart must
-      // agree before either is the reference.
+      // Where that finger lands alone, once the closeup is at rest: the zoom
+      // eases in, so two readings a moment apart must agree first.
       let plateFinger = await alone({ x: 200, y: 400 });
       for (let i = 0; i < 12; i++) {
         await settle(250);

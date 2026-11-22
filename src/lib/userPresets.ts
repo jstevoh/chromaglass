@@ -97,7 +97,14 @@ export function makeUserPreset(
     name: name.trim() || 'Untitled preset',
     description: description.trim() || undefined,
     createdAt: new Date().toISOString(),
-    settings: cleanSettings(settings),
+    /*
+      Saved as it is drawn: the frame reads the Macro Zoom alone (PLAN QA-32c),
+      and a zoom set from the remote or a fader arrives without the flag, so
+      the flag is written from the zoom here. Left as it stood, cleanSettings'
+      rule for looks saved before the zoom was the control (flag off, zoom
+      back to 1) put a closeup saved at 3x back at the plate.
+    */
+    settings: cleanSettings({ ...settings, macroMode: (settings.macroZoom ?? 1) > 1.05 }),
     contract: contract && contract.length ? [...contract] : undefined,
     injectStyles: injectStyles && injectStyles.length ? [...injectStyles] : undefined,
     liquids: liquids && liquids.length ? [...liquids] : undefined,

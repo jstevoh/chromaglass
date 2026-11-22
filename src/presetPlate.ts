@@ -56,7 +56,7 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 }
 
 export const PRESET_CONTRACTS: Record<string, number[]> = {
-  'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
+  'classic':            [20, 1, 17, 0, 7],   // a magenta water; orange, amber and yellow oil, and an icy-blue accent (38w-1: the references are nine tenths warm)
   'comet':              [17, 21, 20, 18, 16, 7],  // amber head, coral, magenta, ultramarine, teal and icy tail (28i-7: one pink hue on black)
   'galaxy':             [7, 17, 18, 21, 20, 8],  // an ice-blue arm and a gold one (the seed's two arms are the first two), ultramarine, coral, magenta; 28i-7: blue-violet wisps read as Jellyfish Bloom
   'cyberpunk':          [2, 20, 10, 18, 7],       // hot pink, magenta, purple, ultramarine, ice: one neon arc (28i-7: lime and orange summed it to grey-teal)
@@ -172,9 +172,10 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
  */
 export const PRESET_LIQUIDS: Record<string, string[]> = {
   // ── The originals ────────────────────────────────────────────────
-  // Oil and water with a drop of soap in it now and then: the thing that is
-  // being imitated, done the way it was actually done.
-  'classic':            ['water', 'water', 'soap'],
+  // Oil and water, the thing being imitated done the way it was done: fresh
+  // oil cells and now and then a drop of the water (38w-1). The old soap is
+  // gone: soap lowers the tension the water films between cells rest on.
+  'classic':            ['oil', 'water', 'oil'],
   'comet':              ['syrup', 'glycerine'],
   // Points of light that must not feather at the edge, and are white anyway.
   'galaxy':             ['water', 'milk'],

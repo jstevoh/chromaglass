@@ -9668,6 +9668,35 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   liquid into pools (a box under a quarter of the fullest box is a wash or a fringe), and
   goes to the pool whose middle is nearest the aim (`closeupland` line 12, red before).
 
+- ~~**QA-32c** "lets get rid of the close-up button. The macro zoom control should be used
+  for zooming in/out always" (the owner, 2026-11-14).~~ **Shipped** (`npm run closeupland
+  -- --node`, lines 8 and 9; `npm run closeupland`; `npm run phone`): every Close-up press
+  is gone: the desk's Close-up beside Randomise, the side rail's Macro (which still flipped
+  `macroMode` alone), the remote's Closeup switch, the command palette's "Macro closeup",
+  the Macro pad action (`macro-toggle`: MIDI learn, the factory maps, the patch bay's
+  order, a pad's light) and the gamepad's R3. The factory maps keep each button's place:
+  the APC mini, nanoKONTROL2, Launchpad and Launch Control XL pad that was Macro is Tap
+  Tempo, the APC40's clip stop is Watch the Room; a saved map naming Macro drops that one
+  binding on load, as any unknown action does. And the zoom is all the frame reads now:
+  `macroZoomOf` was the slider's zoom or 4 for a look with `macroMode` on and the zoom at
+  1, which is what made two controls of one thing (a flag-on look drawn at 4x under every
+  Macro Zoom reading 1.0x, and a zoom fader pulled down to 1 leaving it at 4x). It is the
+  Macro Zoom alone; `macroMode` stays a look's label and is written beside the zoom. Every
+  shipped closeup look carries its own zoom (line 8 checks it), a saved look already got
+  4x on load (`cleanSettings`), and a sequence stage's Closeup on or off now glides the
+  zoom (to the stage's own, or 4x; off to 1). The phone's microscope opens a Macro Zoom
+  slider row instead of toggling; the remote's Macro Zoom is always shown, its camera
+  dials once in; the side rail's Macro became a Macro Zoom slider in its place
+  (`RailZoom.tsx`; without it the rail ended a Layers button in half at 430px, which `npm run
+  layout` caught); the landing on the nearest liquid (QA-32) is on every zoom in, as it
+  already was for the slider and the pinch, and now asks again at each press of + (it stood
+  at the first frame past 2x, so a pool at the 2.07x frame's edge kept it on the aim and the
+  4.3x frame was bare glass: `LAND_HOLD`, half a second held still past 2x; `npm run
+  closeupland -- --node` line 6d, 17/19 before, 19/19 after). The scan and the reading on today's main: 14
+  of 16 lines (the flag at 1x read 4x; 16 Close-up presses in src/), 16 of 16 after. It
+  also supersedes QA-32b (#707, the rail's Macro made the one press, and the readers that
+  took 1x on a 4x flag look): the button is gone and the reading has no 4x left to miss.
+
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
   the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
@@ -15070,7 +15099,7 @@ nothing on the plate on all 39 looks the music plays; at Sound Drive's 1x each c
 what the block's arithmetic did a second (pulse 1.350/1.350, stream 3.600/3.600, swell
 2.880/2.880, a kick's bloom 5.850/5.856, press 0.004/0.004); Sound Drive at 1 pours 2.22x
 its 0.45, and a cord at depth 1 twice its laid 0.5 (press 0.008). Found along the way:
-38w-1 to 38w-6.
+38x-1 to 38x-6.
 
 Found in its own pre-push review and fixed in the same PR: the masters were read before
 the patches folded, so a cord on Sound Drive or Kick Bloom moved none of the hands; a gated
@@ -15084,6 +15113,82 @@ are laid at 0 and silent); a hand taken off its area became a Turbulence cord; t
 had no top (`PRESS_MAX`, 0.032, a little past the old 0.03); and a hand over three areas
 split its volume, so its summed depth stepped 0.05 a tick on a one-second Go (`desk`); it
 splits its depth now.
+
+## 38w-1. Classic Light Show as a real dish (2026-11-21)
+
+The owner: Classic "looks nothing like a traditional liquid light show". Against the Joshua
+Light Show's Liquid Loops (1969) and Fillmore East (1968), Glenn McKay's and Bill Ham's footage
+and the period photographs, it was the opposite of a dish on every count: eleven soft dye
+pools glowing on black glass, added where they overlapped (screen), merging into ribbons, a
+motor turning it. A real show is coloured water and mineral oil between clock glasses on an
+overhead projector's lamp: the colour is what the dye takes from the lamp, the oil lies in
+round cells with a crisp meniscus and small drops of the water caught in the big ones, and the
+dish moves when a hand tips it or presses the top glass.
+
+- **The dish.** `classicDiscs` (`src/lib/oilLay.ts`) lays 26 oil cells of log-normal size
+  (median radius 0.045, the references' 5–15% forms) packed biggest first with a film of water
+  between each two, orange, amber and yellow oil with an icy-blue accent in a magenta water;
+  every cell past radius 0.06 holds one to three drops of the water, each a hole cut in its oil
+  with a wall of oil round it twice the film (a wall of one film, one diffuse interface, broke
+  open and lost the drop: 2 of 8 held, against 9 of 9 with the wall doubled).
+  The cells are real oil bodies (`layCrowd`, as Clock Glass and Splodascope): Oil Bodies keeps
+  each colour as its oil's own, Film Hold keeps touching cells two.
+- **The look.** The lamp (Beer–Lambert through the dye), the meniscus (Edge Relief), a hand on
+  the dish (Plate Rock 0.55, the kick pressing the glass), the motor at 0.015; Gooey, Glass
+  Smear, Post Blur, Hue Journey and the colour mapping off.
+- **Measured** (`npm run classicdish`, lab, 192², 300 steps, two lays): the water 96.9% and
+  95.7% dyed (the old lay 56.2%, pools on black glass), 26 of 26 and 25 of 25 oil cells still
+  apart (0), median 9.0% and 11.1% of the dish across, 1 of 1 and 8 of 8 drops of water held in
+  cells, 4 oil colours, 94.0% and 86.3% of the oil warm, 92.6% and 94.0% of the cells' dye still
+  the oil's own; with Film Hold and Oil Bodies off the same dish keeps 21 of 26 apart and 86.3%.
+  Before and after filmed on the Mac for the owner to judge.
+- **The moiré looks on it.** Moiré Star and Moiré Waves are laid over Classic (45a), so they
+  take the new dish under their sheets: the lamp was already on under both. The plate chose
+  its lay by the look's own id, so a look built on another (`plateLook`) got Splodascope's
+  crowd; it chooses by the look it is built on now, which also gives Moiré Ripple the Clock
+  Glass dish its comment always meant.
+- **No motor, no music hands.** Filmed in the app with the band, the first build still tore
+  the cells to ribbons in a second and flooded the water red with white pockets: the lab steps
+  without curl noise, the app stirred at the look's Turbulence of 0.5 (stirOf 0.69) and the
+  music's stir cord, and Sound Drive 0.5 poured a dye on every pitch and burst air on kicks.
+  Classic now holds Turbulence and Sound Drive at 0, as Lava Lamp does (27f-9h): the band
+  reaches the dish only through a hand (the kick's press, the mids firming the oil, Plate
+  Rock). `classicdish` steps at the look's own stir now: put back at 0.5 it fails five of seven
+  lines (19 of 26 cells apart, 0 of 8 drops held); `musicstir` 21 of 21.
+
+### 48f. Faraday waves: the music's shake stands up as a pattern (shipped 2026-11-21)
+
+*The owner, 2026-11-21: "lest do anything that can be impacted by the music itself. Like
+the standing-wave patterns for example." §48's idea 48f; its open items are in §30.*
+
+- **What shipped.** Shaker (`faradayHz`, the speaker's frequency, 0 off) and Shake
+  (`faraday`, its peak acceleration in g) in Settings → Tilt & Rock, MIDI, the desks, the
+  remote and the phone's Sound sheet, with Music Shake on the phone (lib/shakeCord.ts),
+  the depth of a cord from the bass onto Shake; on the desk it is that cord in Patches.
+  The sound reaches the dish only through that cord.
+- **The physics** (src/lib/faraday.ts, src/gpu/faraday.ts, wgsl/faraday.ts). A 3 mm water
+  layer: the dispersion relation ω² = (gk + σk³/ρ) tanh kh; damping 2νk² plus the floor's
+  boundary layer; the Mathieu equation's first tongue. The step carries the standing
+  wave's amplitude u (the surface is u cos Ωt/2) on 256² over the plate, its linear
+  growth applied exactly mode by mode in Fourier space (ETD1, a radix-2 FFT in workgroup
+  memory), and a cubic that saturates it: the curvature's own for ripples and u³ for
+  gravity waves, by the capillary share, scaled to a real wave's steepness (the scale is
+  the shortcut, 48f-2). White noise of 0.1 µm/√s is the dish's own disturbance. Two
+  guards found by the dial's top: the spectrum is held to a real field's (k and −k
+  stepped together; the anti-Hermitian part the cubic never sees grew at 8/s under a
+  150 Hz lattice and blew it up), and the cubic's stiffest rate, gathered each substep,
+  goes into the exact step (its curvature part is a diffusion an explicit step cannot
+  hold at the grid's finest waves: a 10 Hz pattern at 2 g blew up at a slope of 0.3).
+- **The light** (wgsl/plateFaraday.ts, display binding 25). The projector is focused on
+  the dye 3 mm under the surface, so the wall shows the Jacobian of the refraction's map
+  back, det(I + D′H), D′ = D(1 − 1/n): light moved, never made, with the aperture's loss
+  on steep slopes. Drawn as a camera locked to the wave at its crest, so it never strobes.
+- **Measured** (`npm run faraday`, SwiftShader): at 0.7 of the threshold 0.022 µm r.m.s.
+  after 5 s and no light; at 3× the threshold growth 1.66/s against the Mathieu rate's
+  1.85/s; the wavelength 19.94, 9.72 and 5.87 mm against the dispersion relation's 19.93,
+  9.73 and 5.87 mm at 20, 50 and 100 Hz; saturated at k u 0.19 to 0.22; the ring-down
+  1.01/s against the damping's 1.07/s; at the dial's top (2 g) k u 0.83 at 10 Hz and
+  0.25 at 150 Hz, held for 4 s, and the same at 10 Hz stepped in tenths of a second.
 
 ## 15e-10. A bottle's weight slides it down a rocked thin gap (shipped 2026-11-14)
 
