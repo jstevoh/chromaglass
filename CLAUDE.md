@@ -4,22 +4,9 @@ A liquid light show: a WebGPU fluid solver (`src/gpu/`, shaders in `src/gpu/wgsl
 drawn as a projected plate, played from a Perform desk, built on a Design desk,
 driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 
-Before starting anything that is not a bug fix, read `PLAN.md`: it is the plan's index
-(about 80 KB): **This week** first (the ranked list the owner set, 2026-11-21: beautiful
-visuals and real physics), then the **Order of work** (the standing order, which lanes are
-parked this week), the running order, and a table of the sections. Then read only the file
-your step names: each section is a file under `docs/plan/` (`00-dye-tools.md` to
-`48-ideas-visuals.md`, a big one cut between items into parts of about 30 KB), and
-`grep -rn '14ab-4' docs/plan/` finds an item from its id. Never read every section: the open
-plan is about 900 KB in all, and see "Keeping a session small" for why that matters. The
-section files hold only open work. Closed items are in `docs/plan/archive/` under the same
-file names, and stories from before 2026-11-21 in `docs/plan-shipped.md`, under the same
-numbers: read them only when an open item needs the history behind it. When an item ships,
-mark it shipped where it stands and run `node scripts/planarchive.mjs`, which moves it to
-the archive (19m-5). A branch that still edits the old one-file `PLAN.md` carries its edits
-across with `node scripts/planmove.mjs` after merging main (19m). The engine's own order is
-in `docs/roadmap.md`.
-`docs/judging.md` lists what needs the owner's eyes on a real GPU.
+Before starting anything that is not a bug fix, read `PLAN.md` (see `.claude/rules/plan.md`).
+`docs/roadmap.md` holds the engine's order; `docs/judging.md` lists what needs the owner's
+eyes on a real GPU.
 
 ## Where things live
 
@@ -32,20 +19,13 @@ across many files goes to an Explore agent that returns paths and line numbers.
 
 - **Edges are typed and written down.** Code reaches another domain only through what it
   exports. A PR that changes an export updates that folder's README in the same PR.
-- **Physics writes, rendering reads.** The plate shader draws the solver's fields and never
-  fakes a motion, mixing or surface effect the solver should produce. Sound moves the plate
-  only through cords and preset patches. Desks change settings and never call GPU code.
-  Only the accounts code touches keys and tokens; everything else asks `tierGates`.
 - **One owner per piece of state.** App state lives in `App()` and its hooks (`src/app/`),
   the plate's live state in the visualizer's refs. `window` carries only the checks' hooks
   and the Mac and iPhone bridges, declared in `src/lib/checkHooks.ts`.
-- **No ceremony in the frame.** In the frame loop and the solver, plain functions over
-  typed arrays and refs; no new per-frame objects, classes or wrappers.
-- **The phone shares, never forks.** Phone components call the same lib functions as the desks.
 - **Size.** `npm run sizes` fails a new file over 100 KB or a file already over it that
   grows, and warns past 40 KB: new code for a big file goes in a module beside it. A split
   is a pure move in its own PR, with bytes before and after and a table of old lines to
-  new files. A frame-loop change first moves its piece to its own module (19ai-10).
+  new files.
 - **Planning.** The PR body opens with the domains it touches, the exports it changes and
   the checks that prove it. Ask the owner first only when an export between two domains
   changes shape.
@@ -56,9 +36,7 @@ across many files goes to an Explore agent that returns paths and line numbers.
   `docs/guide.md` (the long reference), and `docs/README.md` maps the other docs. Scratch
   scripts live in `scratch/` (git-ignored), never in the root.
 - **Every claim has a check.** A fix comes with the `npm run …` script that
-  measures it, printed numbers before and after in the commit message. A check
-  asserts the *feature*, not a moment of the plate: see the long comments in
-  `scripts/qa.mjs` for how many "flakes" were a check measuring the wrong thing.
+  measures it, printed numbers before and after in the commit message.
 - **Never loosen, skip or delete a check to get green.** Find why it is red.
 - **Comments explain why, at length, in prose** (see any file in `src/gpu/`).
   Match that: what was reported, what was measured, why this and not the
@@ -93,58 +71,30 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 - One thread per PR (the owner, 2026-09-27). When a thread's PR has merged, its next
   piece starts in a new thread, not this one: say what it is in the closing reply.
 
-## What can be verified where
-
-| Where | Can verify | Cannot |
-|---|---|---|
-| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `regrid`, `particles`, `derive`, `mixer`, `disc`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | The **app's** numbers: with `PW_WEBGPU=1` the app runs headed under Xvfb and its frames read back (PLAN.md 19l), but at about 0.4 solver steps a second against Metal's sixty, so `tools`, `magnet`, `mirror`, `bottles`, `take`, `ferro`, `ferrodrift`, `finger`, `bubbles`, `depth`, `handpour`, `kickbubbles` run their logic on a twentieth of the steps (`settlePlate` in `scripts/frame.mjs`) and not their magnitudes; `qa`, `gallery`, `moving`, `film` are still the Mac's |
-| CI, macOS runner (Metal) | Everything | — |
-| The owner's machine | How it looks at 60 fps | — |
-
-`PW_WEBGPU=1` gives a harness software WebGPU (`scripts/chromium.mjs`): enough for the lab,
-and for the app's logic at a crawl. For pictures of a change, use the `look`
-skill: the lab renders the real plate shader on a deterministic plate.
-
 ## Which checks for which files
 
 Every change: `npm run lint` (typecheck) and `npm run sizes`. Then `npm run quick` runs,
 side by side, the checks your diff from `origin/main` reaches and a cloud session can run
 (`-- --dry` says which and why). The full table, with what `quick` cannot see (agents,
-pictures, the Mac), is `docs/checks-map.md`: grep it for the paths you touched. Three
-rows every session needs:
-
-- a new or changed setting: `panel`, `desk`, and the `setting-auditor` agent;
-- a new or changed check: that check and the `check-skeptic` agent; a new one is an entry
-  in `scripts/checks.json` (its shard, its command, why), never a step in `checks.yml`;
-- a check's bar or input, or a SHOUTING_CASE number in `src/gpu/`: name each under
-  `Check changes:` in the PR body (`docs/handoff.md`), or `Measure` is red.
-
-The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
-not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
-
-## CI
-
-`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, eight parts) and
-`WebGPU (macOS)` (Metal, sharded). What each part runs is `scripts/checks.json`; what
-skips the Mac is `scripts/reach.mjs`; when a deploy trusts a PR's run, or skips the
-checks, is `scripts/deploygate.sh`; the owner's Mac takes main's deploy shards when idle
-and never a PR's (`docs/mac-runner.md`). The whole account is `docs/ci.md`; read it when
-a run or a deploy needs explaining. When CI is red, use the `steward` skill.
+pictures, the Mac), is `docs/checks-map.md`: grep it for the paths you touched.
+A PR's CI runs only the typecheck, the build and the node harnesses; the browser, lab and
+Mac checks run on main's deploy only (19ak-20), so before pushing a change the plate draws,
+run its lab or harness yourself. What a cloud session can and cannot verify is the table in
+`.claude/rules/checks.md`; CI itself is `.claude/rules/ci.md` and `docs/ci.md`.
 
 ## Branches, PRs, deploys
 
 - One PR per piece of work, a draft until CI is green. Squash-merge.
-- Every PR updates the plan: what it shipped marked shipped in its section file under
-  `docs/plan/` (and its row in `PLAN.md`'s running order; `node scripts/planarchive.mjs`
-  then moves it to the archive), and anything found along the way that needs fixing or
-  adding written in as an item in the section it belongs to.
+- Every PR updates the plan (`.claude/rules/plan.md`).
 - Every feature ships its phone version in the same PR.
 - Merge as soon as CI is green; the owner does not need to be asked (2026-09-27).
 - After a PR merges, a branch that carries on is restarted from `main`
   (`git fetch origin main && git checkout -B <branch> origin/main`), never stacked
   on merged history.
-- A merge to `main` deploys (`deploy.yml`). Confirm the deploy run finished green
-  and report the time in **Pacific time**, not UTC.
+- A merge to `main` deploys (`deploy.yml`) within minutes, without waiting for the slow
+  checks, which run beside it as a report (PLAN.md 19ak-21, the owner, 2026-11-22: ship
+  fast, fix what breaks). Confirm its `Build and deploy` job finished green and report the
+  time in **Pacific time**, not UTC. A red check there means a bug is live: fix it.
 - **More than one session works on this repo at once.** Before starting, look
   at open PRs (`list_pull_requests`) and recent commits on `main` so two
   sessions do not rebuild the same thing; keep to your own branch and PR.
@@ -152,29 +102,26 @@ a run or a deploy needs explaining. When CI is red, use the `steward` skill.
   claimed and handed between the two tools, the handoff block in every PR body, and
   which of Antigravity's PRs still owe a review are in `docs/handoff.md` ("Ready, review,
   merge"). Since 2026-11-15 a green Antigravity PR merges without a Claude Code review,
-  pinned to its green head; only sign-in, keys, payments, licences, the Workers under
-  `server/` and security changes still owe one (label `review-owed`). At the start of a
-  session, check `gh pr list --label ready-for-review --label review-owed` (up to three a
-  session). A verdict's first line is `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>`;
-  on a `PASS` the reviewer squash-merges the PR itself, pinned to that head, and confirms
-  the deploy.
+  pinned to its green head; only the PRs labelled `review-owed` wait (see
+  `.claude/rules/server.md`). At the start of a session, check `gh pr list --label ready-for-review --label review-owed`
+  (up to three a session); a verdict's first line is `PASS #<n> head <sha>` or
+  `CHANGES #<n> head <sha>`, and on a `PASS` the reviewer squash-merges the PR itself,
+  pinned to that head, and confirms the deploy.
 
 ## Agents and skills in this repo
 
-- `.claude/skills/steward/`: drive a red PR to green.
-- `.claude/skills/look/`: render before/after pictures of a visual change in the lab.
-- `.claude/skills/watch/`: watch a video (a reference link, a recording of the app) as
-  contact sheets, a slit-scan timeline and motion, colour and sound numbers (`npm run watch`).
-- `.claude/agents/video-watcher.md`: watch long or several videos in its own context and
-  return an account with numbers, or the app compared against a reference.
 - `.claude/skills/ship/`: merge, confirm the deploy, restart the branch.
 - `.claude/agents/prepush-reviewer.md`: adversarial review of the diff before a push.
-- `.claude/agents/preset-auditor.md`: photograph every preset and flag the broken ones.
-- `.claude/skills/crash-triage/`: turn a crash report or the report Worker's digest
-  into a cause, a reproduction and a fix (`docs/crash-plan.md`).
-- `.claude/agents/check-skeptic.md`: find the ways a new or changed check can pass
-  while measuring nothing (the rules in `docs/roadmap.md`).
-- `.claude/agents/setting-auditor.md`: hold a new setting to `PLAN.md`'s operating
-  rules (a default that keeps today's look; MIDI, the desks and the phone).
 - `.claude/hooks/session-start.sh`: a cloud session runs `npm install` before it
   starts, so the checks above can run at once.
+
+Area-specific agents, skills and rules live in `.claude/rules/` (synced to `.agents/rules/`
+by `npm run rules`):
+
+- `.claude/rules/gpu.md` — `src/gpu/**`, `src/sim/**`: physics writes/rendering reads, no ceremony in the frame, `SHOUTING_CASE` constants, `PW_WEBGPU=1`, `look`, `watch`, `preset-auditor`
+- `.claude/rules/checks.md` — `scripts/**`, `scripts/checks.json`: check rules, `check-skeptic`, `Check changes:`, `panel` grep, cloud vs Mac verification table
+- `.claude/rules/ci.md` — `.github/**`, `scripts/checks.json`, `scripts/reach.mjs`, `scripts/deploygate.sh`: `checks.yml`, `deploy.yml`, Mac runner, `steward`
+- `.claude/rules/plan.md` — `PLAN.md`, `docs/plan/**`: reading and updating the plan, `planarchive.mjs`, `planmove.mjs`
+- `.claude/rules/phone.md` — `src/components/phone/**`: shares/never forks, `npm run phone`
+- `.claude/rules/desks-settings.md` — `src/components/desk/**`, `src/components/settings/**`, `src/types.ts`: desks never call GPU code, one panel one kind of control (`panelkinds`), `panel`, `desk`, `setting-auditor`
+- `.claude/rules/server.md` — `server/**`: accounts/keys/`tierGates`, `review-owed`, `crash-triage`

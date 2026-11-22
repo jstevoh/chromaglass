@@ -1,6 +1,6 @@
 # scripts
 
-The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`).
+The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `watchwords.mjs`, `watchoverall.mjs`, `watchpair.mjs`, `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`).
 
 ## Start here
 
@@ -17,7 +17,7 @@ The checks, one script per check (about 265 `.mjs` files), and the helpers they 
 - **The lab** (`physics`, `maze`, `spikes`, `straw`): `openLab()` loads `lab-entry.ts`, so physics runs on SwiftShader too. Other entries: `sloshgpu-entry.ts`, `areacords-entry.ts`, `render-lab-entry.ts`, `live-entry.ts`, `wgsl-entry.ts`.
 - **Two trees** (`samelook`): the lab run in this tree and in a checkout of another commit (`samelook-scenes.mjs`), the same plates compared; the guard a speed-up is held to (PLAN.md 46).
 - **App harnesses** (`panel`, `phone`, `layout`, `qa`): Playwright drives the built app at `?debug`. Mac-only ones (`qa`, `gallery`, `moving`, `film`) need Metal's speed.
-- **CI's own** (`reach`, `checkguard`, `deploygate`, `closedruns`, `mainhold`, `cisecrets`, `actionlint`, `macqueue`, `sizes`).
+- **CI's own** (`reach`, `checkguard`, `deploygate`, `closedruns`, `mainhold`, `cisecrets`, `actionlint`, `macqueue`, `sizes`, `syncrules.mjs`).
 
 ## How a check drives the app
 
@@ -31,6 +31,7 @@ A check that reads source as text reads App and its hooks through `appSource.mjs
 - Shared by several checks: `judge.mjs` (a frame as numbers), `layoutProbe.mjs`, `liquidStandIn.mjs`, `arrangement.mjs` and `band.mjs` (synthesised songs and band), `media-read.mjs` (render containers), `rtmpListener.mjs`, `pagehold.mjs`, `compilestop.mjs` and `startupbehind.mjs` (beside `startup.mjs`, at its size ceiling), `recorder.mjs`.
 - CI and the Mac runner: `deploygate.sh`, `mainhold.mjs` (main held red: the status `hold.yml` posts on every open PR), `macrunner.mjs`, `macrunner-hook.sh`, `macrunner-setup.sh`, `macports.sh`, `macbusy.sh`, `macdeploy.mjs` (a deploy shard's hold on the Mac, which `launchChromium` and `npm run desktop` wait for), `debcache.sh`, `chromiumlibs.mjs`, `checkguard-api.mjs`, `measured.mjs`.
 - Data: `sizes.json` (the size baseline, which only shrinks), `fixtures/`, `brand/`.
+- Rules sync: `syncrules.mjs` (`npm run rules`) generates `.agents/rules/` from `.claude/rules/`, and `--check` holds them in sync and under 24,000 bytes per file.
 
 ## Rules
 

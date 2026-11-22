@@ -55,8 +55,8 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   before any app check leans on software WebGPU for its commits.
 - **19aa-15. A pull request's Measure part builds the site first when a full run would
   have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
-- **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
-  the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
+- ~~**19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
+  the cause is not found, a breakdown is printed).**~~ Dropped 2026-11-22 (19ak-21, the owner's "cut the shit out of things"): the line is deleted from its harness and prints as a note, not fixed. The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
   *earlier* than the control. Over the 192 Mac runs of the week the show's own ran 0.40 to
   3.25 s (median 0.78, 2.0 s or more on 8%), and the control's has the same tail (0.5 to
@@ -186,6 +186,15 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   bar's share was set on the old one (then re-measure DROP_REACH as 19ac-4 did, never widen the bar
   to fit). *Measure:* twenty Mac runs, GitHub's and the owner's, read under half the allowance on
   all three scenes; a drop mirrored where it should not be is still red.
+  *Seen again 2026-11-22* on the video-lamp pull request (14ag-3, head b5bbf9a, a GitHub Mac, twice:
+  the run and its one re-run): 27.9 and 25.2 past the drift where 24.6 was allowed, 91.0 and 90.9
+  under the drop, all four drops alike (past it 14.8 28.6 31.5 27.2; 15.5 26.4 26.1 24.3), the
+  first drop's drift high both times (12.1, 11.6). The same cell, row 6 column 4, 0.164 from the
+  hand. That diff moves no solver code, and with no video loaded it draws Classic's plate from the
+  same lines (the lamp ground's line moved below the closeup's detail, where nothing between reads
+  it; `videolamp` holds Film Mix 0 to the byte). Its head before main came in (5f08157) read green
+  on a GitHub Mac. Eight other Mac runs on main since bbfded1 read 14.0 to 24.4 against 23.9 to
+  26.2 allowed, so the line sits within a few levels of its bar on most trees.
 - **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
   and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
   the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
@@ -219,6 +228,13 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   A third presentation on 2026-10-30 (#550, f3f052e): **68 ask, 0 frame, 0 tick over 71 frames
   asked for**, the "fewer is an ask the ear missed" side of the same line, three in two seconds
   with no stray reading against a bar of two; the same diff read the line green on four other runs.
+  *2026-11-21/22:* main's deploy 879 (492caba, GitHub's Macs) was red on this line and on its
+  neighbour "covered with no wall, the worker's tick keeps the ear going", and four or more PRs
+  that touch neither went red on them too, after #769's fix to the ear. Both lines are
+  quarantined on pull requests and main's deploys from 2026-11-22 to 2026-12-06 (19ak-18),
+  bars unmoved; the PR that finds which side is wrong takes the two entries out. Each line ANDs
+  several clauses and the entry matches its name, so while it holds the ear reading its own
+  frames while covered is held too: the fix splits the flaky clause into a line of its own first.
 
 - **19ad-2. The same shard failed with no check having failed, and with a check that is
   green seven times out of seven on the owner's Mac.** Two more presentations on PR
@@ -504,22 +520,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
   plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
   (`npm run microscope` read 0.00 at every zoom).
-- **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
-  rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
-  and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share
-  of straw steps in the stroke move with the machine. On GitHub's Macs it went 301 → 242 on a
-  PR that does not touch the bubbles (run 41129450339, green on re-run) and 325 → 284 on #603,
-  where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
-  measure over a fixed number of plate steps, not wall time, so its bar means the same on
-  every runner.
-  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
-- **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
-  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
-  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
-  circle's edge; find whether the red runs read a lit edge
-  (the sample too close) or a frame not yet drawn (the read too early), and measure the
-  feature, not the moment.
 - **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
   saves 13%; what still runs every Mac check is the solver and the libraries the lab's
   one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
@@ -578,16 +578,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   run the checks itself. Put to the owner the same day with the cost: the site would stop
   updating until the startup line and 9c are fixed. The owner chose to keep trusting
   them. docs/ci.md now says so.
-- **19ak-11. Open, found by 19ak-9: the film's "at 0, every film is the rainbow every look
-  was made with, to the bit" goes red by one pixel on GitHub's Macs.** Four runs in a
-  week (11-15 three times, 11-21 once), each a different render one pixel off
-  (`closeup00`, `film0`, `plate00`): `scripts/filmlook.mjs` compares two labs, the real
-  shader and a control compiled with Film Physics taken out, each running the solver from
-  scratch. One pixel is either Metal compiling the two shaders' shared arithmetic
-  differently (a fused multiply-add in one and not the other) or the solver not
-  repeating itself to the bit between two pages. Find which (print the pixel and both
-  values; render the control's shader on the real lab's state), then make the claim the
-  one that holds, never a tolerance picked to pass.
 - **19ak-12. Open, found by 19ak-9: the live stream with AAC on GitHub's Macs.** Three
   runs (11-15 twice, 11-21 on #893, which does not touch the stream): "the audio covers
   the stream — 29.95 s of them against 30.57 s streamed", "the sound is where the page
@@ -595,12 +585,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   shape as 37x-4g-1 (the audio encoder's queue has no bound, so a loaded Mac emits AAC
   late), so it may be the app, not the check: read the run's `audioQueue` before
   touching the bar.
-- **19ak-13. Open, found by 19ak-9: Pour's "spreads it out from where it lands" reads the
-  runner's frame rate.** `scripts/tools.mjs` holds each pouring tool for 1200 ms of wall
-  time and settles 700 ms, so the plate takes however many solver steps the runner
-  manages in that time, and the share of dye from 0.02 to 0.07 moves with it: red once
-  on 11-21 (Pour 75% against Drop's 78%, a PR that does not touch the tools). Hold and
-  settle over a fixed number of plate steps, as 19aj-1 asks of the Blow stroke.
 - **19ak-14. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
   keeps the heat" reads ×0.9997, 0.9748 and 0.9657 where its bar wants the heat held. Not yet
   run down: either Heat Spread at 2 now loses heat it kept (a real regression in the heat
@@ -611,3 +595,41 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   ran 10 to 24 before 14d-2. *Fix:* assert what the feature promises (each kick the ear hears
   goes out as a message), by counting the ear's kicks over the same window and holding the OSC
   count to them, not to a number. *Measure:* the ratio on a loaded and an idle run.
+- **19ak-18. Decided: main's deploys honour the quarantines too, until 2026-12-06.** From
+  11-21 12:26 PM Pacific the site stayed on deploy 869 while deploys 871, 872, 879 and 881
+  were each red on a line already known to flake and that none of their changes reached:
+  startup's "moving for good" (19aa-7), intro's 9c (19ak-9), the ear behind the wall
+  (19ad-1) and the Live Show's film (19ak-19). Put to the owner on 2026-11-22 with the cost
+  (a regression on one of those lines could go live while the entry holds); the owner chose
+  to hold them on main too until 12-06. `quarantined()` in `scripts/checks.mjs` honours an
+  entry off a pull request only before `MAIN_QUARANTINE_UNTIL` (2026-12-06), whatever the
+  entry's own end date, so from that day main holds every line to its bar again without
+  anyone taking anything out; a run outside CI holds every line. The ear's two lines and
+  the Live Show film line got entries for the first time, and `scripts/liveshow.mjs` now
+  closes on "N/M checks passed", without which no entry on it could hold. *Measure:*
+  `node scripts/checks.mjs --self-test` (held on a push before the cut-off, red from it,
+  red outside CI). *Open:* each line's fix is its own item; when 12-06 comes, a line still
+  red on main is red on every deploy again, which is the point. `checkguard` flags an
+  entry's end date moving later but not `MAIN_QUARANTINE_UNTIL`; moving the date into
+  `scripts/checks.json` would let it.
+- **19ak-19. Open, found 2026-11-21: the Live Show's "the Plate source's stream moves with
+  the film" goes red when the test film's own clock stalls.** On deploys 871 and 872
+  (owner-mac-2) and #900's first PR run (a GitHub Mac), the film the harness plays went 0.5
+  to 1.3 s in a 2.5 s window, so the stream rightly showed a still bar; green on 867 and
+  869. The stream is not the fault; the runner's load starves the film. *Fix:* make
+  `moving()` in `scripts/liveshow.mjs` say when the film's own clock stalled (its `during`
+  line already reads it) and hold the stream to the film it was given, then find why the
+  film stalls under load. Never a looser bar. Until then the entry also holds a stream
+  frozen while the film ran, the regression the line is for: split that case into its own
+  line ("the film ran and the stream stood still") first. Quarantined on PRs and main's deploys
+  2026-11-22 to 2026-12-06 (19ak-18); the fix takes the entry out.
+- **19ak-22. Open, found on main's deploy of 2026-11-22 (ebfa3324): Classic, calm, moves the
+  plate beyond a drop's reach.** `npm run mirror`'s "and nowhere else" read 29.0 levels past
+  the drift at row 4, column 4 against 26.6 allowed (layer 1), and 30.8 against 25.1 turned a
+  quarter (28.3 against 27.7 on an earlier run), with 91 to 95 under the drop. Classic's
+  plate has had a crowd of small cells since 38w-15 (#923) and the physics merges of the day
+  (#930, #932), so what lies beyond a drop's reach is no longer still. Find whether Classic
+  calm moves on its own (then the allowance should read the plate's own motion without the
+  drop, as the drift column does) or whether a drop's reach grew. Never a looser bar.
+  Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes
+  the entries out.

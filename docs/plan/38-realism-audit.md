@@ -18,20 +18,6 @@ the "Closer 3D macro view" work owns now (14ab-6, #601).
 The music's stir, from the third pass (38u, 2026-11-13; its ranked list is in section 38u,
 at the foot of this file):
 
-- **38u-16. A look saved before 38u-5 has no stir cord** (S; Medium). The built-in looks gain
-  the cord where they are defined; a look the owner saved earlier, a draft, and a look built
-  from the defaults keep their own cords and so stir less with music than they did, until
-  Music Stir is raised (the phone) or the patch is added (Patches). Give a saved look the
-  cord once as it is read (`sanitizeSettings`), with a mark in the saved look that says it
-  has been asked, so a cord the owner pulls stays pulled. Check: `musicstir` gains a saved
-  look from before, read back with its cord, and one with the mark and no cord, left alone.
-
-How it is ranked: what a person would see change on the wall, against what it costs to
-build and what it adds to the frame. S is under a day, M a few days, L a week or more.
-Every item here keeps today's look reachable until the Mac has judged the new one (the
-operating rules), and each ships from its own thread with the check that measures it
-written first. Line numbers are as read on main at d07ac31.
-
 ## The top picks
 
 - **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes
@@ -557,14 +543,12 @@ written first. Line numbers are as read on main at d07ac31.
       glass's 1.5 N, would put the half-settle at 40 ms or more. `lib/cover.ts` is viscous only
       (Stefan, as `npm run gap` 14, 20 and 21 hold it); give the cover the unsteady squeeze
       (ρ r² ḧ/h terms) and re-aim the water rows from it. The thick carrier is inside the theory.
-    - **38r-17. The rest gap's other readers** (S-M). Still at the 2 mm constant: `FILM_TOP`
-      (`wgsl/standing.ts`, compiled into phaseForces), `GAP_LC` (`wgsl/ferroDrop.ts`), the
-      bubbles' `gapMetres` (`lib/bubbles.ts`, set by the visualizer), the rhythm sheet's h₀
-      (`lib/sheet.ts`), the kick's `dentRadius` (`lib/squish.ts`), `handEdge`
-      (`lib/handSolid.ts`), the opening's drag time (`gpu/opening.ts`). Each to the solver's
-      `coverMetres`/`coverUnits`. `forces.ts`'s `nominal` stays the 2 mm on purpose: it is the
-      old plate's absolute depth drag, so a thinner cover already slows it.
-      38v (2026-11-21): more readers of a nominal gap: the milk's scatter is laid through sd =
+    - **38r-17. The rest gap's other readers** (S-M). *Part 1 (the seven readers: `FILM_TOP`,
+      `GAP_LC`, `bubbles.gapMetres`, `sheet.h0`, `kickPress`/`dentRadius`, `handEdge`, and
+      `opening.ts`'s `dragSeconds`) shipped; story in `docs/plan-shipped.md` §38r-17.* `forces.ts`'s
+      `nominal` stays the 2 mm on purpose: it is the old plate's absolute depth drag, so a thinner
+      cover already slows it.
+      Still open (the 38v half — check first: Claude): the milk's scatter is laid through sd =
       sc·6·gap, 6 mm (`plate.ts:195-208`), and its transmission through about 1 mm
       (`milkTransmission`, `plate.ts:634-641`), where `DISH_GAP_METRES` is 0.002; and the
       glint's `GAP_METRES` (`src/lib/glint.ts:95`). Through the real gap Kubelka–Munk gives R
@@ -756,3 +740,44 @@ bubbles' Taylor–Saffman speed and Bretherton film; Plate Rock and the motor; t
 Kubelka–Munk and extinction; `defocusShadow`, `pouredDn` and the indices; `lampField` and
 `pupilPass`; the closeup's bubble wall (Snell, Fresnel, total internal reflection); the
 glitter's Stokes, Jeffery and Poiseuille; the pH, BZ and Liesegang colours as Beer–Lambert.
+
+## 38x. After the music's hands became cords (38v-1, 2026-11-21)
+
+38v-1 shipped (docs/plan-shipped.md 38v-1): the frame loop's own music hands are cords on
+every look (lib/musicCords.ts), on the hands' list (lib/areaCords.ts `AREA_TARGETS`, now
+with Press and a whole-plate aim). What the build found still reaching the plate outside
+a cord, or still a shortcut, each for its own PR:
+
+- **38x-1. The kick's bubbles ride Sound Drive outside a cord** (S; Medium). The music's
+  air (`musicBubblesRef` in LiquidVisualizer.tsx, "Audio Impact 0 drops no bubbles") still
+  reads the kick and Sound Drive itself and lets a bubble go. Make it a hand (Blow, or an
+  Air act on `AREA_TARGETS`) on a kick cord riding Sound Drive, laid on every look as the
+  bloom is. Check: with the cord pulled, a loud band releases none; `kickbubbles` stays
+  green with it in.
+- **38x-2. The plate spin's Driven by reads the sound outside a cord** (S; Medium).
+  `audioMappings.rotation` (Plate Spin's "Driven by", LiquidVisualizer.tsx
+  `mappedFeature`) turns the motor on a sound reading with no patch to show. Make it a cord
+  on the motor's speed, the select rewiring it as What the sound moves now does.
+- **38x-3. One press a plate** (S; Low). `pressBass` holds one palm per plate, so of
+  several Press cords the deepest wins (`AreaHands.pressAt`). A look with two bass areas
+  cannot press both; give the solver a short list of presses.
+- **38x-4. A hand that moves between areas** (S–M; Medium). The block's bass hands took a
+  look's bass areas in turn, a new one each kick (`areaForBand`); a cord is aimed at one
+  area, so Bass Drop's and Chemical Clock's three bass places each get a third of the
+  bloom on every kick. A cord aimed at a band's areas in turn (an `areas` list it steps on
+  each opening) would put the whole slug in one place a kick, as before.
+- **38x-5. A dropper's pace is a regulator** (S; Medium). The droppers pour by the
+  plate's pace (`LayOptions.pace`, the block's `dt / 0.05`, PLAN 28d-A's named
+  shortcut), so a gel pours slower. A dropper's flow is a volume a second whatever the
+  liquid; what a gel changes is how far the drop spreads. Replace the pace with the drop
+  spreading by the gap's own viscosity, and let the regulator be the fill alone.
+- **38x-7. A look change crosses a route as two cords** (S; Low). Two looks whose
+  Color route differs (Classic's treble, Jellyfish's timbre) carry Bottle cords on
+  different readings, so a Go fades one out and the other in, and `npm run desk` holds
+  any cord's depth to 0.03 a tick on a one-second Go: the music's Bottle cord is laid at
+  0.6 for that, and timbre reaches four of five bottles where the block reached five.
+  Cross a hand of the same `role` as one cord (its depth walking, its reading crossfaded
+  as two readings into one act), and lay it back at 1.
+- **38x-6. The phone turns three of the hands' depths only** (S; Low). Kick Pour, Bass
+  Pulse and Bass Press (PhoneStage.tsx `HAND_SLIDERS`). A phone patch view, a list of a
+  look's cords with depth, Size and Volume, would give it the rest.

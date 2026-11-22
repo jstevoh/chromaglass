@@ -173,18 +173,6 @@ Left, each its own plan item:
   uploads check, but the jet is five numbers (landing, footprint, way, share): hand them
   to `hsBody` as uniforms and let the shader evaluate `jetShare`, so a breath uploads
   nothing. Measure the Mac's frame time through a long stroke before and after.
-- **15g-15 The halo round floating bubbles was not rebuilt in isolation.** The owner's
-  recording (2026-11-13, Foam Cells on the desktop) shows a big bubble ringed by small
-  ones with pale patches between them, a flower. On the Mac the same hands left about a
-  hundred bubbles (two wind spawns ten times a second, the straw's satellites) and after
-  15g-12 leave two round ones (films in the PR). What the lab ruled out as its cause by
-  themselves: the straw's bubble alone, the app's press under each bubble (15g-8g), and
-  popped holes (they heal in half a second). So the ring was the spawned crowd round the
-  straw's bubble and the puff's pale discs together, but no check holds a picture of it.
-  If it is seen again with no Blow in play (bubbles from the music, 15e), look first at
-  the bead and rim drawing in the open bubble-outline work (38h-15, 38h-17) and at
-  `depositBubbleRims`.
-
 - **15g-16 A gale blows the pool over the rim.** At Amount 2.5 the jet's plume reaches the
   dish's rim from the middle of the plate, the rim is open (what is carried past it
   leaves, `src/gpu/wgsl/fluid/dye.ts`), and a 1.5 s stroke from the middle sent 36.17% of
@@ -214,16 +202,6 @@ Left, each its own plan item:
   radially, a source with no curl; the only real twist is the cover turned (Couette, 42b).
   Delete it. Check: the curl over a press's disc stays at the idle level, local and remote
   alike. (38v, from RS-36.)
-- **15g-19 The straw's lobes are clipped at a reach, not conserved** (S; Low). Where 15g-12
-  lets fingers form (two or more fit), each lobe reaches to `FINGER_REACH` 0.9 (`air.ts:58`),
-  `rimAt` (`:69-78`) never dips below 1, and `bubbles.ts:425-460` clips at rMax = N·0.07 and
-  drops the rest, so the bubble's area grows with its fingers. Air in a gap keeps its volume:
-  the lobes are a zero-mean change of the rim, with area A = V/b. Check: a fingered straw
-  bubble's area within 3% of its volume over the gap (`npm run straw`). §38's straw line under
-  "Also found" points here. (38v, from RS-15.)
-
-*The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
-
 ## 15f. Found with 15c
 
 - The Finger carries the oil (`carryMix`) whenever the dye mirror is current, and

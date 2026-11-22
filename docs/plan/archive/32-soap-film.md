@@ -26,3 +26,12 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 *Not doing now:* a thickness that follows the dye (the film is its own medium; mixing it
 with the pigment's opacity is 18k's old shortcut, and the reason for this section), Marangoni
 plug flow (named above), and any recorded footage as a texture.
+
+## ~~32d. On the plate~~ — **Shipped** (the look Soap Film, settings `soapFilm`, `soapFilmRate`, `soapFilmAngle`; `src/gpu/soapFilmPlate.ts`, `src/gpu/soapFrame.ts`, `src/gpu/wgsl/soapFilmPlate.ts`, `soapFilmOver` in `src/gpu/wgsl/plateThinFilm.ts`; `npm run soapplate` 13/13; story in `docs/plan-shipped.md` §32d)
+
+- ~~**32d-6**~~ **shipped** (#928): The film's colours took too much light from the plate. `SOAP_GAIN` is 1 and `soapFilmOver` lays Airy's R over the plate in linear light with T = 1 − R: the 0–1.5 µm wedge lets through at least 92.9% (mean 95.9%, correlated 0.94 with Airy), an 8 nm black film 99.87% (`npm run soapplate`, 23/23; main's shader fails both lines in the same harness). The harness draws its sections 2 and 7 on a clean plate, since dye laid in sRGB under a 4% film had been what it measured. No Lace control for more than Airy was added.
+  Was:
+  `SOAP_GAIN` is 4 (`plateThinFilm.ts:172`), and `:204-217` take up to 60% of the light where
+  Airy's reflectance of a soap film is at most 7.8%; R is applied unscaled and not in linear
+  light. Use Airy's R in linear light, with any extra as an optional Lace control. Check: a
+  0–1.5 µm wedge transmits at least 92%, and black film over 99%. (38v, from RS-29.)

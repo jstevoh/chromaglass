@@ -70,6 +70,15 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   no bubbles from wind, one round bubble from a straw, fingers only where the liquid is
   thick enough for two or more (`strawFingers` in `src/lib/bubbles.ts`). Story in
   `docs/plan-shipped.md` §15g-12; `npm run blowrange`, `npm run straw`.
+- ~~**15g-19 The straw's lobes are clipped at a reach, not conserved**~~ **Shipped**:
+  `rimAt` (`src/gpu/wgsl/air.ts`) now applies a zero-mean perturbation in r² (orthogonal
+  low-harmonic lobe modulation minus the exact mean `63/256` of `cos^10`) so a fingered
+  bubble keeps the round bubble's area (`A = V / b`), and `BubbleField` (`src/lib/bubbles.ts`)
+  computes area from volume and the live `gapMetres` with no `rMax` clip (`npm run straw`
+  `663` fingered against `669` round, `0.991x`). Story in `docs/plan/archive/15-tools-on-liquids.md`
+  §15g-19. (38v, from RS-15.)
+
+*The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 
 ## 15e. The liquids' own forces on the GPU plate
 
@@ -85,3 +94,17 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   it; the soap's pull and the polar push no longer act between two glasses.
   `npm run liquidfall` (a drop at Hele-Shaw's speed to 4%), and `liquidpush`'s thin-gap
   reach asks the rock's way. Story in `docs/plan-shipped.md` §15e-10.
+
+## 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
+
+- **15g-15 The halo round floating bubbles was not rebuilt in isolation.** Shipped 2026-11-22: the flower was the slope's stencil, not the bubbles. The plate's Sobel read the dye nine times three cells apart, so a drop narrower than three cells was drawn once per tap: eight dark copies round it at 3 and 3√2 cells (45 and 63 px at 1080p), darkened by the aperture loss. The slope is now a derivative of Gaussian one cell apart (`src/gpu/wgsl/plateSlope.ts`), a stopgap until the light is traced (31s-2); the other sparse stencils are 31s-3, and an audit of how fields are sampled is 31s-5. Films before and after in the PR. The owner's
+  recording (2026-11-13, Foam Cells on the desktop) shows a big bubble ringed by small
+  ones with pale patches between them, a flower. On the Mac the same hands left about a
+  hundred bubbles (two wind spawns ten times a second, the straw's satellites) and after
+  15g-12 leave two round ones (films in the PR). What the lab ruled out as its cause by
+  themselves: the straw's bubble alone, the app's press under each bubble (15g-8g), and
+  popped holes (they heal in half a second). So the ring was the spawned crowd round the
+  straw's bubble and the puff's pale discs together, but no check holds a picture of it.
+  If it is seen again with no Blow in play (bubbles from the music, 15e), look first at
+  the bead and rim drawing in the open bubble-outline work (38h-15, 38h-17) and at
+  `depositBubbleRims`.

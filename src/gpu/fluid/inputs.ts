@@ -36,6 +36,10 @@ export class FluidInputs extends FluidPasses {
   private inkSrc: GPUTexture | null = null;
   /** The ink's carrier's own mask when it is not the letters' (pourInk's `carrier.mask`, PLAN 37x-10g). */
   private padSrc: GPUTexture | null = null;
+  /** A look's lay at the solver's grid and the oil's part of it (layDye), and whether it has an oil part. */
+  private seedDyeTex: GPUTexture | null = null;
+  private seedOilTex: GPUTexture | null = null;
+  private seedOil = false;
 
   /**
    * Fold the CPU-side deltas into the field. `dyeAdd` is L²×4 (R,G,B
@@ -52,12 +56,8 @@ export class FluidInputs extends FluidPasses {
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null, rows: Uint8Array | null = null, oilAdd: Float32Array | null = null): void {
     const q = this.device.queue;
     if (oilAdd) {
-      if (!this.cpuOilTex) {
-        const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
-        this.cpuOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
-        this.deltaOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta', size: [this.N, this.N], format: RGBA32, usage }));
-      }
-      this.uploads.write(q, this.cpuOilTex, oilAdd, 16, null, this.L);
+      this.ensureOilDelta();
+      this.uploads.write(q, this.cpuOilTex!, oilAdd, 16, null, this.L);
     }
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -275,6 +275,68 @@ export class FluidInputs extends FluidPasses {
     pass.end();
     this.submit(enc);
     return poured;
+  }
+
+  /** The oil's share of a lay, the CPU's L² and the solver's N², made together the first time a lay needs them (applyDeltas, layDye). */
+  private ensureOilDelta(): void {
+    if (this.cpuOilTex) return;
+    const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    this.cpuOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
+    this.deltaOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta', size: [this.N, this.N], format: RGBA32, usage }));
+  }
+
+  /**
+   * A look's lay at the solver's own grid (PLAN 38w-8): `dye` the whole lay,
+   * N²×4 in the CPU's delta format (each channel's absorbance times the
+   * amount, then the amount), `oil` the part of it that is the oil's own
+   * colour (applyDeltas' oilAdd, the same format), or null. Held here until
+   * the next lay replaces it, and laid on the plate a share at a time by
+   * layShare.
+   *
+   * Why not the CPU's arrays: they are the 192² grid the app's deltas are
+   * written on, carried up to the solver's by a bilinear (applyDeltas). The
+   * frame on the wall is the middle 0.42 of the plate, so one of those cells
+   * is about seven pixels of a 1080-line wall, and Classic's cells, each a
+   * colour laid in an oil whose rim the solver draws a cell wide, had a dye
+   * edge seven times softer than its oil's: the colour bled past the
+   * meniscus into the water and the small cells were blurs (the owner,
+   * 2026-11-21: "pixelated", then "complexity and clarity"). Laid here, the
+   * dye's edge is the oil's.
+   */
+  layDye(dye: Float32Array, oil: Float32Array | null): boolean {
+    const n = this.N;
+    if (dye.length < n * n * 4) return false;
+    const d = this.device;
+    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    if (!this.seedDyeTex) this.seedDyeTex = this.disposer.track(d.createTexture({ label: 'lay seed dye', size: [n, n], format: RGBA32, usage }));
+    d.queue.writeTexture({ texture: this.seedDyeTex }, dye, { bytesPerRow: n * 16 }, [n, n]);
+    this.seedOil = !!oil && oil.length >= n * n * 4;
+    if (this.seedOil) {
+      this.ensureOilDelta();
+      if (!this.seedOilTex) this.seedOilTex = this.disposer.track(d.createTexture({ label: 'lay seed oil', size: [n, n], format: RGBA32, usage }));
+      d.queue.writeTexture({ texture: this.seedOilTex }, oil!, { bytesPerRow: n * 16 }, [n, n]);
+    }
+    return true;
+  }
+
+  /** `k` of the lay layDye holds onto the plate, through the same fold a CPU delta takes (foldDye), the oil's share to the oil. */
+  layShare(k: number): void {
+    if (!this.seedDyeTex || !(k > 0)) return;
+    const d = this.device;
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    d.queue.writeBuffer(this.sim, 0, this.simData);
+    const enc = d.createCommandEncoder({ label: 'lay share' });
+    const pass = enc.beginComputePass({ label: 'lay share' });
+    const share = this.arg('lay share', [k, 0, 0, 0]);
+    this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // a lay adds; it takes nothing away
+    this.run(pass, 'seedShare', this.deltaDyeTex, [this.seedDyeTex], share);
+    if (this.seedOil) {
+      this.run(pass, 'seedShare', this.deltaOilTex!, [this.seedOilTex!], share);
+      this.oilLayPending = true;
+    }
+    this.foldDye(pass);
+    pass.end();
+    this.submit(enc);
   }
 
   /** One splat record in the splat buffer, for a pour of one thing (pourImage, pourInk). */

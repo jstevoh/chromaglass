@@ -219,12 +219,30 @@ export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'notes'
  * old shape is a special case of the new one rather than a thing to convert.
  */
 /**
- * What a hand does to one place on the plate (PLAN 25h, lib/areaCords.ts):
- * warms it, stirs it with a paddle, pours into it, or picks which of its
- * bottles pours. Only a cord aimed at an area can take one, and a cord aimed
- * at an area can take nothing else.
+ * What a hand does to the liquid (PLAN 25h, 38v-1, lib/areaCords.ts): warms
+ * it, stirs it with a paddle, pours into it, picks which bottle pours, or
+ * presses the glass down on it. A cord aimed at an area does it there; a cord
+ * with no area does it to the whole plate, whose bottles are the look's dyes.
+ * A cord aimed at an area can take nothing else.
  */
-export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue';
+export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue' | 'areaPress';
+
+/**
+ * A dial a cord can ride as a master (PLAN 38v-1, lib/areaCords.ts
+ * `CORD_MASTERS`): the cord's reading is scaled by it, so one knob turns a
+ * whole family of cords up or down. Sound Drive is the master of the music's
+ * hands, Kick Bloom of the kick's pour.
+ */
+export type CordMaster = 'audioImpact' | 'kickBloom';
+
+/**
+ * Which of the music's hands a cord stands for (PLAN 38v-1, lib/musicCords.ts),
+ * so the coarse wiring on the desk and the phone's sliders can find and turn
+ * it. Absent on every other cord.
+ */
+/** The music's hands, by what each did (lib/musicCords.ts); the list is what a file may name. */
+export const MUSIC_ROLES = ['pulse', 'heat', 'press', 'bloom', 'stream', 'swell', 'bottle'] as const;
+export type MusicRole = typeof MUSIC_ROLES[number];
 
 /**
  * How a sound or band cord shapes its reading before it moves a setting or an
@@ -290,6 +308,30 @@ export interface SceneMapping {
   threshold?: number;
   attack?: number;
   release?: number;
+  /*
+    How a hand acts (PLAN 38v-1, lib/areaCords.ts). Read only on a cord aimed
+    at a hand (`AreaTarget`); absent, each is what the hand did before it had
+    one, so a cord saved before reads as it did.
+  */
+  /** The hand's reach, as a share of its area's radius (the plate's half-width with no area): absent, the whole area. 0.02..1. */
+  size?: number;
+  /**
+   * A pour that brings liquid from a dropper rather than washing dye over the
+   * reach. Following, the dropper pours `volume` drops' worth a second at full;
+   * gated, each hit lays a slug of `volume` drops' worth (lib/dropImpact.ts
+   * `DROP_AMOUNT` each) and a dose of the bottle's own liquid.
+   */
+  volume?: number;
+  /** How many drops a gated slug is split into, scattered over the reach (1..16). */
+  drops?: number;
+  /** How far the hand roams its area or the plate as it acts, 0 (its middle) to 1 (out to the reach). */
+  wander?: number;
+  /** Which bottle along the hand reaches for, after the one picked or in turn (a whole number). */
+  bottle?: number;
+  /** The dials this cord rides as masters (`CordMaster`), each scaling its reading. */
+  masters?: CordMaster[];
+  /** Which of the music's hands this cord is (`MusicRole`), for the desk's wiring and the phone. */
+  role?: MusicRole;
 }
 
 export interface VisualizerSettings {
@@ -772,6 +814,8 @@ export interface VisualizerSettings {
   lampGround?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  /** The oil/water interface drawn as the step it really is, not the solver's few-cell band (PLAN 38w-15): 0 off, 1 sharp. */
+  crispEdges?: number;
   /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -955,6 +999,7 @@ export interface VisualizerSettings {
   soapFilm: number;           // the frame's draining soap film over the plate, its reflection 0 (off) to 1 (PLAN 32d)
   soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
   soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
+  soapFilmTilt: number;       // the frame's tilt from flat, degrees: 90 hangs it (gravity along the film is g sin of it, 32h)
   glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
   lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
   sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
@@ -1211,6 +1256,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
+  crispEdges: 0,            // off: the oil's edge drawn as the solver's band, as every look had it
   projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,
@@ -1247,6 +1293,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   soapFilm: 0,              // no film in the frame: every look but Soap Film
   soapFilmRate: 1,
   soapFilmAngle: 0,
+  soapFilmTilt: 90,
   glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
   lensStop: 4,
   sideLight: 0,

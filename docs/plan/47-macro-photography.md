@@ -404,6 +404,31 @@ a curling head need).
   same names as `watch.mjs` so `--vs` can compare, with the run's own numbers checked
   against `watch.mjs` on one clip both can read.
 
+## 47x. Watching in words, and what changed between two films (S–M)
+
+The owner asked (2026-11-22) for the watch tool to say what it sees, not only measure it,
+and to tell what changed between a before and an after film. The vocabulary is
+`docs/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
+Ching's ordering principles and Greenberg's all-over against centred for composition,
+Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling, a wash,
+a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
+an unsteady measure says "may vary from take to take", and every word names its source.
+
+- **47x-6** the watch selftest's A, B (sound against motion lag) and D (one composition change
+  in the crossfade) fail on a Mac's ffmpeg-full 9.0.2, on main as well as this branch, and the
+  Homebrew default ffmpeg has no libvorbis, so the selftest cannot make its clips at all. Find
+  whether the encoder or the reads moved, and say in the selftest which ffmpeg it needs.
+- **47x-9** the overall read against itself. Swells, rests and the peak's place come from one
+  take of a moving fluid: run two takes of one look through it and find which of its sentences
+  hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
+  check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
+- ~~**47x-10**~~ the flow read aliased (shipped, this PR). The words check's drifting
+  stripes (a 64-pixel period moving a pixel a frame) move almost half their period in the
+  second the physics read pairs over, so the backward shift matched as well as the true one:
+  one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
+  two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
+  one sample then lags of 3, 8 and 10, each seeded from the last.
+
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
 Liquid Light Lab's *Quick Tutorial* (cropped to the projected disc) against our *Poster 1969*

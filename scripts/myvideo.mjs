@@ -27,7 +27,9 @@
  *              plate holds as its pour; the dye sheet then shows it under Your
  *              video with Play and Pour a thumb's height, Pour lit; Play puts
  *              the same file on the projector as the film while it still
- *              pours; Stop ends the pour and leaves the film; Play again takes
+ *              pours; Stop ends the pour and leaves the film; Lamp (PLAN
+ *              14ag-3, a thumb's height) puts the film under the front plate
+ *              in the stack and a second tap takes it out; Play again takes
  *              the film off
  *   desk       Settings → Video's Video file plays the file as the film, and its
  *              row's Pour pours that same file, both lit together
@@ -167,6 +169,25 @@ try {
     stopped && stopped.pour === null && stopped.filmKind === 'file' && stopped.filmPaused === false && !(await pressed(page, 'phone-video-pour'))
       && (await page.getByTestId('phone-video-pour').textContent())?.includes('Pour'),
     `pour ${stopped?.pour ?? 'none'}, film ${stopped?.filmKind} ${stopped?.filmPaused ? 'paused' : 'playing'}`);
+
+  // Lamp (PLAN 14ag-3): the video under the glass, as the lamp. What it does
+  // to the picture is `npm run videolamp`'s; here, that the phone's row has the
+  // switch at a thumb's height and that it moves the film's row in the stack
+  // the display draws from, and back.
+  const order = async () => (await page.evaluate(() => window.chromaglassSettings?.()?.mixOrder ?? null)) ?? '';
+  const under = (o) => { const w = String(o).split(' '); return w.indexOf('film') >= 0 && w.indexOf('film') < w.indexOf('front'); };
+  const hl = await height(page, 'phone-video-lamp');
+  const before = await order();
+  await page.getByTestId('phone-video-lamp').tap();
+  await page.waitForTimeout(300);
+  const inLamp = await order(), lampLit = await pressed(page, 'phone-video-lamp');
+  const said = await page.getByTestId('phone-video-loaded').textContent().catch(() => '');
+  await page.getByTestId('phone-video-lamp').tap();
+  await page.waitForTimeout(300);
+  const outAgain = await order();
+  check('Lamp on the phone\'s row puts the playing video under the glass as the lamp, lit and said so, and a second tap lays it over the plate again',
+    hl >= 44 && !under(before) && under(inLamp) && lampLit && said?.includes('lamp') && !under(outAgain) && !(await pressed(page, 'phone-video-lamp')),
+    `${Math.round(hl)} px; ${before || 'the default'} → ${inLamp} (${lampLit ? 'lit' : 'not lit'}, "${said}") → ${outAgain}`);
   await page.getByTestId('phone-video-film').tap();
   await page.waitForTimeout(500);
   const off = await held(page);

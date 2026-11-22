@@ -34,7 +34,8 @@ import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
  * against, on one build and interleaved.
  */
 const LEAN_OFF = (() => { try { return new URLSearchParams(window.location.search).get('lean') === '0'; } catch { return false; } })();
-import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
+import { COVER_FULL_ML, coverNew } from '../lib/cover';
+import { DISH_GAP_FIELD_METRES, carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -175,7 +176,9 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   const viscosity = s.viscosity ?? DEFAULT_SETTINGS.viscosity;
   const bed = (viscosity === 'thin' ? 0.8 : 1.7) * (1 + (s.platePressure ?? DEFAULT_SETTINGS.platePressure ?? 0) * 0.8);
   const dragRate = (0.04 + (s.spinDrag ?? DEFAULT_SETTINGS.spinDrag ?? 0.25) * 1.2) * bed;
-  const tau = dragSeconds(carrierViscosity(viscosity));
+  const ml = Number.isFinite(s.liquidMl) ? s.liquidMl! : COVER_FULL_ML;
+  const coverUnits = coverNew(ml).h / DISH_GAP_FIELD_METRES;
+  const tau = dragSeconds(carrierViscosity(viscosity), coverUnits);
   let dish = 0, liquid = 0;
   for (let k = 0; k < 180; k++) {
     dish = dishFollow(dish, motor, dragRate, 1 / 60);
