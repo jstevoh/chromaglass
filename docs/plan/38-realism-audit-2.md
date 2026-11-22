@@ -213,3 +213,20 @@ is in the project's files).
   the solver's own cells wide holds as well (the interface is a fixed number of cells), so the
   lanes between cells could close to what the references show. Scale them by the grid the lay
   sees, as Foam Cells' FOAM_FILM does, once classicdish can run at 384².
+- **38w-19. A held Press on a domed gap never comes to rest** (M; Medium). 38w-1 gave Classic a
+  plateCurve of 0.2 and main's deploy found `npm run heldpress` red: with the Press held on the
+  thin gap, the far plate's speed stayed at 4.5e-4 against the check's 3e-4, and the bubbles'
+  at 7.4e-5, not a twentieth of the closing. The same glass flat (plateCurve 0) reads 4.3e-5
+  and 1.2e-5; platePressure 0.25 with the dome still fails, so it is the dome. The rest gap is
+  `cover - GAP_REST·plateCurve·(r²-0.5)·2` (gap.ts), and a held press clamps it at rest under
+  Stefan's law, so the gap's slope along the radius stays and drives a flow the Press never
+  stops: a lubrication pressure gradient with nothing to balance it. Clock glasses are curved,
+  so the dome is the real geometry; a held press on one should squeeze the film to its
+  equilibrium and stop. Classic is flat until this is fixed (the fix after #917), and Comet
+  River (0.6), and the looks at 0.45 and 0.2, carry it. Find which term keeps the far plate
+  moving (the squeeze's source against the gap's own gradient) and run heldpress on a 0.6
+  dome as its check. Flat, the press's weight shows the same leak: at 38w-1's platePressure
+  of 0.4 the far plate is still (4.3e-5) but 0.51 of what is left points out from the press,
+  against the check's half (0.44 at 0.25). A held press on the floor has no squeeze, so it
+  should push nothing; Classic is back at 0.25 until both are found, and the fix runs
+  heldpress at 0.4 flat as well.
