@@ -89,6 +89,10 @@ and a stream held on the plate, lay their colour with their own volume; story in
   whose front is set by the pressure the drop's own weight and surface tension give). Measure the
   window's growth on the Mac's grid against R(t) of a Hele-Shaw drop, then lay the drop at a
   point and let the solver spread it.
+- ~~**18c-14**~~ The idle plate laid dye and heat by itself (a hidden seeder orbiting the
+  plate). Shipped (2026-11-21): it is gone and a plate left alone gains no colour; the
+  emergency seed for a drained plate stays (`npm run tools`). Story in
+  `docs/plan-shipped.md` §18c-14.
 - **18c-4** An oil drop as a lens or a film by the spreading coefficient
   S = γ_w − γ_o − γ_ow (the bottles carry σ now, 18d-1), with 18d-3.
 - **18c-5** The held pour's rate is one number, a dropper's 0.5 mL/s (`HELD_POUR`,

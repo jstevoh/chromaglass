@@ -253,6 +253,15 @@ Left, each its own plan item:
   ferrofluid in it went 23.96% of the plate (the ferrofluid 29.89%) where the colour
   alone went 13.07%.
 
+- ~~**15g-17**~~ The pointer shoved bubbles and beads, and a pop pushed and swirled the
+  liquid. Shipped (2026-11-21): a pocket and a bead move only with the liquid round them,
+  liquid laid over a pocket takes it, and a pop is the gap reopening, a curl-free sink
+  (`npm run bubblephysics`). Story in `docs/plan-shipped.md` §15g-17.
+
+- ~~**15g-18**~~ A press twisted the liquid it squeezed (the local press only; the remote
+  press had none). Shipped (2026-11-21): a press is its squeeze and squeeze-out on both
+  paths and turns nothing (`npm run tools`). Story in `docs/plan-shipped.md` §15g-18.
+
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 
 ## 15f. Found with 15c

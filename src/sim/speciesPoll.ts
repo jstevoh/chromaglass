@@ -108,11 +108,16 @@ export function stepPlateBubbles(
       if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');
     }
   }
-  // A pop is an inward cavity collapse into the void left behind.
-  for (const ev of bubbles.events) {
-    if (ev.kind === 'pop' && lead) {
-      const px = Math.round(ev.x), py = Math.round(ev.y);
-      if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.popBubble(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.04);
-    }
-  }
+  /*
+    A pop used to push the liquid in as well (`popBubble`): an inward kick
+    over the pocket's disc plus a swirl whose sign came from the parity of
+    its cell, "an annular vortex ring". Between two glasses neither is
+    there. The pocket's air going is a sink with no curl, and the liquid
+    closes in because the squeeze each pocket holds on its footprint (the
+    loop above) stops and the gap the solver sees opens back up to the
+    liquid; the thin gap's own pressure then fills the hole. A swirl that
+    turns one way or the other by which cell the pop fell in is no flow a
+    pop makes (PLAN 15g-17). The pop events stay on `bubbles.events` for
+    the checks that count them; nothing turns them into velocity.
+  */
 }

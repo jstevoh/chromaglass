@@ -43,9 +43,6 @@ export interface Bubble {
   film: number;
   /** Open to the air at the rim and emptying (see `step`). */
   venting?: boolean;
-  /** A transient kick of velocity (cells/s) from a drop's spreading front nearby. */
-  kx: number;
-  ky: number;
   /**
    * Fingering: how far the rim has broken into fingers (0 round, 1 the
    * fingers as long as the radius), how many there are, and where they sit.
@@ -311,7 +308,6 @@ export class BubbleField {
       id: this.nextId++,
       x, y, r, age: 0, inject: 0,
       sx: 0, sy: 0, film: 0,
-      kx: 0, ky: 0,
       fing: 0, lobes: 8 + this.rng.int(7), fph: this.rng.angle(),
     };
   }
@@ -454,40 +450,35 @@ export class BubbleField {
     // Held at the straw.
     const k = Math.min(1, dt * 8);
     b.x += (x - b.x) * k; b.y += (y - b.y) * k;
-    b.kx = 0; b.ky = 0;
     b.held = true;
   }
 
   /**
-   * Something landed on the plate at (x, y): dye from a dropper, or a blow
-   * of air. A pocket under a drop of dye is taken by it, the liquid closing
-   * where the air was (the engulfing PLAN 38b keeps), and bubbles around the
-   * point are shoved away along the spreading front. Air shoves harder and
-   * takes nothing (fresh air arrives as new bubbles elsewhere).
+   * Liquid landed on the plate at (x, y), reaching `r` cells: a pocket it
+   * lands on is taken by it, the liquid closing where the air was (the
+   * engulfing PLAN 38b keeps). Nothing else.
+   *
+   * This was `disturb`, which also kicked every bubble within three times
+   * the reach outward along "the spreading front" (40 cells/s for air, 22
+   * for dye), a velocity of the bubble's own that decayed over a fifth of a
+   * second, and a blow or a press shoved them the same way. But a pocket
+   * between two glasses has nothing to push it but the liquid round it: a
+   * drop's spreading front moves the bubbles because it moves the liquid,
+   * and the solver already carries that (a drop brings volume on a thin gap,
+   * a blow is wind on the surface, a press closes the gap). The kick moved
+   * a bubble that the liquid round it left where it was, which is the hand
+   * reaching through the glass (PLAN 15g-17). Now a pocket moves only in
+   * `step`, with the flow, the tilt and a press.
    */
-  disturb(x: number, y: number, r: number, kind: 'dye' | 'air', strength = 1): void {
+  engulf(x: number, y: number, r: number): void {
     const bs = this.bubbles;
-    // The front spreads well past the drop itself.
-    const reach = kind === 'air' ? r * 3 + 4 : r * 3 + 6;
-    const shove = (kind === 'air' ? 40 : 22) * strength;
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
-      const dx = b.x - x, dy = b.y - y;
-      const dist = Math.hypot(dx, dy) || 1e-3;
-      if (kind === 'dye' && dist < r + b.r * 0.6 && b.age > 0.3) {
-        // No spray of daughters: that was a free soap film's rim retracting
-        // (Culick), and a pocket between glasses has no film to retract.
-        this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
-        bs.splice(i, 1);
-        continue;
-      }
-      if (dist < reach) {
-        const k = shove * (1 - dist / reach);
-        const ux = dx / dist, uy = dy / dist;
-        // A shove sets the kick rather than adding to it, so a finger held
-        // still does not wind a bubble up to escape velocity.
-        if (Math.hypot(b.kx, b.ky) < k) { b.kx = ux * k; b.ky = uy * k; }
-      }
+      if (b.age <= 0.3 || Math.hypot(b.x - x, b.y - y) >= r + b.r * 0.6) continue;
+      // No spray of daughters: that was a free soap film's rim retracting
+      // (Culick), and a pocket between glasses has no film to retract.
+      this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
+      bs.splice(i, 1);
     }
   }
 
@@ -574,12 +565,10 @@ export class BubbleField {
         moves with the flow, up the tilt and off a press, and with nothing
         else.
       */
-      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb + b.kx;
-      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb + b.ky;
+      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb;
+      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb;
       b.x += dx * dt;
       b.y += dy * dt;
-      b.kx *= Math.exp(-dt / 0.22);
-      b.ky *= Math.exp(-dt / 0.22);
       const speed = Math.hypot(dx, dy);
       const R = b.r * m;
 
