@@ -54,7 +54,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',       // unused under the lamp (plate.ts takes the lamp's light through the dye)
       gooeyEffect: 0,            // its blur merged cells the oil keeps apart
-      rotationSpeed: 0.015,      // the motor almost off
+      rotationSpeed: 0,          // no motor: the owner wants the whole screen still between hand moves (38w-1 round 2)
       /*
         No stirring, as Lava Lamp (PLAN 38w-1): a clock-glass dish is not
         stirred, and Turbulence is a curl of noise laid over the whole plate,
@@ -100,15 +100,16 @@ export const PRESETS: Preset[] = [
       secondLamp: 0.0,
       hueJourney: 0,
       dyeBudget: 0.8,            // the whole dish is dye; 0.18 kept black glass (28i-2)
-      plateCurve: 0.45,          // the bowed glass gathers the cells toward the middle
+      plateCurve: 0.2,           // a flatter glass: the frame is full screen, so the cells should not all crowd the middle
       depthDrag: 1.2,
       plateSpring: 0.35,
       plateRock: 0.55,           // a hand tips the dish: the references' swells
       edgeRelief: 0.6,           // the meniscus round every cell: a dark rim and a bright one
       bubbles: 0.2,
       transmission: 0.4,
-      dishVignette: 0.3,
-      lampHotspot: 0.45,
+      dishVignette: 0,           // full screen, no Petri rim (the owner, 2026-11-21): the projected wall shows the dish filling the frame
+      granulation: 0,            // dissolved dye does not granulate; the grain read as pixelation on the wall
+      lampHotspot: 0.2,          // an even lamp across the full frame, as the references light it
       // A hand on the music: the kick presses the glass, the snare shears, a mid chord rounds.
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.3 },
