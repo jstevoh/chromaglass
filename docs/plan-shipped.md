@@ -2608,6 +2608,31 @@ never join with. `npm run phonelink` asks all of it, with a WebSocket count that
 the localhost desk's socket so that "opens no socket" cannot pass by counting nothing:
 29 of 36 on the code before, 36 of 36 now.
 
+### 14m-https. A network display could not start
+
+**Shipped** (after 14m-mark). Found while doing 14m-lan: a browser gives WebGPU only to a
+secure page (https, or localhost), and the address the show server printed for a projector's
+browser or a second computer was `http://<laptop-ip>:3000/?cast=true&key=…`, so the network
+display stopped at its first shader module ("GPUTextureUsage is not defined"), in Chromium
+and by the same rule in Safari. The show server (`server/remote-server.js`) now also serves
+the same files and the same relay over https on `HTTPS_PORT` (`PORT + 443`, 3443 beside
+3000), with a self-signed certificate made by the system's `openssl` on the first launch
+and kept in `server/.tls` (the Mac app keeps it in its own data folder, `TLS_DIR`). Each
+display's browser warns once (Advanced, then Proceed), and from then on the page is a secure
+context with WebGPU: measured in Chromium, a page whose certificate warning was accepted is
+secure and has `navigator.gpu`. One WebSocketServer takes upgrades from both ports, so every
+count and broadcast sees an https display and an http phone alike; a socket to another path
+is still refused. An https port that is taken, or no `openssl`, leaves the show on http and
+says why. Why not the alternatives: a certificate browsers trust outright needs a public name
+and an authority a room's Wi-Fi lacks; a home-made authority installed per device is the same
+warning made into a setup step; the tunnel leaves the room; a WebGL copy of the plate would be
+a second renderer. The server prints and the desk's Cast menu shows the https address with the
+warning's words; the phone's remote stays on http (it needs no GPU and so no warning).
+The address list sits in `src/components/NetworkDisplayAddresses.tsx`, since `App.tsx` may not
+grow. `npm run netdisplay`: 11 of 11; on main's server before it, 3 of 11 (eight fail: no
+https port, no certificate, the display never opens, no http-only fallback said). Built in #443, closed while idle drafts
+were cleared, and carried onto main in the PR that shipped it.
+
 ### 14o. The song-ID Worker is open to anyone
 
 **Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an
@@ -3710,6 +3735,41 @@ the day they pass.
     the phone's pad down, 0.9 at 180°.
   - What it cannot see here: the liquid. The scheme is `npm run slosh`'s, the kernels
     `sloshgpu`'s, the look at sixty frames the Mac's (judging §58, §64, and the owner's film).
+- **18a-13m, tilt the plate from two knobs (shipped 2026-11-15).**
+  - What was asked: the owner, 2026-11-15, "I want to be able to control the tilt of the
+    plate from my midi controller. Maybe two knobs?" Gravity and Tilt Direction were
+    pinnable but not MIDI-learnable, and as a pair they are a compass, not two hands:
+    Direction does nothing at Gravity 0 and wraps at the end of its knob.
+  - What changed: two settings, Tilt Left/Right and Tilt Up/Down (`plateTiltX`,
+    `plateTiltY`, −1..1, default 0), learnable, in Tilt & Rock under Slosh, on the desks,
+    the remote and the phone's Motion sheet. `lib/handTilt.ts` turns them into the tilt
+    the frame loop hands the solver, added to the remote phone's.
+  - Why that tilt and not Gravity: Gravity stands the plate up, and past a thousandth the
+    solver makes it a sealed bottle with a lamp under its floor (27f-9). A knob is a hand
+    nudging the flat dish on the projector, which is the rock's path the phone already
+    took: on a thin gap the colour's weight down the tipped plate (Darcy, hsBody,
+    ROCK_FALL), light oil lifted the other way (27f-5), the dish sloshing as far as Slosh
+    lets it, the cover glass sliding as far as Frame Sway does. Nothing new in the solver.
+  - Eased: a critically damped follow at 12 rad/s, stepped exactly so the solver's rate
+    does not change it (a CC arrives in 1/127 steps, and the slosh dish and cover took
+    each as a knock); the middle 4% of the travel is level, since CC 64 reads 0.008 and a
+    knob put back by hand lands a step or two off, which over a set drains the plate.
+  - Turned into each plate's dish by its own `plateAngle`, as `downhill()` turns Tilt
+    Direction (`tipPlate`, once per layer, since Rotation is per layer): that path reached
+    the dish unturned, the reason the Tip pad wrote Gravity instead (18a-13j). The phone's
+    own stays unturned until 18a-13k is checked. Phone and knobs together are limited by
+    length (√2, the phone's own corner), not axis by axis after the turn, which would have
+    cut a corner tip by up to 29% four times a turn on a spinning dish (found in review).
+  - A hand's alone: out of the patch bay, sound mapping and Evolve, like Slosh.
+  - Measured (`npm run handtilt`, 24 lines): CC 62–66 level, CC 0/127 the full tip; a
+    throw end to end moves 0.018 in its first sixtieth, 0.95 by 0.4 s, never past; the
+    same 0.874311 at 0.3 s at 30, 60 and 120 steps a second; turned as `downhill()` to
+    machine precision; both knobs at full 1.414 long and at 45.0° on the screen at five
+    dish angles; with the knobs at 0 every plate's tilt, rock and slosh tilt are the old
+    frame loop's from the phone alone, to 2e-16, over phone ages 0 to 3.2 s on a swinging,
+    turned dish.
+  - What it cannot see: the liquid's answer, which is the rock's (`npm run rides`,
+    `oillift`, `slosh`), and the look at sixty frames, the Mac's.
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the
@@ -4731,6 +4791,22 @@ still 0.091 ninety steps later; the dish's red kept to 0.17%, its mean r² grown
 R² (the volume says 1; the floating glass takes some); the middle's blue 0.66 of the drop's
 own; the same dye stamped with no volume 1.795 → 1.539, no window. The rim's spokes and the
 dark collar of the reference are not yet the solver's (18c-6, 18c-7).
+
+**18c-9 and 18c-10** (2026-11-21, `npm run dropwindow` 11/11): a drop opens its window from
+any bottle. On the owner's Mac (Classic at 3× close-up) PR #851 had removed the dark discs, but
+no lighter round window of the drop's colour came. Measured there, the queued drop the lab runs
+opened its window as the lab said; the hand's drops did not, because every bottle with a
+behaviour of its own (ink among them) stamped its dye with no volume while the bottle's deposit
+poured the volume separately a moment later: the colour arrived first and was pushed out by its
+own liquid. A stream held on the plate did the same. Now a hand's drop (`dropBottle`,
+sim/dropSplash.ts) goes through the drop queue with its bottle's species and liquid in every
+pour, and the deposit is told the volume came already; a held stream (`layStream`) pours one
+held share a step (`pourShare`) and lays its colour on that dome at the strength of a column of
+the same bottle's drop (`dropColumnDye`, 2.073 at 192²). The drop now enters over its capillary
+time τ = √(ρD³/σ) (`dropEntrySeconds`: 0.043 s, three steps, at amount 5; seven at amount 30)
+through the whole window rather than `DROP_CORE`'s 0.7 patch over five numerical steps. In the
+lab, a yellow drop of amount 30 in a cyan pool: the pool's red in the middle 1.795 → 0.061
+(0.090 before), the same dye stamped with no volume 0.856, no window.
 
 ### 18d. Each liquid has its real properties
 
@@ -7201,6 +7277,53 @@ the compression pass's margin was `15.0` cells on Metal and `13.4` on software a
 `LAG_BAR` `2.15 → 1.89` and `HALF_BAR` `47 → 94` (midway), `DLAG_BAR` `0.13 → 0.16` (half the gap),
 `DHALF_BAR` kept at `13` (gap `23.8`).
 
+## 31p-1. Polarised light (PLAN 31p)
+
+**Polarisers, Analyser, Quarter Wave, Birefringence** (Settings → Lamp & Light, MIDI, the
+desks' lamp pins and the phone's remote). Shipped in the PR that wrote this, from the
+owner's photograph of dishes between polarisers (2026-11-14).
+
+- The law (`src/lib/polar.ts`): polariser at 0, the liquid a linear retarder of retardation
+  G at axis theta, analyser at alpha, T = cos^2 alpha - sin 2theta sin 2(theta - alpha)
+  sin^2(pi G / lambda); with a quarter-wave plate after the polariser and one crossed before
+  the analyser, T = (1 + cos 2alpha cos delta + sin 2alpha cos 2theta sin delta) / 2. Both
+  are A + B S + C N with two spectra that depend on G alone, so two tables (S and N, every
+  20 nm to 3000 nm, through the soap film's lamp, eye and white balance, `lampLinear` in
+  `filmTable.ts`) give the colour exactly up to the 20 nm interpolation (worst 0.004 of
+  white against T integrated wavelength by wavelength).
+- The liquid (`src/gpu/wgsl/platePolar.ts`): flow birefringence by the stress-optic law,
+  retardation in proportion to the principal strain rate read from the solver's packed flow
+  (`vel0`) by central differences, slow axis along the stretch, carried to the wall through
+  the screen's axes in the plate's uv, air taking its share away. Called once in the display
+  main on the finished stage, before the film projector. plate.ts did not grow: the include
+  swapped for `VIEW_OPTICS` (the thin film's block and this one) and three blank lines'
+  trailing spaces went.
+- The scale: set on the app, filmed on the owner's Mac. At 1000 nm per unit of the solver's
+  strain rate (the lab's calibration) the app drew a contour map of third-order bands at the
+  default; its readback speeds matched the lab's (fastest cell 0.70 against 0.75) but its
+  plate's flow is steeper at the solver's own grid. A sweep on a lamp ground put broad first-
+  and second-order bands at 0.12 to 0.15 of that scale, so Birefringence 1 is 400 nm per
+  unit and the default 0.3 lands there. The lab's check asks 0.75 for the same brightness.
+- Light coloured by dye stays the dye's colour: on a dye-on-black look the sheets cut its
+  light into bands of its own colour (physics: a red light through the chart can only be
+  dark or red); the Michel-Levy colours need white light, a lamp ground with clear or pale
+  liquid, as in the photograph.
+- Quarter Wave defaults to 1: between plane sheets every place where the stretch lines up
+  with a sheet is black whatever its retardation, and a stirred liquid is full of those thick
+  dark worms; the plates take them out, as photoelasticity labs do. At 0 the pinwheel arms of
+  the photograph come back.
+- `npm run polar` 24/24: both laws against Jones matrices (worst 7e-16), the tables against
+  the spectrum (worst 0.004), crossed black and parallel white, complements, the Michel-Levy
+  order, the isoclinic and its removal, shear and rotation; then the lab: off is off to the
+  byte and every dial reaches the picture; a still plate crossed is black (max 0) and
+  parallel the open plate (1 level); a laid vortex pixel by pixel: crossed plus parallel is
+  the open plate in light (mean 1.6 levels, worst 9.6), every pixel on the chart (worst 5.9),
+  the isoclinics on the diagonals and lit axes swap when the plate turns 45 degrees, the
+  turning middle dark; a stirred plate lights (mean 229, 84% coloured), black at
+  Birefringence 0, plane sheets 7.4% near-black against 0.0%. Without the encode, with the
+  axis not carried, or with light from speed instead of stretch, it goes red (one skeptic
+  pass found the first version could not tell those apart).
+
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (#403)
@@ -7656,6 +7779,23 @@ socket in the check) and Art-Net in, and count real packets for a second each: n
 then Home over the Pro key. With the gate: none 0/0/0, Pro 10 OSC, 36 Art-Net out, 10 Art-Net in,
 Home 0/0/0. On main's server the same run reads free 10/37/10 and Home 10/37/10, and 4c fails.
 
+### 34a-6. The looks as films: six 1920s records, on the page (2026-11-08)
+
+*(M; the owner's Mac. The owner, 2026-10-29: films of the looks, each to a different kind of music, the cards to
+animate on hover, open larger and be heard, and the films on the channel. Then 2026-11-08, of
+the six 1920s films the app made once its ear heard a beat without a kick drum (14d-2): those,
+on the website and on the channel.)* **Shipped** the row: `src/lib/siteFilms.ts` lists six
+records from before 1926 (public domain in the US since 2026; `public/landing/films/SOURCES.md`
+records each Great 78 Project transfer, its checksum and the basis), each played whole by a
+look; the page's gallery of looks keeps its stills and the films are a row of their own under
+it, "Six records from the 1920s". `npm run sitefilms` takes the films the app recorded (or
+renders them on a Mac) and cuts each card's 6 s muted loop (MP4 and WebM, seam blended), its
+640 × 400 still, the channel's 1280 × 720 thumbnail and the description text.
+`LandingFilms.tsx`: a pointer (or focus) plays a card's loop, a phone plays the card in view,
+reduced motion keeps the stills, and a card whose film is on the channel opens it from
+youtube-nocookie.com with the credit under it. `npm run landingfilms` holds all of it. Not a
+GIF: 256 colours band a plate's gradients, and a GIF is ten to twenty times the bytes.
+
 ### 34a-8. The YouTube channel, linked from the landing page (2026-11-08)
 
 Asked: the owner, on 2026-11-08, the day six films went public on the channel: the homepage did
@@ -7701,6 +7841,13 @@ recording and back to 1.600 after, the free site's file is a 9:16 MP4 with an Op
 phone's is the 9:16 slice of its screen.
 
 ## 35. Clear controls: on reads on, one name for one thing
+
+**34a-6a, the channel's ids (2026-11-08).** The owner had the six films uploaded to the channel
+from the package `npm run sitefilms` writes, each with its own title, description, credit and
+thumbnail, and made Public. Their ids went into `siteFilms.ts`: Wolverines `j7afUdmWi2c`,
+Caruso `9N4GEV-z2KE`, Rachmaninoff `6SIl6gNhcpE`, Whiteman `WbqOB_OeEoM`, Oliver
+`nIzxLuUu8tk`, Bessie `ij4wuO7HQH8`. Every card now opens its film; `npm run landingfilms`
+uses the real ids instead of its stand-ins, since it only stubs the ids that are null.
 
 ### 35a. One look for on, every name unique (2026-10-24)
 
@@ -9499,8 +9646,8 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   255 and no pixel lit, for as long as it was in. Coming in, Hold and Follow now check
   their aim (`src/lib/macroLanding.ts`, beside the camera, which is near the size the repo
   warns at); if its frame holds under a tenth of the plate's average dye, they go to the
-  nearest frame holding at least half what the plate's fullest does, centred on the dye in
-  it, and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
+  nearest liquid (since the follow-up below, the nearest pool), centred on the dye in it,
+  and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
   and lands on the first pour; a hand moving the aim during the closeup is obeyed onto
   glass, and a mode switch mid-closeup is not a landing (`npm run holdjump`). It stops
   asking once fully in or after 1.5 s (a pinch let go at 1.5x otherwise cut across the
@@ -9512,7 +9659,14 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   button flipped `macroMode` alone, so the plate went to 4x while the Macro Zoom knob
   beside it read 1.00x; it is now the M key's press (`closeupToggle`), in by the zoom and
   out with both, and so are the phone's Zoom, the remote's Closeup switch and the
-  command palette's, whose lit states and a pad's light read `closeupIn`.
+  command palette's, whose lit states and a pad's light read `closeupIn`. Then, on the
+  owner's film of it (2026-11-14), it chose the blue pool over the orange one, and asked
+  nearest or biggest, the owner said "go to the nearest pool": the nearest frame that
+  held a pool had been measured to that frame's middle, and a 16:10 frame reaches a pool
+  beside the aim from nearer its middle, so a pool 0.179 off to the side beat one 0.160
+  above the aim. It now reads the plate in pool-sized boxes, joins the touching boxes of
+  liquid into pools (a box under a quarter of the fullest box is a wash or a fringe), and
+  goes to the pool whose middle is nearest the aim (`closeupland` line 12, red before).
 
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
@@ -11184,6 +11338,36 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   way: 19k-16 (`draftwall --frames` painted 0 on #734's run), with the line printing what the
   projector window says of itself.
 
+#### 19k-20. The ear behind the wall: windows the runner can fill
+
+- **19k-20** (E, S): **shipped** (2026-11-14). After 19k-15 `npm run ears` went red three more
+  times on GitHub's hosted Macs (MacCloud, westus), each on a different line and each on a
+  fixed two-second window the runner could not fill: deploy 729's "covered with no wall" read
+  15 ticks and 7 levels (bars more than 20 and 10; the page was free about 7 times a second),
+  #718's "uncovered" 19 frames (bar more than 20, its 17 ticks all in stalls past 250 ms), #744's
+  "visible with the wall asking" 7 frames stamped (bar 10). Main's deploys 732 and 733 passed.
+  The check measured the runner. Reproduced in a cloud session two ways the check now takes:
+  `--slow=16` (Chromium's CPU throttle on the page and the wall) put four lines red on 8 to 12
+  frames; `--busy=130` (a 130 ms long task every 140 ms) put two red (15 asks, 16 frames).
+  Now each window lasts at least 2 s, so a free runner measures exactly as before, then until
+  the runner has *offered* 30 of what the line is judged on (frames the page drew, frames the
+  wall asked for, page turns of a 16 ms timer, level samples), never the readings judged, at
+  most 15 s. Every bar is the one it was. Slowed, the covered line then went red on a bar that
+  was wrong: it held asks plus ticks to the frames drawn within 2, but a tick reads and draws
+  nothing (`askFrame` and `render` are the only callers of `draw()`), so with the wall's asks
+  more than 250 ms apart its ticks counted against it (32 asks, 9 ticks, 32 frames). Now exact
+  both ways: no more ask readings than frames drawn, and frames past them only one per tick (an
+  ask within EAR_MIN_GAP_MS of a tick's reading is that reading; #718's 44, 1, 45 on 11-08).
+  The check-skeptic found that "one per tick" excused asks the ear never got (a build deaf to
+  every ask in the first half of each second went green at 31 asks, 49 ticks, 61 frames), so
+  each excused ask is now found by its own time, stamped on the wall's side within 6 ms after a
+  tick's reading (that build: red). And since a stretched window makes a fixed count easier,
+  the tick line is also held to ten readings a second over its window, or half the page's own
+  turns where the page got fewer (half the turns alone went red on a GitHub Mac whose worker ran
+  at half the page's rate: 48 ticks, 99 turns, 2.1 s), and "uncovered" to every frame drawn, as the visible lines.
+  Cloud: 26/26 at full speed (2 s windows, 21 s run), `--slow=16`, 32 and `--busy=130` (up to
+  100 s; a window that reaches the 15 s cap says so).
+
 #### 21. Looks after painters (found along the way, for §14b)
 
 *Found along the way (for §14b's owner, not this section's):* on this PR's two Mac
@@ -11227,7 +11411,9 @@ over a second (`originGap >= 1000`).
   the centrifugal force as a paraboloid floor −Ω²r²/2g (the scheme's well-balancing holds
   the heap at rest exactly), and the Euler force −Ω̇ ẑ×r and the Coriolis force −2Ω ẑ×u on
   both layers, in the TypeScript reference and the GPU kernels alike. A spin over 0.34 rad/s
-  (a heap of a hundredth of the depth) or a change of speed over 0.25 rad/s² wakes the dish;
+  (a heap of a hundredth of the depth) or the liquid's lag behind a change of speed over the
+  same 0.34 rad/s wakes the dish (22n-1: first a change over 0.25 rad/s², which a frame
+  stalled in the opening read in five looks' motors and woke the dish on the owner's Mac);
   the looks' own motors (0.31 rad/s at most) do not, so a look nobody spins costs what it
   did. The step shortens with the spin and with what the liquid still carries after a stop
   (sloshSpinFast), so a hard stop from the hand's top speed holds. Measured (`npm run spinslosh`): the paraboloid
@@ -14753,6 +14939,43 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+## 43d. A palette from any picture or video (2026-11-15)
+
+`src/lib/picturePalette.ts`, `src/app/usePaletteLock.ts`, `src/components/PicturePaletteButton.tsx`,
+the Dyes panel (`DeskPanels.tsx`), the phone's Dye sheet (`PhoneStage.tsx`), the cast state.
+
+The owner, 2026-11-15, after the competitor study ("Study Photism for ideas worth borrowing"):
+"I like the general idea of taking video, image, album art or whatever visual input and
+creating a palette from it." It was 43d, "the cover sets the colours".
+
+- **The picture picks the dyes and nothing else.** A palette colour is a dye's
+  transmission through one unit, per band (lib/dye.ts, 18l), so the picture's colours
+  become four dyes the solver pours, carries, mixes and absorbs as it does Warm
+  Sunset's. Nothing of the picture is drawn on the plate; no motion comes from it.
+- **Which colours.** k-means in CIELAB over the picture (128 px on its long side, a
+  video's eight frames spread across it), clusters ranked by the square roots of their
+  share and their chroma together: a black sleeve with a pink title gives the pink first,
+  where a commonest-pixel picker gives the black (that picker is the check's control).
+  Four taken at least ΔE 18 apart; black and white are the paper and the ink and come in
+  only when a picture has no colour; fewer than four colours fill with lighter and
+  darker strengths of the ones there are; a black-and-white cover gives two greys.
+- **Seen on both grounds.** Each dye is moved in lightness only to 40 from black and
+  from white, 28b's rule for every palette, so it shows on a lamp look and a dark one.
+- **Four slots after the 24 named dyes.** Every dye on the plate is an index into
+  `PALETTE_RGB`, so the picture's are four slots there, written only by
+  `setPictureDyes`, and "From picture" is the lock one past the 21 named harmonies
+  (a saved named lock keeps its index). The named dyes, `PALETTE` and the dice's count
+  are untouched, so no seeded plate moves. The colours are kept beside the lock, so the
+  entry survives a reload, and travel with it to a projector window (`pictureDyes` in
+  the cast state). A recorded WebM that does not say its length (MediaRecorder's, the
+  app's own takes) is seeked past its end first so its eight frames span the film.
+- **Measured** (`npm run picturepalette`, 18 lines): four blocks back within ΔE 0.1;
+  the sleeve's pink first (control fails); a 2% red tail light kept and a 0.1% speck
+  not; every dye 40 from both grounds; the slots the only ones written; a PNG, a JPEG
+  and a recorded orange-then-blue WebM through Chromium's own decoders (both colours
+  within ΔE 0.5, the file saying its length was Infinity). `npm run phone`: the Dye
+  sheet's button makes "From picture" the palette in the picture's four colours.
 
 ## 15e-10. A bottle's weight slides it down a rocked thin gap (shipped 2026-11-14)
 

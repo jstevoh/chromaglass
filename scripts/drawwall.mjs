@@ -505,18 +505,47 @@ try {
     await new Promise((resolve, reject) => { old.once('open', resolve); old.once('error', reject); });
     old.send(JSON.stringify({ type: 'hello', role: 'controller', key: KEY }));
     await wait(300);
+    /*
+      What the display itself did over a control's window, printed beside
+      it (PLAN 8-draw-a-6). On four GitHub Mac runs of two heads (#896's
+      branch, #893's) the first control read the same whole-wall change,
+      "median 383 to 392, centre none", where its other runs read median 3
+      or 4: something moved the whole picture in that window, the same way
+      each time. Its own frame says whether that was the plate or only the
+      pad's picture, and the tip, rock, spin and rung whether the dish was
+      tipped, sloshed or rebuilt. Read only, no bar.
+    */
+    const plateNow = () => display.evaluate(async ([G, H]) => {
+      const d = window.chromaglassDebug?.(), f = d?.fluids?.[0];
+      const px = await window.__cgFrame(64, 36);
+      const grid = px ? Array.from({ length: G * H }, (_, c) => {
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let y = Math.floor(c / G) * 36 / H; y < (Math.floor(c / G) + 1) * 36 / H; y++)
+          for (let x = (c % G) * 64 / G; x < ((c % G) + 1) * 64 / G; x++) { const i = (y * 64 + x) * 4; r += px[i]; g += px[i + 1]; b += px[i + 2]; n++; }
+        return [r / n, g / n, b / n];
+      }) : null;
+      const n2 = (v) => (typeof v === 'number' ? +v.toFixed(3) : v);
+      return { grid, tip: f && [f.tiltX, f.tiltY, f.rockX, f.rockY].map(n2), spin: Array.from(d?.spin?.current ?? []).map(n2), rung: d?.governor?.rung?.grid ?? null, steps: f?.stepCount ?? null };
+    }, [G, H]);
+    const plateSaid = (p0, p1) => {
+      const own = p0.grid && p1.grid ? [...change(p0.grid, p1.grid)].sort((a, b) => a - b)[Math.floor(G * H / 2)].toFixed(0) : '?';
+      return `; the display's own frame changed by median ${own}, tip/rock ${JSON.stringify(p0.tip)} → ${JSON.stringify(p1.tip)}, spin ${JSON.stringify(p0.spin)} → ${JSON.stringify(p1.spin)}, rung ${p0.rung} → ${p1.rung}, steps ${p0.steps} → ${p1.steps}`;
+    };
     const sendOld = async (x, y) => {
       const c0 = await gridOf(page, G, H);
+      const p0 = await plateNow();
       for (let i = 0; i < 4; i++) { old.send(JSON.stringify({ type: 'drop', x, y, layer: 0, amount: 0.5 })); await wait(120); }
-      return judge(change(c0, await settle()));
+      const j = judge(change(c0, await settle()));
+      j.display = plateSaid(p0, await plateNow());
+      return j;
     };
     const flat = await display.evaluate(([u, v]) => window.chromaglassDebug?.()?.wallToPlate(u, v, 0, false), [U, V]);
     const unturned = flat ? await sendOld(flat.x, flat.y) : null;
     check('the control: through the camera without the dish\'s turn, it lands on the wall elsewhere',
       unturned && unturned.peak > 3 * Math.max(unturned.median, drift) && unturned.top !== unturned.want && unturned.off > 0.15,
-      unturned ? say(unturned) : 'no wallToPlate on the display');
+      unturned ? say(unturned) + unturned.display : 'no wallToPlate on the display');
     const plain = await sendOld(U, V);
-    check('the control: as the plate\'s own point (the old pad), it does not land there', plain.top !== plain.want && plain.off > 0.15, say(plain));
+    check('the control: as the plate\'s own point (the old pad), it does not land there', plain.top !== plain.want && plain.off > 0.15, say(plain) + plain.display);
     const held = await display.evaluate(() => window.chromaglassDebug?.()?.rotation?.current ?? null);
     check('and the dish held its turn throughout', Array.isArray(held) ? Math.abs(held[0] - TURN) < 0.05 : Math.abs(Number(held) - TURN) < 0.05, JSON.stringify(held));
     old.close();

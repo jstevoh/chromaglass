@@ -93,6 +93,8 @@ const SECTION_OF: Record<string, string> = {
   plateRock: 'tilt',
   frameSway: 'look',
   slosh: 'tilt',
+  plateTiltX: 'tilt',
+  plateTiltY: 'tilt',
   beatSqueeze: 'show',
   kickBloom: 'show',
   melodyWalk: 'show',
@@ -150,6 +152,8 @@ const SECTION_OF: Record<string, string> = {
   moireSpin: 'moire',
   beatLead: 'audio-input',
   filmDrive: 'film',
+  // The video's framing (PLAN 14ag), learnable in midi.ts, drawn in Video.
+  filmZoom: 'film', filmX: 'film', filmY: 'film',
   // The four masters, with the patch bay they pull down.
   filmImpact: 'film',
   soundImpact: 'audio-input',
@@ -177,6 +181,10 @@ const SECTION_OF: Record<string, string> = {
   sideLight: 'lamp',
   sideLightHue: 'lamp',
   sideLightAngle: 'lamp',
+  polariser: 'lamp',
+  analyserAngle: 'lamp',
+  quarterWave: 'lamp',
+  birefringence: 'lamp',
   tank: 'camera',
   tankFeed: 'camera',
   tankWeight: 'camera',

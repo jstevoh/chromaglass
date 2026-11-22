@@ -14,7 +14,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 
 - `App.tsx` owns settings and show state, with the hooks in `src/app/`, and hands them down through `DeskProps`; the desk changes them only through those callbacks.
 - Layout and tabs come from `lib/deskLayout`, `lib/deskTabs` via `hooks/useDeskLayout`.
-- Imports `src/lib`, `src/types`, `src/brand`, `../ui` and a few siblings (`MixerPanel`, `CartoonShelf`, `SongScore`, `PanelGuard`, `ToolAmount`, `AlphaBadge`, `portalBody`). Never `src/gpu` or `LiquidVisualizer`.
+- Imports `src/lib`, `src/types`, `src/brand`, `../ui` and a few siblings (`MixerPanel`, `VideoShelf`, `SongScore`, `PanelGuard`, `ToolAmount`, `AlphaBadge`, `portalBody`). Never `src/gpu` or `LiquidVisualizer`.
 - `phone/PhoneStage.tsx` reuses `TabStrip`. `App.tsx` and the hooks in `src/app/` import the desk's types (`Cue`, `SetAction`, `Command`).
 
 ## Files

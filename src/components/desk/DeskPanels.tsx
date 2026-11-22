@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
-import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
+import { ImagePlus, Palette, SlidersHorizontal, Video } from 'lucide-react';
+import { PicturePaletteButton } from '../PicturePaletteButton';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
-import { CartoonShelf } from '../CartoonShelf';
+import { VideoShelf } from '../VideoShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
@@ -721,6 +722,15 @@ function DyesBody({ p }: { p: DeskProps }) {
         </>,
         portalBody,
       )}
+      {p.onPicturePalette && (
+        <PicturePaletteButton
+          onFile={p.onPicturePalette}
+          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-60"
+          testId="picture-palette"
+        >
+          <Palette size={13} className="mr-1.5 inline" /> Palette from a picture or video…
+        </PicturePaletteButton>
+      )}
       <div className="flex gap-1.5">
         <button
           onClick={p.onImageDye}
@@ -737,10 +747,12 @@ function DyesBody({ p }: { p: DeskProps }) {
           <Video size={13} className="mr-1.5 inline" /> Pour a video…
         </button>
       </div>
-      {p.cartoons && (
+      {/* The video loaded (PLAN 14ag), from Pour a video… here or Video file
+          in the Video panel: one row, Play and Pour, either or both. */}
+      {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Cartoons</span>
-          <CartoonShelf {...p.cartoons} />
+          <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
+          <VideoShelf {...p.video} prefix="dyes-" />
         </div>
       )}
     </div>

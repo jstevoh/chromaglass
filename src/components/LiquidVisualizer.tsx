@@ -42,6 +42,7 @@ import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFra
 import { stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
+import { levelHandTilt, makeHandTilt, stepHandTilt, tipPlate } from '../lib/handTilt';
 import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, rockPast, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -75,6 +76,7 @@ import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
+import { dropBottle, layStream } from '../sim/dropSplash';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
@@ -554,6 +556,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** How the second layer is currently viewed (zoom about the centre plus drift), for brush mapping. */
   const layer1ViewRef = useRef({ zoom: 1, dx: 0, dy: 0 });
   const externalTiltRef = useRef({ x: 0, y: 0, at: -1e9 });
+  const handTiltRef = useRef(makeHandTilt());
   const chemRef = useRef(new ChemistryField(GRID_SIZE));
   /**
    * The steady part of the room's flow, learned and subtracted. Two floats a
@@ -642,11 +645,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
   /** Told when a captured window is taken away from the browser's side. */
   const filmEndedRef = useRef<(() => void) | null>(null);
-  /** Frames the plate's loop found a poured video ready to read, for `npm run cartoons`. */
+  /** Frames the plate's loop found a poured video ready to read, for `npm run myvideo`. */
   const videoPourReadsRef = useRef(0);
   /*
     What the plate holds as its pour and its film, under `?debug`, so
-    `npm run cartoons` can ask whether the video it watched play is the one the
+    `npm run myvideo` can ask whether the video it watched play is the one the
     plate reads, not only that some video played. Set apart from
     `chromaglassDebug` (which waits for the GPU) because the hand-over is the
     same with or without one.
@@ -656,7 +659,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     stopped in the GL effect's cleanup, which also runs on a rebuild (a lost
     device, a resolution change: `glEpoch`), so a loop, the camera or a
     window went dark on the projector while the panel still said it was
-    playing. Found by `npm run cartoons` on software WebGPU (PW_WEBGPU=1):
+    playing. Found by the cartoons check on software WebGPU (PW_WEBGPU=1):
     a second and a half after Film the projector held no film and the video
     had been reset; with the stop moved here, it plays on (16/16).
   */
@@ -1192,8 +1195,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         break;
       case 'drop': {
         const liq = selectedLiquidRef.current;
-        if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
-        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose, !liq?.behaviour);
+        dropBottle(af, x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), amt);
         af.addTemp(x, y, 0.6 * amt);
         break;
       }
@@ -1275,8 +1277,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       default: { // dropper
         const liq = selectedLiquidRef.current;
-        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
-        layBottle(af, x, y, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), liq, kTool);
+        dropBottle(af, x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), kTool, af.dtSeconds);
       }
     }
   };
@@ -3124,7 +3125,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (p.age < HAND_SETTLE && !p.fresh) continue;
             const speed = Math.hypot(p.vx, p.vy);
             const size = Math.min(1, p.area * 8);
-            const color = harmony.length ? PALETTE[harmony[p.id % harmony.length]].hex : undefined;
+            const color = PALETTE[harmony[p.id % harmony.length]]?.hex; // a 43d picture dye: none
 
             if (p.fresh) {
               performGesture({ tool: 'drop', x: p.x, y: p.y, color, layer: 0, amount: roomHands * (0.35 + 0.4 * size) });
@@ -3469,34 +3470,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   hand.laid.drops++;
                   hand.laid.dye += amt * poured.dose;
-                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose, !liq?.behaviour);
+                  dropBottle(af, x, y, amt, rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE), k, DROP_EVERY * af.dtSeconds);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
-                  if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k, DROP_EVERY * af.dtSeconds);
                 }
               } else {
-                // dropper (default)
-                // Wider as well as denser: a held drop fills to the plate's
-                // density ceiling in its middle, so more dye there alone would
-                // not show; a drop with more in it spreads further.
+                // dropper (default). Wider as well as denser: a held drop fills
+                // to the plate's density ceiling in its middle, so a drop with
+                // more in it spreads further. On a thin gap its colour comes
+                // in with its volume (sim/dropSplash.ts, layStream), and the
+                // properties of soap, milk or glycerine on the same disc.
                 const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
                 const amt = (liq?.injectAmount ?? 0.8) * k * poured.dose;
                 hand.laid.steps++;
-                for (let dy = -r; dy <= r; dy++) {
-                  for (let dx = -r; dx <= r; dx++) {
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist > r) continue;
-                    const nx = x + dx, ny = y + dy;
-                    if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
-                    const w = (1 - dist / r) ** 2;
-                    hand.laid.dye += amt * w;
-                    af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
-                    if (heat > 0) af.addTemp(nx, ny, heat * w);
-                  }
-                }
-                // Soap, milk, silicone and glycerine put their properties into
-                // the plate on the same disc as their colour, and the plate
-                // keeps acting on them long after the drop.
-                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k, af.dtSeconds);
+                hand.laid.dye += layStream(af, x, y, r, amt, poured.dose * (liq?.injectAmount ?? 0.8) / 0.8, rgb.r, rgb.g, rgb.b, heat, liq?.behaviour, k);
               }
             }
             // Counted after the step it was read on (see the clock above).
@@ -4359,22 +4345,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
             stepRock(rock, simStepS);
             const [swingX, swingY] = rockSwing(rock, R, ...swayAt(noise2D, time));
-            // A phone held by the projectionist: its tilt is the plate's, fading
-            // out a couple of seconds after the last reading if the link drops.
-            const ext = externalTiltRef.current;
-            const extAge = showNow() * 0.001 - ext.at;
-            const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
-            const tiltX = swingX * HOLD_TILT + ext.x * 0.0045 * extK;
-            const tiltY = swingY * HOLD_TILT + ext.y * 0.0045 * extK;
             /*
               The plate takes the swing itself (±1–2 at full), scaled by the
-              slider; the phone's tilt joins it. On a thin gap that is the
-              plate tipped (× CUR_ROCK, sinθ), and a phone held tipped slides
-              the colour downhill while held, as a dish tipped in the hand
-              does (PLAN 27a).
+              slider, and a hand's tip joins it: the phone's and the Tilt
+              knobs' (lib/handTilt.ts). On a thin gap that is the plate
+              tipped (× CUR_ROCK, sinθ), PLAN 27a.
             */
-            const rockX = swingX + ext.x * 1.1 * extK;
-            const rockY = swingY + ext.y * 1.1 * extK;
+            const hand = handTiltRef.current;
+            stepHandTilt(hand, externalTiltRef.current, showNow() * 0.001, currentSettings.plateTiltX, currentSettings.plateTiltY, simStepS);
+            for (const fluid of fluidsRef.current) { tipPlate(fluid, hand, swingX, swingY); fluid.rockGain = rockPast(R); fluid.swingX = swingX; fluid.swingY = swingY; }
+            // The lead plate's, for the cover, the beads and the bubbles.
+            const lead = fluidsRef.current[0];
+            const tiltX = lead ? lead.tiltX : swingX * HOLD_TILT, tiltY = lead ? lead.tiltY : swingY * HOLD_TILT;
+            const rockX = lead ? lead.rockX : swingX, rockY = lead ? lead.rockY : swingY;
             /*
               And the cover glass slides on its film as the pair tips, and
               drags the liquid with it (lib/plateRock.ts, PLAN 27a-1), so a
@@ -4391,12 +4374,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             stepCover(cover, plateSin(tiltX, rockX), plateSin(tiltY, rockY),
               coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS, 1000, currentSettings.coverWeight, fluidsRef.current[0]?.gpu?.coverMetres), simStepS,
               coverRoom(currentSettings.frameSway));
-            for (const fluid of fluidsRef.current) {
-              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; fluid.rockGain = rockPast(R);
-              fluid.coverX = cover.vx; fluid.coverY = cover.vy;
-              fluid.extTiltX = ext.x * extK; fluid.extTiltY = ext.y * extK;
-              fluid.swingX = swingX; fluid.swingY = swingY;
-            }
+            for (const fluid of fluidsRef.current) { fluid.coverX = cover.vx; fluid.coverY = cover.vy; }
 
             // ── Oil beads ───────────────────────────────────────
             {
@@ -5329,6 +5307,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         onBackLookClearedRef.current?.();
       }
       externalTiltRef.current = { x: 0, y: 0, at: -1e9 };
+      levelHandTilt(handTiltRef.current);
       journeyRef.current.lastAt = -1;
       flashRef.current.reset();
       flashGainRef.current = 1;
@@ -5656,6 +5635,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // under `?debug`.
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
+        /** What `prepareShow` built ahead and each pipeline built on a frame; the page's, so a setup with no renderer yet (a lost device's) still has it (PLAN 14v-12b). */
+        pipelines: pipelinesSeen,
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
         padPicture: padPictureSender()?.debug ?? null,
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
@@ -6787,13 +6768,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           },
           /** The kit checked on this GPU: a compute pipeline, a ping-pong pair, the readback ring, the profiler. */
           kitSelfTest: () => (stage ? kitSelfTest(stage.device, stage.gpu.timestamps) : null),
-          /**
-           * How the show's pipelines were built: what `prepareShow` built
-           * ahead for the opening (and for every device since), and every
-           * one built on a frame on any device this page has had (`npm run
-           * startup` reads it).
-           */
-          pipelines: pipelinesSeen,
           /**
            * Twelve red-black sweeps against twenty-four Jacobi passes on one
            * divergence field, by the residual each leaves (H2). The claim
