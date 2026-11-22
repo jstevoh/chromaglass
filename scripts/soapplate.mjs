@@ -89,7 +89,7 @@ const check = (name, ok, detail = '') => {
   takes its ids out of --owed in scripts/checks.json and never edits a line or
   a bar. An owed line is excused only while the plate still draws main's film,
   which is told by the transmission main measures (MAIN_T in section 7,
-  within 0.02): a build that changes the composite moves it, and a build that
+  within 0.005): a build that changes the composite moves it, and a build that
   is there and misses is then red, owed or not. A half-built item (the
   composite moved to linear light with the gain of 4 kept, say) lands outside
   main's window and under the bar, so it is red too.
@@ -201,12 +201,66 @@ try {
       reflected light, the same over both, cancels), and their ratio, in
       linear light, is the film's transmission T. The lamp's fall-off and
       whatever the plate does behind the film divide out, so a ground that is
-      not flat cannot move it; and the pixels are decoded one by one before
-      they are summed, because a sum of encoded values is not light.
+      not flat cannot move it.
+
+      Light, not pixels. The ratio is of light only if the picture is linear
+      in light, and the plate's is not: decoding sRGB undoes the encode but
+      not the tone map and the plate's own response, and measured on main
+      (2026-11-21) the plate under half the lit plate's light reads 0.5505
+      of it in decoded pixels where the light is 0.4977 of it, 10.6% high,
+      so a share taken from the light is misread by about as much.
+      So the harness measures the plate's response here and inverts it: the
+      film-off plate is drawn under a ramp of LED levels (0, 12, … 252, 255
+      on all three channels), which at every pixel and channel gives the
+      pixel value each level of light makes, and a pixel of any picture is
+      then read back, at that pixel and channel, as the LED light that would
+      have made it, interpolated between the two levels either side (and
+      carried on the end segment's slope past either end). The light of an
+      LED level is its colour decoded: the setting is a CSS colour, sRGB
+      encoded, as every colour the owner picks is. Doing it per pixel takes
+      the lamp's fall-off and the plate's ground out of the response too;
+      what is read back is light in the LED's units, which a sum and a ratio
+      can be taken of. The control in section 7 checks the inversion on a
+      level that is not one of the ramp's.
     */
     const dec = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-    // Linear luminance summed over each film column (two pixels a cell), rows clear of the border.
+    // The plate is lit from below by the LED platform (bare has it off, so its ledColor alone lights nothing); dark is the same platform at black.
+    const lit = { ...bare, ledPlatform: true, ledMode: 'single', ledColor: '#c8c8c8', soapFilmAngle: 0 };
+    const dark = { ...bare, ledPlatform: true, ledMode: 'single', ledColor: '#000000', soapFilmAngle: 0 };
+    const grey = (g) => `#${g.toString(16).padStart(2, '0').repeat(3)}`;
+    const LEVELS = []; for (let g = 0; g <= 252; g += 12) LEVELS.push(g); LEVELS.push(255);
+    const LIGHT = LEVELS.map(dec);
+    const ramp = [];
+    for (const g of LEVELS) ramp.push(await lab.render(R, { ...lit, soapFilm: 0, ledColor: grey(g) }, cam));
+    const last = LEVELS.length - 1;
+    let flat = 0;
+    // A pixel's value read back as the LED light that would have made it there, channel by channel.
+    const toLight = (px) => {
+      const out = new Float32Array(R * R * 3);
+      for (let p = 0; p < R * R; p++) for (let c = 0; c < 3; c++) {
+        const k = p * 4 + c, v = px[k];
+        let j = 0;
+        while (j < last - 1 && ramp[j + 1][k] < v) j++;
+        // A flat end segment (a channel clipped at 255, or two dark levels one value apart) has no slope to read: step in to one that has.
+        while (j > 0 && ramp[j + 1][k] - ramp[j][k] < 1) j--;
+        while (j < last - 1 && ramp[j + 1][k] - ramp[j][k] < 1) j++;
+        const a = ramp[j][k], b = ramp[j + 1][k];
+        if (b - a < 1) { flat++; out[p * 3 + c] = 0.5 * (LIGHT[j] + LIGHT[j + 1]); continue; }
+        out[p * 3 + c] = LIGHT[j] + ((v - a) / (b - a)) * (LIGHT[j + 1] - LIGHT[j]);
+      }
+      return out;
+    };
+    // Luminance of that light summed over each film column (two pixels a cell), rows clear of the border.
     const colY = (px) => {
+      const L = toLight(px), s = new Array(N).fill(0);
+      for (let y = 8; y < R - 8; y++) for (let x = 0; x < R; x++) {
+        const k = (y * R + x) * 3;
+        s[x >> 1] += 0.2126 * L[k] + 0.7152 * L[k + 1] + 0.0722 * L[k + 2];
+      }
+      return s;
+    };
+    // The same sum of the pixels only decoded, as the harness read them before the inversion: the control prints it beside the inverted reading.
+    const colDec = (px) => {
       const s = new Array(N).fill(0);
       for (let y = 8; y < R - 8; y++) for (let x = 0; x < R; x++) {
         const k = (y * R + x) * 4;
@@ -214,9 +268,19 @@ try {
       }
       return s;
     };
-    // The plate is lit from below by the LED platform (bare has it off, so its ledColor alone lights nothing); dark is the same platform at black.
-    const lit = { ...bare, ledPlatform: true, ledMode: 'single', ledColor: '#c8c8c8', soapFilmAngle: 0 };
-    const dark = { ...bare, ledPlatform: true, ledMode: 'single', ledColor: '#000000', soapFilmAngle: 0 };
+    /*
+      The control: a neutral filter of a half, made as the plate under half
+      the lit plate's light (#929292, whose decoded light is 0.497 of
+      #c8c8c8's; neither is a level of the ramp, so it is the interpolation
+      and the per-pixel response being tested, not a lookup of a node). Its
+      read-back light over the lit plate's, each less the dark plate's, must
+      be that 0.497.
+    */
+    {
+      const half = await lab.render(R, { ...lit, soapFilm: 0, ledColor: '#929292' }, cam);
+      const full = await lab.render(R, { ...lit, soapFilm: 0 }, cam), none = await lab.render(R, { ...dark, soapFilm: 0 }, cam);
+      o.ctrl = { half: colY(half), full: colY(full), none: colY(none), halfDec: colDec(half), fullDec: colDec(full), noneDec: colDec(none), want: dec(0x92) / dec(0xc8) };
+    }
     const through = async () => ({
       onLit: colY(await lab.render(R, lit, cam)), onDark: colY(await lab.render(R, dark, cam)),
       offLit: colY(await lab.render(R, { ...lit, soapFilm: 0 }, cam)), offDark: colY(await lab.render(R, { ...dark, soapFilm: 0 }, cam)),
@@ -227,6 +291,7 @@ try {
     o.wedge = await through();
     film().film.write(new Float32Array(N * N).fill(8));
     o.black = await through();
+    o.flat = flat;
     return o;
   }, { N, R });
 } finally {
@@ -443,11 +508,19 @@ const reported = (px) => {
 
   const tOf = (m, i) => (m.onLit[i] - m.onDark[i]) / (m.offLit[i] - m.offDark[i]);
   const w = res.wedge, b = res.black;
-  // The instrument: the lit plate must be lit, or every ratio below is noise over noise. The dark plate is not black (about 12% of the lit one's light is the plate's own ground and glow, measured on main), and lit − dark takes it out, so the bar asks only that most of it be the lamp.
+  // The instrument: the lit plate must be lit, or every ratio below is noise over noise. The dark plate need not be black (decoded only, about 12% of the lit one's light was the plate's own ground and glow; read back as light it is the ramp's level 0, so none), and lit − dark takes it out, so the bar asks only that most of it be the lamp.
   const ground = cols.reduce((s, i) => s + (w.offLit[i] - w.offDark[i]), 0) / cols.reduce((s, i) => s + w.offLit[i], 0);
   const groundY = cols.reduce((s, i) => s + w.offLit[i], 0) / (cols.length * 2 * (R - 16));
   check('control: the lit plate behind the film is lit (its own light over 0.2, and over 80% of what is seen with the film off)',
     groundY > 0.2 && ground > 0.8, `luminance ${groundY.toFixed(3)}, ${(100 * ground).toFixed(1)}% of it the plate's own`);
+  // The inversion (in the page, above): a half neutral filter must read as one.
+  {
+    const c = res.ctrl, sumOf = (a) => cols.reduce((s, i) => s + a[i], 0);
+    const got = (sumOf(c.half) - sumOf(c.none)) / (sumOf(c.full) - sumOf(c.none));
+    const raw = (sumOf(c.halfDec) - sumOf(c.noneDec)) / (sumOf(c.fullDec) - sumOf(c.noneDec));
+    check('control: read back through the plate\'s measured response, the plate under half its light (#929292 for #c8c8c8) reads that half to within 1%, so the ratios below are of light',
+      Math.abs(got / c.want - 1) < 0.01, `${got.toFixed(4)} against ${c.want.toFixed(4)} (${(100 * (got / c.want - 1)).toFixed(2)}%); the pixels only decoded read ${raw.toFixed(4)} (${(100 * (raw / c.want - 1)).toFixed(1)}%); ${res.flat} pixel channels on a flat segment`);
+  }
 
   /*
     The wedge. T in every column at least 0.92, and the share the film takes,
@@ -472,13 +545,16 @@ const reported = (px) => {
   const rho = sab / Math.sqrt(Math.max(1e-30, saa * sbb)), ratio = ma / ml;
   const worst = cols[T.indexOf(minT)];
   /*
-    Main's numbers, measured on main with this harness (2026-11-21: least 75.5% at 579 nm, mean 93.9%, black 102.3%): MAIN_T
-    holds them, the wedge's least and mean transmission and the black film's.
-    Main is excused while the plate draws them to within 0.02; any build of
-    32d-6 moves the composite and so these.
+    Main's numbers, measured on main with this harness and read back as
+    light (2026-11-21: least 82.8% at 591 nm, mean 107.6%, black 106.11%;
+    decoded only, before the inversion, they read 75.5%, 93.9% and 102.3%):
+    MAIN_T holds them, the wedge's least and mean transmission and the black
+    film's. Main is excused while the plate draws them to within 0.005, the
+    8-bit picture's reading error; any build of 32d-6 moves the composite
+    and so these.
   */
-  const MAIN_T = { wedgeMin: 0.755, wedgeMean: 0.939, black: 1.023 };
-  const nearMain = (v, m) => Math.abs(v - m) < 0.02;
+  const MAIN_T = { wedgeMin: 0.828, wedgeMean: 1.076, black: 1.061 };
+  const nearMain = (v, m) => Math.abs(v - m) < 0.005;
   line('wedge', 'a 0 to 1.5 µm film lets at least 92% of the plate through everywhere, in linear light, and what it takes follows Airy\'s R (correlation over 0.8, mean 0.6 to 1.4 of it)',
     minT >= 0.92 && rho > 0.8 && ratio > 0.6 && ratio < 1.4,
     `least ${(100 * minT).toFixed(1)}% at ${thick(worst).toFixed(0)} nm (Airy's there ${(100 * (1 - rBar(thick(worst)))).toFixed(1)}%), mean ${(100 * meanT).toFixed(1)}%; correlation with Airy ${rho.toFixed(3)}, ${ratio.toFixed(2)} of Airy's share`,
@@ -491,11 +567,20 @@ const reported = (px) => {
   /*
     Both ways: a lossless film can let through no more light than reaches it,
     so T over 1 is a film that adds light, which is what main draws (its
-    colour laid over the plate even at 8 nm, 102% measured). The ceiling's
+    colour laid over the plate even at 8 nm, 106% measured as light). The ceiling's
     half a percent is the 8-bit picture's reading error.
+
+    And only with a film there. A plate that draws no film at all lets all
+    of the light through at 8 nm and passes the black line alone, so black
+    is held with the wedge showing that a film is drawn: what the wedge
+    takes, 1 − T on average, over 2%. Airy's average share on this wedge is
+    about 4% (ml below, printed), and the 8-bit reading is good to about
+    half a percent, so 2% is half the law's and four times the reading's.
   */
-  line('black', 'a black film (8 nm) lets more than 99% of the plate through and no more than all of it (100.5%), in linear light',
-    tBlack > 0.99 && tBlack < 1.005, `${(100 * tBlack).toFixed(2)}% (Airy's ${(100 * (1 - lawBlack)).toFixed(2)}%)`, nearMain(tBlack, MAIN_T.black));
+  const drawn = ma > 0.02;
+  line('black', 'a black film (8 nm) lets more than 99% of the plate through and no more than all of it (100.5%), in linear light, with a film drawn (the wedge takes over 2% on average)',
+    tBlack > 0.99 && tBlack < 1.005 && drawn,
+    `${(100 * tBlack).toFixed(2)}% (Airy's ${(100 * (1 - lawBlack)).toFixed(2)}%); the wedge takes ${(100 * ma).toFixed(2)}% on average (Airy's ${(100 * ml).toFixed(2)}%)`, nearMain(tBlack, MAIN_T.black));
 }
 
 console.log(`\n${passed}/${passed + failed} checks passed`);

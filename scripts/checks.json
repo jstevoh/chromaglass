@@ -3290,7 +3290,7 @@
     {
       "name": "The heat",
       "shard": "open",
-      "run": "npm run heat -- --owed=lift,once",
+      "run": "npm run heat -- --owed=once",
       "why": [
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",

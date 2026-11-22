@@ -22,9 +22,7 @@
  *   9. The heat rides the liquid on a thin gap (PLAN 38f): a warm heavy blob sinking down a
  *      standing plate takes its heat with its colour (carryHeat)
  *
- * Owed lines (PLAN 36e-6), red until built, run as `npm run heat -- --owed=lift,once`:
- *   lift  warm water on a standing water gap rises at the Hele-Shaw speed of its own
- *         Boussinesq lift, (ρ(20 °C) − ρ(T))·g·h²/(12·μ(T)), with water's μ at the patch's T
+ * Owed line (PLAN 36e-6), red until built, run as `npm run heat -- --owed=once`:
  *   once  the lamp's heat diffuses once: a 50 K spot on a level plate spreads as
  *         4·κ·t with the sandwich's κ, and the same at Double Diffusion 0 and 1
  */
@@ -43,7 +41,7 @@ const check = (name, ok, detail = '') => {
   it misses while the code has left main's state (half built, or built and
   wrong) it is a FAIL, so a build cannot hide behind the excuse.
 */
-const IDS = ['lift', 'once'];
+const IDS = ['once'];
 const flag = process.argv.find((a) => a.startsWith('--owed='));
 const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
 const unknown = [...owed].filter((id) => !IDS.includes(id));
@@ -54,76 +52,6 @@ const line = (id, name, ok, detail, mainState) => {
   if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
   if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
   console.log(` owed  ${name} — ${detail}`);
-};
-
-/*
-  Water's own data, typed here from the tables and not read from the code,
-  so a build that changes the code's numbers cannot move the bar with them.
-  Density: Kell's 1975 fit for air-free water at one atmosphere, kg/m³, good
-  to a few ppm from 0 to 100 °C. Viscosity: Vogel's equation as usually
-  fitted to water, μ = 2.414e-5·10^(247.8/(T − 140 K)) Pa·s, which gives
-  1.00 mPa·s at 20 °C, 0.65 at 40, 0.47 at 60 and 0.35 at 80 (the handbook's
-  1.002, 0.653, 0.467, 0.355). The lamp's heat lives in the solver as the
-  rise above 20 °C, so T here is 20 plus the field's number.
-*/
-const kellRho = (t) => (999.83952 + 16.945176 * t - 7.9870401e-3 * t * t - 46.170461e-6 * t ** 3
-  + 105.56302e-9 * t ** 4 - 280.54253e-12 * t ** 5) / (1 + 16.879850e-3 * t);
-const vogelMu = (t) => 2.414e-5 * 10 ** (247.8 / (t + 273.15 - 140));
-
-/*
-  The Hele-Shaw rise of a warm field, solved here in node on the field the
-  solver wrote, so the prediction is the real law applied to whatever
-  temperatures the plate actually holds (a patch that has spread, cooled or
-  lost heat is predicted from what it is, not from what was laid).
-
-  In a gap of height h the gap-averaged flow is Darcy's: u = M·(f − ∇p),
-  with mobility M = h²/(12·μ(T)) and the Boussinesq body force
-  f = (ρ(20 °C) − ρ(T))·g pointing up the standing plate, and ∇·u = 0. The
-  dish is sealed (the standing plate is the sealed bottle, PLAN 27f-9), so
-  its rim carries no flow: a face to a cell outside the dish has zero
-  mobility, which is the Neumann wall, and the warm water's rise is paid for
-  by cool water coming down beside it, as in the real thing. The pressure is
-  solved by red-black SOR on the cell grid with harmonic-mean face
-  mobilities (the face between a hot and a cold cell is as stiff as the
-  stiffer, which is how the series resistance of two half cells adds), and
-  the vertical speed of each cell is the mean of its two faces' fluxes. The
-  result is the weighted mean of that speed under `weight` (the dye that
-  marks the warm water), in m/s.
-*/
-const hsRise = (v, weight, N, W, h) => {
-  const g = 9.81, dx = W / N, n = N * N;
-  const M = new Float64Array(n), F = new Float64Array(n), ins = new Uint8Array(n), p = new Float64Array(n), rhs = new Float64Array(n);
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const k = j * N + i, x = (i + 0.5) / N - 0.5, y = (j + 0.5) / N - 0.5;
-    ins[k] = x * x + y * y < 0.25 && i > 0 && j > 0 && i < N - 1 && j < N - 1 ? 1 : 0;
-    const t = 20 + (ins[k] ? Math.max(0, v[k * 4 + 2]) : 0);
-    M[k] = (h * h) / (12 * vogelMu(t));
-    F[k] = (kellRho(20) - kellRho(t)) * g;
-  }
-  const face = (a, b) => (ins[a] && ins[b] ? (2 * M[a] * M[b]) / (M[a] + M[b]) : 0);
-  for (let k = 0; k < n; k++) if (ins[k]) {
-    rhs[k] = dx * (face(k, k + N) * 0.5 * (F[k] + F[k + N]) - face(k, k - N) * 0.5 * (F[k] + F[k - N]));
-  }
-  const om = 2 / (1 + Math.sin(Math.PI / N));
-  for (let it = 0; it < 4000; it++) for (let par = 0; par < 2; par++) {
-    for (let j = 1; j < N - 1; j++) for (let i = 1 + ((j + par) & 1); i < N - 1; i += 2) {
-      const k = j * N + i;
-      if (!ins[k]) continue;
-      let s = 0, d = 0;
-      for (const q of [k + 1, k - 1, k + N, k - N]) { const m = face(k, q); d += m; s += m * p[q]; }
-      if (d > 0) p[k] += om * ((s - rhs[k]) / d - p[k]);
-    }
-  }
-  let sw = 0, su = 0;
-  for (let k = 0; k < n; k++) {
-    if (!ins[k]) continue;
-    const w = Math.max(0, weight[k * 4 + 3]);
-    if (!(w > 0)) continue;
-    const ut = face(k, k + N) * (0.5 * (F[k] + F[k + N]) - (p[k + N] - p[k]) / dx);
-    const ub = face(k, k - N) * (0.5 * (F[k] + F[k - N]) - (p[k] - p[k - N]) / dx);
-    sw += w; su += w * 0.5 * (ut + ub);
-  }
-  return su / sw;
 };
 
 const { page, close } = await openLab();
@@ -448,102 +376,42 @@ try {
     `colour moved ${rides.dyeShift.toFixed(2)} cells, heat ${rides.heatShift.toFixed(2)} (0 without the carry), heat kept ${(rides.kept * 100).toFixed(1)}%`
   );
 
-  // ── owed 36e-6 (lift): warm water rises at its Hele-Shaw speed ──
+  // ── 36e-6 (lift): not a line yet, and why ──
   /*
-    What the audit found (PLAN 36e-6, the realism audit's row 10): the
-    lamp's buoyancy is added to the current after the current's speed cap,
-    so how fast warm water rises is the cap and the Buoyancy knob, not the
-    water. Measured here in main, a hot patch's marked water climbs a
-    standing water gap at 17 to 170 mm/s whatever its temperature does,
-    four to ninety times what its own lift can drive, and with the boil
-    running it climbs at the same speed at Buoyancy 0 (the motion is not the
-    heat's at all).
+    The item also asks that warm water rise at the Hele-Shaw speed of its own
+    lift, (ρ(20 °C) − ρ(T))·g·h²/(12·μ(T)) with water's μ at the patch's T. A
+    line for it was written (an 80 °C patch, dyed, low on a standing water
+    gap, its dye's rise between 2.5 and 3 s held to a Darcy solve on the
+    plate's own temperature field, bar 0.85 to 1.15), and a review of it
+    measured on main (2026-11-21) that building 36e-6 alone cannot pass it,
+    so it is not owed here: an owed line has to be one the item's build can
+    turn green. Main's numbers:
 
-    The real law. Water at T is lighter than the water round it by
-    ρ(20 °C) − ρ(T) (Kell), so it is pushed up a standing plate with a body
-    force of that times g; in a gap of h = 2 mm (the rest gap, PLAN 38r) the
-    flow is Hele-Shaw, u = h²/(12·μ(T))·(f − ∇p), and the warm water's own
-    viscosity μ(T) is water's at its temperature (Vogel: 0.35 mPa·s at
-    80 °C, a third of the cold water's), so the speed of the patch is the
-    Darcy solve hsRise above on the plate's own temperature field. An 80 °C
-    patch 12 mm across starts at about 20 mm/s by that solve.
+      as written                         dye rises 11.61 mm/s
+      Buoyancy 0                                    9.65 mm/s
+      no heat patch at all                         16.56 mm/s
+      boil off                    about 143 mm/s in 0.5 s
+      plate level                                   0.00 mm/s
+      heat kept on the standing plate     0.20 / 0.09 (0.09 after 3 s)
 
-    The line lays an 80 °C patch, dyed so its water can be followed, low on
-    a standing plate of water (Gap Thickness 0, the app's grid of 192, the
-    app's cap of three quarters of a cell a step, the boil running at a
-    whisper of lamp heat with the lamp dimmed so no new heat comes in, the
-    default Buoyancy of 0.45, Heat Decay 1), and measures the dye's centre
-    between 2.5 and 3 s against hsRise on the fields at both ends of that
-    half second. The dye is the tracer and not the heat's centre because a
-    heat centre moves when heat is lost unevenly (the cool upper glass takes
-    heat, PLAN 27f-9e), which is a motion of nothing; the dye's centre moves
-    only when water does (it is conserved, kept 1.000 here, and has no
-    weight with Solutal Buoyancy 0). The window starts at 2.5 s because the
-    gap's flow has a memory, ρh²/(12μ), 0.9 s for 80 °C water at 2 mm
-    (scripts/gap.mjs holds the solver to it), so a faithful plate is still
-    approaching its terminal speed for the first seconds: by 2.5 s it is
-    within 7% of it at the hottest. Bar: 0.85 to 1.15 of hsRise.
-
-    Why a look cannot pass. The bar is a ratio to the solve on the plate's
-    own field, so tuning the Buoyancy knob or the cap until a plume looks
-    right moves the measured speed but not the prediction, and only one
-    lift per kelvin per viscosity matches it at every temperature the
-    patch passes through. A build that lifts with cold water's viscosity
-    rises at about a half to a third of the bar's speed (μ(20)/μ(T)), and
-    one whose lift is linear in ΔT with water's 20 °C expansion (2.1e-4/K)
-    misses at 80 °C by Kell's curvature (water's β triples by 80 °C), both
-    red. What the build must add (PLAN 36e-6, and 38f's hsBody): while the
-    boil runs, the warm water's Boussinesq lift (ρ(20 °C) − ρ(T))·g in N/m³
-    is a body force in the thin gap's Hele-Shaw solve, at the default
-    Buoyancy, outside the current's speed cap, with the gap's mobility at
-    μ(T) (hsPrep's tempVisc today, exp(−0.02·ΔT) clamped at 50 K, is
-    within 5% of Vogel to 70 °C).
-
-    mainState: the marked water outruns its lift by more than twice, which
-    is main (4 to 90 times, in every window) and no build that lays the
-    lift in the gap's solve.
+    Two things the line does not own move the water. The dye climbs a
+    standing plate with no heat laid at all, faster than with it: most
+    likely the lamp-floor kick of the capillary pass reading the dye as wax
+    (src/gpu/wgsl/fluid/capillary.ts, around line 426), a lift that has
+    nothing to do with temperature. And the heat is gone too soon to lift
+    anything: with the boil live on a standing plate, 9% of it is left after
+    3 s, where air cooling the two faces of a 2 mm water gap between two
+    1 mm glasses takes minutes: the sandwich holds ρc·d ≈ 1.26e4 J/(m²·K)
+    (water 4.18e6 × 2 mm, glass 2.1e6 × 2 mm), so at h = 10 W/(m²·K) a face
+    (still air and radiation) it falls to 1/e in ρc·d / 2h ≈ 630 s, and even
+    a generous 50 a face leaves two minutes; main's falls to 1/e in about
+    1.2 s (9% left at 3 s is e to the −2.4). So lift
+    waits on two other fixes, the dye's own climb and the boil's heat loss
+    on a standing plate, and comes back as a line after them, with its
+    prediction (Kell's density and Vogel's viscosity for water, a Darcy
+    solve with harmonic-mean face mobilities on the sealed dish) as the
+    draft had it.
   */
-  {
-    const N = 192, W = 0.2, h = 0.002, dx = W / N;
-    const snaps = await page.evaluate(async (N) => {
-      await lab.create(N, N);
-      for (let k = 0; k < 40 && !lab.solver().sealReady(); k++) await new Promise((q) => setTimeout(q, 250));
-      lab.dye(0.5, 0.2, 0.06, [1, 1, 1], 1.0);
-      lab.vel(0.5, 0.2, 0.06, [0, 0, 60, 0]);
-      lab.flush();
-      const over = { thinGap: 1, gapThickness: 0, plateUpright: 1, gravityX: 0, gravityY: -1, solutalBuoyancy: 0,
-        heat: 0.001, dimmer: 0, heatDecay: 1, currentBuoy: 0.45 * 0.3, maxCurrent: 0.75 / ((1 / 60) * (N - 2)),
-        dt: 1 / 60, magnetSeconds: 1 / 60 };
-      const out = [];
-      let done = 0;
-      for (const at of [1, 150, 180]) {
-        await lab.step(at - done, over);
-        done = at;
-        out.push({ at, v: Array.from(await lab.field('vel')), d: Array.from(await lab.field('dye')) });
-      }
-      return out;
-    }, N);
-    const mom = (s) => {
-      let a = 0, ay = 0, heat = 0;
-      for (let k = 0; k < N * N; k++) {
-        const w = s.d[k * 4 + 3];
-        a += w; ay += w * (Math.floor(k / N) + 0.5);
-        heat += Math.max(0, s.v[k * 4 + 2]);
-      }
-      return { a, y: ay / a, heat };
-    };
-    const [m0, m1, m2] = snaps.map(mom);
-    const seconds = (snaps[2].at - snaps[1].at) / 60;
-    const measured = ((m2.y - m1.y) * dx) / seconds;
-    const predicted = 0.5 * (hsRise(snaps[1].v, snaps[1].d, N, W, h) + hsRise(snaps[2].v, snaps[2].d, N, W, h));
-    const start = hsRise(snaps[0].v, snaps[0].d, N, W, h);
-    const ratio = measured / predicted;
-    line('lift',
-      'warm water rises at the Hele-Shaw speed of its own Boussinesq lift at its own viscosity (PLAN 36e-6)',
-      Number.isFinite(ratio) && ratio > 0.85 && ratio < 1.15,
-      `dye rose ${(measured * 1000).toFixed(2)} mm/s over 2.5–3 s, its lift drives ${(predicted * 1000).toFixed(2)} (${start * 1000 > 0 ? (start * 1000).toFixed(1) : '?'} at the start), ratio ${ratio.toFixed(2)}, bar 0.85–1.15; heat kept ${(m2.heat / m0.heat).toFixed(2)}, dye kept ${(m2.a / m0.a).toFixed(3)}`,
-      Number.isFinite(ratio) && ratio > 2);
-  }
 
   // ── owed 36e-6 (once): the lamp's heat diffuses once ──
   /*

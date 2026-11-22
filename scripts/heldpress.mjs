@@ -162,6 +162,7 @@ const line = (id, name, ok, detail, mainState) => {
   goes in src/lib/pressRing.ts (whose exports are in scope here); a name the
   paths use that is not in scope fails the line by name.
 */
+let nodeTwist = null;
 {
   const fs = await import('node:fs');
   const out = 'node_modules/.cache/heldpress-press.mjs';
@@ -224,17 +225,124 @@ const line = (id, name, ok, detail, mainState) => {
   const local = found ? await press(localBody, plain, 30 * GS, { k: 1, kSoft: 1 }) : null;
   const remotes = found ? await Promise.all(AMTS.map((amt) => press(remoteBody, asCase, (20 + 12 * amt) * GS, { amt }))) : [];
   const say = (name, r) => `${name}: |Γ| ${r.ratio.toFixed(3)} of ∮|u|dl over ${r.writes} velocity writes, ${r.squish} squeezes${r.squeezed ? '' : ' (the squeeze does not reach the solver)'}${r.error ? `, threw ${r.error}` : ''}${r.unknown.length ? `, unknown calls ${r.unknown.join(', ')}` : ''}`;
-  line('presstwist', 'a press squeezes the film and writes no turning: the circulation round its palm is under 1% of its flow, the hand\'s and the remote\'s alike, and its squeeze reaches the solver',
-    found && local.ok && remotes.every((r) => r.ok),
-    found ? [say('the hand', local), ...remotes.map((r, i) => say(`the remote at ${AMTS[i]}`, r))].join('; ') : 'the press paths were not found in LiquidVisualizer (renamed?)',
+  // Printed with the solver's twin, in the lab below: one line, both halves.
+  nodeTwist = {
+    ok: found && local.ok && remotes.every((r) => r.ok),
+    detail: found ? [say('the hand', local), ...remotes.map((r, i) => say(`the remote at ${AMTS[i]}`, r))].join('; ') : 'the press paths were not found in LiquidVisualizer (renamed?)',
     // Main's: the hand's press writes a vortex, so its circulation is (nearly) all of its flow.
-    found && !local.error && local.ratio > 0.5);
+    mainState: found && !local.error && local.ratio > 0.5,
+  };
 }
 
 const { page, close } = await openLab();
 try {
   const over = glass(await page.evaluate(() => lab.look('classic').settings));
   console.log(`  Classic's glass at dt ${DT}: spring ${over.gapSpring.toExponential(2)}, memory ${over.gapMemory.toFixed(5)}, pressure ${over.platePressure}, dome ${over.plateCurve}`);
+
+  /*
+    The press's twist, on the solver (the lab twin of the node half above,
+    the same id, PLAN 15g-18). The node half runs the app's press paths with
+    stand-ins and holds what they write; it cannot see what the solver makes
+    of a press. Here the press's two real halves, squishDisc (the very
+    function FluidSimulation.applySquish runs, lab.squish) at the hand's
+    three radii 30, 18 and 8 times GRID_SCALE (45, 27, 12 cells of the 192
+    plate) and amount 0.004 a frame, and squeezeOut's oil half (pressOil,
+    pressTake's share; its dye half writes no velocity), are laid at a palm
+    for six steps and flushed as the app flushes them, on Classic's thick
+    gap and on a thin gap (where the disc lays only the glass, as a bowl,
+    and the flow is the gap's source in the projection). Then the solver's
+    own velocity field is read and held to the law's: the circulation round
+    circles at 0.3, 0.5, 0.7 and 0.9 of the palm, sampled bilinearly at the
+    cells' middles, is under 1% of ∮|u| dl round the same circles, on both
+    gaps. What the twin adds over the node half: a twist written anywhere
+    else (in squishDisc's own velocity, in the projection's source, in the
+    gap's spring) shows here and not there. On main the twist is written by
+    LiquidVisualizer and not by either half, so the twin may well pass on
+    main; the line is owed for the node half.
+
+    Two controls, so a ratio of nothing cannot pass: the press must move
+    the liquid (∮|u| over a hundred times a still plate's, stepped the same),
+    and the instrument must see a turning when there is one. A vortex laid
+    alone through the solver (addVel, the same palm, (1 − r/R)² r̂⊥) reads a
+    ratio near 1; and the press's own field with that vortex added at 2% of
+    the press's flow on each circle reads over the 1% bar at every circle.
+  */
+  {
+    const tw = await page.evaluate(async ({ over }) => {
+      const L = 192, X0 = 96, Y0 = 96, PALM = 45, AMT = 0.004, STEPS = 6;
+      const at = (f, X, Y, c) => {
+        // Cells' values at their middles: cell i spans i to i + 1.
+        const x = X - 0.5, y = Y - 0.5, i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+        const g = (a, b) => f[(a + b * L) * 4 + c];
+        return (1 - fy) * ((1 - fx) * g(i, j) + fx * g(i + 1, j)) + fy * ((1 - fx) * g(i, j + 1) + fx * g(i + 1, j + 1));
+      };
+      // Per circle: |Γ| and ∮|u| dl, about the palm's middle (cell 96's middle, where squishDisc centres the disc).
+      // `add` (optional) is a second field and its weight on each circle: the controls' press with a vortex laid over it.
+      const rings = (f, add = null) => [0.3, 0.5, 0.7, 0.9].map((frac, k) => {
+        const rho = frac * PALM, n = 720, dl = 2 * Math.PI * rho / n;
+        let g = 0, flow = 0;
+        for (let s = 0; s < n; s++) {
+          const th = 2 * Math.PI * s / n, X = X0 + 0.5 + rho * Math.cos(th), Y = Y0 + 0.5 + rho * Math.sin(th);
+          let u = at(f, X, Y, 0), v = at(f, X, Y, 1);
+          if (add) { u += add.w[k] * at(add.f, X, Y, 0); v += add.w[k] * at(add.f, X, Y, 1); }
+          g += (-u * Math.sin(th) + v * Math.cos(th)) * dl;
+          flow += Math.hypot(u, v) * dl;
+        }
+        return { g, flow };
+      });
+      const worst = (rs) => Math.max(...rs.map((r) => (r.flow > 0 ? Math.abs(r.g) / r.flow : 0)));
+      const total = (rs) => rs.reduce((a, r) => a + r.flow, 0);
+      const plate = async (o, lay) => {
+        await lab.create(256, L);
+        for (let k = 0; k < STEPS; k++) { lay(o); lab.flush(o.dt); await lab.step(1, o, true); }
+        return await lab.field('vel');
+      };
+      const press = (o) => {
+        const thin = (o.thinGap ?? 0) > 0.5;
+        lab.squish(X0, Y0, 30 * 1.5, AMT, 0, 'press', 0, thin);
+        lab.squish(X0, Y0, 18 * 1.5, AMT, 0, 'press', 0, thin);
+        lab.squish(X0, Y0, 8 * 1.5, AMT, 0, 'press', 0, thin);
+        if (!thin) lab.pressOil(X0, Y0, PALM, L, Math.min(0.6, AMT * 48));
+      };
+      const vortex = (o, w) => {
+        const d = new Array(L * L * 4).fill(0);
+        for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+          const dx = i + 0.5 - (X0 + 0.5), dy = j + 0.5 - (Y0 + 0.5), r = Math.hypot(dx, dy);
+          if (r >= PALM || r === 0) continue;
+          const a = w * (1 - r / PALM) ** 2;
+          d[(i + j * L) * 4] = -a * dy / r; d[(i + j * L) * 4 + 1] = a * dx / r;
+        }
+        return d;
+      };
+      const out = {};
+      for (const [name, o] of [['thick', over], ['thin', { ...over, thinGap: 1, gapThickness: 0.45 }]]) {
+        const f = await plate(o, press);
+        const still = await plate(o, () => {});
+        const rs = rings(f);
+        // The press's own field with a vortex added at 2% of its flow on each circle, so every circle has a turning twice the bar to find.
+        const vf = vortex(o, 1), vr = rings(vf);
+        const w = rs.map((r, k) => 0.02 * r.flow / Math.max(1e-30, vr[k].flow));
+        const mixed = rings(f, { f: vf, w }).map((r) => (r.flow > 0 ? Math.abs(r.g) / r.flow : 0));
+        out[name] = { ratio: worst(rs), flow: total(rs), stillFlow: total(rings(still)), mixed: Math.min(...mixed) };
+      }
+      // The vortex alone, through the solver, on the thick gap: its speed at the circles about the press's.
+      const vAlone = await plate(over, () => lab.addVel(vortex(over, 1e-3)));
+      out.vortex = worst(rings(vAlone));
+      out.vortexMin = Math.min(...rings(vAlone).map((r) => (r.flow > 0 ? Math.abs(r.g) / r.flow : 0)));
+      return out;
+    }, { over });
+    const e = (x) => x.toExponential(2);
+    const moved = ['thick', 'thin'].every((k) => tw[k].flow > 100 * tw[k].stillFlow && tw[k].flow > 0);
+    check('control: the twin\'s press moves the liquid round the palm (∮|u| over a hundred times a still plate\'s, both gaps)', moved,
+      ['thick', 'thin'].map((k) => `${k} ${e(tw[k].flow)} against still ${e(tw[k].stillFlow)}`).join('; '));
+    check('control: a turning is seen when there is one (a vortex alone through the solver reads over 0.9 at every circle; the press with 2% of its flow on each circle added as a vortex reads over the 1% bar at every circle, both gaps)',
+      tw.vortexMin > 0.9 && tw.thick.mixed > 0.01 && tw.thin.mixed > 0.01,
+      `vortex alone ${tw.vortexMin.toFixed(3)} to ${tw.vortex.toFixed(3)}; press + 2% vortex, its least circle: thick ${tw.thick.mixed.toFixed(4)}, thin ${tw.thin.mixed.toFixed(4)}`);
+    const twinOk = moved && tw.thick.ratio < 0.01 && tw.thin.ratio < 0.01;
+    const twinSay = `the solver's twin: |Γ|/∮|u| at most ${e(tw.thick.ratio)} on the thick gap, ${e(tw.thin.ratio)} on the thin`;
+    line('presstwist', 'a press squeezes the film and writes no turning: the circulation round its palm is under 1% of its flow, the hand\'s and the remote\'s alike, its squeeze reaches the solver, and the solver\'s own flow under the real squish and squeeze turns no more than that',
+      nodeTwist.ok && twinOk, `${nodeTwist.detail}; ${twinSay}`, nodeTwist.mainState);
+  }
   const run = (press, trapped = false) => page.evaluate(async ({ press, trapped, AMOUNT, RADIUS, AT, BUBBLES, SETTLE, WATCH, over }) => {
     await lab.create(256, 192);
     const L = 192;
