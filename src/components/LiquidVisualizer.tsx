@@ -47,7 +47,8 @@ import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, step
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
-import { BeadField, beadPopulation } from '../lib/beads';
+import { BeadField } from '../lib/beads';
+import { stepPlateBeads } from '../sim/beadStep';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
@@ -4163,58 +4164,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             for (const fluid of fluidsRef.current) { fluid.coverX = cover.vx; fluid.coverY = cover.vy; }
 
             // ── Oil beads ───────────────────────────────────────
-            {
-              const beadAmt = c01(currentSettings.beads ?? 0);
-              const beads = beadsRef.current;
-              if (beadAmt <= 0) {
-                if (beads.beads.length) beads.clear();
-              } else {
-                // Every thirtieth frame. This read the gesture counter, which only
-                // advances while someone is painting: before the first stroke it
-                // repopulated on every frame (up to count × 6 placement tries,
-                // each checking every bead), and after one it mostly never ran
-                // again, so the beads stopped following their slider.
-                // Drops take their colours from the look's palette (PLAN.md
-                // batch 3); set every frame because it is one number, and the
-                // palette with the populate below, since a new one is eased
-                // toward over a second and a half rather than cut to.
-                beads.drops = currentSettings.beadDrops ?? 0; // clamped, and NaN made 0, by the field
-                if (simStep === 0 && (beadFrameRef.current % 30 === 0 || !beads.hasPalette) && beads.drops > 0) {
-                  beads.setPalette(harmonyRef.current.map(i => PALETTE_RGB[i] ?? PALETTE_RGB[0]));
-                }
-                if (simStep === 0 && beadFrameRef.current++ % 30 === 0) {
-                  const dens = fluidsRef.current[0]?.readDensity;
-                  beads.populate(...beadPopulation(beadAmt, currentSettings.macroMode), dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
-                }
-                if (isActiveRef.current && drainFrameRef.current === 0) {
-                  const lead0 = fluidsRef.current[0];
-                  const bvx = lead0?.readVx, bvy = lead0?.readVy;
-                  const bk = particleFlowScale(lead0, currentSettings);
-                  beads.step(simStepS, (bx, by) => {
-                    if (!bvx || !bvy) return [0, 0];
-                    /*
-                      The clamp has to reject NaN, which the obvious one does
-                      not. `Math.round(NaN)` is NaN, `Math.min` and `Math.max`
-                      pass NaN through, an array indexed by NaN is `undefined`
-                      and `undefined * bk` is NaN — so a bead that went bad
-                      once was fed NaN for ever, and the gradient `beads.ts`
-                      draws it with throws inside the frame loop. The canvas
-                      stopped and the desk kept working.
-                    */
-                    const cell = (v: number): number =>
-                      Number.isFinite(v) ? Math.max(0, Math.min(GRID_SIZE - 1, Math.round(v))) : -1;
-                    const ix = cell(bx);
-                    const iy = cell(by);
-                    if (ix < 0 || iy < 0) return [0, 0];
-                    const vx = bvx[ix + iy * GRID_SIZE] * bk;
-                    const vy = bvy[ix + iy * GRID_SIZE] * bk;
-                    // And the field itself: a solver that has gone unstable
-                    // hands back NaN, and this is where it would get in.
-                    return [Number.isFinite(vx) ? vx : 0, Number.isFinite(vy) ? vy : 0];
-                  }, tiltX, tiltY);
-                }
-              }
-            }
+            if (stepPlateBeads(
+              beadsRef.current,
+              fluidsRef.current[0],
+              currentSettings,
+              harmonyRef.current,
+              PALETTE_RGB,
+              simStep,
+              beadFrameRef.current,
+              isActiveRef.current && drainFrameRef.current === 0,
+              simStepS,
+              plateSin(tiltX, rockX),
+              plateSin(tiltY, rockY),
+            )) beadFrameRef.current++;
 
             // ── Bubbles ─────────────────────────────────────────
             const bubbleAmt = c01(currentSettings.bubbles ?? 0);
