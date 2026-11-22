@@ -9,6 +9,7 @@
  */
 
 import { HEAD, MAGNET_WGSL, PHASE_MEAN3, STAND_ASIDE, W } from './shared';
+import { CAPILLARY } from './capillary';
 import { FILM_H0 } from '../standing';
 import { SPIKE_PITCH } from '../spikes';
 import { DISH_GAP_FIELD_UV } from '../../../lib/turntable';
@@ -481,5 +482,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   textureStore(dst, p, vec4f(mean3(p, i32(S.n)), 0.0, 0.0, 0.0));
+}`,
+
+  /*
+    Ferrofluid interfacial tension (sigma * kappa * grad(c_smooth)) on a thin
+    gap (PLAN 9ae), reusing CAPILLARY from capillary.ts and the [1 4 6 4 1]^2
+    smoothed phase field from mixSmooth. Zeroed inside a standing film's
+    domes (stand), where standing.ts shapes the domes.
+  */
+  phaseCapillary: `${HEAD}${CAPILLARY}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var soft: texture_2d<f32>;
+@group(0) @binding(4) var stand: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let f = capillaryAt(p, S.n) * (1.0 - textureLoad(stand, p, 0).r);
+  textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
 }`,
 };
