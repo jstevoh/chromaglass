@@ -191,9 +191,6 @@ point, thin pale rims, a pale field (the sheets not fully crossed). The colours 
 birefringence, not a thin film. The owner asked for the polariser, a turnable analyser and a
 liquid that lights where its flow stretches it ("Let's do it!").*
 
-~~**31p-1** Polarisers, Analyser, Quarter Wave, Birefringence~~ (shipped; story in
-`docs/plan-shipped.md` §31p-1; `npm run polar`).
-
 - **31p-2. The colour lingers after the stir.** A liquid that shows flow birefringence has a
   relaxation time: its molecules stay lined up for a while after the flow that lined them up
   slows, so a stirred micelle solution keeps glowing and fades. 31p-1 reads the strain rate

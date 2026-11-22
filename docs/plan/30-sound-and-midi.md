@@ -50,10 +50,6 @@ the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
 analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
 
 ## ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
-
-Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Story in
-`docs/plan-shipped.md` §30a (moved 2026-10-29, 19m).
-
 - **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
   on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the
   projector mirrors `#liquid-canvas` directly, so it shows the laptop's fold (including
@@ -92,9 +88,6 @@ Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Story in
   the quarter is, and the line stays red about half the time until it is found.
 
 ## ~~30b. The LFOs and envelopes are fixed~~ (shipped 2026-11-08)
-
-Shipped (`npm run soundowed`, id `lfo` taken out of `--owed` in `scripts/checks.json`; `npm run shapes` 15/15). Story in `docs/plan-shipped.md` §30b.
-
 - **30b-loop. A recorded song's onsets driving `Modulators.trigger`.** In `soundowed.mjs` the drum loop is written out; the ear's kick and snare onsets call `trigger('kick')` and `trigger('snare')` in `Modulators.step`, and a check line feeding a recorded song's analysed onsets through the ear to `trigger` remains open here.
 
 **Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the

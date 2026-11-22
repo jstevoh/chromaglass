@@ -1,17 +1,94 @@
 # ChromaGlass plan
 
-This file is the index of the plan: the order of work, where each section stands, and
-the rules. Each section is a file of its own under [`docs/plan/`](docs/plan/), listed in
-"Sections" below, so a session reads this file and the one section its step names, never
-the whole plan. What shipped is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under
-the same numbers; each shipped item keeps a one-line stub in its section saying where its
-story went. Find an item from its id with `grep -rn "14ab-4" docs/plan/`.
+This file is the index of the plan: this week's list, the order of work, where each section
+stands, and the rules. Each section is a file of its own under [`docs/plan/`](docs/plan/),
+listed in "Sections" below, so a session reads this file and the one section its step names,
+never the whole plan. The section files hold **only open work**: since 2026-11-21 every
+closed item lives, whole and with its id unchanged, in
+[`docs/plan/archive/`](docs/plan/archive/) under its section's file name, and the stories
+moved before then are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same
+numbers. Find an item from its id, open or closed, with `grep -rn "14ab-4" docs/plan/`.
 
-A PR writes in the section file its work belongs to; marks what it shipped there, moving
-the story to the archive and leaving the stub; updates its row in the running order below;
-and adds what it found along the way as an item in the right section. A new section is a
-new file, named here. (The split into files is 19m, 2026-10-29; [`docs/plan/README.md`]
-(docs/plan/README.md) maps the old line ranges for a branch that still edits the old file.)
+A PR writes in the section file its work belongs to; marks what it shipped there, where it
+stands (struck through, or `**shipped**` beside its id, as the plan has always written it);
+updates its row in the running order below; and adds what it found along the way as an item
+in the right section. `node scripts/planarchive.mjs` then moves every closed item to the
+archive (`--dry` to look first; it moves nothing twice and refuses a sweep that would lose a
+line), so a PR may run it or leave it for the next sweep. A new section is a new file, named
+here. (The split into files is 19m, 2026-10-29; [`docs/plan/README.md`](docs/plan/README.md)
+maps the old line ranges for a branch that still edits the old file, and says how a branch
+from before the 2026-11-21 sweep takes it in.)
+
+## This week: beautiful visuals, real physics (2026-11-21 to 11-28)
+
+The owner, 2026-11-21: "lets reprioritize the remaining work to focus on beautiful
+visualizations/physics for this week", and then "lets rank order them by how big of a
+change visually it will make". So the list is ranked by how much a person watching the
+wall would see change, biggest first. Each line is its own thread and PR, as always, with
+its check first, filmed before and after on the owner's Mac for the owner to judge. The
+standing rule holds for every line: the phenomenon is simulated, the dials may ramp past
+real, and the plate shader draws only what the solver makes.
+
+1. **Faraday waves: the music's vibration stands up as a pattern** (**48f**, the owner's
+   pick from §48: "anything that can be impacted by the music itself"). A whole new kind
+   of picture, stripes, squares and hexagons that grow with a note and fade with it, on
+   any look a cord drives. Started in its own thread.
+2. **Soap Film's big swirls** (**32k**, **32h**, **32d-1**, PR #837: a Brinkman film with
+   its own air, and Frame Tilt as gravity in the plane). The look goes from 82–87% black
+   (the 2026-11-12 study) to a continuous swirling sheet of Newton's colours, as in the
+   "Liquid Tapestry" reference. Built; merge on green, then film. Next in §32: **32i** real
+   drag with time as its own dial, **32j** the surfactant moves (Marangoni).
+3. **Video as the lamp** (**14ag-3**, PR #899): any footage under the dish, seen through
+   the liquid, refracted and coloured by the oil. A new source for every look. Built;
+   merge on green, then film.
+4. **The liquid looks at a real show's pace** (**48q**): 25 of 33 liquid looks turn over
+   several times slower than real shows, and the cause is the forcing, not the camera.
+   The widest change on the list, since it touches most looks: work the liquid harder by
+   real means on the looks meant to be lively, measured by `npm run watch` against the
+   reference library.
+5. **Polarised light: stress rainbows** (**31p-1**, PR #855, the liquid's flow
+   birefringence between a polariser and a turnable analyser; **31p-3**, PR #895, Dish
+   Stress, the moulded dish's own rainbows in series). A new look mode of saturated
+   rainbow bands that follow the flow, where it is turned on. Built; merge on green, then
+   film.
+6. **Ferrofluid fingers, thin and branched** (**38d-1**, PR #838, the magnetic Bond number
+   sets the labyrinth's period; reference `photism-morphogen`). A crisp branching maze in
+   place of today's fine hatch, on Ferro Paint and Magnet Garden. Built; its thread takes it
+   to green and films both looks.
+7. **Real drops: a colour drop pushes the dye aside** (**18c-9** the contact patch and its
+   steps on the capillary time, then **18c-8** the round window, **18c-6** the rim's
+   fingers, **18c-7** the dark collar; `18-physics-2.md`). In progress in its own thread.
+   Every drop parts the liquid like a real one: seen on each drop, but each drop is small.
+8. **The physics calls already built, landed** (each a PR waiting on green, merge as each
+   goes green). Mostly subtle one by one, together a cleaner plate: **38u-8** and **38u-11**
+   Granulation and Glass Smear still unless something moves them (#889, looks open a
+   touch brighter and steadier); **18e-7** no line where two dyes meet up close (#881);
+   **18e-2** a clear pour's edge from the optical path (#755); **38u-10** the dye's index
+   at its measured strength with Dye Index Boost (#882); **38u-7**, **38u-12**, **38u-14**
+   (#848); **38u-9** Macro Lacing rides the flow (#883); **38h-6** the bubble film by
+   transmission (#750); **15e-10** a bottle slides down a rocked gap at Hele-Shaw's speed
+   (#877); **38r-16** the pinch and the puddle (#873); **47a** the closeup's fine dye (#835).
+9. **The rest of the third realism pass** (§38u): **38u-6** the music no longer speeds the
+   solver's clock, **38u-13** kicks no longer make air from nowhere, **38u-15** the drain
+   flushes the dye rather than fading it. Small to see, right to have.
+10. **The physics-shortcut audit's findings** (the fourth pass after §18, §38, §38u; running
+    now in its own thread). A slot held: its findings go into §38 as ranked items, and each
+    takes its place in this list by how much it would change on the wall.
+
+After this week, the ideas the music can move through a cord, in the owner's order
+(§48): **48c** bioluminescent trails where the music's cords stir, **48a** the chemical
+clock with a cord on the light that holds its waves back, **48d** lifting the glass into
+ferns, **48i** the ferrofluid's stripes turned by the field, and **48r** timbre and harmony
+as cord sources, which every one of them can use.
+
+**Parked this week, kept in the plan.** The launch, the stores and the money (§12, §23,
+§37, §39, §43), the VJ software and the gig's plumbing (§13, §14, §16, §17, §24), the
+assistant (§44), the controls' polish (§35), and the efficiency hunt (§46) wait until the
+list above is through, unless something breaks a show or a sale. The checks and the build
+(§19) keep only what stops a PR from merging: a red that blocks this week's merges is fixed
+first, because every line above lands through it. The order of work below is unchanged and
+is the order again after this week; this week draws from its Wave 6 (the physics) and §47
+(the closeup), and its Waves 0, 1, 3, 4, 5 and 7 are parked.
 
 ## Order of work
 
@@ -411,68 +488,68 @@ stop for a second or two either (#181); the magnet stays where the hand leaves i
 
 One file a section, cut between items into parts of 30 KB or less, so each part has room to grow under the 40 KB at which `npm run sizes` warns. A part that reaches it is cut again between items, and the new part named here.
 
+Each file holds only open work; its closed items are in [`docs/plan/archive/`](docs/plan/archive/) under the same name. §2 (Lacing), §3 (Drops, not rings) and §7 (The room in the plate) shipped whole, and their files are there.
+
 | § | Section | File | Items (a cut section) | KB |
 |---|---|---|---|---|
 | 0 | The dye a tool makes, and the deploys it is blocking | [`00-dye-tools.md`](docs/plan/00-dye-tools.md) |  | 15 |
-| 1 | Sharp liquid, and pigment in it | [`01-sharp-liquid.md`](docs/plan/01-sharp-liquid.md) |  | 5 |
-| 2 | Lacing | [`02-lacing.md`](docs/plan/02-lacing.md) |  | 0 |
-| 3 | Drops, not rings | [`03-drops.md`](docs/plan/03-drops.md) |  | 0 |
+| 1 | Sharp liquid, and pigment in it | [`01-sharp-liquid.md`](docs/plan/01-sharp-liquid.md) |  | 7 |
 | 4 | Liquids that behave differently | [`04-liquids.md`](docs/plan/04-liquids.md) |  | 2 |
 | 5 | Playing it: sound learn, shutter, and a look link | [`05-playing-it.md`](docs/plan/05-playing-it.md) |  | 8 |
 | 6 | Render a song | [`06-render-a-song.md`](docs/plan/06-render-a-song.md) |  | 1 |
-| 7 | The room in the plate: the camera as a sensor | [`07-room-camera.md`](docs/plan/07-room-camera.md) |  | 0 |
-| 8 | The desk: the laptop is a control surface, not the show | [`08-desk.md`](docs/plan/08-desk.md) |  | 14 |
-| 9 | Ferrofluid after the references | [`09-ferrofluid.md`](docs/plan/09-ferrofluid.md) |  | 16 |
-| 10 | Playing like a show | [`10-playing-like-a-show.md`](docs/plan/10-playing-like-a-show.md) |  | 22 |
+| 8 | The desk: the laptop is a control surface, not the show | [`08-desk.md`](docs/plan/08-desk.md) |  | 13 |
+| 9 | Ferrofluid after the references | [`09-ferrofluid.md`](docs/plan/09-ferrofluid.md) |  | 20 |
+| 10 | Playing like a show | [`10-playing-like-a-show.md`](docs/plan/10-playing-like-a-show.md) |  | 23 |
 | 11 | The mixer | [`11-mixer.md`](docs/plan/11-mixer.md) |  | 12 |
-| 12 | ChromaGlass in the App Store and Google Play | [`12-app-stores.md`](docs/plan/12-app-stores.md) |  | 8 |
-| 13 | ChromaGlass in popular VJ software | [`13-vj-software.md`](docs/plan/13-vj-software.md) |  | 20 |
-| 14 | The show at the gig: hearing, timing, speed and the picture on the wall | [`14-show-at-the-gig.md`](docs/plan/14-show-at-the-gig.md) | 14a–14r | 28 |
-|  | (continued) | [`14-show-at-the-gig-2.md`](docs/plan/14-show-at-the-gig-2.md) | 14s–14ae-5 | 26 |
-|  | (continued) | [`14-show-at-the-gig-3.md`](docs/plan/14-show-at-the-gig-3.md) | 14af, 14ad–14ag-4 | 9 |
-| 15 | Every tool on every liquid | [`15-tools-on-liquids.md`](docs/plan/15-tools-on-liquids.md) | 15a–15h | 23 |
+| 12 | ChromaGlass in the App Store and Google Play | [`12-app-stores.md`](docs/plan/12-app-stores.md) |  | 39 |
+| 13 | ChromaGlass in popular VJ software | [`13-vj-software.md`](docs/plan/13-vj-software.md) |  | 22 |
+| 14 | The show at the gig: hearing, timing, speed and the picture on the wall | [`14-show-at-the-gig.md`](docs/plan/14-show-at-the-gig.md) | 14a–14r | 33 |
+|  | (continued) | [`14-show-at-the-gig-2.md`](docs/plan/14-show-at-the-gig-2.md) | 14s–14ae-5 | 32 |
+|  | (continued) | [`14-show-at-the-gig-3.md`](docs/plan/14-show-at-the-gig-3.md) | 14af, 14ad–14ag-4 | 6 |
+| 15 | Every tool on every liquid | [`15-tools-on-liquids.md`](docs/plan/15-tools-on-liquids.md) | 15a–15h | 35 |
 |  | (continued) | [`15-tools-on-liquids-2.md`](docs/plan/15-tools-on-liquids-2.md) | 15k | 2 |
 | 16 | Many plates: each projector its own source (rig-plan R1) | [`16-many-plates.md`](docs/plan/16-many-plates.md) |  | 6 |
 | 17 | Hear the set ahead, from files | [`17-hear-ahead.md`](docs/plan/17-hear-ahead.md) | 17a–17h | 13 |
-| 18 | The physics under the look: where the plate imitates a result instead of simulating it | [`18-physics.md`](docs/plan/18-physics.md) | 18a–18b-8 | 24 |
-|  | (continued) | [`18-physics-2.md`](docs/plan/18-physics-2.md) | 18b-9–18l-6 | 28 |
+| 18 | The physics under the look: where the plate imitates a result instead of simulating it | [`18-physics.md`](docs/plan/18-physics.md) | 18a–18b-8 | 25 |
+|  | (continued) | [`18-physics-2.md`](docs/plan/18-physics-2.md) | 18b-9–18l-6 | 38 |
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
-| 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 19 |
+| 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 28 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-15 | 45 |
-|  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19an-1 | 4 |
-| 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 18 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-15 | 50 |
+|  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19an-1 | 5 |
+| 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 19 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
-| 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 5 |
-| 23 | Selling it: the site free, the app paid | [`23-selling.md`](docs/plan/23-selling.md) | 23.1–23.10e | 22 |
-|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.21 | 16 |
+| 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 7 |
+| 23 | Selling it: the site free, the app paid | [`23-selling.md`](docs/plan/23-selling.md) | 23.1–23.10e | 21 |
+|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.21 | 21 |
 | 24 | Modular rigs: patch the rack into the liquid | [`24-modular-rigs.md`](docs/plan/24-modular-rigs.md) |  | 10 |
-| 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 11 |
-| 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 10 |
-| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 17 |
-| 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 19 |
+| 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 13 |
+| 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 8 |
+| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 28 |
+| 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 20 |
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28l | 21 |
-| 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 14 |
-| 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 11 |
+| 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 15 |
+| 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 10 |
 | 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 16 |
-| 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 10 |
-| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33c, 33d, 33f-2..4 open | 7 |
-| 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 8 |
-| 35 | Clear controls: on reads on, one name for one thing (asked 2026-10-24) | [`35-clear-controls.md`](docs/plan/35-clear-controls.md) |  | 9 |
-| 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 12 |
-| 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 30 |
-| 38 | Realism audit: what still imitates, after §18 (asked 2026-10-30) | [`38-realism-audit.md`](docs/plan/38-realism-audit.md) | 38a–38u-16 | 23 |
+| 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 15 |
+| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33c, 33d, 33f-2..4 open | 12 |
+| 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 19 |
+| 35 | Clear controls: on reads on, one name for one thing (asked 2026-10-24) | [`35-clear-controls.md`](docs/plan/35-clear-controls.md) |  | 10 |
+| 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 13 |
+| 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 45 |
+| 38 | Realism audit: what still imitates, after §18 (asked 2026-10-30) | [`38-realism-audit.md`](docs/plan/38-realism-audit.md) | 38a–38u-16 | 61 |
 |  | (continued) | [`38-realism-audit-2.md`](docs/plan/38-realism-audit-2.md) | 38v | 15 |
-| 39 | Feedback from inside the app (asked 2026-10-30) | [`39-feedback.md`](docs/plan/39-feedback.md) |  | 5 |
-| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) |  | 27 |
+| 39 | Feedback from inside the app (asked 2026-10-30) | [`39-feedback.md`](docs/plan/39-feedback.md) |  | 2 |
+| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) |  | 25 |
 | 41 | Specs for the thin items, part 2: sound and beat, many plates, the fluids (written 2026-11-01) | [`41-specs-sound-plates-fluids.md`](docs/plan/41-specs-sound-plates-fluids.md) |  | 28 |
-| 42 | What Liquid Light Lab's tutorials and gear showed (asked 2026-11-07) | [`42-liquid-light-lab.md`](docs/plan/42-liquid-light-lab.md) |  | 10 |
-| 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 9 |
-| 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 13 |
-| 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 4 |
+| 42 | What Liquid Light Lab's tutorials and gear showed (asked 2026-11-07) | [`42-liquid-light-lab.md`](docs/plan/42-liquid-light-lab.md) |  | 13 |
+| 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 12 |
+| 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 33 |
+| 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 8 |
 | 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46r, one args name one value a step, **shipped** (`npm run argnames`); 46a-46e builds to Antigravity after its queue; the audit of 2026-11-13: 46f (the ear's view and the clock out of the shell) and 46g (liquids carried only once poured) **shipped**, 46h-46q, 46s and 46t written | 18 |
-| 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 36 |
-| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
+| 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 43 |
+| 48 | Ideas: more compelling visuals from real phenomena (brainstormed 2026-11-21) | [`48-ideas-visuals.md`](docs/plan/48-ideas-visuals.md) |  | 15 |
+| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 3 |
 
 ## Not doing
 

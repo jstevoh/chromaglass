@@ -80,7 +80,6 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     and until 18f-2 lands the ring there is the kick's own hand and the soap's. When 18f-2
     lands, `npm run areacords` should add a heat cord that opens the well's surface on a
     level plate, against the same cord with the heat off.
-  - ~~**25h-2. The gate on every cord, and the rest of 30a.**~~ Shipped with 30a (`PatchBay.fold` holds a `CordGate` per whole-plate cord keyed by what the cord is and clocked from `fold`'s `now`, while area cords keep `CordGate` in `AreaHands`; `npm run soundcords`).
   - **25h-3. Area cords on the back plate.** They work on the plate the music plays, in its
     areas; a back plate with its own look has that look's areas (25d) but the front look's
     cords do not reach them, and the panel greys Plate for an area cord. With 25d.
@@ -128,10 +127,6 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     bromous acid fires the gel (`bottles.ts` BZ Activator). A wire works by taking the bromide
     (the inhibitor) out of a spot, which the two-variable Oregonator here does not carry; the
     two look alike in a dish (a ring runs out), and the second needs a third species.
-  - ~~**25i-6. Three looks fixed after filming on the Mac**~~ (shipped: Poster's kicks pour on a
-    full plate, Red Cabbage's pH is solved from what was poured and its dish set square,
-    Chemical Clock's gel no longer switched off by the song; `npm run areacords`). Story in
-    `docs/plan-shipped.md` §25.
   - **25i-7. Red Cabbage's seed paints its pH zones.** Its opening picture (fluidSimulation.ts,
     `red-cabbage` in both seed paths) lays crimson, teal-green and gold *dye* where acid and base
     would make those colours, and its palette (hot pink, violet, teal-green) and Hue Journey 2
@@ -146,9 +141,6 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   - **25i-9. The juice's buffer is an estimate.** lib/phIndicator.ts takes red cabbage juice as
     2 mM of a buffer at pKa 7, which sets how much acid tips a well from violet. A titration of a
     home-made juice (drops of vinegar to the first pink) would measure it.
-  - ~~**25i-10. The loop's own hands still poured dye on a reagent**~~ (shipped: Chemical
-    Clock's kicks threw droplets of a pool's dye on the gel, which kept them as clusters at its
-    places; `npm run kickbloom`). Story in `docs/plan-shipped.md` §25. Open, found building it:
   - **25i-11. Chemical Clock's indicator pools only fade now.** With the music's dye gone from
     its places, nothing tops up the five pools the seed lays (presetPlate.ts, teal to red under
     the ferroin waves) and evaporation (0.004) thins them through a set. A BZ dish has no pools:
