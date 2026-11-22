@@ -433,6 +433,23 @@
       ]
     },
     {
+      "name": "Watching in words",
+      "shard": "sound",
+      "run": "npm run watchwords",
+      "why": [
+        "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
+        "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
+        "from an after one (PLAN.md 47x). Held to clips made to sit at known poles:",
+        "a steady drift reads sustained, analogous and all-over; a picture that",
+        "sits and jumps reads sudden and strong; a centred disc on black reads",
+        "centred and dark-ground, hard-edged at one pixel and soft at fourteen.",
+        "The before/after read must rank the edge first when only the edge",
+        "changed, and find nothing steady changed between two takes of the same",
+        "look. Written before the words were built, so it holds them to pictures",
+        "and not to the code's own thresholds. In the sound shard for its ffmpeg."
+      ]
+    },
+    {
       "name": "Following a song",
       "shard": "logic",
       "run": "npm run songfollow",

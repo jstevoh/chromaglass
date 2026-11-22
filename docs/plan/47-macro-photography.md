@@ -404,6 +404,28 @@ a curling head need).
   same names as `watch.mjs` so `--vs` can compare, with the run's own numbers checked
   against `watch.mjs` on one clip both can read.
 
+## 47x. Watching in words, and what changed between two films (S–M)
+
+The owner asked (2026-11-22) for the watch tool to say what it sees, not only measure it,
+and to tell what changed between a before and an after film. The vocabulary is
+`docs/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
+Ching's ordering principles and Greenberg's all-over against centred for composition,
+Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling, a wash,
+a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
+an unsteady measure says "may vary from take to take", and every word names its source.
+
+- **47x-1** the words: `scripts/watchwords.mjs` `describe()`, a "## In words" section at the
+  top of summary.md, `words` on `watchVideo`'s result. The check, `npm run watchwords`, was
+  written first, on clips made to sit at known poles.
+- **47x-2** what changed: `scripts/watchpair.mjs` `watchPair()` and
+  `npm run watch -- --before A --after B --out D`: diff.md ranks the changes in
+  just-noticeable steps and lists what held, with the two timelines stacked and frames at
+  matched times side by side.
+- **47x-3** tried on real pairs (the blow-48 webm takes, the Classic closeup films), with the
+  reads shown to the owner on one page.
+- **47x-4** a plan for sharing the watch tool as a Claude Code plugin (the owner decides
+  after 47x-3).
+
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
 Liquid Light Lab's *Quick Tutorial* (cropped to the projected disc) against our *Poster 1969*
