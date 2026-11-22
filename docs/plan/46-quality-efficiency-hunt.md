@@ -41,13 +41,6 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
 
 ## Items
 
-- **46-0 · The guards** (**shipped**, this PR): `npm run samelook` (the look kept, above;
-  controls every run on Classic and Roy: the same tree twice byte for byte, the two trees'
-  bundles differing exactly when src/ does, a rounding-sized change passing, and a coarser
-  grid, half the picture's pixels, a tenth slower flow and Ferro Paint's magnet off each
-  failing) and `openingtime --bar --owed=count` in Measure's browser2 part, on software WebGPU (Classic
-  asks WebGPU for at most 52 pipelines before its first step, main 66; owed until 46a). Reviewed by a skeptic
-  pass before merge; what it found and was fixed is in the PR.
 - **46-2 · A named shortcut in the guard:** samelook steps each look with the step
   parameters that share a name with its settings, because the app's own mapping from a
   look's settings to a step lives inside `LiquidVisualizer.tsx` and the lab cannot call it.
@@ -64,11 +57,6 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   in the opening; every look opens on only what it waited for; nothing a first step asks for
   left out) and `physics`/`thingap` for any fused kernel. The owner's Mac's number to beat:
   first step 15.48 s cold, read from main's deploy after merge.
-- **46a-2 · A smaller display: shipped by 14v-12** (2026-11-14, a Claude thread, not
-  Antigravity's: the owner's report of a thirty-second start on a phone). The opening
-  compiles the display with only the effects its look can reach and builds the whole one
-  behind the show; every look the same bytes (`npm run leandisplay`). Story in
-  `docs/plan-shipped.md` §14v-12; what is left of it is 14v-14 and 14v-16.
 - **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, H2c-6, H2c-9
   (briefs of 2026-11-07), then H2c-8 and H2c-5, then H2c-2 once H2c-3 and H2c-1 merge. Each
   takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
@@ -132,16 +120,6 @@ and the raw list are in the project's shared files, `perf-2026-11-13/`):
 So the largest single cost on a page with music was not the plate: it was the shell drawn
 again ten times a second for three meters and a percentage.
 
-- ~~**46f · The ear's view and the desk's clock render themselves, not the shell**~~
-  (**shipped**, `npm run renders`: components rendered a second with the band 5,840 → 11 on
-  the laptop, 714 → 0 on the phone; no sound 531 → 1 and 65 → 0; story in
-  `docs/plan-shipped.md`).
-- ~~**46g · The poured liquids' fields are carried only once something is poured**~~
-  (**shipped**, `npm run encode`: a thin-gap step 400 dispatches, direct and indirect, → 334,
-  the open plate 500 → 494, and a liquid poured brings its carries back; `physics`,
-  `liquids`; with it 14ab-11's first parts, the uploads of a step with bubbles or music
-  1.33 MB → 0.04 to 0.24, and the liquids' step asking for no flush at all; story in
-  `docs/plan-shipped.md`).
 - **46h · A ride and a fade still render the whole shell** (M; 14u names the fade). A MIDI
   fader tells React ten times a second and a Go fade thirty, each a render of every desk
   panel: 14.3 ms on the owner's Mac, more than half of it the commit (React 19 updates every
@@ -208,9 +186,6 @@ again ten times a second for three meters and a percentage.
   whole window though it is framed in the hole (2.2 times the hole's area at 1440×900), and
   takes and streams record that canvas; the recorder asks for VP9 before hardware H.264 at
   sixty frames of the full canvas.
-- ~~**46r · Three writes in one step shared the args name `'current grid'`**~~ (**shipped**
-  with 15e-1, `npm run argnames`; story in `docs/plan-shipped.md`, "15e-1 (met again as
-  14ab-16) and 46r"). 46r-1, above, was found with it.
 - **46s · The lamp's heat is carried on every thin-gap step, heated or not** (S to M; found
   2026-11-13 re-basing `encode`'s bars). `carryHeat` (38f-1, `src/gpu/fluid/passes.ts`) packs
   the temperature, carries it through the colour's substeps and unpacks it on every thin
