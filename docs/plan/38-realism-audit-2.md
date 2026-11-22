@@ -184,8 +184,6 @@ The owner, 2026-11-21: Classic "looks nothing like a traditional liquid light sh
 against the Joshua Light Show, Glenn McKay, Bill Ham and the period photographs (the gap list
 is in the project's files).
 
-- ~~**38w-1. Classic laid as oil cells in a coloured water on the lamp**~~ shipped
-  (`npm run classicdish`; the story in `docs/plan-shipped.md`).
 - **38w-2. Classic's motion as a hand's, measured** (S–M; Medium). The references rest about
   40% of the time and swell every 12 to 20 s from a tilt, a press or a fresh pour. 38w-1 gave
   the look a hand (Plate Rock, the kick's press) and stopped the motor, but nothing measures
@@ -235,4 +233,3 @@ is in the project's files).
   the solver's own cells wide holds as well (the interface is a fixed number of cells), so the
   lanes between cells could close to what the references show. Scale them by the grid the lay
   sees, as Foam Cells' FOAM_FILM does, once classicdish can run at 384².
-

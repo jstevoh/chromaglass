@@ -986,8 +986,7 @@ try {
         the look's plate count alone, and every built-in carries one or two.
         Each look is laid from the Looks sheet, its button pressed, and the
         other button pressed to put it back: on Lumia (one plate) that is add,
-        then take off; on Comet River (two) the reverse. (Classic was the two-plate
-        look until 38w-1 laid it as one dish on one plate.) What is measured is the
+        then take off; on Comet (two) the reverse. What is measured is the
         Front and Back pickers coming and going with the buttons, which are
         App's plate count on the stage, and the solvers the engine has (built
         with or without a GPU, so asked everywhere: a missing count fails). A tap that did nothing leaves the sheet as
