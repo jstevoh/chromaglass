@@ -12,7 +12,8 @@ import { Info } from '../Info';
 import { LIT } from '../ui';
 import { Slider, PinChips } from './controls';
 import { PATCH_SOURCES, featuresFor, sceneTargets, TARGET_GROUPS } from './patchLists';
-import { HandControls } from './HandControls';
+import { HandControls, MusicHandsFold } from './HandControls';
+import { isMusicCord } from '../../lib/musicCords';
 import type { SectionCtx } from './props';
 
 const SHAPE_NAMES: Record<typeof LFO_SHAPES[number], string> = {
@@ -55,6 +56,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
     settings, onUpdate, readEar, focusSection, lookAreas, areaColours, pins, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
+  // The music's cords folded until opened (HandControls.tsx MusicHandsFold says why).
+  const [handsOpen, setHandsOpen] = React.useState(false);
+  const musicRoles = (settings.sceneMappings ?? []).filter(isMusicCord).map(m => m.role!);
   return (
     <>
 
@@ -103,7 +107,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {(settings.sceneMappings ?? []).map((m, i) => (
+              <MusicHandsFold roles={musicRoles} open={handsOpen} onToggle={() => setHandsOpen(o => !o)} />
+              {(settings.sceneMappings ?? []).map((m, i) => !handsOpen && isMusicCord(m) ? null : (
                 <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
                   <div className="flex items-center gap-1">
                     {/*
@@ -191,6 +196,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
                       aria-label="Remove mapping"
+                      // By the patch's index, for the phone's check: the music's folded cords make the nth on screen another patch.
+                      data-testid={`patch-remove-${i}`}
                     >
                       <X size={12} />
                     </button>

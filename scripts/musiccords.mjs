@@ -62,20 +62,23 @@ const QUIET = { bass: 0, mid: 0, treble: 0, volume: 0, energy: 0, timbre: 0, com
  * Play `cords` on the real hands for `seconds` at sixty steps a second: the
  * sound `sound`, a kick hit of `kick` every half second (0 for none), Sound
  * Drive `drive` at the passage's loudness `passage`, Kick Bloom `bloom`.
- * Returns what reached the sink, and how many kicks let a slug go (`slugs`).
+ * Returns what reached the sink, how many kicks let a slug go (`slugs`) and
+ * what each step laid, where and from which bottle (`trace`). `hands` is a fresh AreaHands
+ * unless one is handed in, as a render reuses the visualizer's.
  */
-function play(cords, { sound = LOUD, kick = 0.8, drive = 0.45, seconds = 4, areas = null, dyes = 5, bloom = 1, passage = 1 } = {}) {
-  const hands = new AreaHands();
+function play(cords, { sound = LOUD, kick = 0.8, drive = 0.45, seconds = 4, areas = null, dyes = 5, bloom = 1, passage = 1, hands = new AreaHands() } = {}) {
   const plate = plateArea(dyes);
-  const got = { dye: 0, drop: 0, slug: 0, heat: 0, paddle: 0, liquid: 0, dose: 0, press: 0, slugs: 0 };
-  let slugStep = false;
+  const got = { dye: 0, drop: 0, slug: 0, heat: 0, paddle: 0, liquid: 0, dose: 0, press: 0, slugs: 0, trace: [] };
+  let slugStep = false, laid = '';
+  // What each step laid, where and in which bottle, for a check that two plays are one (8).
+  const at = (what, x, y, a) => { laid += `${what}${Math.round(x)},${Math.round(y)}:${a.toFixed(6)};`; };
   const sink = {
-    heat(x, y, k) { got.heat += Math.abs(k); },
-    dye(x, y, a) { got.dye += a; },
-    paddle() { got.paddle++; },
-    liquid() { got.liquid++; },
-    drop(x, y, a, c, slug) { if (slug) { got.slug += a; slugStep = true; } else got.drop += a; },
-    dose() { got.dose++; },
+    heat(x, y, k) { got.heat += Math.abs(k); at('h', x, y, k); },
+    dye(x, y, a) { got.dye += a; at('d', x, y, a); },
+    paddle(x, y) { got.paddle++; at('p', x, y, 0); },
+    liquid(x, y) { got.liquid++; at('l', x, y, 0); },
+    drop(x, y, a, c, slug) { if (slug) { got.slug += a; slugStep = true; } else got.drop += a; at(slug ? 's' : 'o', x, y, a); },
+    dose(x, y) { got.dose++; at('q', x, y, 0); },
   };
   const masters = setMasters({}, { audioImpact: drive, kickBloom: bloom }, { passage });
   let n = 0;
@@ -84,9 +87,10 @@ function play(cords, { sound = LOUD, kick = 0.8, drive = 0.45, seconds = 4, area
     const ctx = { sound, shape: null, room: null, film: null, hits: { value: (f) => (f === 'kickHit' || f === 'anyHit' ? v : 0) }, roomImpact: 0, filmImpact: 0, soundImpact: 1, shapeImpact: 1, masters };
     hands.step(cords, areas, (m, band) => cordReading(ctx, m, 0, band), 1 / 60, plate, masters);
     slugStep = false;
-    hands.lay(sink, 192, 1 / 60, () => ({ r: 1, g: 1, b: 1 }), 0, { pace: 1, dice: () => ((n = (n + 0.618034) % 1)), plate });
+    hands.lay(sink, 192, 1 / 60, (a, k) => { laid += `b${k};`; return { r: 1, g: 1, b: 1 }; }, 0, { pace: 1, dice: () => ((n = (n + 0.618034) % 1)), plate });
     if (slugStep) got.slugs++;
     if (hands.pressAt) got.press = Math.max(got.press, hands.pressAt.depth);
+    got.trace.push(laid); laid = '';
   }
   return got;
 }
@@ -224,6 +228,35 @@ const total = (g) => g.dye + g.drop + g.slug + g.heat + g.liquid + g.dose + g.pr
   check('at Kick Bloom 0.2, Sound Drive 0.1 or a breakdown every kick still blooms, Kick Bloom 0.2 a fifth as big',
     full.slugs === K && low.slugs === K && soft.slugs === K && lull.slugs === K && Math.abs(ratio - 0.2) < 0.02,
     `kicks that bloomed ${full.slugs}, ${low.slugs}, ${soft.slugs}, ${lull.slugs} of ${K}; x${f3(ratio)} at 0.2`);
+}
+
+// ── 8. A render forgets the hands: the same song twice lays the same, step for step ──
+{
+  /*
+    The render's own check (`npm run render-app`, the Mac's) found two renders
+    of one seed differing from the first frame: the hands' gates and bottle
+    walk were the live show's. The render lays its plate through
+    resetPlateClocks, which must forget them. This plays Classic's hands on
+    one AreaHands as the show and then as two renders, each after `forget`;
+    and once more without it, the control, which has to differ for the check
+    to mean anything.
+  */
+  const cords = PRESETS.find(p => p.id === 'classic').settings.sceneMappings.filter(isMusicCord);
+  const hands = new AreaHands();
+  play(cords, { hands, seconds: 1.3 });
+  hands.forget();
+  const first = play(cords, { hands, seconds: 2 }).trace;
+  hands.forget();
+  const second = play(cords, { hands, seconds: 2 }).trace;
+  const fresh = play(cords, { seconds: 2 }).trace;
+  const carried = play(cords, { hands, seconds: 2 }).trace;
+  const steps = (a, b) => a.reduce((n, v, i) => n + (v !== b[i] ? 1 : 0), 0);
+  const vis = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  const clocks = vis.slice(vis.indexOf('const resetPlateClocks'), vis.indexOf('renderApiRef.current = {'));
+  const forgets = clocks.includes('areaHandsRef.current.forget()');
+  check('a render forgets the hands: the same song twice lays the same, step for step, and the show\'s gates left on would not',
+    steps(first, second) === 0 && steps(first, fresh) === 0 && steps(first, carried) > 0 && forgets,
+    `${steps(first, second)} and ${steps(first, fresh)} of ${first.length} steps differ after forget, ${steps(first, carried)} without it; resetPlateClocks ${forgets ? 'forgets them' : 'DOES NOT forget them'}`);
 }
 
 const failed = checks.filter(c => !c.ok);

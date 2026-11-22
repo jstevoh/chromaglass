@@ -5174,6 +5174,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       dropLaidRef.current = freshLaid();
       beadFrameRef.current = 0;
       gestureFrameRef.current = 0;
+      // The music's hands, gates and bottle walk too (AreaHands.forget says why).
+      areaHandsRef.current.forget();
       /*
         The rest of what the frame integrates from one frame to the next, at
         the values they are made with. The rock is a damped spring the beat

@@ -84,3 +84,35 @@ export function HandControls({ m, i, settings, onUpdate }: Props) {
     </div>
   );
 }
+
+const ROLE_NAMES: Record<string, string> = {
+  pulse: 'Pulse', heat: 'Heat', press: 'Press', bloom: 'Kick Bloom', stream: 'Stream', swell: 'Swell', bottle: 'Bottle',
+};
+
+/*
+  The music's own cords, folded into one row of the patch bay until opened
+  (38v-1). Every look carries seven of them now, each with its hand's dials,
+  and drawn open they made Patches about five screens deep at the desk's
+  size (`npm run qa` holds every section under three, "and no section is
+  more than three screens deep"), with the look's own patches pushed below
+  them. Folded they are still one press from every dial, and this row says
+  which hands there are and what they ride.
+*/
+export function MusicHandsFold({ roles, open, onToggle }: { roles: readonly string[]; open: boolean; onToggle: () => void }) {
+  if (roles.length === 0) return null;
+  const names = [...new Set(roles)].map(r => ROLE_NAMES[r] ?? r).join(', ');
+  return (
+    <button
+      onClick={onToggle}
+      aria-expanded={open}
+      className="w-full text-left rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 p-2"
+      data-testid="music-hands-fold"
+    >
+      <div className="flex items-center justify-between text-[12px] font-medium text-text">
+        <span>The music's hands, {roles.length} cords</span>
+        <span className={open ? 'text-white/70' : 'text-white/40'}>{open ? 'Fold' : 'Open'}</span>
+      </div>
+      <div className="text-[11px] text-white/40 mt-0.5">{names}, on Sound Drive</div>
+    </button>
+  );
+}
