@@ -139,7 +139,7 @@
     {
       "name": "The turntable",
       "shard": "logic",
-      "run": "npm run turntable",
+      "run": "npm run turntable -- --owed=38v-4",
       "why": [
         "The spinning dish's CPU half: the liquid's lag behind the glass, Auto",
         "Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22)."
@@ -148,7 +148,7 @@
     {
       "name": "The glass gap, one number",
       "shard": "logic",
-      "run": "npm run gap -- --owed=puddle,settle,lift,pinch",
+      "run": "npm run gap -- --owed=puddle,settle,lift,pinch,readers,wired",
       "why": [
         "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
         "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
@@ -673,7 +673,7 @@
     {
       "name": "The drops",
       "shard": "logic",
-      "run": "npm run drops",
+      "run": "npm run drops -- --owed=slide",
       "why": [
         "Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,",
         "each drop its own colour, pressed flat where it touches, a swallowed",
@@ -1625,7 +1625,7 @@
     {
       "name": "The soap film on the plate",
       "shard": "lab3",
-      "run": "npm run soapplate",
+      "run": "npm run soapplate -- --owed=wedge,black",
       "why": [
         "Soap Film draws the frame's own draining film (PLAN 32d, gpu/soapFilmPlate.ts):",
         "off is the plate to the byte and makes no film; on, the plate's colours follow the",
@@ -2025,6 +2025,23 @@
         "the same plate without the drops: all four do the same. `npm run liquidsgpu`",
         "holds the liquids' sizes on the Mac; this holds when they act, in a minute,",
         "on any adapter."
+      ]
+    },
+    {
+      "name": "A heavy bottle slides down a rocked thin gap at Hele-Shaw's speed (15e-10)",
+      "shard": "lab4",
+      "run": "npm run liquidfall",
+      "timeout": 6,
+      "why": [
+        "On a thin gap a poured liquid's push met the flow before the gap kept it, so",
+        "its drag took it within the step: a heavy drop's slide was two thousandths of",
+        "the flow beside it and against the rock's way, and a light bottle's weight was",
+        "floored to nothing by the carry (scripts/liquidfall.mjs). Each line against",
+        "the law worked out in SI: a drop at half Darcy's w g sinθ h²/12ν to 10%, a",
+        "light one rising at the same, the tilt's direction its own, a thicker plate",
+        "as a force per unit of drag, a raised cover as h², glycerine crawling as a",
+        "thick inclusion, and an oil's weight counted once with its lift. About a",
+        "minute here."
       ]
     },
     {
@@ -2711,7 +2728,7 @@
     {
       "name": "The relief",
       "shard": "plate",
-      "run": "npm run derive -- --owed=grad",
+      "run": "npm run derive -- --owed=grad,height",
       "why": [
         "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
         "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
@@ -2720,7 +2737,7 @@
     {
       "name": "The straw bubble",
       "shard": "plate",
-      "run": "npm run straw",
+      "run": "npm run straw -- --owed=area",
       "why": [
         "Held still, the Blow grows a bubble with a fingered rim and a ring of satellites."
       ]
@@ -2751,7 +2768,7 @@
     {
       "name": "A held press moves only its own neighbourhood",
       "shard": "plate",
-      "run": "npm run heldpress",
+      "run": "npm run heldpress -- --owed=presstwist",
       "why": [
         "A press held in one place (each bubble's) moves the liquid around it,",
         "not the whole plate: the projection's source sums to zero exactly."
@@ -2778,7 +2795,7 @@
     {
       "name": "The spinning dish",
       "shard": "plate",
-      "run": "npm run dish",
+      "run": "npm run dish -- --owed=22r",
       "why": [
         "A spun dish drags its liquid round through the gap, harder where the",
         "gap is tight, flings the heavy dye out and draws the oil in; with",
@@ -3151,7 +3168,7 @@
     {
       "name": "The ferrofluid drop in the closeup",
       "shard": "open",
-      "run": "npm run ferrodrop",
+      "run": "npm run ferrodrop -- --owed=29a-11",
       "why": [
         "The closeup's ferrofluid drop (PLAN 29a): its surface the sessile",
         "balance's for its contact angle and size, leaned toward a magnet with",
@@ -3162,7 +3179,7 @@
     {
       "name": "The ferrofluid drop at rest on the thin gap",
       "shard": "open",
-      "run": "npm run ferrorest",
+      "run": "npm run ferrorest -- --owed=9ae",
       "why": [
         "The closeup's ferrofluid drop at rest on the thin gap (PLAN 29c):",
         "degenerate mobility in phaseCHVolume holds its half-full core and",
@@ -3301,7 +3318,7 @@
     {
       "name": "The heat",
       "shard": "open",
-      "run": "npm run heat",
+      "run": "npm run heat -- --owed=once",
       "why": [
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",
@@ -3362,7 +3379,7 @@
     {
       "name": "A colour drop pushes the dye aside into a window of its own colour, and splashes only past Cossali's K",
       "shard": "fifth",
-      "run": "npm run dropwindow",
+      "run": "npm run dropwindow -- --owed=splashliquid,satellitedye",
       "timeout": 6,
       "why": [
         "PLAN 18c-2 and 18c-3: a colour drop on a thin gap is a pour of its",
