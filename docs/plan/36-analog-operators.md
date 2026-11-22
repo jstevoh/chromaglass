@@ -134,13 +134,15 @@ button, making it look good. Every item here is held to those.
     the bands are the boil's first-order carry, the current's coarser grid or the open
     plate's wall, and either give the open plate a `plateboil` part of its own or say in
     the Heat control that the boil is the thin gap's. No shipped look runs the open plate.
-  - **36e-6. Hot water's lift is capped, and its viscosity is not gated** (*open* — lift half stays open behind 36e-7 and 36e-8; S; Medium).
+  - **36e-6. Hot water's lift is capped, and its viscosity is not gated** (*open* — `heatVisc` half shipped, lift half stays open behind 36e-7 and 36e-8; S; Medium).
     Buoyancy (`forces.ts:254-289`) is added after the `maxCur` clamp at `:277`, so a hot plume
     never reaches its speed; `heatVisc` (`fluid.ts:645-668`) runs when the heat carry
     (`fluid.ts:1199`) is gated off by `!boilLive`; and `tempAt` (`lampBoil.ts:750-757`) reads
     a half-float. Exempt buoyancy from the cap or move it into `hsBody` (38f), and gate
     `heatVisc` with the carry. Check: an upright plate at 80 °C rises at over 0.9 of U_buoy,
     and a 50 K spot cools the same at Double Diffusion 0 and 1. (38v, from RS-2.)
+    *Shipped (heatVisc half):* `heatViscPlan` in `src/gpu/fluid/heat.ts` skips `heatVisc`
+    and resets `heatSeconds` while `boilLive` is true (`npm run heat` `once` out of `--owed`).
     The lift half stays open behind **36e-7** and **36e-8** (which hide thermal buoyancy on a
     standing plate).
   - **36e-7. With the boil live on a standing plate, the heat vanishes** (*open*, found writing
