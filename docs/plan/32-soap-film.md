@@ -165,9 +165,3 @@ about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carr
   a faint dye (Dye Budget 0.3) that shows through the film's black and its thin orders. A real
   frame has nothing behind it but the dark ground; decide with the owner whether the dye stays
   as a colour under the film or goes.
-- **32d-6. The film's colours take too much light from the plate** (S; Medium; a look change).
-  `SOAP_GAIN` is 4 (`plateThinFilm.ts:172`), and `:204-217` take up to 60% of the light where
-  Airy's reflectance of a soap film is at most 7.8%; R is applied unscaled and not in linear
-  light. Use Airy's R in linear light, with any extra as an optional Lace control. Check: a
-  0–1.5 µm wedge transmits at least 92%, and black film over 99%. (38v, from RS-29.)
-
