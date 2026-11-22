@@ -4792,6 +4792,22 @@ R² (the volume says 1; the floating glass takes some); the middle's blue 0.66 o
 own; the same dye stamped with no volume 1.795 → 1.539, no window. The rim's spokes and the
 dark collar of the reference are not yet the solver's (18c-6, 18c-7).
 
+**18c-9 and 18c-10** (2026-11-21, `npm run dropwindow` 11/11): a drop opens its window from
+any bottle. On the owner's Mac (Classic at 3× close-up) PR #851 had removed the dark discs, but
+no lighter round window of the drop's colour came. Measured there, the queued drop the lab runs
+opened its window as the lab said; the hand's drops did not, because every bottle with a
+behaviour of its own (ink among them) stamped its dye with no volume while the bottle's deposit
+poured the volume separately a moment later: the colour arrived first and was pushed out by its
+own liquid. A stream held on the plate did the same. Now a hand's drop (`dropBottle`,
+sim/dropSplash.ts) goes through the drop queue with its bottle's species and liquid in every
+pour, and the deposit is told the volume came already; a held stream (`layStream`) pours one
+held share a step (`pourShare`) and lays its colour on that dome at the strength of a column of
+the same bottle's drop (`dropColumnDye`, 2.073 at 192²). The drop now enters over its capillary
+time τ = √(ρD³/σ) (`dropEntrySeconds`: 0.043 s, three steps, at amount 5; seven at amount 30)
+through the whole window rather than `DROP_CORE`'s 0.7 patch over five numerical steps. In the
+lab, a yellow drop of amount 30 in a cyan pool: the pool's red in the middle 1.795 → 0.061
+(0.090 before), the same dye stamped with no volume 0.856, no window.
+
 ### 18d. Each liquid has its real properties
 
 **18d-1** (2026-10-05): each poured liquid's own viscosity, on a thin gap (`npm run thick`,
@@ -7763,6 +7779,23 @@ socket in the check) and Art-Net in, and count real packets for a second each: n
 then Home over the Pro key. With the gate: none 0/0/0, Pro 10 OSC, 36 Art-Net out, 10 Art-Net in,
 Home 0/0/0. On main's server the same run reads free 10/37/10 and Home 10/37/10, and 4c fails.
 
+### 34a-6. The looks as films: six 1920s records, on the page (2026-11-08)
+
+*(M; the owner's Mac. The owner, 2026-10-29: films of the looks, each to a different kind of music, the cards to
+animate on hover, open larger and be heard, and the films on the channel. Then 2026-11-08, of
+the six 1920s films the app made once its ear heard a beat without a kick drum (14d-2): those,
+on the website and on the channel.)* **Shipped** the row: `src/lib/siteFilms.ts` lists six
+records from before 1926 (public domain in the US since 2026; `public/landing/films/SOURCES.md`
+records each Great 78 Project transfer, its checksum and the basis), each played whole by a
+look; the page's gallery of looks keeps its stills and the films are a row of their own under
+it, "Six records from the 1920s". `npm run sitefilms` takes the films the app recorded (or
+renders them on a Mac) and cuts each card's 6 s muted loop (MP4 and WebM, seam blended), its
+640 × 400 still, the channel's 1280 × 720 thumbnail and the description text.
+`LandingFilms.tsx`: a pointer (or focus) plays a card's loop, a phone plays the card in view,
+reduced motion keeps the stills, and a card whose film is on the channel opens it from
+youtube-nocookie.com with the credit under it. `npm run landingfilms` holds all of it. Not a
+GIF: 256 colours band a plate's gradients, and a GIF is ten to twenty times the bytes.
+
 ### 34a-8. The YouTube channel, linked from the landing page (2026-11-08)
 
 Asked: the owner, on 2026-11-08, the day six films went public on the channel: the homepage did
@@ -7808,6 +7841,13 @@ recording and back to 1.600 after, the free site's file is a 9:16 MP4 with an Op
 phone's is the 9:16 slice of its screen.
 
 ## 35. Clear controls: on reads on, one name for one thing
+
+**34a-6a, the channel's ids (2026-11-08).** The owner had the six films uploaded to the channel
+from the package `npm run sitefilms` writes, each with its own title, description, credit and
+thumbnail, and made Public. Their ids went into `siteFilms.ts`: Wolverines `j7afUdmWi2c`,
+Caruso `9N4GEV-z2KE`, Rachmaninoff `6SIl6gNhcpE`, Whiteman `WbqOB_OeEoM`, Oliver
+`nIzxLuUu8tk`, Bessie `ij4wuO7HQH8`. Every card now opens its film; `npm run landingfilms`
+uses the real ids instead of its stand-ins, since it only stubs the ids that are null.
 
 ### 35a. One look for on, every name unique (2026-10-24)
 
@@ -14487,6 +14527,40 @@ minute read one turn in 62 s (and the opposite sign turned back), sinking and ri
 Lab's *Quick Tutorial* fetched on the owner's Mac (47y holds what it found).
 
 
+## 47v-5-47v-6. Grain out of the carried share, and a crop too small to read says so (2026-11-12)
+
+Both are fixes to numbers the watch tool prints (`scripts/watchphysics.mjs`, selftest in
+`scripts/watchreadtest.mjs`).
+
+**47v-6.** `--crop 0.05,0.33,0.9,0.13` on the Brooklyn Bowl film decoded to 320×26 and the
+physics read printed dashes with no reason. The flow is read in 8-pixel blocks on a half-size
+copy with the outer ring left out, so a strip under 64 rows (`MIN_ROWS`) has no row of blocks to
+read. The summary now carries `rows` and `tooShort`, and `physicsLines` prints "The flow read
+needs a taller crop" with the decoded height, in place of speed, whole-field, rotation,
+spreading, carried, turnover and drift, keeping lifetime and spectrum (which do not need the
+blocks). The selftest holds the line at 26 and 62 rows (says it), 64 and 180 (does not).
+
+**47v-5.** The change between two samples includes the grain: film grain, a camcorder's noise in
+the dark. The flow cannot carry it, so it counted against the carried share. Each pair now
+reads its own noise floor (`noiseSigma`: Immerkaer's response to the mask [1 −2 1; −2 4 −2;
+1 −2 1], which answers to white noise and not to ramps or soft blobs, ×1.128 for the mean
+absolute difference of two samples; capped by `quietestBlock`, the change in the quietest
+tenth of the blocks) and `carriedShare` takes it out of both sides in quadrature, which is how
+noise and motion add in a mean absolute change. The first version took the quietest tenth of
+the blocks alone as the floor; on a texture that fills the frame and moves, every block's
+change is the motion, so it read a floor of 26 grey levels on clean footage and was dropped as
+the estimate, kept as the cap. Measured on the selftest's slid texture at a fifth of its
+contrast with ±6 grey levels of grain: carried 0.79 before, 0.94 now (0.99 clean); grain over a
+still texture read 14 changing pairs before and none now; pulsing in place under grain stays
+in place (0.01).
+
+On the real films: the 1969 film (full 10 minutes) 0.187 → 0.229, the bar 0.125 → 0.127. The
+real range in `REAL_SHOWS` is now 0.13 to 0.23 (the in-place guess fires under 0.127). The
+finding is that grain was a small part of why real shows read carried low; on the 1969 film the
+pairs with the least grain read the same as the rest. What is left (the lamp, superimposed
+loops, flow faster than the search) is 47v-8. The two kept references were patched with the new
+carried and noise floor in `/mnt/project-files/references/` so `--vs` compares like with like.
+
 ## 47w-2-47v-2-47v-3. Dissolves, a reference library, and real shows beside the physics bands (2026-11-12)
 
 The follow-up the owner asked for to the watch tool, as one PR.
@@ -14899,6 +14973,34 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+## 38u-7, 38u-12, 38u-14. Three drawn stand-ins made physical (2026-11-13)
+
+From the third physics pass (38u). Each is a look change on purpose.
+
+- **38u-7, the force between colours.** Polarity's push was multiplied by 1 + 2n, n a slow noise on
+  the plate; under n = −0.5 the factor is negative and the force pulled unlike colours together,
+  the backward diffusion the fingering push had been taken out for. Noise removed (GPU and CPU).
+  A tension between two liquids does not depend on where on the glass they meet.
+- **38u-12, Rain Drip.** Its weight along the plate was the same on a level plate as on the wall.
+  Gravity along a plate is g sin θ: the dial now scales by the tilt (`plateUpright`, `dripOf` in
+  `gpu/fluid/constants.ts`; the CPU twin and the deep plate's force read it the same). Seven looks
+  that set Rain Drip at 0.2 or more got a tilt of 0.25; Velvet Underground got 0.05, about 3 degrees
+  (`npm run pools` on the Mac: at 0.25 the tilt's buoyancy and heat broke its pools twice; level, they
+  moved 8.9% against frozen's 8.5%, under the 1.5x bar; at 0.05 they keep 95.3/92.9/93.1% and move
+  44.0% against 11.1%; at 0.10 and 0.15 two pools drain to 39–70%); Rain Drip's help and guide line
+  say it needs Gravity.
+- **38u-14, the clear drop.** `plate.ts` drew the oil drop's band at 0.35 when there was no dye
+  under it; the band is the meniscus bending light out of the aperture and does not need dye. Now at
+  full strength; the clear oil's flat warm tint is now exp(−α·thickness). The bubble's 0.7 in clear
+  liquid stays (see the section's note).
+
+*Measured* (cloud lab, software WebGPU, main then this): `npm run forces` 6, rows of a straight
+boundary pushing the colours apart, thin gap 50 of 76 → 76 of 76 (spread 2.46 → 0.11 of the mean);
+deep plate 73 → 76 (0.35 → 0.00). 7, a pool under Rain Drip 0.5: level plate 0.1657 → 0.00000, tipped
+to a half 0.1657 → 0.0830, the wall 0.1657 unchanged. `npm run droplens`, the drop's band on clear
+water, the ring's brightness from 0.75 to 0.85 of the radius: 72% of the plate on main (the check red,
+no half-bright edge) → 25%, against 24% on dyed water (new line: as dark on clear water as on dye).
 
 ## 43d. A palette from any picture or video (2026-11-15)
 

@@ -490,7 +490,7 @@ export class FluidSimulation {
       soap for what it already does pays nothing for the passes that would
       move it.
     */
-    this.liquid.onDeposit = (cx, cy, radius, what, amount, seconds) => {
+    this.liquid.onDeposit = (cx, cy, radius, what, amount, seconds, push) => {
       const g = this.gpu;
       const s = this.lastSettings;
       if (!g || !s || amount <= 0) return;
@@ -528,7 +528,7 @@ export class FluidSimulation {
         Only on a thin gap: the old plate has no volume to push and no
         viscosity a cell to give it.
       */
-      if (this.thinGap && g.pour) {
+      if (this.thinGap && g.pour && push !== false) {
         const L = this.size;
         const r = Math.max(1.5, radius) / L;
         g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds, g.coverMetres), speciesOf(what), true, what);
@@ -2563,8 +2563,7 @@ export class FluidSimulation {
     `dye`, the share of `amount` that is colour, in every style: 0 for a clear
     liquid (lib/liquidColour.ts) or the music on a reagent (PLAN 25i-10). A
     clear drop still splashes; only what it lays is scaled. `volume` false for
-    a drop that brings no liquid of its own (a fresh plate's lay, a bottle
-    whose own pour brought it; sim/dropSplash.ts).
+    a drop with no liquid of its own (a fresh plate's lay; sim/dropSplash.ts).
   */
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1, volume = true) {
     const S = this.size;
@@ -2804,13 +2803,14 @@ export class FluidSimulation {
     this.applyCurlTurbulence(p.turbScale, p.turbDetail, time, noise2D);
 
     // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
-    this.applyImmiscibility(p.immiscibility, time, noise2D);
+    this.applyImmiscibility(p.immiscibility);
 
     // 8. Vibration — only when explicitly cranked up
     if (p.vibIntensity > 0) this.applyVibration(p.vibIntensity, p.vibFrequency, time);
 
     // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
-    if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
+    const tipped = Math.max(0, Math.min(1, p.plateUpright ?? 0)); // gravity along the plate, 38u-12
+    if (p.drip * tipped > 0) this.applyDripping(p.drip * tipped, dt, time, noise2D);
     if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D);
     if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
 
@@ -3401,7 +3401,7 @@ export class FluidSimulation {
     }
   }
 
-  private applyImmiscibility(immiscibility: number, time: number, noise2D: (x: number, y: number) => number) {
+  private applyImmiscibility(immiscibility: number) {
     const strength = immiscibility * 0.8;
     const sharpness = 2.0;
     for (let j = 1; j < this.size - 1; j++) {
@@ -3450,10 +3450,8 @@ export class FluidSimulation {
           colorDiffY = diffT ** sharpness - diffB ** sharpness;
         }
 
-        const n = noise2D(i * 0.03, j * 0.03 + time * 0.05);
-        const noiseMod = 1.0 + n * 2.0;
-        this.vx[idx] -= colorDiffX * strength * d * noiseMod;
-        this.vy[idx] -= colorDiffY * strength * d * noiseMod;
+        this.vx[idx] -= colorDiffX * strength * d;
+        this.vy[idx] -= colorDiffY * strength * d;
       }
     }
   }
