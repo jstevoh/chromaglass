@@ -1577,6 +1577,25 @@
       ]
     },
     {
+      "name": "Faraday waves stand up from the liquid's physics (SwiftShader)",
+      "shard": "lab5",
+      "run": "npm run faraday",
+      "why": [
+        "The dish on a shaker (PLAN 48f, src/gpu/faraday.ts), the standing wave the",
+        "music's cord on Shake grows, on the app's own grid and substeps on the GPU",
+        "(scripts/faraday.mjs): no pattern at 0.7 of the threshold and its light",
+        "invisible; at 3x the threshold growth at the Mathieu equation's Floquet rate",
+        "within 20%; the pattern's wavelength within 10% of the dispersion relation's",
+        "root at 20, 50 and 100 Hz, saturated and finite under breaking steepness; and",
+        "the ring-down at the water's damping within 25% once the shake stops; the",
+        "dial's top (2 g at 10 and 150 Hz, and at 10 Hz in 0.1 s frames) finite and",
+        "unbroken; and the lab's real plate drawing it, its mean brightness held",
+        "within 2%, still again after the shaker goes off and on.",
+        "In lab5 beside the tank's GPU check: it opens the lab page and asks for a",
+        "WebGPU adapter. About twelve minutes on SwiftShader in a cloud session."
+      ]
+    },
+    {
       "name": "Polarised light",
       "shard": "lab9",
       "run": "npm run polar",

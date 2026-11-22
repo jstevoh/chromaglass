@@ -16,6 +16,7 @@ import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { musicStirOf, withMusicStir } from '../../lib/stir';
+import { musicShakeOf, withMusicShake } from '../../lib/shakeCord';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -1150,6 +1151,29 @@ export function PhoneStage(p: PhoneStageProps) {
               <Slider label="Music Stir" value={musicStirOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                 onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicStir(p.mixer!.settings.sceneMappings, v) })}
                 display={`${Math.round(musicStirOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-stir" />
+            </div>
+          )}
+          {/*
+            The dish on a speaker (PLAN 48f): Shaker, the drive's frequency
+            (nought, none), and while it is on, Shake in g and Music Shake,
+            the depth of the cord from the bass onto Shake
+            (lib/shakeCord.ts), as the desk's Tilt & Rock card has them.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Shaker" value={p.mixer.settings.faradayHz ?? 0} min={0} max={150} step={1}
+                onChange={(v) => p.mixer!.onSetting({ faradayHz: v })}
+                display={(p.mixer.settings.faradayHz ?? 0) > 0 ? `${Math.round(p.mixer.settings.faradayHz ?? 0)} Hz` : 'Off'} touch testId="phone-shaker" midiKey="setting:faradayHz" />
+              {(p.mixer.settings.faradayHz ?? 0) > 0 && (
+                <>
+                  <Slider label="Shake" value={p.mixer.settings.faraday ?? 0} min={0} max={2} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ faraday: v })}
+                    display={`${(p.mixer.settings.faraday ?? 0).toFixed(2)} g`} touch testId="phone-shake" midiKey="setting:faraday" />
+                  <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
+                    display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />
+                </>
+              )}
             </div>
           )}
           </PanelGuard>
