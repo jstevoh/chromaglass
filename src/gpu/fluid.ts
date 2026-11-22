@@ -744,7 +744,7 @@ export class WebGPUFluid extends FluidCover {
     else if (this.oilDye) this.oilDyeStale = true;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
     const pull = oil * (thin ? OIL_TENSION_GAP * this.coverH2 : OIL_TENSION) * perSecond * N * N, cells = OIL_CELLS / Math.max(disp * N, 1e-9);
-    const phaseCapOn = thin && this.phaseLive && seconds > 0;
+    const phaseCapOn = thin && this.phaseLive && (p.magnetSeconds ?? 1 / 60) > 0;
     stage('phase capillary', (pass) => {
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [this.phase.read], none);
