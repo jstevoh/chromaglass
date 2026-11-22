@@ -135,6 +135,17 @@
       ]
     },
     {
+      "name": "One panel, one kind of control",
+      "shard": "logic",
+      "run": "npm run panelkinds",
+      "why": [
+        "Every desk panel and the Wall panel rendered in node: none draws both knobs and",
+        "sliders, Rides and the Mixer draw sliders, the Recipe and section panels knobs,",
+        "whatever a control is learned to on a controller (PLAN 8d-3, the owner,",
+        "2026-11-22: the Recipe's Bubbles and Saturation were sliders among knobs again)."
+      ]
+    },
+    {
       "name": "The desk's layouts",
       "shard": "logic",
       "run": "npm run desklayout",

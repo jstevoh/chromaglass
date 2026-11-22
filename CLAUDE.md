@@ -41,6 +41,9 @@ across many files goes to an Explore agent that returns paths and line numbers.
   and the Mac and iPhone bridges, declared in `src/lib/checkHooks.ts`.
 - **No ceremony in the frame.** In the frame loop and the solver, plain functions over
   typed arrays and refs; no new per-frame objects, classes or wrappers.
+- **One panel, one kind of control.** Rides, the Mixer, the Wall panel, the settings sheet
+  and the phone draw sliders; the Recipe and every section's knobs panel draw knobs. Never pick a control's
+  kind from what it is learned to. `npm run panelkinds` renders every panel and fails a mix (8d-3).
 - **The phone shares, never forks.** Phone components call the same lib functions as the desks.
 - **Size.** `npm run sizes` fails a new file over 100 KB or a file already over it that
   grows, and warns past 40 KB: new code for a big file goes in a module beside it. A split
