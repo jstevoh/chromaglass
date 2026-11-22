@@ -392,8 +392,8 @@ async function scenario(server, gport) {
     const nbA = qJob?.notBefore ? Date.parse(qJob.notBefore) : 0;
     const lastA = storeA.lastUploadAt ? Date.parse(storeA.lastUploadAt) : 0;
     const statusA = await c.tool('upload_status', { job: qJob?.id });
-    line('limitQueue', 'an upload refused by the daily limit leaves the job queued with notBefore >= lastUploadAt + 24 h and >= now + 2 h',
-      !resA.error && g.sessions.length === sessionsBeforeA && qJob?.state === 'queued' && lastA > 0 && nbA >= lastA + 24 * 3600_000 && nbA >= t0 + 2 * 3600_000 && /queued, the Mac retries after/.test(resA.text) && Boolean(statusA.v?.not_before || statusA.v?.[0]?.not_before),
+    line('limitQueue', 'an upload refused by the daily limit a minute after the last upload waits exactly lastUploadAt + 24 h 10 min',
+      !resA.error && g.sessions.length === sessionsBeforeA && qJob?.state === 'queued' && g.limitNext === 0 && lastA > 0 && nbA === lastA + 24 * 3600_000 + 10 * 60_000 && nbA >= t0 + 2 * 3600_000 && /queued, the Mac retries after/.test(resA.text) && Boolean(statusA.v?.not_before || statusA.v?.[0]?.not_before),
       `state ${qJob?.state}, nb ${nbA}, last+24h ${lastA + 24 * 3600_000}, now+2h ${t0 + 2 * 3600_000}`);
 
     // (b) drain before notBefore sends nothing to the stand-in
@@ -489,6 +489,28 @@ async function scenario(server, gport) {
     c.child.stdin.end();
     await Promise.race([c.exited, sleep(3000)]);
 
+    // (a') the floor. In (a) the last upload was a minute old, so lastUploadAt + 24 h
+    // was always the later term and a server without the now + 2 h floor passed it
+    // (the check-skeptic's control). Here the last upload is 30 hours old, so only
+    // the floor stops the Mac retrying at once and hitting the limit again.
+    const lastF = Date.parse(readJson(join(conf, 'uploads.json')).lastUploadAt ?? '') || t0;
+    const tF = lastF + 30 * 3600_000;
+    const cF = start(server, { ...env, CHROMAGLASS_YOUTUBE_NOW: String(tF) });
+    logs.push(cF.out);
+    await cF.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
+    const fileF = join(dir, 'film-floor.mp4');
+    writeFileSync(fileF, randomBytes(CHUNK));
+    g.limitNext = 1;
+    const startsBeforeF = g.startCalls;
+    const resF = await cF.tool('upload_video', { file: fileF, title: 'Floor film' });
+    const jobF = (readJson(join(conf, 'uploads.json')).jobs ?? []).find((j) => j.meta?.snippet?.title === 'Floor film');
+    const nbF = jobF?.notBefore ? Date.parse(jobF.notBefore) : 0;
+    line('limitFloor', 'an upload refused by the daily limit a day after the last upload waits exactly now + 2 h',
+      !resF.error && g.limitNext === 0 && g.startCalls === startsBeforeF + 1 && jobF?.state === 'queued' && nbF === tF + 2 * 3600_000,
+      `state ${jobF?.state}, nb - now ${(nbF - tF) / 60_000} min, starts ${g.startCalls - startsBeforeF}`);
+    cF.child.stdin.end();
+    await Promise.race([cF.exited, sleep(3000)]);
+
     // (h) install-agent writes a valid plist without running launchctl under the env var
     const fakeHome = join(dir, 'home');
     const fakeBin = join(dir, 'bin');
@@ -512,6 +534,10 @@ async function scenario(server, gport) {
     let plistRemoved = false;
     try { statSync(plistFile); } catch { plistRemoved = true; }
     try { statSync(launchMarker); launchRan = true; } catch { /* expected */ }
+    // No mutant for this line, on purpose. A mutant that dropped the NO_LAUNCHCTL guard would
+    // run the real launchctl on whatever machine runs the check; the fake one on PATH should
+    // catch it, but a server that called launchctl by its full path would load a real agent
+    // that drains the real queue every hour. The line reads the plist and the marker file.
     line('plist', 'install-agent writes a plist naming drain, the real script path and StartInterval 3600 without running launchctl under the env var',
       instCode === 0 && uninstCode === 0 && !launchRan && plistRemoved && plistText.includes('<string>drain</string>') && plistText.includes(realpathSync(server)) && plistText.includes('<key>StartInterval</key><integer>3600</integer>'),
       `inst ${instCode}, uninst ${uninstCode}, launchRan ${launchRan}, removed ${plistRemoved}`);
@@ -521,7 +547,7 @@ async function scenario(server, gport) {
     const leaked = [...g.secrets].filter((x) => logs.some((o) => o.all.includes(x)));
     line('leak', `nothing secret is in a reply or the log (${g.secrets.size} keys, secrets and session addresses looked for)`, leaked.length === 0, `found ${leaked.map((x) => x.slice(0, 10)).join(', ')}`);
     const leakedFiles = [...g.secrets].filter((x) => manifestRaw.includes(x) || plistText.includes(x));
-    line('leakFiles', 'nothing secret is in the manifest or the plist', leakedFiles.length === 0, `found ${leakedFiles.map((x) => x.slice(0, 10)).join(', ')}`);
+    line('leakFiles', 'nothing secret is in the manifest or the plist', manifestRaw.length > 0 && plistText.length > 0 && leakedFiles.length === 0, `found ${leakedFiles.map((x) => x.slice(0, 10)).join(', ')}`);
   } catch (e) {
     line('crash', 'the scenario ran to its end', false, String(e?.stack ?? e));
   } finally {
@@ -551,6 +577,11 @@ const MUTANTS = [
   { rule: 'limitQueue', find: "if (e instanceof GoogleApiError && (e.reason === 'uploadLimitExceeded' || e.reason === 'quotaExceeded'))", replace: 'if (false)' },
   { rule: 'drainWait', find: 'if (fresh.notBefore && Date.parse(fresh.notBefore) > nowMs()) continue;', replace: 'if (false) continue;' },
   { rule: 'drainLock', find: 'if (busyElsewhere(fresh)) continue;', replace: 'if (false) continue;' },
+  { rule: 'limitFloor', find: 'return Math.max(now + 2 * 3600_000, afterLast);', replace: 'return afterLast || now + 2 * 3600_000;' },
+  // The check's old video has no manifest entry yet when its replacement finishes, so
+  // the server takes the push branch (the entry made on the spot), and that is the one cut.
+  { rule: 'manifestReplace', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
+  { rule: 'leakFiles', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: loadToken()?.refresh_token }, null, 2));' },
 ];
 
 function mutant(m) {
