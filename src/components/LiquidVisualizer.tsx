@@ -78,7 +78,7 @@ import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun'
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { dropBottle, layStream } from '../sim/dropSplash';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
@@ -4103,12 +4103,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   dent lands anywhere in the middle half of the dish, a finger
                   finding the glass where it falls; the glass about the middle.
                 */
-                const press = kickPress(thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), currentSettings.frameSway ?? 0);
+                const nu = thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS);
+                const press = kickPress(nu, currentSettings.frameSway ?? 0, leadPlate.gpu?.coverMetres);
                 const sheet = press.radii.length === 1;
-                const sqAt = sqArea ? areaCentre(sqArea, GRID_SIZE) : { x: GRID_SIZE / 2, y: GRID_SIZE / 2 };
-                const sqSpread = sqArea ? sqArea.r * GRID_SIZE : (sheet ? GRID_SIZE / 2 : 30 * GRID_SCALE);
-                const cx = sqAt.x + DICE.music.centred() * sqSpread;
-                const cy = sqAt.y + DICE.music.centred() * sqSpread;
+                const { x: cx, y: cy } = kickCenter(sqArea, sheet, DICE.music);
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
                 // (Whatever showed then was not the press, which never landed
                 // until the centre was rounded, PLAN §10 step 4.) Pressed and
@@ -4128,7 +4126,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   deep as a hard one; now two thirds (kickDepth).
                 */
                 const a = kickDepth(squeezeAmt, bass01, accent);
-                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), Math.max(-1, Math.min(1, currentSettings.plateCurve ?? 0)));
+                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, nu, Math.max(-1, Math.min(1, currentSettings.plateCurve ?? 0)));
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, (sheet ? press.radii[0] : 30) * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }

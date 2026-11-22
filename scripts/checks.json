@@ -164,7 +164,7 @@
     {
       "name": "The glass gap, one number",
       "shard": "logic",
-      "run": "npm run gap -- --owed=puddle,settle,lift,pinch,readers,wired",
+      "run": "npm run gap -- --owed=puddle,settle,lift,pinch",
       "why": [
         "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
         "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
