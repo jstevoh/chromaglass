@@ -262,17 +262,6 @@ Left from 18h, each its own item:
 - **18h-1. Flux-form dye transport and removal of MacCormack clamp.** The dye advection stage currently uses MacCormack backtracing with neighbor bounding clamps, which causes minor mass drift (~0.4% over 60 steps) under shear flow. Moving dye advection to a conservative flux form across faces will allow removing the clamp and guaranteeing exact mass conservation during both advection and dispersion.
 - **18h-2. Dye spreads along the flow (visible streaking).** On show timescales ($t \ll 25\text{ hours}$ across 6 mm gap), shear dispersion is in the unsteady pre-asymptotic regime ($\sigma^2 \approx 0.2 v^2$). This draws the dye out into visible streaks along the flow. It requires a multi-layer or sub-stepped flux scheme to model the flow's shear without capping the dispersion at the explicit face flux limit.
 
-## 18i. Bubbles and beads live by physics, not timers (shipped)
-- **18i-2** The beads still run on dials, not on the gap (M; Medium–High). `beads.ts:420-445`
-  slides them by tiltX·500; `viscosityRatio` is 1.5 (`:209`); they merge at 0.02 a step
-  (`:579`), repel at 0.25 (`:639`), age by `innerLife` (`:146`), are clamped (`:675`), and are
-  populated every 30 frames (`:300-349`, `LiquidVisualizer.tsx:4417`), though `MERGE_TAU_S` is
-  already Paterson's. A pancake between glasses lags the liquid at 2U/(1 + λ), slides at Δρ g
-  sinθ b²/(12μ(1 + λ)), and merges on Paterson's τ = 2μR³/(b²σ). Write each rate as 1 −
-  exp(−dt/τ), make beads only from pours and break-up, and let them leave over the rim. Check:
-  a bead's slide within 15% of that speed, and the merge count the same at 30 and 60 steps a
-  second. With 15g-17. (38v, from RS-11.)
-
 ## 18k. Smaller ones
 
 - **Thin-film colour:** the film's thickness is the dye's opacity ×16 plus drifting

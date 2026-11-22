@@ -130,6 +130,15 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="edgeRelief"
         />
         <Slider
+          label="Crisp Edges"
+          value={settings.crispEdges ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ crispEdges: v })}
+          settingKey="crispEdges"
+        />
+        <Slider
           label="Projector Focus"
           value={settings.projectorFocus ?? 0.5}
           min={0}

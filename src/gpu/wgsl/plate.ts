@@ -30,6 +30,7 @@ import { PH_WGSL } from '../../lib/phIndicator';
 import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
+import { INTERFACE_WGSL } from './plateInterface';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { VIEW_OPTICS } from './platePolar';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
@@ -1523,6 +1524,7 @@ fn viewAt(uv: vec2f) -> View {
   for (var k = 0; k < 9; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
   return View(o[0] * ${PHASE_VIEW_TOP}.0, o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7], o[8]);
 }
+${INTERFACE_WGSL}
 
 /*
   A drop of oil sitting on the plate is a lens, and what it shows depends on
@@ -2248,6 +2250,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
+  // A screen pixel in plate units, for the ferrofluid's and oil's edges
+  // (crispInterface), outside any branch: a derivative reads across the
+  // quad. Not fwidth: √2 px on a turn. Relief reads rim0 unmoved.
+  let px0 = max(length(dpdx(fuv0)), length(dpdy(fuv0)));
+  let rim0 = fuv0;
+  fuv0 = crispInterface(fuv0, px0);
   let fuvBase = fuv0;
 
   var flow0 = vec2f(0.0);
@@ -2256,12 +2264,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
   // The front plate's own physics, once, where it sits on the plate.
   let view = viewAt(fuvBase);
-  // One screen pixel in plate units, for the ferrofluid's edge. Taken here,
-  // before any branch a pixel can take on its own, because WGSL reads a
-  // derivative across the whole quad or not at all. The length of a step
-  // across the screen, not fwidth: fwidth adds the two axes, which on a
-  // turning plate is up to √2 pixels and softened the edge as it spun.
-  let phasePx = max(length(dpdx(fuvBase)), length(dpdy(fuvBase)));
+  let phasePx = px0;
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   /*
     The clear film (§20b, 18b-6): the water's dye has the gap less the film,
@@ -2370,10 +2373,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   let sharp0 = dof < 0.55;
   var near0 = vec4f(0.0);
-  if (sharp0 && U.derivedOn > 0.5) { near0 = bicubicSigned(derived0, fuv0); }
+  if (sharp0 && U.derivedOn > 0.5) { near0 = bicubicSigned(derived0, rim0); }
   var normal0 = vec3f(0.0, 0.0, 1.0);
   if (sharp0) {
-    if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
+    if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, rim0); }
     // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
     normal0 = normalize(mix(normal0, vec3f(0.0, 0.0, 1.0), airNear(fuv0)));
   }

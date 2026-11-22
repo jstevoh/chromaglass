@@ -69,7 +69,7 @@ export const PRESETS: Preset[] = [
       damping: 0.985,
       heatDecay: 0.99,
       automateRate: 0.06,
-      platePressure: 0.4,
+      platePressure: 0.25,      // 0.4 leaves a held Press pushing (38w-19)
       glassSmear: 0,
       rainDrip: 0,
       viscosity: 'thick',
@@ -91,11 +91,12 @@ export const PRESETS: Preset[] = [
       secondLamp: 0.0,
       hueJourney: 0,
       dyeBudget: 0.8,            // the whole dish is dye; 0.18 kept black glass (28i-2)
-      plateCurve: 0.2,           // flatter glass, so the cells spread over the full frame
+      plateCurve: 0,             // flat: at 0.2 a held Press never rests (heldpress, 38w-19)
       depthDrag: 1.2,
       plateSpring: 0.35,
       plateRock: 0.55,           // a hand tips the dish: the references' swells
       edgeRelief: 0.6,           // the meniscus round every cell: a dark rim and a bright one
+      crispEdges: 1,             // the rims a real dish shows: one pixel, not the solver's band (38w-15)
       bubbles: 0.2,
       transmission: 0.4,
       dishVignette: 0,           // full screen, no Petri rim (the owner, 2026-11-21)

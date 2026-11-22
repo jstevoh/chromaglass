@@ -7,7 +7,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `stage.ts`: `WebGPUStage`: canvas, device, frame.
 - `fluid.ts` (99 KB, grep it): `WebGPUFluid`, the solver's `step` and the pipelines built ahead. The rest of the class is in `fluid/`, and the map is in this file's header; `fluid/README.md` has the order.
 - `plate.ts`: `WebGPUPlate`; `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms.
-- `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (`GpuStepParams` carries the tank's six settings, PLAN 47n; including `speciesShare` and `speciesSnapshot`, and `pourInk`, a title's mask added to the dye at the solver's own grid, PLAN 37x-10, with an optional `carrier` laid into the species field under it, the thick ink's pad, PLAN 37x-10g; and `layOil`, the oil laid cell for cell at the solver's grid, Foam Cells' pressed drops, PLAN 47z-5; and the optional `pourReady`, PLAN 18c-2).
+- `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (`GpuStepParams` carries the tank's six settings, PLAN 47n; including `speciesShare` and `speciesSnapshot`, and `pourInk`, a title's mask added to the dye at the solver's own grid, PLAN 37x-10, with an optional `carrier` laid into the species field under it, the thick ink's pad, PLAN 37x-10g; and `layOil`, the oil laid cell for cell at the solver's grid, Foam Cells' pressed drops, PLAN 47z-5; and `layDye` with `layShare`, a look's dye laid at the solver's grid and added a share at a time, Classic's cells, PLAN 38w-8; and the optional `pourReady`, PLAN 18c-2).
 - `kit.ts` (48 KB, grep it): `PipelineCache` (`hasRender(name, ask)` says whether a render pipeline is built without building it), `PingPong`, `Disposer`, `bindGroup`, `ReadbackRing`, `GpuProfiler`.
 
 ## Contracts
@@ -25,7 +25,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `camera.ts`: refraction, depth of field, bloom, grain.
 - `device.ts`: `requestGpu`, `requestGpuEarly`, `classifyAdapter`.
 - `displayLean.ts`: the plate's display compiled for the opening look (PLAN 14v-12): `gateDisplayWgsl` (each optional effect's uniform test behind a WGSL override), `displayMayMask` (the effects a look's settings and cords can reach), `displayNeeds` (the effects a draw's uniform bytes turn on), `leanConstants`, `leanCovers`, `WHOLE_DISPLAY`. `plate.ts` draws lean while it covers the draw and whole otherwise (`setLeanDisplay`, `lastDisplayName` for a harness).
-- `ferroDrop.ts`: the closeup's ferrofluid drop.
+- `ferroDrop.ts`: the closeup's ferrofluid drop (`FerroDrop.solve(..., gapMetres?)`).
 - `fluid/`: the solver's class chain, six files.
 - `glint.ts`: `PlateGlint`, the plate's lens pass (PLAN 47e, 47d-1, 47b-1): the glitter's flakes stepped on the dye's flow and splatted through the lens, and the side lamp, run after the display only while Glitter or Side Light is up (`WebGPUPlate.glint`; `npm run glint`).
 - `groupCache.ts`: `groupOf`, `viewOf`: bind groups and views made once.
