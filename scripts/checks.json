@@ -3221,7 +3221,7 @@
     {
       "name": "The ferrofluid drop in the closeup",
       "shard": "open",
-      "run": "npm run ferrodrop -- --owed=29a-11",
+      "run": "npm run ferrodrop",
       "why": [
         "The closeup's ferrofluid drop (PLAN 29a): its surface the sessile",
         "balance's for its contact angle and size, leaned toward a magnet with",
