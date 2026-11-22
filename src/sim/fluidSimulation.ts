@@ -2926,7 +2926,7 @@ export class FluidSimulation {
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, spin: sp.spin, spinRate: sp.rate } : null);
   }
 
-  /** This layer's spin drag (PLAN 38v-4): ν, cover gap (m) and τ = h²/12ν. */
+  /** This layer's spin drag (38v-4): ν, gap (m), τ = h²/12ν. */
   spinDrag(settings: VisualizerSettings) { return layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS); }
 
   private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
@@ -3313,15 +3313,8 @@ export class FluidSimulation {
         note on Rotation Speed).
       */
       /*
-        The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
-        frame that turns with the liquid, the liquid's own speed (the
-        centrifuge), the bulk's drag time, and the liquid. All but the last
-        are zero on a dish nobody turns, and the swirl does not run.
-        The drag time and ν are this layer's own (PLAN 38v-4, spinDrag):
-        on a thin gap the liquid the gap solves with (thicknessViscosity,
-        22 cSt at the default Thickness), not the carrier's 1 or 20 cSt,
-        and this layer's cover gap, not Layer 0's. τ = h²/12ν, so the old
-        read was a lag about 22 times too short on every thin look.
+        The spun dish (PLAN §22): the dish's speed in the liquid's frame,
+        the liquid's own, and this layer's drag (38v-4, layerSpinDrag).
       */
       spinDish: this.dishSpin - this.liquidSpin,
       spinLiquid: this.liquidSpin,

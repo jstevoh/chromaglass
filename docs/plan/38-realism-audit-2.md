@@ -100,6 +100,14 @@ water, so it never does.
   over 60 s the soap and seed totals are the same under loud music and silence with no
   cord, and follow the cord's depth with one. (38v, from RS-46.)
 
+- **38v-4b. The cover glass and the bubbles still read Layer 0's gap (found with 38v-4)**
+  (S; Medium). 38v-4 gave the spin each layer's own ν and gap (`spinDrag`), but the cover's
+  drag (`coverDrag`, one shared cover), `LiquidVisualizer.tsx`'s cover read near the press,
+  `bubbles.ts`'s gap and `fluidSimulation.ts`'s slosh still take Layer 0's `coverUnits`. A
+  back layer under a thicker glass then drains, presses and holds its pockets at the front
+  glass's pace (Stefan's squeeze goes as h³). Read each from that layer's `gpu.coverMetres`.
+  Check: `npm run turntable` or `npm run stefan`, a two-layer plate with 1.5 mm and 3 mm
+  covers giving each layer its own squeeze time.
 - **38v-5. The chorus turns the look's dials outside the cords** (S–M; Medium).
   `useMusicIntelligence.ts:595-614`, on a chorus, adds 0.2 to turbulence, 0.15 to
   saturation and 0.2 to Impact, and scales turbulence by 0.7 + 0.6·energy;

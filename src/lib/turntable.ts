@@ -155,6 +155,12 @@ export interface SpinDrag { nu: number; gap: number; tau: number }
  * lag time `tau = gap² / (12 nu)` (s). Both `deriveStep` and the frame loop's
  * `dishFrame` read this through `FluidSimulation.prototype.spinDrag` so the
  * solver and the turntable share one liquid and one glass per layer.
+ *
+ * Why: before this, the spin took ν from `carrierViscosity` (1 or 20 cSt)
+ * while the thin gap solved with `thicknessViscosity` (22 cSt at the default
+ * Thickness), and every layer read Layer 0's cover. τ goes as 1/ν, so on a
+ * thin look the liquid caught up with the turning glass about 22 times too
+ * fast, and a back layer under a different glass took the front one's lag.
  */
 export function layerSpinDrag(
   settings: { thinGap?: number; gapThickness?: number; viscosity?: string },
