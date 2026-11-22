@@ -460,21 +460,13 @@ and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
   oil and syrup parting where they meet and a finger mixing them; liquidsgpu has only the
   four liquids' scenes. Lay those four on the GPU the same way, with the same owed rule,
   before or with Brief 11, which changes the forces they would measure.
-- **15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**
-  `liquidForces` adds to the flow before the step keeps "the velocity from before the
-  forces" (`thin gap keep`), as it did from the fold, so a thin gap reads the push as flow
-  the liquid already had and its drag has it within the step, where the oil's tension, the
-  magnet and the maze go in after the keep and are read as a speed to drive the liquid to.
-  Measured (`npm run liquidpush`, 64², six steps, a heavy drop on a plate rocked 0.5): the
-  slide under the drop is 3.4e-2 on the open plate and −9.4e-4 on the thin gap, beside a
-  flow of 0.53: two thousandths of it, and against the rock's way. So on the plate every look uses, a
-  heavy liquid does not slide down a rocked plate and an oil does not keep to itself by
-  these forces; what a bottle does there is its species' viscosity and weight in the thin
-  solve (18d) and the soap's erasure (15e-5). Move the pass after the keep and give its
-  constants the thin solve's units (a force per unit of drag, with 15e-2's time base), or
-  retire the terms the species already carry. Not done with 15e-1 because it changes what
-  every poured bottle does in every look, and wants its own before and after. *Measure:*
-  liquidpush's thin-gap reach line asks the slide the rock's way, as the open plate's does.
+- ~~**15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**~~
+  **Shipped** (2026-11-14): a bottle's weight down a rocked thin gap is a drive laid after
+  the gap keeps its flow (`liquidDrive`, `driveLiquids`), Darcy's w g sinθ h²/12ν read as
+  every body force is; a light bottle's lightness has a field of its own so the carry keeps
+  it; the soap's pull and the polar push no longer act between two glasses.
+  `npm run liquidfall` (a drop at Hele-Shaw's speed to 4%), and `liquidpush`'s thin-gap
+  reach asks the rock's way. Story in `docs/plan-shipped.md` §15e-10.
 - **15e-11. The CPU's stand-aside copy of the first pour (found with 15e-1).**
   `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so the first
   pour on a new solver lands in the CPU's copy too, which then never decays
@@ -483,6 +475,41 @@ and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
   **shipped** with 14ab-11 (the step asks for no flush; `npm run frameuploads`). Left: set
   `gpuNative` before the pour can land and return from `stepLiquid` when the GPU has the
   liquids.
+- **15e-12. A heavy bottle's weight goes through the dish's open rim (found with 15e-10).**
+  `liquidDrive` lays w ρ g sinθ on every cell, as the colour's weight is laid (hsBody), and
+  the thin solve holds the rim open (p = 0, where a press's liquid leaves). A drop in the
+  middle is a Darcy dipole that closes inside the dish (`npm run liquidfall` reads it at
+  1.04× Hele-Shaw's speed), but a drop that reaches the downhill rim on a steady tilt goes
+  on out through it, where a clock glass's wall would hold it in a pool, and a plate mostly
+  full of syrup would translate through the rim. The oil's lift met the same and was laid as
+  the closed dish's circulation (27f-5: Ψ relaxed a few sweeps a step, ψ = 0 on the rim).
+  Lay the liquids' weight the same way, one Ψ for the column's whole Δρ/ρ (the oil's share
+  and the liquids' w together), which also retires the (1 − oil) guard `liquidDrive` keeps
+  against counting the oil twice. *Measure:* `oillift`'s rim line for a heavy drop held
+  against the downhill rim by a steady 6° tilt (keeps 98.5% over six readings), and
+  `liquidfall` unchanged.
+- **15e-13. A bottle's polarity loses its sign to the carry (found with 15e-10).** The
+  carries floor every field at zero (`bodyAdvect`, there for the dye), and `liquids1.r`
+  holds a signed polarity (oil −0.9, soap −0.25, silicone −0.95), so every nonpolar bottle's
+  polarity is zero after its first carried step, on the thin gap and on the open plate
+  wherever it is carried by `bodyAdvect`. 15e-10 moved the weight's sign out of the way (a
+  light bottle's lightness in `liquids1.g`) and retired the polar push on the thin gap, where
+  an oil's keeping to itself is its own tension in the mix (38e) and the miscible ones have
+  none; the open plate's push still reads only the polar half. Split it as the weight was, or
+  retire it on the open plate too. *Measure:* `liquidsgpu`'s open-plate oil scene against
+  the stand-in, before and after.
+- **15e-14. A thin gap reads the magnet's, the maze's and the mix's forces against a
+  different drag when nothing else is a body force that step (found with 15e-10).**
+  `hsPrep` reads what was added between 'thin gap keep' and the body forces' keep (`hsMid`)
+  against the reference liquid's k₀, and what came after against the clear liquid's own. The
+  body forces' keep is made only when a body force runs (Rain Drip, Updraft, a breath, Plate
+  Rock: `thinBody`), and without it `mid` is the keep before the forces, so the magnet, the
+  maze and the mix force are then read as stirring, against the clear liquid's k₀. At the
+  default Thickness the two are one number; on a thick look (Thickness 0.8 is eleven times
+  the reference) the magnet's pull changes by ν_ref/ν the moment the plate starts rocking.
+  Keep `hsMid` whenever any of them ran, or read the body forces apart another way.
+  *Measure:* a `magnet`-style lab line, the ferrofluid's speed toward the magnet on a thick
+  look rocked and still, the same to a few percent.
 - **15e-9. Two lab checks at once share one bundle.** `scripts/lab.mjs` writes the plain
   lab's page to one file in `node_modules/.cache` for every run, so two lab checks started
   together (`npm run quick` runs them side by side) can load a bundle the other is writing.
