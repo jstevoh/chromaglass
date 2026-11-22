@@ -341,7 +341,10 @@ style (§31).
   on a level plate and ~~38u-14~~ the clear drop's lens shipped together; next, each a thread, **38u-6**
   (the music warps the clock), **38u-13**; **38u-8** and **38u-11** are the owner's call.
   A fourth pass (**38v**, 2026-11-21, `38-realism-audit-2.md`) ranked what was left: first the
-  two live bugs, **29a-10** and **9ac**, then **15g-17**, **18c-14**, **18c-3b** and **38v-1**.
+  two live bugs, **29a-10** and **9ac**, then **15g-17**, **18c-14**, **18c-3b** and ~~38v-1~~.
+  38v-1, the music's own hands (pulse, press, bloom, stream, swell), are cords on every look,
+  shipped 2026-11-21; what it left outside a cord is **38x** (the kick's bubbles, the plate spin's
+  Driven by, one press a plate, a hand that moves between areas, the droppers' pace, the phone).
   ~~**38w-1**~~ Classic Light Show as a real dish (oil cells in a coloured water on the lamp,
   2026-11-21, `npm run classicdish`; no motor and no music hands; full screen, no grain, about forty smaller cells after the owner's second look) shipped; 38w-2 to 38w-9 open.
 - **6.11** What Liquid Light Lab's tutorials and gear showed (§42, asked 2026-11-07), each its own

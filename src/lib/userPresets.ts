@@ -13,6 +13,7 @@
 import { PALETTE } from '../constants';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { sanitizePatch } from './sanitizeSettings.ts';
+import { withMusicCordsOnce } from './musicCords.ts';
 import type { ShowSequence, ShowStage } from './sequencer';
 import { parseSongRef, type SongRef } from './songRef';
 import { PACE_MOMENTS, type PaceMoment, type StagePace } from './scenePacing';
@@ -36,7 +37,18 @@ export const USER_PRESETS_KEY = 'chromaglass-user-presets';
   from version 2 on keeps whatever it was saved with, off included, since
   off was then a choice.
 */
-export const PRESET_VERSION = 2;
+/*
+  And 4 since the music reaches the plate only through cords (PLAN 38v-1; 3 is
+  38u-16's, the music's stir). Until then the frame loop played every look
+  with hands of its own (a pulse, a press, a bloom on each kick, a stream and
+  a swell); now each look carries them as cords, and a look saved before has
+  none, so it came back still to the music. Read before version 4, a saved
+  look gains the cords its own wiring and Sound Drive call for (lib/musicCords.ts
+  `withMusicCordsOnce`); from 4 on it keeps what it was saved with, none
+  included, since by then a look without them is one the owner pulled them
+  out of.
+*/
+export const PRESET_VERSION = 4;
 
 export interface UserPreset {
   format: typeof PRESET_FORMAT;
@@ -130,9 +142,15 @@ export function serializePreset(p: UserPreset): string {
  * route that takes a saved look whole rather than through parsePresetFile
  * (a set list's): nothing else about it changes, its id included.
  */
+/** A look saved before version 4, read with the music's cords once (PRESET_VERSION says why). */
+function musicOnce<T extends Partial<VisualizerSettings>>(version: unknown, settings: T): T {
+  return !(Number(version) >= 4) && settings && typeof settings === 'object' ? withMusicCordsOnce(settings) : settings;
+}
+
 export function upgradeSaved(p: UserPreset): UserPreset {
   const old = !(Number(p.version) >= 2) && p.settings?.thinGap === 0;
-  return { ...p, version: PRESET_VERSION, settings: old ? { ...p.settings, thinGap: 1 } : p.settings };
+  const s = old ? { ...p.settings, thinGap: 1 } : p.settings;
+  return { ...p, version: PRESET_VERSION, settings: musicOnce(p.version, s) };
 }
 
 export function parsePresetFile(text: string): UserPreset {
@@ -145,6 +163,7 @@ export function parsePresetFile(text: string): UserPreset {
   const settings = cleanSettings(o.settings);
   // Off as the old default, not as a choice (PRESET_VERSION says why).
   if (!(Number(o.version) >= 2) && settings.thinGap === 0) settings.thinGap = 1;
+  settings.sceneMappings = musicOnce(o.version, settings).sceneMappings;
   return {
     format: PRESET_FORMAT,
     version: PRESET_VERSION,

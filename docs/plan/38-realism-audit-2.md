@@ -25,7 +25,7 @@ cost, then Low.
 | 3 | 15g-17 | The pointer shoves bubbles and beads; a pop pushes and swirls (RS-37) | `15-tools-on-liquids.md` | S | High | new |
 | 4 | 18c-14 | The ambient seed pours dye and heat into every look (RS-38) | `18-physics-2.md` | S–M | High | new |
 | 5 | 18c-3b | The mouse's dye stamp and the themes' kicks lay no volume (RS-39) | `18-physics-2.md` | M | High | updates |
-| 6 | 38v-1 | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | new |
+| 6 | ~~38v-1~~ | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | shipped |
 | 7 | 18c-13 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
 | 8 | 9ad | The domes rise on \|B\|, not on its normal part (RS-20) | `09-ferrofluid.md` | S–M | Medium–High | new |
 | 9 | 18i-2 | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | new |
@@ -78,26 +78,6 @@ Notes that only point here: 38e (to 9ae), 38k-3 and 9t-5 (to 9t-11), 9j (to 9af)
 (WRONG, or held whole by an older item), and so was the half of RS-19 that said the
 viscosity floor in `liquidProps.ts:84-99` engages: no bottle on the shelf is thinner than
 water, so it never does.
-
-- **38v-1. Sound Drive's built-in hands become cords on real actuators** (L; High). When
-  `audioMappings` is set and `impact > 0.01` and the volume is over 3,
-  `LiquidVisualizer.tsx:3940-4230` plays the music with its own hands: a centre pulse
-  (4071-4076), a bass press (4090-4094), the kick's bloom and doses (4126-4146), a mid
-  stream (4150-4163), sparks (4200-4205) and a swell (4214-4227). That is live on 33 of the
-  34 house looks; only the radial burst is dead (gated `!thinGap`). A real show moves the
-  plate with a hand on a dropper, a squeeze or a motor, and the music reaches it only
-  through the operator. Make each piece a cord onto the actuator it imitates (the pulse and
-  stream onto `areaPour`, the press onto Beat Squeeze, the swell onto `areaStir` or the
-  motor), give the looks those cords as default patches so they keep their life, and drop
-  the sparks and the hue nudge. Touches 27e-1, 27e-3 and `00-dye-tools.md:68-76`. Check:
-  with `sceneMappings` empty, loud music against silence lays zero dye, heat and doses
-  apart; `npm run soundpatch` and `npm run breakdown` stay green. (38v, from RS-43.)
-  The owner (2026-11-21) wants the music able to add things aggressively, so the cords
-  must reach at least as far as the block does: a whole-plate pour cord (today `areaPour`
-  needs an area), a gated pour that lays a slug of liquid of a set volume and size on each
-  hit rather than only opening a bottle wider, and a whole-plate heat cord for the centre
-  pulse. Each piece then gets its own depth and gain, where the block shared one Audio
-  Impact.
 
 - **38v-2. Comet's pull flickers with the beat, and is absent on the open plate** (S;
   Medium). `thinGap.ts:330-357` adds the `cometX/Y` pull inside `hsBody`

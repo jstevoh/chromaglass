@@ -104,15 +104,26 @@
       ]
     },
     {
+      "name": "The music's hands as cords",
+      "shard": "logic",
+      "run": "npm run musiccords",
+      "why": [
+        "PLAN 38v-1: the frame loop's own music hands are gone and each is a cord",
+        "on every look. With the cords pulled loud music lays nothing; laid, each",
+        "pours within a tenth of what the block did at Sound Drive's 1x, and Sound",
+        "Drive and the cords' depths can go past it."
+      ]
+    },
+    {
       "name": "The kick's bloom",
       "shard": "logic",
       "run": "npm run kickbloom",
       "why": [
-        "The droplets each kick throws (Kick Bloom, lib/kickBloom.ts), run on a",
-        "recording sink: the dial scales the dye and the push each alone, and the",
-        "droplets clump rather than sit on one ring (moved from panel.mjs's grep",
-        "when the bloom left the frame loop, 19ai-10); and the music lays no dye",
-        "on a reagent area, Chemical Clock's gel or Red Cabbage's wells (25i-10)."
+        "The kick's bloom, a cord since 38v-1 (a gated dropper riding Kick Bloom),",
+        "played by the real hands: the dial scales its dye and at 0 lays none;",
+        "its drops clump rather than sit on one ring (lib/kickBloom.ts); and the",
+        "music lays no dye on a reagent area, Chemical Clock's gel or Red",
+        "Cabbage's wells (25i-10), in the loop or through its cords."
       ]
     },
     {

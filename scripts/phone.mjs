@@ -964,7 +964,7 @@ try {
         await page.waitForTimeout(200);
         const m = (await mappings())?.[patchAt];
         hitPicked = m ? `${m.source}:${m.feature}` : null;
-        await page.getByLabel('Remove mapping').nth(patchAt).tap();
+        await page.getByTestId(`patch-remove-${patchAt}`).tap();
         await page.waitForTimeout(250);
       }
       const patchesAfter = (await mappings())?.length ?? null;

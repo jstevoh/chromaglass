@@ -15089,6 +15089,52 @@ creating a palette from it." It was 43d, "the cover sets the colours".
   within ΔE 0.5, the file saying its length was Infinity). `npm run phone`: the Dye
   sheet's button makes "From picture" the palette in the picture's four colours.
 
+
+## 38v-1. The music's hands are cords (2026-11-21)
+
+What was there: whenever Sound Drive was over 0.01 the frame loop played the music with a
+block of its own (LiquidVisualizer.tsx, about 300 lines): a pulse of dye and heat at the
+middle on the Density route, the glass pressed on the Velocity route, a radial burst off a
+thin gap, a bloom of 5 to 11 droplets and a dose of the look's liquid on each kick, a
+stream on the mids, white sparks and heat on the treble, and a swell on the energy, all
+scaled by Sound Drive. Live on 33 looks and on no patch bay: with every cord pulled the
+plate still answered the music (the audit's RS-43).
+
+What shipped: each hand is a cord on the hands' list (lib/areaCords.ts), laid on every
+look from its own wiring and areas (lib/musicCords.ts `layMusicCords`): the pulse a
+dropper at the middle (in the bass's areas on an area look), its heat a Heat cord, the
+press a Press cord (new, `areaPress`), the bloom a gated dropper on the kick that lets go a
+slug of drops (lib/kickBloom.ts `scatterBloom`) and doses the bottle's liquid, the stream
+and the swell droppers roaming the plate, the colour route a Bottle cord. The sparks and
+the burst are gone. The hands now work the whole plate as well as an area (`plateArea`),
+and a hand's cord takes `size`, `volume`, `drops`, `wander` and `bottle`; any cord can
+ride dials as masters (`masters`: Sound Drive, Kick Bloom), which is how Sound Drive
+still turns the music up and down. A sound cord on the bass takes Bass Boost as a gain
+(27g), as the press did. The desk's patch bay lists **Hands on the plate** and draws each
+hand's Size, Roam, Volume, Drops and Rides; What the sound moves rewires the cords; the
+phone's Sound sheet has Kick Pour, Bass Pulse and Bass Press. A look saved before is
+given its cords once (PRESET_VERSION 4).
+
+Measured (`npm run musiccords`): with the music's cords pulled, loud music and kicks lay
+nothing on the plate on all 39 looks the music plays; at Sound Drive's 1x each cord pours
+what the block's arithmetic did a second (pulse 1.350/1.350, stream 3.600/3.600, swell
+2.880/2.880, a kick's bloom 5.850/5.856, press 0.004/0.004); Sound Drive at 1 pours 2.22x
+its 0.45, and a cord at depth 1 twice its laid 0.5 (press 0.008). Found along the way:
+38x-1 to 38x-6.
+
+Found in its own pre-push review and fixed in the same PR: the masters were read before
+the patches folded, so a cord on Sound Drive or Kick Bloom moved none of the hands; a gated
+hand's masters sat inside its reading, so Kick Bloom under about 0.3 lifted the gate over
+every kick (`musiccords` now holds every kick blooming at Kick Bloom 0.2, a fifth the size,
+and at Sound Drive 0.1 and a breakdown); one Bottle cord on the plate coloured nothing on a
+look with areas (it is now every area's when the area has none of its own, and rides the
+family's walk on the treble route as the colour cycle did); New Look and New Palette started
+with no hands (`NEW_LOOK`); a look stored at Sound Drive 0 could never get them back (they
+are laid at 0 and silent); a hand taken off its area became a Turbulence cord; the press
+had no top (`PRESS_MAX`, 0.032, a little past the old 0.03); and a hand over three areas
+split its volume, so its summed depth stepped 0.05 a tick on a one-second Go (`desk`); it
+splits its depth now.
+
 ## 38w-1. Classic Light Show as a real dish (2026-11-21)
 
 The owner: Classic "looks nothing like a traditional liquid light show". Against the Joshua

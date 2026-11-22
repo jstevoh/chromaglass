@@ -4,6 +4,12 @@ The closed items of [`docs/plan/38-realism-audit-2.md`](../38-realism-audit-2.md
 and kept for reference. Ids are unchanged: `grep -rn '<id>' docs/plan/` finds an item here or
 in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`, under the same numbers.
 
+## 38v. A fourth pass (2026-11-21)
+
+- ~~**38v-1.**~~ Sound Drive's built-in hands became cords on every look (shipped 2026-11-21,
+  `docs/plan-shipped.md` 38v-1). What it left outside a cord is **38x-1** to **38x-7**
+  (`38-realism-audit.md`).
+
 ## 38w. Classic Light Show as a real dish (2026-11-21)
 
 - ~~**38w-1. Classic laid as oil cells in a coloured water on the lamp**~~ shipped
