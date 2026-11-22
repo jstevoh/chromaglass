@@ -144,7 +144,16 @@ const actions = [
     return `kaleido ${s.kaleidoscope}, macro ${s.macroMode} x${(s.macroZoom ?? 1).toFixed(1)}, ${s.renderStyle}`;
   } },
   { weight: 1, name: 'desk action', run: async (page) => {
-    const a = pick(['seed', 'automate-toggle', 'spin-front', 'macro-toggle']);
+    const a = pick(['seed', 'automate-toggle', 'spin-front', 'zoom']);
+    // The closeup in and out by its one control, the Macro Zoom (it was the
+    // Macro pad action until the Close-up press was taken out, PLAN QA-32c).
+    // By the keys, the app's own zoom code: + seven times is 4.3x from the
+    // plate, − ten times back to it.
+    if (a === 'zoom') {
+      const zin = !((await page.evaluate(() => window.chromaglassDebug().settings.macroZoom ?? 1)) > 1.05);
+      for (let k = 0; k < (zin ? 7 : 10); k++) await page.keyboard.press(zin ? '+' : '-');
+      return zin ? 'zoom in' : 'zoom out';
+    }
     await page.evaluate((x) => window.chromaglassAction?.(x), a);
     return a;
   } },

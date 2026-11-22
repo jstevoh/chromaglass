@@ -201,9 +201,9 @@ export interface PhoneStageProps {
     something played, not set up.
   */
   spin: { auto: number; rpm: number; beats: number; /** The tempo the dish's Tempo mode is lit by, bpm, or 0. */ bpm: number; onChange: (patch: Partial<VisualizerSettings>) => void };
-  // The closeup
+  // The closeup: the Macro Zoom, the one way in and out of it (PLAN QA-32c).
   zoom: number;
-  onZoom: () => void;
+  onZoom: (zoom: number) => void;
   camera: 'hold' | 'follow' | 'auto';
   onCamera: (c: 'hold' | 'follow' | 'auto') => void;
   /** Auto's cut, "5s" (`shotLabel`, lib/macroCamera.ts), named on its button so it reads apart from Follow (QA-11). */
@@ -455,6 +455,15 @@ export function PhoneStage(p: PhoneStageProps) {
   const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
+  /*
+    The Macro Zoom's row, opened by the microscope at the top. That button used
+    to be the closeup's on/off (4x in, the plate out); the owner asked for the
+    Close-up button gone everywhere (2026-11-14), the zoom being the one way in
+    and out, so here it opens the zoom itself rather than standing in for it.
+    A pinch still sets the zoom once in; the row is how a phone gets in at all,
+    and back to the whole plate in one drag.
+  */
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   /*
     The camera's hint, for a few seconds after the closeup comes in: the one
@@ -510,11 +519,11 @@ export function PhoneStage(p: PhoneStageProps) {
             </button>
           )}
           <button
-            onClick={p.onZoom}
-            aria-pressed={zoomed}
-            aria-label={zoomed ? 'Leave the closeup' : 'Closeup'}
+            onClick={() => setZoomOpen(o => !o)}
+            aria-expanded={zoomOpen}
+            aria-label="Macro Zoom"
             data-testid="phone-zoom"
-            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomed ? LIT : 'text-text-2 active:bg-active'}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomOpen || zoomed ? LIT : 'text-text-2 active:bg-active'}`}
           >
             <Microscope size={20} />
           </button>
@@ -538,6 +547,22 @@ export function PhoneStage(p: PhoneStageProps) {
         </div>
       </div>
 
+      {zoomOpen && (
+        <div className="pointer-events-auto mx-3 mt-2 rounded-xl border border-border-strong bg-surface/90 px-4 pt-3 backdrop-blur-xl" data-testid="phone-zoom-panel">
+          <Slider
+            label="Macro Zoom"
+            value={Math.max(1, p.zoom)}
+            min={1}
+            max={16}
+            step={0.1}
+            onChange={p.onZoom}
+            display={`${Math.max(1, p.zoom).toFixed(1)}×`}
+            touch
+            testId="phone-zoom-slider"
+            midiKey="setting:macroZoom"
+          />
+        </div>
+      )}
       {zoomed && (
         <div className="pointer-events-auto mx-auto mt-2 flex flex-col items-center gap-2" data-testid="phone-camera">
           <div className="flex rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
