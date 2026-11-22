@@ -111,3 +111,18 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   to put back (`npm run assistant`, `desk-play`, `desk-tab`, `desk-answer`, `desk-tabs`,
   `desk-move`, `desk-undo`, `desk-panel`, `desk-pin`, `phone-desk`, and the page line on
   the real `deskTabs.ts`). Story in `docs/plan-shipped.md` §44.
+- ~~**44i-5. An upload queue that waits out the daily limit.**~~ **Shipped** 2026-11-22:
+  `queue_upload` (saves queued jobs with optional `key` and `replaces` without
+  uploading), `upload_video` queuing instead of failing on `uploadLimitExceeded`
+  (`max(now + 2h, lastUploadAt + 24h + 10m)`) or `quotaExceeded` (next midnight Pacific
+  + 10m), `drain` CLI mode (oldest due first, `busyElsewhere` lock, stops on limit),
+  `install-agent` / `uninstall-agent` LaunchAgent plist, and Pacific-time queue status
+  in `upload_status` and `GUIDE` (`npm run youtube`, lines `limitQueue`, `drainWait`,
+  `drainUpload`, `drainLock`, `queueTool`, `plist`, and mutants).
+- ~~**44i-6. A manifest of the channel.**~~ **Shipped** 2026-11-22:
+  `~/.chromaglass/youtube/manifest.json` (mode 600), `manifest` tool (`sync: true`
+  pages all uploads at 1 unit/page while preserving local fields `key`, `source`,
+  `status`, `reason`, `replacedBy`, `replaces`, `notes`, keeping gone videos as
+  `removed`), `mark_video` (single or batch `video_ids`), upload completion recording
+  `replaces` → `replaced` / `ok`, and `manifest [--sync] [--md <file>]` CLI (`npm run
+  youtube`, lines `manifestReplace`, `manifestSync`, `leakFiles`).
