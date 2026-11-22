@@ -67,9 +67,9 @@ permissions:
   actions: read
   pull-requests: read
 
-concurrency:
-  group: firebase-hosting-live
-  cancel-in-progress: false
+# No run-wide group since PLAN.md 19ak-21: the deploy job holds the live
+# channel on its own (below), so a run's checks, which can take hours on
+# GitHub's Macs, never hold the next merge's deploy behind them.
 
 jobs:
   # Was this exact tree already measured? A squash merge of a PR whose head
@@ -112,11 +112,10 @@ jobs:
           BEFORE: ${{ github.event.before }}
         run: bash scripts/deploygate.sh "$GITHUB_SHA" "$BEFORE"
 
-  # Nothing reaches the live site until the app has been measured and driven.
-  # `npm run show` pulls main on show night, so what is on main is what turns
-  # up at the venue; a deploy gated only on the typechecker was a deploy gated
-  # on nothing that an audience can see. That still holds: either this run
-  # measures it, or `verified` found the PR run that measured this same tree.
+  # Until PLAN.md 19ak-21 nothing reached the live site until the app had been
+  # measured and driven here, or `verified` found the PR run that measured
+  # this same tree. The owner chose speed over that on 2026-11-22: the checks
+  # below now report on what went live (see `checks`).
   #
   # Since 2026-10-04 (the owner's choice, PLAN.md 19h-3) a third answer:
   # `disjoint`, when the PR's run passed the Mac on an older main and the site
@@ -183,9 +182,19 @@ jobs:
           SHARDS: ${{ needs.mac.outputs.shards }}
         run: node scripts/macwatch.mjs
 
+  # Since PLAN.md 19ak-21 (the owner, 2026-11-22: "I would much rather release
+  # shit that crashes and deal with a couple bugs here and there. Let's get
+  # shit live quicker.") the checks no longer stand between a merge and the
+  # live site. They run beside the deploy, on the tree it published, and a red
+  # one is a report for the steward of main (and `hold.yml`'s status), not a
+  # stop. A newer push to main cancels the older run's checks: only the newest
+  # tree's answer is worth a Mac.
   checks:
     name: Checks
     needs: [verified, mac]
+    concurrency:
+      group: main-checks-${{ github.ref }}
+      cancel-in-progress: true
     # Written out with `!cancelled()` because `mac` is skipped whenever the
     # Mac shards will not run, and a job whose need was skipped is skipped
     # with it unless its condition says otherwise. `verified` must still have
@@ -198,17 +207,23 @@ jobs:
       mac: ${{ needs.verified.outputs.tested != 'disjoint' }}
       local: ${{ needs.mac.outputs.shards || '[]' }}
 
+  # The deploy waits for nothing but the gate's answer (PLAN.md 19ak-21): what
+  # holds a merge is its PR's run (the typecheck, the build and the node
+  # checks), and the build here, which publishes nothing if it fails.
+  # `nothing` publishes nothing: the live site is already this build's. The
+  # watchdog's re-run (`hosted`) is for the Mac shards alone; the tree it would
+  # publish went live with the run that started it.
   deploy:
     name: Build and deploy
-    needs: [verified, checks]
-    # `checks` is skipped only when `verified` said the tree had passed; a
-    # skipped `checks` for any other reason (a failed `verified`) never deploys.
-    # `nothing` publishes nothing: the live site is already this build's.
+    needs: [verified]
     if: >-
       ${{ !cancelled() && needs.verified.result == 'success' &&
-          needs.verified.outputs.tested != 'nothing' &&
-          (needs.checks.result == 'success' ||
-           (needs.checks.result == 'skipped' && needs.verified.outputs.tested == 'true')) }}
+          needs.verified.outputs.tested != 'nothing' && !inputs.hosted }}
+    # Never two deploys racing onto the live channel: one runs, the newest
+    # waiting one takes the next turn.
+    concurrency:
+      group: firebase-hosting-live
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     # Where FIREBASE_SERVICE_ACCOUNT lives (step 3 at the top): main only.
     environment: firebase-live

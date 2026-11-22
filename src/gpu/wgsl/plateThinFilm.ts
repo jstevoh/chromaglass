@@ -12,6 +12,7 @@
  */
 import { SOAP_LUT_STEP_NM } from '../../lib/soapFilm';
 import { SOAP_FRAME_LO, SOAP_FRAME_SPAN } from '../soapFrame';
+import { FARADAY_PLATE_WGSL } from './plateFaraday';
 
 export const THIN_FILM_WGSL = /* wgsl */ `
 /*
@@ -215,5 +216,19 @@ fn soapFilmOver(c: vec3f, fuv: vec2f) -> vec3f {
   let film = soapEncode(lin);
   let reflected = min(1.0, dot(film, vec3f(0.2126, 0.7152, 0.0722)));
   return mix(c, c * (1.0 - reflected) + film, U.soapFilm);
+}
+
+/*
+  What lies over the plate's liquid, in the order light meets it: a shaken
+  dish's standing waves bend the lamp's light (PLAN 48f, plateFaraday.ts),
+  then the frame's soap film reflects over all of it (32d). Here and not in
+  plate.ts, which is at its size ceiling.
+*/
+${FARADAY_PLATE_WGSL}
+fn coversOver(c: vec3f, fuv: vec2f) -> vec3f {
+  var o = c;
+  if (U.faraday > 0.5) { o = faradayOver(o, fuv); }
+  if (U.soapFilm > 0.001) { o = soapFilmOver(o, fuv); }
+  return o;
 }
 `;

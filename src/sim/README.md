@@ -13,7 +13,7 @@ the component.
   `dropGpu`, `syncFromGpu`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
-- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom, Turing's rates, the currents.
+- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom (`macroZoomOf`, the Macro Zoom alone since PLAN QA-32c: `macroMode` no longer floors it at 4x; `MACRO_PRESET_ZOOM`, what a flag-only saved look or stage is given), Turing's rates, the currents.
 
 ## Contracts
 
@@ -32,6 +32,7 @@ the component.
 
 ## Files
 
+- `beadStep.ts`: `stepPlateBeads` (oil bead stepping and live gap/liquid wiring, moved out of `LiquidVisualizer.tsx`, PLAN 18i-2, 19ai-10).
 - `constants.ts`: the grid, the macro zoom, Turing's drift, the currents' gains.
 - `dice.ts`: `DICE` (seeded randomness), the palette window.
 - `dropSplash.ts`: `layDrop` (a colour drop: on a thin gap its volume and dye queued through lib/dropImpact.ts, else the stamp; its crater, and satellites only past Cossali's K; a last `what` carries the bottle's liquid into every pour), `dropBottle` (a hand's drop from a bottle: `layDrop` with its liquid, and the bottle's deposit told the volume came already), `layStream` (a stream held on the plate: one held share a step with its colour laid at the strength of a column of the same drop, `dropColumnDye`; the stamp when nothing pours) and `stepPlateDrops` (the drops on their way in, a step at a time), PLAN 18c-2, 18c-3, 18c-10; moved out of `fluidSimulation.ts` with its old `splash()`. `FluidSimulation.autoInject` takes a last `volume` (false for a fresh plate's lay and a bottle whose own pour brought it) and the sim holds `drops`.
@@ -39,9 +40,10 @@ the component.
 - `frameTypes.ts`: the frame's shapes.
 - `noteVoicesStep.ts`: `handleNoteVoiceEvent`, `queueMelodyDrops`, `stepMelodyAndVoices` (MIDI note voices and Melody Walk stepped into the plate, PLAN 24.3).
 - `speciesPoll.ts`: `SpeciesPoller` (`speciesShare` and `speciesSnapshot` polled once a second on a thin gap) and `stepPlateBubbles` (handing the snapshot to `BubbleField` on a thin gap and stepping the bubbles).
+- `solverLay.ts`: `layClassicOnSolver` (Classic's dye and oil cells laid at the solver's own grid through `FluidInputs.layDye`, not on the CPU's 192² and carried up bilinearly, which blurred every rim; PLAN 38w-8) and `SolverSeeds` (which captured seeds hold such a lay, so `addSeedShare` sends each share to the solver too through `layShare`, and the dish mean the solver's lay added, which `seedPreset`'s CPU sum cannot see).
 - `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
-  `resolveSimResolution`, `engineLabel`.
-- `tools.ts`: the hands' settle and hold, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`).
+  `resolveSimResolution`, `engineLabel`, `pressSheetKick` (sheet kick with live cover gap).
+- `tools.ts`: the hands' settle and hold, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`), `kickCenter`.
 
 ## Checks
 

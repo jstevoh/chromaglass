@@ -28,7 +28,7 @@ the chemical clock counted in:
 3. **48c** bioluminescent trails: a dark plate that glows where the liquid is sheared
 4. **48d** lift the glass: air fingers branch into ferns
 5. **48e** oil-slick rainbows from a real spreading film
-6. **48f** Faraday waves: the music's vibration stands up as a pattern, through a cord
+6. **48f** Faraday waves: the music's vibration stands up as a pattern, through a cord (shipped 2026-11-21)
 
 **The owner's pick, 2026-11-21:** "lest do anything that can be impacted by the music itself.
 Like lke the standing-wave patterns for example." So the music-driven ideas go first, each
@@ -107,21 +107,6 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   drawn dial with physics. Check: the band order from the middle out is Newton's series,
   and a film that has spread twice as wide shows bands of the colours of half the
   thickness.
-
-- **48f. Faraday waves: the music's vibration stands up as a pattern** (M–L; through a
-  cord only; kin to **34d** Chladni figures, which are sand on a ringing plate). A liquid
-  layer shaken up and down past a threshold grows standing waves at half the drive's
-  frequency: stripes, squares, hexagons, and at two frequencies quasi-crystals. The drive
-  is the cord's amplitude and the pattern's scale is set by the dispersion relation of the
-  layer's depth, so a bass note gives big cells and a high one fine ones, and the pattern
-  grows and decays with the note rather than flashing. Model: a surface height on the
-  liquid (the thin gap's free layer, as the open dish §42d has) with the parametric
-  forcing of the Mathieu equation; light through it by the same optical path as 48b. Why it
-  looks great: the audience sees the music make a shape, and it is the shape a physicist
-  would draw. It stays inside the rule: the sound only shakes the dish through a cord the
-  owner patches, and the pattern is the liquid's. Check: no pattern under the threshold
-  amplitude, and the pattern's wavelength follows the dispersion relation within 10% at
-  three drive frequencies.
 
 - **48g. Thermochromic liquid-crystal dye that shows the heat** (M; builds on the heat field
   of **18f**, **18f-2** Bénard–Marangoni cells). Cholesteric liquid crystals reflect a

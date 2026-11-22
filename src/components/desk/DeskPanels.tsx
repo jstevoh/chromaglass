@@ -19,7 +19,6 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
-import { closeupIn, closeupToggle } from '../../lib/macroLanding';
 import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
@@ -556,16 +555,13 @@ function RecipeBody({ p }: { p: DeskProps }) {
       )}
       {/* Pinned rather than at the end of a list that scrolls. */}
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
-        <Button
-          full height={32}
-          pressed={closeupIn(p.settings)}
-          title="The closeup camera, in among the drops (M). Lit while it is on."
-          onClick={() => p.onSetting(closeupToggle(p.settings))}
-          midiKey="action:macro-toggle"
-          testId="macro-button"
-        >
-          Close-up
-        </Button>
+        {/*
+          A Close-up button sat here, beside Randomise: one press to 4x and
+          one back to the plate. The owner asked for it gone (2026-11-14):
+          the Macro Zoom is the one way in and out, so there is one control
+          for the closeup and it always reads what the plate is doing
+          (PLAN QA-32c).
+        */}
         {/* Randomise replaces every setting at once, so it asks first. */}
         <Button
           full height={32}
@@ -752,7 +748,7 @@ function DyesBody({ p }: { p: DeskProps }) {
       {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
           <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
-          <VideoShelf {...p.video} prefix="dyes-" />
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
         </div>
       )}
     </div>

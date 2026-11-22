@@ -185,6 +185,8 @@ export class BubbleField {
   liquidOstwald = OIL_AIR.ostwald;
   /** The gap between the glasses, metres: the dish's rest gap. */
   gapMetres = DISH_GAP_METRES;
+  /** The gap at which current bubble radii were computed, so changing `gapMetres` conserves V = πr²b. */
+  private areaGap = DISH_GAP_METRES;
   /**
    * How many times the real rate air dissolves into the liquid. 1 is real,
    * and real is effectively never on a show's clock (see `step`); a dial
@@ -278,6 +280,7 @@ export class BubbleField {
     this.touchingNow.clear();
     this.snap = null;
     this.poured = null;
+    this.areaGap = Math.max(1e-6, this.gapMetres);
     this.nextId = 1;
   }
 
@@ -300,10 +303,26 @@ export class BubbleField {
     return FILM_COEF * Math.cbrt(Ca * Ca);
   }
 
-  /** A steady breath's volume, as r² a second (cells²): the straw fills a seventh of the plate across in 3.5 s. */
+  /**
+   * Keep every pocket's volume V = π r² b when the live gap `this.gapMetres`
+   * changes (A = V / b, PLAN 15g-19).
+   */
+  private syncGap(): void {
+    const gap = Math.max(1e-6, this.gapMetres);
+    if (gap === this.areaGap) return;
+    const scale = this.areaGap / gap;
+    const rScale = Math.sqrt(scale);
+    for (const b of this.bubbles) {
+      b.r *= rScale;
+      b.inject *= scale;
+    }
+    this.areaGap = gap;
+  }
+
+  /** A steady breath's volume, as r² a second (cells²) in the live gap: fills a seventh-of-the-plate disc at the rest gap in 3.5 s. */
   private get breath(): number {
-    const rMax = this.grid * 0.07;
-    return (rMax * rMax) / 3.5;
+    const rRef = this.grid * 0.07;
+    return ((rRef * rRef) / 3.5) * (DISH_GAP_METRES / Math.max(1e-6, this.gapMetres));
   }
 
   private make(x: number, y: number, r: number): Bubble {
@@ -346,6 +365,7 @@ export class BubbleField {
 
   /** Let `count` pockets of air in at (x, y), scattered within `spread` cells. Each inflates at a breath's rate. */
   spawn(x: number, y: number, r: number, count = 1, spread = 0): void {
+    this.syncGap();
     const N = this.grid;
     for (let i = 0; i < count; i++) {
       /*
@@ -389,10 +409,11 @@ export class BubbleField {
    * Air blown through a straw held still at (x, y): one bubble on the end of
    * it, growing while the blowing goes on.
    *
-   * Its area grows at a steady rate, as a steady breath delivers a steady
-   * volume, so it swells fast at first and slows as it gets big, up to about
-   * a seventh of the plate across. Let go, it stays where it is; blow again
-   * beside it and there is a second.
+   * Its volume grows at a steady rate, so its area A = V / b in the live gap
+   * b grows at a steady rate without an artificial radius clip: it swells
+   * fast at first and slows as it gets big, and vents only if it reaches the
+   * open rim. Let go, it stays where it is; blow again beside it and there is
+   * a second.
    *
    * It is round, and it sheds nothing (PLAN.md 15g-12). It used to break
    * into six to eighteen fingers while it grew and throw a ring of small
@@ -424,7 +445,8 @@ export class BubbleField {
    */
   blow(x: number, y: number, dt: number, strength = 1): void {
     const N = this.grid;
-    const rMax = N * 0.07;
+    this.syncGap();
+    const gap = this.areaGap;
     let b = this.strawBubble;
     if (b && (!this.bubbles.includes(b) || Math.hypot(b.x - x, b.y - y) > b.r + 3)) {
       // Gone, or the straw has moved off it: the next breath is a new bubble.
@@ -436,10 +458,11 @@ export class BubbleField {
       this.push(b, true);
       this.strawBubble = b;
     }
-    const rate = Math.max(0, strength || 0) * Math.PI * rMax * rMax / 3.5;   // cells² a second
+    const rRef = N * 0.07;
+    // Steady breath volume rate (at rest gap DISH_GAP_METRES, fills rRef in 3.5 s), divided by live gap b (PLAN 15g-19).
+    const rate = Math.max(0, strength || 0) * ((Math.PI * rRef * rRef) / 3.5) * (DISH_GAP_METRES / gap);   // cells² a second
     const r0 = b.r;
-    // Up to a seventh of the plate; one a merge made bigger keeps its air.
-    b.r = Math.max(b.r, Math.min(rMax, Math.sqrt(b.r * b.r + rate * dt / Math.PI)));
+    if (rate > 0 && dt > 0) b.r = Math.sqrt(b.r * b.r + (rate * dt) / Math.PI);
     const speed = (b.r - r0) / Math.max(dt, 1e-4);                       // cells a second
     // The film under it is the one its growing rim lays down.
     if (speed > 0) b.film = this.filmAt(speed);
@@ -496,10 +519,11 @@ export class BubbleField {
    * units; `tiltX/Y` is the plate's hold tilt (air climbs against it).
    */
   step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number): void {
+    this.syncGap();
     const N = this.grid;
     const bs = this.bubbles;
     const m = DISH_METRES / N;            // metres a cell
-    const gap = this.gapMetres;
+    const gap = this.areaGap;
     this.events.length = 0;
 
     /*

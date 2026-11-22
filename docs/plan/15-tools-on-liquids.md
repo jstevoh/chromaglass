@@ -214,16 +214,6 @@ Left, each its own plan item:
   radially, a source with no curl; the only real twist is the cover turned (Couette, 42b).
   Delete it. Check: the curl over a press's disc stays at the idle level, local and remote
   alike. (38v, from RS-36.)
-- **15g-19 The straw's lobes are clipped at a reach, not conserved** (S; Low). Where 15g-12
-  lets fingers form (two or more fit), each lobe reaches to `FINGER_REACH` 0.9 (`air.ts:58`),
-  `rimAt` (`:69-78`) never dips below 1, and `bubbles.ts:425-460` clips at rMax = N·0.07 and
-  drops the rest, so the bubble's area grows with its fingers. Air in a gap keeps its volume:
-  the lobes are a zero-mean change of the rim, with area A = V/b. Check: a fingered straw
-  bubble's area within 3% of its volume over the gap (`npm run straw`). §38's straw line under
-  "Also found" points here. (38v, from RS-15.)
-
-*The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
-
 ## 15f. Found with 15c
 
 - The Finger carries the oil (`carryMix`) whenever the dye mirror is current, and

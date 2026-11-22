@@ -25,10 +25,10 @@ cost, then Low.
 | 3 | 15g-17 | The pointer shoves bubbles and beads; a pop pushes and swirls (RS-37) | `15-tools-on-liquids.md` | S | High | new |
 | 4 | 18c-14 | The ambient seed pours dye and heat into every look (RS-38) | `18-physics-2.md` | S–M | High | new |
 | 5 | 18c-3b | The mouse's dye stamp and the themes' kicks lay no volume (RS-39) | `18-physics-2.md` | M | High | updates |
-| 6 | 38v-1 | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | new |
+| 6 | ~~38v-1~~ | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | shipped |
 | 7 | 18c-13 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
 | 8 | 9ad | The domes rise on \|B\|, not on its normal part (RS-20) | `09-ferrofluid.md` | S–M | Medium–High | new |
-| 9 | 18i-2 | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | new |
+| 9 | ~~18i-2~~ | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | shipped |
 | 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | new |
 | 11 | 38v-2 | Comet's pull flickers with the beat, and is absent on the open plate (RS-3) | here | S | Medium | new |
 | 12 | 29a-11 | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | new |
@@ -57,7 +57,7 @@ cost, then Low.
 | 35 | 18m-3 | The slump reads one global viscosity (RS-6) | `18-physics-3.md` | S | Low | updates |
 | 36 | 1k | Retire the sharpen pass still behind Sharpness and CC15 (RS-9; plan text corrected) | `01-sharp-liquid.md` | S | Low | new |
 | 37 | 18f-4, 38s | Vogel's law for warm glycerine; the cover's density is water's (RS-10) | `18-physics-2.md`, `38-realism-audit.md` | S | Low | updates |
-| 38 | 15g-19 | The straw's lobes are clipped at a reach, not conserved (RS-15) | `15-tools-on-liquids.md` | S | Low | new |
+| 38 | 15g-19 | The straw's lobes are clipped at a reach, not conserved (RS-15) | `15-tools-on-liquids.md` | S | Low | shipped |
 | 39 | 20b-17 | The lace's solvent evaporates under the cover (RS-17) | `20-lace-and-holes.md` | S | Low | new |
 | 40 | 47b-4 | The glint's spikes add light the disc keeps (RS-28) | `47-macro-photography.md` | S | Low | new |
 | 41 | 47n-8 | The tank's glow adds white at any exposure (RS-31) | `47-macro-photography.md` | S | Low | new |
@@ -78,26 +78,6 @@ Notes that only point here: 38e (to 9ae), 38k-3 and 9t-5 (to 9t-11), 9j (to 9af)
 (WRONG, or held whole by an older item), and so was the half of RS-19 that said the
 viscosity floor in `liquidProps.ts:84-99` engages: no bottle on the shelf is thinner than
 water, so it never does.
-
-- **38v-1. Sound Drive's built-in hands become cords on real actuators** (L; High). When
-  `audioMappings` is set and `impact > 0.01` and the volume is over 3,
-  `LiquidVisualizer.tsx:3940-4230` plays the music with its own hands: a centre pulse
-  (4071-4076), a bass press (4090-4094), the kick's bloom and doses (4126-4146), a mid
-  stream (4150-4163), sparks (4200-4205) and a swell (4214-4227). That is live on 33 of the
-  34 house looks; only the radial burst is dead (gated `!thinGap`). A real show moves the
-  plate with a hand on a dropper, a squeeze or a motor, and the music reaches it only
-  through the operator. Make each piece a cord onto the actuator it imitates (the pulse and
-  stream onto `areaPour`, the press onto Beat Squeeze, the swell onto `areaStir` or the
-  motor), give the looks those cords as default patches so they keep their life, and drop
-  the sparks and the hue nudge. Touches 27e-1, 27e-3 and `00-dye-tools.md:68-76`. Check:
-  with `sceneMappings` empty, loud music against silence lays zero dye, heat and doses
-  apart; `npm run soundpatch` and `npm run breakdown` stay green. (38v, from RS-43.)
-  The owner (2026-11-21) wants the music able to add things aggressively, so the cords
-  must reach at least as far as the block does: a whole-plate pour cord (today `areaPour`
-  needs an area), a gated pour that lays a slug of liquid of a set volume and size on each
-  hit rather than only opening a bottle wider, and a whole-plate heat cord for the centre
-  pulse. Each piece then gets its own depth and gain, where the block shared one Audio
-  Impact.
 
 - **38v-2. Comet's pull flickers with the beat, and is absent on the open plate** (S;
   Medium). `thinGap.ts:330-357` adds the `cometX/Y` pull inside `hsBody`
@@ -167,3 +147,103 @@ water, so it never does.
   Drive off, the noise dials at 0. Check: the clean start under loud music adds nothing
   without a cord; every built-in look renders as before (`npm run panel`, `npm run desk`).
   (38v, from RS-53.)
+
+## 38w. Classic Light Show as a real dish (2026-11-21)
+
+The owner, 2026-11-21: Classic "looks nothing like a traditional liquid light show". Watched
+against the Joshua Light Show, Glenn McKay, Bill Ham and the period photographs (the gap list
+is in the project's files).
+
+- **38w-2. Classic's motion as a hand's, measured** (S–M; Medium). The references rest about
+  40% of the time and swell every 12 to 20 s from a tilt, a press or a fresh pour. 38w-1 gave
+  the look a hand (Plate Rock, the kick's press) and stopped the motor, but nothing measures
+  the rest-and-swell rhythm in the app. Check: on the Mac, the flow's speed over a minute of
+  the band has a median under a third of its peaks, peaks 12–20 s apart (`moving` style).
+- **38w-3. A fresh pour's radial streaks** (M; Low–Medium). After a pour the references show
+  dye streaming out from the drop in rays, the Marangoni spread of a new drop on the water.
+  Classic's automation pours, but a drop lands as a disc. Model the spreading drop's surface
+  tension gradient (18c's drop impact is where it lands); measure the angular structure round
+  a fresh drop in the lab.
+- **38w-4. The old Classic's plate as a look of its own** (S; Low). The neon pools on black
+  that Classic was (11 blobs, screen blend, gooey) are the opposite of a real dish but were a
+  look some may want. Offer it as "Neon Pools" if the owner asks; until then it is gone.
+- **38w-5. The song's chorus stirs a dish that does not stir** (S; Medium). Classic and Lava
+  Lamp hold Turbulence and Sound Drive at 0 (no curl noise, no stir cord, no music hands), but
+  `useMusicIntelligence` still adds 0.2 to both in a chorus when the song has a map
+  (`src/hooks/useMusicIntelligence.ts`, the section switch), so a mapped song's chorus stirs and
+  pours into the dish again: the red flood and kick bubbles 38w-1 took out. A section should
+  change what the look's hand does (a harder rock, a press), not switch on a motor the look
+  turned off. Check: Classic with a song map through a chorus keeps classicdish's cells apart.
+- **38w-6. The snare's swirl is vorticity confinement** (S–M; Low). Classic's snare cord
+  raises Vorticity Confinement, a numerical device that puts back the small eddies the solver's
+  diffusion loses; nothing in a dish does that. The real snare in a show is a finger or a
+  straw flicking the water. Replace the cord with a flick (the hand tools' impulse, 27f) and
+  measure the cells still apart after a run of snares.
+- **38w-7. Small cells come out as rounded squares** (S–M; Med). Filmed 2026-11-21 at gpu=mid:
+  the smallest orange cells in Classic read as rounded squares, not discs. A real oil drop
+  squashed between two glasses is round, because surface tension minimises its rim. Two
+  suspects: the Cahn–Hilliard Laplacian's five-point stencil, which is anisotropic at a few
+  cells across and favours the grid's axes, and the lay packing cells on a grid. Measure
+  roundness (perimeter² / 4π·area, or the spread of rim radius by angle) for each cell after
+  classicdish's run at 192² and 384²; if it worsens with smaller cells and lifts at 384², use
+  the isotropic nine-point Laplacian in the oil's chemical potential.
+- **38w-11. classicdish's size bar on the references' own measure** (S; Medium). The bar is a
+  cell diameter, 5–15% of the frame's height, a proxy chosen after the owner's call for more
+  detail; the stills were measured by the watch tool's form scale, a correlation length against
+  the width (9.0% on the round-two film, 5.1% on the stills). Render the lab plate
+  (`lab.render`), crop it to the wall's frame, run watchdesign's `corrLen` on it and bound
+  that against the stills' band, so the check and the references read the same quantity.
+- **38w-12. Splodascope and Clock Glass laid at the solver's grid too** (M; Medium). Both still
+  lay their dye on the CPU's 192 and carry it up, so their colour edges are a 192 cell soft
+  under an oil rim sharp at 768. Lay them through `SolverSeeds` as Classic is.
+- **38w-13. The solver's seed survives a regrid and a lost device** (S; Medium). Classic's
+  dye lives only in the solver's texture: a regrid (Quality) or a device loss rebuilds the
+  solver from the CPU's fields, which never held it, so the dish comes back empty. Keep the
+  laid arrays (SolverSeeds.capture) and lay them again on a rebuild.
+- **38w-14. One seed texture for every capture** (S; Low). SolverSeeds keeps a single seed, so a
+  second Classic captured later (a set list arming it twice with different seeds) overwrites the
+  first. Key the kept seed by the look's id or drop it once laid.
+- **38w-16. The dye inside Classic's cells lays as soft rounded squares** (S–M; Medium). With the
+  rims crisp, the colour inside the bigger cells still shows a soft square-cornered patch where
+  the lay put it (`classicCell` in `src/lib/oilLay.ts`). A drop of dyed oil is one colour to
+  its rim. Lay each cell's oil dye to fill its disc, and measure the dye's spread inside each
+  cell (its coefficient of variation) in classicdish.
+- **38w-17. A darker mottled network in Classic's water** (S; Medium). In the 1024 render the
+  water between cells shows a faint darker web, which the references' flat dyed water does not.
+  Suspects: the wash's dye pooling in the films between cells, or the relief's shading. Measure
+  the water's luminance spread away from the rims, find which field carries it, fix it there.
+- **38w-18. The oil/water interface sharp in the solver** (L; Low). 38w-15 draws the rim sharp
+  from the solver's tanh band; the solver still carries the band (Cahn–Hilliard's width is set
+  by the grid). A conservative level set or a volume-of-fluid interface would carry the step
+  itself, and the dye's own mixing across the band with it. Worth it only if a check finds the
+  band's mixing showing through somewhere 38w-15 cannot reach (the chemistry, the oil's dye).
+- **38w-19. A held Press on a domed gap never comes to rest** (M; Medium). 38w-1 gave Classic a
+  plateCurve of 0.2 and main's deploy found `npm run heldpress` red: with the Press held on the
+  thin gap, the far plate's speed stayed at 4.5e-4 against the check's 3e-4, and the bubbles'
+  at 7.4e-5, not a twentieth of the closing. The same glass flat (plateCurve 0) reads 4.3e-5
+  and 1.2e-5; platePressure 0.25 with the dome still fails, so it is the dome. The rest gap is
+  `cover - GAP_REST·plateCurve·(r²-0.5)·2` (gap.ts), and a held press clamps it at rest under
+  Stefan's law, so the gap's slope along the radius stays and drives a flow the Press never
+  stops: a lubrication pressure gradient with nothing to balance it. Clock glasses are curved,
+  so the dome is the real geometry; a held press on one should squeeze the film to its
+  equilibrium and stop. Classic is flat until this is fixed (the fix after #917), and Comet
+  River (0.6), and the looks at 0.45 and 0.2, carry it. Find which term keeps the far plate
+  moving (the squeeze's source against the gap's own gradient) and run heldpress on a 0.6
+  dome as its check. Flat, the press's weight shows the same leak: at 38w-1's platePressure
+  of 0.4 the far plate is still (4.3e-5) but 0.51 of what is left points out from the press,
+  against the check's half (0.44 at 0.25). A held press on the floor has no squeeze, so it
+  should push nothing; Classic is back at 0.25 until both are found, and the fix runs
+  heldpress at 0.4 flat as well.
+- **38w-20. Warm cells still read soft in the app with Crisp Edges on** (M; High). Filmed in
+  the app on Metal (seed 1, 512² grid, 1280x800 canvas, after 12 s): the cyan cells' rims are
+  one crisp pixel, but the red and orange cells' rims are a soft three or four pixels, and
+  turning Crisp Edges off leaves them unchanged. Edge Relief adds a broad dark band just inside
+  them (it reads the solver's band at `rim0`, unmoved), but Edge Relief at 0 still leaves the
+  rim soft, so the relief is not the cause. Not measured yet, two guesses: those cells' oil band
+  is wider than 3.5 cells, which `crispInterface`'s `real` gate leaves alone on purpose as real
+  diffusion; or their dye has leaked out into the water (about 7% of it in the lab), so the
+  colour's edge is not the oil's. First read the band half-width (`eps / h.x`) and the dye
+  outside the oil at those rims in the app, then fix the cause in the solver (why warm cells
+  spread wider than cyan) and not in the plate. Once the rim is sharp, draw the meniscus as a
+  narrow line at the crisp rim (the chain rule through the warp), not as the band-wide halo.
+

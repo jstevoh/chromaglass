@@ -98,18 +98,33 @@ export const SHARED = [
   (it stopped early), one with as many FAIL lines as the runner keeps (the
   rest unread), a quarantined line whose numbers read unread, never, NaN or
   null (the flake is a reading on the wrong side of its bar, not a missing
-  one), and any FAIL line that is not on the list. And nothing at all off a
-  pull request: main's deploy holds every line to its bar, so a real
-  regression the quarantine let through a PR is red there before it is live.
-  An entry has to end within QUARANTINE_DAYS of its start: a quarantine is
-  the time the fix takes, not a place lines go to stay. Adding one, or moving
-  its end later, is a check change `checkguard.mjs` makes the PR name.
+  one), and any FAIL line that is not on the list. An entry has to end within
+  QUARANTINE_DAYS of its start: a quarantine is the time the fix takes, not a
+  place lines go to stay. Adding one, or moving its end later, is a check
+  change `checkguard.mjs` makes the PR name.
+
+  Main's deploys (PLAN.md 19ak-18). Until 2026-11-22 a quarantine held only on
+  a pull request, so that main's deploy, running every line to its bar, would
+  be red on a regression a quarantine let through a PR before it went live.
+  What it did instead, from 11-21 12:26 PM Pacific: deploys 871, 872, 879 and
+  881 were each red on a line already known to flake (startup's "moving for
+  good", intro's 9c, the ear behind the wall, the Live Show's film), none on
+  new code, and the site stayed where it was while every merge since waited.
+  The owner chose (a card, 2026-11-22 05:06Z) to let main's deploys honour the
+  same entries until 2026-12-06, by when the fixes are due. So off a pull
+  request an entry holds only before MAIN_QUARANTINE_UNTIL, whatever its own
+  end date says: the day after it, main holds every line again without a PR
+  having to remember to take this out. A run with no GITHUB_EVENT_NAME (a
+  session's own run) holds every line, so the red is in front of whoever is
+  working on it.
 */
 export const QUARANTINE_DAYS = 21;
+export const MAIN_QUARANTINE_UNTIL = '2026-12-06';
 export const MAX_FAILS = 20;
 const failText = (l) => l.replace(/^.*?\bFAIL\b[:\s]*/, '').trim();
-export function quarantined(c, r, { today = new Date().toISOString().slice(0, 10), event = process.env.GITHUB_EVENT_NAME } = {}) {
-  if (event !== 'pull_request') return null;
+export function quarantined(c, r, { today = new Date().toISOString().slice(0, 10), event = process.env.GITHUB_EVENT_NAME, mainUntil = MAIN_QUARANTINE_UNTIL } = {}) {
+  if (!event) return null;
+  if (event !== 'pull_request' && !(today < mainUntil)) return null;
   if (r.ok || r.code !== 1 || r.timedOut || r.signal || r.stack || !r.fails.length || r.fails.length >= MAX_FAILS) return null;
   // The harness reached its own end and counted exactly these lines red.
   if (!r.tally || r.tally.total - r.tally.pass !== r.fails.length) return null;
@@ -134,6 +149,11 @@ export function parseManifest(text, where = 'scripts/checks.json') {
   if (!Array.isArray(measure) || !Array.isArray(mac) || !measure.length || !mac.length) bad('needs shards.measure and shards.mac, each a list');
   const all = [...measure, ...mac];
   if (new Set(all).size !== all.length) bad('a shard is named twice');
+  // The Measure parts a pull request runs (PLAN.md 19ak-20): optional, and
+  // when given, a non-empty list of Measure parts. reach.mjs runs every part
+  // when it is missing, so a tree from before it reads as it did.
+  const pr = m.shards?.pr;
+  if (pr !== undefined && (!Array.isArray(pr) || !pr.length || pr.some((s) => !measure.includes(s)))) bad('shards.pr, when given, is a list of Measure parts');
   if (!Array.isArray(m.checks) || !m.checks.length) bad('has no checks');
   const seen = new Set();
   for (const [i, c] of m.checks.entries()) {
@@ -165,7 +185,7 @@ export function parseManifest(text, where = 'scripts/checks.json') {
     seen.add(key);
   }
   for (const s of all) if (!m.checks.some((c) => c.shard === s)) bad(`shard ${s} has no checks`);
-  return { shards: { measure, mac }, checks: m.checks };
+  return { shards: { measure, mac, ...(pr ? { pr } : {}) }, checks: m.checks };
 }
 
 export const loadManifest = () => parseManifest(fs.readFileSync(MANIFEST, 'utf8'), path.relative(ROOT, MANIFEST));
@@ -632,7 +652,7 @@ async function selftest() {
   say(/^\s+part: \$\{\{ fromJSON\(needs\.reach\.outputs\.parts\) \}\}\s*$/m.test(wf), 'Measure\'s matrix is the parts reach selected (the manifest\'s measure shards unless the diff is only checks and documents)');
   say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.only \}\}/.test(wf), 'and the names reach selected are passed to the part\'s runner');
   say(/^\s+shard: \$\{\{ fromJSON\(needs\.reach\.outputs\.shards\) \}\}\s*$/m.test(wf), 'the Mac matrix is the shards reach selected');
-  say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.maconly \}\}/.test(wf) && /ESBUILD_MODULE: /.test(wf), 'and the Mac\'s names are passed to the shard\'s runner, read with the esbuild the reach job installs (19ak-2)');
+  say(!/outputs\.maconly/.test(wf), 'and the Mac runs every check of its shard: only main\'s deploy runs one (19ak-20)');
   say(/run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.part \}\}/.test(wf) && /run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.shard \}\}/.test(wf), 'Measure and the Mac run their shard from the manifest');
   // The workflow's own tools (which files reach, the runner, the guard on a
   // PR's bars, whether the owner's Mac is free of other work before a shard,
@@ -971,7 +991,28 @@ async function selftest() {
   say(/✗ untallied/.test(qt), 'a check that never printed its closing count is red');
   say(/✗ miscounted/.test(qt), 'a check whose count has more red than its FAIL lines is red');
   say(/✗ unread/.test(qt), 'a quarantined line that could not read its numbers is red');
-  say(qc === 1 && /✗ onmain/.test(qt), 'off a pull request (main\'s deploy) a quarantined line blocks');
+  // Main's deploys (19ak-18): held before MAIN_QUARANTINE_UNTIL, blocked from
+  // that day on, and never on a run that is not CI's at all. The shard run
+  // above reads today's date, so it is held or blocked by which side of the
+  // cut-off today is; the direct calls pin both sides whatever the date.
+  const onMain = new Date().toISOString().slice(0, 10) < MAIN_QUARANTINE_UNTIL;
+  say(onMain ? qc === 0 && /⚠ onmain, red after/.test(qt) : qc === 1 && /✗ onmain/.test(qt),
+    `off a pull request (main's deploy) a quarantined line is ${onMain ? `held until ${MAIN_QUARANTINE_UNTIL}` : 'red again'} (exit ${qc})`);
+  const qr = { ok: false, code: 1, timedOut: false, signal: null, stack: false, fails: ['FAIL  the flaky line — 3 against 2'], tally: { pass: 0, total: 1 } };
+  const qc1 = { quarantine: [{ line: 'the flaky line', plan: '19ak-1', since: '2026-11-15', until: '2026-12-06' }] };
+  const held = (event, today) => quarantined(qc1, qr, { event, today, mainUntil: '2026-12-01' }) != null;
+  say(held('push', '2026-11-30') && held('workflow_dispatch', '2026-11-30'), 'on a push or a dispatched deploy, the day before the main cut-off, it holds');
+  say(!held('push', '2026-12-01') && held('pull_request', '2026-12-01'), 'from the cut-off main holds the line to its bar, while a pull request still honours the entry to its own end');
+  // null, not undefined: an undefined event takes quarantined()'s default,
+  // process.env.GITHUB_EVENT_NAME, which in CI is the run's own event (this
+  // line was red on the PR's first run for that reason).
+  say(!held(null, '2026-11-30') && !held('', '2026-11-30'), 'a run outside CI (no GITHUB_EVENT_NAME) holds every line');
+  // The real cut-off is compared as a string, so it has to be a whole date
+  // (a '2026-12-6' would hold all December), and no later than an entry may
+  // run from today: main's hold is the time the fixes take, like an entry's.
+  const mainDays = (Date.parse(MAIN_QUARANTINE_UNTIL) - Date.parse('2026-11-22')) / 86_400_000;
+  say(/^\d{4}-\d\d-\d\d$/.test(MAIN_QUARANTINE_UNTIL) && mainDays > 0 && mainDays <= QUARANTINE_DAYS,
+    `MAIN_QUARANTINE_UNTIL (${MAIN_QUARANTINE_UNTIL}) is a whole date within ${QUARANTINE_DAYS} days of the owner's choice on 2026-11-22`);
   const refuses = (q) => { try { parseManifest(JSON.stringify({ shards: { measure: ['m'], mac: ['x'] }, checks: [{ name: 'a', shard: 'm', run: 'true', quarantine: q }, { name: 'b', shard: 'x', run: 'true' }] })); return false; } catch { return true; } };
   say(refuses([{ line: 'the flaky line', since: day(0), until: day(5) }]), 'a quarantine with no plan id is refused');
   say(refuses(qd('the flaky line', day(0), day(QUARANTINE_DAYS + 1))), `a quarantine longer than ${QUARANTINE_DAYS} days is refused`);
