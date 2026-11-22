@@ -638,6 +638,7 @@ export class FluidPasses extends FluidFields {
   }
 
   protected stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    this.stepSurfaceHeight(enc, p);
     const want = Math.max(0, Math.min(1, p.particles ?? 0));
     if (want <= 0) {
       if (this.particles) { this.particles.dispose(); this.particles = null; }
@@ -655,6 +656,27 @@ export class FluidPasses extends FluidFields {
       dt: p.dt,
       seed: 0x9e3779b9,
     }, this.stageTimings ? (label) => this.profiler.pass(label) : undefined);
+  }
+
+  /** Step free-surface and oil-layer height h in metres (PLAN 31s-1). */
+  protected stepSurfaceHeight(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    const sh = this.surfaceHeight;
+    if (!sh || !sh.live) return;
+    const thin = this.thinLive && !!this.hsP && !!this.hsMob && !!this.carrySub && !!this.carryInd;
+    const disp = stepDisplacement(p.dt, p.advection, this.N);
+    const vel = thin ? this.ride() : this.velForced;
+    const mix = this.mixLive && this.mix ? this.mix.read : this.blank('rgba');
+    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+    const maxCells = Math.max(1, Math.ceil(this.statsLatest.maxSpeed * disp * this.N / 0.4));
+    sh.step(enc, {
+      seconds,
+      disp,
+      vel,
+      mix,
+      gapThickness: p.gapThickness,
+      thin: thin ? { pr: this.hsP!, sq: this.squeeze.read, mob: this.hsMob!, sub: this.carrySub!, ind: this.carryInd! } : null,
+      advectSubsteps: maxCells,
+    }, this.profiler.pass('surfaceHeight'));
   }
 
   protected jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {

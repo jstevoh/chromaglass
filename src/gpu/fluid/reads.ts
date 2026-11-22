@@ -10,6 +10,7 @@ import type { GpuStepParams } from '../solverTypes';
 import { rimCount } from '../../lib/rimMask';
 import { RimRead } from '../rimRead';
 import { REST_GAP, RGBA32, type FieldStats } from './constants';
+import type { SurfaceProps } from '../surfaceHeight';
 import { FluidInputs } from './inputs';
 
 export class FluidReads extends FluidInputs {
@@ -509,5 +510,36 @@ export class FluidReads extends FluidInputs {
     const stride = row / 4;
     for (let y = 0; y < this.L; y++) out.set(padded.subarray(y * stride, y * stride + this.L * 4), y * this.L * 4);
     return out;
+  }
+
+  /** Free-surface / oil-layer height h in metres, read back whole (r32float), for checks. */
+  async readSurfaceHeight(): Promise<{ n: number; data: Float32Array } | null> {
+    if (!this.device) return null;
+    const sh = this.surfaceHeight;
+    if (!sh) return { n: this.N, data: new Float32Array(this.N * this.N) };
+    const n = sh.n;
+    const row = Math.ceil((n * 4) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read surface height', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read surface height' });
+    enc.copyTextureToBuffer({ texture: sh.field }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.submitRead(enc);
+    await buf.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(buf.getMappedRange().slice(0));
+    const out = new Float32Array(n * n);
+    const stride = row / 4;
+    for (let y = 0; y < n; y++) out.set(all.subarray(y * stride, y * stride + n), y * n);
+    buf.unmap();
+    buf.destroy();
+    return { n, data: out };
+  }
+
+  /** Seed an explicit height profile h (in metres, N x N) and optional liquid properties. For checks. */
+  setSurfaceHeight(data: Float32Array, props?: SurfaceProps): void {
+    this.ensureSurfaceHeight().setFromHost(data, props);
+  }
+
+  /** Toggle lubrication levelling on/off (default true) for lab check controls. */
+  setSurfaceLevelling(on: boolean): void {
+    this.ensureSurfaceHeight().levellingEnabled = on;
   }
 }

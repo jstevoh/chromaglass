@@ -1641,6 +1641,19 @@
       ]
     },
     {
+      "name": "Surface height advects conservatively and levels by thin-film lubrication (SwiftShader)",
+      "shard": "lab4",
+      "run": "npm run surfaceheight",
+      "why": [
+        "Free-surface and oil-layer height h on the solver grid (PLAN 31s-1,",
+        "src/gpu/surfaceHeight.ts, scripts/surfaceheight.mjs): still oil lens",
+        "meniscus matches sqrt(sigma / (rho g)) within 10%; cosine ripples decay on",
+        "tau = 3 mu / (h0^3 (sigma k^4 + rho g k^2)) within 15% at two wavenumbers",
+        "across 256^2 and 384^2 at 60 Hz and 30 Hz; total h is kept to 0.1% over",
+        "600 steps with flow running."
+      ]
+    },
+    {
       "name": "Polarised light",
       "shard": "lab9",
       "run": "npm run polar",

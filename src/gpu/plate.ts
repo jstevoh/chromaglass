@@ -35,6 +35,7 @@ import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
 import { drawTank } from './tankDraw';
 import type { TankPlateField } from './tankPlate';
 import type { FaradayField } from './faraday';
+import { PACK_SURFACE_KERNEL } from './wgsl/plateSurface';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -209,6 +210,9 @@ export class WebGPUPlate {
   private readonly blankBeads: GPUBuffer;
   /** The same, for the species field (rgba32float). */
   private readonly blankSpecies: GPUTexture;
+  private surfaceBuf: GPUBuffer | null = null;
+  private surfaceN = 0;
+  private surfaceReady = false;
 
   /**
    * Everything a frame of the plate draws with, built before the show opens
@@ -242,6 +246,7 @@ export class WebGPUPlate {
           cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true),
         ]),
       ...(['packDye', 'packDyeBodies', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
+      cache.computePrep('packSurface', PACK_SURFACE_KERNEL, true),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
       // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
@@ -400,7 +405,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -490,6 +495,27 @@ export class WebGPUPlate {
         packPass.dispatchWorkgroups(groups, groups);
       }
     }
+    const shTex = fields[0].surfaceHeight ?? null;
+    this.surfaceReady = false;
+    if (shTex) {
+      const shN = shTex.width;
+      if (!this.surfaceBuf || this.surfaceN !== shN) {
+        if (this.surfaceBuf) this.disposer.release(this.surfaceBuf);
+        this.surfaceBuf = this.disposer.track(this.device.createBuffer({
+          label: 'surface height store', size: Math.max(16, shN * shN * 4),
+          usage: GPUBufferUsage.STORAGE,
+        }));
+        this.surfaceN = shN;
+      }
+      const pipeSurf = this.pipelines.computePipeline('packSurface', PACK_SURFACE_KERNEL);
+      if (pipeSurf) {
+        const gSurf = Math.ceil(shN / 8);
+        packPass.setPipeline(pipeSurf);
+        packPass.setBindGroup(0, groupOf(this.device, pipeSurf, [shTex, this.surfaceBuf]));
+        packPass.dispatchWorkgroups(gSurf, gSurf);
+        this.surfaceReady = true;
+      }
+    }
     packPass.end();
 
     // ── Derive ──────────────────────────────────────────────────────
@@ -559,7 +585,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -594,7 +620,7 @@ export class WebGPUPlate {
     uniforms: GPUBuffer,
     /** What `uniforms` was written from: which of the display's effects this draw turns on. */
     bytes: ArrayBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -644,6 +670,8 @@ export class WebGPUPlate {
       rings?.args ?? this.blankBeadArgs, rings?.beads ?? this.blankBeads, rings?.tiles ?? this.blankList,
       // The shaken dish's standing waves (48f), the front plate's alone.
       fields[0].faraday?.h ?? this.blankStore,
+      // Free-surface and oil-layer height h (PLAN 31s-1), read-only for 31s-2 caustics.
+      this.surfaceReady && this.surfaceBuf ? this.surfaceBuf : this.blankStore,
     ]));
     pass.draw(6);
     pass.end();

@@ -458,6 +458,8 @@ export class FluidFields extends FluidCore {
       coverMetres: this.coverGap * GAP_METRES,
       /** The shaken dish's standing wave (PLAN 48f), or null with no shaker. */
       faraday: this.faradayPlate?.field ?? null,
+      /** Free-surface and oil-layer height field in metres (PLAN 31s-1). */
+      surfaceHeight: this.surfaceHeight?.live ? this.surfaceHeight.field : null,
     };
   }
 
@@ -474,6 +476,8 @@ export class FluidFields extends FluidCore {
     this.tankPlate = null;
     this.faradayPlate?.dispose();
     this.faradayPlate = null;
+    this.surfaceHeight?.dispose();
+    this.surfaceHeight = null;
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();

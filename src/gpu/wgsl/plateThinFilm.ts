@@ -13,6 +13,7 @@
 import { SOAP_LUT_STEP_NM } from '../../lib/soapFilm';
 import { SOAP_FRAME_LO, SOAP_FRAME_SPAN } from '../soapFrame';
 import { FARADAY_PLATE_WGSL } from './plateFaraday';
+import { SURFACE_PLATE_WGSL } from './plateSurface';
 
 export const THIN_FILM_WGSL = /* wgsl */ `
 /*
@@ -224,11 +225,14 @@ fn soapFilmOver(c: vec3f, fuv: vec2f) -> vec3f {
   then the frame's soap film reflects over all of it (32d). Here and not in
   plate.ts, which is at its size ceiling.
 */
+${SURFACE_PLATE_WGSL}
 ${FARADAY_PLATE_WGSL}
 fn coversOver(c: vec3f, fuv: vec2f) -> vec3f {
   var o = c;
   if (U.faraday > 0.5) { o = faradayOver(o, fuv); }
   if (U.soapFilm > 0.001) { o = soapFilmOver(o, fuv); }
+  // Bound read-only for 31s-2 caustics; 31s-1 does not draw it yet.
+  if (U.gridSize < 0.0) { o += vec3f(surfaceHeightAt(fuv)); }
   return o;
 }
 `;

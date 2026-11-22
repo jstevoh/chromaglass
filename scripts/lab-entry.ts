@@ -580,6 +580,12 @@ const api = {
   },
   /** The mix or the reactions (readChemistry), as plain arrays; null when the solver has none. */
   async chemistry(which: 'mix' | 'rxn' | 'lies') { const f = await lab!.solver.readChemistry(which); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  /** Free-surface / oil-layer height h in metres (PLAN 31s-1). */
+  async surfaceHeight() { const f = await lab!.solver.readSurfaceHeight(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  setSurfaceHeight(data: number[], props?: { oilMu?: number; oilSigma?: number; oilRho?: number; waterMu?: number; waterSigma?: number; waterRho?: number }) {
+    lab!.solver.setSurfaceHeight(new Float32Array(data), props);
+  },
+  surfaceLevelling(on: boolean) { lab!.solver.setSurfaceLevelling(on); },
   /** The oil's share of the dye, pour by pour (Oil Bodies' budget). */
   oilCover() { return lab!.solver.oilCover; },
   /** The oil's half of a press, through the app's own function (squeezeOut): mirror cells, N across. */
@@ -868,7 +874,7 @@ const api = {
     // and be 0, which a check of the flat dye beside a hole would take for the
     // mask not being there. Say so instead.
     if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
-    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, faraday: l.solver.fields.faraday, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, faraday: l.solver.fields.faraday, surfaceHeight: l.solver.fields.surfaceHeight, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
