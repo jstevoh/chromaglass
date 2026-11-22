@@ -18,7 +18,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | the Record button's clip (`src/hooks/useRecorder.ts`, `src/lib/clipFrame.ts`, `RecordPanel.tsx`, `shareClip.ts`) | `clip` (node half here; `-- --app` is the Mac's: with `PW_WEBGPU=1` after a build a cloud session gets a file with no picture about half the time), `record`, `panel`, `phone` |
 | areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords; the indicator's pH, `src/lib/phIndicator.ts`; the hit's regulator, `hitRoomOf` in `src/lib/dyeTarget.ts`) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
 | Velvet Underground's settings or areas, Turbulence (`turbulenceScale`, `forcesB`'s curl noise) | `pools` (Mac: the app's GPU solver; three pools keep 85% over a minute, the old stir as control) |
-| settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser; `deskreach` (the Rides at 1280, the scrollers' marks, the deck's Macro panel, the iPad app's Laptop remote; owed until 35c-6a, 35c-6b and 12 step 4a) |
+| settings, panels, desks (`src/components/**`) | `panel`, `desk`, `panelkinds` (one kind of control per panel, PLAN 8d-3); layout at 1440/1280/1024 in a browser; `deskreach` (the Rides at 1280, the scrollers' marks, the deck's Macro panel, the iPad app's Laptop remote; owed until 35c-6a, 35c-6b and 12 step 4a) |
 | the Tip pad (`src/components/ui/TipPad.tsx`, `src/lib/tipPad.ts`, the Tools panel in `DeskPanels.tsx`, Tilt & Rock, the phone's Motion sheet) | `tippad`, `phone`, `layout` |
 | the Tilt knobs (`src/lib/handTilt.ts`, `plateTiltX`/`plateTiltY` in Tilt & Rock, the remote, the phone's Motion sheet) | `handtilt`, `panel`, `desk`, `phone` |
 | Preview's copy (`drafting`, `wallRef` in `src/app/useWallLook.ts`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
@@ -39,7 +39,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | the owner's YouTube connector (`mcp/youtube-mcp.js`, PLAN 44i) | `youtube` (a stand-in Google; nothing reaches the real one) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
 | Settings → Feedback (`server/feedback-worker.js`, `feedback-schema.sql`, `wrangler.feedback.toml`, `src/lib/feedback*.ts`, `FeedbackPane.tsx`) | `feedback-worker`, `feedbackpane` (the pane on the desk and the phone), `phone` |
-| `scripts/watch.mjs`, `watchdesign.mjs`, `watchphysics.mjs`, `watchreadtest.mjs`, `watchcuts.mjs`, `watchrefs.mjs` | `npm run watch -- --selftest` (Measure, `sound` shard) and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |
+| `scripts/watch.mjs`, `watchwords.mjs`, `watchpair.mjs`, `watchdesign.mjs`, `watchphysics.mjs`, `watchreadtest.mjs`, `watchcuts.mjs`, `watchrefs.mjs` | `npm run watch -- --selftest`, `npm run watchwords` (Measure, `sound` shard) and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |
 | `scripts/recorder.mjs` | `moving` and `film` record through it (Mac only; a PR touching it films three looks in `film.yml`) |
 | the mixer (`src/lib/mixer.ts`, `MixerPanel.tsx`) | `mixer`, `rowfade` (the take buttons), `panel`, `phone`, `remotemix` (the remote's) |
 | the video as the lamp (`wgsl/plateLamp.ts`: `mixLamp`, `lampBendAt`; `filmInLamp`/`filmAsLamp` in `lib/mixer.ts`; the lamp ground the film brings in `plateUniforms.ts`; the Lamp switch in `VideoShelf.tsx`) | `videolamp`, `mixer`, `myvideo`, `phone` |

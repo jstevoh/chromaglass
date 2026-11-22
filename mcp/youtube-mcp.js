@@ -49,12 +49,16 @@
  * stdout, Node's own fetch and http. Nothing but protocol goes to stdout; the
  * log goes to stderr.
  *
- *   node mcp/youtube-mcp.js login     sign in once (opens the browser)
- *   node mcp/youtube-mcp.js whoami    which channel the saved sign-in is
- *   node mcp/youtube-mcp.js logout    revoke the sign-in and forget it
- *   node mcp/youtube-mcp.js           the MCP server (what the assistant runs)
+ *   node mcp/youtube-mcp.js login             sign in once (opens the browser)
+ *   node mcp/youtube-mcp.js whoami            which channel the saved sign-in is
+ *   node mcp/youtube-mcp.js logout            revoke the sign-in and forget it
+ *   node mcp/youtube-mcp.js drain             upload queued jobs whose wait has passed
+ *   node mcp/youtube-mcp.js install-agent     install the hourly LaunchAgent for drain
+ *   node mcp/youtube-mcp.js uninstall-agent   remove the LaunchAgent
+ *   node mcp/youtube-mcp.js manifest [--sync] [--md <file>]  show or export the channel manifest
+ *   node mcp/youtube-mcp.js                   the MCP server (what the assistant runs)
  */
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { open } from 'node:fs/promises';
@@ -62,11 +66,14 @@ import { createServer } from 'node:http';
 import { homedir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
 
 const DIR = process.env.CHROMAGLASS_YOUTUBE_DIR ?? join(homedir(), '.chromaglass', 'youtube');
 const SECRET_FILE = join(DIR, 'client_secret.json');
 const TOKEN_FILE = join(DIR, 'token.json');
 const JOBS_FILE = join(DIR, 'uploads.json');
+const MANIFEST_FILE = join(DIR, 'manifest.json');
+const AGENT_LABEL = 'art.chromaglass.youtube-drain';
 /* One scope: `youtube` covers upload, update, thumbnails and playlists. The
    narrower `youtube.upload` cannot change a video once it is up, which is
    half of what was asked. */
@@ -91,6 +98,40 @@ const PRIVATE = 0o600;
 const log = (...a) => process.stderr.write(`youtube-mcp: ${a.join(' ')}\n`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const b64url = (b) => Buffer.from(b).toString('base64url');
+/* The check passes a future clock (`CHROMAGLASS_YOUTUBE_NOW`) so drain after
+   `notBefore` can run immediately without sleeping 24 hours; OAuth expiry and
+   the live-process `beat` keep real wall-clock time (`Date.now()`). */
+function nowMs() {
+  const raw = process.env.CHROMAGLASS_YOUTUBE_NOW;
+  if (!raw) return Date.now();
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : Date.parse(raw);
+}
+function pacificParts(ms) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(ms));
+  const get = (t) => Number(parts.find((p) => p.type === t).value);
+  return { y: get('year'), m: get('month'), d: get('day'), h: get('hour') % 24, min: get('minute'), s: get('second') };
+}
+function nextMidnightPacificPlus10m(now) {
+  const p = pacificParts(now);
+  const targetWall = Date.UTC(p.y, p.m - 1, p.d + 1, 0, 10, 0);
+  let t = targetWall + 8 * 3600_000;
+  for (let i = 0; i < 2; i++) {
+    const g = pacificParts(t);
+    t += targetWall - Date.UTC(g.y, g.m - 1, g.d, g.h, g.min, g.s);
+  }
+  return t;
+}
+function formatPacific(ms) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  }).format(new Date(ms));
+}
 /* A key file read without quoting it: Node's JSON error carries about ten
    characters of the text, which in these files can be part of a secret. */
 function readKeyFile(file) {
@@ -223,11 +264,18 @@ const HINTS = {
   forbidden: 'YouTube refused it for this channel. A custom thumbnail needs the channel verified by phone (youtube.com/verify).',
   invalidPublishAt: 'a scheduled time must be in the future, and the video private.',
 };
-function googleError(status, j, text) {
+class GoogleApiError extends Error {
+  constructor(status, reason, message) {
+    super(message);
+    this.status = status;
+    this.reason = reason;
+  }
+}
+function googleErrorInfo(status, j, text) {
   const e = j?.error;
   const reason = e?.errors?.[0]?.reason ?? e?.status ?? '';
   const message = e?.message ?? (typeof e === 'string' ? e : String(text ?? '').slice(0, 200));
-  return `YouTube said ${status}${reason ? ` (${reason})` : ''}: ${message}${HINTS[reason] ? `. That means ${HINTS[reason]}` : ''}`;
+  return { reason, text: `YouTube said ${status}${reason ? ` (${reason})` : ''}: ${message}${HINTS[reason] ? `. That means ${HINTS[reason]}` : ''}` };
 }
 
 async function api(method, path, { query = {}, body, raw, type, headers: extra = {}, base = G.api } = {}) {
@@ -241,7 +289,10 @@ async function api(method, path, { query = {}, body, raw, type, headers: extra =
     const text = await r.text();
     let j = {};
     try { j = text ? JSON.parse(text) : {}; } catch { /* not JSON */ }
-    if (!r.ok) throw new Error(googleError(r.status, j, text));
+    if (!r.ok) {
+      const info = googleErrorInfo(r.status, j, text);
+      throw new GoogleApiError(r.status, info.reason, info.text);
+    }
     return { r, j };
   }
 }
@@ -367,7 +418,7 @@ async function addToPlaylist(videoId, playlistId) {
   return `added to playlist ${playlistId}`;
 }
 
-// ── Uploads ────────────────────────────────────────────────────────────
+// ── Uploads & queue ────────────────────────────────────────────────────
 
 /*
   Every upload is a job, saved as it goes: the session Google gave (a URL
@@ -377,14 +428,38 @@ async function addToPlaylist(videoId, playlistId) {
   finds the job and carries on from Google's count instead of starting over.
   `pid` keeps two servers (a desktop chat and a coding agent open at once)
   from both pushing the same job.
+
+  YouTube's per-channel daily upload limit (`uploadLimitExceeded`) is not
+  documented with a fixed reset hour and behaves in practice as a rolling
+  24-hour window from the last completed upload. So `uploads.json` records
+  `lastUploadAt`, and an upload refused by `uploadLimitExceeded` is queued
+  with `notBefore = max(now + 2 hours, lastUploadAt + 24 hours + 10 minutes)`:
+  the 10-minute slack avoids waking on the boundary and hitting the limit a
+  second time, while `now + 2 hours` avoids tight retries when `lastUploadAt`
+  is unknown (earlier uploads made in Studio) or older than 22 hours. By
+  contrast, `quotaExceeded` is the Google Cloud project's daily 10,000-unit
+  quota, which resets at midnight Pacific time, so its `notBefore` is the next
+  midnight Pacific + 10 minutes.
 */
 const running = new Map();
-function readJobs() { try { return JSON.parse(readFileSync(JOBS_FILE, 'utf8')); } catch { return []; } }
-function saveJob(job) {
+function readStoreStrict() {
+  if (!existsSync(JOBS_FILE)) return { lastUploadAt: null, jobs: [] };
+  const d = JSON.parse(readFileSync(JOBS_FILE, 'utf8'));
+  if (Array.isArray(d)) return { lastUploadAt: null, jobs: d };
+  if (!d || typeof d !== 'object' || !Array.isArray(d.jobs)) throw new Error(`${JOBS_FILE} is unreadable.`);
+  return { lastUploadAt: d.lastUploadAt ?? null, jobs: d.jobs };
+}
+function readStore() { try { return readStoreStrict(); } catch { return { lastUploadAt: null, jobs: [] }; } }
+function writeStore(store) {
+  writePrivate(JOBS_FILE, JSON.stringify({ lastUploadAt: store.lastUploadAt ?? null, jobs: store.jobs.slice(-50) }, null, 2));
+}
+function saveJob(job, { lastUploadAt } = {}) {
   if (job.pid === process.pid) job.beat = Date.now();
-  const jobs = readJobs().filter((j) => j.id !== job.id);
-  jobs.push(job);
-  writePrivate(JOBS_FILE, JSON.stringify(jobs.slice(-50), null, 2));
+  const store = readStore();
+  if (lastUploadAt) store.lastUploadAt = lastUploadAt;
+  store.jobs = store.jobs.filter((j) => j.id !== job.id);
+  store.jobs.push(job);
+  writeStore(store);
 }
 /* A pid is reused (a reboot, a kill mid-upload), so a job counts as another
    app's only while that app has saved it in the last five minutes too; a
@@ -392,11 +467,26 @@ function saveJob(job) {
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const busyElsewhere = (j) => Boolean(j.pid) && j.pid !== process.pid && pidAlive(j.pid) && Date.now() - (j.beat ?? 0) < 5 * 60_000;
 
+function computeNotBefore(reason, now, lastUploadAt) {
+  if (reason === 'quotaExceeded') return nextMidnightPacificPlus10m(now);
+  const last = lastUploadAt ? Date.parse(lastUploadAt) : 0;
+  const afterLast = Number.isFinite(last) && last > 0 ? last + 24 * 3600_000 + 10 * 60_000 : 0;
+  return Math.max(now + 2 * 3600_000, afterLast);
+}
+function limitNote(reason, nbMs) {
+  const prefix = reason === 'quotaExceeded' ? "YouTube's daily quota is spent" : "YouTube's daily upload limit";
+  return `${prefix}; queued, the Mac retries after ${formatPacific(nbMs)}`;
+}
+
 function jobView(job) {
   const pct = job.size ? Math.floor((100 * job.sent) / job.size) : 0;
   return {
     job: job.id, file: job.file, title: job.meta.snippet.title, privacy: job.meta.status.privacyStatus, state: job.state,
     sent: `${(job.sent / 1048576).toFixed(1)} of ${(job.size / 1048576).toFixed(1)} MB (${pct}%)`,
+    ...(job.key ? { key: job.key } : {}),
+    ...(job.replaces ? { replaces: job.replaces } : {}),
+    ...(job.notBefore ? { not_before: formatPacific(Date.parse(job.notBefore)), not_before_iso: job.notBefore } : {}),
+    ...(job.note ? { note: job.note } : {}),
     ...(job.video_id ? { video_id: job.video_id, url: watchUrl(job.video_id) } : {}),
     ...(job.after?.length ? { then: job.after } : {}), ...(job.error ? { error: job.error } : {}),
   };
@@ -411,7 +501,8 @@ async function askOffset(job, retried = false) {
   if (r.status === 200 || r.status === 201) return { video: await r.json() };
   if (r.status === 308) { const m = /bytes=0-(\d+)/.exec(r.headers.get('range') ?? ''); return { at: m ? Number(m[1]) + 1 : 0 }; }
   if (r.status === 404 || r.status === 410) return { gone: true };
-  throw new Error(googleError(r.status, await r.json().catch(() => ({}))));
+  const info = googleErrorInfo(r.status, await r.json().catch(() => ({})));
+  throw new GoogleApiError(r.status, info.reason, info.text);
 }
 
 async function startSession(job) {
@@ -452,7 +543,10 @@ async function push(job) {
       }
       if (r && r.status === 401) { await accessToken(true); if (++fails > TRIES) throw new Error('The sign-in keeps being refused.'); continue; }
       if (r && (r.status === 404 || r.status === 410)) { job.session = await startSession(job); job.sent = 0; saveJob(job); continue; }
-      if (r && r.status < 500) throw new Error(googleError(r.status, await r.json().catch(() => ({}))));
+      if (r && r.status < 500) {
+        const info = googleErrorInfo(r.status, await r.json().catch(() => ({})));
+        throw new GoogleApiError(r.status, info.reason, info.text);
+      }
       // A dropped connection or Google's own 5xx: wait, ask where it stopped, carry on from there.
       if (r) why = `${r.status}`;
       if (++fails > TRIES) throw new Error(`The upload stalled ${TRIES} times in a row (last: ${why}). Ask again with the same file and title to resume it.`);
@@ -466,26 +560,191 @@ async function push(job) {
   } finally { await fh.close(); }
 }
 
+// ── The channel manifest (44i-6) ───────────────────────────────────────
+
+const MANIFEST_STATUS = ['ok', 'rerecord', 'queued', 'replaced', 'removed'];
+function readManifestStrict() {
+  if (!existsSync(MANIFEST_FILE)) return { syncedAt: null, videos: [] };
+  const d = JSON.parse(readFileSync(MANIFEST_FILE, 'utf8'));
+  if (Array.isArray(d)) return { syncedAt: null, videos: d };
+  if (!d || typeof d !== 'object' || !Array.isArray(d.videos)) throw new Error(`${MANIFEST_FILE} is unreadable.`);
+  return { syncedAt: d.syncedAt ?? null, videos: d.videos };
+}
+function readManifest() { try { return readManifestStrict(); } catch { return { syncedAt: null, videos: [] }; } }
+function writeManifest(m) {
+  writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));
+}
+
+function recordUploadedManifest(job, video, finishedAt) {
+  if (!job.key && !job.replaces) return;
+  const m = readManifest();
+  const videos = m.videos.slice();
+  const idx = videos.findIndex((e) => e.videoId === video.id);
+  const prev = idx >= 0 ? videos[idx] : {};
+  const entry = {
+    ...prev,
+    videoId: video.id,
+    title: video.snippet?.title ?? job.meta.snippet.title,
+    privacy: video.status?.privacyStatus ?? job.meta.status.privacyStatus,
+    publishedAt: video.snippet?.publishedAt ?? finishedAt,
+    ...(job.key ? { key: job.key } : {}),
+    source: job.file,
+    status: 'ok',
+    ...(job.replaces ? { replaces: job.replaces } : {}),
+    updatedAt: finishedAt,
+  };
+  if (idx >= 0) videos[idx] = entry; else videos.unshift(entry);
+  if (job.replaces) {
+    const rIdx = videos.findIndex((e) => e.videoId === job.replaces);
+    if (rIdx >= 0) {
+      videos[rIdx] = { ...videos[rIdx], status: 'replaced', replacedBy: video.id, updatedAt: finishedAt };
+    } else {
+      videos.push({ videoId: job.replaces, title: '', privacy: '', publishedAt: '', status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });
+    }
+  }
+  writeManifest({ ...m, videos });
+}
+
+async function syncManifest() {
+  const ch = await channel();
+  const ids = [];
+  const seen = new Set();
+  let pageToken;
+  for (;;) {
+    const { j } = await api('GET', 'playlistItems', {
+      query: { part: 'contentDetails', playlistId: ch.uploads, maxResults: 50, ...(pageToken ? { pageToken } : {}) },
+    });
+    for (const item of j.items ?? []) {
+      const id = item.contentDetails?.videoId;
+      if (id && !seen.has(id)) { seen.add(id); ids.push(id); }
+    }
+    if (!j.nextPageToken || !(j.items ?? []).length) break;
+    pageToken = j.nextPageToken;
+  }
+  const remote = new Map();
+  for (let i = 0; i < ids.length; i += 50) {
+    for (const v of await videos(ids.slice(i, i + 50))) remote.set(v.id, v);
+  }
+  const cur = readManifest();
+  const byId = new Map(cur.videos.map((e) => [e.videoId, e]));
+  const nowIso = new Date(nowMs()).toISOString();
+  const merged = [];
+  for (const id of ids) {
+    const v = remote.get(id);
+    const prev = byId.get(id);
+    merged.push({
+      ...(prev ?? {}),
+      videoId: id,
+      title: v?.snippet?.title ?? prev?.title ?? '',
+      privacy: v?.status?.privacyStatus ?? prev?.privacy ?? '',
+      publishedAt: v?.snippet?.publishedAt ?? prev?.publishedAt ?? '',
+      status: prev?.status ?? 'ok',
+      updatedAt: prev?.updatedAt ?? nowIso,
+    });
+  }
+  for (const prev of cur.videos) {
+    if (!seen.has(prev.videoId)) {
+      merged.push({
+        ...prev,
+        status: 'removed',
+        updatedAt: prev.status === 'removed' ? prev.updatedAt : nowIso,
+      });
+    }
+  }
+  const next = { syncedAt: nowIso, videos: merged };
+  writeManifest(next);
+  return next;
+}
+
+function formatManifestTable(list, statusFilter) {
+  const rows = statusFilter ? list.filter((e) => e.status === statusFilter) : list;
+  if (!rows.length) return statusFilter ? `No videos with status "${statusFilter}" in manifest.` : 'Manifest is empty (run manifest with sync: true to populate it).';
+  const cell = (v) => String(v ?? '').replace(/[\r\n]+/g, ' ').replace(/\|/g, '\\|');
+  const lines = ['| key | title | id | privacy | status | replacedBy |', '| --- | --- | --- | --- | --- | --- |'];
+  for (const e of rows) {
+    lines.push(`| ${cell(e.key)} | ${cell(e.title)} | ${cell(e.videoId)} | ${cell(e.privacy)} | ${cell(e.status)} | ${cell(e.replacedBy)} |`);
+  }
+  return lines.join('\n');
+}
+
+function markVideo(a) {
+  if (a.status !== undefined && !MANIFEST_STATUS.includes(a.status)) {
+    throw new Error(`status is one of ${MANIFEST_STATUS.join(', ')}.`);
+  }
+  const m = readManifest();
+  const videos = m.videos.slice();
+  const nowIso = new Date(nowMs()).toISOString();
+  const targets = [];
+  if (Array.isArray(a.video_ids) && a.video_ids.length) {
+    for (const id of a.video_ids) {
+      const idx = videos.findIndex((e) => e.videoId === String(id));
+      if (idx < 0) throw new Error(`No video ${id} in manifest (run manifest with sync: true first).`);
+      targets.push(idx);
+    }
+  } else if (a.video_id) {
+    const idx = videos.findIndex((e) => e.videoId === String(a.video_id));
+    if (idx < 0) throw new Error(`No video ${a.video_id} in manifest (run manifest with sync: true first).`);
+    targets.push(idx);
+  } else if (a.key) {
+    const idx = videos.findIndex((e) => e.key === String(a.key));
+    if (idx < 0) throw new Error(`No entry with key "${a.key}" in manifest.`);
+    targets.push(idx);
+  } else {
+    throw new Error('Pass video_id, video_ids, or key.');
+  }
+  const updated = [];
+  for (const idx of targets) {
+    const e = { ...videos[idx], updatedAt: nowIso };
+    if (a.video_id && !Array.isArray(a.video_ids) && a.key !== undefined) e.key = a.key;
+    if (a.status !== undefined) e.status = a.status;
+    if (a.reason !== undefined) e.reason = a.reason;
+    if (a.replaced_by !== undefined) e.replacedBy = a.replaced_by;
+    if (a.notes !== undefined) e.notes = a.notes;
+    videos[idx] = e;
+    updated.push(e);
+  }
+  writeManifest({ ...m, videos });
+  return updated.length === 1 ? updated[0] : { updated: updated.length, status: a.status };
+}
+
 function run(job) {
-  job.state = 'uploading'; job.pid = process.pid; job.error = undefined; saveJob(job);
+  job.state = 'uploading'; job.pid = process.pid; job.error = undefined; job.limitReason = undefined; saveJob(job);
   const p = (async () => {
+    let setupErr = null;
     try {
       const video = await push(job);
-      job.video_id = video.id; job.sent = job.size; job.state = 'done'; job.finished = new Date().toISOString(); job.after = [];
+      const finishedAt = new Date(nowMs()).toISOString();
+      job.video_id = video.id; job.sent = job.size; job.state = 'done'; job.finished = finishedAt;
+      job.notBefore = undefined; job.note = undefined; job.after = [];
       if (job.playlist_id) job.after.push(await addToPlaylist(video.id, job.playlist_id).catch((e) => `playlist not added: ${e.message}`));
       if (job.thumbnail) job.after.push(await setThumbnail(video.id, job.thumbnail).catch((e) => `thumbnail not set: ${e.message}`));
+      recordUploadedManifest(job, video, finishedAt);
       log(`uploaded ${job.file} as ${watchUrl(video.id)}`);
+      job.pid = undefined; saveJob(job, { lastUploadAt: finishedAt });
     } catch (e) {
-      job.state = 'failed'; job.error = String(e?.message ?? e); log(`upload of ${job.file} failed: ${job.error}`);
+      if (e instanceof GoogleApiError && (e.reason === 'uploadLimitExceeded' || e.reason === 'quotaExceeded')) {
+        const nbMs = computeNotBefore(e.reason, nowMs(), readStore().lastUploadAt);
+        job.state = 'queued';
+        job.notBefore = new Date(nbMs).toISOString();
+        job.limitReason = e.reason;
+        job.note = limitNote(e.reason, nbMs);
+        job.error = undefined;
+        log(`queued ${job.file}: ${job.note}`);
+      } else {
+        if (e instanceof Setup) setupErr = e;
+        job.state = 'failed'; job.error = String(e?.message ?? e); log(`upload of ${job.file} failed: ${job.error}`);
+      }
+      job.pid = undefined; saveJob(job);
     }
-    job.pid = undefined; saveJob(job); running.delete(job.id);
+    running.delete(job.id);
+    if (setupErr) throw setupErr;
   })();
   running.set(job.id, p);
   return p;
 }
 
 const PRIVACY = ['private', 'unlisted', 'public'];
-async function uploadVideo(a) {
+function validateUploadArgs(a) {
   const { path: file } = uploadable(a.file, MIME, 'A video');
   const st = statSync(file);
   if (!a.title) throw new Error('A title is needed.');
@@ -493,27 +752,146 @@ async function uploadVideo(a) {
   if (a.privacy !== undefined && !PRIVACY.includes(a.privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
   if (a.publish_at && a.privacy && a.privacy !== 'private') throw new Error('A scheduled video goes up private and turns public at publish_at; leave privacy out or private.');
   if (a.thumbnail) uploadable(a.thumbnail, IMAGE, 'A thumbnail');
+  return { file, st };
+}
+function buildJob(a, file, st) {
+  return {
+    id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
+    meta: {
+      snippet: { title: a.title, description: a.description ?? '', tags: a.tags ?? [], categoryId: String(a.category_id ?? 10), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
+      status: { privacyStatus: a.privacy ?? 'private', selfDeclaredMadeForKids: Boolean(a.made_for_kids ?? false), ...(a.publish_at ? { publishAt: a.publish_at } : {}) },
+    },
+    playlist_id: a.playlist_id, thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined,
+    ...(a.key ? { key: String(a.key) } : {}),
+    ...(a.replaces ? { replaces: String(a.replaces) } : {}),
+    sent: 0, started: new Date(nowMs()).toISOString(),
+  };
+}
+
+async function uploadVideo(a) {
+  const { file, st } = validateUploadArgs(a);
   await accessToken();
-  const jobs = readJobs();
+  const { jobs } = readStore();
   const same = (j) => j.file === file && j.size === st.size && j.mtime === st.mtimeMs && j.meta.snippet.title === a.title;
   const done = jobs.find((j) => same(j) && j.state === 'done');
   if (done && !a.again) throw new Error(`This file is already up with this title: ${watchUrl(done.video_id)}. Pass again: true to upload a second copy.`);
   let job = a.again ? null : jobs.find((j) => same(j) && j.state !== 'done');
   if (job && running.has(job.id)) return { ...jobView(job), note: 'already uploading in this window' };
   if (job && busyElsewhere(job)) return { ...jobView(job), note: 'already uploading from another app on this Mac' };
-  if (!job) {
-    job = {
-      id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
-      meta: {
-        snippet: { title: a.title, description: a.description ?? '', tags: a.tags ?? [], categoryId: String(a.category_id ?? 10), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
-        status: { privacyStatus: a.privacy ?? 'private', selfDeclaredMadeForKids: Boolean(a.made_for_kids ?? false), ...(a.publish_at ? { publishAt: a.publish_at } : {}) },
-      },
-      playlist_id: a.playlist_id, thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined, sent: 0, started: new Date().toISOString(),
-    };
+  if (job && job.state === 'queued' && job.notBefore && Date.parse(job.notBefore) > nowMs()) return jobView(job);
+  if (!job) job = buildJob(a, file, st);
+  else {
+    if (a.key && !job.key) job.key = String(a.key);
+    if (a.replaces && !job.replaces) job.replaces = String(a.replaces);
   }
   const p = run(job);
-  await Promise.race([p, sleep(WAIT_MS)]);
+  await Promise.race([p.catch(() => {}), sleep(WAIT_MS)]);
   return jobView(job);
+}
+
+function queueUpload(a) {
+  const { file, st } = validateUploadArgs(a);
+  const { jobs } = readStore();
+  const same = (j) => j.file === file && j.size === st.size && j.mtime === st.mtimeMs && j.meta.snippet.title === a.title;
+  const done = jobs.find((j) => same(j) && j.state === 'done');
+  if (done && !a.again) throw new Error(`This file is already up with this title: ${watchUrl(done.video_id)}. Pass again: true to upload a second copy.`);
+  const existing = a.again ? null : jobs.find((j) => same(j) && (j.state === 'queued' || j.state === 'uploading'));
+  if (existing) throw new Error(`This file is already queued with this title (job ${existing.id}). Pass again: true to queue a second copy.`);
+  const job = { ...buildJob(a, file, st), state: 'queued', note: 'Queued; the Mac uploads it on the next pass.' };
+  saveJob(job);
+  if (job.replaces) {
+    const m = readManifest();
+    const idx = m.videos.findIndex((e) => e.videoId === job.replaces);
+    if (idx >= 0) {
+      m.videos[idx] = { ...m.videos[idx], status: 'queued', updatedAt: new Date(nowMs()).toISOString() };
+      writeManifest(m);
+    }
+  }
+  return jobView(job);
+}
+
+async function drain() {
+  // Check local sign-in and manifest/jobs readability before touching Google,
+  // so a drain with nothing due sends zero requests yet still catches broken config.
+  client();
+  if (!loadToken()?.refresh_token) throw new Setup('Not signed in to YouTube yet. In Terminal, from the repo: node mcp/youtube-mcp.js login');
+  const initial = readStoreStrict();
+  readManifestStrict();
+  const ordered = initial.jobs
+    .slice()
+    .sort((a, b) => Date.parse(a.started ?? 0) - Date.parse(b.started ?? 0));
+  let authed = false;
+  for (const item of ordered) {
+    const fresh = readStoreStrict().jobs.find((j) => j.id === item.id);
+    if (!fresh || (fresh.state !== 'queued' && fresh.state !== 'uploading')) continue;
+    if (busyElsewhere(fresh)) continue;
+    if (fresh.notBefore && Date.parse(fresh.notBefore) > nowMs()) continue;
+    if (!authed) { await accessToken(); authed = true; }
+    await run(fresh);
+    if (fresh.state === 'queued' && fresh.notBefore) {
+      const store = readStoreStrict();
+      const nbMs = Date.parse(fresh.notBefore);
+      let changed = false;
+      for (const j of store.jobs) {
+        if (j.id !== fresh.id && j.state === 'queued' && (!j.notBefore || Date.parse(j.notBefore) < nbMs)) {
+          j.notBefore = fresh.notBefore;
+          j.note = fresh.note;
+          changed = true;
+        }
+      }
+      if (changed) writeStore(store);
+      break;
+    }
+  }
+}
+
+const xmlEscape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function buildPlist() {
+  const script = realpathSync(fileURLToPath(import.meta.url));
+  const logFile = join(DIR, 'drain.log');
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    '<dict>',
+    `  <key>Label</key><string>${AGENT_LABEL}</string>`,
+    '  <key>ProgramArguments</key>',
+    '  <array>',
+    `    <string>${xmlEscape(process.execPath)}</string>`,
+    `    <string>${xmlEscape(script)}</string>`,
+    '    <string>drain</string>',
+    '  </array>',
+    '  <key>StartInterval</key><integer>3600</integer>',
+    '  <key>RunAtLoad</key><true/>',
+    `  <key>StandardOutPath</key><string>${xmlEscape(logFile)}</string>`,
+    `  <key>StandardErrorPath</key><string>${xmlEscape(logFile)}</string>`,
+    '</dict>',
+    '</plist>',
+    '',
+  ].join('\n');
+}
+function plistPath() { return join(homedir(), 'Library', 'LaunchAgents', `${AGENT_LABEL}.plist`); }
+function installAgent() {
+  mkdirSync(DIR, { recursive: true, mode: 0o700 });
+  chmodSync(DIR, 0o700);
+  const dest = plistPath();
+  mkdirSync(join(homedir(), 'Library', 'LaunchAgents'), { recursive: true });
+  writeFileSync(dest, buildPlist(), { mode: 0o644 });
+  if (process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL !== '1') {
+    const target = `gui/${process.getuid()}`;
+    try { execFileSync('launchctl', ['bootout', target, dest], { stdio: 'ignore' }); } catch { /* not loaded */ }
+    execFileSync('launchctl', ['bootstrap', target, dest], { stdio: 'inherit' });
+  }
+  log(`installed ${dest}`);
+}
+function uninstallAgent() {
+  const dest = plistPath();
+  if (process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL !== '1') {
+    const target = `gui/${process.getuid()}`;
+    try { execFileSync('launchctl', ['bootout', target, dest], { stdio: 'ignore' }); } catch { /* not loaded */ }
+  }
+  if (existsSync(dest)) unlinkSync(dest);
+  log(`uninstalled ${dest}`);
 }
 
 // ── The tools ──────────────────────────────────────────────────────────
@@ -523,36 +901,44 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 - Uploads go up PRIVATE unless you pass privacy. Make a video unlisted or public, or schedule it (publish_at), only when the owner said so in this conversation. A scheduled video is private until its time.
 - Before uploading, say what you will upload: the file, the title, the privacy. Credit the music's source in the description when the owner has one (where a recording came from and its date).
 - upload_video answers within about 45 seconds: a short film is done by then; a long one answers "uploading" and carries on. Check it with upload_status. If an upload stops (the Mac slept, the app closed), ask upload_video again with the same file and title: it carries on where it stopped and never makes a second copy unless you pass again: true.
+- A job in state "queued" (from queue_upload, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: the Mac's background agent finishes it on its own after not_before (shown in Pacific time). Do not retry it by hand.
+- Use queue_upload to line up several films without uploading them immediately, and pass key (a short film id) or replaces (an old video id) so the channel manifest stays current.
+- Use manifest (with sync: true to pull all pages from the channel, 1 quota unit a page) and mark_video to track which videos are ok, need rerecord, are queued, replaced or removed.
 - YouTube processes a video for a few minutes after the upload; its upload_status in list_videos says when it is "processed".
 - Deleting is not here on purpose: tell the owner to delete in YouTube Studio.
-- Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day; reading costs 1.`;
+- Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day; reading (and each manifest sync page) costs 1.`;
 
 const str = { type: 'string' };
+const uploadProps = {
+  file: { ...str, description: 'Full path to the video file on this Mac.' },
+  title: { ...str, description: 'At most 100 characters.' },
+  description: str,
+  tags: { type: 'array', items: str },
+  privacy: { type: 'string', enum: PRIVACY, description: 'Default private. Only another value when the owner asked for it.' },
+  publish_at: { ...str, description: 'Schedule: an ISO 8601 time in the future; the video stays private until then.' },
+  category_id: { ...str, description: 'YouTube category id; default 10 (Music). 24 is Entertainment, 1 Film & Animation.' },
+  made_for_kids: { type: 'boolean', description: 'Default false.' },
+  language: { ...str, description: 'e.g. en' },
+  playlist_id: { ...str, description: 'Add it to this playlist once it is up.' },
+  thumbnail: { ...str, description: 'Full path to a .jpg or .png (16:9, at most 2 MB) to set once it is up.' },
+  key: { ...str, description: 'Optional short film id (e.g. "hymn-to-the-dawn") recorded in the channel manifest.' },
+  replaces: { ...str, description: 'Optional existing video id this upload replaces in the manifest.' },
+  again: { type: 'boolean', description: 'Upload a second copy of a file already up with this title.' },
+};
 const TOOLS = [
   { name: 'channel', description: 'The signed-in channel: its name, link, subscribers, views and video count.', inputSchema: { type: 'object', properties: {} } },
   { name: 'list_videos', description: "The channel's latest uploads, newest first: id, link, title, privacy, schedule, processing state, views.", inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 50, description: 'How many (default 10).' } } } },
   {
     name: 'upload_video',
-    description: 'Upload a video file from this Mac. Private unless privacy says otherwise. Resumes an interrupted upload of the same file and title.',
-    inputSchema: {
-      type: 'object', required: ['file', 'title'],
-      properties: {
-        file: { ...str, description: 'Full path to the video file on this Mac.' },
-        title: { ...str, description: 'At most 100 characters.' },
-        description: str,
-        tags: { type: 'array', items: str },
-        privacy: { type: 'string', enum: PRIVACY, description: 'Default private. Only another value when the owner asked for it.' },
-        publish_at: { ...str, description: 'Schedule: an ISO 8601 time in the future; the video stays private until then.' },
-        category_id: { ...str, description: 'YouTube category id; default 10 (Music). 24 is Entertainment, 1 Film & Animation.' },
-        made_for_kids: { type: 'boolean', description: 'Default false.' },
-        language: { ...str, description: 'e.g. en' },
-        playlist_id: { ...str, description: 'Add it to this playlist once it is up.' },
-        thumbnail: { ...str, description: 'Full path to a .jpg or .png (16:9, at most 2 MB) to set once it is up.' },
-        again: { type: 'boolean', description: 'Upload a second copy of a file already up with this title.' },
-      },
-    },
+    description: 'Upload a video file from this Mac. Private unless privacy says otherwise. Resumes an interrupted upload of the same file and title. If YouTube answers with the daily upload limit or quota, queues the job for automatic retry on the Mac instead of failing.',
+    inputSchema: { type: 'object', required: ['file', 'title'], properties: uploadProps },
   },
-  { name: 'upload_status', description: 'How the uploads are going (or one, by its job id): MB sent, done, failed and why, the link once up.', inputSchema: { type: 'object', properties: { job: str } } },
+  {
+    name: 'queue_upload',
+    description: 'Save a video upload job in state "queued" without uploading yet; the Mac drains the queue on its own. Refuses if the same file and title is already queued or up.',
+    inputSchema: { type: 'object', required: ['file', 'title'], properties: uploadProps },
+  },
+  { name: 'upload_status', description: 'How the uploads are going (or one, by its job id): MB sent, queued jobs with not_before in Pacific time (not a failure; the Mac finishes them on its own — do not retry by hand), done, failed and why, the link once up.', inputSchema: { type: 'object', properties: { job: str } } },
   {
     name: 'update_video',
     description: "Change a video's title, description, tags, category, privacy or schedule. Only the fields you pass change.",
@@ -562,6 +948,27 @@ const TOOLS = [
   { name: 'list_playlists', description: "The channel's playlists: id, title, privacy, how many videos.", inputSchema: { type: 'object', properties: {} } },
   { name: 'create_playlist', description: 'Make a playlist (private unless privacy says otherwise).', inputSchema: { type: 'object', required: ['title'], properties: { title: str, description: str, privacy: { type: 'string', enum: PRIVACY } } } },
   { name: 'add_to_playlist', description: 'Add a video to a playlist.', inputSchema: { type: 'object', required: ['video_id', 'playlist_id'], properties: { video_id: str, playlist_id: str } } },
+  {
+    name: 'manifest',
+    description: 'Show the channel manifest table (key, title, id, privacy, status, replacedBy), optionally filtered by status. Pass sync: true to page through the whole channel and merge without overwriting local fields; sync costs 1 quota unit a page (plus 1 per 50 videos).',
+    inputSchema: { type: 'object', properties: { sync: { type: 'boolean', description: 'Page through all uploads on the channel first (1 unit a page).' }, status: { type: 'string', enum: MANIFEST_STATUS, description: 'Filter table rows by status.' } } },
+  },
+  {
+    name: 'mark_video',
+    description: 'Set local manifest fields (status, reason, replaced_by, notes, key) on one video by video_id or key, or set one status change across a list of video_ids.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        video_id: str,
+        video_ids: { type: 'array', items: str, description: 'Batch update multiple video ids in one call.' },
+        key: { ...str, description: 'Film id to look up (when no video_id) or to set (when video_id is given).' },
+        status: { type: 'string', enum: MANIFEST_STATUS },
+        reason: str,
+        replaced_by: str,
+        notes: str,
+      },
+    },
+  },
 ];
 
 const text = (v) => ({ content: [{ type: 'text', text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }] });
@@ -572,9 +979,12 @@ async function call(name, a = {}) {
     case 'channel': { const { uploads, ...c } = await channel(); return text(c); }
     case 'list_videos': return text(await listVideos(Number(a.limit ?? 10)));
     case 'upload_video': return text(await uploadVideo(a));
+    case 'queue_upload': return text(queueUpload(a));
     case 'upload_status': {
-      const jobs = readJobs().filter((j) => !a.job || j.id === a.job).map((j) => (j.state === 'uploading' && !running.has(j.id) && !busyElsewhere(j) ? { ...j, state: 'stopped (ask upload_video again with the same file and title to resume)' } : j));
-      return text(jobs.length ? jobs.slice(-10).map(jobView) : 'No uploads yet.');
+      const { jobs } = readStore();
+      const filtered = jobs.filter((j) => !a.job || j.id === a.job).map((j) => (j.state === 'uploading' && !running.has(j.id) && !busyElsewhere(j) ? { ...j, state: 'stopped (ask upload_video again with the same file and title to resume)' } : j));
+      const shown = a.job ? filtered : filtered.filter((j, idx) => j.state === 'queued' || j.state === 'uploading' || idx >= filtered.length - 10);
+      return text(shown.length ? shown.map(jobView) : 'No uploads yet.');
     }
     case 'update_video': {
       if (a.privacy !== undefined && !PRIVACY.includes(a.privacy)) return fail(`privacy is one of ${PRIVACY.join(', ')}.`);
@@ -592,6 +1002,12 @@ async function call(name, a = {}) {
       return text({ id: j.id, title: j.snippet?.title, privacy: j.status?.privacyStatus });
     }
     case 'add_to_playlist': return text(await addToPlaylist(String(a.video_id), String(a.playlist_id)));
+    case 'manifest': {
+      if (a.status !== undefined && !MANIFEST_STATUS.includes(a.status)) return fail(`status is one of ${MANIFEST_STATUS.join(', ')}.`);
+      const m = a.sync ? await syncManifest() : readManifest();
+      return text(formatManifestTable(m.videos, a.status));
+    }
+    case 'mark_video': return text(markVideo(a));
     default: return fail(`No such tool: ${name}`);
   }
 }
@@ -622,11 +1038,25 @@ async function onRequest(m) {
 }
 
 const command = process.argv[2];
-if (command === 'login' || command === 'logout' || command === 'whoami') {
+if (command === 'login' || command === 'logout' || command === 'whoami' || command === 'drain' || command === 'install-agent' || command === 'uninstall-agent' || command === 'manifest') {
   try {
     if (command === 'login') await login();
     else if (command === 'logout') await logout();
-    else { const { uploads, ...c } = await channel(); log(JSON.stringify(c)); }
+    else if (command === 'whoami') { const { uploads, ...c } = await channel(); log(JSON.stringify(c)); }
+    else if (command === 'drain') await drain();
+    else if (command === 'install-agent') installAgent();
+    else if (command === 'uninstall-agent') uninstallAgent();
+    else {
+      const args = process.argv.slice(3);
+      const sync = args.includes('--sync');
+      const mdIdx = args.indexOf('--md');
+      const mdFile = mdIdx >= 0 ? args[mdIdx + 1] : null;
+      if (mdIdx >= 0 && !mdFile) throw new Error('--md needs a file path.');
+      const m = sync ? await syncManifest() : readManifestStrict();
+      const table = formatManifestTable(m.videos);
+      if (mdFile) { writeFileSync(mdFile, `${table}\n`); log(`wrote ${mdFile}`); }
+      else process.stdout.write(`${table}\n`);
+    }
     process.exit(0);
   } catch (e) { log(e instanceof Setup ? e.message : `failed: ${e?.message ?? e}`); process.exit(1); }
 } else {

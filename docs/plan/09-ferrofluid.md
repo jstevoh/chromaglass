@@ -241,16 +241,6 @@ Open, from building 9i:
   stand inside the radius where |B_z| passes the onset and none in the ring past the rim where
   |B| is still high. (38v, from RS-20.)
 
-- **9ae. The ferrofluid rounds at the step rate, not in seconds** (S; Medium). The
-  Cahn–Hilliard mobility in `fluid.ts:1393-1401` is 0.006 + 0.012·phaseSharp a substep,
-  `CH_SUBSTEPS` 4 (`constants.ts:392`), with no `magnetSeconds` and no grid size in it: when
-  the governor drops to 30 steps a second (`governor.ts:112`) a ferro body rounds half as fast
-  in a second, and at 384² it rounds slower than at 256². The display's rate does not matter;
-  the step's does. A drop between plates relaxes on τ = 12μR³/(b²σ). Scale the mobility by the
-  step's seconds and Δx² so the rounding time is that τ. Check: a stretched ferro body's
-  aspect ratio after 2 s within 5% at 60 against 30 steps a second and at 256² against 384².
-  38e points here. (38v, from RS-23.)
-
 - **9af. The magnet's strength and walk ride the music outside the cords** (S; Medium).
   `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.55 +
   0.35·energy + 0.45·env)) and speeds its walk on the music whatever the patch says (no

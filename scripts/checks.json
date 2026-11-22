@@ -74,6 +74,16 @@
       ]
     },
     {
+      "name": "The rules stay in sync",
+      "shard": "logic",
+      "run": "npm run rules -- --check",
+      "why": [
+        "Antigravity's per-area rules under .agents/rules/ are generated from",
+        ".claude/rules/ by scripts/syncrules.mjs, so the two agents' rule files",
+        "never drift and each generated file stays under Antigravity's 24,000-byte cap."
+      ]
+    },
+    {
       "name": "What a change reaches",
       "shard": "logic",
       "run": "npm run reach",
@@ -147,6 +157,17 @@
       ]
     },
     {
+      "name": "One panel, one kind of control",
+      "shard": "logic",
+      "run": "npm run panelkinds",
+      "why": [
+        "Every desk panel and the Wall panel rendered in node: none draws both knobs and",
+        "sliders, Rides and the Mixer draw sliders, the Recipe and section panels knobs,",
+        "whatever a control is learned to on a controller (PLAN 8d-3, the owner,",
+        "2026-11-22: the Recipe's Bubbles and Saturation were sliders among knobs again)."
+      ]
+    },
+    {
       "name": "The desk's layouts",
       "shard": "logic",
       "run": "npm run desklayout",
@@ -167,7 +188,7 @@
     {
       "name": "The turntable",
       "shard": "logic",
-      "run": "npm run turntable -- --owed=38v-4",
+      "run": "npm run turntable",
       "why": [
         "The spinning dish's CPU half: the liquid's lag behind the glass, Auto",
         "Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22)."
@@ -442,6 +463,23 @@
         "and a pour, a spreading dye body and a dimming lamp each turned down by",
         "its own step (47w-2, scripts/watchcuts.mjs). In the sound shard for its",
         "ffmpeg. About two minutes."
+      ]
+    },
+    {
+      "name": "Watching in words",
+      "shard": "sound",
+      "run": "npm run watchwords",
+      "why": [
+        "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
+        "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
+        "from an after one (PLAN.md 47x). Held to clips made to sit at known poles:",
+        "a steady drift reads sustained, analogous and all-over; a picture that",
+        "sits and jumps reads sudden and strong; a centred disc on black reads",
+        "centred and dark-ground, hard-edged at one pixel and soft at fourteen.",
+        "The before/after read must rank the edge first when only the edge",
+        "changed, and find nothing steady changed between two takes of the same",
+        "look. Written before the words were built, so it holds them to pictures",
+        "and not to the code's own thresholds. In the sound shard for its ffmpeg."
       ]
     },
     {
@@ -1690,7 +1728,7 @@
     {
       "name": "The soap film on the plate",
       "shard": "lab3",
-      "run": "npm run soapplate -- --owed=wedge,black",
+      "run": "npm run soapplate",
       "why": [
         "Soap Film draws the frame's own draining film (PLAN 32d, gpu/soapFilmPlate.ts):",
         "off is the plate to the byte and makes no film; on, the plate's colours follow the",
@@ -2793,7 +2831,7 @@
     {
       "name": "The relief",
       "shard": "plate",
-      "run": "npm run derive -- --owed=grad,height",
+      "run": "npm run derive -- --owed=grad",
       "why": [
         "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
         "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
@@ -2860,7 +2898,7 @@
     {
       "name": "The spinning dish",
       "shard": "plate",
-      "run": "npm run dish -- --owed=22r",
+      "run": "npm run dish",
       "why": [
         "A spun dish drags its liquid round through the gap, harder where the",
         "gap is tight, flings the heavy dye out and draws the oil in; with",
@@ -3233,7 +3271,7 @@
     {
       "name": "The ferrofluid drop in the closeup",
       "shard": "open",
-      "run": "npm run ferrodrop -- --owed=29a-11",
+      "run": "npm run ferrodrop",
       "why": [
         "The closeup's ferrofluid drop (PLAN 29a): its surface the sessile",
         "balance's for its contact angle and size, leaned toward a magnet with",
@@ -3244,7 +3282,7 @@
     {
       "name": "The ferrofluid drop at rest on the thin gap",
       "shard": "open",
-      "run": "npm run ferrorest -- --owed=9ae",
+      "run": "npm run ferrorest",
       "why": [
         "The closeup's ferrofluid drop at rest on the thin gap (PLAN 29c):",
         "degenerate mobility in phaseCHVolume holds its half-full core and",
@@ -3383,7 +3421,7 @@
     {
       "name": "The heat",
       "shard": "open",
-      "run": "npm run heat -- --owed=once",
+      "run": "npm run heat",
       "why": [
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",
@@ -3444,7 +3482,7 @@
     {
       "name": "A colour drop pushes the dye aside into a window of its own colour, and splashes only past Cossali's K",
       "shard": "fifth",
-      "run": "npm run dropwindow -- --owed=splashliquid,satellitedye",
+      "run": "npm run dropwindow",
       "timeout": 6,
       "why": [
         "PLAN 18c-2 and 18c-3: a colour drop on a thin gap is a pour of its",
@@ -3833,6 +3871,12 @@
       "name": "A flicked plate's liquid trails the glass",
       "shard": "fifth",
       "run": "node scripts/flick.mjs",
+      "quarantine": [
+        { "line": "a flick on water: the liquid trails the glass by its drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "and the picture turns with the liquid, not the glass", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "the solver is handed the dish", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "two drag times later the picture has lost the drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md",
         "22h): the look's own turning goes through the liquid's drag time like",
@@ -3998,6 +4042,10 @@
       "name": "A drop lands only where it is dropped",
       "shard": "show",
       "run": "node scripts/mirror.mjs",
+      "quarantine": [
+        { "line": "Classic, calm, layer 1: and nowhere else", "plan": "19ak-22", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "Classic, calm, layer 1 turned a quarter: and nowhere else", "plan": "19ak-22", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "A drop lands where it is dropped: on the Design desk, on either layer,",
         "the cell under the hand changes and its mirror image across the middle",

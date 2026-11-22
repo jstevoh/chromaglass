@@ -554,6 +554,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
+  { key: 'crispEdges',      label: 'Crisp Edges',      min: 0, max: 1 },
   { key: 'projectorFocus',  label: 'Projector Focus',  min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
   // The Roy look's own: the plate printed as a comic, a knob to print it by.
@@ -638,6 +639,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'soapFilm',        label: 'Soap Film',        min: 0, max: 1 },
   { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
   { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
+  { key: 'soapFilmTilt',    label: 'Frame Tilt',       min: 0, max: 90 },
   // Glitter in the liquid and the lens photographing it (PLAN 47e, 47d): a
   // fader for how much, and the f-number on a curve, so the knob's travel
   // spends as long on the wide-open discs as on the stopped-down stars.
@@ -1305,6 +1307,14 @@ const KNOB_CCS: Record<FactoryMapId, (s: MidiSource) => boolean> = {
  * takes a row of its own at the top of the panel. A fader is drawn as a slider
  * only where a profile knows it is one. The Rides strip is unaffected: it
  * draws every control as a fader whatever it is learned to.
+ *
+ * And then the desk stopped drawing by it (PLAN 8d-3, the owner, 2026-11-22):
+ * the APC mini mk2's factory map rides Bubbles and Saturation on faders, so
+ * the Recipe drew those two as sliders among its knobs, the same fault from
+ * another door. A panel's kind of control is now the panel's (`ControlGrid`
+ * in `desk/DeskPanels.tsx`, `npm run panelkinds`). This still says which of
+ * a profiled board's CCs are faders, for the controller's picture and learn
+ * (8d-2), and nothing on the desk asks it.
  */
 export function controlKindOf(map: MidiMap | null | undefined, key: keyof VisualizerSettings, inputName?: string | null): 'fader' | 'encoder' | null {
   const b = map?.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);

@@ -84,7 +84,7 @@ let lab: Lab | null = null;
  *  rasteriser's (`npm run lampzero`) reads this rather than trusting the flags. */
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
-let lastDrop: { n: number; h: Float32Array } | null = null;
+let lastDrop: { n: number; h: Float32Array; z: Float32Array } | null = null;
 /** The colour drops on their way in (PLAN 18c-2), drained a step at a time by `step` as the app's sim drains its own. */
 const drops = makeDropQueue();
 const api = {
@@ -428,10 +428,10 @@ const api = {
   },
   /** One cell of the splodascope's lay, as seedPreset lays it. */
   splodascopeCell,
-  /** Classic's dish as the app lays it (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
-  classicDiscs(seed: number, dyes: number) {
+  /** Classic's dish as the app lays it on an `n`-cell grid (src/lib/oilLay.ts, PLAN 38w-8: the solver's grid in the app, 192 the CPU's), from a seeded stream of the lab's own. */
+  classicDiscs(seed: number, dyes: number, n = 192) {
     let s = seed;
-    return classicDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes);
+    return classicDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes, n);
   },
   /** One cell of Classic's lay, as seedPreset lays it. */
   classicCell,
@@ -920,6 +920,8 @@ const api = {
   },
   /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
   dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
+  /** Both the solved drop height h and the packed height z = min(h + domes, gap) in l_c (PLAN 29a-11). */
+  dropSurface() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h), z: Array.from(lastDrop.z) } : null; },
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

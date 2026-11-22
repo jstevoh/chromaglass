@@ -71,3 +71,33 @@ each band.
 - ~~**47v-6. A crop too small to read says so.**~~ Shipped, this PR (story in `docs/plan-shipped.md`).
 - ~~**47v-5. Carried on real footage: the grain taken out.**~~ Shipped, this PR (story in `docs/plan-shipped.md`); it moved
   the real films' carried only from 0.187 to 0.229 and from 0.125 to 0.127, so 47v-8 is what is left.
+
+## 47x. Watching in words, and what changed between two films (S–M)
+
+- ~~**47x-1** the words~~ (**shipped**): `scripts/watchwords.mjs` (`describe()`, `BANDS` table),
+  `## In words` (and reference section with `--vs`) in `summary.md`, `words` returned by `watchVideo`.
+- ~~**47x-2** what changed~~ (**shipped**): `compareReads()` in `scripts/watchwords.mjs`,
+  `scripts/watchpair.mjs` (`watchPair()`), `--before`/`--after` in `watch.mjs` writing `diff.md`, `diff-timeline.png`, `pairs.png`.
+- ~~**47x-3** tried on real pairs~~ (**shipped**): blow-48's two webm takes, the 38u Classic
+  closeup and the cell bloom, through `--before/--after`, shown to the owner on one page. The
+  Classic closeup crashed the read: `paletteStrip` (`scripts/watchdesign.mjs`) placed each edge
+  on the last rounded one and ran a column past the strip (selftest H). The change sentences
+  read "swells more swells a minute"; each measure now has a plain sentence with a subject
+  ("the edges got softer, and became painterly, graded edges (edge width 1.81 to 7.06% of
+  width)"). The cell bloom's only change was hues a frame 3 to 2 (47x-7).
+- ~~**47x-4** a plan for sharing the watch tool as a Claude Code plugin~~ (**shipped**):
+  `docs/watch-plugin-plan.md`. Packaging waits on the owner (the name, its own repository or
+  this one, whether the liquid show references ship as examples).
+- ~~**47x-5**~~ (shipped, this PR: a word that differs while its measure moved under a step is listed under "Near an edge", not as a change) a word that flickers at a band edge. A word can be said in one read and not the
+  other while its measure held under a step (the bloom's "weight: light" and "space:
+  indirect" are only in its after read). `compareReads` should say a word came or went only
+  when its measure moved a step, or the bands need a margin either side.
+- ~~**47x-7**~~ (shipped, this PR: hues a frame is the mean over the frames; the bloom's 3 to 2 now holds) an integer measure moving by one (hues a frame 3 to 2) counts as a whole step, so a
+  film whose hue count sits at a boundary reads as changed. Use the mean over the samples, not
+  the median's integer, or hold one-unit changes of a count to a half step.
+- ~~**47x-8**~~ (shipped, this PR) the whole film in a paragraph. The owner asked (2026-11-22) how
+  the show felt overall, not only what moved: `scripts/watchoverall.mjs` reads the arc in
+  thirds (holds, builds, settles, swells, dips, rises and falls), the Laban character, the
+  strongest moment and the longest rest, the light and colour drift, the reorganisations and
+  the hold on the music, and the look in a line. It is `## Overall` in summary.md and `## How it
+  felt` in diff.md, with how the arc changed.

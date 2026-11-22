@@ -225,3 +225,98 @@ liquid that lights where its flow stretches it ("Let's do it!").*
   analyser at a half. *Measure:* with the sheets in and crossed, a still plate's glints are
   dimmed by the analyser and not by the polariser.
 
+
+## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
+
+*The owner, 2026-11-22, on the flower (eight grey discs round every moving drop, 15g-15):
+"why are we using stencils at all? ... and not simulating the actual physical effect of
+things?" The flower was a sampling fault: the plate's slope was read from taps three cells
+apart, so a drop narrower than that was seen once per tap and drawn eight times. The stopgap
+(15g-15) reads the slope with a dense smooth stencil instead, but the deeper fault stays:
+the light the plate draws is not the light a liquid would throw. The optical path comes from
+how much dye sits in a cell, not from the shape of the oil and water surface, and the light is
+only darkened where it is, never moved, so there are no caustics: no bright rims focused by a
+lens-shaped drop, no shadow beside it.*
+
+- **31s-1. The liquid's surface height as a solver field.** A height field h (the oil layer's
+  thickness over the water, and the water's own free surface) advected by the flow and levelled
+  by the thin-film (lubrication) equation: dh/dt + div(h u) = -div( h^3/(3 mu) grad(p) ), with
+  p = -sigma lap(h) + rho g h. Surface tension pulls a drop's edge into a meniscus whose width is
+  the capillary length (about 2 mm for oil on water, sqrt(sigma/(rho g))); gravity levels a
+  wide pool. Interfacial tension between oil and water sets the contact shape where the phases
+  meet (the phase field already knows where). *Measure (lab):* a still lens of oil keeps the
+  meniscus profile set by the capillary length (within 10%); a sine ripple of wavenumber k on a
+  layer h0 decays on tau = 3 mu / (h0^3 (sigma k^4 + rho g k^2)) (within 15%); mass of h is
+  kept to 0.1% over 600 steps.
+- **31s-2. Light traced through the surface, gathered on the wall.** Each lamp ray leaves the
+  lamp, bends at the surface by Snell's law (air, oil, water and glass indices, the slope from
+  31s-1), and lands on the wall where its new direction takes it; the wall's brightness is how
+  many rays land in each pixel (the inverse Jacobian of that map). A lens-shaped drop then
+  focuses a bright rim and throws a shadow beside it by itself, as on an overhead projector.
+  This replaces the dye-thickness optical path and the aperture darkening (refractionOptics),
+  and the stopgap's dense slope stencil (15g-15). *Measure (lab):* a plano-convex drop of
+  radius R focuses at R/(n-1) within 10%; a flat plate lights the wall evenly (1%); light is
+  kept (total on the wall within 1% of total in); no feature is drawn twice (one peak per drop
+  in the wall's autocorrelation).
+- **31s-3. The other sparse stencils.** Still reading the plate at a stride: the bubble glow's
+  airNear (a 9-tap max at 4.5 cells, plate.ts), the camera's camLap (an 8-tap max,
+  plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c) and blurAlpha (3x3). Each can draw
+  ghost copies of anything narrower than its stride the way the slope did. Replace each with the
+  traced light of 31s-2 where it is optics, or a dense stencil where it is a field read.
+- **31s-4. Retune the looks on the traced light.** Once 31s-2 draws the plate, every preset's
+  brightness, contrast and rim weight moves. Retune on films from the Mac, judged by the owner
+  against the reference library (watch skill).
+- **31s-6. Open, found on main's deploy of 2026-11-22 (ebfa3324): `npm run holeline` was
+  calibrated on the stride-3 stencil 15g-15 replaced.** The dense slope (#933, `plateSlope.ts`,
+  sigma 1.5 cells) reads a hole's rim about 1.6 to 2 cells wider than the Sobel did, so
+  holeline's precondition throws before any line is judged: "the hole of 5.0 cells has its rim
+  at 6.7 cells" against `RIM_SLACK` 1.5 (bisected to ea277f3d; 61cab2c4 passes). Past it, on
+  the dense stencil, every feature line holds ("no line round a hole" at most 0 levels) and two
+  controls miss: "the control finds the glow" (3.7, wanting more than 6) and "the smallest hole
+  is partly flattened" (5.28 against 0.9 times 5.47). A narrower stencil (sigma 1.0) breaks the
+  controls further, so it is the check's yardstick that moved, not the picture. Fix: read the
+  rim the way the dense stencil spreads it (its reach, `SLOPE_REACH2`, rather than a fixed
+  slack), and set the glow control's size row from the dense slope's own response, or from
+  31s-2's traced light once it draws the plate. Never a looser bar without the owner's word;
+  until then holeline stays red on main's checks (the site deploys without them, 19ak-21).
+- **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
+  passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
+  a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
+  a phenomenon that nobody built, or a field that is read wrongly. That is how the flower got through
+  every pass. It came from a sparse stencil, which is a correct operator on anything wider than its
+  stride and draws ghost copies of anything narrower. It also got through because no pass followed
+  the light out of the dish, so none asked what a small drop's curved surface does to it. This audit
+  turns the question round. Walk the real rig in order (lamp, condenser, glass, liquid layers, glass,
+  projection lens, wall, eye). For each stage, list what physically happens there from optics and
+  fluid texts, never from our code. Then mark each item as built (with the file), faked (with what
+  stands in for it) or missing. Six areas, each with its own list:
+  1. **Depth.** The layers have thickness: film height, meniscus, a drop's cap, oil over water, and
+     what lies at the bottom against what lies at the top. Is any of it a field, or does the dye
+     stand in for it? (31s-1 builds the height.)
+  2. **Light all the way through.** Refraction at each interface, total internal reflection, focus
+     and caustics, Beer-Lambert absorption by depth, scattering in milky dyes, Fresnel loss and
+     dispersion. Does energy add up from the lamp to the wall? (31s-2 builds the trace.)
+  3. **Lens and wall.** Depth of field across a dish that is not flat, the lamp's size against how
+     sharp an edge can be, vignetting, keystone, the wall's texture and bounce, and how bright the
+     wall is against how the eye adapts.
+  4. **Sampling.** Every shader read of a solver field at a stride over one cell, every max or min
+     over sparse taps, every place a field is drawn at another resolution, with what each can ghost
+     or alias. (31s-3 holds the known ones.)
+  5. **Dish edges.** The meniscus against the rim, wetting and contact angle, the rim's shadow and
+     its refraction, and how drops behave next to the wall of the dish.
+  6. **Time.** How fast each thing happens in a real dish (diffusion, Marangoni spreading, settling,
+     evaporation, heat from the lamp) against the solver's steps, and what the frame rate smears.
+  Checks. (a) Lab: seed single small drops (one to three cells) and moving ones, render the wall,
+  and assert one peak per drop in the picture's autocorrelation, with no copies at the stencil's
+  offsets. It must fail on the old three-cell Sobel. (b) The optical numbers of our films against
+  the real-show references kept for `npm run watch` (jls-liquid-loops-1969, bar-the-dip-2016):
+  edge width, how sharp and how high the brightest caustic peaks are, and the dark rims round drops.
+  Any number outside the references' range becomes an item in its area. The two halves check each other
+  (the owner, 2026-11-22): a number of ours outside the references' range is a symptom, and every
+  symptom must point at a rig item that explains it. A symptom nothing explains means the rig walk
+  missed a phenomenon. An item marked built whose number is still out of range is really faked. The
+  watch tool gains a ghost measure (secondary autocorrelation peaks round small forms), which would
+  have caught the flower from the films alone. Each missing or faked item
+  the audit finds becomes a plan item in the section it belongs to. Antigravity runs it after 31s-1
+  lands. 38w-7 (small cells drawn as rounded squares) may be the same square stencil, so re-film it
+  after 15g-15.

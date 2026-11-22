@@ -30,6 +30,7 @@ import { PH_WGSL } from '../../lib/phIndicator';
 import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
+import { INTERFACE_WGSL } from './plateInterface';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { VIEW_OPTICS } from './platePolar';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
@@ -38,6 +39,7 @@ import { FILM_DYE_WGSL } from './filmDye';
 import { FILM_FRAME_WGSL } from './plateFilm';
 import { LAMP_MIX_WGSL } from './plateLamp';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
+import { SLOPE_WGSL } from './plateSlope';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -431,21 +433,7 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
   return vec4f(ltBody, alpha);
 }
 
-fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
-  let ts = 3.0 / U.logicalGrid;
-  let d00 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, -ts)).a);
-  let d10 = decodeDensity(textureBicubic(t, fuv + vec2f(0.0, -ts)).a);
-  let d20 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, -ts)).a);
-  let d01 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, 0.0)).a);
-  let d21 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, 0.0)).a);
-  let d02 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, ts)).a);
-  let d12 = decodeDensity(textureBicubic(t, fuv + vec2f(0.0, ts)).a);
-  let d22 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, ts)).a);
-  let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
-  let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
-  return vec2f(gradX, gradY);
-}
-
+${SLOPE_WGSL}
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
 /*
@@ -1262,8 +1250,7 @@ fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
   let deltaFilm = v.z * 0.087;
   let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
   let gap = v.y;
-  let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
-  let h = hScale * (1.0 - 0.5 * v.z);
+  let h = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
   return n * h;
 }
 
@@ -1285,55 +1272,47 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
     return vec4f(sobelGrad(src, in.uv), 0.0, path);
   }
 
-  let ts = 3.0 / U.logicalGrid;
+  let cell = 1.0 / U.logicalGrid;
   let dyeGain = max(1.0, U.boundaryContrast * 3.0);
 
-  let d00 = decodeDensity(tex2(src, in.uv + vec2f(-ts, -ts)).a);
-  let d10 = decodeDensity(tex2(src, in.uv + vec2f( 0.0, -ts)).a);
-  let d20 = decodeDensity(tex2(src, in.uv + vec2f( ts, -ts)).a);
-  let d01 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  0.0)).a);
-  let dC  = decodeDensity(tex2(src, in.uv).a);
-  let d21 = decodeDensity(tex2(src, in.uv + vec2f( ts,  0.0)).a);
-  let d02 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  ts)).a);
-  let d12 = decodeDensity(tex2(src, in.uv + vec2f( 0.0,  ts)).a);
-  let d22 = decodeDensity(tex2(src, in.uv + vec2f( ts,  ts)).a);
-
-  let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
-  let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
-  let g = vec2f(gradX, gradY);
-
+  let dC = decodeDensity(tex2(src, in.uv).a);
   let vC = viewProps(in.uv);
   let oC = calcOpl(dC, vC, pouredDn(in.uv), dyeGain);
-
-  var o00: f32; var o10: f32; var o20: f32;
-  var o01: f32; var o21: f32;
-  var o02: f32; var o12: f32; var o22: f32;
 
   // Each tap's own view and poured index wherever either can differ from
   // the middle's: oil, a film, or any liquid poured (the species is 1×1
   // with none, so a plate with nothing poured pays for none of these reads).
   let poured = textureDimensions(speciesSrc).x > 1u;
-  if (vC.x > 0.001 || vC.z > 0.001 || poured) {
-    o00 = oplAt(d00, in.uv + vec2f(-ts, -ts), dyeGain);
-    o10 = oplAt(d10, in.uv + vec2f( 0.0, -ts), dyeGain);
-    o20 = oplAt(d20, in.uv + vec2f( ts, -ts), dyeGain);
-    o01 = oplAt(d01, in.uv + vec2f(-ts,  0.0), dyeGain);
-    o21 = oplAt(d21, in.uv + vec2f( ts,  0.0), dyeGain);
-    o02 = oplAt(d02, in.uv + vec2f(-ts,  ts), dyeGain);
-    o12 = oplAt(d12, in.uv + vec2f( 0.0,  ts), dyeGain);
-    o22 = oplAt(d22, in.uv + vec2f( ts,  ts), dyeGain);
-  } else {
-    o00 = calcOpl(d00, vC, 0.0, dyeGain);
-    o10 = calcOpl(d10, vC, 0.0, dyeGain);
-    o20 = calcOpl(d20, vC, 0.0, dyeGain);
-    o01 = calcOpl(d01, vC, 0.0, dyeGain);
-    o21 = calcOpl(d21, vC, 0.0, dyeGain);
-    o02 = calcOpl(d02, vC, 0.0, dyeGain);
-    o12 = calcOpl(d12, vC, 0.0, dyeGain);
-    o22 = calcOpl(d22, vC, 0.0, dyeGain);
-  }
+  let perTap = vC.x > 0.001 || vC.z > 0.001 || poured;
 
-  let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
+  // The slope and the optical path's curvature from the same taps, at one
+  // cell apart with Gaussian weights (sobelGrad says why: the old stencil's
+  // taps three cells apart made eight copies of every narrow drop). The
+  // curvature is scaled to the old nine-tap stencil's answer on a bowl,
+  // o = a·r²: that stencil read 1800a, so this reads 1800a too, and flat
+  // ground and straight ramps still read zero.
+  var gs = vec2f(0.0);
+  var m2 = 0.0;
+  var ls = 0.0;
+  var r2s = 0.0;
+  for (var j = -3; j <= 3; j++) {
+    for (var i = -3; i <= 3; i++) {
+      let r2 = i * i + j * j;
+      if (r2 == 0 || r2 > SLOPE_REACH2) { continue; }
+      let w = slopeWeight(r2);
+      let k = vec2f(f32(i), f32(j));
+      let uv = in.uv + k * cell;
+      let d = decodeDensity(tex2(src, uv).a);
+      var o: f32;
+      if (perTap) { o = oplAt(d, uv, dyeGain); } else { o = calcOpl(d, vC, 0.0, dyeGain); }
+      gs += k * (w * d);
+      m2 += f32(i * i) * w;
+      ls += w * (o - oC);
+      r2s += w * f32(r2);
+    }
+  }
+  let g = gs * (3.0 / m2);
+  let lap = ls * (1800.0 / r2s);
 
   return vec4f(g, lap, oC);
 }
@@ -1524,6 +1503,7 @@ fn viewAt(uv: vec2f) -> View {
   for (var k = 0; k < 9; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
   return View(o[0] * ${PHASE_VIEW_TOP}.0, o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7], o[8]);
 }
+${INTERFACE_WGSL}
 
 /*
   A drop of oil sitting on the plate is a lens, and what it shows depends on
@@ -2249,6 +2229,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
+  // A screen pixel in plate units, for the ferrofluid's and oil's edges
+  // (crispInterface), outside any branch: a derivative reads across the
+  // quad. Not fwidth: √2 px on a turn. Relief reads rim0 unmoved.
+  let px0 = max(length(dpdx(fuv0)), length(dpdy(fuv0)));
+  let rim0 = fuv0;
+  fuv0 = crispInterface(fuv0, px0);
   let fuvBase = fuv0;
 
   var flow0 = vec2f(0.0);
@@ -2257,12 +2243,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
   // The front plate's own physics, once, where it sits on the plate.
   let view = viewAt(fuvBase);
-  // One screen pixel in plate units, for the ferrofluid's edge. Taken here,
-  // before any branch a pixel can take on its own, because WGSL reads a
-  // derivative across the whole quad or not at all. The length of a step
-  // across the screen, not fwidth: fwidth adds the two axes, which on a
-  // turning plate is up to √2 pixels and softened the edge as it spun.
-  let phasePx = max(length(dpdx(fuvBase)), length(dpdy(fuvBase)));
+  let phasePx = px0;
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   /*
     The clear film (§20b, 18b-6): the water's dye has the gap less the film,
@@ -2371,10 +2352,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   let sharp0 = dof < 0.55;
   var near0 = vec4f(0.0);
-  if (sharp0 && U.derivedOn > 0.5) { near0 = bicubicSigned(derived0, fuv0); }
+  if (sharp0 && U.derivedOn > 0.5) { near0 = bicubicSigned(derived0, rim0); }
   var normal0 = vec3f(0.0, 0.0, 1.0);
   if (sharp0) {
-    if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
+    if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, rim0); }
     // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
     normal0 = normalize(mix(normal0, vec3f(0.0, 0.0, 1.0), airNear(fuv0)));
   }
