@@ -13,10 +13,6 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
 - **22c. Coriolis is left out.** In a flat gap it is a pure gradient for a
   divergence-free flow and the projection takes it; with a varying gap a sliver is
   left. Add 2ω_l ẑ×u where h varies, and measure what it changes.
-- ~~**22d. The CPU solver gets the bulk lag and not the swirl.**~~ Dropped with the CPU
-  solver's stepping (2.6, decided 2026-10-06; 3.1). Where there is no
-  WebGPU, `FluidSimulation`'s own step (`LiquidVisualizer.tsx`) turns the picture
-  with the liquid but has no swirl; give it `spinSwirl`'s few lines.
 - **22e. The liquid's drag on the dish is ignored.** The dish is a flywheel with its
   own drag (the plate's old spin), not slowed by the liquid it drags; a thick liquid
   should brake a flicked dish harder than water.
@@ -62,21 +58,6 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
     this change. Still over the check's half of the old plate's 0.534, but by 15% where it
     was by more than double. Find what moved it (#248 Thin Gap everywhere, #255 the thin
     forces, or the lab's own plate) and either restore it or write down why it moved.
-- ~~**22n. A spun plate's liquid did not heap, lag or overshoot.**~~ **Shipped**
-  (`npm run spinslosh`, `npm run sloshgpu` case 6). Story in `docs/plan-shipped.md` §22n.
-  Its shortcut, named so it is replaced: the open dish's flow is the glass's frame's
-  and is laid over the solver's, whose frame turns with the thin gap's liquid (ω_l),
-  so while the thin gap's liquid lags the glass (a third of a second on water, a
-  sixtieth on the thick liquid) the two frames differ by that lag. Properly one
-  liquid has one lag: when the open dish runs, its own turn should be the frame's.
-- ~~**22n-1. Five looks woke the open dish in their opening.**~~ **Shipped** (`npm run
-  spinslosh` 7, `npm run startup` on the Mac). 22n woke the dish on a change of speed past
-  0.25 rad/s²; deploy 835 on the owner's Mac found Fractal Dream, Velvet Underground, Cell
-  Bloom, Chemical Clock and Clock Glass asking for the dish's kernels in their opening with
-  no list naming them: a frame stalled while the opening compiled moves the dish to its
-  motor (0.02 to 0.09 rad/s) in one step, which read as several rad/s². Now the dish wakes
-  on the liquid's lag behind a change (summed, let go at the dish's drag) past the speed a
-  steady spin needs, so no motor wakes it however the frames fall and a flick still does.
 - **22o. The open dish's staircase rim brakes a turning flow.** The slosh dish is a
   Cartesian 64² grid inside a circle; its rim is cell faces, and a flow going round
   the rim meets each step face-on, is turned back and loses energy in the jumps it

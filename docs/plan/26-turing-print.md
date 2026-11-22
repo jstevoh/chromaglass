@@ -24,10 +24,6 @@ What the plate had when this was proposed, and what was missing:
   repelling within a surface), and stays the magnet's.
 
 Steps:
-- **26a. Gray–Scott on the GPU, carried by the flow (shipped, #327; carried once since
-  26d).** Story in `docs/plan-shipped.md` §26.
-- **26b. The pattern as a control (shipped, #327; Width in plate units and the phone
-  version with 26d).** Story in `docs/plan-shipped.md` §26.
 - **26c. Where it grows: the poured liquid is the reagent (shipped in part, #327, #331).**
   A pour of Turing Reagent feeds and seeds the reaction where it lands on any look, with
   its own pattern baked in (`npm run turing`: 70% of a pour grows, specks with no reagent
@@ -44,9 +40,6 @@ Steps:
     soft at a close zoom. The owner's pack is a Karl Sims render through FXAA, harder
     than a dish. If the owner wants that, it is a choice to make, not physics; the plate
     could threshold the reconstructed field at screen resolution, as Ben-Day's edge does.
-  - ~~**26d-3. Other colour in a fed print**~~ (**shipped**; story in
-    `docs/plan-shipped.md` §26): a poured colour shows under the print, and the print
-    has its own ink (`turingInk`, desk, phone, remote, MIDI).
   - **26d-3a, open: the ink is a bright hue, not a depth.** The plate reads the print's
     rgb as a colour at a fixed density, so starch's own indigo prints black and any hue
     must be drawn at full strength to print as itself. A hue that printed lighter, as
@@ -67,11 +60,6 @@ Steps:
     substrate stops 0.3–0.5% short and its stripe is a little wider. Storing the substrate's
     deficit 1 − u instead of u would give half floats their fine steps where u is near
     1, on every GPU and at half the bandwidth, and would make a cleared dish full (26d-4).
-  - ~~**26d-6. The print keeps evolving**~~ (**shipped**; story in `docs/plan-shipped.md`
-    §26): `turingDrift` slides the feed and kill along the saddle-node curve across the plate
-    on a 40–90 s clock (desk, phone, remote, MIDI; the Turing Print preset sets 0.7).
-    Shortcuts named: three plane waves, not a noise field; the saddle-node line, not
-    Pearson's full regime boundaries; a fixed-rate clock that follows no music.
   - **26d-6a. More ways for the print to evolve** (grey patch and regime glide **shipped**;
     story in `docs/plan-shipped.md` §26): the drift's k is now the saddle-node curve plus a
     margin that glides each region between stripes and spots on slower waves (50, 80 and
@@ -118,4 +106,3 @@ Steps:
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take
   out). A CIMA print is flat: the complex sits in the gel and does not raise it, so
   Turing Print draws no relief (Edge Relief 0 in the look).
-- **26-colour-b. The coral as soft blurred rings (fixed with 26d).** Story in `docs/plan-shipped.md` §26-colour-b (moved 2026-10-29, 19m-2).

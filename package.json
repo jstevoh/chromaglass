@@ -240,6 +240,7 @@
     "plateboil": "node scripts/plateboil.mjs",
     "argnames": "node scripts/argnames.mjs",
     "liquidpush": "node scripts/liquidpush.mjs",
+    "liquidfall": "node scripts/liquidfall.mjs",
     "particles": "node scripts/particles.mjs",
     "glint": "node scripts/glint.mjs",
     "polar": "node scripts/polar.mjs",
