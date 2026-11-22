@@ -3,8 +3,9 @@
  *
  * What was reported (the owner, 2026-10-29, again 2026-11-14): "this closeup
  * button doesn't seem to do anything besides make the canvas black/empty".
- * The Close-up button, the M key, the zoom and the phone's pinch all bring the
- * closeup in on the camera's mode, and the default mode is Hold, aimed at the
+ * The zoom (the Macro Zoom slider, + and −, the wheel, the phone's pinch and
+ * zoom; the Close-up button that also did, until the owner asked for it gone
+ * on 2026-11-14, PLAN QA-32c) brings the closeup in on the camera's mode, and the default mode is Hold, aimed at the
  * middle of the plate. Hold sat on its aim and nowhere else, so on a plate
  * whose middle was bare (a look that pours in pools, a middle a finger had
  * swept, a plate between pours) the frame was four times the size of nothing:
@@ -26,7 +27,6 @@
  * summed-area table is kept between calls so those frames make no new arrays.
  */
 import type { MacroField } from './macroCamera';
-import type { VisualizerSettings } from '../types';
 
 /**
  * A held frame is bare glass when the dye in it is under this share of the
@@ -35,6 +35,13 @@ import type { VisualizerSettings } from '../types';
  * reads 0.
  */
 export const BARE_SHARE = 0.1;
+/**
+ * A pool, to the landing, is a box about a pool's size holding at least this
+ * share of the fullest such box on the plate: enough to pass over a thin wash
+ * and the faint fringe of a pool, low enough that a small pool near the aim
+ * counts against a big one across the plate (the owner asked for the nearest).
+ */
+export const POOL_SHARE = 0.25;
 /** A plate whose average dye is under this has nothing to land on yet. */
 export const EMPTY_PLATE = 1e-3;
 /**
@@ -51,11 +58,23 @@ export const LAND_FULL_ZOOM = 2;
  * whenever its pool later flowed out of the frame, a cut in the middle of a
  * held shot minutes on (the review of this port measured it: Hold at 1.5x on
  * the middle for ten seconds, then across the plate in one frame). Long enough
- * for the zoom's own ease in, which is most of a second.
+ * for the zoom's own ease in, which is most of a second. Counted from the
+ * zoom's last rise, so a slow hand on the slider is not cut off half way in.
  */
 export const LAND_SECONDS = 1.5;
-/** The zoom the Close-up press goes to (`MACRO_PRESET_ZOOM`, checked the same way). */
-export const CLOSEUP_PRESS_ZOOM = 4;
+/**
+ * How long a zoom past LAND_FULL_ZOOM must stop coming in before the landing
+ * stands, in seconds of liquid on the plate. With the Close-up button gone
+ * (PLAN QA-32c) the zoom is the only way in, and + comes in by steps of 1.2x
+ * (1.2, 1.44, 1.73, 2.07, 2.49, 2.99, 3.58, 4.3). The landing used to stand on
+ * the first frame at 2x or more, so at 2.07x a pool a sixth of the plate from
+ * the aim still showed at the frame's edge, the aim was not bare, and it
+ * stood: two presses on, the 2.99x frame was bare glass and stayed so to 4.3x
+ * (the Mac's `npm run closeupland` caught it, the frame 0.000 lit and the aim
+ * on 0.5, 0.5). Each rise of the zoom asks again; a zoom that has held still
+ * this long, a hand's pause between presses and more, has its answer.
+ */
+export const LAND_HOLD = 0.5;
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -83,6 +102,9 @@ export function frameMean(field: MacroField, x: number, y: number, hx: number, h
 }
 
 let sat = new Float64Array(0);
+let boxes = new Float64Array(0);
+let labels = new Int32Array(0);
+let stack = new Int32Array(0);
 let satW = 0;
 
 /** The mean dye in a (hx, hy) half-cell box about (cx, cy), from the summed-area table `landing` last built. */
@@ -95,14 +117,14 @@ function boxMean(cx: number, cy: number, hx: number, hy: number, size: number): 
 }
 
 /**
- * The nearest frame to the aim (ax, ay) that holds at least half the dye the
- * plate's fullest frame holds, centred on the dye it holds. Grid cells; the
+ * The nearest pool to the aim (ax, ay), and the frame centred on the dye
+ * there. Grid cells; the
  * frame is (hx, hy) half-cells, and its middle stays `margin` cells off the
  * walls. Writes the answer into `out`.
  *
  * Nearest rather than fullest, so a look whose middle has a little in it moves
- * no further than it must; at least half the fullest, so it lands on a subject
- * and not on the fringe of one. The frame is the one asked for (the zoom it is
+ * no further than it must (the owner's choice, 2026-11-14); a pool and not a
+ * fringe (POOL_SHARE), so it lands on a subject. The frame is the one asked for (the zoom it is
  * going to), not the one easing in from the plate.
  */
 export function landing(field: MacroField, ax: number, ay: number, hx: number, hy: number, margin: number,
@@ -126,26 +148,51 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
   const yLo0 = Math.max(hy, margin), yHi0 = size - Math.max(hy, margin);
   const xLo = xLo0 <= xHi0 ? xLo0 : size / 2, xHi = xLo0 <= xHi0 ? xHi0 : size / 2;
   const yLo = yLo0 <= yHi0 ? yLo0 : size / 2, yHi = yLo0 <= yHi0 ? yHi0 : size / 2;
-  const stride = Math.max(1, Math.min(hx, hy) / 2);
-  // Two sweeps over the same lattice, the first for the fullest frame and the
-  // second for the nearest one holding half of it, rather than a list of every
-  // candidate: the box sum is four reads, cheaper than the list.
+  /*
+    The nearest pool, measured to the pool. The first build took the nearest
+    frame holding at least half of what the fullest frame holds, and measured
+    to that frame's middle; a 16:10 frame reaches a pool beside the aim from
+    nearer its middle than one above it, so it could go to the farther pool:
+    on the owner's film (2026-11-14) it picked the blue pool over the orange
+    one, and asked, the owner said "go to the nearest pool". So the plate is
+    read in boxes about a pool's size (a third of the frame's shorter half), a
+    box holding at least POOL_SHARE of the fullest box is liquid (a thin wash
+    or a pool's fringe is not), the touching boxes of liquid are one pool, and
+    the pool whose middle (its dye's centroid) is nearest the aim wins. To the
+    middle and not the near edge, because two pools the same distance off are
+    told apart by where they sit, as a person sees them, not by which spread
+    a cell further. The arrays are kept between calls.
+  */
+  const s = Math.max(1, Math.min(hx, hy) / 3);
+  const stride = Math.max(1, s / 2);
+  const n = Math.max(1, Math.floor((size - 2 * s) / stride) + 1);
+  if (boxes.length < n * n) { boxes = new Float64Array(n * n); labels = new Int32Array(n * n); stack = new Int32Array(n * n); }
   let best = 0;
-  for (let y = yLo; y <= yHi + 1e-6; y += stride) {
-    for (let x = xLo; x <= xHi + 1e-6; x += stride) { const v = boxMean(x, y, hx, hy, size); if (v > best) best = v; }
+  for (let b = 0; b < n; b++) {
+    for (let a = 0; a < n; a++) { const v = boxMean(s + a * stride, s + b * stride, s, s, size); boxes[a + b * n] = v; if (v > best) best = v; }
   }
+  const floor = POOL_SHARE * best;
+  labels.fill(0, 0, n * n);
   let px = ax, py = ay, near = Infinity;
-  for (let y = yLo; y <= yHi + 1e-6; y += stride) {
-    for (let x = xLo; x <= xHi + 1e-6; x += stride) {
-      if (boxMean(x, y, hx, hy, size) < 0.5 * best) continue;
-      const dist = Math.hypot(x - ax, y - ay);
-      if (dist < near) { near = dist; px = x; py = y; }
+  for (let k = 0; k < n * n; k++) {
+    if (labels[k] !== 0 || !(boxes[k] >= floor) || !(best > 0)) continue;
+    // One pool: every touching box of liquid, weighed by the dye it holds.
+    let top = 0, w = 0, wx = 0, wy = 0;
+    stack[top++] = k; labels[k] = 1;
+    while (top > 0) {
+      const c = stack[--top], a = c % n, b = (c - a) / n, v = boxes[c];
+      w += v; wx += v * (s + a * stride); wy += v * (s + b * stride);
+      if (a > 0 && labels[c - 1] === 0 && boxes[c - 1] >= floor) { labels[c - 1] = 1; stack[top++] = c - 1; }
+      if (a < n - 1 && labels[c + 1] === 0 && boxes[c + 1] >= floor) { labels[c + 1] = 1; stack[top++] = c + 1; }
+      if (b > 0 && labels[c - n] === 0 && boxes[c - n] >= floor) { labels[c - n] = 1; stack[top++] = c - n; }
+      if (b < n - 1 && labels[c + n] === 0 && boxes[c + n] >= floor) { labels[c + n] = 1; stack[top++] = c + n; }
     }
+    const cx = wx / w, cy = wy / w, dist = Math.hypot(cx - ax, cy - ay);
+    if (dist < near) { near = dist; px = cx; py = cy; }
   }
-  // The nearest such frame has its subject in the corner furthest from the
-  // aim (every frame that holds the whole of a pool holds the same dye), so
-  // the subject is put in the middle: the frame goes to the centroid of the
-  // dye it holds, twice, as a cut lands on a drop's middle (`recenter`).
+  px = clamp(px, xLo, xHi); py = clamp(py, yLo, yHi);
+  // And the frame centred on the dye it holds there, twice, as a cut lands on
+  // a drop's middle (`recenter`): the boxes are coarse, the dye is not.
   for (let pass = 0; pass < 2; pass++) {
     const x0 = clamp(Math.floor(px - hx), 0, size - 1), x1 = clamp(Math.ceil(px + hx), 0, size - 1);
     const y0 = clamp(Math.floor(py - hy), 0, size - 1), y1 = clamp(Math.ceil(py + hy), 0, size - 1);
@@ -163,18 +210,19 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
  * A closeup's landing: whether it still has to check that its aim shows any
  * liquid (`pending`, set as it comes in), and where it landed instead when it
  * did not (grid cells, NaN while it sits on its aim); how long it has asked
- * (`age`, seconds), and whether the place it settled on has been handed back
- * as the aim (`told`). Owned by the camera.
+ * since the zoom last came in further (`age`, seconds) and the zoom it asked
+ * at (`zoom`), and whether the place it settled on has been handed back as
+ * the aim (`told`). Owned by the camera.
  */
-export interface Landing { pending: boolean; x: number; y: number; age: number; told: boolean; out: { x: number; y: number } }
+export interface Landing { pending: boolean; x: number; y: number; age: number; zoom: number; told: boolean; out: { x: number; y: number } }
 
 export function newLanding(): Landing {
-  return { pending: true, x: NaN, y: NaN, age: 0, told: false, out: { x: 0, y: 0 } };
+  return { pending: true, x: NaN, y: NaN, age: 0, zoom: NaN, told: false, out: { x: 0, y: 0 } };
 }
 
 /** Coming in again (`pending` true), or a hand on the camera (false): either way, back on the aim. */
 export function clearLanding(l: Landing, pending: boolean): void {
-  l.pending = pending; l.x = NaN; l.y = NaN; l.age = 0; l.told = false;
+  l.pending = pending; l.x = NaN; l.y = NaN; l.age = 0; l.zoom = NaN; l.told = false;
 }
 
 /**
@@ -211,7 +259,9 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
   const plate = plateMean(field, margin);
   // An empty plate waits on the aim, still pending, for the first pour.
   if (!(plate > EMPTY_PLATE)) return false;
-  l.age += step;
+  // A zoom still coming in (the slider's ramp, + after +) is asked afresh.
+  if (!(frame.zoom <= l.zoom + 1e-3)) l.age = 0; else l.age += step;
+  l.zoom = frame.zoom;
   const { size } = field;
   const hx = clamp(frame.spanX / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
   const hy = clamp(frame.spanY / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
@@ -220,9 +270,10 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
     slider comes in from 1x a notch at a time, and at 1.01x the frame is nearly
     the whole plate and holds the plate's average: asked only then, it was
     never asked again, and the pinch went on into the bare middle (a ramp from
-    1.01x to 4x over a second ended on 0.5, 0.5). Fully in, the answer stands.
+    1.01x to 4x over a second ended on 0.5, 0.5). Fully in and held there
+    (LAND_HOLD), or parked short of it (LAND_SECONDS), the answer stands.
   */
-  if (frame.zoom >= LAND_FULL_ZOOM || l.age >= LAND_SECONDS) l.pending = false;
+  if (l.age >= (frame.zoom >= LAND_FULL_ZOOM ? LAND_HOLD : LAND_SECONDS)) l.pending = false;
   const had = Number.isFinite(l.x);
   const atX = Number.isFinite(followX) ? followX : had ? l.x : ax;
   const atY = Number.isFinite(followY) ? followY : had ? l.y : ay;
@@ -237,23 +288,4 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
   landing(field, ax, ay, hx, hy, margin, l.out);
   l.x = l.out.x; l.y = l.out.y;
   return !had;
-}
-
-/** Whether the closeup is in: the same reading as `macroZoomOf(s) > 1.05` (src/sim/constants.ts). */
-export function closeupIn(s: { macroMode?: boolean; macroZoom?: number }): boolean {
-  return s.macroMode === true || (s.macroZoom ?? 1) > 1.05;
-}
-
-/**
- * The one press in and out of the closeup: the desk's Close-up button, the M
- * key, a pad, the phone's Zoom. In by the zoom, as the slider and the pinch go
- * in, with the flag riding along; out to the plate with both. The desk button
- * used to flip the flag alone, so the plate went to 4x while the Macro Zoom
- * knob beside it still read 1.00x (the owner's screenshot, 2026-10-29), and a
- * look carrying a zoom with the flag off was in the closeup with the button
- * unlit; the M key read the zoom alone, so a look that set the flag was in
- * with M pressing it further in.
- */
-export function closeupToggle(s: { macroMode?: boolean; macroZoom?: number }): Pick<VisualizerSettings, 'macroMode' | 'macroZoom'> {
-  return closeupIn(s) ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: CLOSEUP_PRESS_ZOOM };
 }

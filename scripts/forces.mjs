@@ -55,6 +55,23 @@
  *      liquid at 1/7.9 of the default's, each to 8%; and the colour goes as
  *      the liquid there goes with no colour laid at all, to 3% (the draught's
  *      gusts make the pool's own speed differ from the plate's mean).
+ *   6. Polarity pushes unlike colours apart the same everywhere (PLAN 38u-7).
+ *      A straight boundary between two colours, the plate's own thin gap and
+ *      the deep one, the same push along every row of it: every row pushes
+ *      the one colour away from the other (none the other way), and the push
+ *      varies along the boundary by under 25% (std over mean, 0.10 and 0.00;
+ *      the push was multiplied by 1 + 2n, n a noise on the plate, which went
+ *      negative in patches and pulled the colours together there: 26 of 76
+ *      rows the wrong way on the thin gap, a spread of 2.5 times the mean).
+ *      Polarity 0 on the same plate moves nothing, or the push is not what
+ *      the rows are measuring.
+ *   7. Rain Drip is gravity along the plate, g sin θ (PLAN 38u-12). On a
+ *      level plate (Gravity 0) a pool of colour under Rain Drip does not fall
+ *      (under 2% of the speed it has on the wall), tipped to a half it falls
+ *      at about half that speed (40 to 60%), and it was the same speed at
+ *      every tilt, so every look with Rain Drip streaked down a plate lying
+ *      flat on the projector. Checks 1 and 3 hold the plate on the wall
+ *      (Gravity 1), where the weight is whole and the numbers are today's.
  *   And any GPU validation error fails the run: a pass that never ran would
  *   read as stillness.
  *
@@ -134,7 +151,7 @@ try {
       const mean = await meanDye();
       // Twenty drag times of the thicker liquid's slowest answer is nothing at
       // these drags (0.1 s and 0.013 s): thirty steps is steady for both.
-      await lab.step(30, { ...thin, drip: 0.5, meanDensity: mean });
+      await lab.step(30, { ...thin, drip: 0.5, plateUpright: 1, meanDensity: mean });
       out.drip[t] = await flow();
       await lab.create(N, N); await pool();
       await lab.step(30, { ...thin, turbScale: 1 });
@@ -144,11 +161,15 @@ try {
     {
       await lab.create(N, N); lab.dye(0.5, 0.5, 5, [1, 0, 0], 1); lab.flush();
       const mean = await meanDye();
-      await lab.step(30, { thinGap: 1, gapThickness: DEF, gapSpring: 0, drip: 0.5, meanDensity: mean });
+      await lab.step(30, { thinGap: 1, gapThickness: DEF, gapSpring: 0, drip: 0.5, plateUpright: 1, meanDensity: mean });
       out.even = { ...(await flow()), mean };
+      // Tipped to the wall, the plate has the tilt's own flow (the buoyancy and the lamp's heat of a plate that stands up, 38u-12): what the same plate does with no Rain Drip is the floor Rain Drip is asked to add nothing to.
+      await lab.create(N, N); lab.dye(0.5, 0.5, 5, [1, 0, 0], 1); lab.flush();
+      await lab.step(30, { thinGap: 1, gapThickness: DEF, gapSpring: 0, drip: 0, plateUpright: 1, meanDensity: mean });
+      out.evenBase = await flow();
       // The control: the same plate weighed against nothing (meanDensity 0) must slide, or the stillness above says nothing.
       await lab.create(N, N); lab.dye(0.5, 0.5, 5, [1, 0, 0], 1); lab.flush();
-      await lab.step(30, { thinGap: 1, gapThickness: DEF, gapSpring: 0, drip: 0.5, meanDensity: 0 });
+      await lab.step(30, { thinGap: 1, gapThickness: DEF, gapSpring: 0, drip: 0.5, plateUpright: 1, meanDensity: 0 });
       out.evenControl = await flow();
     }
 
@@ -219,6 +240,48 @@ try {
         out.air.clearUnderPool = cy / w;
       }
     }
+    /*
+      6. A straight boundary, red on the left and blue on the right over about
+      five cells, Polarity (immiscibility) 0.3 or 0. The push on the red side,
+      summed across the band left of the boundary, row by row over the middle
+      of the plate, on the thin gap (the app's) and on the deep plate.
+    */
+    out.polar = {};
+    for (const thin of [1, 0]) for (const imm of [0.3, 0]) {
+      await lab.create(N, N);
+      const d = new Array(N * N * 4).fill(0);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const t = Math.min(1, Math.max(0, ((i + 0.5) / N - 0.5) / 0.04 + 0.5));
+        const k = (i + j * N) * 4;
+        d[k] = 1 - t; d[k + 2] = t; d[k + 3] = 1;
+      }
+      lab.addDye(d); lab.flush();
+      const over = thin ? { thinGap: 1, gapThickness: DEF, gapSpring: 0, immiscibility: imm } : { immiscibility: imm };
+      await lab.step(6, over);
+      const v = await lab.field('vel');
+      const rows = [];
+      for (let j = 0; j < N; j++) {
+        if (Math.abs((j + 0.5) / N - 0.5) > 0.3) continue;
+        let sum = 0;
+        for (let i = 0; i < N; i++) { const x = (i + 0.5) / N; if (x > 0.44 && x < 0.5) sum += v[(i + j * N) * 4]; }
+        rows.push(sum);
+      }
+      const mean = rows.reduce((a, b) => a + b, 0) / rows.length;
+      const sd = Math.sqrt(rows.reduce((a, b) => a + (b - mean) ** 2, 0) / rows.length);
+      out.polar[`${thin ? 'thin' : 'deep'}:${imm}`] = { mean, cv: sd / Math.max(Math.abs(mean), 1e-12), away: rows.filter((x) => x < 0).length, back: rows.filter((x) => x > 0).length, rows: rows.length };
+    }
+    /*
+      7. The same pool under Rain Drip 0.5 on a plate lying flat, tipped to a
+      half and standing on the wall (the wall's is out.drip[DEF] above, with
+      the same steps).
+    */
+    out.tilt = {};
+    for (const u of [0, 0.5]) {
+      await lab.create(N, N); await pool();
+      const mean = await meanDye();
+      await lab.step(30, { thinGap: 1, gapThickness: DEF, gapSpring: 0, drip: 0.5, plateUpright: u, meanDensity: mean });
+      out.tilt[u] = await flow();
+    }
     out.nuRatio = lab.thinGapViscosity(THICK) / lab.thinGapViscosity(DEF);
     return out;
   });
@@ -255,8 +318,8 @@ try {
       Math.abs(r.drip[0.45].my) < 0.03 * pool,
       `the plate's mean ${r.drip[0.45].my.toFixed(5)} against the pool's ${(-pool).toFixed(4)} (on the thin gap before, the plate slid at 110% of it)`);
     check('and an evenly coloured plate, nothing heavier than anything else, does not move; weighed against nothing it would slide',
-      r.even.mean > 0.9 && r.even.speed < 0.02 * pool && r.evenControl.speed > 0.5 * pool,
-      `mean speed ${r.even.speed.toFixed(5)} against the pool's ${pool.toFixed(4)}, the plate's colour ${r.even.mean.toFixed(3)}; the control (no mean taken) ${r.evenControl.speed.toFixed(4)}`);
+      r.even.mean > 0.9 && r.even.speed - r.evenBase.speed < 0.02 * pool && r.evenControl.speed > 0.5 * pool,
+      `mean speed ${r.even.speed.toFixed(5)} against ${r.evenBase.speed.toFixed(5)} with no Rain Drip (the tilt's own flow) and the pool's ${pool.toFixed(4)}, the plate's colour ${r.even.mean.toFixed(3)}; the control (no mean taken) ${r.evenControl.speed.toFixed(4)}`);
   }
   // 4.
   {
@@ -280,6 +343,23 @@ try {
       Math.abs(thick / ratio - 1) < 0.08,
       `${thick.toFixed(2)} times (${r.air.default.my.toFixed(5)} and ${r.air.thick.my.toFixed(5)})`);
   }
+// 6.
+{
+  const P = r.polar;
+  for (const kind of ['thin', 'deep']) {
+    const on = P[`${kind}:0.3`], off = P[`${kind}:0`];
+    check(`Polarity pushes unlike colours apart along the whole boundary, ${kind === 'thin' ? 'on the thin gap' : 'on the deep plate'}: no row pulls them together, the push the same to 25%`,
+      on.back === 0 && on.away === on.rows && on.cv < 0.25 && off.away === 0 && off.back === 0 && Math.abs(on.mean) > 1e-5,
+      `${on.away} of ${on.rows} rows push the red side away from the blue, ${on.back} toward it; the spread along the boundary ${on.cv.toFixed(2)} of the mean ${on.mean.toFixed(5)}; Polarity 0: ${off.away} and ${off.back} rows`);
+  }
+}
+// 7.
+{
+  const wall = Math.abs(r.drip[0.45].colourVy), flat = Math.abs(r.tilt[0].colourVy), half = Math.abs(r.tilt[0.5].colourVy);
+  check('Rain Drip is gravity along the plate: on a level plate a pool does not fall, tipped to a half it falls at about half its speed on the wall',
+    r.drip[0.45].colourVy < 0 && flat < 0.02 * wall && r.tilt[0.5].colourVy < 0 && half / wall > 0.4 && half / wall < 0.6,
+    `the pool falls ${wall.toFixed(4)} on the wall, ${half.toFixed(4)} at a half (${(half / wall).toFixed(2)}), ${flat.toFixed(5)} flat (${(flat / wall * 100).toFixed(1)}%); before, ${wall.toFixed(4)} at every tilt`);
+}
 } finally {
   await close();
 }

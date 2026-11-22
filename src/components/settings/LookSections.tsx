@@ -130,6 +130,15 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="edgeRelief"
         />
         <Slider
+          label="Crisp Edges"
+          value={settings.crispEdges ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ crispEdges: v })}
+          settingKey="crispEdges"
+        />
+        <Slider
           label="Projector Focus"
           value={settings.projectorFocus ?? 0.5}
           min={0}
@@ -702,6 +711,26 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
             />
             <Slider label="Side Angle" value={settings.sideLightAngle ?? 160} min={0} max={360} step={5} onChange={(v: number) => onUpdate({ sideLightAngle: v })}
               settingKey="sideLightAngle"
+            />
+          </>
+        )}
+        {/* Polarised light (PLAN 31p-1): a polariser under the plate and an
+            analyser at the lens; the liquid shows Michel-Levy colours where its
+            flow stretches it. The analyser and the liquid's strength while the
+            sheets are in. */}
+        <Slider label="Polarisers" value={settings.polariser ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ polariser: v })}
+          settingKey="polariser"
+        />
+        {(settings.polariser ?? 0) > 0.001 && (
+          <>
+            <Slider label="Analyser" value={settings.analyserAngle ?? 90} min={0} max={180} step={5} onChange={(v: number) => onUpdate({ analyserAngle: v })}
+              settingKey="analyserAngle"
+            />
+            <Slider label="Quarter Wave" value={settings.quarterWave ?? 1} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ quarterWave: v })}
+              settingKey="quarterWave"
+            />
+            <Slider label="Birefringence" value={settings.birefringence ?? 0.3} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ birefringence: v })}
+              settingKey="birefringence"
             />
           </>
         )}

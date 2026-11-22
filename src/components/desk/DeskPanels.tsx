@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
-import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
+import { ImagePlus, Palette, SlidersHorizontal, Video } from 'lucide-react';
+import { PicturePaletteButton } from '../PicturePaletteButton';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
-import { CartoonShelf } from '../CartoonShelf';
+import { VideoShelf } from '../VideoShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
@@ -18,7 +19,6 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
-import { closeupIn, closeupToggle } from '../../lib/macroLanding';
 import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
@@ -555,16 +555,13 @@ function RecipeBody({ p }: { p: DeskProps }) {
       )}
       {/* Pinned rather than at the end of a list that scrolls. */}
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
-        <Button
-          full height={32}
-          pressed={closeupIn(p.settings)}
-          title="The closeup camera, in among the drops (M). Lit while it is on."
-          onClick={() => p.onSetting(closeupToggle(p.settings))}
-          midiKey="action:macro-toggle"
-          testId="macro-button"
-        >
-          Close-up
-        </Button>
+        {/*
+          A Close-up button sat here, beside Randomise: one press to 4x and
+          one back to the plate. The owner asked for it gone (2026-11-14):
+          the Macro Zoom is the one way in and out, so there is one control
+          for the closeup and it always reads what the plate is doing
+          (PLAN QA-32c).
+        */}
         {/* Randomise replaces every setting at once, so it asks first. */}
         <Button
           full height={32}
@@ -721,6 +718,15 @@ function DyesBody({ p }: { p: DeskProps }) {
         </>,
         portalBody,
       )}
+      {p.onPicturePalette && (
+        <PicturePaletteButton
+          onFile={p.onPicturePalette}
+          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-60"
+          testId="picture-palette"
+        >
+          <Palette size={13} className="mr-1.5 inline" /> Palette from a picture or video…
+        </PicturePaletteButton>
+      )}
       <div className="flex gap-1.5">
         <button
           onClick={p.onImageDye}
@@ -737,10 +743,12 @@ function DyesBody({ p }: { p: DeskProps }) {
           <Video size={13} className="mr-1.5 inline" /> Pour a video…
         </button>
       </div>
-      {p.cartoons && (
+      {/* The video loaded (PLAN 14ag), from Pour a video… here or Video file
+          in the Video panel: one row, Play and Pour, either or both. */}
+      {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Cartoons</span>
-          <CartoonShelf {...p.cartoons} />
+          <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
         </div>
       )}
     </div>

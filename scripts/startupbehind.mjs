@@ -38,6 +38,8 @@
  * (BEHIND_PACE_MAX, below), so a half that slows is red there and not hidden
  * by the wait.
  */
+
+export { asOldWay } from './startuplean.mjs';
 export const BEHIND_START_MS = 45_000;
 export const BEHIND_SLACK_MS = 5_000;
 export const BEHIND_MAX_MS = 180_000;

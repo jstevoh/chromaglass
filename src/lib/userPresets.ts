@@ -14,6 +14,7 @@ import { PALETTE } from '../constants';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { sanitizePatch } from './sanitizeSettings.ts';
 import { withStirCordOnce } from './stir.ts';
+import { withMusicCordsOnce } from './musicCords.ts';
 import type { ShowSequence, ShowStage } from './sequencer';
 import { parseSongRef, type SongRef } from './songRef';
 import { PACE_MOMENTS, type PaceMoment, type StagePace } from './scenePacing';
@@ -37,7 +38,6 @@ export const USER_PRESETS_KEY = 'chromaglass-user-presets';
   from version 2 on keeps whatever it was saved with, off included, since
   off was then a choice.
 */
-export const PRESET_VERSION = 3;
 /*
   And 3 since the music stirs the liquid only through a cord (PLAN 38u-5,
   the owner's pick of 2026-11-13; this is 38u-16).
@@ -52,6 +52,18 @@ export const PRESET_VERSION = 3;
   the cord is one the owner pulled it out of. The version is written as the
   look is read, so the cord is asked for once and not every time.
 */
+/*
+  And 4 since the music reaches the plate only through cords (PLAN 38v-1; 3 is
+  38u-16's, the music's stir). Until then the frame loop played every look
+  with hands of its own (a pulse, a press, a bloom on each kick, a stream and
+  a swell); now each look carries them as cords, and a look saved before has
+  none, so it came back still to the music. Read before version 4, a saved
+  look gains the cords its own wiring and Sound Drive call for (lib/musicCords.ts
+  `withMusicCordsOnce`); from 4 on it keeps what it was saved with, none
+  included, since by then a look without them is one the owner pulled them
+  out of.
+*/
+export const PRESET_VERSION = 4;
 
 export interface UserPreset {
   format: typeof PRESET_FORMAT;
@@ -100,7 +112,14 @@ export function makeUserPreset(
     name: name.trim() || 'Untitled preset',
     description: description.trim() || undefined,
     createdAt: new Date().toISOString(),
-    settings: cleanSettings(settings),
+    /*
+      Saved as it is drawn: the frame reads the Macro Zoom alone (PLAN QA-32c),
+      and a zoom set from the remote or a fader arrives without the flag, so
+      the flag is written from the zoom here. Left as it stood, cleanSettings'
+      rule for looks saved before the zoom was the control (flag off, zoom
+      back to 1) put a closeup saved at 3x back at the plate.
+    */
+    settings: cleanSettings({ ...settings, macroMode: (settings.macroZoom ?? 1) > 1.05 }),
     contract: contract && contract.length ? [...contract] : undefined,
     injectStyles: injectStyles && injectStyles.length ? [...injectStyles] : undefined,
     liquids: liquids && liquids.length ? [...liquids] : undefined,
@@ -145,14 +164,16 @@ export function upgradeSaved(p: UserPreset): UserPreset {
 /**
  * A saved look's settings as this version plays them, from the version it
  * was saved at (PRESET_VERSION says why each step): Thin Gap on if it was
- * off only as the old default, and the music's stir cord if it was saved
- * before there was one. A look saved at this version comes back untouched.
+ * off only as the old default, the music's stir cord if it was saved
+ * before there was one (3), and the music's other cords likewise (4). A
+ * look saved at this version comes back untouched.
  */
 function readAsNow(version: unknown, settings: VisualizerSettings): VisualizerSettings {
   const v = Number(version);
   let s = settings;
   if (!(v >= 2) && s?.thinGap === 0) s = { ...s, thinGap: 1 };
   if (!(v >= 3) && s && typeof s === 'object') s = withStirCordOnce(s, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
+  if (!(v >= 4) && s && typeof s === 'object') s = withMusicCordsOnce(s);
   return s;
 }
 
@@ -163,7 +184,7 @@ export function parsePresetFile(text: string): UserPreset {
   if (!o || typeof o !== 'object' || o.format !== PRESET_FORMAT) throw new Error('That is not a ChromaGlass preset file.');
   if (!o.settings || typeof o.settings !== 'object') throw new Error('The preset file has no settings block.');
   const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim() : 'Untitled preset';
-  // Thin Gap off as the old default, and no stir cord because there was none (PRESET_VERSION says why).
+  // Thin Gap off as the old default, and no stir cord or music cords because there were none (PRESET_VERSION says why).
   const settings = readAsNow(o.version, cleanSettings(o.settings));
   return {
     format: PRESET_FORMAT,

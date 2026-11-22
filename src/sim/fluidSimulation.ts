@@ -14,7 +14,7 @@
  * GPU side alone. What it reads from the rest of `src/sim/` is the grid and
  * the solver's constants (`constants.ts`) and the step (`stepping.ts`).
  */
-import { layFinger } from '../lib/handSolid';
+import { layFinger, handEdge } from '../lib/handSolid';
 import { layBreath, holdBreath, breatheHeld, type HeldBreath } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH } from '../lib/handCarry';
 import { VisualizerSettings } from '../types';
@@ -38,7 +38,7 @@ import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
-import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
+import { RhythmSheet } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, BassPress, type Presser, type Stroke } from '../lib/squish';
 import { type Phrase } from '../lib/phrasing';
 import { stream, type Rng } from '../lib/rng';
@@ -46,8 +46,11 @@ import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
-import { SIM_STEP, stepCurrentCpu } from './stepping';
+import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
+import { layDrop, stepPlateDrops } from './dropSplash';
+import { SolverSeeds, takeBack, addShare, scaleSince } from './solverLay';
+import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
 
@@ -129,6 +132,7 @@ export class FluidSimulation {
   sparseDarkLook = false;
   /** Everything `addDensity` has been given, summed, so a frame's hand can be told from the music's. */
   private laidMass = 0;
+  private readonly seeds = new SolverSeeds();
   private handMarkMass = 0;
   /**
    * Dye a hand has laid on a seeded plate, as a mean over the dish, that the
@@ -152,6 +156,8 @@ export class FluidSimulation {
   /** How far a dropped liquid falls, 0–1 (set each frame from Drop Height), and the plate's Fingering for its splash. */
   dropHeight = 0;
   dropFingering = 0;
+  /** The colour drops on their way in (PLAN 18c-2, lib/dropImpact.ts), drained a step at a time. */
+  readonly drops = makeDropQueue();
   /** The rock as the frame loop set it (not a tilt), and its gain past real (rockPast,
    PLAN 38r-9). */
   rockX = 0; rockY = 0; rockGain = 1;
@@ -486,7 +492,7 @@ export class FluidSimulation {
       soap for what it already does pays nothing for the passes that would
       move it.
     */
-    this.liquid.onDeposit = (cx, cy, radius, what, amount, seconds) => {
+    this.liquid.onDeposit = (cx, cy, radius, what, amount, seconds, push) => {
       const g = this.gpu;
       const s = this.lastSettings;
       if (!g || !s || amount <= 0) return;
@@ -524,7 +530,7 @@ export class FluidSimulation {
         Only on a thin gap: the old plate has no volume to push and no
         viscosity a cell to give it.
       */
-      if (this.thinGap && g.pour) {
+      if (this.thinGap && g.pour && push !== false) {
         const L = this.size;
         const r = Math.max(1.5, radius) / L;
         g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds, g.coverMetres), speciesOf(what), true, what);
@@ -1336,14 +1342,8 @@ export class FluidSimulation {
    */
   captureSeed(lay: () => void): Float32Array[] {
     const arrays = [this.density, this.densityR, this.densityG, this.densityB];
-    const before = arrays.map(a => a.slice());
-    lay();
-    const delta = arrays.map((a, c) => {
-      const d = new Float32Array(a.length);
-      for (let i = 0; i < a.length; i++) d[i] = a[i] - before[c][i];
-      a.set(before[c]);
-      return d;
-    });
+    const before = arrays.map(a => a.slice()), onSolver = this.seeds.capture(lay), delta = takeBack(arrays, before);
+    this.seeds.keep(delta, onSolver);
     this.dirty = true;
     return delta;
   }
@@ -1351,11 +1351,8 @@ export class FluidSimulation {
   /** Add `k` of a captured seed (see `captureSeed`) to the plate. */
   addSeedShare(seed: Float32Array[], k: number): void {
     if (!(k > 0)) return;
-    const arrays = [this.density, this.densityR, this.densityG, this.densityB];
-    for (let c = 0; c < 4; c++) {
-      const a = arrays[c], d = seed[c];
-      for (let i = 0; i < a.length; i++) a[i] += d[i] * k;
-    }
+    this.seeds.share(seed, this.gpu, k);
+    addShare([this.density, this.densityR, this.densityG, this.densityB], seed, k);
     this.dirty = true;
   }
 
@@ -1367,12 +1364,8 @@ export class FluidSimulation {
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
     const k = c01(w);
     const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
-    const harmony = this.seedPreset(presetId, noise2D);
-    const now = [this.density, this.densityR, this.densityG, this.densityB];
-    for (let c = 0; c < 4; c++) {
-      const a = now[c], b = before[c];
-      for (let i = 0; i < a.length; i++) a[i] = b[i] + (a[i] - b[i]) * k;
-    }
+    const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
+    scaleSince([this.density, this.densityR, this.densityG, this.densityB], before, k);
     this.dirty = true;
     return harmony;
   }
@@ -1484,24 +1477,6 @@ export class FluidSimulation {
         this.splatBlob(cx - 18 * k, cy + 10 * k, 24, 1.0, col(0).r, col(0).g, col(0).b);
         this.splatBlob(cx + 22 * k, cy - 14 * k, 20, 1.0, col(1).r, col(1).g, col(1).b);
         this.splatBlob(cx + 4 * k, cy + 30 * k, 14, 0.9, col(2).r, col(2).g, col(2).b);
-        break;
-      }
-
-      case 'classic': {
-        /*
-          Luminous, not thick, and on the screen, with open dark glass around
-          the pools (PLAN 28i-2).
-        */
-        const blobs: [number, number, number][] = [[0.5, 0.5, 8.5]];
-        for (let i = 0; i < 6; i++) {
-          const a = i * Math.PI / 3 + 0.3;
-          blobs.push([0.5 + Math.cos(a) * 0.18, 0.5 + Math.sin(a) * 0.14, 7.5 + (i % 2) * 1.5]);
-        }
-        blobs.push([0.24, 0.24, 10], [0.76, 0.24, 10], [0.24, 0.76, 10], [0.76, 0.76, 10]);
-        blobs.forEach(([fx, fy, rad], idx) => {
-          const c = col(idx);
-          this.splatBlob(fx * S, fy * S, rad, 0.85, c.r, c.g, c.b);
-        });
         break;
       }
 
@@ -1951,17 +1926,23 @@ export class FluidSimulation {
       }
 
       case 'clock-glass':
-      case 'splodascope': {
+      case 'splodascope':
+      case 'classic': {
         /*
           Coloured water and oil that will not mix, each body of oil laid with
           one of the other dyes as its own colour (src/lib/oilLay.ts, and why;
           layCrowd). With Oil Bodies on (the look's) each body keeps its colour
-          while it moves; Splodascope's Film Hold keeps its crowd apart where
-          they touch. The oil is laid only where the solver is there to take
-          it; before it is, the colours still land, as spots in the water.
+          while it moves; Splodascope's and Classic's Film Hold keeps their
+          crowds apart where they touch. The oil is laid only where the solver
+          is there to take it; before it is, the colours still land, as spots
+          in the water. Classic was eleven soft pools of dye on black glass
+          until PLAN 38w-1, which is what the 1960s dish is not: classicDiscs
+          says what the references show instead.
         */
         const water = col(0);
-        layCrowd(look === 'clock-glass' ? look : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
+        const g = presetId === 'classic' && this.seeds.lay(this.gpu, S, this.rng.float, harmony.length, col, this.dishArea);
+        if (g) { this.laidMass += g; break; }
+        layCrowd(presetId === 'clock-glass' || presetId === 'classic' ? presetId : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
           (x, y, d) => this.addDensity(x, y, d, water.r, water.g, water.b),
           (x, y, d, dye) => { const c = col(dye); this.addOilDensity(x, y, d, c.r, c.g, c.b); });
         break;
@@ -2045,7 +2026,7 @@ export class FluidSimulation {
       }
     }
 
-    this.seedMean = Math.max(0, dishSum() - beforeMean);
+    this.seedMean = Math.max(0, dishSum() - beforeMean + this.seeds.took());
     this.seedBudget = findPreset(look)?.settings.dyeBudget ?? 0.85;
     return harmony;
   }
@@ -2163,10 +2144,7 @@ export class FluidSimulation {
       */
       const radius = Math.round(radii[0] * GRID_SCALE);
       this.pressLift.press('kick', x, y, radius, amount, fingering, showNow());
-      this.sheet.setLiquid(nu);
-      // No deeper than the dome's rest under it (kickRoom): where the glasses touch, a kick presses nothing.
-      const u = (x + 0.5) / this.size, v = (y + 0.5) / this.size;
-      this.sheet.pressVolume(u, v, stampedVolume(amount, radii[0] / 128), radii[0] / 128, KICK_HOLD, kickRoom(u, v, curve));
+      pressSheetKick(this.sheet, this.size, x, y, amount, radii[0], nu, curve, this.gpu.coverMetres);
     } else {
       radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
       this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
@@ -2346,7 +2324,7 @@ export class FluidSimulation {
     if (this.gpu && this.thinGap && !ferroUnasked) {
       const m = moved ?? { x: dx, y: dy };
       if (!this.hands) this.hands = new Float32Array(GRID_AREA * 4);
-      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y) > 0) { this.rows.disc(y, r); this.handsLaid = true; }
+      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y, handEdge(this.size, this.gpu.coverMetres)) > 0) { this.rows.disc(y, r); this.handsLaid = true; }
       this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
       return;
     }
@@ -2558,9 +2536,10 @@ export class FluidSimulation {
   /*
     `dye`, the share of `amount` that is colour, in every style: 0 for a clear
     liquid (lib/liquidColour.ts) or the music on a reagent (PLAN 25i-10). A
-    clear drop still splashes; only what it lays is scaled.
+    clear drop still splashes; only what it lays is scaled. `volume` false for
+    a drop with no liquid of its own (a fresh plate's lay; sim/dropSplash.ts).
   */
-  autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1) {
+  autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1, volume = true) {
     const S = this.size;
     const k = GRID_SCALE;
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -2640,83 +2619,9 @@ export class FluidSimulation {
         }
         break;
       }
-      default: { // drop
-        // How hard it lands: the height it fell from, times how big a drop it
-        // is — so a real drop from the dropper or the bench splashes, and the
-        // faint pulse the music lays down on every frame (which also takes this
-        // shape) does not.
-        const h = Math.max(0, Math.min(2, this.dropHeight));
-        // Impact grows as the square root of the height (the speed a fall
-        // reaches does), so the middle of the slider already splashes.
-        const e = Math.sqrt(h) * Math.min(1.5, amount / 5);
-        // A drop from higher spreads thinner as it lands: a wider disc, the
-        // same dye.
-        const spread = 1 + 0.6 * e;
-        const dropR = Math.round(3 * k * spread);
-        const thin = 1 / (spread * spread);
-        for (let ddy = -dropR; ddy <= dropR; ddy++)
-          for (let ddx = -dropR; ddx <= dropR; ddx++) {
-            const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-            if (dd > dropR) continue;
-            const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
-            this.addDensity(nx, ny, amount * dye * thin * Math.pow(1 - dd / dropR, 2), r, g, b);
-          }
-        if (e > 0.02) this.splash(x, y, dropR, h, e, amount * dye, r, g, b);
+      default: // drop (PLAN 18c-2, 18c-3): sim/dropSplash.ts
+        layDrop(this, x, y, amount, r, g, b, dye, volume);
         break;
-      }
-    }
-  }
-
-  /*
-    A drop landing from a height: what liquid falling into liquid does between
-    two plates of glass.
-
-    - It presses the film. The impact is a squeeze pulse under the drop — the
-      same machinery as the beat squeeze and the Press tool — which drives the
-      liquid out in a ring and, with Fingering up, breaks the ring into fingers.
-    - The crown pushes outward: a ring-shaped kick just outside the drop, the
-      liquid it displaced shoving its neighbours.
-    - It throws satellites: droplets of its own dye flung clear of the impact,
-      more of them and further out the higher it fell.
-
-    `e` is the impact (height × drop size); `h` the height alone, which sets
-    how far things are thrown.
-  */
-  private splash(x: number, y: number, dropR: number, h: number, e: number, amount: number, r: number, g: number, b: number) {
-    const S = this.size;
-    const k = GRID_SCALE;
-    const inside = (px: number, py: number) => px >= 2 && px < S - 2 && py >= 2 && py < S - 2;
-    this.applySquish(x, y, (dropR / k) * (1.6 + 1.8 * h), 0.0012 * e, this.dropFingering, true, 'splash');
-
-    const r0 = dropR * 0.6, r1 = dropR * (2 + 3 * h);
-    const R = Math.ceil(r1);
-    for (let j = -R; j <= R; j += 2) {
-      for (let i = -R; i <= R; i += 2) {
-        const d = Math.sqrt(i * i + j * j);
-        if (d < r0 || d > r1) continue;
-        const px = x + i, py = y + j;
-        if (!inside(px, py)) continue;
-        const f = 0.9 * e * Math.sin(Math.PI * (d - r0) / (r1 - r0));
-        this.addVelocity(px, py, (i / d) * f, (j / d) * f);
-      }
-    }
-
-    const n = Math.round(e * 7 * (0.6 + this.rng.float() * 0.8));
-    for (let q = 0; q < n; q++) {
-      const a = this.rng.angle();
-      const dist = dropR * (1.4 + (1 + 5 * h) * this.rng.float());
-      const px = Math.round(x + Math.cos(a) * dist), py = Math.round(y + Math.sin(a) * dist);
-      if (!inside(px, py)) continue;
-      const sr = Math.max(1, Math.round((0.8 + this.rng.float() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
-      for (let dy = -sr; dy <= sr; dy++) {
-        for (let dx = -sr; dx <= sr; dx++) {
-          const dd = Math.sqrt(dx * dx + dy * dy);
-          if (dd > sr || !inside(px + dx, py + dy)) continue;
-          this.addDensity(px + dx, py + dy, amount * 0.22 * (1 - dd / sr), r, g, b);
-        }
-      }
-      const kick = (0.25 + 0.5 * h) * Math.min(1, e);
-      this.addVelocity(px, py, Math.cos(a) * kick, Math.sin(a) * kick);
     }
   }
 
@@ -2840,6 +2745,7 @@ export class FluidSimulation {
     this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
 
     if (this.gpu) {
+      if (dropsLive(this.drops)) stepPlateDrops(this);
       const applied = this.dirty || this.foldDue;
       if (applied) this.flushDeltas(p.dt);
       this.stepSlosh(settings, p);
@@ -2871,13 +2777,14 @@ export class FluidSimulation {
     this.applyCurlTurbulence(p.turbScale, p.turbDetail, time, noise2D);
 
     // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
-    this.applyImmiscibility(p.immiscibility, time, noise2D);
+    this.applyImmiscibility(p.immiscibility);
 
     // 8. Vibration — only when explicitly cranked up
     if (p.vibIntensity > 0) this.applyVibration(p.vibIntensity, p.vibFrequency, time);
 
     // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
-    if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
+    const tipped = Math.max(0, Math.min(1, p.plateUpright ?? 0)); // gravity along the plate, 38u-12
+    if (p.drip * tipped > 0) this.applyDripping(p.drip * tipped, dt, time, noise2D);
     if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D);
     if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
 
@@ -2988,7 +2895,7 @@ export class FluidSimulation {
     };
   }
 
-  /** The slosh dish: what drives it this frame (lib/slosh.ts SloshDrive says what, and why). */
+  /** The slosh dish: what drives it (lib/slosh.ts SloshDrive says why). */
   private stepSlosh(settings: VisualizerSettings, p: GpuStepParams) {
     const gpu = this.gpu;
     if (!gpu) return;
@@ -2998,7 +2905,7 @@ export class FluidSimulation {
       if (this.sloshClock.live) gpu.setSlosh(null);
       this.sloshClock.stop();
       this.dishKicks.length = 0;
-      this.sloshSpin.read(this.dishSpin, 0);
+      this.sloshSpin.read(this.dishSpin, 0, 0);
       return;
     }
     const [hx, hy] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);
@@ -3013,7 +2920,7 @@ export class FluidSimulation {
     }
     this.dishKicks = this.dishKicks.filter((k) => k.t < KICK_HOLD + KICK_RELEASE + dt);
     const r = sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
-    const sp = this.sloshSpin.read(this.dishSpin, dt);
+    const sp = this.sloshSpin.read(this.dishSpin, dt, r);
     const driven = ax !== 0 || ay !== 0 || presses.some((q) => q.depth > 0) || sp.wakes;
     const tick = this.sloshClock.tick(dt, driven, r);
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, spin: sp.spin, spinRate: sp.rate } : null);
@@ -3468,7 +3375,7 @@ export class FluidSimulation {
     }
   }
 
-  private applyImmiscibility(immiscibility: number, time: number, noise2D: (x: number, y: number) => number) {
+  private applyImmiscibility(immiscibility: number) {
     const strength = immiscibility * 0.8;
     const sharpness = 2.0;
     for (let j = 1; j < this.size - 1; j++) {
@@ -3517,10 +3424,8 @@ export class FluidSimulation {
           colorDiffY = diffT ** sharpness - diffB ** sharpness;
         }
 
-        const n = noise2D(i * 0.03, j * 0.03 + time * 0.05);
-        const noiseMod = 1.0 + n * 2.0;
-        this.vx[idx] -= colorDiffX * strength * d * noiseMod;
-        this.vy[idx] -= colorDiffY * strength * d * noiseMod;
+        this.vx[idx] -= colorDiffX * strength * d;
+        this.vy[idx] -= colorDiffY * strength * d;
       }
     }
   }

@@ -81,7 +81,11 @@ const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message
     since.settings.thinGap === 0 && sinceOn.settings.thinGap === 1, `${since.settings.thinGap}, ${sinceOn.settings.thinGap}`);
   const again = parsePresetFile(serializePreset(old));
   check('and an old look read once is saved as the new version, so reading it again changes nothing',
-    old.version === PRESET_VERSION && again.version === PRESET_VERSION && again.settings.thinGap === 1);
+    // "The new version" is whatever the reader writes now, not the 2 that Thin
+    // Gap's fix introduced: 38v-1's music cords made it 4, and a literal here
+    // would fail every later bump while the reading it guards is unchanged.
+    old.version === PRESET_VERSION && again.version === PRESET_VERSION && again.settings.thinGap === 1
+      && JSON.stringify(again.settings) === JSON.stringify(old.settings), `version ${old.version}/${again.version} of ${PRESET_VERSION}`);
   // And arriving inside a set list, which takes a saved look whole rather than through the file reader.
   const inSet = (version) => readSetListFile(JSON.stringify({ format: 'chromaglass-setlist', version: 1, items: [{ saved: base.id }],
     presets: [{ ...base, version, settings: { ...DEFAULT_SETTINGS, thinGap: 0 } }] }), known).presets[0];

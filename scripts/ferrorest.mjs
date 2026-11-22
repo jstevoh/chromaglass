@@ -39,9 +39,24 @@
  *     cell of its settled position and within a cell of (0.36, 0.5).
  *  5. The loss slows: a second window, steps 200 to 380, loses at most half
  *     the half-full cells the first (20 to 200) did, or at most 3.
+ *  6. A stretched body rounds in seconds, not in steps (PLAN 9ae, owed):
+ *     the same stretched ferrofluid body on the thin gap, rounded for 2 s at
+ *     60 steps a second and at 30 (the governor's two rates), and at 256²
+ *     and 384², ends with the same aspect ratio within 5%, and its rounding
+ *     time is the Hele-Shaw law's for the liquids' own data, within a factor
+ *     of 1.5. See the line's comment for the law.
+ *
+ *   npm run ferrorest -- --owed=9ae
+ *
+ * Each line under an id in `--owed` is printed as owed while what it asks
+ * for is absent (the convention of `npm run gap`): the PR that builds the
+ * item takes its id out of `--owed` in scripts/checks.json and never edits
+ * a line or a bar. A build that is there and misses is red, owed or not,
+ * and an owed line that passes is red until its id is taken out.
  *
  * Lab only (software WebGPU in headless Chrome, or Metal on the Mac).
  */
+import { build } from 'esbuild';
 import { openLab } from './lab.mjs';
 
 const checks = [];
@@ -49,6 +64,36 @@ const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
+const IDS = ['9ae'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknown = [...owed].filter((id) => !IDS.includes(id));
+if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+/** `mainState`: what the line is owed for is absent, which is the only state an owed line is excused in. */
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
+
+/*
+  The liquids' data for line 6, from the solver's own constants (bundled, as
+  `npm run gap` does, since the solver's files import without extensions).
+*/
+const libOut = 'node_modules/.cache/ferrorest-lib.mjs';
+await build({
+  stdin: {
+    contents: [
+      "export { DISH_METRES, DISH_GAP_METRES, thicknessViscosity } from './src/lib/turntable.ts';",
+      "export { FERRO_NU, THIN_GAP_THICKNESS, LIQUID_DENSITY } from './src/gpu/fluid/constants.ts';",
+      "export { FERRO_DENSITY, WATER_DENSITY, SPIKE_PITCH } from './src/gpu/wgsl/spikes.ts';",
+    ].join('\n'),
+    resolveDir: process.cwd(), loader: 'ts',
+  },
+  bundle: true, format: 'esm', platform: 'node', outfile: libOut, logLevel: 'error',
+});
+const LIB = await import(`${process.cwd()}/${libOut}`);
 
 const N = 384;
 const R = 0.022; // drop radius, ~4.4 mm on 20 cm dish
@@ -123,7 +168,56 @@ try {
     }
     const s2 = await getStats();
 
-    return { sInit, s0, s1, s2 };
+    /*
+      6. Rounding in seconds (PLAN 9ae). A stadium of ferrofluid (discs of
+      radius RS along x from -S to +S, each saturated, so their union is
+      full inside and the edge is the solver's own after the settle) on the
+      thin gap, rounded for TWO seconds of the app's clock in three arms:
+      256² at 60 steps a second (120 steps of dt 0.004, magnetSeconds 1/60,
+      the lab's own step), 256² at 30 (60 steps of twice the dt and
+      magnetSeconds 1/30: what the governor hands the solver at 30 steps a
+      second, fluidSimulation.ts's wantDt and magnetSeconds both ∝ the
+      step's seconds), and 384² at 60. The aspect ratio is the square root
+      of the ratio of the body's second moments (exact for an ellipse).
+    */
+    const aspectOf = async (n) => {
+      const p = await lab.phase();
+      if (!p || p.n !== n) throw new Error(`phase: ${p ? `${p.n}² read for ${n}²` : 'no phase field'}`);
+      let w = 0, mx = 0, my = 0;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const c = p.data[j * n + i]; if (c < 0.05) continue;
+        w += c; mx += c * (i + 0.5) / n; my += c * (j + 0.5) / n;
+      }
+      mx /= w; my /= w;
+      let xx = 0, yy = 0, xy = 0;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const c = p.data[j * n + i]; if (c < 0.05) continue;
+        const dx = (i + 0.5) / n - mx, dy = (j + 0.5) / n - my;
+        xx += c * dx * dx; yy += c * dy * dy; xy += c * dx * dy;
+      }
+      const tr = xx + yy, det = xx * yy - xy * xy, root = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+      const l1 = tr / 2 + root, l2 = Math.max(1e-12, tr / 2 - root);
+      // The area of the body (Σc, plate widths²) for its equivalent radius.
+      let sum = 0; for (const c of p.data) sum += c;
+      return { aspect: Math.sqrt(l1 / l2), area: sum / (n * n) };
+    };
+    const RS = 0.03, S = 0.015;
+    const arm = async (n, rate) => {
+      await lab.create(n, n);
+      for (let x = -S; x <= S + 1e-9; x += 0.0025) lab.addPhase(0.5 + x, 0.5, RS, 20);
+      const per = { ...opts, dt: 0.004 * 60 / rate, magnetSeconds: 1 / rate };
+      // Settle the edge first: 10 of the lab's steps, the same in every arm, so 0 s is the same body.
+      for (let k = 0; k < 10; k++) await lab.step(1, opts);
+      const a0 = await aspectOf(n);
+      for (let k = 0; k < 2 * rate; k++) await lab.step(1, per);
+      const a2 = await aspectOf(n);
+      return { a0, a2 };
+    };
+    const r60 = await arm(256, 60);
+    const r30 = await arm(256, 30);
+    const r384 = await arm(384, 60);
+
+    return { sInit, s0, s1, s2, r60, r30, r384 };
   }, { N, R });
 
   const { sInit, s0, s1, s2 } = result;
@@ -178,6 +272,80 @@ try {
     moved < 0.5 / N && Math.abs(s0.cx - 0.36) < 1 / N && Math.abs(s1.cx - 0.36) < 1 / N && Math.abs(s1.cy - 0.5) < 1 / N && s1.halfCount > 0,
     `moved ${(moved * N).toFixed(3)} cells (${moved.toFixed(6)} plate widths, bar < 0.5 cells) at (${s1.cx.toFixed(4)}, ${s1.cy.toFixed(4)})`,
   );
+
+  /*
+    6. Rounding in seconds (PLAN 9ae).
+
+    The law. A drop between two glasses a gap b apart moves as Darcy flow,
+    u = −(b²/12μ)∇p, in itself and in the liquid around it, and the jump in
+    pressure across its edge is σ times the edge's curvature in the plane.
+    For a drop of radius R with an edge r = R(1 + ε cos nθ), solving the two
+    Laplace problems for the pressure and matching the edge's speed to the
+    flow on both sides (Paterson 1981, a drop with no injection) gives
+      dε/dt = −n(n² − 1) b²σ ε / (12 R³ (μ_in + μ_out)),
+    so the stretch, mode 2, decays as exp(−t/τ₂) with
+      τ₂ = 2 (μ_in + μ_out) R³ / (b² σ),
+    the item's scale 12μR³/(b²σ) over n(n² − 1) = 6. The data are the
+    solver's own: b the 2 mm gap (DISH_GAP_METRES), μ_in the ferrofluid's
+    FERRO_NU at FERRO_DENSITY (6 mPa·s), μ_out the clear liquid's at the
+    thin gap's default Thickness (thicknessViscosity at THIN_GAP_THICKNESS,
+    22 mm²/s, at LIQUID_DENSITY), and σ from the spike pitch the solver
+    draws: Rosensweig's spikes stand 2π l_c apart with l_c = √(σ/(Δρ g)),
+    so σ = (FERRO_DENSITY − WATER_DENSITY) g l_c², about 3.3 mN/m, the
+    tension the spikes already assume. R is the body's equivalent radius,
+    √(area/π) in metres, as the solver laid it.
+
+    The measure. With A the aspect ratio, ε = (A − 1)/(A + 1) for a small
+    ellipse-like stretch, and over the two seconds τ = 2 s / ln(ε₀/ε₂).
+
+    The bars. The item's own: the aspect after 2 s is the same within 5% at
+    60 and at 30 steps a second, and at 256² and at 384². And the rounding
+    time at 256² and 60 steps a second is τ₂ within a factor of 1.5 either
+    way (the stadium is not a small stretch, and the solver's edge is a few
+    cells wide). Without that last bar a body that never rounds, or rounds
+    at once, ends with the same aspect in every arm and would pass; with it
+    only a rounding paced by seconds and by the plate's metres, at the
+    liquids' rate, passes. A build that makes the 30-step arm take twice the
+    substeps matches the steps but not the law's time; one that tunes a
+    constant at 256² misses at 384²; neither looks wrong in a picture.
+
+    Why the arms are compared by their rounding time and not their end
+    aspect: the 384² body settles to a different start (an aspect of 1.48
+    against 256²'s 1.36 after the same ten steps, measured on main
+    2026-11-21: the finer grid's interface sharpens to a different width), so
+    end aspects 5% apart would be red on a perfect build. τ, from each arm's
+    own start, is what the item means by the same rounding.
+
+    mainState: the rounding is per step or per cell, which is main's. The
+    decay ln(ε₀/ε₂) over the 2 s at 60 steps a second at 256² is more than
+    1.25 times the one at 30, or the one at 384². Main measured 1.46 against
+    30 steps and 2.4 against 384² (the flow's own capillary rounding is in
+    seconds, so the per-step mobility's share does not show as the full 2x).
+    A build that paces the steps and the cells but misses the law is not
+    excused.
+  */
+  {
+    const { r60, r30, r384 } = result;
+    const g = 9.81;
+    const lc = (LIB.SPIKE_PITCH * LIB.DISH_METRES) / (2 * Math.PI);
+    const sigma = (LIB.FERRO_DENSITY - LIB.WATER_DENSITY) * g * lc * lc;
+    const muIn = LIB.FERRO_NU * LIB.FERRO_DENSITY;
+    const muOut = LIB.thicknessViscosity(LIB.THIN_GAP_THICKNESS) * LIB.LIQUID_DENSITY;
+    const b = LIB.DISH_GAP_METRES;
+    const Req = Math.sqrt(r60.a0.area / Math.PI) * LIB.DISH_METRES;
+    const tauLaw = (2 * (muIn + muOut) * Req ** 3) / (b * b * sigma);
+    const eps = (A) => (A - 1) / (A + 1);
+    const decay = (r) => Math.log(eps(r.a0.aspect) / Math.max(1e-6, eps(r.a2.aspect)));
+    const tau = (r) => (decay(r) > 0 ? 2 / decay(r) : Infinity);
+    const rate = Math.abs(r30.a2.aspect / r60.a2.aspect - 1);
+    const lawRatio = tau(r60) / tauLaw;
+    const same0 = Math.abs(r30.a0.aspect / r60.a0.aspect - 1) < 0.02;
+    const gridTau = Math.abs(tau(r384) / tau(r60) - 1);
+    line('9ae', 'a stretched ferrofluid body rounds in seconds: its aspect after 2 s is the same within 5% at 60 and 30 steps a second, its rounding time the same within 10% at 256² and 384², on the Hele-Shaw time 2(μ_in+μ_out)R³/(b²σ) within ×1.5',
+      same0 && rate < 0.05 && gridTau < 0.1 && lawRatio > 1 / 1.5 && lawRatio < 1.5,
+      `aspect ${r60.a0.aspect.toFixed(3)} → ${r60.a2.aspect.toFixed(3)} at 256²/60, ${r30.a0.aspect.toFixed(3)} → ${r30.a2.aspect.toFixed(3)} at 256²/30 (${(rate * 100).toFixed(1)}% apart), ${r384.a0.aspect.toFixed(3)} → ${r384.a2.aspect.toFixed(3)} at 384²/60 (τ ${(gridTau * 100).toFixed(1)}% apart); τ ${tau(r60).toFixed(2)} s at 256²/60, ${tau(r30).toFixed(2)} s at 30, ${tau(r384).toFixed(2)} s at 384², the law's ${tauLaw.toFixed(2)} s (R ${(Req * 1000).toFixed(1)} mm, σ ${(sigma * 1000).toFixed(2)} mN/m, μ ${(muIn * 1000).toFixed(1)} + ${(muOut * 1000).toFixed(1)} mPa·s, b ${(b * 1000).toFixed(1)} mm)`,
+      decay(r30) > 0 && decay(r384) > 0 && (decay(r60) > 1.25 * decay(r30) || decay(r60) > 1.25 * decay(r384)));
+  }
 } finally {
   await close();
 }
