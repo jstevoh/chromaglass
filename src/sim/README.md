@@ -13,7 +13,7 @@ the component.
   `dropGpu`, `syncFromGpu`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
-- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom, Turing's rates, the currents.
+- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom (`macroZoomOf`, the Macro Zoom alone since PLAN QA-32c: `macroMode` no longer floors it at 4x; `MACRO_PRESET_ZOOM`, what a flag-only saved look or stage is given), Turing's rates, the currents.
 
 ## Contracts
 

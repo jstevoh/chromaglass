@@ -107,3 +107,7 @@ and a stream held on the plate, lay their colour with their own volume; story in
 - ~~**18c-2**~~ The colour's own drops as volume. Shipped (see above).
 - ~~**18c-9**~~ The drop's entry over its capillary time τ = √(ρD³/σ). Shipped (see above).
 - ~~**18c-10**~~ A hand's drop and a held stream lay their colour with their volume. Shipped (see above).
+
+## 18e. Edges come from refraction (replaces the painted rims and highlights)
+
+- ~~**18e-7**~~ #881 The closeup's relief reads the optical path at the lens's disc (`camLap`), not the colour step: no line where two dyes meet up close, the dial moves nothing there, a swell gathers light, bubbles left to the traced bubble. `npm run camrelief`, `holeline` 6 and 6b.

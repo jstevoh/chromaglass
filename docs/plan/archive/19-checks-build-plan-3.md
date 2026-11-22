@@ -109,3 +109,67 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
   prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
   (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
+- ~~**19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
+  rate.**~~ Dropped 2026-11-22 (19ak-21, the owner's "cut the shit out of things"): the line is deleted from its harness and prints as a note, not fixed. The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
+  and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share
+  of straw steps in the stroke move with the machine. On GitHub's Macs it went 301 → 242 on a
+  PR that does not touch the bubbles (run 41129450339, green on re-run) and 325 → 284 on #603,
+  where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
+  measure over a fixed number of plate steps, not wall time, so its bar means the same on
+  every runner.
+  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
+- ~~**19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
+  dark" goes red on PRs that do not touch the wall.**~~ Dropped 2026-11-22 (19ak-21, the owner's "cut the shit out of things"): the line is deleted from its harness and prints as a note, not fixed. Quarantined 2026-11-01 to 2026-11-15
+  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
+  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
+  circle's edge; find whether the red runs read a lit edge
+  (the sample too close) or a frame not yet drawn (the read too early), and measure the
+  feature, not the moment.
+- ~~**19ak-11. Open, found by 19ak-9: the film's "at 0, every film is the rainbow every look
+  was made with, to the bit" goes red by one pixel on GitHub's Macs.**~~ Dropped 2026-11-22 (19ak-21, the owner's "cut the shit out of things"): the line is deleted from its harness and prints as a note, not fixed. Four runs in a
+  week (11-15 three times, 11-21 once), each a different render one pixel off
+  (`closeup00`, `film0`, `plate00`): `scripts/filmlook.mjs` compares two labs, the real
+  shader and a control compiled with Film Physics taken out, each running the solver from
+  scratch. One pixel is either Metal compiling the two shaders' shared arithmetic
+  differently (a fused multiply-add in one and not the other) or the solver not
+  repeating itself to the bit between two pages. Find which (print the pixel and both
+  values; render the control's shader on the real lab's state), then make the claim the
+  one that holds, never a tolerance picked to pass.
+- ~~**19ak-13. Open, found by 19ak-9: Pour's "spreads it out from where it lands" reads the
+  runner's frame rate.**~~ Dropped 2026-11-22 (19ak-21, the owner's "cut the shit out of things"): the line is deleted from its harness and prints as a note, not fixed. `scripts/tools.mjs` holds each pouring tool for 1200 ms of wall
+  time and settles 700 ms, so the plate takes however many solver steps the runner
+  manages in that time, and the share of dye from 0.02 to 0.07 moves with it: red once
+  on 11-21 (Pour 75% against Drop's 78%, a PR that does not touch the tools). Hold and
+  settle over a fixed number of plate steps, as 19aj-1 asks of the Blow stroke.
+- **19ak-20. Shipped 2026-11-22: a pull request runs only the fast checks.** The owner,
+  2026-11-22, after 52 of 93 PR `Checks` runs from 11-14 to 11-21 went red, every one on a
+  browser, lab or Mac line timing a page or a plate on a slow or busy runner (the intro's
+  9c, startup's "moving for good", the ear behind the wall, the film's one pixel, AAC):
+  "Cut the shit out of things". `scripts/checks.json` names `shards.pr` (`logic`,
+  `sound`); `scripts/reach.mjs --diff` on a pull request runs only those Measure parts
+  (narrowed further by 19k-4 when the diff is only checks and documents) and no Mac shard,
+  and says "partial" to the deploy gate. A new `always` check in `logic`, "The site
+  builds" (`vite build`, about eleven seconds), keeps the build on every PR. Gone with it,
+  since nothing runs them now: carrying an earlier PR run's Mac result (19i), the per-shard
+  and per-check Mac selection (19k, 19ak-2) and a re-run skipping the shards that passed
+  (19ak-3a); the reach job no longer installs esbuild. Supersedes the draft rule of #904
+  (19ak-16), which only took the Mac off a draft's pushes. *Measured:* `npm run reach` 76
+  ok (three new cases on `shards.pr`; every PR case now expects no Mac), `npm run checks`
+  all ok, `npm run actionlint` 15 workflows ok.
+- **19ak-21. Shipped 2026-11-22: the deploy does not wait for the checks, and five
+  only-flaky lines are deleted.** The owner, 2026-11-22: "I would much rather release shit
+  that crashes and deal with a couple bugs here and there. Let's get shit live quicker. We
+  don't have customers." `deploy.yml`'s `Build and deploy` needs only the gate (`verified`)
+  and holds `firebase-hosting-live` on its own; the `checks` job (every Measure part and
+  Mac shard) runs beside it on the tree it published as a report, in a group
+  (`main-checks-<ref>`) a newer push cancels; the watchdog's `hosted` re-run checks and
+  does not publish again. A red there is a bug that is live. Deleted as checks, kept as
+  printed notes: startup's "moving for good no later than the old way" (19aa-7), Blow's
+  "keeps it rather than erasing it" (19aj-1), the wall's "a circle leaves the corners of
+  its quad dark" (19aj-2), the film's "at 0 ... to the bit" (19ak-11) and Pour's "spreads it
+  out from where it lands" (19ak-13), each found by its own item to read the runner's speed
+  or one pixel of it, none ever a real catch; their quarantine entries went with them.
+  Kept: intro 9c and the drawwall control, each red on main from a real change being fixed
+  (#897, 8-draw-a-7). Left: `deploygate.sh`'s rule 6 finds the live commit by a run's
+  green conclusion, so a deploy whose checks went red reads as not live and the next
+  docs-only merge publishes again (the safe way to be wrong; a few minutes).

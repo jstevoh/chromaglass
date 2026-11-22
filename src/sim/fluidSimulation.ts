@@ -1491,24 +1491,6 @@ export class FluidSimulation {
         break;
       }
 
-      case 'classic': {
-        /*
-          Luminous, not thick, and on the screen, with open dark glass around
-          the pools (PLAN 28i-2).
-        */
-        const blobs: [number, number, number][] = [[0.5, 0.5, 8.5]];
-        for (let i = 0; i < 6; i++) {
-          const a = i * Math.PI / 3 + 0.3;
-          blobs.push([0.5 + Math.cos(a) * 0.18, 0.5 + Math.sin(a) * 0.14, 7.5 + (i % 2) * 1.5]);
-        }
-        blobs.push([0.24, 0.24, 10], [0.76, 0.24, 10], [0.24, 0.76, 10], [0.76, 0.76, 10]);
-        blobs.forEach(([fx, fy, rad], idx) => {
-          const c = col(idx);
-          this.splatBlob(fx * S, fy * S, rad, 0.85, c.r, c.g, c.b);
-        });
-        break;
-      }
-
       case 'cyberpunk': {
         // Full-plate neon pink, cyan, and violet washes + diagonal streaks so
         // the plate stays <60% near-black at the 95th percentile and holds >=3 hues (PLAN 28i-2).
@@ -1955,17 +1937,21 @@ export class FluidSimulation {
       }
 
       case 'clock-glass':
-      case 'splodascope': {
+      case 'splodascope':
+      case 'classic': {
         /*
           Coloured water and oil that will not mix, each body of oil laid with
           one of the other dyes as its own colour (src/lib/oilLay.ts, and why;
           layCrowd). With Oil Bodies on (the look's) each body keeps its colour
-          while it moves; Splodascope's Film Hold keeps its crowd apart where
-          they touch. The oil is laid only where the solver is there to take
-          it; before it is, the colours still land, as spots in the water.
+          while it moves; Splodascope's and Classic's Film Hold keeps their
+          crowds apart where they touch. The oil is laid only where the solver
+          is there to take it; before it is, the colours still land, as spots
+          in the water. Classic was eleven soft pools of dye on black glass
+          until PLAN 38w-1, which is what the 1960s dish is not: classicDiscs
+          says what the references show instead.
         */
         const water = col(0);
-        layCrowd(look === 'clock-glass' ? look : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
+        layCrowd(presetId === 'clock-glass' || presetId === 'classic' ? presetId : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
           (x, y, d) => this.addDensity(x, y, d, water.r, water.g, water.b),
           (x, y, d, dye) => { const c = col(dye); this.addOilDensity(x, y, d, c.r, c.g, c.b); });
         break;

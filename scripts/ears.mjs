@@ -652,7 +652,7 @@ try {
     const excused = askAt.filter(a => recent.some(r => r.driver === 'tick' && a - r.at >= 0 && a - r.at < 6)).length;
     return { n, asks, misplaced, closest, excused };
   }, [v3.t0, v3.t1]);
-  check('and it hears on the wall\'s asks, one a frame, not on its own frames, nor the tick but where the asks stopped past 250 ms',
+  check("and it hears on the wall's asks, one a frame, not on its own frames, nor the tick but where the asks stopped past 250 ms",
     v3.d.ask > 20 && v3.d.frame === 0 && v3t.n === v3.d.tick && v3t.asks === v3.d.ask && v3t.misplaced === 0 && v3.d.ask <= v3.drawn && v3.drawn - v3.d.ask <= v3t.excused,
     `readings ${v3.d.ask} ask, ${v3.d.frame} frame, ${v3.d.tick} tick, over ${v3.drawn} frames asked for` +
     `${v3t.excused ? `, ${v3t.excused} of them asked within 6 ms of a tick's reading` : ''}${capNote(v3)}` +
@@ -677,7 +677,7 @@ try {
   */
   await page.waitForTimeout(300);
   const v4 = await watch(2000, (g) => g.turns >= ENOUGH && g.samples >= ENOUGH);
-  check('covered with no wall, the worker\'s tick keeps the ear going',
+  check("covered with no wall, the worker's tick keeps the ear going",
     v4.lv.size >= 10 && v4.d.tick > 20 && v4.d.tick >= Math.min(10 * v4.lv.ms / 1000, v4.lv.got.turns / 2) && v4.d.ask === 0 && v4.d.frame === 0,
     `${v4.lv.size} distinct levels in ${(v4.lv.ms / 1000).toFixed(1)} s${capNote(v4)}; readings ${v4.d.tick} tick, ${v4.d.ask} ask, ${v4.d.frame} frame; ${v4.lv.got.turns} turns the page got`);
 
