@@ -1691,7 +1691,7 @@
     {
       "name": "The soap film on the plate",
       "shard": "lab3",
-      "run": "npm run soapplate -- --owed=wedge,black",
+      "run": "npm run soapplate",
       "why": [
         "Soap Film draws the frame's own draining film (PLAN 32d, gpu/soapFilmPlate.ts):",
         "off is the plate to the byte and makes no film; on, the plate's colours follow the",
