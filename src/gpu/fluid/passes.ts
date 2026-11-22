@@ -19,6 +19,7 @@ import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
 import { SoapFilmPlate, SOAP_PLATE_DX } from '../soapFilmPlate';
 import { TankPlate } from '../tankPlate';
+import { FaradayPlate } from '../faraday';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
@@ -277,6 +278,22 @@ export class FluidPasses extends FluidFields {
   protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
     this.stepSoapPlate(enc, p);
     this.stepTankPlate(enc, p);
+    this.stepFaradayPlate(enc, p);
+  }
+
+  /**
+   * The dish on a shaker (PLAN 48f, gpu/faraday.ts): made the first time
+   * Shaker is up, stepped on the show's own seconds at the Shake the patch
+   * bay folded (a cord carries the music there). Turned off, it goes, and
+   * the next time the water is still.
+   */
+  protected stepFaradayPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.faradayHz ?? 0) > 0)) {
+      if (this.faradayPlate) { this.faradayPlate.dispose(); this.faradayPlate = null; }
+      return;
+    }
+    if (!this.faradayPlate) this.faradayPlate = new FaradayPlate(this.device);
+    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0);
   }
 
   /**

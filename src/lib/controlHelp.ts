@@ -42,6 +42,8 @@ export const CONTROL_HELP: Record<string, string> = {
   frameSway: 'Lets the music move the whole frame, not just the liquid. Kept at zero unless you want the picture itself to move.',
   plateTiltX: 'A hand tipping the flat plate: up dips the right edge, so heavy colour runs right and light oil rises. The middle is level.',
   plateTiltY: 'A hand tipping the flat plate: up dips the top edge, so heavy colour runs up the screen. The middle is level.',
+  faradayHz: 'Sits the dish on a speaker at this frequency (under 10 plays as 10); shaken hard enough, the water stands in waves. Off at 0.',
+  faraday: 'How hard the speaker shakes the dish, in g. Past the water\'s threshold the waves grow; a cord from the bass shakes it.',
   slosh: 'How much the dish\'s own momentum carries when it is tilted: the colour piles on the low edge and a wave rings back.',
   bubbles: 'Trapped air bubbles on the plate. A few go a long way.',
   saturationBoost: 'Colour strength of the finished picture, from washed out to vivid.',

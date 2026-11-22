@@ -70,17 +70,6 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   no bubbles from wind, one round bubble from a straw, fingers only where the liquid is
   thick enough for two or more (`strawFingers` in `src/lib/bubbles.ts`). Story in
   `docs/plan-shipped.md` §15g-12; `npm run blowrange`, `npm run straw`.
-
-## 15e. The liquids' own forces on the GPU plate
-
-- ~~**15e-1. The liquids' forces act only on a frame something else is laid in.**~~
-  **Shipped** (2026-11-13, met again as 14ab-16): the step runs them itself, once a step,
-  on any plate a bottle was poured on (`stepLiquids`); `npm run liquidpush`, and
-  `liquidsgpu`'s five "a still plate" lines owed to it gate. Story in
-  `docs/plan-shipped.md` §15e-1.
-
-## 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
-
 - ~~**15g-19 The straw's lobes are clipped at a reach, not conserved**~~ **Shipped**:
   `rimAt` (`src/gpu/wgsl/air.ts`) now applies a zero-mean perturbation in r² (orthogonal
   low-harmonic lobe modulation minus the exact mean `63/256` of `cos^10`) so a fingered
@@ -93,6 +82,11 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 
 ## 15e. The liquids' own forces on the GPU plate
 
+- ~~**15e-1. The liquids' forces act only on a frame something else is laid in.**~~
+  **Shipped** (2026-11-13, met again as 14ab-16): the step runs them itself, once a step,
+  on any plate a bottle was poured on (`stepLiquids`); `npm run liquidpush`, and
+  `liquidsgpu`'s five "a still plate" lines owed to it gate. Story in
+  `docs/plan-shipped.md` §15e-1.
 - ~~**15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**~~
   **Shipped** (2026-11-14): a bottle's weight down a rocked thin gap is a drive laid after
   the gap keeps its flow (`liquidDrive`, `driveLiquids`), Darcy's w g sinθ h²/12ν read as
