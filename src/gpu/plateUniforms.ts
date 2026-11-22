@@ -387,6 +387,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('soapFilm', Number.isFinite(s.soapFilm) ? clamp01(s.soapFilm) : 0);
     const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
+    // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
+    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? 1 : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they

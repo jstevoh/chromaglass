@@ -2953,7 +2953,28 @@ Looks change here on purpose. Judge from the film (before and after, same looks)
 4. Two colours side by side with Polarity up: the line between them stays an even edge, no
    patches where they smear into each other.
 
-## 140. The video as the lamp under the dish (PLAN 14ag-3)
+## 140. Faraday waves: the music shakes the dish (PLAN 48f)
+
+Settings → Tilt & Rock (the phone's Sound sheet): Shaker sits the dish on a speaker at a
+frequency, Shake is how hard it shakes in g, and the phone's Music Shake puts the music's
+bass on Shake through a cord (on the desk, that cord is laid in Patches: bass onto Shake). Past the water's threshold the surface stands up in a lattice of
+standing waves at half the Shaker's frequency, drawn by the lamp's light through it.
+
+1. On Classic, Shaker 40 Hz, Shake 0.05: nothing should show (under the threshold, about
+   0.09 g at 40 Hz). Raise Shake slowly to 0.3 and wait two seconds: does a fine lattice
+   of light grow over the dye? Bad: a pattern that flashes on at once, or none at all.
+2. With the lattice up, sweep Shaker from 20 to 120 Hz: do the cells get finer as it
+   rises (about 2 cm across at 20 Hz, 5 mm at 120)? Good: it reads as water, not a
+   texture laid over the plate.
+3. Shake to 0: does the lattice settle away over a second or two, not vanish?
+4. Shake 0, Music Shake 50% on the phone (or the bass cord on Shake in Patches), a song
+   with a strong bass: does the lattice grow with the
+   bass lines and settle in the quiet bars? Say whether it is too faint or too strong to
+   read on the wall; the light is the real lens of the water's surface, and a stronger
+   default depth is a dial away.
+5. Watch for flicker: the pattern must hold still while it grows and fades, never strobe.
+
+## 141. The video as the lamp under the dish (PLAN 14ag-3)
 
 The check (`npm run videolamp`) proves the dye filters the video's light by the same share it
 takes of a white lamp, that bare water shows the video, and that a glycerine pool's rim moves a
