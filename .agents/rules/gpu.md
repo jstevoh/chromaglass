@@ -4,7 +4,6 @@ description: "Rules for src/gpu/** and src/sim/**: the solver and shaders. Read 
 ---
 
 Generated from .claude/rules/gpu.md by npm run rules; edit that file, not this one.
-<!-- stale control -->
 
 # the solver and shaders
 
