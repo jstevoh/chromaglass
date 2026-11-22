@@ -520,11 +520,11 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 28 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-21 | 50 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-22 | 51 |
 |  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19an-1 | 5 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 19 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
-| 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 7 |
+| 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 8 |
 | 23 | Selling it: the site free, the app paid | [`23-selling.md`](docs/plan/23-selling.md) | 23.1–23.10e | 21 |
 |  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.21 | 21 |
 | 24 | Modular rigs: patch the rack into the liquid | [`24-modular-rigs.md`](docs/plan/24-modular-rigs.md) |  | 10 |
@@ -535,7 +535,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28l | 21 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 15 |
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 10 |
-| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 16 |
+| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 17 |
 | 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 15 |
 | 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33c, 33d, 33f-2..4 open | 12 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 19 |

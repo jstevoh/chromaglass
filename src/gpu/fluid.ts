@@ -182,6 +182,14 @@ export class WebGPUFluid extends FluidCover {
       ['speciesSplat', [RGBA32], false],
       // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
       ['inkSpecies', [RGBA32], false],
+      /*
+        The layered seed's oil share (38w-15, `layShare` in fluid/inputs.ts),
+        added without an entry here, so the first look that laid oil built it
+        on a frame: main's deploy of 2026-11-22 read "1 in the ledger (0 in
+        the opening), fluid/seedShare:rgba32float" in `npm run startup`. No
+        look's opening asks for it, so it is built behind the show.
+      */
+      ['seedShare', [RGBA32], false],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       ['liquidForces', [VEL], false],
