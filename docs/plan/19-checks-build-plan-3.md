@@ -223,7 +223,9 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   neighbour "covered with no wall, the worker's tick keeps the ear going", and four or more PRs
   that touch neither went red on them too, after #769's fix to the ear. Both lines are
   quarantined on pull requests and main's deploys from 2026-11-22 to 2026-12-06 (19ak-18),
-  bars unmoved; the PR that finds which side is wrong takes the two entries out.
+  bars unmoved; the PR that finds which side is wrong takes the two entries out. Each line ANDs
+  several clauses and the entry matches its name, so while it holds the ear reading its own
+  frames while covered is held too: the fix splits the flaky clause into a line of its own first.
 
 - **19ad-2. The same shard failed with no check having failed, and with a check that is
   green seven times out of seven on the owner's Mac.** Two more presentations on PR
@@ -630,7 +632,9 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   closes on "N/M checks passed", without which no entry on it could hold. *Measure:*
   `node scripts/checks.mjs --self-test` (held on a push before the cut-off, red from it,
   red outside CI). *Open:* each line's fix is its own item; when 12-06 comes, a line still
-  red on main is red on every deploy again, which is the point.
+  red on main is red on every deploy again, which is the point. `checkguard` flags an
+  entry's end date moving later but not `MAIN_QUARANTINE_UNTIL`; moving the date into
+  `scripts/checks.json` would let it.
 - **19ak-19. Open, found 2026-11-21: the Live Show's "the Plate source's stream moves with
   the film" goes red when the test film's own clock stalls.** On deploys 871 and 872
   (owner-mac-2) and #900's first PR run (a GitHub Mac), the film the harness plays went 0.5
@@ -638,5 +642,7 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   869. The stream is not the fault; the runner's load starves the film. *Fix:* make
   `moving()` in `scripts/liveshow.mjs` say when the film's own clock stalled (its `during`
   line already reads it) and hold the stream to the film it was given, then find why the
-  film stalls under load. Never a looser bar. Quarantined on PRs and main's deploys
+  film stalls under load. Never a looser bar. Until then the entry also holds a stream
+  frozen while the film ran, the regression the line is for: split that case into its own
+  line ("the film ran and the stream stood still") first. Quarantined on PRs and main's deploys
   2026-11-22 to 2026-12-06 (19ak-18); the fix takes the entry out.
