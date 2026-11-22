@@ -383,8 +383,9 @@ const cpuRgb = (rgb, flip = false) => {
   greens at nearly one brightness.
 
   Why the detail: the film is drawn over the plate, and the plate behind it
-  shows through what the film does not reflect: the dye laid in the middle
-  and the lamp's fall-off. Those are broad (measured on this plate: the
+  shows through what the film does not reflect: the lamp's fall-off, and
+  before 32d-6 the dye laid in the middle (bare is now drawn on a clean
+  plate, since at Airy's 4% the dye's edges showed through). Those are broad (measured on this plate: the
   picture twice the reference's brightness in the middle, the same at the
   rim), and they took the plain correlation of a plate that drew the film
   exactly down to 0.70, where the film's own pattern, the plumes and bands a

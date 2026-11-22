@@ -161,6 +161,11 @@ about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carr
   workgroups over the film's 128² (2.4 ms a step at 256² on Metal, 32c); one film step per
   solver step. Measure it on the Mac (`npm run soapplate` prints nothing of the Mac's) and,
   if it shows in the frame, split those passes across workgroups (H2c's pattern).
+- **32d-7. The film's transmission over dye is not measured in linear light** (S; Low; a check).
+  `npm run soapplate` section 7 reads T over a clean lit plate (32d-6): over dye the plate lays dye
+  on the LED ground in sRGB (`onGround` in `wgsl/plate.ts`) and dye does not scale with the lamp,
+  so lit − dark there is not the film's transmission. Measure T over dye by inverting the dye's own
+  response (or rendering the dye as a lit layer), so a film that dims dye more than Airy allows is red.
 - **32d-5. The plate's dye under the film is the old look's.** Soap Film still seeds and pours
   a faint dye (Dye Budget 0.3) that shows through the film's black and its thin orders. A real
   frame has nothing behind it but the dark ground; decide with the owner whether the dye stays
