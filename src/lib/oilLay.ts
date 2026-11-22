@@ -181,6 +181,11 @@ function splodDye(u: number, others: number): number {
  * and a little past.
  */
 export function splodascopeCell(x: number, y: number, n: number, discs: readonly OilDisc[]): { oil: number; disc: number; water: number; dye: number } {
+  return discCell(x, y, n, discs, SPLOD_REACH, SPLOD_WASH, SPLOD_BODY_DYE);
+}
+
+/** A cell of a dish of discs laid in order (splodascopeCell, classicCell): the water's wash out to `reach` and a little past, and `bodyDye` in each disc's oil. */
+function discCell(x: number, y: number, n: number, discs: readonly OilDisc[], reach: number, wash: number, bodyDye: number): { oil: number; disc: number; water: number; dye: number } {
   let oil = 0, disc = -1;
   discs.forEach((b, q) => {
     const c = Math.max(0, Math.min(1, (b.r - Math.hypot(x - b.x, y - b.y)) * n + 0.5));
@@ -188,8 +193,128 @@ export function splodascopeCell(x: number, y: number, n: number, discs: readonly
     oil = oil * (1 - c) + (b.oil > 0 ? c : 0);
     if (c > 0.5) disc = b.oil > 0 ? q : -1;
   });
-  const inDish = Math.hypot(x - 0.5, y - 0.5) < SPLOD_REACH + 0.03;
-  return { oil, disc, water: inDish ? SPLOD_WASH * (1 - oil) : 0, dye: disc >= 0 ? SPLOD_BODY_DYE * oil : 0 };
+  const inDish = Math.hypot(x - 0.5, y - 0.5) < reach + 0.03;
+  return { oil, disc, water: inDish ? wash * (1 - oil) : 0, dye: disc >= 0 ? bodyDye * oil : 0 };
+}
+
+/*
+  Classic Light Show's dish (PLAN 38w-1), after the Joshua Light Show's
+  Liquid Loops (1969) and its Fillmore East nights (1968), the period
+  photographs of the Avalon and the Fillmore, and Glenn McKay's and Bill
+  Ham's own footage (the watch tool's references, 2026-11-21). What every
+  one of them shows is a dish on an overhead projector's lamp: a coloured
+  water filling the glass, and in it round cells of coloured mineral oil
+  that will not mix with it, squashed flat between the two glasses, each
+  ringed by its meniscus, a frame holding eleven to nineteen of them from
+  specks to a fifth of the frame across. In the big cells sit small round
+  drops of the water, trapped when the oil was poured or squeezed, and
+  those are the "bubbles inside the cells" that every still has.
+
+  So this is the splodascope's packing (random sequential, biggest first,
+  log-normal sizes, a film of water between each two) with fewer and
+  bigger cells, in a warmer family: the references are nine tenths warm
+  (orange, amber and yellow oil in a magenta water) with one cool accent.
+  And every cell past CLASSIC_HELD gets one to three drops of the water in
+  it, each a hole cut in its oil and nothing put back, so the water's own
+  colour is laid in the hole by the wash (classicCell), as a drop of the
+  dish's water would carry it.
+
+  Sizes: the references' forms are 5 to 15% of the frame (the watch
+  tool's form scale, 11.5% in Liquid Loops). The first lay took that of the
+  dish (a median radius of 0.045, twenty-six cells), and the owner judged it
+  short of the references' detail (2026-11-21): the frame on the wall is not
+  the dish but the middle of it, 0.42 of the plate high at 16:10 (uvToFluid),
+  so a cell 9% of the plate across was a fifth of the frame's height, and
+  only nine or ten of them were ever on the screen. Measured against the
+  frame instead, a median radius of 0.026 is 12% of its height, and the
+  references' spread of sizes (a fifth of the frame down to specks) is a
+  sigma of 0.6 between the floor and 0.1. Ninety drawn, packed biggest first
+  as far as random sequential packing goes, put about thirty-five on the
+  screen with water lanes between, as the stills show.
+
+  The floor stays CLASSIC_MIN, 0.018: below it the dye, laid on the CPU's
+  192 grid and carried up to the solver's (applyDeltas), is a cell or two
+  across and smears into the water round it before the oil has its rim
+  (PLAN 38w-8 lays it at the solver's own grid). The oil itself is laid at
+  the solver's grid and is crisp at any size above it.
+*/
+export const CLASSIC_DROPS = 90;
+export const CLASSIC_MEDIAN = 0.026, CLASSIC_SIGMA = 0.6, CLASSIC_MIN = 0.018, CLASSIC_MAX = 0.1;
+export const CLASSIC_GAP = 0.02;
+export const CLASSIC_REACH = 0.43;
+export const CLASSIC_WASH = 0.8;
+export const CLASSIC_BODY_DYE = 1.6;
+/* The oils' shares, by the dyes after the water's: orange most, amber, yellow, and the cool accent. */
+export const CLASSIC_SHARE = [0.35, 0.3, 0.15, 0.2];
+/*
+  A cell this big (radius) or more holds drops of the water; each drop a
+  radius from CLASSIC_DROP_MIN up to a third of its cell's, and set in the
+  body of its cell, with a wall of oil round it at least twice the film
+  between cells (CLASSIC_GAP). The wall is what keeps a drop. Laid with a
+  wall of one film, 0.02 of the plate (four cells, about one of the phase
+  field's interfaces), most drops were gone inside five seconds, at every
+  size: classicdish held 0 of 1 and 2 of 7 on its two lays (2 of 8). The wall that
+  thin is two diffuse interfaces touching, so the oil in it is never a body
+  of oil, and the capillary flow round the drop opens it to the dish's water
+  (with Oil Tension at 0, or the carry stopped, all seven held), as a real
+  film of oil between two waters drains and breaks once it is thin. With
+  the wall doubled every drop held, down to the floor of 0.014 (1 of 1 and
+  8 of 8, 9 of 9), so only a cell with room for a drop and its wall holds any.
+*/
+export const CLASSIC_HELD = 0.06;
+export const CLASSIC_DROP_MIN = 0.014;
+
+/**
+ * Classic's dish for one lay, from `float` (a seeded stream), as
+ * splodascopeDiscs lays its crowd: each cell of oil (oil 1), then the drops
+ * of water held in it (oil −1). `dyes` as clockGlassBodies takes it.
+ */
+export function classicDiscs(float: () => number, dyes: number): OilDisc[] {
+  const others = Math.max(1, dyes - 1);
+  const sizes: number[] = [];
+  for (let i = 0; i < CLASSIC_DROPS; i++) {
+    let r = CLASSIC_MEDIAN;
+    for (let t = 0; t < 16; t++) {
+      const z = Math.sqrt(-2 * Math.log(1 - float())) * Math.cos(2 * Math.PI * float());
+      const v = CLASSIC_MEDIAN * Math.exp(CLASSIC_SIGMA * z);
+      if (v >= CLASSIC_MIN && v <= CLASSIC_MAX) { r = v; break; }
+    }
+    sizes.push(r);
+  }
+  sizes.sort((a, b) => b - a);
+  const placed: { x: number; y: number; r: number }[] = [];
+  const out: OilDisc[] = [];
+  for (const r of sizes) {
+    for (let t = 0; t < SPLOD_TRIES; t++) {
+      const a = float() * Math.PI * 2;
+      const d = (CLASSIC_REACH - r) * Math.sqrt(float());
+      const x = 0.5 + Math.cos(a) * d, y = 0.5 + Math.sin(a) * d;
+      if (placed.some((q) => Math.hypot(q.x - x, q.y - y) < q.r + r + CLASSIC_GAP)) continue;
+      placed.push({ x, y, r });
+      let u = float(), k = 0;
+      while (k < CLASSIC_SHARE.length - 1 && u >= CLASSIC_SHARE[k]) u -= CLASSIC_SHARE[k++];
+      out.push({ x, y, r, oil: 1, dye: 1 + (k % others) });
+      if (r >= CLASSIC_HELD) {
+        const held: { x: number; y: number; r: number }[] = [];
+        const want = 1 + Math.floor(float() * 3);
+        for (let h = 0; h < want * 8 && held.length < want; h++) {
+          const hr = CLASSIC_DROP_MIN + Math.max(0, r / 3 - CLASSIC_DROP_MIN) * float();
+          const off = (r - hr - 2 * CLASSIC_GAP) * Math.sqrt(float()), oa = float() * Math.PI * 2;
+          const hx = x + Math.cos(oa) * off, hy = y + Math.sin(oa) * off;
+          if (off < 0 || held.some((q) => Math.hypot(q.x - hx, q.y - hy) < q.r + hr + CLASSIC_GAP)) continue;
+          held.push({ x: hx, y: hy, r: hr });
+          out.push({ x: hx, y: hy, r: hr, oil: -1, dye: 0 });
+        }
+      }
+      break;
+    }
+  }
+  return out;
+}
+
+/** One cell of Classic's dish, as splodascopeCell lays the splodascope's: the water's wash flat across the dish, round the oil and in the drops held in it. */
+export function classicCell(x: number, y: number, n: number, discs: readonly OilDisc[]): { oil: number; disc: number; water: number; dye: number } {
+  return discCell(x, y, n, discs, CLASSIC_REACH, CLASSIC_WASH, CLASSIC_BODY_DYE);
 }
 
 /*
@@ -270,23 +395,25 @@ export function layOilShare(share: Float32Array | null, index: number, amount: n
 }
 
 /**
- * Clock Glass's or Splodascope's dish for one lay (FluidSimulation's seed):
+ * Clock Glass's, Splodascope's or Classic's dish for one lay (FluidSimulation's seed):
  * the bodies from `float` (a seeded stream), each laid as oil (`oil`, a
  * negative amount cutting a compound drop's hole), then every cell as
- * clockGlassCell or splodascopeCell lays it, the water's wash as dye
+ * clockGlassCell, splodascopeCell or classicCell lays it, the water's wash as dye
  * (`water`) and each body's colour in its oil as the oil's own (`inOil`,
  * with which of the look's dyes it is; PLAN 47z-1).
  */
-export function layCrowd(look: 'clock-glass' | 'splodascope', n: number, float: () => number, dyes: number,
+export function layCrowd(look: 'clock-glass' | 'splodascope' | 'classic', n: number, float: () => number, dyes: number,
   oil: (x: number, y: number, r: number, amount: number) => void,
   water: (x: number, y: number, amount: number) => void,
   inOil: (x: number, y: number, amount: number, dye: number) => void): void {
   const glass = look === 'clock-glass';
-  const bodies: readonly (OilBody & { oil?: number })[] = glass ? clockGlassBodies(float, dyes) : splodascopeDiscs(float, dyes);
+  const bodies: readonly (OilBody & { oil?: number })[] = glass ? clockGlassBodies(float, dyes)
+    : look === 'classic' ? classicDiscs(float, dyes) : splodascopeDiscs(float, dyes);
+  const discCellOf = look === 'classic' ? classicCell : splodascopeCell;
   for (const b of bodies) oil(b.x, b.y, b.r, b.oil ?? 1);
   for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
     const u = (x + 0.5) / n, v = (y + 0.5) / n;
-    const cell = glass ? clockGlassCell(u, v, n, bodies) : splodascopeCell(u, v, n, bodies as readonly OilDisc[]);
+    const cell = glass ? clockGlassCell(u, v, n, bodies) : discCellOf(u, v, n, bodies as readonly OilDisc[]);
     const which = glass ? (cell as { body: number }).body : (cell as { disc: number }).disc;
     if (cell.water > 0) water(x, y, cell.water);
     if (cell.dye > 0) inOil(x, y, cell.dye, bodies[which].dye);
