@@ -55,6 +55,16 @@ export const PRESETS: Preset[] = [
       blendMode: 'screen',       // unused under the lamp (plate.ts takes the lamp's light through the dye)
       gooeyEffect: 0,            // its blur merged cells the oil keeps apart
       rotationSpeed: 0.015,      // the motor almost off
+      /*
+        No stirring, as Lava Lamp (PLAN 38w-1): a clock-glass dish is not
+        stirred, and Turbulence is a curl of noise laid over the whole plate,
+        not a hand. Filmed on the Mac (2026-11-21, no sound, seed 1): at the
+        default 0.5 the round cells were torn into smeared patches within the
+        first second and never came back; at 0 they stay round for the whole
+        22 s, as the lab's dish does. Turbulence at 0 also lays no music stir
+        cord here once the Sound Drive below is 0 (lib/stir.ts stirCordDepth).
+      */
+      turbulenceScale: 0,
       centerGravity: 0.05,
       ledPlatform: false,
       diffusionRate: 0,
@@ -71,7 +81,17 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.002,
       airVelocity: 0.02,
       vibrationFrequency: 0.05,
-      audioImpact: 0.5,
+      /*
+        The music's hands off, as Lava Lamp's (PLAN 27f-9h): at 0.5 they
+        poured a dye on every pitch, burst air on the kicks and, through the
+        mids' stir cord that Sound Drive sets, kept a curl of noise over the
+        dish. Filmed with the band (2026-11-21): the water flooded red and the
+        cells dissolved into it in 25 s, with white air pockets popping up.
+        The band reaches this dish the way it reached a 1960s one, through a
+        hand: the kick presses the top glass and the mids firm the oil
+        (sceneMappings below), and the dish rocks (Plate Rock).
+      */
+      audioImpact: 0,
       blobSurfaceTension: 0.45,
       boundaryContrast: 0.3,
       saturationBoost: 1.0,

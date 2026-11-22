@@ -199,4 +199,16 @@ is in the project's files).
 - **38w-4. The old Classic's plate as a look of its own** (S; Low). The neon pools on black
   that Classic was (11 blobs, screen blend, gooey) are the opposite of a real dish but were a
   look some may want. Offer it as "Neon Pools" if the owner asks; until then it is gone.
+- **38w-5. The song's chorus stirs a dish that does not stir** (S; Medium). Classic and Lava
+  Lamp hold Turbulence and Sound Drive at 0 (no curl noise, no stir cord, no music hands), but
+  `useMusicIntelligence` still adds 0.2 to both in a chorus when the song has a map
+  (`src/hooks/useMusicIntelligence.ts`, the section switch), so a mapped song's chorus stirs and
+  pours into the dish again: the red flood and kick bubbles 38w-1 took out. A section should
+  change what the look's hand does (a harder rock, a press), not switch on a motor the look
+  turned off. Check: Classic with a song map through a chorus keeps classicdish's cells apart.
+- **38w-6. The snare's swirl is vorticity confinement** (S–M; Low). Classic's snare cord
+  raises Vorticity Confinement, a numerical device that puts back the small eddies the solver's
+  diffusion loses; nothing in a dish does that. The real snare in a show is a finger or a
+  straw flicking the water. Replace the cord with a flick (the hand tools' impulse, 27f) and
+  measure the cells still apart after a run of snares.
 

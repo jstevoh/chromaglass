@@ -94,7 +94,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'node_modules', '.cache', 'classicdish', 'app.mjs');
 mkdirSync(dirname(out), { recursive: true });
 await build({
-  stdin: { contents: "export { FluidSimulation } from './src/sim/fluidSimulation.ts'; export { dyeAbsorbances } from './src/lib/dye.ts'; export { setShowSeed } from './src/lib/rng.ts';", resolveDir: root, loader: 'ts' },
+  stdin: { contents: "export { FluidSimulation } from './src/sim/fluidSimulation.ts'; export { dyeAbsorbances } from './src/lib/dye.ts'; export { setShowSeed } from './src/lib/rng.ts'; export { stirOf } from './src/lib/stir.ts';", resolveDir: root, loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
 // The GPU's usage flags are named at the solver's import (kickbloom.mjs does the same).
@@ -124,7 +124,20 @@ const appLay = (seed) => {
 const DUMP = process.env.CLASSICDISH_DUMP;
 const { page, close } = await openLab();
 try {
-  const run = (which, lay, off = {}) => page.evaluate(async ({ which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP }) => {
+  /*
+    The look's stirring, as the app stirs it. The lab steps with no curl noise
+    unless it is asked for, and the first version of this check never asked:
+    it passed on round cells while the app, stirring at the look's Turbulence
+    of 0.5 (stirOf 0.69), tore them to ribbons inside a second (filmed
+    2026-11-21, no sound, seed 1). The dial is read from the look the lab
+    reads, and turned into a speed by the app's own stirOf, so a Classic that
+    stirs again fails here, not on the wall: put back at 0.5 it fails five
+    of the seven lines (19 of 26 cells apart, 0 of 8 drops held).
+  */
+  const [dial, detail] = await page.evaluate(() => { const s = lab.look('classic').settings; return [s.turbulenceScale ?? 0, s.turbulenceDetail ?? 3]; });
+  const TURB = { turbScale: app.stirOf(dial), turbDetail: Math.max(1, Math.min(4, Math.round(detail))) };
+  console.log(`classic stirs at ${TURB.turbScale.toFixed(3)} (dial ${dial}, detail ${TURB.turbDetail})`);
+  const run = (which, lay, off = {}) => page.evaluate(async ({ which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP, TURB }) => {
     await lab.create(N, N);
     const { settings: s, dyes: now } = lab.look('classic');
     const dyes = which === 'before' ? OLD : now;
@@ -132,7 +145,7 @@ try {
     const over = which === 'before'
       ? { thinGap: 1, advection: 0.35, platePressure: 0.25, oilTension: 0, oilBodies: 0, filmHold: 0 }
       : { thinGap: 1, advection: s.advection, plateCurve: s.plateCurve, depthDrag: s.depthDrag, platePressure: s.platePressure,
-        oilTension: s.oilTension, oilBodies: s.oilBodies, filmHold: s.filmHold, diff: s.diffusionRate, ...off };
+        oilTension: s.oilTension, oilBodies: s.oilBodies, filmHold: s.filmHold, diff: s.diffusionRate, ...TURB, ...off };
     const ab = (c) => [c.r, c.g, c.b].map((v) => -Math.log(Math.max(0.002, v)));
     // A dye's absorbances as the app lays them (dyeAbsorbances, floor and ceiling and all), so a cell is named by the dye it was laid with.
     const abOf = (i) => (which === 'before' ? ab(dyes[i]) : abs[i]);
@@ -285,7 +298,7 @@ try {
       median: diam.length ? diam[diam.length >> 1] : 0, smallest: diam[0] ?? 0, biggest: diam[diam.length - 1] ?? 0,
       warm: oilDye > 0 ? warm / oilDye : 0, carried: laidInOil > 0 ? carried / laidInOil : 0, png,
     };
-  }, { which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP: !!DUMP });
+  }, { which, lay, off, abs, N, STEPS, DISH, SPECK, DROP, WET, OLD, DUMP: !!DUMP, TURB });
 
   const pc = (v) => `${(v * 100).toFixed(1)}%`;
   const fmt = (r) => `dyed ${pc(r.dyed)}, ${r.cells} cells of ${r.laidCells} laid (median ${pc(r.median)}, ${pc(r.smallest)}–${pc(r.biggest)} of the dish), `
