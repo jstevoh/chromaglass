@@ -484,13 +484,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 // Oil: its share of a cell, from the mix where a look has one (1×1 blank otherwise).
 fn oilAt(uv: vec2f) -> f32 { return clamp(bilerpN(mixT, uv, f32(textureDimensions(mixT).x)).r, 0.0, 1.0); }
 /*
-  Δρ/ρ here. The dye as the current reads it (saturated about the plate's mean,
-  so a plate with more dye everywhere is not heavier everywhere), times the
-  dye's contrast (A.b.z); the oil lighter (A.b.w); the ferrofluid heavier, a
-  fixed property of the liquid (lib/turntable.ts).
+  Δρ/ρ here. Linear in the dye's density gap above the plate's mean (Boussinesq,
+  PLAN 22r / 18m-3: the mean is constant across the plate so its gradient is
+  zero, and taking it off keeps weightAt centred near zero), times the dye's
+  contrast (A.b.z); the oil lighter (A.b.w); the ferrofluid heavier, a fixed
+  property of the liquid (lib/turntable.ts).
 */
 fn weightAt(uv: vec2f) -> f32 {
-  let d = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
+  let d = bilerpN(dye, uv, S.n).a - S.meanD;
   let f = clamp(bilerpN(ph, uv, f32(textureDimensions(ph).x)).r, 0.0, 1.0);
   return A.b.z * d - A.b.w * oilAt(uv) + 0.25 * f;
 }

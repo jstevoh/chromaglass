@@ -2848,7 +2848,7 @@
     {
       "name": "The spinning dish",
       "shard": "plate",
-      "run": "npm run dish -- --owed=22r",
+      "run": "npm run dish",
       "why": [
         "A spun dish drags its liquid round through the gap, harder where the",
         "gap is tight, flings the heavy dye out and draws the oil in; with",
