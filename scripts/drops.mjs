@@ -842,6 +842,85 @@ const clusterStats = (fld, withColour) => {
     `mean radius ${pl.mean.toFixed(3)} -> ${mc.mean.toFixed(3)} cells (${(mc.mean / pl.mean).toFixed(2)}x, bar 1.4 to 1.8), beads ${pl.n} -> ${mc.n} (bar at least 60%)`);
 }
 
+/*
+  PLAN 18i-2, written before the build: the beads run on the gap, not on dials.
+
+  A pancake of oil between two glasses a gap b apart, on a plate tipped by θ,
+  slides at U = Δρ g sinθ b² / (12 μ (1 + λ)), μ the liquid round it and λ the
+  ratio of the drop's viscosity to it (the Hele-Shaw drop's mobility, the same
+  1 + λ the field's 2U/(1 + λ) lag already carries). On main the field slides
+  a bead by tiltX·500 cells a second, whatever the gap or the liquids, and
+  merges touching beads with a chance of 0.02 a step.
+
+  What the build adds, and the only API these lines assume: `setLiquid({
+  gapMetres, muOut, muIn, deltaRho, sigma })` on the field (SI units), and the
+  tilt that `step` takes read as the sine of the plate's tilt on each axis.
+  The line is run with two pairs of liquids a factor apart in λ and in gap, so
+  a constant tuned to one of them misses the other.
+
+  The merge's chance a step has no line (why is written where it would be,
+  below the slide line).
+
+    npm run drops -- --owed=slide
+
+  is how main runs it until 18i-2 is built; the PR that builds it takes the
+  id out of --owed in scripts/checks.json and changes nothing here.
+*/
+{
+  const IDS = ['slide'];
+  const flag = process.argv.find((a) => a.startsWith('--owed='));
+  const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+  const unknown = [...owed].filter((id) => !IDS.includes(id));
+  if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+  const owedCheck = (id, name, ok, detail, mainState) => {
+    if (!owed.has(id)) return check(name, ok, detail);
+    if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+    if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+    console.log(` owed  ${name} — ${detail}`);
+  };
+  const G = 9.81, METRES_PER_CELL = 0.2 / N;
+  const built = typeof new BeadField(N).setLiquid === 'function';
+  const still = () => [0, 0];
+  const LIQUIDS = [
+    { name: 'light oil in water, 2 mm', gapMetres: 0.002, muOut: 1e-3, muIn: 0.01, deltaRho: 80, sigma: 0.03 },
+    { name: 'thick oil in water, 1 mm', gapMetres: 0.001, muOut: 1e-3, muIn: 0.1, deltaRho: 120, sigma: 0.03 },
+  ];
+  const sinT = 0.1;
+  const slides = LIQUIDS.map((L) => {
+    seed(1802);
+    const f = new BeadField(N);
+    f.drops = 1;
+    if (built) f.setLiquid(L);
+    f.populate(40, 1);
+    f.beads.splice(1);
+    const b = f.beads[0];
+    b.x = N * 0.3; b.y = N * 0.5;
+    const x0 = b.x, secs = 2, steps = 60 * secs;
+    for (let i = 0; i < steps; i++) f.step(1 / 60, still, sinT, 0);
+    const got = Math.abs(f.beads[0] ? f.beads[0].x - x0 : NaN) * METRES_PER_CELL / secs;
+    const want = L.deltaRho * G * sinT * L.gapMetres ** 2 / (12 * L.muOut * (1 + L.muIn / L.muOut));
+    return { L, got, want, ratio: got / want };
+  });
+  owedCheck('slide', 'a bead on a tipped plate slides at Hele-Shaw’s Δρ g sinθ b²/(12μ(1 + λ)), within 15%, for two liquids and gaps',
+    slides.every((s) => s.ratio > 0.85 && s.ratio < 1.15),
+    slides.map((s) => `${s.L.name}: ${(s.got * 1e3).toFixed(3)} mm/s against ${(s.want * 1e3).toFixed(3)} (${s.ratio.toFixed(2)}x)`).join('; '),
+    !built);
+
+  /*
+    No rate line. The item also asks that a merge be Paterson's
+    1 − exp(−dt/τ), not the 0.02 a step of beads.ts, and a line for it was
+    written and measured on main (2026-11-21) in two setups, neither of which
+    can tell the two apart. On a crowded plate the gathering current packs,
+    1738 beads were lost in six seconds at 60 steps a second and 1834 at 30
+    (1.06x): the instant merge of a small drop inside a big one takes almost
+    all of them, and it has no chance in it. Pairs laid pressed on a still
+    plate part before the chance fires: 3 of 256 merged in half a second at
+    either rate. A line that is green on main is not owed, and one that reads
+    three events cannot fail honestly, so the chance a step is left to the
+    build's own reading of the item, and slide is the line 18i-2 is held to.
+  */
+}
+
 console.log(`     the mask for ${beads.length} drops took ${ms.toFixed(1)} ms to draw (the rings' canvas is not timed here)`);
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

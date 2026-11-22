@@ -47,6 +47,7 @@
  * press moves nothing ever. A plate with no press at all is run beside it
  * and printed, to show the far plate has nothing else moving it.
  */
+import { build, transform } from 'esbuild';
 import { openLab } from './lab.mjs';
 
 const checks = [];
@@ -99,6 +100,136 @@ const glass = (settings) => ({
   platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
   plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
 });
+
+/*
+  The press's twist (PLAN 15g-18), owed, in node and first: the convention of
+  `gap.mjs`. `--owed=<ids>` names the lines whose fault is still in the build;
+  such a line prints " owed" while main's fault is there and turns red both
+  when it starts to pass (take its id out) and when what it is owed for has
+  been built and still misses. An id it does not know is a FAIL, so a typo
+  cannot quietly owe nothing.
+*/
+const IDS = ['presstwist'];
+const owedFlag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(owedFlag ? owedFlag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknownOwed = [...owed].filter((id) => !IDS.includes(id));
+if (unknownOwed.length) check('every id in --owed is a line of this check', false, `unknown: ${unknownOwed.join(', ')} (known: ${IDS.join(', ')})`);
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
+
+/*
+  A press squeezes; it does not twist (PLAN 15g-18).
+
+  What is there: the hand's press (LiquidVisualizer, `tool === 'press'`)
+  squeezes the film under the palm, as it should, and then writes a vortex
+  over the palm's whole disc, w = (1 − d/R)² · 40 · amount · √k, round the
+  middle (a comment calls it the Photoscope's twisting of one slide against
+  another). Nothing in a press turns the glass: the remote's press (the
+  phone's and a cord's, `case 'press'`) has no such twist, so the same
+  gesture stirs the plate from the desk and not from the phone, and the
+  plate shows a swirl no hand made.
+
+  The law. Two glasses a gap b apart pressed together at ḃ (< 0) squeeze a
+  Hele-Shaw film: depth-averaged, ∇·(b u) = −ḃ under a palm pressing evenly,
+  with u = −(b²/12μ)∇p a gradient, so the flow is u = −(r/2)(ḃ/b) r̂, straight
+  out from the middle and irrotational. Its circulation round any circle
+  about the palm, Γ = ∮ u · dl, is zero, and the flux out through radius R,
+  2πR · b · u_r = −πR²ḃ, is the volume the palm displaces. That outflow is the
+  solver's to make from the squeeze (the gap's source in the projection), and
+  `npm run thingap` holds on the solver that a press pushes out what it
+  displaces; what this line holds is that the press hands the solver its
+  squeeze and writes no turning of its own on top.
+
+  Measured on the app's own code: the two press paths are read out of
+  LiquidVisualizer's source and run as written (types stripped), with the
+  names they use given as stand-ins, on a recording `af` that adds every
+  velocity write into a 192² grid (GRID_SIZE). Then the circulation round
+  circles at 0.3, 0.5, 0.7 and 0.9 of the palm, sampled bilinearly, against
+  ∮|u| dl round the same circles: |Γ| must be under 1% of it (a purely
+  radial write, which the law allows, gives only the grid's sampling error;
+  main's twist gives all of it, 1.0). And the squeeze must still reach the
+  solver: at least one applySquish with a positive amount and one squeezeOut
+  over the palm, so deleting the press passes nothing. A call on `af` this
+  stand-in does not know (another way to write velocity) is a FAIL that
+  names it, so moving the twist to a new method cannot hide it. A build that
+  only fades the swirl, or draws the plate as though pressed, keeps a
+  circulation equal to its whole speed and cannot pass: the ratio does not
+  care how strong the twist is. If the press moves into a helper, the helper
+  goes in src/lib/pressRing.ts (whose exports are in scope here); a name the
+  paths use that is not in scope fails the line by name.
+*/
+{
+  const fs = await import('node:fs');
+  const out = 'node_modules/.cache/heldpress-press.mjs';
+  await build({ stdin: { contents: "export * from './src/lib/pressRing.ts';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+  const M = await import(`../${out}`);
+  const lv = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  const between = (from, to) => {
+    const a = lv.indexOf(from), b = a < 0 ? -1 : lv.indexOf(to, a + from.length);
+    return a < 0 || b < 0 || lv.indexOf(from, a + 1) >= 0 ? null : lv.slice(a + from.length, b);
+  };
+  const localBody = between("} else if (tool === 'press') {", "} else if (tool === 'blow') {");
+  const remoteBody = between("case 'press': {", "case 'finger': {");
+  const N = 192, GS = N / 128, X0 = 96, Y0 = 96;
+  const KNOWN = new Set(['applySquish', 'squeezeOut', 'addVelocity']);
+  const press = async (body, wrap, palmCells, vars) => {
+    const u = new Float64Array(N * N), v = new Float64Array(N * N), squish = [], squeeze = [], unknown = new Set();
+    let writes = 0;
+    const rec = {
+      applySquish: (x, y, r, a) => squish.push([r, a]),
+      squeezeOut: (x, y, R, a) => squeeze.push([R, a]),
+      addVelocity: (i, j, du, dv) => { writes++; const c = Math.floor(j) * N + Math.floor(i); if (c >= 0 && c < N * N) { u[c] += du; v[c] += dv; } },
+    };
+    const af = new Proxy(rec, { get: (t, key) => (KNOWN.has(key) ? t[key] : (unknown.add(String(key)), () => {})) });
+    const scope = {
+      ...M, af, x: X0, y: Y0, GRID_SCALE: GS, GRID_SIZE: N, S: N, layer: 0,
+      beadsRef: { current: { disturb() {} } }, activeLayerRef: { current: 0 },
+      currentSettings: { fingering: 0 }, settingsRef: { current: { fingering: 0 } }, ...vars,
+    };
+    let error = null;
+    try {
+      const names = Object.keys(scope);
+      const { code } = await transform(`(function (${names.join(', ')}) { ${wrap(body)} })`, { loader: 'ts' });
+      new Function(`return ${code.trim().replace(/;$/, '')}`)()(...names.map((n) => scope[n]));
+    } catch (e) { error = String(e.message ?? e).slice(0, 120); }
+    const at = (f, X, Y) => {
+      const i = Math.floor(X), j = Math.floor(Y), fx = X - i, fy = Y - j, c = j * N + i;
+      return (1 - fy) * ((1 - fx) * f[c] + fx * f[c + 1]) + fy * ((1 - fx) * f[c + N] + fx * f[c + N + 1]);
+    };
+    let G = 0, flow = 0;
+    for (const frac of [0.3, 0.5, 0.7, 0.9]) {
+      const rho = frac * palmCells, n = 720, dl = 2 * Math.PI * rho / n;
+      let g = 0;
+      for (let s = 0; s < n; s++) {
+        const th = 2 * Math.PI * s / n, X = X0 + rho * Math.cos(th), Y = Y0 + rho * Math.sin(th);
+        const uu = at(u, X, Y), vv = at(v, X, Y);
+        g += (-uu * Math.sin(th) + vv * Math.cos(th)) * dl;
+        flow += Math.hypot(uu, vv) * dl;
+      }
+      G += Math.abs(g);
+    }
+    const ratio = flow > 0 ? G / flow : 0;
+    const squeezed = squish.length > 0 && squish.every(([, a]) => a > 0) && squeeze.length === 1 && squeeze[0][1] > 0 && Math.abs(squeeze[0][0] - palmCells) < 1e-9;
+    return { ok: !error && unknown.size === 0 && squeezed && ratio < 0.01, ratio, writes, squeezed, error, unknown: [...unknown], squish: squish.length };
+  };
+  const plain = (b) => b;
+  // The remote's path is a switch case ending in `break; }`: run inside one.
+  const asCase = (b) => `switch (0) { case 0: {${b}} `;
+  const found = localBody !== null && remoteBody !== null;
+  const AMTS = [0.3, 1];
+  const local = found ? await press(localBody, plain, 30 * GS, { k: 1, kSoft: 1 }) : null;
+  const remotes = found ? await Promise.all(AMTS.map((amt) => press(remoteBody, asCase, (20 + 12 * amt) * GS, { amt }))) : [];
+  const say = (name, r) => `${name}: |Γ| ${r.ratio.toFixed(3)} of ∮|u|dl over ${r.writes} velocity writes, ${r.squish} squeezes${r.squeezed ? '' : ' (the squeeze does not reach the solver)'}${r.error ? `, threw ${r.error}` : ''}${r.unknown.length ? `, unknown calls ${r.unknown.join(', ')}` : ''}`;
+  line('presstwist', 'a press squeezes the film and writes no turning: the circulation round its palm is under 1% of its flow, the hand\'s and the remote\'s alike, and its squeeze reaches the solver',
+    found && local.ok && remotes.every((r) => r.ok),
+    found ? [say('the hand', local), ...remotes.map((r, i) => say(`the remote at ${AMTS[i]}`, r))].join('; ') : 'the press paths were not found in LiquidVisualizer (renamed?)',
+    // Main's: the hand's press writes a vortex, so its circulation is (nearly) all of its flow.
+    found && !local.error && local.ratio > 0.5);
+}
 
 const { page, close } = await openLab();
 try {

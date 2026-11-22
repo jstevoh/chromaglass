@@ -76,6 +76,15 @@
  *      held share pourShare gives, and lays its colour with that volume at
  *      the strength of a column of the same bottle's drop (dropColumnDye, to
  *      1e-6 a cell), its deposit pushing nothing; with no pour, the stamp
+ *  12. (owed, splashliquid) a bottle's drop splashes by its own liquid's
+ *      Weber and Ohnesorge numbers: each of water, alcohol, oil and glycerine
+ *      throws nothing from 0.9 of the height its own ρ, μ and σ put
+ *      Cossali's threshold at, worked out here in SI, and throws from 1.1 of
+ *      it wherever that is within the slider's reach
+ *  13. (owed, satellitedye) a splash moves the drop's dye and volume, it
+ *      makes none: everything a splashing drop lays, satellites and all, is
+ *      the drop's dye to 0.5%, its pours the drop's volume to 0.5%, and some
+ *      of that dye is thrown clear
  *
  * Measured (SwiftShader, 2026-11-14): see the commit that added it.
  */
@@ -86,6 +95,25 @@ const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok });
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
+};
+/*
+  Lines 12 and 13 are owed (PLAN 18c-13), the convention of `gap.mjs`: a line
+  under an id named in --owed prints as owed while what it asks for is absent,
+  and is red the day it passes with its id still listed, so the PR that builds
+  the item takes the id out of --owed in scripts/checks.json and never edits a
+  line or a bar. A build that is there and misses is red, owed or not.
+*/
+const IDS = ['splashliquid', 'satellitedye'];
+const owedFlag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(owedFlag ? owedFlag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknownOwed = [...owed].filter((id) => !IDS.includes(id));
+if (unknownOwed.length) check('every id in --owed is a line of this check', false, `unknown: ${unknownOwed.join(', ')} (known: ${IDS.join(', ')})`);
+/** `mainState`: what the line is owed for is absent, the only state an owed line is excused in. */
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
 };
 
 const N = 192;
@@ -99,7 +127,7 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
 {
   const out = 'node_modules/.cache/dropwindow-drop.mjs';
   await build({
-    stdin: { contents: "export * from './src/sim/dropSplash.ts'; export * from './src/lib/dropImpact.ts'; export { speciesOf } from './src/lib/liquidProps.ts'; export { LiquidPhase } from './src/lib/liquidPhase.ts'; export { DISH_METRES } from './src/lib/turntable.ts';", resolveDir: '.', loader: 'ts' },
+    stdin: { contents: "export * from './src/sim/dropSplash.ts'; export * from './src/lib/dropImpact.ts'; export { speciesOf } from './src/lib/liquidProps.ts'; export { LiquidPhase } from './src/lib/liquidPhase.ts'; export { DISH_METRES, DISH_GAP_METRES } from './src/lib/turntable.ts';", resolveDir: '.', loader: 'ts' },
     bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
   });
   const D = await import(`../${out}`);
@@ -246,6 +274,108 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
       && Math.abs(laid - st.laid.reduce((s, l) => s + l[2], 0)) < 1e-9
       && coldS.pours.length === 0 && coldS.deposits[0]?.volume === true && Math.abs(coldLaid / (0.8 * m0) - 1) < 1e-6,
     `share ${share.toFixed(4)} a step, ${st.laid.length} cells of the disc's ${inside} at ${(C * DYE).toFixed(3)} a column (a drop's ${dropStrength.toFixed(3)} at dye 1, ${C.toFixed(3)} the stream's), ${laid.toFixed(2)} laid, deposit push ${st.deposits[0]?.volume}; cold: ${coldS.pours.length} pours, the stamp's ${(coldLaid / (0.8 * m0)).toFixed(4)}`);
+
+  /*
+    12–13 (PLAN 18c-13, owed): the splash is the falling liquid's own, and it
+    moves the drop's dye rather than making more.
+
+    What is there: `dropImpact` works K = We·Oh^−0.4 out with water's ρ, σ
+    and μ whatever falls, and `layDrop` never hands it the bottle's liquid,
+    so a drop of glycerine (1412 times water's viscosity) splashes from
+    exactly the height water does, and a drop of alcohol (a third of water's
+    tension) only from there too. And each satellite `splash` throws lays
+    0.22 of the drop's dye at its middle on top of the drop's whole dye,
+    which is still poured in full: a splash makes colour out of nothing.
+
+    The law. A drop of diameter D falling H arrives at v = √(2gH); its Weber
+    number is We = ρv²D/σ and its Ohnesorge number Oh = μ/√(ρσD), both the
+    falling liquid's own ρ, μ and σ, since it is the drop's inertia against
+    its own surface and its own viscosity that decide whether its rim
+    breaks up (Cossali, Coghe and Marengo 1997). It splashes on a film h
+    deep when K = We·Oh^−0.4 passes 2100 + 5880 (h/D)^1.44. K grows as H, so
+    each liquid has one threshold height, H* = Kc / K(1 m), worked out here
+    in SI from the bottles' own numbers (src/bottles.ts, in LiquidBehaviour's
+    units: mPa·s, g/cm³, mN/m), not from anything the app computes. For the
+    5 mm drop of amount 5 that is about 0.2 m for water, half that for
+    alcohol (its low tension raises We more than its Oh lowers K), more
+    than half a metre for sunflower oil and some two and a half metres for
+    glycerine, past the slider's reach (2 × DROP_HEIGHT_METRES, 0.6 m): a
+    glycerine drop does not splash from any height the plate can drop it.
+    And a satellite is a piece of the drop's own rim pinched off: whatever
+    the crown throws is drop, so the dye and volume laid in all are the
+    drop's, only some of it further out.
+
+    Measured as the app lays it, through `dropBottle` (the hand's Dropper,
+    the phone's and the remote's drops: line 10 holds that they all go
+    through it) on the stand-in plate above, twenty drops a height, each
+    stepped until it is in, satellites counted as dye laid or volume poured
+    past the drop's own widest disc (`reach`, line 7's). The heights are 0.9
+    and 1.1 of each liquid's own H*, so the bracket is the threshold's ±10%
+    and nothing between: a build that only turns the splash off for thick
+    bottles still fails alcohol, which must splash from a height water
+    cannot; one that scales the threshold by viscosity, or by any one
+    number, misses at least one of the four brackets; and the film's depth
+    is the rest gap here (`coverMetres` on the stand-in), so a build that
+    reads the plate's gap gets the same Kc this works out.
+
+    13 then asks a splashing water drop (Drop Height 1.5, 0.45 m, past
+    twice its H*) for the totals: the dye everything laid within 0.5% of the
+    drop's (the stamp's mass, as line 9 measures a still drop to lay
+    exactly), the volume its pours carry (share × radius² a pour, the
+    queue's own measure, W = (amount / DROP_AMOUNT) · DROP_DISC² a drop)
+    within 0.5% of the drop's, and some of the dye (over 0.1%) laid past the
+    drop's disc, so a build that deletes the satellites to balance the books
+    is red too. Dimming the satellites without taking their dye from the
+    drop cannot pass either: it is the total that is held, not their share.
+
+    Not held here, and still in the item: the trickle's mass (`dropSplash`'s
+    music trickle) and the crater's fixed size.
+  */
+  {
+    const G = 9.81, GAP = D.DISH_GAP_METRES, DIAM = D.dropDiameter(5), SLIDER = 2;
+    const LIQUIDS = {
+      water: { viscosity: 1.0, density: 1.0, tension: 72.8 },
+      alcohol: { viscosity: 1.2, density: 0.79, tension: 22 },
+      oil: { viscosity: 49, density: 0.92, tension: 33 },
+      glycerine: { viscosity: 1412, density: 1.261, tension: 63.4 },
+    };
+    const thresholdMetres = (b) => {
+      const rho = b.density * 1000, mu = b.viscosity * 1e-3, sigma = b.tension * 1e-3;
+      const Oh = mu / Math.sqrt(rho * sigma * DIAM);
+      const KatOneMetre = (rho * 2 * G * DIAM / sigma) * Math.pow(Oh, -0.4);
+      return (2100 + 5880 * Math.pow(GAP / DIAM, 1.44)) / KatOneMetre;
+    };
+    const drops = (what, setting, dye = 1) => {
+      const p = plate(setting);
+      p.gpu.coverMetres = GAP;
+      for (let k = 0; k < 20; k++) {
+        D.dropBottle(p, 96, 96, 5, 1, 1, 0.1, dye, what, 4, 1);
+        let guard = 0;
+        while (D.dropsLive(p.drops) && guard++ < 200) D.stepPlateDrops(p);
+      }
+      let thrown = 0, thrownDye = 0, dyeLaid = 0, vol = 0;
+      for (const [i, j, a] of p.laid) { dyeLaid += a; if (Math.hypot(i - 96, j - 96) > reach) { thrown++; thrownDye += a; } }
+      for (const q of p.pours) { vol += q.share * q.r * q.r; if (Math.hypot(q.x * 192 - 96.5, q.y * 192 - 96.5) > reach) thrown++; }
+      return { thrown, thrownDye, dyeLaid, vol };
+    };
+    const rows = Object.entries(LIQUIDS).map(([name, b]) => {
+      const H = thresholdMetres(b), lo = 0.9 * H / D.DROP_HEIGHT_METRES, hi = 1.1 * H / D.DROP_HEIGHT_METRES;
+      return { name, H, low: drops(b, Math.min(SLIDER, lo)).thrown, high: hi <= SLIDER ? drops(b, hi).thrown : null };
+    });
+    const row = Object.fromEntries(rows.map((r) => [r.name, r]));
+    line('splashliquid', '12. a drop splashes by its own liquid\'s We and Oh: water, alcohol, oil and glycerine each throw nothing from 0.9 of their own threshold height (or the slider\'s top) and throw from 1.1 of it',
+      rows.every((r) => r.low === 0 && (r.high === null || r.high > 0)) && row.water.high !== null && row.alcohol.high !== null,
+      rows.map((r) => `${r.name} H* ${(r.H * 100).toFixed(1)} cm: ${r.low} cells thrown below, ${r.high ?? 'out of reach'} above`).join('; '),
+      // Main's: water's numbers gate every bottle, so alcohol from 1.1 of its own (lower) threshold throws nothing and glycerine from the slider's top throws.
+      row.alcohol.high === 0 && row.glycerine.low > 0);
+    const DYE = 0.8, s = drops(LIQUIDS.water, 1.5, DYE);
+    const dyeRatio = s.dyeLaid / (20 * m0 * 5 * DYE), volRatio = s.vol / (20 * (5 / D.DROP_AMOUNT) * D.DROP_DISC ** 2);
+    line('satellitedye', '13. a splash moves the drop, it makes none: its dye and volume laid in all are the drop\'s to 0.5%, some of it thrown clear',
+      Math.abs(dyeRatio - 1) < 0.005 && Math.abs(volRatio - 1) < 0.005 && s.thrown > 0 && s.thrownDye > 0.001 * s.dyeLaid,
+      `twenty water drops from Drop Height 1.5: dye ${dyeRatio.toFixed(4)} of theirs, volume ${volRatio.toFixed(4)}, ${s.thrown} cells thrown carrying ${(100 * s.thrownDye / Math.max(1e-12, s.dyeLaid)).toFixed(1)}% of the dye`,
+      // Main's: each satellite lays 0.22 of the drop's dye on top of the drop's whole dye.
+      dyeRatio > 1.005);
+  }
 }
 
 // ── 1–6, on the solver ──
