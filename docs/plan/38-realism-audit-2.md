@@ -28,7 +28,7 @@ cost, then Low.
 | 6 | ~~38v-1~~ | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | shipped |
 | 7 | 18c-13 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
 | 8 | 9ad | The domes rise on \|B\|, not on its normal part (RS-20) | `09-ferrofluid.md` | S–M | Medium–High | new |
-| 9 | 18i-2 | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | new |
+| 9 | ~~18i-2~~ | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | shipped |
 | 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | new |
 | 11 | 38v-2 | Comet's pull flickers with the beat, and is absent on the open plate (RS-3) | here | S | Medium | new |
 | 12 | 29a-11 | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | new |
@@ -57,7 +57,7 @@ cost, then Low.
 | 35 | 18m-3 | The slump reads one global viscosity (RS-6) | `18-physics-3.md` | S | Low | updates |
 | 36 | 1k | Retire the sharpen pass still behind Sharpness and CC15 (RS-9; plan text corrected) | `01-sharp-liquid.md` | S | Low | new |
 | 37 | 18f-4, 38s | Vogel's law for warm glycerine; the cover's density is water's (RS-10) | `18-physics-2.md`, `38-realism-audit.md` | S | Low | updates |
-| 38 | 15g-19 | The straw's lobes are clipped at a reach, not conserved (RS-15) | `15-tools-on-liquids.md` | S | Low | new |
+| 38 | 15g-19 | The straw's lobes are clipped at a reach, not conserved (RS-15) | `15-tools-on-liquids.md` | S | Low | shipped |
 | 39 | 20b-17 | The lace's solvent evaporates under the cover (RS-17) | `20-lace-and-holes.md` | S | Low | new |
 | 40 | 47b-4 | The glint's spikes add light the disc keeps (RS-28) | `47-macro-photography.md` | S | Low | new |
 | 41 | 47n-8 | The tank's glow adds white at any exposure (RS-31) | `47-macro-photography.md` | S | Low | new |

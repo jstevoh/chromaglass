@@ -47,7 +47,8 @@ import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, step
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
-import { BeadField, beadPopulation } from '../lib/beads';
+import { BeadField } from '../lib/beads';
+import { stepPlateBeads } from '../sim/beadStep';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
@@ -77,7 +78,7 @@ import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun'
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { dropBottle, layStream } from '../sim/dropSplash';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
@@ -4102,12 +4103,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   dent lands anywhere in the middle half of the dish, a finger
                   finding the glass where it falls; the glass about the middle.
                 */
-                const press = kickPress(thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), currentSettings.frameSway ?? 0);
+                const nu = thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS);
+                const press = kickPress(nu, currentSettings.frameSway ?? 0, leadPlate.gpu?.coverMetres);
                 const sheet = press.radii.length === 1;
-                const sqAt = sqArea ? areaCentre(sqArea, GRID_SIZE) : { x: GRID_SIZE / 2, y: GRID_SIZE / 2 };
-                const sqSpread = sqArea ? sqArea.r * GRID_SIZE : (sheet ? GRID_SIZE / 2 : 30 * GRID_SCALE);
-                const cx = sqAt.x + DICE.music.centred() * sqSpread;
-                const cy = sqAt.y + DICE.music.centred() * sqSpread;
+                const { x: cx, y: cy } = kickCenter(sqArea, sheet, DICE.music);
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
                 // (Whatever showed then was not the press, which never landed
                 // until the centre was rounded, PLAN §10 step 4.) Pressed and
@@ -4127,7 +4126,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   deep as a hard one; now two thirds (kickDepth).
                 */
                 const a = kickDepth(squeezeAmt, bass01, accent);
-                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), Math.max(-1, Math.min(1, currentSettings.plateCurve ?? 0)));
+                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, nu, Math.max(-1, Math.min(1, currentSettings.plateCurve ?? 0)));
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, (sheet ? press.radii[0] : 30) * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }
@@ -4165,58 +4164,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             for (const fluid of fluidsRef.current) { fluid.coverX = cover.vx; fluid.coverY = cover.vy; }
 
             // ── Oil beads ───────────────────────────────────────
-            {
-              const beadAmt = c01(currentSettings.beads ?? 0);
-              const beads = beadsRef.current;
-              if (beadAmt <= 0) {
-                if (beads.beads.length) beads.clear();
-              } else {
-                // Every thirtieth frame. This read the gesture counter, which only
-                // advances while someone is painting: before the first stroke it
-                // repopulated on every frame (up to count × 6 placement tries,
-                // each checking every bead), and after one it mostly never ran
-                // again, so the beads stopped following their slider.
-                // Drops take their colours from the look's palette (PLAN.md
-                // batch 3); set every frame because it is one number, and the
-                // palette with the populate below, since a new one is eased
-                // toward over a second and a half rather than cut to.
-                beads.drops = currentSettings.beadDrops ?? 0; // clamped, and NaN made 0, by the field
-                if (simStep === 0 && (beadFrameRef.current % 30 === 0 || !beads.hasPalette) && beads.drops > 0) {
-                  beads.setPalette(harmonyRef.current.map(i => PALETTE_RGB[i] ?? PALETTE_RGB[0]));
-                }
-                if (simStep === 0 && beadFrameRef.current++ % 30 === 0) {
-                  const dens = fluidsRef.current[0]?.readDensity;
-                  beads.populate(...beadPopulation(beadAmt, currentSettings.macroMode), dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
-                }
-                if (isActiveRef.current && drainFrameRef.current === 0) {
-                  const lead0 = fluidsRef.current[0];
-                  const bvx = lead0?.readVx, bvy = lead0?.readVy;
-                  const bk = particleFlowScale(lead0, currentSettings);
-                  beads.step(simStepS, (bx, by) => {
-                    if (!bvx || !bvy) return [0, 0];
-                    /*
-                      The clamp has to reject NaN, which the obvious one does
-                      not. `Math.round(NaN)` is NaN, `Math.min` and `Math.max`
-                      pass NaN through, an array indexed by NaN is `undefined`
-                      and `undefined * bk` is NaN — so a bead that went bad
-                      once was fed NaN for ever, and the gradient `beads.ts`
-                      draws it with throws inside the frame loop. The canvas
-                      stopped and the desk kept working.
-                    */
-                    const cell = (v: number): number =>
-                      Number.isFinite(v) ? Math.max(0, Math.min(GRID_SIZE - 1, Math.round(v))) : -1;
-                    const ix = cell(bx);
-                    const iy = cell(by);
-                    if (ix < 0 || iy < 0) return [0, 0];
-                    const vx = bvx[ix + iy * GRID_SIZE] * bk;
-                    const vy = bvy[ix + iy * GRID_SIZE] * bk;
-                    // And the field itself: a solver that has gone unstable
-                    // hands back NaN, and this is where it would get in.
-                    return [Number.isFinite(vx) ? vx : 0, Number.isFinite(vy) ? vy : 0];
-                  }, tiltX, tiltY);
-                }
-              }
-            }
+            if (stepPlateBeads(
+              beadsRef.current,
+              fluidsRef.current[0],
+              currentSettings,
+              harmonyRef.current,
+              PALETTE_RGB,
+              simStep,
+              beadFrameRef.current,
+              isActiveRef.current && drainFrameRef.current === 0,
+              simStepS,
+              plateSin(tiltX, rockX),
+              plateSin(tiltY, rockY),
+            )) beadFrameRef.current++;
 
             // ── Bubbles ─────────────────────────────────────────
             const bubbleAmt = c01(currentSettings.bubbles ?? 0);

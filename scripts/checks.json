@@ -164,7 +164,7 @@
     {
       "name": "The glass gap, one number",
       "shard": "logic",
-      "run": "npm run gap -- --owed=puddle,settle,lift,pinch,readers,wired",
+      "run": "npm run gap -- --owed=puddle,settle,lift,pinch",
       "why": [
         "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
         "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
@@ -689,7 +689,7 @@
     {
       "name": "The drops",
       "shard": "logic",
-      "run": "npm run drops -- --owed=slide",
+      "run": "npm run drops",
       "why": [
         "Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,",
         "each drop its own colour, pressed flat where it touches, a swallowed",
@@ -2790,7 +2790,7 @@
     {
       "name": "The straw bubble",
       "shard": "plate",
-      "run": "npm run straw -- --owed=area",
+      "run": "npm run straw",
       "why": [
         "Held still, the Blow grows a bubble with a fingered rim and a ring of satellites."
       ]
