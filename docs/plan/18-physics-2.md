@@ -72,17 +72,11 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   whose front is set by the pressure the drop's own weight and surface tension give). Measure the
   window's growth on the Mac's grid against R(t) of a Hele-Shaw drop, then lay the drop at a
   point and let the solver spread it.
-- **18c-13** The splash is water's, whatever liquid falls, and makes dye (S; Medium–High).
-  `dropImpact.ts:82` carries water's ρ, σ and μ, so Cossali's K gates the satellites with
-  water's numbers for oil or glycerine; `dropSplash.ts:114` ignores the gap; the satellites
-  (`:119-134`) add 22% more dye than the drop held; the trickle (`:75-80`) carries no mass;
-  the crater (`:66`) is a fixed size. A splash needs K = We·Oh^-0.4 over about 2100 with the
-  falling liquid's own properties, and a drop splits its volume, it does not add to it. Read
-  the bottle's ρ, σ, μ, take the gap, and split the drop's dye and volume among crater, crown
-  and satellites. Check: total dye and volume after a splash within 0.5% of the drop's; an oil
-  drop from the same height does not splash. Lines are at 801a815e; after #905 the water constants
-  sit at `dropImpact.ts:89` and the satellites at `dropSplash.ts:193-207`, each still laying 0.22
-  of the drop's dye. (38v, from RS-13.)
+- **18c-13b** The trickle's mass and the crater's size (found with 18c-13; S).
+  The music trickle (`dropSplash.ts`, `amount < DROP_TRICKLE`) still stamps its dye before a
+  Tate drop falls and queues the falling drop with zero dye using water's fixed `DROP_TATE`,
+  and the crater (`applySquish` in `dropSplash.ts`) still uses a fixed depth scale rather than
+  scaling with impact energy and the falling liquid's properties.
 - **18c-14** The idle plate lays dye and heat by itself (S–M; High). With nothing touched,
   `ambientSeedRef` (`LiquidVisualizer.tsx:839`) runs orbits at `3911-3933` that lay 0.05 of
   dye and 0.02 of heat a frame, so a still plate fills and warms. A plate left alone only
