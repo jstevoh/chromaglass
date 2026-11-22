@@ -422,6 +422,12 @@ an unsteady measure says "may vary from take to take", and every word names its 
   take of a moving fluid: run two takes of one look through it and find which of its sentences
   hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
   check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
+- ~~**47x-10**~~ the flow read aliased (shipped, this PR). The words check's drifting
+  stripes (a 64-pixel period moving a pixel a frame) move almost half their period in the
+  second the physics read pairs over, so the backward shift matched as well as the true one:
+  one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
+  two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
+  one sample then lags of 3, 8 and 10, each seeded from the last.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
