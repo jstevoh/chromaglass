@@ -60,6 +60,17 @@ function extract(read) {
     }
   }
 
+  // Hues a frame as the mean over the samples, not shape()'s median integer (PLAN 47x-7):
+  // the cell bloom's before and after read 3 and 2 by the median, a whole step, when the
+  // frames were holding about two and a half hues in both. The rule per frame is shape()'s
+  // own (a hue counts at 8% of the coloured pixels; a frame under 5% coloured has none), so
+  // a film whose every frame holds the same count reads the same number as before.
+  let huesMean = null;
+  const hueRows = rows.filter(r => r && r.hue12 && Number.isFinite(r.colour) && Number.isFinite(r.coloured));
+  if (hueRows.length) {
+    huesMean = hueRows.reduce((s, r) => s + (r.colour < 0.05 ? 0 : [...r.hue12].filter(c => c / r.coloured >= 0.08).length), 0) / hueRows.length;
+  }
+
   const p5 = finite(ds.p5?.med);
   const p95 = finite(ds.p95?.med);
   const lumSpread = p5 != null && p95 != null ? p95 - p5 : null;
@@ -92,7 +103,7 @@ function extract(read) {
     // Colour (Itten)
     colourfulness: finite(ds.colourfulness?.med),
     coloured: finite(ds.coloured?.med),
-    huesCount: finite(sh.hues),
+    huesCount: huesMean ?? finite(sh.hues),
     hueGap: finite(ds.hueGap?.med),
     hueSpread: finite(ds.hueSpread?.med),
     warm: finite(ds.warm?.med),
@@ -243,12 +254,14 @@ export const BANDS = [
     test: (v, m) => v >= 15 && v < 28 && (m.coloured == null || m.coloured >= 0.05),
     say: v => `muted colour (colourfulness ${fmtNum(v)})`,
   },
-  // `REAL_SHOWS` / multi-hue shows have >= 3 hues; `drift`/`jumps` have 2, `crisp`/`soft` have 1.
+  // `REAL_SHOWS` / multi-hue shows have >= 3 hues by the median; `drift`/`jumps` have 2, `crisp`/`soft` have 1.
+  // The measure is now the mean over the samples (47x-7), so the edge sits at 2.5: the median's 3
+  // is any film holding three hues in more than half its frames, which is a mean above about 2.5.
   {
     area: 'colour', term: 'of hue', source: 'Johannes Itten',
     measure: 'hues a frame', steady: true,
     read: m => m.huesCount,
-    test: (v, m) => v >= 3 && (m.colourfulness == null || m.colourfulness >= 15) && (m.coloured == null || m.coloured >= 0.05),
+    test: (v, m) => v >= 2.5 && (m.colourfulness == null || m.colourfulness >= 15) && (m.coloured == null || m.coloured >= 0.05),
     say: v => `contrast of hue (${fmtNum(v)} hues a frame)`,
   },
   // `jumps` reads hueGap = 180° (opposite); `drift` reads 30° (under 45° in `watchdesign.mjs`).
@@ -627,6 +640,7 @@ export function compareReads(before, after) {
   const am = extract(after ?? {});
   const changed = [];
   const held = [];
+  const edge = [];
 
   for (const s of COMPARE_SPECS) {
     const bw = wordByMeasure(bWords, s.measure);
@@ -645,7 +659,12 @@ export function compareReads(before, after) {
 
     const steady = bw ? bw.steady : (aw ? aw.steady : s.steady);
     if (steps < 1) {
-      held.push({ area: s.area, measure: s.measure });
+      held.push({ area: s.area, measure: s.measure, label: s.label });
+      // A word said in one read and not the other, or two different words, while its measure
+      // moved under a step: the measure sits near a band's edge and the word flickered (PLAN
+      // 47x-5; the cell bloom's "weight: light" and "space: indirect" showed in its after read
+      // only). Named apart, so the two In words reads are not taken for a change.
+      if ((bw || aw) && bw?.term !== aw?.term) edge.push(`${s.label} (${bw ? bw.term : 'no word'} before, ${aw ? aw.term : 'no word'} after)`);
       continue;
     }
 
@@ -661,8 +680,8 @@ export function compareReads(before, after) {
     const Dir = dir[0].toUpperCase() + dir.slice(1);
     let phrase;
     if (bw && aw && bw.term !== aw.term) phrase = `${Dir}, from ${name(bw)} to ${name(aw)} ${nums}`;
-    else if (!bw && aw) phrase = `${Dir}, and became ${name(aw)} ${nums}`;
-    else if (bw && !aw) phrase = `${Dir}, and is no longer ${name(bw)} ${nums}`;
+    else if (!bw && aw) phrase = `${Dir} ${nums}, and now reads as ${name(aw)}`;
+    else if (bw && !aw) phrase = `${Dir} ${nums}, and no longer reads as ${name(bw)}`;
     else phrase = `${Dir} ${nums}`;
     if (steady === false) phrase += ` ${UNSTEADY_NOTE}`;
 
@@ -685,7 +704,10 @@ export function compareReads(before, after) {
     '',
     '## Held',
     '',
-    ...(held.length ? [held.map(h => `${h.area} (${h.measure})`).join(', ')] : ['none']),
+    // The plain names, not the measures with their units: the list is read, not parsed.
+    ...(held.length ? [held.map(h => h.label).join(', ')] : ['none']),
+    ...(edge.length ? ['', '## Near an edge', '',
+      `A word differs between the two reads while its measure moved under a step, so the measure sits near that word's edge and it is not a change: ${edge.join('; ')}.`] : []),
   ];
-  return { changed, held, lines };
+  return { changed, held, edge, lines };
 }

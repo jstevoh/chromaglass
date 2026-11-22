@@ -1,6 +1,6 @@
 # scripts
 
-The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `watchwords.mjs`, `watchpair.mjs`, `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`).
+The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `watchwords.mjs`, `watchoverall.mjs`, `watchpair.mjs`, `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`).
 
 ## Start here
 

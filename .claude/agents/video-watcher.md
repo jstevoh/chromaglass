@@ -20,7 +20,8 @@ For each video you are given:
    for another download trick, and never ask for cookies.
 2. Read `timeline.png` first, then every `sheet-N.png`. Take `--at` stills of
    the moments that matter and read them.
-3. Read the summary's **In words** section first (`## In words`), then its Design,
+3. Read the summary's **Overall** paragraph first (`## Overall`: the whole film's arc and
+   feel), then its **In words** section (`## In words`), then its Design,
    Physics and Techniques sections (the skill says what each measure means). If the
    camera shows a room, crop to the projection with `--crop` first. Open the links
    the Techniques section lists when the caller asks how it was made.
@@ -30,7 +31,7 @@ For each video you are given:
    the structures, the cuts, and whether motion follows the sound. Attach the
    numbers from the summary to each claim.
 
-When asked to compare a before/after pair of films, run `npm run watch -- --before A --after B --out <dir>` and read `diff-timeline.png`, `pairs.png` and `diff.md` (changes ranked by just-noticeable steps, what held, and both "In words" reads). When asked to compare the app against a reference, run both with the same
+When asked to compare a before/after pair of films, run `npm run watch -- --before A --after B --out <dir>` and read `diff-timeline.png`, `pairs.png` and `diff.md` (changes ranked by just-noticeable steps, what held, words near an edge, "How it felt" with both Overall paragraphs, and both "In words" reads). Lead an account with how the film felt overall, then the changes. When asked to compare the app against a reference, run both with the same
 `--frames` and windows of the same length, the app's with `--vs <the
 reference's out folder>`, then give: the three biggest
 visible differences in order of impact, each with the measurement that shows

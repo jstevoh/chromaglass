@@ -75,6 +75,7 @@ import { designFrame, designSummary, designLines, compareDesign, paletteAcc, pal
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
 import { thumb, findDissolves } from './watchcuts.mjs';
 import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
+import { overall } from './watchoverall.mjs';
 import { describe } from './watchwords.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
@@ -741,6 +742,7 @@ async function watch() {
   const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, sheets, tiles, picks, timeline, span, pr, w, h, rate };
   const words = describe(result);
   result.words = words;
+  result.overall = overall(result);   // the whole film's arc and feel, before the words one measure at a time (47x-8)
   fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, words }, null, 1) + '\n');
   const palettePng = path.join(out, 'palette.png');
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
@@ -757,6 +759,10 @@ async function watch() {
     `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t) + (rows[k].dissolve ? ' (dissolve)' : '')).join(', ') : 'none'}${dissolves.length ? `; ${dissolves.length} of them dissolves, ${dissolves.map(v => `${((v.to - v.from) / rate).toFixed(1)} s`).join(', ')}` : ''}`,
     ...shapeLines,
     sync ? `- sound: loudness median ${q(loud, 0.5).toFixed(0)} dB; motion vs loudness r = ${sync.r0.toFixed(2)} at no lag, best ${sync.best.toFixed(2)} with motion ${sync.lag >= 0 ? 'following' : 'leading'} the sound by ${Math.abs(sync.lag).toFixed(2)} s` : '- sound: no audio track',
+    '',
+    '## Overall',
+    '',
+    ...result.overall.lines,
     '',
     '## In words',
     '',

@@ -13,6 +13,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { watchVideo, writePng, label } from './watch.mjs';
 import { compareReads } from './watchwords.mjs';
+import { compareOverall } from './watchoverall.mjs';
 
 const stamp = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
 
@@ -206,6 +207,10 @@ export async function watchPair(before, after, opts = {}) {
   const b = await watchVideo(before, { ...shared, out: path.join(out, 'before') });
   const a = await watchVideo(after, { ...shared, out: path.join(out, 'after') });
   const diff = compareReads(b, a);
+  // The whole film before and after, and how the overall feel changed (47x-8): the owner asked
+  // how the show felt, not only which measures moved.
+  const effortNearEdge = diff.edge.some(e => /^motion (timing|weight) \(|^flow turning \(/.test(e));
+  diff.overall = compareOverall(b.overall, a.overall, { effortNearEdge });
 
   const md = [
     '# What changed',
@@ -214,6 +219,14 @@ export async function watchPair(before, after, opts = {}) {
     `- after: ${after}`,
     '',
     ...diff.lines,
+    '',
+    '## How it felt',
+    '',
+    ...(diff.overall.length ? diff.overall : ['The overall feel held.']),
+    '',
+    `Before: ${(b.overall?.lines ?? [])[0] ?? 'no read'}`,
+    '',
+    `After: ${(a.overall?.lines ?? [])[0] ?? 'no read'}`,
     '',
     '## Before in words',
     '',

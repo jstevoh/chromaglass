@@ -141,3 +141,33 @@ differences are ranked by their size in steps, said in plain sentences ("the edg
 from hard-edged to soft (edge width 0.62 to 2.67% of the width)"), and a difference in an unsteady
 measure is marked as such. What held (under a step) is listed too, so "nothing else
 changed" is a measured claim and not a silence.
+
+A word can differ between two reads while its measure moved by less than a step: the measure
+sits near that word's band edge, and a second take of the same look can land either side. Those
+are listed apart under **Near an edge** and are not changes (47x-5). Counts are read as means
+over the frames, not as a median count, so a count that moves by one in a few frames (the
+cell bloom's hues a frame, 3 to 2) is not a whole step (47x-7).
+
+## Overall: how the film felt
+
+The words above are one measure at a time. The **Overall** paragraph (`scripts/watchoverall.mjs`)
+reads the film as a whole, the way a viewer would describe a show afterwards:
+
+- **The arc**, from the motion in thirds against the film's mean: it *holds* (the thirds within
+  30% of each other), *builds* (the last third 1.4 times the first), *settles* (the reverse),
+  *swells* in the middle, *dips* in the middle, or *rises and falls with no clear direction*.
+  Within the arc it moves *in surges* when the smoothed motion's spread is over 0.6 of its mean.
+- **Its character**, Laban's Effort: the eight basic efforts (a float, a glide, a dab, a flick,
+  a press, a wring, a punch, a slash) when Time, Weight and Space all read a word.
+- **The strongest moment**, named only when the 1.25 s-smoothed motion peaks at 1.8 times its
+  median or more, and only where the window is whole (at either end one blip weighs double);
+  **the longest rest**, a run of at least 2 s under a third of the 90th percentile.
+- **How the light and colour drift** from the first third to the last, how often the picture
+  **reorganises**, and whether it **goes with the music** (motion and loudness correlated at
+  0.4 or more) or keeps its own time.
+- **The look** in one line, from the words the In words section said.
+
+In a before/after pair, **How it felt** puts both paragraphs side by side and says whether the
+arc, the character, the peak, the surges and the hold on the music changed. Swells, rests and
+the peak's place come from one take of a moving fluid and can differ between two takes of the
+same look; the paragraph says so.

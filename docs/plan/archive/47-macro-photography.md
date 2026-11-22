@@ -88,3 +88,16 @@ each band.
 - ~~**47x-4** a plan for sharing the watch tool as a Claude Code plugin~~ (**shipped**):
   `docs/watch-plugin-plan.md`. Packaging waits on the owner (the name, its own repository or
   this one, whether the liquid show references ship as examples).
+- ~~**47x-5**~~ (shipped, this PR: a word that differs while its measure moved under a step is listed under "Near an edge", not as a change) a word that flickers at a band edge. A word can be said in one read and not the
+  other while its measure held under a step (the bloom's "weight: light" and "space:
+  indirect" are only in its after read). `compareReads` should say a word came or went only
+  when its measure moved a step, or the bands need a margin either side.
+- ~~**47x-7**~~ (shipped, this PR: hues a frame is the mean over the frames; the bloom's 3 to 2 now holds) an integer measure moving by one (hues a frame 3 to 2) counts as a whole step, so a
+  film whose hue count sits at a boundary reads as changed. Use the mean over the samples, not
+  the median's integer, or hold one-unit changes of a count to a half step.
+- ~~**47x-8**~~ (shipped, this PR) the whole film in a paragraph. The owner asked (2026-11-22) how
+  the show felt overall, not only what moved: `scripts/watchoverall.mjs` reads the arc in
+  thirds (holds, builds, settles, swells, dips, rises and falls), the Laban character, the
+  strongest moment and the longest rest, the light and colour drift, the reorganisations and
+  the hold on the music, and the look in a line. It is `## Overall` in summary.md and `## How it
+  felt` in diff.md, with how the arc changed.
