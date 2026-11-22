@@ -3162,7 +3162,7 @@ export class FluidSimulation {
       insurance against something that does not happen.
     */
     const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
-    const spin = this.spinDrag(settings);
+    const spin = layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS);
 
     return {
       dt, visc, nu,
