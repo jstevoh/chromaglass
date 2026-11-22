@@ -57,7 +57,7 @@ export const RIM_SAMPLES = 1024;
   the solve's p' = p − Φ held at zero on the rim is p held at φ there.
   Everywhere short of the band the force is untouched, to the bit.
 */
-export const CAPILLARY = /* wgsl */ `
+const CAPILLARY = /* wgsl */ `
 fn cs(p: vec2i, n: f32) -> f32 { return textureLoad(soft, clampP(p, n), 0).r; }
 fn grad(p: vec2i, n: f32) -> vec2f {
   return 0.5 * vec2f(cs(p + vec2i(1, 0), n) - cs(p - vec2i(1, 0), n), cs(p + vec2i(0, 1), n) - cs(p - vec2i(0, 1), n));

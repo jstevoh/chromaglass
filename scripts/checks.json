@@ -3232,7 +3232,7 @@
     {
       "name": "The ferrofluid drop at rest on the thin gap",
       "shard": "open",
-      "run": "npm run ferrorest -- --owed=9ae",
+      "run": "npm run ferrorest",
       "why": [
         "The closeup's ferrofluid drop at rest on the thin gap (PLAN 29c):",
         "degenerate mobility in phaseCHVolume holds its half-full core and",
