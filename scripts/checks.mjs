@@ -1003,7 +1003,10 @@ async function selftest() {
   const held = (event, today) => quarantined(qc1, qr, { event, today, mainUntil: '2026-12-01' }) != null;
   say(held('push', '2026-11-30') && held('workflow_dispatch', '2026-11-30'), 'on a push or a dispatched deploy, the day before the main cut-off, it holds');
   say(!held('push', '2026-12-01') && held('pull_request', '2026-12-01'), 'from the cut-off main holds the line to its bar, while a pull request still honours the entry to its own end');
-  say(!held(undefined, '2026-11-30') && !held('', '2026-11-30'), 'a run outside CI (no GITHUB_EVENT_NAME) holds every line');
+  // null, not undefined: an undefined event takes quarantined()'s default,
+  // process.env.GITHUB_EVENT_NAME, which in CI is the run's own event (this
+  // line was red on the PR's first run for that reason).
+  say(!held(null, '2026-11-30') && !held('', '2026-11-30'), 'a run outside CI (no GITHUB_EVENT_NAME) holds every line');
   // The real cut-off is compared as a string, so it has to be a whole date
   // (a '2026-12-6' would hold all December), and no later than an entry may
   // run from today: main's hold is the time the fixes take, like an entry's.
