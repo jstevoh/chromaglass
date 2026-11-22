@@ -211,6 +211,11 @@ Left from 20b, each its own item:
   would let a pour of red oil streak a yellow lace.
 - **20b-16. The bubble lens and the edge decodes do not see the film's dye** (as 20b-11 for
   the film itself): a bubble over dyed film shows the water's colour undyed.
+- **20b-17. The film evaporates under the cover and is clamped** (S; Low). `film.ts:262-263`
+  thins it at a constant rate, cover or not, and `:295` clamps it at 0.95. Under a closed
+  cover the air saturates and evaporation stops. Zero it when the cover is closed and drop the
+  clamp for a conserving limit. Check: the film's volume within 1% over 60 s closed, and a
+  pour's within 0.5%. (38v, from RS-17.)
 
 ## 20c. The lace stays lace: a viscous film
 

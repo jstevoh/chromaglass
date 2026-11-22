@@ -1,5 +1,7 @@
 # 38. Realism audit: what still imitates, after §18 (asked 2026-10-30)
 
+This section is in 2 files, cut between items: `38-realism-audit.md`, `38-realism-audit-2.md`.
+
 Asked 2026-10-30: "a physics and realism evaluation across all of the visualization code.
 Can we make things more realistic?" This is the second pass of the audit §18 began on
 2026-09-28. Since then the plate became a Hele-Shaw cell (18a), the lamp shines through
@@ -144,6 +146,8 @@ written first. Line numbers are as read on main at d07ac31.
   bottle; the cap becomes CFL sub-steps, as the carries already do. *Measure:* a thread's
   break-up time against Rayleigh–Plateau in a gap, and a drop's rounding time against
   h²σ/(12μR) for two oils.
+  38v (2026-11-21): the ferrofluid's own rounding runs by steps, with no seconds and no grid
+  size in its Cahn–Hilliard mobility (`fluid.ts:1393-1401`): 9ae.
 
 - **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
   (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).
@@ -289,6 +293,14 @@ written first. Line numbers are as read on main at d07ac31.
     Film Physics 0 (`camFilm`'s `0.45 + 1.25 × filmC`), 0 at 1, where it already
     transmits. A throwaway `camFilm` that returns `mix(1, filmTableAt(filmP, true), irid)`
     at any Film Physics passed it (10.83% moved at each).
+    38v (2026-11-21): the ferro glint is drawn, not lit. `plate.ts:2690-2736` paints a
+    nine-arm star, cos(ang·9 + rise·3), on pow(1 − N_z, 2), with pow(face, 70)·1.2 and a dot
+    on each crest, from a key at about 44.6°, and the halo multiplies the light by 1 +
+    0.6·lens·amt (`:2779`, `:2853`). Nothing gates it to the closeup, so it makes light on
+    projected looks. Gate it to the drop camera, take the face's reflection from Schlick at n
+    = 1.6, drop the star, and drive the halo from `defocusShadow`. Check: a projected ferro
+    look added to `scripts/nolight.mjs` gains no pixel over the lamp. (S–M; Medium; from
+    RS-27.)
   - **38h-14. The projector's bubble film still reflects at Film Physics 0** (S, nil; a
     look change on the looks that set Iridescence over 0.25). Found writing 38h-6's
     check: the plate's own bubbles at Iridescence 1 against 0 read 51 levels brighter at
@@ -416,6 +428,8 @@ written first. Line numbers are as read on main at d07ac31.
   - **38k-3. The film's patches step their own magnet's field** (S). The pull and the drop
     add the magnets as vectors now; each standing patch (`wgsl/standing.ts`, `lift`) still
     reads its own magnet alone, so two fingers' domes between them stand on half the field.
+    38v (2026-11-21): and the patches start only on the primary magnet's field (`fluid.ts:461,
+    474-476`), so two magnets each under the onset start nothing: 9t-11.
   - **38k-4. The ramp past the onset** (S). `SPIKE_FULL` keeps the old proportion (1.94 ×
     the onset) when 38k-7 moves it: the solver's gate as domes arrive, not their height, which the film's
     lift makes. The subcritical jump and its hysteresis are 9t-3's.
@@ -457,6 +471,12 @@ written first. Line numbers are as read on main at d07ac31.
     lighter still. The press is laid as a gap change a frame, not a force: model the
     hand's press as a force over time (the third option the owner was offered), so a
     soft, long press digs as a soft hand on stiff glass does. Found filming 38l-4.
+    38v (2026-11-21): the release too. `squish.ts:705-736` lets Bass Press go in one step; the
+    cosine release (`:535-582`, `KICK_RELEASE` 1/3 s at `:478`) runs only for the multi-disc
+    kick or off a thin gap (`fluidSimulation.ts:2156-2178`). A glass let go rises only as fast
+    as the liquid flows back under it, Stefan's dh/dt = 2h³(F − K(h0 − h))/(3πμR⁴). Release
+    through the same gap spring the press uses. Check: after release the gap follows the
+    spring's curve, and the rate halves when μ doubles. (S–M; Medium; from RS-42.)
   - **38l-6. The lift's step reads the film at its start** (S; Low). `squeezeUpdate` (and
     the sheet's share in `lib/sheet.ts`) takes 1 − (1 − k)^((h/h_s)³) with the depth held
     at the step's start, so the glass lags where it opens fastest, the snap once a peeled
@@ -473,6 +493,8 @@ written first. Line numbers are as read on main at d07ac31.
   #163) is gated by `filmPhysics`, default 0 and set by no preset (`types.ts:1093`). The
   research's item 8 shipped, and nothing shows it. Photograph the looks with iridescence at
   0 and 1 for the owner to pick, as 18b-1 did for the lamp.
+  38v (2026-11-21): on a backlit plate the film gains up to 1.8 from the reflection table
+  (`plateThinFilm.ts:128-137`): 38v-7.
 
 - ~~**38n. Bubbles move by the look's own liquids**~~ **Shipped** (#603): μ from the look's
   Thickness (or its Viscosity word with Thin Gap off), σ and air's solubility from water or
@@ -506,6 +528,9 @@ written first. Line numbers are as read on main at d07ac31.
   (`wgsl/output.ts:287`) and the camera's bloom (`wgsl/camera.ts:128-130`) add encoded values.
   Beer–Lambert's powers commute with the encode, so the dye's depth is right either way;
   the bias is only in sums (a guess of 20–40% too bright in the mids).
+  38v (2026-11-21): two sites where it shows: `plate.ts:2755` adds the linear studio light to
+  the encoded `edgeLit`, and the drop's total-reflection switch (`ferroDrop.ts:363-374`):
+  29a-6.
 
 - **38q. The camera's lens, not a grade** (S–M; Medium on the camera looks). Sharpens
   **31a**, **31e**. ACES on an 8-bit scene, bloom thresholded at 0.55 in encoded values, a
@@ -524,6 +549,11 @@ written first. Line numbers are as read on main at d07ac31.
     and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the water
     under it. Either the tilt's slosh is the open dish's, or on the sandwich it is the thin
     gap's creeping flow. The owner's call.
+    38v (2026-11-21): where it goes: `addSlosh` (`forces.ts:584-599`) runs after `thinProject`
+    (`fluid.ts:940-950`), so its push is not divergence-free in hu and dye piles at the oil's
+    rims, though the face carry still conserves it. If the slosh stays on the sandwich, hand
+    it to the thin solve as a driving speed. Check: in `npm run thingap`, |∇·(hu)| at the
+    no-slosh level and the rims' dye gaining under 1% in 10 s. (M; Low; from RS-7.)
   - **38r-2. A drop is a pancake past half the real gap** (S). `DROP_HALF_GAP`
     (`wgsl/plate.ts`) is 0.016 of the plate, half the 6 mm; half of 2 mm is 0.005, at which
     the common bead touches both glasses, and `lib/beads.ts`'s merge time is in units of it.
@@ -627,6 +657,12 @@ written first. Line numbers are as read on main at d07ac31.
       (`lib/handSolid.ts`), the opening's drag time (`gpu/opening.ts`). Each to the solver's
       `coverMetres`/`coverUnits`. `forces.ts`'s `nominal` stays the 2 mm on purpose: it is the
       old plate's absolute depth drag, so a thinner cover already slows it.
+      38v (2026-11-21): more readers of a nominal gap: the milk's scatter is laid through sd =
+      sc·6·gap, 6 mm (`plate.ts:195-208`), and its transmission through about 1 mm
+      (`milkTransmission`, `plate.ts:634-641`), where `DISH_GAP_METRES` is 0.002; and the
+      glint's `GAP_METRES` (`src/lib/glint.ts:95`). Through the real gap Kubelka–Munk gives R
+      = Sd/(1 + Sd), 0.80 at sc 2. Pass `coverMetres` to each. Check: R + T + A = 1 within 2%.
+      The owner judges the milk. (S; Medium; from RS-30, RS-28.)
     - **38r-18. The gap field's ceiling is a cap a floating glass does not have** (S). Past
       4 mm (`DISH_GAP_RANGE[1]`, a weightless glass on more than 125 mL) the ledger overflows
       over the rim (`lib/cover.ts` coverSettleTop), because raising the ceiling moves the spun
@@ -699,6 +735,10 @@ written first. Line numbers are as read on main at d07ac31.
   viscosity adds 10–30% at saturation, a guess for EFH1); twelve looks set dye diffusion to
   0 (`fluid.ts:1008-1009`; real D is never below about 4e-10, tiny on a show's time, so this
   is bookkeeping). All belong to **18d-3** and **18d-4**'s one-table-per-bottle.
+  38v (2026-11-21): the cover's bead sizing takes `DENSITY` 1000 (`cover.ts:63`, used at
+  `:102` and `:225`), so a glycerine bead (1261 kg/m³) comes out 26% too large; it belongs in
+  the same table. The spin and the cover also read Layer 0's viscosity and gap for every
+  layer: 38v-4. (From RS-10, RS-50.)
 
 - **38t. Updraft is noise between two glasses** (S; Low-Medium). `snoise(p·0.05 − t)·air·4dt`
   plus a uniform −8dt (`thinGap.ts:348-353`, `forces.ts:224-228`). A draught has no free
@@ -712,9 +752,9 @@ carries it and `phaseDisplace` goes (write it into 29c-9's thread). The closeup 
 is at full share (`ferroDrop.ts:45`) while the layer under it has none (`standing.ts:80`),
 and the drop has no μ0Mn²/2 jump at its surface, so it cannot peak in a normal field: for
 the closeup's thread after the macro view, with **29a-1..3** and **9t-2**. The straw's
-Saffman–Taylor lobes are drawn with an effective gap 63× thinner than the real one
-(`bubbles.ts:312-319`, `wgsl/air.ts:94-103`); at these capillary numbers a 6 mm air front is
-stable, so real fingering would grow in the thin-gap pressure solve, an L for 18i's thread.
+Saffman–Taylor lobes were drawn at a gap 63× thinner than the real one; 15g-12 since counts
+Paterson's fingers at the real gap, so a straw fingers only where two or more fit (refreshed
+2026-11-21 by 38v; the lobes' area is 15g-19).
 The lace film's equation is right but its numbers are in grid units (`wgsl/film.ts:65-72`),
 for 20b's thread. The Photograph style's paper is painted (`plate.ts:2750-2767,
 3259-3264`; Kubelka–Munk twice through the dye plus a Fresnel reflection is the real
@@ -767,6 +807,11 @@ On in every look, or nearly:
   dt stops being seconds, so every SI rate (`D_MOLECULAR`, the lamp's cooling, the drag) is
   off by that factor. dt is real seconds times Speed; the music's pace reaches forces through
   cords. none.
+  38v (2026-11-21): the terms, read: `fluidSimulation.ts:2671-2765` builds `dynamicSpeed` =
+  0.05 + platePressure·0.02 + airVelocity·0.01 + automateRate·0.01; eight house looks cord
+  `platePressure` (and Moiré Ripple), and Clock Glass's kick adds 8% to dt. Drop the terms and
+  retune Speed per look. Check: dt equal under kicks and in silence; `npm run quick` green.
+  (S; Medium; from RS-45.)
 - ~~**38u-7. The force between colours changes sign in patches**~~ — **Shipped (2026-11-13).**
   Polarity's push (`forces.ts`, and the CPU's `applyImmiscibility`) was multiplied by 1 + 2·snoise,
   negative under −0.5: there it pulled unlike colours together. The noise is gone, so the push has
@@ -842,6 +887,8 @@ Behind a dial at 0, or in one look:
   Each either becomes its phenomenon (viscous fingers and dewetting for the lacing,
   Bénard–Marangoni cells from the heat field, droplets from the beads) or goes, as Edge
   Detail did. Lacing Run's subject is its lacing, so that one waits for §20's film to draw it.
+  38v (2026-11-21): the Lumia's light is fbm through a sin³ (`plate.ts:1985-1995`): §11.7. The
+  thin film and the bead cores brighten the backlit plate: 38v-7.
 
 ## What is already physical, and should be left alone
 
