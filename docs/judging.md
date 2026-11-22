@@ -3008,3 +3008,17 @@ here.
    cluster of bubbles. Bad: a bubble's surroundings brighter than the dye away from it.
 4. Macro Relief from 0 to 1 up close: the shading deepens and widens a little; the frame's
    brightness stays about the same. Boundary Glow from 0 to 1 up close: nothing moves.
+
+## 143. A clear drop's bright rim falls inside its disc (PLAN 18e-9)
+
+The check (`npm run derive -- --owed=grad`) proves in the lab that `calcOpl`'s optical path
+through a clear film is `(n_water + 0.087·film)·h` across gaps and film shares, and that the
+path's Laplacian is negative just inside a clear drop's edge and positive just outside. How
+a clear film drop looks on a projected plate is judged here.
+
+1. Turn on **Clear Film** (or a look with clear film drops) and turn **Projector Focus** off
+   centre (toward 0.8 or 0.2): a clear drop's bright rim (at positive defocus) falls inside
+   its disc, like a converging lens of higher index than water, not reversed outside it.
+2. With **Lamp** on a video row under the front plate, a clear drop over a patterned video
+   refracts the picture consistently with a higher-index lens (`lampDepthAt` uses the same
+   gap height).

@@ -1440,14 +1440,14 @@ export const PRESETS: Preset[] = [
   {
     id: 'soap-film',
     name: 'Soap Film',
-    description: 'A real soap film in its frame: it drains through the colours of its own thickness, silver to gold, blue and magenta, swirls with the music, goes black from the top, and is drawn again.',
+    description: 'A real soap film in a frame held nearly flat: it drains through the colours of its thickness, silver to gold, blue and magenta, marbles with the music, goes black from the top, and is drawn again.',
     settings: {
       surfactantFlow: 0.6,
-      // The frame's own film (PLAN 32d) over a dark ground: its colour is its
-      // thickness, seen in reflection. The plate under it is a faint dye
-      // whose flow, stirred by the soap and the music, is the air that
-      // swirls the film. No dish motor: the frame does not turn.
+      // The frame's film (PLAN 32d) on a dark ground, its colour its thickness
+      // in reflection; the faint dye's flow drives its air. Held 12° from
+      // flat (32h): hung, its big swirls (32k) sort into bands. No motor.
       soapFilm: 1,
+      soapFilmTilt: 12,
       globalSpeed: 0.0168,
       surge: 0.5,
       layerCount: 1,

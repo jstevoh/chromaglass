@@ -2781,7 +2781,7 @@
     {
       "name": "The relief",
       "shard": "plate",
-      "run": "npm run derive -- --owed=grad,height",
+      "run": "npm run derive -- --owed=grad",
       "why": [
         "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
         "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
@@ -3221,7 +3221,7 @@
     {
       "name": "The ferrofluid drop in the closeup",
       "shard": "open",
-      "run": "npm run ferrodrop -- --owed=29a-11",
+      "run": "npm run ferrodrop",
       "why": [
         "The closeup's ferrofluid drop (PLAN 29a): its surface the sessile",
         "balance's for its contact angle and size, leaned toward a magnet with",

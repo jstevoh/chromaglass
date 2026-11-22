@@ -111,5 +111,7 @@ and a stream held on the plate, lay their colour with their own volume; story in
 ## 18e. Edges come from refraction (replaces the painted rims and highlights)
 
 - ~~**18e-7**~~ #881 The closeup's relief reads the optical path at the lens's disc (`camLap`), not the colour step: no line where two dyes meet up close, the dial moves nothing there, a swell gathers light, bubbles left to the traced bubble. `npm run camrelief`, `holeline` 6 and 6b.
+- ~~**18e-9**~~ The optical path's height over a clear film uses the real gap `h = gap / 0.03` (with no `1 - 0.5·film` factor) in `calcOpl` (`wgsl/plate.ts`) and `lampDepthAt` (`wgsl/plateLamp.ts`), so `OPL = (n_water + 0.087·film)·h`. `npm run derive -- --owed=grad` (`height` taken out of `--owed`).
+
 ## 18i. Bubbles and beads live by physics, not timers (shipped)
 - ~~**18i-2**~~ **shipped**: `BeadField.setLiquid({ gapMetres, muOut, muIn, deltaRho, sigma })` slides by Δρ g sinθ b² / (12 μ_out (1 + λ)), every per-step drop rate is 1 − exp(−dt/τ) (Paterson coalescence, repel, attract, recolour), drops leave over the open circular rim, and `stepPlateBeads` (`src/sim/beadStep.ts`) wires the live gap and carrier/oil properties from the frame loop (`npm run drops` 33/33; story in [`docs/plan-shipped.md`](../plan-shipped.md) §18i-2). Left: retiring the 30-frame `populate` timer once presets/pours seed beads directly (currently required by `npm run webgpu` and presets with `beads > 0`), and `15g-17` (PR #914).
