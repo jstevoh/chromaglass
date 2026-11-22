@@ -818,6 +818,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
+          {/* The dish on a speaker (PLAN 48f): Shaker's frequency, and while it is on, how hard it shakes. */}
+          <Slider label="Shaker" field="faradayHz" step={1} format={(v) => (v > 0 ? `${Math.round(v)} Hz` : 'Off')} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.faradayHz ?? 0) > 0 && (
+            <Slider label="Shake" field="faraday" step={0.01} format={(v) => `${v.toFixed(2)} g`} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+          )}
           {/* Polarised light (PLAN 31p-1), and while the sheets are in the analyser's turn and the liquid's strength, as on the desk. */}
           <Slider label="Polarisers" field="polariser" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.polariser ?? 0) > 0.001 && (

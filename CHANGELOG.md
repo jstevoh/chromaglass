@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A controller's factory map keeps every button where it was: the pad that was Macro is Tap
   Tempo (Watch the Room on the APC40).
 
+### Added — the music shakes the dish into Faraday waves (PLAN 48f)
+
+- **Shaker** and **Shake** (`faradayHz`, `faraday`, Settings → Tilt & Rock under Plate Rock; MIDI,
+  the desks, the remote and the phone's Sound sheet), and **Music Shake** on the phone (on the
+  desk, the cord in Patches): the dish sat on a speaker at a frequency, shaken at a peak
+  acceleration in g, with the music's bass on Shake through a cord. Past the water's threshold
+  the surface stands up in a standing lattice at half the speaker's frequency, its cells the
+  water's own wavelength (36 mm at 10 Hz, 11 mm at 40, 4 mm at 150), growing as the bass swells
+  and ringing down as it fades, drawn by the lamp's light through the wavy surface. Its own
+  solver (src/gpu/faraday.ts): the Mathieu equation's growth exact in Fourier space. Off in
+  every look until turned on. `npm run faraday`.
+
 ### Changed — three drawn stand-ins made physical (PLAN 38u-7, 38u-12, 38u-14)
 
 - **Rain Drip** needs the plate tipped (Gravity): the weight along a plate is g sin θ, nothing on a
