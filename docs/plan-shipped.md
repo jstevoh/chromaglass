@@ -14974,6 +14974,34 @@ both ways): 27 gate, 11 owed.
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
 
+## 38u-7, 38u-12, 38u-14. Three drawn stand-ins made physical (2026-11-13)
+
+From the third physics pass (38u). Each is a look change on purpose.
+
+- **38u-7, the force between colours.** Polarity's push was multiplied by 1 + 2n, n a slow noise on
+  the plate; under n = −0.5 the factor is negative and the force pulled unlike colours together,
+  the backward diffusion the fingering push had been taken out for. Noise removed (GPU and CPU).
+  A tension between two liquids does not depend on where on the glass they meet.
+- **38u-12, Rain Drip.** Its weight along the plate was the same on a level plate as on the wall.
+  Gravity along a plate is g sin θ: the dial now scales by the tilt (`plateUpright`, `dripOf` in
+  `gpu/fluid/constants.ts`; the CPU twin and the deep plate's force read it the same). Seven looks
+  that set Rain Drip at 0.2 or more got a tilt of 0.25; Velvet Underground got 0.05, about 3 degrees
+  (`npm run pools` on the Mac: at 0.25 the tilt's buoyancy and heat broke its pools twice; level, they
+  moved 8.9% against frozen's 8.5%, under the 1.5x bar; at 0.05 they keep 95.3/92.9/93.1% and move
+  44.0% against 11.1%; at 0.10 and 0.15 two pools drain to 39–70%); Rain Drip's help and guide line
+  say it needs Gravity.
+- **38u-14, the clear drop.** `plate.ts` drew the oil drop's band at 0.35 when there was no dye
+  under it; the band is the meniscus bending light out of the aperture and does not need dye. Now at
+  full strength; the clear oil's flat warm tint is now exp(−α·thickness). The bubble's 0.7 in clear
+  liquid stays (see the section's note).
+
+*Measured* (cloud lab, software WebGPU, main then this): `npm run forces` 6, rows of a straight
+boundary pushing the colours apart, thin gap 50 of 76 → 76 of 76 (spread 2.46 → 0.11 of the mean);
+deep plate 73 → 76 (0.35 → 0.00). 7, a pool under Rain Drip 0.5: level plate 0.1657 → 0.00000, tipped
+to a half 0.1657 → 0.0830, the wall 0.1657 unchanged. `npm run droplens`, the drop's band on clear
+water, the ring's brightness from 0.75 to 0.85 of the radius: 72% of the plate on main (the check red,
+no half-bright edge) → 25%, against 24% on dyed water (new line: as dark on clear water as on dye).
+
 ## 43d. A palette from any picture or video (2026-11-15)
 
 `src/lib/picturePalette.ts`, `src/app/usePaletteLock.ts`, `src/components/PicturePaletteButton.tsx`,
@@ -15045,3 +15073,57 @@ the standing-wave patterns for example." §48's idea 48f; its open items are in 
   9.73 and 5.87 mm at 20, 50 and 100 Hz; saturated at k u 0.19 to 0.22; the ring-down
   1.01/s against the damping's 1.07/s; at the dial's top (2 g) k u 0.83 at 10 Hz and
   0.25 at 150 Hz, held for 4 s, and the same at 10 Hz stepped in tenths of a second.
+
+## 15e-10. A bottle's weight slides it down a rocked thin gap (shipped 2026-11-14)
+
+What a bottle's liquid pushes (`liquidForces`: a heavy liquid's slide down a rocked plate, a
+soap's pull down its own gradient, a polar liquid keeping apart) went into the flow first in
+the step, before the thin gap keeps "the velocity from before the forces" ('thin gap keep').
+The thin solve reads what is added after that keep as a speed to drive the liquid to against
+the glass, and what was there before it as flow the liquid already had, which the gap's drag
+takes within the step. So on the plate every look uses the push was momentum, not a drive:
+`npm run liquidpush` (64², six steps, rocked 0.5) read the slide under a heavy drop at
+−9.4e-4 beside a flow of 0.53, two thousandths of it and against the rock's way, where the
+open plate's was 3.4e-2. A syrup or a glycerine never slid down a rocked plate.
+
+The physics between two glasses is Darcy's. A column whose density is the water's times
+(1 + w), tipped θ, feels w ρ g sinθ more than the liquid round it and is driven at
+w g sinθ h²/12ν (LIQUID_FALL, the oil's lift's law with the bottle's own sign and density,
+not tuned); a round drop as thin as the water goes at half that (Saffman–Taylor's inclusion:
+the water it displaces has to go round it), a thicker one at 2/(1 + λ) of it. The weight is
+now laid after the keep (`liquidDrive`, run by `driveLiquids` while a bottle has been poured
+and the plate is rocked), read as every body force is, at the cover's gap (h²), times Plate
+Rock's tilt and gain. Its own viscosity (the species field, 18d) and the water it pushes are
+the solve's.
+
+Found and fixed on the way: a light bottle's weight was lost on its first step. The liquids'
+fields are carried by `bodyAdvect`, which floors every field at zero (there for the dye), and
+`liquids0.a` held w signed, so an oil, an alcohol or a soap (w below zero) weighed nothing
+after one carry: an alcohol drop on a tipped thin gap moved 0. A light bottle's lightness is
+now `liquids1.g`, a heavy one's w stays in `liquids0.a`, each only what is not negative.
+The oil poured with Oil Tension on lands in the mix too, whose own lift already weighs it
+(hsBody, OIL_LIFT), so the drive takes the column's w less the mix's oil share; without that
+the lens rose 1.57 times as fast.
+
+Retired on the thin gap, with the reason in `liquidForces`: the soap's pull (between two
+glasses there is no free surface for a Marangoni stress; what a soap does there is 15e-5's)
+and the polar push (an oil's keeping to itself is its tension in the mix, 38e, and the
+miscible bottles have none). Both were pure-gradient pushes the thin solve's pressure takes
+anyway. The drags (milk's held edge, `repel`) stay where they were, on the flow the liquid
+already had; `body` was already the species field's on a thin gap.
+
+`npm run liquidfall` (new, lab4, 45 s), each line against the law worked out in SI, at the
+default Thickness (22.4 cSt), 2 mm, sinθ 0.1: a syrup-weight drop (w 0.35) slides at
+1.372 mm/s against Hele-Shaw's 1.321 (1.04×, bar 10%; before 0.000); an alcohol-weight drop
+(w −0.2) rises at 0.785 against 0.755 (1.04×; before 0.000); tipped across, 1.000× across
+and 0.000 along; at Thickness 0.8 0.090× the default's speed against ν(0.45)/ν(0.8) = 0.089;
+under a cover raised to 2.409 mm 1.452× against (h/h₀)² = 1.451; with glycerine in its
+column 0.070× the plain drop's, between 2/(1 + λ) at its middle (0.041) and at its inner
+half's edge (0.100); an oil lens poured into both fields 0.994× the lens alone (bar 5%; 1.568× with the
+guard taken out). `liquidpush`'s thin-gap reach now asks the rock's way: 4.12e-1 against
+−9.4e-4. `liquidsgpu` unchanged (27 gate, 11 owed).
+
+Left open: 15e-12 (the weight goes through the dish's open rim, as the colour's does; the
+closed circulation the oil's lift has), 15e-13 (a bottle's polarity loses its sign to the
+same floor), 15e-14 (a thin gap reads the magnet's and the mix's forces against a different
+drag when no other body force runs that step).

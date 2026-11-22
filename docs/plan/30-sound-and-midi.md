@@ -139,5 +139,5 @@ story is in `docs/plan-shipped.md` under 48f. Open:
 - **48f-7. A look that opens shaken** (S). No look sits on the shaker yet, so every look
   opens as it did; a look built for it (Shaker on, Music Shake set) would show the
   feature without a hand on the desk. Needs the owner's judging first (docs/judging.md
-  §139).
+  §140).
 
