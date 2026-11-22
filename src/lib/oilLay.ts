@@ -220,12 +220,26 @@ function discCell(x: number, y: number, n: number, discs: readonly OilDisc[], re
   dish's water would carry it.
 
   Sizes: the references' forms are 5 to 15% of the frame (the watch
-  tool's form scale, 11.5% in Liquid Loops), so a median radius of 0.045.
-  Twenty-six of them fill about half the dish, where random packing stops,
-  and the flow and the bowed glass crowd them from there.
+  tool's form scale, 11.5% in Liquid Loops). The first lay took that of the
+  dish (a median radius of 0.045, twenty-six cells), and the owner judged it
+  short of the references' detail (2026-11-21): the frame on the wall is not
+  the dish but the middle of it, 0.42 of the plate high at 16:10 (uvToFluid),
+  so a cell 9% of the plate across was a fifth of the frame's height, and
+  only nine or ten of them were ever on the screen. Measured against the
+  frame instead, a median radius of 0.026 is 12% of its height, and the
+  references' spread of sizes (a fifth of the frame down to specks) is a
+  sigma of 0.6 between the floor and 0.1. Ninety drawn, packed biggest first
+  as far as random sequential packing goes, put about thirty-five on the
+  screen with water lanes between, as the stills show.
+
+  The floor stays CLASSIC_MIN, 0.018: below it the dye, laid on the CPU's
+  192 grid and carried up to the solver's (applyDeltas), is a cell or two
+  across and smears into the water round it before the oil has its rim
+  (PLAN 38w-8 lays it at the solver's own grid). The oil itself is laid at
+  the solver's grid and is crisp at any size above it.
 */
-export const CLASSIC_DROPS = 26;
-export const CLASSIC_MEDIAN = 0.045, CLASSIC_SIGMA = 0.55, CLASSIC_MIN = 0.018, CLASSIC_MAX = 0.13;
+export const CLASSIC_DROPS = 90;
+export const CLASSIC_MEDIAN = 0.026, CLASSIC_SIGMA = 0.6, CLASSIC_MIN = 0.018, CLASSIC_MAX = 0.1;
 export const CLASSIC_GAP = 0.02;
 export const CLASSIC_REACH = 0.43;
 export const CLASSIC_WASH = 0.8;

@@ -219,4 +219,20 @@ is in the project's files).
   roundness (perimeter² / 4π·area, or the spread of rim radius by angle) for each cell after
   classicdish's run at 192² and 384²; if it worsens with smaller cells and lifts at 384², use
   the isotropic nine-point Laplacian in the oil's chemical potential.
+- **38w-8. Classic's dye laid at the solver's grid, not the CPU's** (M; Medium). The owner asked
+  for more detail (2026-11-21), and the lay now packs about forty cells of median radius 0.026
+  (`src/lib/oilLay.ts`, CLASSIC_MEDIAN). The oil is laid at the solver's grid (`addMix`), but the
+  dye in it and the water's wash are laid on the CPU's 192 grid and carried up (applyDeltas'
+  oilAdd), so a cell's colour edge is a 192 cell soft while its oil rim is sharp at 768, and no
+  cell can be smaller than 0.018 (3.5 CPU cells) without its colour smearing into the water.
+  Lay both at the solver's grid (an oil-share pour like `pourInk` that keeps each cell's own
+  colour, not bodyLand's share by the oil, which put each drop's colour in the water: 28k-5),
+  then lower CLASSIC_MIN toward the oil's own floor in grid cells. Check: classicdish at 384²
+  with cells down to 0.01, every colour still carried.
+- **38w-9. Classic's floors in the solver's grid cells** (S; Low). CLASSIC_GAP (0.02),
+  CLASSIC_DROP_MIN (0.014) and the drop's wall are plate units measured at 192², about four
+  cells of the Cahn–Hilliard interface there; at the app's 768 they are sixteen. A film four of
+  the solver's own cells wide holds as well (the interface is a fixed number of cells), so the
+  lanes between cells could close to what the references show. Scale them by the grid the lay
+  sees, as Foam Cells' FOAM_FILM does, once classicdish can run at 384².
 

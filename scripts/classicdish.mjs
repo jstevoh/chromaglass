@@ -72,7 +72,7 @@ const SPECK = 6;       // cells, for a region of oil to be a cell (filmhold.mjs)
 const DROP = 3;        // cells, for a region of water inside oil to be a drop
 const DYED = 0.85, WET = 0.3;
 const KEPT = 0.9;      // of the cells laid, still apart after five seconds
-const CELLS_MAX = 40;
+const CELLS_MAX = 120;  // the lay draws ninety (CLASSIC_DROPS) and packs what fits: 45 and 31 on the two seeds; more than that cannot be the lay
 const HELD = 0.75;     // of the drops laid, still held where they were laid
 const WARM = 0.6;
 const CARRIED = 0.9;
