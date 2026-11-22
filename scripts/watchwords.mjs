@@ -187,7 +187,7 @@ export const BANDS = [
     measure: 'drift speed', steady: true,
     read: m => m.driftSpeed,
     test: (v, m) => v >= 2.0 && (m.curl == null || Math.abs(m.curl) < 0.03),
-    say: v => `direct, steady heading (drift speed ${fmtNum(v)} pct/s)`,
+    say: v => `direct, steady heading (drift speed ${fmtNum(v)} per cent of the width a second)`,
   },
 
   // ── Flow (Laban) ──
@@ -341,21 +341,21 @@ export const BANDS = [
     measure: 'edge width (% of width)', steady: true,
     read: m => m.edgeWidth,
     test: v => v < 1.0,
-    say: v => `hard-edged (edge width ${fmtNum(v)} pct of width)`,
+    say: v => `hard-edged (edge width ${fmtNum(v)} per cent of the width)`,
   },
   {
     area: 'edges', term: 'soft', source: 'Clement Greenberg',
     measure: 'edge width (% of width)', steady: true,
     read: m => m.edgeWidth,
     test: v => v >= 2.0 && v < 4.0,
-    say: v => `soft edges (edge width ${fmtNum(v)} pct of width)`,
+    say: v => `soft edges (edge width ${fmtNum(v)} per cent of the width)`,
   },
   {
     area: 'edges', term: 'painterly', source: 'Clement Greenberg',
     measure: 'edge width (% of width)', steady: true,
     read: m => m.edgeWidth,
     test: v => v >= 4.0,
-    say: v => `painterly, graded edges (edge width ${fmtNum(v)} pct of width)`,
+    say: v => `painterly, graded edges (edge width ${fmtNum(v)} per cent of the width)`,
   },
 
   // ── Form (the wet show / Greenberg) ──
@@ -409,14 +409,14 @@ export const BANDS = [
     measure: 'form scale across (% of width)', steady: true,
     read: m => m.scaleX,
     test: v => v < 4.5,
-    say: v => `fine form scale (${fmtNum(v)} pct of width)`,
+    say: v => `fine form scale (${fmtNum(v)} per cent of the width)`,
   },
   {
     area: 'form', term: 'broad', source: 'Clement Greenberg',
     measure: 'form scale across (% of width)', steady: true,
     read: m => m.scaleX,
     test: v => v >= 10.0,
-    say: v => `broad form scale (${fmtNum(v)} pct of width)`,
+    say: v => `broad form scale (${fmtNum(v)} per cent of the width)`,
   },
 
   // ── Composition (Arnheim / Greenberg / Ching) ──
@@ -495,14 +495,14 @@ export const BANDS = [
     measure: 'own flow speed (% width/s)', steady: true,
     read: m => m.ownSpeed,
     test: (v, m) => v >= 1.5 && m.wholeShare != null && m.wholeShare < 0.5 && m.elongation != null && m.elongation < 0.35 && m.coherence != null && m.coherence >= 0.6,
-    say: v => `marbling sheared by flow (own speed ${fmtNum(v)} pct/s)`,
+    say: v => `marbling sheared by flow (own speed ${fmtNum(v)} per cent of the width a second)`,
   },
   {
     area: 'show', term: 'cells', source: 'the wet show',
     measure: 'own flow speed (% width/s)', steady: true,
     read: m => m.ownSpeed,
     test: (v, m) => v >= 1.0 && m.elongation != null && m.elongation >= 0.75 && m.forms != null && m.forms >= 6,
-    say: v => `cells moving in the flow (own speed ${fmtNum(v)} pct/s)`,
+    say: v => `cells moving in the flow (own speed ${fmtNum(v)} per cent of the width a second)`,
   },
 ];
 
@@ -570,48 +570,48 @@ export function describe(read) {
  */
 const COMPARE_SPECS = [
   // Time and Weight (log ratio against 1.5x)
-  { area: 'time', measure: 'motion p90/p50', label: 'motion timing', read: m => m.motionRatio, kind: 'ratio', steady: true, up: 'became more sudden', down: 'became more sustained' },
-  { area: 'weight', measure: 'motion p90', label: 'motion weight', read: m => m.motionP90, kind: 'ratio', steady: true, up: 'got stronger', down: 'got lighter' },
+  { area: 'time', measure: 'motion p90/p50', label: 'motion timing', read: m => m.motionRatio, kind: 'ratio', steady: true, up: 'the motion came more in jumps', down: 'the motion ran more evenly' },
+  { area: 'weight', measure: 'motion p90', label: 'motion weight', read: m => m.motionP90, kind: 'ratio', steady: true, up: 'the moves got stronger', down: 'the moves got lighter' },
   // Space and Flow
-  { area: 'space', measure: 'curl', label: 'flow turning', read: m => m.curl, kind: 0.05, steady: true, up: 'turned more clockwise', down: 'turned more anticlockwise' },
-  { area: 'space', measure: 'drift speed', label: 'drift speed', read: m => m.driftSpeed, kind: 2.0, steady: true, up: 'drifted faster', down: 'drifted slower' },
-  { area: 'flow', measure: 'carried share', label: 'carried flow', read: m => m.carried, kind: 0.15, steady: true, up: 'more carried by flow', down: 'changed more in place' },
+  { area: 'space', measure: 'curl', label: 'flow turning', read: m => m.curl, kind: 0.05, steady: true, up: 'the flow turned more clockwise', down: 'the flow turned more anticlockwise' },
+  { area: 'space', measure: 'drift speed', label: 'drift speed', read: m => m.driftSpeed, kind: 2.0, steady: true, up: 'the drift got faster', down: 'the drift got slower' },
+  { area: 'flow', measure: 'carried share', label: 'carried flow', read: m => m.carried, kind: 0.15, steady: true, up: 'more of the change was carried by the flow', down: 'more of the change happened in place' },
   // Build (unsteady across takes)
-  { area: 'build', measure: 'swells a minute', label: 'swells', read: m => m.swellsPerMin, kind: 1.0, steady: false, up: 'more swells a minute', down: 'fewer swells a minute' },
-  { area: 'build', measure: 'calm share', label: 'calm share', read: m => m.calm, kind: 0.15, steady: false, up: 'calmer more of the time', down: 'less calm time' },
-  { area: 'build', measure: 'motion half-life', label: 'motion half-life', read: m => m.halfLife, kind: 'ratio', steady: false, up: 'motion held longer', down: 'motion changed quicker' },
+  { area: 'build', measure: 'swells a minute', label: 'swells', read: m => m.swellsPerMin, kind: 1.0, steady: false, up: 'the swells came more often', down: 'the swells came less often' },
+  { area: 'build', measure: 'calm share', label: 'calm share', read: m => m.calm, kind: 0.15, steady: false, up: 'more of the film was calm', down: 'less of the film was calm' },
+  { area: 'build', measure: 'motion half-life', label: 'motion half-life', read: m => m.halfLife, kind: 'ratio', steady: false, up: 'the motion held longer', down: 'the motion faded quicker' },
   // Colour (compareDesign step sizes)
-  { area: 'colour', measure: 'colourfulness', label: 'colourfulness', read: m => m.colourfulness, kind: 15, steady: true, up: 'more vivid', down: 'more muted' },
-  { area: 'colour', measure: 'coloured share', label: 'coloured area', read: m => m.coloured, kind: 0.15, steady: true, up: 'more of the frame coloured', down: 'less of the frame coloured' },
-  { area: 'colour', measure: 'hue spread', label: 'hue spread', read: m => m.hueSpread, kind: 0.2, steady: true, up: 'more hues at once', down: 'fewer hues at once' },
-  { area: 'colour', measure: 'warm share', label: 'warmth', read: m => m.warm, kind: 0.2, steady: true, up: 'warmer', down: 'cooler' },
-  { area: 'colour', measure: 'hue gap', label: 'hue gap', read: m => m.hueGap, kind: 45, steady: true, up: 'hues moved further apart', down: 'hues moved closer together' },
-  { area: 'colour', measure: 'hues a frame', label: 'hues a frame', read: m => m.huesCount, kind: 1.0, steady: true, up: 'more hues a frame', down: 'fewer hues a frame' },
-  { area: 'colour', measure: 'luminance spread', label: 'light-dark spread', read: m => m.lumSpread, kind: 0.15, steady: true, up: 'wider light-dark spread', down: 'narrower light-dark spread' },
-  { area: 'colour', measure: 'dominant hue share', label: 'dominant hue share', read: m => m.domHue, kind: 0.15, steady: true, up: 'one hue dominated more', down: 'hue shares evened out' },
+  { area: 'colour', measure: 'colourfulness', label: 'colourfulness', read: m => m.colourfulness, kind: 15, steady: true, up: 'the colour got more vivid', down: 'the colour got more muted' },
+  { area: 'colour', measure: 'coloured share', label: 'coloured area', read: m => m.coloured, kind: 0.15, steady: true, up: 'more of the frame was coloured', down: 'less of the frame was coloured' },
+  { area: 'colour', measure: 'hue spread', label: 'hue spread', read: m => m.hueSpread, kind: 0.2, steady: true, up: 'more hues showed at once', down: 'fewer hues showed at once' },
+  { area: 'colour', measure: 'warm share', label: 'warmth', read: m => m.warm, kind: 0.2, steady: true, up: 'the colour got warmer', down: 'the colour got cooler' },
+  { area: 'colour', measure: 'hue gap', label: 'hue gap', read: m => m.hueGap, kind: 45, steady: true, up: 'the main hues moved further apart', down: 'the main hues moved closer together' },
+  { area: 'colour', measure: 'hues a frame', label: 'hues a frame', read: m => m.huesCount, kind: 1.0, steady: true, up: 'more hues held a share of each frame', down: 'fewer hues held a share of each frame' },
+  { area: 'colour', measure: 'luminance spread', label: 'light-dark spread', read: m => m.lumSpread, kind: 0.15, steady: true, up: 'the light-dark spread got wider', down: 'the light-dark spread got narrower' },
+  { area: 'colour', measure: 'dominant hue share', label: 'dominant hue share', read: m => m.domHue, kind: 0.15, steady: true, up: 'one hue took more of the colour', down: "the hues' shares evened out" },
   // Light (compareDesign step sizes)
-  { area: 'light', measure: 'mean luminance', label: 'mean luminance', read: m => m.lumMean, kind: 0.08, steady: true, up: 'got brighter', down: 'got darker' },
-  { area: 'light', measure: 'RMS contrast', label: 'contrast', read: m => m.rms, kind: 0.05, steady: true, up: 'more contrast', down: 'flatter contrast' },
-  { area: 'light', measure: 'near-black share', label: 'dark ground', read: m => m.blackMean, kind: 0.15, steady: true, up: 'more near black', down: 'less near black' },
-  { area: 'light', measure: '95th luminance', label: 'peak brightness', read: m => m.p95, kind: 0.1, steady: true, up: 'brighter highlights', down: 'dimmer highlights' },
+  { area: 'light', measure: 'mean luminance', label: 'mean luminance', read: m => m.lumMean, kind: 0.08, steady: true, up: 'the picture got brighter', down: 'the picture got darker' },
+  { area: 'light', measure: 'RMS contrast', label: 'contrast', read: m => m.rms, kind: 0.05, steady: true, up: 'the contrast got stronger', down: 'the contrast got flatter' },
+  { area: 'light', measure: 'near-black share', label: 'dark ground', read: m => m.blackMean, kind: 0.15, steady: true, up: 'more of the frame was near black', down: 'less of the frame was near black' },
+  { area: 'light', measure: '95th luminance', label: 'peak brightness', read: m => m.p95, kind: 0.1, steady: true, up: 'the highlights got brighter', down: 'the highlights got dimmer' },
   // Edges (compareDesign ratio 1.5x)
-  { area: 'edges', measure: 'edge width (% of width)', label: 'the edges', read: m => m.edgeWidth, kind: 'ratio', steady: true, up: 'got softer', down: 'got crisper' },
+  { area: 'edges', measure: 'edge width (% of width)', label: 'the edges', read: m => m.edgeWidth, kind: 'ratio', steady: true, up: 'the edges got softer', down: 'the edges got crisper' },
   // Form (compareDesign + comparePhysics step sizes)
-  { area: 'form', measure: 'form scale across (% of width)', label: 'form scale', read: m => m.scaleX, kind: 'ratio', steady: true, up: 'larger forms', down: 'finer forms' },
-  { area: 'form', measure: 'flow-line coherence', label: 'flow lines', read: m => m.coherence, kind: 0.12, steady: true, up: 'more filaments and streaks', down: 'blobbier, fewer flow lines' },
-  { area: 'form', measure: 'forms a frame', label: 'form count', read: m => m.forms, kind: 'ratio', steady: true, up: 'more separate forms', down: 'fewer separate forms' },
-  { area: 'form', measure: 'elongation', label: 'form shape', read: m => m.elongation, kind: 0.15, steady: true, up: 'rounder forms', down: 'more stretched forms' },
-  { area: 'form', measure: 'spectrum slope', label: 'form detail', read: m => m.spectrum, kind: 0.4, steady: true, up: 'got sharper with finer detail', down: 'got smoother, less fine detail' },
+  { area: 'form', measure: 'form scale across (% of width)', label: 'form scale', read: m => m.scaleX, kind: 'ratio', steady: true, up: 'the forms got larger', down: 'the forms got finer' },
+  { area: 'form', measure: 'flow-line coherence', label: 'flow lines', read: m => m.coherence, kind: 0.12, steady: true, up: 'the forms drew out into more filaments and streaks', down: 'the forms got blobbier, with fewer flow lines' },
+  { area: 'form', measure: 'forms a frame', label: 'form count', read: m => m.forms, kind: 'ratio', steady: true, up: 'there were more separate forms', down: 'there were fewer separate forms' },
+  { area: 'form', measure: 'elongation', label: 'form shape', read: m => m.elongation, kind: 0.15, steady: true, up: 'the forms got rounder', down: 'the forms got more stretched' },
+  { area: 'form', measure: 'spectrum slope', label: 'form detail', read: m => m.spectrum, kind: 0.4, steady: true, up: 'the detail got sharper and finer', down: 'the detail got smoother' },
   // Composition (compareDesign step sizes)
-  { area: 'composition', measure: 'mirror symmetry', label: 'mirror symmetry', read: m => m.mirror, kind: 0.2, steady: true, up: 'more symmetric', down: 'less symmetric' },
-  { area: 'composition', measure: 'spread of the light', label: 'composition spread', read: m => m.spread, kind: 0.06, steady: true, up: 'spread wider across the frame', down: 'more concentrated' },
-  { area: 'composition', measure: 'centroid offset', label: 'balance', read: m => m.centroidOffset, kind: 0.12, steady: true, up: 'more off-centre', down: 'more centred' },
+  { area: 'composition', measure: 'mirror symmetry', label: 'mirror symmetry', read: m => m.mirror, kind: 0.2, steady: true, up: 'the picture got more symmetric', down: 'the picture got less symmetric' },
+  { area: 'composition', measure: 'spread of the light', label: 'composition spread', read: m => m.spread, kind: 0.06, steady: true, up: 'the light spread wider across the frame', down: 'the light drew together' },
+  { area: 'composition', measure: 'centroid offset', label: 'balance', read: m => m.centroidOffset, kind: 0.12, steady: true, up: 'the weight moved off centre', down: 'the weight moved toward the centre' },
   // Show / physics (comparePhysics step sizes)
-  { area: 'show', measure: 'own flow speed (% width/s)', label: 'fluid flow speed', read: m => m.ownSpeed, kind: 'ratio', steady: true, up: 'faster fluid flow', down: 'slower fluid flow' },
-  { area: 'show', measure: 'turnover (s)', label: 'turnover', read: m => m.turnover, kind: 'ratio', steady: true, up: 'more stately turnover', down: 'brisker turnover' },
-  { area: 'show', measure: 'lifetime (s)', label: 'form lifetime', read: m => m.lifetime, kind: 'ratio', steady: true, up: 'longer-lived forms', down: 'shorter-lived forms' },
-  { area: 'show', measure: 'whole-field share', label: 'whole-field motion', read: m => m.wholeShare, kind: 0.2, steady: true, up: 'more whole-picture motion', down: 'more of the fluid\'s own motion' },
-  { area: 'show', measure: 'divergence', label: 'spreading', read: m => m.div, kind: 0.1, steady: true, up: 'more spreading outwards', down: 'drawing in more' },
+  { area: 'show', measure: 'own flow speed (% width/s)', label: 'fluid flow speed', read: m => m.ownSpeed, kind: 'ratio', steady: true, up: "the fluid's own flow got faster", down: "the fluid's own flow got slower" },
+  { area: 'show', measure: 'turnover (s)', label: 'turnover', read: m => m.turnover, kind: 'ratio', steady: true, up: 'the picture renewed itself more slowly', down: 'the picture renewed itself more quickly' },
+  { area: 'show', measure: 'lifetime (s)', label: 'form lifetime', read: m => m.lifetime, kind: 'ratio', steady: true, up: 'the forms lived longer', down: 'the forms lived shorter' },
+  { area: 'show', measure: 'whole-field share', label: 'whole-field motion', read: m => m.wholeShare, kind: 0.2, steady: true, up: 'more of the motion moved the whole picture', down: "more of the motion was the fluid's own" },
+  { area: 'show', measure: 'divergence', label: 'spreading', read: m => m.div, kind: 0.1, steady: true, up: 'the picture spread outwards more', down: 'the picture drew inwards more' },
 ];
 
 /**
@@ -649,17 +649,21 @@ export function compareReads(before, after) {
       continue;
     }
 
-    const nums = `(${s.measure} ${fmtNum(from)} to ${fmtNum(to)})`;
+    // A plain sentence: what moved, which way, the words it left or took, then the
+    // numbers. "The edges got softer, from hard-edged to soft edges (edge width 0.62 to
+    // 2.67% of width)". A word's name is its text before the number in brackets.
+    const unit = s.measure.match(/^(.*) \((.*)\)$/);
+    const nums = unit
+      ? `(${unit[1]} ${fmtNum(from)} to ${fmtNum(to)}${unit[2].startsWith('%') ? '' : ' '}${unit[2]})`
+      : `(${s.measure} ${fmtNum(from)} to ${fmtNum(to)})`;
+    const name = w => w.text.split(' (')[0];
+    const dir = to > from ? s.up : s.down;
+    const Dir = dir[0].toUpperCase() + dir.slice(1);
     let phrase;
-    if (bw && aw && bw.term !== aw.term) {
-      phrase = `${s.label} went from ${bw.term} to ${aw.term} ${nums}`;
-    } else if (!bw && aw) {
-      phrase = `${s.label} became ${aw.term} ${nums}`;
-    } else if (bw && !aw) {
-      phrase = `${s.label} left ${bw.term} (${s.label} ${to > from ? s.up : s.down}) ${nums}`;
-    } else {
-      phrase = `${s.label} ${to > from ? s.up : s.down} ${nums}`;
-    }
+    if (bw && aw && bw.term !== aw.term) phrase = `${Dir}, from ${name(bw)} to ${name(aw)} ${nums}`;
+    else if (!bw && aw) phrase = `${Dir}, and became ${name(aw)} ${nums}`;
+    else if (bw && !aw) phrase = `${Dir}, and is no longer ${name(bw)} ${nums}`;
+    else phrase = `${Dir} ${nums}`;
     if (steady === false) phrase += ` ${UNSTEADY_NOTE}`;
 
     changed.push({
