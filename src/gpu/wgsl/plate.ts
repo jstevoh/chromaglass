@@ -3302,8 +3302,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let inner = bm.r;
     let r = drop.z;
     let R = drop.w;
-    let inDye = smoothstep(0.015, 0.2, auxH);
-    let k = clamp(U.beads * 2.0, 0.0, 1.0) * mix(0.35, 1.0, inDye) * inner;
+    // Full strength in clear water: the band is the oil's curve (38u-14).
+    let k = clamp(U.beads * 2.0, 0.0, 1.0) * inner;
     let flat = dropFlat(R, dropRho);
     let t = dropBand(r, R, dropRho);
     // How much oil the light crosses: 1 over the flat top (or a small drop's
@@ -3342,7 +3342,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       the contact, where the meniscus is steepest and bends the most light
       out of the lens. The band and the camera's line are that rim (38h-2).
     */
-    var dropC = outColor * vec3f(0.99, 0.97, 0.93) * shade;
+    // Beer-Lambert tint (38u-14).
+    let oilTint = pow(vec3f(0.99, 0.97, 0.93), vec3f(th));
+    var dropC = outColor * oilTint * shade;
 
     /*
       Drops (beadDrops, PLAN.md batch 3): the second reference frame, where
@@ -3373,9 +3375,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let absorb = -log(clamp(dc, vec3f(0.04), vec3f(1.0)));
       let trans = exp(-absorb * th * 1.0);
       let glowC = dc * (1.0 - dot(trans, vec3f(0.3333))) * 1.15 * (1.0 - U.lampGround);
-      let body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * shade;
+      let body = (outColor * oilTint * trans + glowC) * shade;
       dropC = mix(dropC, body, U.beadDrops);
-      kDrop = clamp(U.beads * 2.0, 0.0, 1.0) * mix(mix(0.35, 1.0, inDye), 1.0, U.beadDrops) * inner;
+      kDrop = k;
     }
     outColor = mix(outColor, dropC, kDrop);
     auxB = max(auxB, inner * 0.4 * kDrop);

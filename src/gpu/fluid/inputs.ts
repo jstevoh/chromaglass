@@ -737,6 +737,17 @@ export class FluidInputs extends FluidPasses {
     const soap = (what.soap ?? 0) * amount;
     const body = (what.body ?? 0) * amount;
     const repel = (what.repel ?? 0) * amount;
+    /*
+      A light liquid's weight (an oil, alcohol, a soap: w below zero) goes in
+      liquids1.g as its lightness, a heavy one's in liquids0.a, so each field
+      holds only what is not negative (PLAN 15e-10). The carries keep a
+      field from going below zero (bodyAdvect's floor, there for the dye),
+      and one field of signed w lost every light bottle's weight on its
+      first step: an alcohol drop on a rocked thin gap moved nothing
+      (`npm run liquidfall`). The polarity's sign meets the same floor;
+      on a thin gap it no longer pushes (liquidForces), and the open plate
+      keeps it as it was.
+    */
     const weight = what.weight ?? 0;
     const polar = what.polarity ?? 0;
     const enc = this.device.createCommandEncoder({ label: 'add liquid drop' });
@@ -744,10 +755,10 @@ export class FluidInputs extends FluidPasses {
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     this.run(pass, 'liquidSplat0', this.liquids0.write, [this.liquids0.read],
-      this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, weight]));
+      this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, Math.max(0, weight)]));
     this.liquids0.swap();
     this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
-      this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
+      this.arg('liquid splat 1', [x, y, radius, take, polar, Math.max(0, -weight), 0, 0]));
     this.liquids1.swap();
     pass.end();
     this.submit(enc);

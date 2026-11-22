@@ -111,7 +111,7 @@ fn defocusShadow(t: texture_2d<f32>, uv: vec2f) -> f32 {
   steps (oil 0.137, glycerine 0.14) are ten times the dye's stand-in, so
   the stairs went straight to camShadow's clamp. An oil drop's and a
   pour's rims are 18e-2's to draw, a bubble's wall its own lens; returning
-  them to the closeup waits on reading them smoothly (PLAN 18e-11).
+  them to the closeup waits on reading them smoothly (PLAN 18e-12).
 
   Two readings were tried before this and taken back (18e-5's thread):
   nothing (a flat closeup) and the derive pass's own nine-tap Laplacian of

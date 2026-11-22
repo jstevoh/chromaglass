@@ -112,8 +112,10 @@ shows) and `lll-melt-your-face-1` (Liquid Light Lab's own look: a dish
 camera through a video mirror and colouriser, so not a real-show row).
 
 A crop is decoded 320 pixels wide. A thin strip (a screen filmed from the
-crowd) leaves too few rows for the flow read's blocks, and the physics
-section prints dashes: crop a squarer piece of the screen (47v-6).
+crowd) leaves too few rows for the flow read's blocks. Under 64 rows (a
+crop less than a fifth as tall as it is wide) the physics section says "the
+flow read needs a taller crop" and reads only lifetime and spectrum: crop a
+squarer piece of the screen (47v-6).
 
 ## The design, physics and techniques sections
 
@@ -140,7 +142,8 @@ Definitions, with why each measure and what its bands mean, are at the top of
   carried, turnover, lifetime and spectrum the read prints the range real
   performances read (`REAL_SHOWS` in `scripts/watchphysics.mjs`, 47v-3), and
   says when a clip is under or over every one. Real shows read carried only
-  0.13 to 0.19 (film grain, the lamp, superimposition), so a low carried
+  0.13 to 0.23 (the lamp, superimposed loops, the camera; the grain is taken
+  out of the change first, from the pair's own noise, 47v-5), so a low carried
   share is a finding only under that.
 - **Techniques:** technique words found in the page (rig, oils, dyes,
   surfactants, heat, magnets, optics, camera speed, digital tools), its

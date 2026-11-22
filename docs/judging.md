@@ -2822,7 +2822,7 @@ at one frame. Whether the looks read better without the line is only seen here.
    line along a boundary, or the colours duller than before.
 2. Any look with two layers (Comet River is one): the back plate's rims are still a little
    brighter than its dye, as before.
-3. **Macro Zoom** to 4x on Comet River: judged in §139 (PLAN 18e-7 took the band up close).
+3. **Macro Zoom** to 4x on Comet River: judged in §140 (PLAN 18e-7 took the band up close).
 4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
    Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
 5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
@@ -2935,7 +2935,23 @@ here.
    pinks and greens. The default 0.3 should feel like the photograph.
 5. Polarisers at 0 on any look: the look exactly as before.
 
-## 139. No black lines up close, and the closeup's depth from the liquid (PLAN 18e-7)
+## 139. Three physics fixes: Rain Drip needs a tilt, the clear drop's lens, colours push apart (PLAN 38u-7, 38u-12, 38u-14)
+
+Looks change here on purpose. Judge from the film (before and after, same looks).
+
+1. Acid Trip, Neon Coral Reef (Rain Drip 0.4 to 0.6, now on a plate tipped
+   about 15 degrees): the streaks run down at a quarter of the old pull. Good: still streaks,
+   slower, with the heavy colour sinking in fingers. Bad: nothing runs, or the tilt's buoyancy
+   changes the look past what you want (then raise Rain Drip, or set Gravity lower).
+2. Classic on a level plate: no downhill streaks at all now (its Rain Drip 0.15 had a trace).
+   Velvet Underground on a plate tipped about 3 degrees (its 0.6 streaked its pools, which should
+   stay pools): the three pools stay apart and drift slowly, no streaks running out of them.
+3. Pour a clear drop (no dye) on bare water, projected: its dark ring is as strong as a dyed
+   drop's, thin and clear, not a faint ghost.
+4. Two colours side by side with Polarity up: the line between them stays an even edge, no
+   patches where they smear into each other.
+
+## 140. No black lines up close, and the closeup's depth from the liquid (PLAN 18e-7)
 
 Judged 2026-11-15 by the owner on the Mac's frame-locked films of main against the fix: "Looks good"
 (Comet River 4x and Classic 6x better than main, Splodascope 4x about the same).
