@@ -87,12 +87,17 @@ a grid of generic stock thumbnails: ours are the plate itself.
     that card gets YouTube's own notice in the player, not the film.
   - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills.
   - **34a-6d. The films to modern ambient music.** *(The owner, 2026-11-21: "we need to move
-    all of the demo videos off of the old recordings. The quality is just too low.")* In
-    progress (this thread's PR): the webpage's six, the TV samples and their channel copies to
-    Scott Buckley's CC BY 4.0 library, each on the look its record had; a long channel film of
-    Chris Zabriskie's *Cylinders* (CC BY 4.0), a look a piece (`npm run sitefilms -- --album
-    cylinders`). `public/landing/films/SOURCES.md` has each page, licence line and checksum.
+    all of the demo videos off of the old recordings. The quality is just too low.")*
+    **Shipped (2026-11-22):** the webpage's six loops, the TV samples (release `tv-films-1`)
+    and four of their channel copies on Scott Buckley's CC BY 4.0 library, each on the look its
+    record had. `public/landing/films/SOURCES.md` has each page, licence line and checksum.
     The 1920s films stay on the channel and 34a-6c's disputes stand.
+  - **34a-6f. Open: the last three channel films.** Hymn to the Dawn and Permafrost are
+    rendered (`/Volumes/Media/ChromaGlass/renders/ambient-2026-11/`) but YouTube's daily upload
+    limit refused them, so their cards loop and do not open; and the long film of Chris
+    Zabriskie's *Cylinders* (CC BY 4.0, a look a piece, `npm run sitefilms -- --album
+    cylinders`) has 7 of 9 pieces. Upload them, then put the ids in `siteFilms.ts`
+    (`SITE_FILMS`, `CHANNEL_ALBUMS`) and `Sample.FILMS`.
   - **34a-6e. Open: a TV build with the new films.** The Android TV app names its sample films
     in `Sample.java`; a TV on build 24 or older keeps playing the 1920s films (they stay in the
     `tv-films-1` release) until the next build reaches Play.
