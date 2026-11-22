@@ -211,4 +211,12 @@ is in the project's files).
   diffusion loses; nothing in a dish does that. The real snare in a show is a finger or a
   straw flicking the water. Replace the cord with a flick (the hand tools' impulse, 27f) and
   measure the cells still apart after a run of snares.
+- **38w-7. Small cells come out as rounded squares** (S–M; Med). Filmed 2026-11-21 at gpu=mid:
+  the smallest orange cells in Classic read as rounded squares, not discs. A real oil drop
+  squashed between two glasses is round, because surface tension minimises its rim. Two
+  suspects: the Cahn–Hilliard Laplacian's five-point stencil, which is anisotropic at a few
+  cells across and favours the grid's axes, and the lay packing cells on a grid. Measure
+  roundness (perimeter² / 4π·area, or the spread of rim radius by angle) for each cell after
+  classicdish's run at 192² and 384²; if it worsens with smaller cells and lifts at 384², use
+  the isotropic nine-point Laplacian in the oil's chemical potential.
 

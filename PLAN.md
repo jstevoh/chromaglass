@@ -266,7 +266,7 @@ style (§31).
   A fourth pass (**38v**, 2026-11-21, `38-realism-audit-2.md`) ranked what was left: first the
   two live bugs, **29a-10** and **9ac**, then **15g-17**, **18c-14**, **18c-3b** and **38v-1**.
   ~~**38w-1**~~ Classic Light Show as a real dish (oil cells in a coloured water on the lamp,
-  2026-11-21, `npm run classicdish`; no motor and no music hands) shipped; 38w-2 to 38w-6 open.
+  2026-11-21, `npm run classicdish`; no motor and no music hands) shipped; 38w-2 to 38w-7 open.
 - **6.11** What Liquid Light Lab's tutorials and gear showed (§42, asked 2026-11-07), each its own
   thread: **42m** the tutorials watched on the owner's Mac first, then **42a** the glass pair
   (Fast and Slow glass from real radii; after #655), **42e** the classic mixture's numbers (with
