@@ -59,7 +59,8 @@
 import { analysePcm, SOURCE_NAMES } from '../src/lib/audioFeatures.ts';
 import { HitSource, HIT_FEATURES } from '../src/lib/hitSource.ts';
 import { PatchBay, SETTING_TRAVEL, cordReading } from '../src/lib/sceneMap.ts';
-import { AreaHands, isAreaCord } from '../src/lib/areaCords.ts';
+import { AreaHands, isAreaCord, isHandCord, plateArea } from '../src/lib/areaCords.ts';
+import { isMusicCord } from '../src/lib/musicCords.ts';
 import { plateAreas } from '../src/lib/plateAreas.ts';
 import { SoundLearn } from '../src/lib/soundLearn.ts';
 import { parseMidiMap, serializeMidiMap, MIDI_FORMAT, MUSIC_SOURCES } from '../src/lib/midi.ts';
@@ -113,11 +114,12 @@ for (const p of PRESETS) {
       acting on an area the look has. A name its source lacks reads 0 there
       too, the gate never opens, and the act is nothing.
     */
-    if (isAreaCord(m)) {
+    // And a hand on the whole plate (the music's own hands, PLAN 38v-1) the same, on the plate as its area.
+    if (isHandCord(m)) {
       const hands = new AreaHands();
       let acts = [];
-      for (let s = 0; s < 120; s++) acts = hands.step([m], plateAreas(p.id), (c) => cordReading(ctx, c, 0), 1 / 60);
-      if (!(Math.abs(acts[0]?.amount ?? 0) > 0)) dead.push(`${p.id} ${m.source ?? 'room'}:${m.feature} on ${m.setting} in area ${m.area}`);
+      for (let s = 0; s < 120; s++) acts = hands.step([m], plateAreas(p.id), (c) => cordReading(ctx, c, 0), 1 / 60, plateArea(5));
+      if (!(Math.abs(acts[0]?.amount ?? 0) > 0)) dead.push(`${p.id} ${m.source ?? 'room'}:${m.feature} on ${m.setting} in ${m.area ?? 'the plate'}`);
       continue;
     }
     const travel = SETTING_TRAVEL[m.setting];
@@ -150,8 +152,9 @@ for (const p of PRESETS) for (const m of p.settings.sceneMappings ?? []) {
   const src = m.source ?? 'room';
   if (!FAST.has(src) && !NOT_SOUND.has(src)) slow.push(`${p.id} ${src}:${m.feature}`);
 }
-// A look's own answers: its cords less the music's stir, which every look carries and `npm run musicstir` holds.
-const answers = (p) => (p?.settings.sceneMappings ?? []).filter((m) => !isStirCord(m));
+// A look's own answers: its cords less the music's stir and its hands, which every look carries and
+// `npm run musicstir` and `npm run musiccords` hold (PLAN 38u-5, 38v-1).
+const answers = (p) => (p?.settings.sceneMappings ?? []).filter((m) => !isStirCord(m) && !isMusicCord(m));
 const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp', 'poster-1969'];
 const pattern = PATTERN.map((id) => {
   const ms = answers(PRESETS.find((p) => p.id === id));

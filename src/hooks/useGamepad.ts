@@ -163,7 +163,6 @@ export function useGamepad(host: GamepadHost, enabled = true) {
       if (rose(8)) h.action('automate-toggle');
       if (rose(9)) h.action('play-toggle');
       if (rose(10)) { c.x = 0.5; c.y = 0.5; }
-      if (rose(11)) h.action('macro-toggle');
       if (rose(12)) h.cycleLayer(1);
       if (rose(13)) h.cycleLayer(-1);
       if (rose(14)) h.action('preset-prev');

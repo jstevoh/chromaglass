@@ -104,15 +104,26 @@
       ]
     },
     {
+      "name": "The music's hands as cords",
+      "shard": "logic",
+      "run": "npm run musiccords",
+      "why": [
+        "PLAN 38v-1: the frame loop's own music hands are gone and each is a cord",
+        "on every look. With the cords pulled loud music lays nothing; laid, each",
+        "pours within a tenth of what the block did at Sound Drive's 1x, and Sound",
+        "Drive and the cords' depths can go past it."
+      ]
+    },
+    {
       "name": "The kick's bloom",
       "shard": "logic",
       "run": "npm run kickbloom",
       "why": [
-        "The droplets each kick throws (Kick Bloom, lib/kickBloom.ts), run on a",
-        "recording sink: the dial scales the dye and the push each alone, and the",
-        "droplets clump rather than sit on one ring (moved from panel.mjs's grep",
-        "when the bloom left the frame loop, 19ai-10); and the music lays no dye",
-        "on a reagent area, Chemical Clock's gel or Red Cabbage's wells (25i-10)."
+        "The kick's bloom, a cord since 38v-1 (a gated dropper riding Kick Bloom),",
+        "played by the real hands: the dial scales its dye and at 0 lays none;",
+        "its drops clump rather than sit on one ring (lib/kickBloom.ts); and the",
+        "music lays no dye on a reagent area, Chemical Clock's gel or Red",
+        "Cabbage's wells (25i-10), in the loop or through its cords."
       ]
     },
     {
@@ -968,7 +979,8 @@
         "a plate whose middle is bare frame the nearest pool from the first frame",
         "(the control: the frame on the aim is bare); with liquid on the aim Hold",
         "does not move; a hand's aim is obeyed; an empty plate lands on the first",
-        "pour; and the Close-up press goes in by the zoom and out with both."
+        "pour; the frame's zoom is the Macro Zoom alone, every closeup look carries",
+        "its own, and no Close-up press is left in src/ (QA-32c)."
       ]
     },
     {
@@ -3485,6 +3497,18 @@
       ]
     },
     {
+      "name": "Classic Light Show lays a 1960s dish",
+      "shard": "open",
+      "run": "npm run classicdish",
+      "why": [
+        "Classic Light Show (PLAN 38w-1): its dish is a coloured water full of",
+        "round oil cells of many sizes, warm, with drops of the water held in",
+        "the big ones, where the old lay was eleven soft pools of dye on black",
+        "glass. Two 192² plates of 300 steps; in the open shard, beside",
+        "clockglass."
+      ]
+    },
+    {
       "name": "Clock Glass keeps its colours apart",
       "shard": "open",
       "run": "npm run clockglass",
@@ -3545,6 +3569,19 @@
         "gel wheel and the lumia in the lamp, over the lens and among the rest.",
         "On the fifth shard since PLAN.md 19w (on show before that, to even it",
         "with plate, 19h); it is the lab, so any shard will do."
+      ]
+    },
+    {
+      "name": "The video as the lamp under the dish",
+      "shard": "fifth",
+      "run": "npm run videolamp",
+      "why": [
+        "PLAN 14ag-3: the video under the front plate is a picture in the lamp,",
+        "seen through the liquid. The dye filters its light (the plate on the",
+        "white lamp times the film's colour), bare water shows it, Film Mix 0",
+        "leaves the look to the byte, the frame's edge passes the bare lamp, and",
+        "a glycerine pool's rim moves a striped picture and not a flat one. The",
+        "lab, beside the mixer's check on the same shard."
       ]
     },
     {
@@ -3853,14 +3890,14 @@
       ]
     },
     {
-      "name": "The Close-up button lands on liquid",
+      "name": "The Macro Zoom pushed in lands on liquid",
       "shard": "tools",
       "run": "npm run closeupland",
       "timeout": 4,
       "why": [
-        "The desk's Close-up button on a plate cleared to one pool off the middle",
-        "(PLAN.md QA-32, the owner's blank plate): the 4x frame is lit, the",
-        "button lights and the knob reads 4x, and it comes out to the plate. The",
+        "The Macro Zoom pushed to 4x on a plate cleared to one pool off the middle",
+        "(PLAN.md QA-32, the owner's blank plate; QA-32c, the zoom the one control):",
+        "the 4x frame is lit, the chip reads 4x, and its minus brings it out to the plate. The",
         "controls: at 1x the pool is drawn, and the frame on the aim is bare glass.",
         "On the Mac: the app's frames; a cloud session runs it with PW_WEBGPU=1."
       ]

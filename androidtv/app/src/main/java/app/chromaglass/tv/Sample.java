@@ -15,9 +15,10 @@ package app.chromaglass.tv;
  * What they are (the owner, 2026-11-14, on the first samples: "I don't like
  * the visuals… can we play the YouTube videos as samples? If not YouTube,
  * let's get much better and longer samples"): the six films on the channel,
- * each a look playing a whole 1920s record, two and a half to three and a half
- * minutes, about nineteen minutes round. They were two twenty-second press
- * clips before. The files are the channel's own masters, not YouTube's
+ * each a look playing a whole piece of Scott Buckley's ambient music, three
+ * and a half to seven and a half minutes, about thirty-four minutes round.
+ * They were two twenty-second press clips before, and six 1920s records until
+ * 2026-11-21 (the owner: "The quality is just too low"; PLAN 34a-6d). The files are the channel's own masters, not YouTube's
  * player: an embedded YouTube player in a TV app's WebView may refuse to play
  * or show an advert first, and this app's WebView only ever loads the Mac's
  * page. src/lib/tvFilms.ts (the TV page's list, which this one must match:
@@ -26,13 +27,14 @@ package app.chromaglass.tv;
  * of the repository, which the platform player follows.
  *
  * Nothing is drawn or faked in them; they are the solver's own frames. The
- * records were published before 1926 and are in the public domain in the US,
- * so no credit is owed, but the TV says what is playing while it plays
+ * music is under Creative Commons Attribution 4.0, which asks for a credit:
+ * the TV says what is playing, whose it is and the licence while it plays
  * (ShowsTest checks every film says it).
  *
  * Since 12-tv-2h (the owner had asked for the YouTube films first) the sample
- * tries YouTube's own player before these files: FILMS below, the same six by
- * their YouTube ids, played one after another in a WebView (assets/films.html,
+ * tries YouTube's own player before these files: FILMS below, the same films
+ * by their YouTube ids (those already on the channel: in 34a-6d YouTube's daily
+ * upload limit held two back, which join when they are up), played one after another in a WebView (assets/films.html,
  * MainActivity.startFilms()), so a TV YouTube serves gets YouTube's adaptive
  * streams. When YouTube's player cannot play (no network to it, a film taken
  * down, error 150/152/153 in a WebView it refuses, or nothing for
@@ -53,17 +55,17 @@ final class Sample {
         Clip(String id, String look, String title, String performer, int year) {
             this.url = ORIGIN + "/films/" + id + ".mp4";
             this.look = look;
-            this.credit = "“" + title + "”, " + performer + " (" + year + ")";
+            this.credit = "“" + title + "”, " + performer + " (" + year + "), CC BY 4.0";
         }
     }
 
     static final Clip[] CLIPS = {
-        new Clip("wolverines", "Splodascope", "Riverboat Shuffle", "The Wolverine Orchestra, with Bix Beiderbecke", 1924),
-        new Clip("caruso", "Solar Flare", "Vesti la giubba", "Enrico Caruso", 1907),
-        new Clip("rachmaninoff", "Galaxy", "Prelude in C-sharp minor", "Sergei Rachmaninoff", 1921),
-        new Clip("whiteman", "Aurora Borealis", "Whispering", "Paul Whiteman and His Ambassador Orchestra", 1920),
-        new Clip("oliver", "Neon Coral Reef", "Tears", "King Oliver's Creole Jazz Band, with Louis Armstrong", 1923),
-        new Clip("bessie", "Velvet Underground", "Careless Love Blues", "Bessie Smith, with Louis Armstrong", 1925),
+        new Clip("effervescence", "Splodascope", "Effervescence", "Scott Buckley", 2023),
+        new Clip("hymn-to-the-dawn", "Solar Flare", "Hymn to the Dawn", "Scott Buckley", 2022),
+        new Clip("distant-sun", "Galaxy", "The Distant Sun", "Scott Buckley", 2019),
+        new Clip("permafrost", "Aurora Borealis", "Permafrost", "Scott Buckley", 2022),
+        new Clip("undertow", "Neon Coral Reef", "Undertow", "Scott Buckley", 2019),
+        new Clip("machina", "Velvet Underground", "Machina", "Scott Buckley", 2019),
     };
 
     static final class Film {
@@ -83,12 +85,10 @@ final class Sample {
     }
 
     static final Film[] FILMS = {
-        new Film("nIzxLuUu8tk", "Neon Coral Reef", "Tears", "King Oliver's Creole Jazz Band, with Louis Armstrong", 1923),
-        new Film("j7afUdmWi2c", "Splodascope", "Riverboat Shuffle", "The Wolverine Orchestra, with Bix Beiderbecke", 1924),
-        new Film("WbqOB_OeEoM", "Aurora Borealis", "Whispering", "Paul Whiteman and His Ambassador Orchestra", 1920),
-        new Film("ij4wuO7HQH8", "Velvet Underground", "Careless Love Blues", "Bessie Smith, with Louis Armstrong", 1925),
-        new Film("6SIl6gNhcpE", "Galaxy", "Prelude in C-sharp minor", "Sergei Rachmaninoff", 1921),
-        new Film("9N4GEV-z2KE", "Solar Flare", "Vesti la giubba", "Enrico Caruso", 1907),
+        new Film("mIkBqddPS_c", "Splodascope", "Effervescence", "Scott Buckley", 2023),
+        new Film("-us9tmNVuWA", "Galaxy", "The Distant Sun", "Scott Buckley", 2019),
+        new Film("L20txtagBLw", "Neon Coral Reef", "Undertow", "Scott Buckley", 2019),
+        new Film("iAfSG01qJVo", "Velvet Underground", "Machina", "Scott Buckley", 2019),
     };
 
     /**
