@@ -162,10 +162,6 @@ through cords and preset patches, and the plate shader is untouched.
   reachable only from the Mac's own assistant apps. Once 44h's Worker exists, the
   same tools can ride it (the Mac's server doing the upload, since the films are on
   the Mac). Only if the owner wants uploads started from the phone.
-- **44i-4. Progress while an upload runs.** `upload_video` answers within 45 s and
-  the assistant asks `upload_status` after. MCP's progress notifications would let a
-  client show a bar instead; Claude's apps did not all show them when checked. Pass: a
-  `youtube` line where a client that sends a `progressToken` receives rising progress.
 - **44j-3. The assistant's sound source on the Mac.** *(Owner's eyes, a minute.)*
   `system` asks macOS for screen-and-sound capture the first time; from the
   assistant there is no click to answer a prompt with. Try it once on the Mac before

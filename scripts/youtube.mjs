@@ -68,6 +68,7 @@ function standIn(gport) {
     faults: new Map([[2, 'stall'], [4, 'expire'], [5, 'drop'], [7, '503']]), refreshesAtExpiry: null, stalled: false, secrets: new Set([CLIENT_SECRET]),
     pkceOk: false, authAsked: null,
     requests: 0, limitNext: 0, pageSize: 50, playlistPages: 0, startCalls: 0, holdStart: null, onStartEnter: null,
+    playlists: [{ id: 'PL1', snippet: { title: 'Films' }, status: { privacyStatus: 'public' } }],
   };
   const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json', ...headers }); res.end(JSON.stringify(body)); };
   const err = (res, status, reason, message) => json(res, status, { error: { code: status, message, errors: [{ reason, message }] } });
@@ -189,16 +190,21 @@ function standIn(gport) {
         const offset = Number(q.get('pageToken') ?? 0);
         const slice = all.slice(offset, offset + limit);
         const nextPageToken = offset + limit < all.length ? String(offset + limit) : undefined;
-        return json(res, 200, { items: slice.map((videoId) => ({ contentDetails: { videoId } })), ...(nextPageToken ? { nextPageToken } : {}) });
+        return json(res, 200, { items: slice.map((videoId, idx) => ({ contentDetails: { videoId }, snippet: { position: offset + idx, resourceId: { videoId } } })), ...(nextPageToken ? { nextPageToken } : {}) });
       }
       if (p === '/youtube/v3/playlistItems' && req.method === 'POST') {
         const b = JSON.parse((await body(req)).toString());
-        g.playlistItems.push({ playlistId: b.snippet.playlistId, videoId: b.snippet.resourceId.videoId });
-        return json(res, 200, { id: 'pli1', snippet: b.snippet });
+        g.playlistItems.push({ playlistId: b.snippet.playlistId, videoId: b.snippet.resourceId.videoId, ...(b.snippet.position !== undefined ? { position: b.snippet.position } : {}) });
+        return json(res, 200, { id: `pli${g.playlistItems.length}`, snippet: b.snippet });
       }
       if (p === '/youtube/v3/playlists') {
         if (req.method === 'POST') { const b = JSON.parse((await body(req)).toString()); return json(res, 200, { id: 'PL2', ...b }); }
-        return json(res, 200, { items: [{ id: 'PL1', snippet: { title: 'Films' }, status: { privacyStatus: 'public' }, contentDetails: { itemCount: g.playlistItems.length } }] });
+        const all = g.playlists.map((pl) => ({ ...pl, contentDetails: { itemCount: g.playlistItems.filter((i) => i.playlistId === pl.id).length } }));
+        const limit = Math.min(Number(q.get('maxResults') ?? 50), g.pageSize);
+        const offset = Number(q.get('pageToken') ?? 0);
+        const slice = all.slice(offset, offset + limit);
+        const nextPageToken = offset + limit < all.length ? String(offset + limit) : undefined;
+        return json(res, 200, { items: slice, ...(nextPageToken ? { nextPageToken } : {}) });
       }
       if (p === '/youtube/v3/videos' && req.method === 'GET') {
         const ids = (q.get('id') ?? '').split(',');
@@ -225,11 +231,12 @@ function standIn(gport) {
 
 function start(server, env, args = []) {
   const child = spawn(process.execPath, [server, ...args], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
-  const out = { all: '', stderr: '', pending: new Map(), next: 1 };
+  const out = { all: '', stderr: '', pending: new Map(), notifications: [], next: 1 };
   child.stderr.on('data', (d) => { out.stderr += d; out.all += d; });
   createInterface({ input: child.stdout }).on('line', (line) => {
     out.all += `${line}\n`;
     let m; try { m = JSON.parse(line); } catch { return; }
+    if (m.method && m.id === undefined) out.notifications.push(m);
     out.pending.get(m.id)?.(m); out.pending.delete(m.id);
   });
   const exited = new Promise((r) => child.on('exit', (code) => r(code)));
@@ -239,8 +246,8 @@ function start(server, env, args = []) {
     out.pending.set(id, (m) => { clearTimeout(t); res(m); });
     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
   });
-  const tool = async (name, a = {}, ms) => {
-    const m = await rpc('tools/call', { name, arguments: a }, ms);
+  const tool = async (name, a = {}, ms, meta) => {
+    const m = await rpc('tools/call', { name, arguments: a, ...(meta ? { _meta: meta } : {}) }, ms);
     const t = m.result?.content?.[0]?.text ?? '';
     let v = t; try { v = JSON.parse(t); } catch { /* words */ }
     return { error: Boolean(m.result?.isError) || Boolean(m.timeout), text: t, v };
@@ -257,7 +264,16 @@ async function scenario(server, gport) {
   await listen();
   const dir = mkdtempSync(join(tmpdir(), 'yt-'));
   const conf = join(dir, 'conf');
-  const env = { CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40' };
+  // A fake osascript and launchctl sit first on PATH for every server this check starts, so that
+  // whatever the server's own guards do, no run of the check (or of a mutant that strips those
+  // guards) can reach the real ones and put a notification on the owner's screen; the fakes leave a
+  // marker the notifyGuard line reads. Written here, before the first drain, so the marker
+  // covers every drain in the scenario and not only the last.
+  const binDir = join(dir, 'bin');
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(join(binDir, 'launchctl'), `#!/bin/sh\necho "$@" > "${join(dir, 'launchctl-ran')}"\nexit 0\n`, { mode: 0o755 });
+  writeFileSync(join(binDir, 'osascript'), `#!/bin/sh\necho "$@" > "${join(dir, 'osascript-ran')}"\nexit 0\n`, { mode: 0o755 });
+  const env = { PATH: `${binDir}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40', CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1' };
   const logs = [];
   try {
     // The override names another host: the server stops before anything.
@@ -300,7 +316,7 @@ async function scenario(server, gport) {
     const init = await a.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
     const list = await a.rpc('tools/list', {});
     const names = (list.result?.tools ?? []).map((t) => t.name);
-    line('protocol', `it speaks MCP: initialize with a guide, and its twelve tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 12);
+    line('protocol', `it speaks MCP: initialize with a guide, and its fourteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 14);
     const before = g.refreshes;
     const ch = await a.tool('channel');
     line('refresh', 'an access key Google refuses is refreshed once and the call goes through', !ch.error && ch.v.title === 'Stand-in Channel' && g.refreshes === before + 1 && g.rejected401 >= 1, ch.text.slice(0, 160));
@@ -515,9 +531,11 @@ async function scenario(server, gport) {
     const fakeHome = join(dir, 'home');
     const fakeBin = join(dir, 'bin');
     const launchMarker = join(dir, 'launchctl-ran');
+    const notifyMarker = join(dir, 'osascript-ran');
     mkdirSync(fakeHome, { recursive: true });
     mkdirSync(fakeBin, { recursive: true });
     writeFileSync(join(fakeBin, 'launchctl'), `#!/bin/sh\necho "$@" > "${launchMarker}"\nexit 0\n`, { mode: 0o755 });
+    writeFileSync(join(fakeBin, 'osascript'), `#!/bin/sh\necho "$@" > "${notifyMarker}"\nexit 0\n`, { mode: 0o755 });
     const agentEnv = { ...env, HOME: fakeHome, PATH: `${fakeBin}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL: '1' };
     const inst = start(server, agentEnv, ['install-agent']);
     logs.push(inst.out);
@@ -542,12 +560,149 @@ async function scenario(server, gport) {
       instCode === 0 && uninstCode === 0 && !launchRan && plistRemoved && plistText.includes('<string>drain</string>') && plistText.includes(realpathSync(server)) && plistText.includes('<key>StartInterval</key><integer>3600</integer>'),
       `inst ${instCode}, uninst ${uninstCode}, launchRan ${launchRan}, removed ${plistRemoved}`);
 
-    // (i) nothing secret in any reply, the log, the manifest or the plist
+    // ── Replace, sidecar card, release plan, progress, notify (PLAN 44i-4, 44i-7..10) ─
+    const c2 = start(server, { ...env, CHROMAGLASS_YOUTUBE_NOW: String(tF + 60_000) });
+    logs.push(c2.out);
+    await c2.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
+
+    // (44i-4) progressToken receives rising progress notifications
+    const fileProg = join(dir, 'film-prog.mp4');
+    const bytesProg = randomBytes(4 * CHUNK);
+    writeFileSync(fileProg, bytesProg);
+    const progNotesBefore = c2.out.notifications.length;
+    const progRes = await c2.tool('upload_video', { file: fileProg, title: 'Progress film' }, 20_000, { progressToken: 'prog-1' });
+    const progNotes = c2.out.notifications.slice(progNotesBefore).filter((n) => n.method === 'notifications/progress' && n.params?.progressToken === 'prog-1');
+    const progRising = progNotes.length >= 2 && progNotes.every((n, i) => n.params.total === bytesProg.length && n.params.progress > (i ? progNotes[i - 1].params.progress : 0) && n.params.progress <= n.params.total) && progNotes.at(-1)?.params?.progress === bytesProg.length;
+    line('progress', 'upload_video emits rising MCP progress notifications when progressToken is sent',
+      !progRes.error && progRes.v?.state === 'done' && progRising,
+      `notes ${progNotes.length}, values ${progNotes.map((n) => n.params.progress).join(',')}`);
+
+    // (j) replace_video + (m) manifest views/likes + no osascript under env var
+    g.playlists.push({ id: 'PL2', snippet: { title: 'Ambient' }, status: { privacyStatus: 'public' } });
+    g.videos.set('vidOld', {
+      id: 'vidOld',
+      snippet: { title: 'Old ambient', description: 'Old desc', tags: ['ambient', 'old'], categoryId: '10', publishedAt: new Date(tF).toISOString(), channelId: 'UC1', thumbnails: {} },
+      status: { uploadStatus: 'uploaded', privacyStatus: 'public', selfDeclaredMadeForKids: false },
+      statistics: { viewCount: '42', likeCount: '7' },
+      contentDetails: { duration: 'PT1M' },
+    });
+    g.playlistItems.push({ playlistId: 'PL1', videoId: 'vidOld' });
+    g.playlistItems.push({ playlistId: 'PL2', videoId: 'vidOld' });
+    const pl1Pos = g.playlistItems.filter((i) => i.playlistId === 'PL1').length - 1;
+    const pl2Pos = g.playlistItems.filter((i) => i.playlistId === 'PL2').length - 1;
+    g.pageSize = 1;
+    await c2.tool('manifest', { sync: true });
+    await c2.tool('mark_video', { video_id: 'vidOld', key: 'old-ambient' });
+    const manifestSynced = readJson(join(conf, 'manifest.json'));
+    const oldSynced = (manifestSynced.videos ?? []).find((e) => e.videoId === 'vidOld');
+    line('manifestViews', 'manifest sync stores views and likes from videos.list statistics on the same call',
+      oldSynced?.views === 42 && oldSynced?.likes === 7,
+      `views ${oldSynced?.views}, likes ${oldSynced?.likes}`);
+
+    const fileRepl = join(dir, 'film-repl.mp4');
+    const bytesRepl = randomBytes(2 * CHUNK);
+    writeFileSync(fileRepl, bytesRepl);
+    const sessionsBeforeJ = g.sessions.length;
+    const updatesBeforeJ = g.updates;
+    const repRes = await c2.tool('replace_video', { video_id: 'vidOld', file: fileRepl });
+    const jobsAfterJ = readJson(join(conf, 'uploads.json')).jobs ?? [];
+    const repJob = jobsAfterJ.find((j) => j.replaces === 'vidOld');
+    const queuedOkJ = !repRes.error && g.sessions.length === sessionsBeforeJ && g.updates === updatesBeforeJ
+      && g.videos.get('vidOld')?.status?.privacyStatus === 'public'
+      && repJob?.state === 'queued' && repJob?.meta?.snippet?.title === 'Old ambient'
+      && repJob?.meta?.snippet?.description === 'Old desc'
+      && repJob?.meta?.snippet?.tags?.join(',') === 'ambient,old'
+      && repJob?.meta?.status?.privacyStatus === 'private'
+      && repJob?.key === 'old-ambient';
+    // Drain the queued replacement (plus Floor film if due) with NO_NOTIFY=1 and fake osascript on PATH
+    const drainRepl = start(server, { ...env, PATH: `${fakeBin}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1', CHROMAGLASS_YOUTUBE_NOW: String(tF + 3 * 3600_000) }, ['drain']);
+    logs.push(drainRepl.out);
+    const drainReplCode = await Promise.race([drainRepl.exited, sleep(15_000).then(() => 'timeout')]);
+    if (drainReplCode === 'timeout') await drainRepl.kill();
+    let notifyRan = false;
+    try { statSync(notifyMarker); notifyRan = true; } catch { /* expected */ }
+    const vNew = g.sessions.slice(sessionsBeforeJ).map((s) => s.video).find((vv) => vv && sha(vv.bytes) === sha(bytesRepl));
+    const manifestAfterJ = readJson(join(conf, 'manifest.json'));
+    const oldAfterJ = (manifestAfterJ.videos ?? []).find((e) => e.videoId === 'vidOld');
+    const newAfterJ = (manifestAfterJ.videos ?? []).find((e) => e.videoId === vNew?.id);
+    const inPl1 = g.playlistItems.some((i) => i.playlistId === 'PL1' && i.videoId === vNew?.id && i.position === pl1Pos);
+    const inPl2 = g.playlistItems.some((i) => i.playlistId === 'PL2' && i.videoId === vNew?.id && i.position === pl2Pos);
+    line('replaceVideo', 'replace_video queues old metadata and replaces without uploading yet; drain adds new id to all old playlists and marks manifest old replaced, new ok',
+      queuedOkJ && drainReplCode === 0 && Boolean(vNew?.id) && inPl1 && inPl2 && oldAfterJ?.status === 'replaced' && oldAfterJ?.replacedBy === vNew?.id && newAfterJ?.status === 'ok' && newAfterJ?.key === 'old-ambient' && newAfterJ?.replaces === 'vidOld',
+      `queued ${queuedOkJ}, drain ${drainReplCode}, vNew ${vNew?.id}, pl1 ${inPl1}, pl2 ${inPl2}, old ${oldAfterJ?.status}, new ${newAfterJ?.status}`);
+    line('notifyGuard', 'drain never invokes osascript when CHROMAGLASS_YOUTUBE_NO_NOTIFY=1 is set',
+      drainReplCode === 0 && !notifyRan,
+      `drain ${drainReplCode}, notifyRan ${notifyRan}`);
+
+    // (k) sidecar upload card: fills omitted title, call wins, unknown field refused with nothing queued
+    const cardFile1 = join(dir, 'card1.mp4');
+    writeFileSync(cardFile1, randomBytes(CHUNK));
+    writeFileSync(join(dir, 'card1.youtube.json'), JSON.stringify({ title: 'From Card', description: 'Card desc', tags: ['card'], playlist: 'PL1', key: 'card-key-1' }));
+    const qCard1 = await c2.tool('queue_upload', { file: cardFile1 });
+    const cardFile2 = join(dir, 'card2.mp4');
+    writeFileSync(cardFile2, randomBytes(CHUNK));
+    writeFileSync(join(dir, 'card2.youtube.json'), JSON.stringify({ title: 'Card Loses', description: 'Card desc 2' }));
+    const qCard2 = await c2.tool('queue_upload', { file: cardFile2, title: 'Call Wins' });
+    const cardFileBad = join(dir, 'cardbad.mp4');
+    writeFileSync(cardFileBad, randomBytes(CHUNK));
+    writeFileSync(join(dir, 'cardbad.youtube.json'), JSON.stringify({ title: 'Typo film', titel: 'wrong' }));
+    const jobsBeforeBad = (readJson(join(conf, 'uploads.json')).jobs ?? []).length;
+    const sessionsBeforeBad = g.sessions.length;
+    const qCardBad = await c2.tool('queue_upload', { file: cardFileBad });
+    const uCardBad = await c2.tool('upload_video', { file: cardFileBad });
+    const jobsAfterBad = (readJson(join(conf, 'uploads.json')).jobs ?? []).length;
+    const jobsStoreK = readJson(join(conf, 'uploads.json')).jobs ?? [];
+    const jCard1 = jobsStoreK.find((j) => j.key === 'card-key-1');
+    const jCard2 = jobsStoreK.find((j) => j.file === realpathSync(cardFile2));
+    line('sidecar', 'sidecar upload card fills omitted title, call wins over card, and unknown fields are refused with nothing queued',
+      !qCard1.error && jCard1?.meta?.snippet?.title === 'From Card' && jCard1?.meta?.snippet?.description === 'Card desc' && jCard1?.playlist_id === 'PL1'
+      && !qCard2.error && jCard2?.meta?.snippet?.title === 'Call Wins' && jCard2?.meta?.snippet?.description === 'Card desc 2'
+      && qCardBad.error && /titel/.test(qCardBad.text) && uCardBad.error && /titel/.test(uCardBad.text)
+      && jobsAfterBad === jobsBeforeBad && g.sessions.length === sessionsBeforeBad,
+      `c1 ${jCard1?.meta?.snippet?.title}, c2 ${jCard2?.meta?.snippet?.title}, bad ${qCardBad.error}/${uCardBad.error}`);
+
+    // (l) release_plan dry run sends no update; real run sets publishAt at Pacific clock time across DST (2026-03-08)
+    await c2.tool('mark_video', { video_id: v2?.id, key: 'v2-rel' });
+    const updatesBeforeL = g.updates;
+    const dryPlan = await c2.tool('release_plan', { keys: ['v2-rel', 'old-ambient', 'card-key-1'], start: '2026-03-07', every: 24, at: '10:00', dry_run: true });
+    const updatesAfterDry = g.updates;
+    const jobAfterDry = (readJson(join(conf, 'uploads.json')).jobs ?? []).find((j) => j.key === 'card-key-1');
+    const pubPlan = await c2.tool('release_plan', { video_ids: ['vidOld'], start: '2026-03-07', every: 24, at: '10:00' });
+    const realPlan = await c2.tool('release_plan', { keys: ['v2-rel', 'old-ambient', 'card-key-1'], start: '2026-03-07', every: 24, at: '10:00' });
+    const jobAfterReal = (readJson(join(conf, 'uploads.json')).jobs ?? []).find((j) => j.key === 'card-key-1');
+    const pacWall = (iso) => {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(Date.parse(iso)));
+      const get = (t) => parts.find((p) => p.type === t)?.value;
+      return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
+    };
+    const slot0 = g.videos.get(v2?.id)?.status?.publishAt;
+    const slot1 = g.videos.get(vNew?.id)?.status?.publishAt;
+    const slot2 = jobAfterReal?.meta?.status?.publishAt;
+    const dstOk = slot0 && slot1 && slot2
+      && pacWall(slot0) === '2026-03-07 10:00'
+      && pacWall(slot1) === '2026-03-08 10:00'
+      && pacWall(slot2) === '2026-03-09 10:00';
+    line('releasePlan', 'release_plan dry run sends no update, refuses public targets, and real run sets publishAt at Pacific clock time across DST (2026-03-08)',
+      !dryPlan.error && dryPlan.v?.quota_cost === 100 && updatesAfterDry === updatesBeforeL && !jobAfterDry?.meta?.status?.publishAt
+      && pubPlan.error && /private/.test(pubPlan.text)
+      && !realPlan.error && g.updates === updatesBeforeL + 2 && realPlan.v?.quota_cost === 100 && dstOk,
+      `updates dry ${updatesAfterDry - updatesBeforeL} / all ${g.updates - updatesBeforeL}, slots ${slot0 ? pacWall(slot0) : 'none'} / ${slot1 ? pacWall(slot1) : 'none'} / ${slot2 ? pacWall(slot2) : 'none'}`);
+
+    c2.child.stdin.end();
+    await Promise.race([c2.exited, sleep(3000)]);
+
+    // (i) nothing secret in any reply, the log, the manifest, uploads.json or the plist
     const manifestRaw = readText(join(conf, 'manifest.json'));
+    const uploadsRaw = readText(join(conf, 'uploads.json'));
     const leaked = [...g.secrets].filter((x) => logs.some((o) => o.all.includes(x)));
     line('leak', `nothing secret is in a reply or the log (${g.secrets.size} keys, secrets and session addresses looked for)`, leaked.length === 0, `found ${leaked.map((x) => x.slice(0, 10)).join(', ')}`);
     const leakedFiles = [...g.secrets].filter((x) => manifestRaw.includes(x) || plistText.includes(x));
     line('leakFiles', 'nothing secret is in the manifest or the plist', manifestRaw.length > 0 && plistText.length > 0 && leakedFiles.length === 0, `found ${leakedFiles.map((x) => x.slice(0, 10)).join(', ')}`);
+    // Every key the stand-in ever issued (g.secrets keeps them; g.access is emptied at the expire
+    // fault), less the upload session addresses, which uploads.json holds on purpose to resume.
+    const keySecrets = [...g.secrets].filter((x) => !x.startsWith('http'));
+    const leakedUploads = keySecrets.filter((x) => uploadsRaw.includes(x));
+    line('leakUploads', 'no key or token is in uploads.json', uploadsRaw.length > 0 && leakedUploads.length === 0, `found ${leakedUploads.map((x) => x.slice(0, 10)).join(', ')}`);
   } catch (e) {
     line('crash', 'the scenario ran to its end', false, String(e?.stack ?? e));
   } finally {
@@ -582,6 +737,12 @@ const MUTANTS = [
   // the server takes the push branch (the entry made on the spot), and that is the one cut.
   { rule: 'manifestReplace', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
   { rule: 'leakFiles', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: loadToken()?.refresh_token }, null, 2));' },
+  { rule: 'progress', find: 'if (moved) { onProgress?.(job.sent, job.size); fails = 0; continue; }', replace: 'if (moved) { fails = 0; continue; }' },
+  { rule: 'replaceVideo', find: 'const playlists = Array.isArray(oldEntry?.playlists) ? oldEntry.playlists : await findVideoPlaylists(oldId);', replace: 'const playlists = [];' },
+  { rule: 'sidecar', find: 'if (unknown.length) {', replace: 'if (false) {' },
+  { rule: 'notifyGuard', find: "if (process.platform !== 'darwin' || process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;", replace: '' },
+  { rule: 'manifestViews', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
+  { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? pacificWallToMs(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
 ];
 
 function mutant(m) {
