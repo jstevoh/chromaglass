@@ -482,4 +482,45 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   textureStore(dst, p, vec4f(mean3(p, i32(S.n)), 0.0, 0.0, 0.0));
 }`,
+
+  /*
+    Ferrofluid interfacial tension on a thin gap (PLAN 9ae) in conservative
+    capillary stress-tensor form (Lafaurie et al. 1994): div(|grad c| I -
+    grad c x grad c / |grad c|) = kappa * grad c, evaluated as face fluxes over
+    the [1 4 6 4 1]^2 smoothed phase field from mixSmooth so the net force on
+    any isolated drop vanishes identically regardless of sub-cell placement.
+    Zeroed inside a standing film's domes (stand).
+  */
+  phaseCapillary: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var soft: texture_2d<f32>;
+@group(0) @binding(4) var stand: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+fn cs(p: vec2i, n: f32) -> f32 { return textureLoad(soft, clampP(p, n), 0).r; }
+fn cssFace(p: vec2i, e: vec2i, n: f32) -> vec2f {
+  let q = p + e;
+  let ni = i32(n);
+  if (p.x < 0 || p.y < 0 || p.x >= ni || p.y >= ni || q.x < 0 || q.y < 0 || q.x >= ni || q.y >= ni) {
+    return vec2f(0.0);
+  }
+  let t = vec2i(e.y, e.x);
+  let gn = cs(q, n) - cs(p, n);
+  let gt = 0.25 * ((cs(p + t, n) - cs(p - t, n)) + (cs(q + t, n) - cs(q - t, n)));
+  let g = vec2f(f32(e.x) * gn + f32(t.x) * gt, f32(e.y) * gn + f32(t.y) * gt);
+  let gm = length(g);
+  if (gm <= 1e-5) { return vec2f(0.0); }
+  return gm * vec2f(e) - g * (gn / gm);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let v = textureLoad(vel, p, 0);
+  var f = A.a.x * (cssFace(p, vec2i(1, 0), n) - cssFace(p - vec2i(1, 0), vec2i(1, 0), n)
+                 + cssFace(p, vec2i(0, 1), n) - cssFace(p - vec2i(0, 1), vec2i(0, 1), n));
+  let l = length(f);
+  if (l > A.a.y) { f *= A.a.y / l; }
+  f *= (1.0 - textureLoad(stand, p, 0).r);
+  textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
+}`,
 };

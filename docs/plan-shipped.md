@@ -4919,6 +4919,11 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   - **Measured (the lab, SwiftShader):** `npm run holeline` 21/21, its closeup lines judged: Boundary Contrast 1 against 0 moves a seam up close 0 levels at one depth and at depths five times apart (87 and 116 on main); the relief itself moves the seam 0 at one depth and 38 at depths apart (the path steps there, the dye's stand-in index), and the seam at one depth is 3 darker and 3 brighter than its dyes. `npm run camrelief` 7/7 (new): at 2x a dome of dye 50% deeper gathers 14.8 levels in its middle, its flank -2.6 (the law -0.09 of the middle), the frame's summed change 14% of the core's gain, nothing at its mirror or with the dye level, and a dome in the gap moves nothing (0.0); at 4x round a cluster of cut bubbles the relief moves no pixel over 4 levels and whitens none, a dome on the same plate clear of them still lifts 15.2, and the control without the air mask moves a pixel there 39. `npm run macroview` 6/6: relief 0.027 to 0.033 of the frame on the defaults and three looks (0.020 to 0.026 with the projector's disc; main 0.084 to 0.184, most of it the seams' dark bands), 0.97 smooth. `microscope` 3/3, `derive` as main (its owed 18e-2 line).
   - **Found on the way:** 18e-10 (time `camLap` on Metal), 18e-11 (the closeup's depth from the dye's stand-in index, a named shortcut), 18e-12 (the gap, oil and pours back in the closeup's relief, read smoothly).
 
+- **18e-9 (shipped 2026-11-22). The optical path's height over a clear drop is the real gap.**
+  - **What was wrong:** `calcOpl` (`src/gpu/wgsl/plate.ts`) multiplied `hScale` by `1 - 0.5 * v.z`, so a full clear film at the rest gap read `1.420 * 0.5 = 0.71` against water's `1.333`, reversing every slope and Becke doublet over a clear drop. `lampDepthAt` (`src/gpu/wgsl/plateLamp.ts`) mirrored that `1 - 0.5 * v.film` term when subtracting `h` from `derived0.w` to form `(n - 1) * h` for under-dish video refraction.
+  - **What changed:** Both `calcOpl` (`plate.ts`) and `lampDepthAt` (`plateLamp.ts`) take the real gap height `h = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001)` with no `1 - 0.5 * film` factor, so `OPL = (n_water + 0.087 * film) * h` increases with both depth and film share.
+  - **Measured:** `PW_WEBGPU=1 npm run derive -- --owed=grad` (`height` removed from `--owed`): clear film OPL matches `n_water*(1-f)*h + 1.420*f*h` at 0.6, 1, and 1.5 rest gaps across `f = 0, 0.5, 1` (worst 2.2 µm against 10.0 µm bar; rest-gap full film adds +173.8 µm against +174.0 µm, before -1246.1 µm), and the rest-gap rim Laplacian is negative inside (-4.301, 438 px) and positive outside (3.465, 527 px).
+
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
 **Shipped (#352):**
@@ -7505,6 +7510,50 @@ across, all on the GPU from the solver's own stats. Measured on the lab's pictur
 (`npm run soapplate`): luminance 0.48, 0.1% near black, 11 of 12 hue sectors; the plate's colours
 follow the CPU reference's picture of the read-back film at r = 0.955 (−0.01 upside down); off is
 the plate to the byte. The shortcuts it leaves are 32d-1..5.
+
+### 32k, 32h, 32d-1 (in part). The film's big swirls, its air, and the frame's tilt
+
+Reported 2026-11-13 (Soap Film after 32d, filmed on the Mac against the owner's "Liquid
+Tapestry"): about 12 bright forms a frame against the photograph's 55 to 62, lower contrast,
+and none of its folded, marbled streaks. Measured in the lab (scratch scripts rendering the look
+every ten film seconds over two drain cycles, the watch tool's design read on each): the film
+moved under a stir by a cell or two, and the picture was the laid 6 mm patches and the drainage
+plumes. The solver's Darcy law gives every size of motion the one tuned friction ζ = 1.5, so a
+frame-wide swirl crawled as slowly as a 6 mm patch, and the film copied the plate's flow step by
+step (it stopped when the plate stopped).
+
+What shipped (`src/gpu/soapAir.ts`, `src/gpu/wgsl/soapAir.ts`, on a grid half the film's):
+
+- **32k, the film is a Brinkman fluid.** The air's drag on the film's faces, ζ_air = 2 μ_air / δ,
+  resists a motion of any size; the film's surface viscosity η resists a small one far more
+  (η k²). η is the value at which the 6 mm patches keep the tuned ζ (1.4e-6 Pa·s·m), so the
+  patches crawl as they did and the frame-scale motions run: `(1 − ℓ²∇²) W = F / ζ_air`, solved
+  warm-started on the air's grid against each row's mean (a level stratification is a gradient
+  the frame holds), projected, and handed to the solver less its own Darcy part. `npm run
+  soapplate` 7: a frame-wide 20 nm imbalance turns over at 5.8 mm/s rms (main 0.05; the tuned
+  Darcy ceiling 0.13), 6 mm patches at 0.21.
+- **32d-1 in part, the air over the film.** A slab 5.5 mm deep with its own inertia (it carries
+  its momentum, semi-Lagrangian, projected), dragged by the film's plumes at 2 μ / (ρ δ²), losing
+  its momentum to the room at ν / δ², and pushed by the plate's flow at 6 a second (the stir is
+  still the plate's flow, named). The film takes the air whole. `soapplate` 8: on a plate with no
+  flow at all, the film's own plumes set the air moving (8 mm/s rms after a fresh dip; main has
+  no air). The stir lines hold: 11.6 nm under the stir, 0.9 at its mirror.
+- **The fresh film is laid in 12 mm sheets at 50%** (was 6 mm at 25%): a hand-drawn film's
+  unevenness, which the big swirls fold into marbling. Still a laid profile, not a pull (32d-2).
+- **32h, Frame Tilt** (`soapFilmTilt`, degrees from flat, default 90 hanging, today's film):
+  gravity along the film is g sin θ, the fresh film's √z profile scales with it. With the big
+  swirls free, a hanging film sorts itself into level bands within seconds (measured: 11 forms
+  a frame over a cycle, the bands of a draining film); a frame held near flat keeps its
+  marbling. The look Soap Film holds it at 12°: over two cycles 52 bright forms a frame (main
+  48, the photograph 62), the forms frame-sized swirls where they were 6 mm blobs; RMS contrast
+  0.199 (main 0.203) and near black 0.5% (main 1.3%), so the contrast gap is not closed here:
+  mid-cycle the swirls blur into soft bands (32k-3), and the plate's dye shows through as a pale
+  disc in the middle (32d-5). On the desk,
+  the phone's remote and MIDI. `soapplate` 7: at 12° the imbalance turns over at 0.208 of the
+  hanging speed (sin 12° = 0.208).
+
+Tried and left out: the lamp's heat as a stir (warm air rising from the frame's foot in plumes):
+at 1.5 K it moved the air at a millimetre a second and the film not visibly (32m).
 
 ## 33. Bubbles and the closeup, per liquid
 
@@ -11494,6 +11543,20 @@ over a second (`originGap >= 1000`).
   `npm run sloshgpu` case 6 holds the GPU to the reference through a spin-up and a hard
   stop with a lens on the water, to 8e-6. No new setting: Thickness already sets the drag,
   and the phone's Spin tool turns the same dish.
+
+#### 22r. The spin's weight is linear in the density gap
+
+- ~~**22r. The spin's weight is a tanh, not the density**~~ (**spin half shipped**, `npm run dish` 10).
+  `weightAt` in `src/gpu/wgsl/fluid/forces.ts` passed `bilerpN(dye, uv, S.n).a - S.meanD`
+  through `tanh(clamp(..., -10.0, 10.0))`, so dye past the plate's mean saturated instead of
+  weighing in proportion to excess density Δρ/ρ₀ (Boussinesq, 18m-3). Removing the `tanh`
+  makes `weightAt` linear in `bilerpN(dye, uv, S.n).a - S.meanD` (`S.meanD` is constant across
+  the plate so its gradient is zero and subtracting it keeps `weightAt` centred near zero).
+  Measured (`PW_WEBGPU=1 npm run dish`): 2× and 3× discs drift at `1.970×` and `2.898×` the 1×
+  disc (was `2.030×` and `2.389×`, bar within 5%), and the 1× disc drifts at `2.456e-3` plate
+  widths/s against the Hele-Shaw law's `2.475e-3` (was `1.849e-3`, 0.747 of the law, bar within
+  15%). Left open in `docs/plan/22-spin.md`: `currentForces` (`src/gpu/wgsl/fluid/forces.ts:325`)
+  still passes `dye.a − S.meanD` through `tanh` for tilt and gravity, clamped at `maxCur`.
 
 ### 23. Selling it: the site free, the app paid
 

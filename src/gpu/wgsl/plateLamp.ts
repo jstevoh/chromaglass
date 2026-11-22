@@ -36,7 +36,7 @@ export const LAMP_MIX_WGSL = /* wgsl */ `
   n·h, h in rest gaps, the oil's, the film's and the poured liquids' indices
   in n, and the dye's named stand-in (refractionOptics note 6). The ray's
   delay against the air it replaces is that less h, (n - 1)h, with h read
-  from the view as calcOpl reads it (the gap, less half the clear film), so
+  from the view as calcOpl reads it (the gap in rest gaps), so
   a pool of glycerine at the water's depth bends by its index step and a
   squeezed gap of water by its depth's slope, each by the true amount. The
   gradient is taken in the dish's own uv, by central differences two cells
@@ -57,8 +57,7 @@ fn videoInLamp() -> bool { return U.filmOn != 0 && U.mixPos.z < U.mixPos2.z && U
 // The column's depth in rest gaps, as calcOpl takes it from the view.
 fn lampDepthAt(fuv: vec2f) -> f32 {
   let v = viewAt(fuv);
-  let g = select(1.0, clamp(v.gap / 0.03, 0.3, 3.0), v.gap > 0.001);
-  return g * (1.0 - 0.5 * v.film);
+  return select(1.0, clamp(v.gap / 0.03, 0.3, 3.0), v.gap > 0.001);
 }
 // (n - 1)h: the delay of a ray through the column against air, in rest gaps.
 fn lampDelayAt(fuv: vec2f) -> f32 { return tex2(derived0, fuv).w - lampDepthAt(fuv); }

@@ -32,8 +32,18 @@ Mac app, and not named on any page a visitor or customer reads.
   `~/.chromaglass/youtube/`, `CHROMAGLASS_YOUTUBE_DIR`, beside the Google client file
   the owner saves there). Tools: `channel`, `list_videos`, `upload_video` (resumable
   8 MiB chunks; resumes a dropped connection, an expired key, and a closed app from
-  `uploads.json`), `upload_status`, `update_video` (only the fields named change),
-  `set_thumbnail`, `list_playlists`, `create_playlist`, `add_to_playlist`. No delete.
+  `uploads.json`; queues the job with `notBefore` on `uploadLimitExceeded` or
+  `quotaExceeded` instead of failing), `queue_upload` (saves a job in state `queued`
+  with optional `key` and `replaces` without uploading yet), `upload_status` (lists
+  queued jobs with `not_before` in Pacific time), `update_video` (only the fields named
+  change), `set_thumbnail`, `list_playlists`, `create_playlist`, `add_to_playlist`,
+  `manifest` (reads `~/.chromaglass/youtube/manifest.json` and optionally syncs all
+  upload pages, keeping local fields), `mark_video` (sets local manifest fields on one
+  video or a list of `video_ids`). No delete. Command-line modes: `login`, `whoami`,
+  `logout`, `drain` (uploads queued jobs whose `notBefore` has passed, one at a time,
+  using `busyElsewhere` so two drains never push the same job), `install-agent` /
+  `uninstall-agent` (writes/removes the hourly LaunchAgent plist for `drain`),
+  `manifest [--sync] [--md <file>]` (prints or writes the manifest as Markdown).
 
 ## Contracts
 

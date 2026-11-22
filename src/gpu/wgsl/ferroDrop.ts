@@ -70,20 +70,21 @@
  */
 import { SPIKES_WGSL, SPIKE_PITCH } from './spikes';
 import { FILM_H0, PHASE_VIEW_TOP } from './standing';
-import { DISH_GAP_FIELD_UV, DISH_GAP_METRES, DISH_METRES } from '../../lib/turntable';
+import { DISH_GAP_FIELD_UV, DISH_GAP_METRES, DISH_METRES, DISH_REST_GAP } from '../../lib/turntable';
 
 const W = '@compute @workgroup_size(8, 8)';
 
 /*
   The solve's arguments: the plate's grid, l_c in its cells, the drop's
   height on a wide flat top (2 sin θ/2, in l_c), the magnet's pull in the
-  film's units, the Langevin scale, the most a drop can stand (the top
-  glass, in l_c), the magnets' radius, and the magnets.
+  film's units, the Langevin scale, the rest plateau cap (0.95 GAP_LC),
+  the magnets' radius, and l_c per gap unit (GAP_LC / DISH_REST_GAP) to
+  convert the live squeeze field into l_c; followed by the magnets.
 */
 const ARGS = /* wgsl */ `
 struct DropArgs {
   grid: vec4f,   // n, l_c in cells, the plateau's height (l_c), the pull's scale
-  more: vec4f,   // the Langevin scale, the most a drop stands (l_c), the magnet's radius, 0
+  more: vec4f,   // the Langevin scale, the rest plateau cap (l_c), the magnet's radius, l_c per gap unit
   mags: array<vec4f, 4>,
 };
 @group(0) @binding(0) var<uniform> A: DropArgs;
@@ -158,25 +159,129 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let c = textureLoad(src, q, 0).xy;
   let L = A.grid.y;
   let a = 1.0 / (L * L);
-  let s = clamp(A.grid.z + A.grid.w * (c.y - mean[1]), 0.0, A.more.y);
+  // The drop's unsqueezed sessile+magnetic target: bounded by the rest plateau
+  // cap without throwing the magnet's positive volume shift away. Any excess
+  // above the live glass gap is spread conservatively to neighbours below.
+  let s = max(min(A.grid.z, A.more.y) + A.grid.w * (c.y - mean[1]), 0.0);
   let nb = hAt(q + vec2i(1, 0), n) + hAt(q - vec2i(1, 0), n) + hAt(q + vec2i(0, 1), n) + hAt(q - vec2i(0, 1), n);
   let h = (nb + c.x * s * a) / (4.0 + a + 40.0 * (1.0 - c.x));
-  textureStore(hout, q, vec4f(min(h, A.more.y), 0.0, 0.0, 0.0));
+  textureStore(hout, q, vec4f(h, 0.0, 0.0, 0.0));
+}`;
+
+/*
+  Squeezing a drop under the live top glass (PLAN 29a-11): a drop pressed by a
+  glass spreads sideways and keeps every bit of its volume, V = ∫h dA, with
+  nothing above the ceiling b = 0.95 * gap_live. In the Baiocchi obstacle
+  formulation of Hele-Shaw squeeze, the integrated contact pressure φ ≥ 0
+  satisfies φ(h₀ + Δφ − b) = 0 with h = h₀ + Δφ ≤ b. Because Δφ is in exact
+  discrete divergence form with Neumann boundaries, Σ h = Σ h₀ identically
+  to floating-point rounding regardless of how far the drop spreads. Solved
+  by 4-level full-multigrid Red-Black SOR so wide puddles converge in one
+  frame on any grid.
+*/
+const RHS = /* wgsl */ `${ARGS}
+@group(0) @binding(1) var hin: texture_2d<f32>;
+@group(0) @binding(2) var view: texture_2d<u32>;
+@group(0) @binding(3) var<storage, read_write> rhs: array<f32>;
+@group(0) @binding(4) var<storage, read_write> phi: array<f32>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = i32(A.grid.x);
+  let q = vec2i(id.xy);
+  if (q.x >= n || q.y >= n) { return; }
+  let i = q.y * n + q.x;
+  let h0 = textureLoad(hin, q, 0).x;
+  let gap = max(unpack2x16unorm(textureLoad(view, q, 0).w).x * 0.06, 0.001) * A.more.w;
+  rhs[i] = h0 - 0.95 * gap;
+  phi[i] = 0.0;
+}`;
+
+const DOWN = /* wgsl */ `
+struct GridArgs { fn_: u32, cn: u32, pad0: u32, pad1: u32 };
+@group(0) @binding(0) var<uniform> G: GridArgs;
+@group(0) @binding(1) var<storage, read> fineRhs: array<f32>;
+@group(0) @binding(2) var<storage, read_write> coarseRhs: array<f32>;
+@group(0) @binding(3) var<storage, read_write> coarsePhi: array<f32>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let cn = i32(G.cn); let fn_ = i32(G.fn_);
+  let cx = i32(id.x); let cy = i32(id.y);
+  if (cx >= cn || cy >= cn) { return; }
+  let fx = cx * 2; let fy = cy * 2;
+  let s = fineRhs[fy * fn_ + fx] + fineRhs[fy * fn_ + fx + 1]
+        + fineRhs[(fy + 1) * fn_ + fx] + fineRhs[(fy + 1) * fn_ + fx + 1];
+  let ci = cy * cn + cx;
+  coarseRhs[ci] = s;
+  coarsePhi[ci] = 0.0;
+}`;
+
+const SOR = /* wgsl */ `
+struct SorArgs { n: u32, parity: u32, w: f32, pad: u32 };
+@group(0) @binding(0) var<uniform> S: SorArgs;
+@group(0) @binding(1) var<storage, read> rhs: array<f32>;
+@group(0) @binding(2) var<storage, read_write> phi: array<f32>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = i32(S.n);
+  let y = i32(id.y);
+  let x = i32(id.x) * 2 + ((y ^ i32(S.parity)) & 1);
+  if (x >= n || y >= n) { return; }
+  let i = y * n + x;
+  let xp = min(x + 1, n - 1); let xm = max(x - 1, 0);
+  let yp = min(y + 1, n - 1); let ym = max(y - 1, 0);
+  let nb = phi[y * n + xp] + phi[y * n + xm] + phi[yp * n + x] + phi[ym * n + x];
+  phi[i] = max(0.0, (1.0 - S.w) * phi[i] + S.w * (rhs[i] + 0.25 * nb));
+}`;
+
+const UP = /* wgsl */ `
+struct GridArgs { fn_: u32, cn: u32, pad0: u32, pad1: u32 };
+@group(0) @binding(0) var<uniform> G: GridArgs;
+@group(0) @binding(1) var<storage, read> coarsePhi: array<f32>;
+@group(0) @binding(2) var<storage, read_write> finePhi: array<f32>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let fn_ = i32(G.fn_); let cn = i32(G.cn);
+  let fx = i32(id.x); let fy = i32(id.y);
+  if (fx >= fn_ || fy >= fn_) { return; }
+  let ux = (f32(fx) + 0.5) * 0.5 - 0.5;
+  let uy = (f32(fy) + 0.5) * 0.5 - 0.5;
+  let x0 = clamp(i32(floor(ux)), 0, cn - 1);
+  let y0 = clamp(i32(floor(uy)), 0, cn - 1);
+  let x1 = min(x0 + 1, cn - 1);
+  let y1 = min(y0 + 1, cn - 1);
+  let tx = clamp(ux - f32(x0), 0.0, 1.0);
+  let ty = clamp(uy - f32(y0), 0.0, 1.0);
+  let a = coarsePhi[y0 * cn + x0]; let b = coarsePhi[y0 * cn + x1];
+  let c = coarsePhi[y1 * cn + x0]; let d = coarsePhi[y1 * cn + x1];
+  finePhi[fy * fn_ + fx] = mix(mix(a, b, tx), mix(c, d, tx), ty);
+}`;
+
+const SQUEEZE = /* wgsl */ `${ARGS}
+@group(0) @binding(1) var hin: texture_2d<f32>;
+@group(0) @binding(2) var<storage, read> phi: array<f32>;
+@group(0) @binding(3) var hout: texture_storage_2d<r32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = i32(A.grid.x);
+  let q = vec2i(id.xy);
+  if (q.x >= n || q.y >= n) { return; }
+  let i = q.y * n + q.x;
+  let xp = min(q.x + 1, n - 1); let xm = max(q.x - 1, 0);
+  let yp = min(q.y + 1, n - 1); let ym = max(q.y - 1, 0);
+  let nb = phi[q.y * n + xp] + phi[q.y * n + xm] + phi[yp * n + q.x] + phi[ym * n + q.x];
+  let h = textureLoad(hin, q, 0).x + 0.25 * (nb - 4.0 * phi[i]);
+  textureStore(hout, q, vec4f(max(h, 0.0), 0.0, 0.0, 0.0));
 }`;
 
 /*
   The packed flow (pack.ts, packVel) with the drop's height in its third
   channel, which the display reads (FERRO_DROP_WGSL): the solve's height,
   and on it the standing film's domes, a cell past full being a dome that
-  much taller than the layer (FILM_H0 l_c a full cell). Its fourth channel
-  is 2 where packVel writes 1: the display draws the drop only where a
-  surface was solved this frame (dropSolved). Without it, the first frames
+  much taller than the layer (FILM_H0 l_c a full cell), clamped at the live
+  gap so the drawn drop never passes through the cover glass. Its fourth
+  channel is 2 where packVel writes 1: the display draws the drop only where
+  a surface was solved this frame (dropSolved). Without it, the first frames
   into the closeup while the kernels build behind the show would light a
   flat surface (z 0), which reflects almost nothing, and the drop would go
   flat black where the old glint used to be.
 */
 const PACK = /* wgsl */ `
-struct PackArgs { n: f32, pad0: f32, pad: vec2f };
+struct PackArgs { n: f32, gapScale: f32, pad: vec2f };
 @group(0) @binding(0) var<uniform> A: PackArgs;
 @group(0) @binding(1) var vel: texture_2d<f32>;
 @group(0) @binding(2) var h: texture_2d<f32>;
@@ -186,8 +291,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
   let q = vec2i(id.xy);
   let v = textureLoad(vel, q, 0).xy;
-  let phase = unpack2x16unorm(textureLoad(view, q, 0).x).x * ${PHASE_VIEW_TOP}.0;
-  let z = textureLoad(h, q, 0).x + ${FILM_H0} * max(phase - 1.0, 0.0);
+  let pv = textureLoad(view, q, 0);
+  let phase = unpack2x16unorm(pv.x).x * ${PHASE_VIEW_TOP}.0;
+  let gap = max(unpack2x16unorm(pv.w).x * 0.06, 0.001) * A.gapScale;
+  let z = min(textureLoad(h, q, 0).x + ${FILM_H0} * max(phase - 1.0, 0.0), gap);
   textureStore(dst, q, vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), z, 2.0));
 }`;
 
@@ -196,7 +303,17 @@ export function gapLc(gapMetres = DISH_GAP_METRES): number {
   return gapMetres / DISH_METRES / (SPIKE_PITCH / (2 * Math.PI));
 }
 export const GAP_LC = gapLc();
-export const DROP_KERNELS = { dropSource: SOURCE, dropMean: MEAN, dropRelax: RELAX, packVelDrop: PACK } as const;
+export const DROP_KERNELS = {
+  dropSource: SOURCE,
+  dropMean: MEAN,
+  dropRelax: RELAX,
+  dropRhs: RHS,
+  dropDown: DOWN,
+  dropSor: SOR,
+  dropUp: UP,
+  dropSqueeze: SQUEEZE,
+  packVelDrop: PACK,
+} as const;
 
 /*
   The ferrofluid's refractive index, by Maxwell Garnett: 8% by volume of
