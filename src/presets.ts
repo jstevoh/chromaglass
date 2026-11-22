@@ -1,10 +1,7 @@
-import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
-import { layMoireLooks } from './presetsMoire';
+import { VisualizerSettings } from './types';
+import { layLooks } from './presetsLay';
 import { FOAM_CELLS } from './presetsFoam';
-import { layStirCords } from './lib/stir';
-import { layMusicCords } from './lib/musicCords';
 export { NEW_LOOK } from './lib/musicCords';
-import { PRESET_AREAS } from './lib/plateAreas';
 
 export interface Preset {
   id: string;
@@ -58,7 +55,7 @@ export const PRESETS: Preset[] = [
       automateRate: 0.08,        // regular auto-injection keeps the frame alive
       platePressure: 0.25,       // subtle radial spread from center
       glassSmear: 0.3,           // soft smearing, no harsh edges
-      rainDrip: 0.15,            // occasional downward streaks for variety
+      rainDrip: 0.15,            // a trace of streaks, once the plate is tipped (38u-12)
       viscosity: 'thick',        // heavy, syrupy movement
       polarity: 0.85,            // colors stay distinct but can gently intermingle
       evaporationRate: 0.012,    // keeps black between the blobs across the show
@@ -240,6 +237,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.6,
       glassSmear: 0.8,
       rainDrip: 0.2,
+      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
       polarity: 0.75,
       // 28i-2: at 0.05 on treble density the plate dried to 99% black and one
@@ -299,6 +297,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.8,
       glassSmear: 0.9,
       rainDrip: 0.4,
+      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
       polarity: 0.75,            // 28i-7: immiscible enough that five colours stay five
       // It lays dye on the weakest thing the music does (timbre) and dried it at
@@ -496,6 +495,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.15,
       glassSmear: 0.4,
       rainDrip: 0.2,
+      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
       polarity: 0.4,
       evaporationRate: 0.008,
@@ -610,6 +610,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.45,
       glassSmear: 0,
       rainDrip: 0.45,
+      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thick',
       polarity: 0.85,
       evaporationRate: 0.003,
@@ -672,6 +673,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.5,
       glassSmear: 0.7,
       rainDrip: 0.3,
+      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
       polarity: 0.65,
       evaporationRate: 0.025,
@@ -743,6 +745,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.45,
       glassSmear: 0.22,
       rainDrip: 0.6,
+      plateUpright: 0.05, // 3 deg: pools stay pools (38u-12)
       viscosity: 'thick',
       polarity: 0.9,
       evaporationRate: 0.004,
@@ -808,6 +811,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.35,
       glassSmear: 0.45,
       rainDrip: 0.55,
+      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thick',
       polarity: 0.75,
       evaporationRate: 0.012,
@@ -1235,6 +1239,7 @@ export const PRESETS: Preset[] = [
       platePressure: 0.45,       // squeeze drives the front without flattening it
       glassSmear: 0.4,
       rainDrip: 0.2,
+      plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
       polarity: 0.98,
       evaporationRate: 0.005,
@@ -2359,13 +2364,8 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-// The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
-// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5), then the
-// music's hands as cords on every look, from its own wiring and areas (lib/musicCords.ts, PLAN 38v-1).
-// In that order.
-layMoireLooks(PRESETS);
-layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
-layMusicCords(PRESETS, id => PRESET_AREAS[id] ?? null);
+// The moiré pack, the music's stir and its hands, over every look (presetsLay.ts).
+layLooks(PRESETS);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).
