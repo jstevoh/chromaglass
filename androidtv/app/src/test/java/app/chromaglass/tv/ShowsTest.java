@@ -83,8 +83,12 @@ public class ShowsTest {
     }
 
     // The YouTube films (Sample.FILMS, 12-tv-2h): each a real YouTube id, no
-    // film twice, and each named on screen by its look and its record, which
-    // must be one old enough to be public domain (published before 1926).
+    // film twice, and each named on screen by its look and its music. Since
+    // 34a-6d the music is modern and under CC BY 4.0, not a pre-1926 record,
+    // so the old "public domain by its year" bar is gone; in its place every
+    // film must be one of CLIPS (the same title, composer and year), the list
+    // whose credits name the licence, so no film can carry music the TV does
+    // not credit.
     @Test public void everyFilmIsAYouTubeIdWithItsRecordNamed() {
         assertEquals(true, Sample.FILMS.length >= 4);
         java.util.Set<String> ids = new java.util.HashSet<>();
@@ -92,7 +96,11 @@ public class ShowsTest {
             assertEquals(f.id, true, f.id.matches("[A-Za-z0-9_-]{11}"));
             assertEquals(f.id, true, ids.add(f.id));
             assertEquals(f.id, false, f.look.isEmpty() || f.title.isEmpty() || f.performer.isEmpty());
-            assertEquals(f.id, true, f.year >= 1890 && f.year < 1926);
+            boolean credited = false;
+            for (Sample.Clip c : Sample.CLIPS) {
+                credited |= c.credit.equals("\u201c" + f.title + "\u201d, " + f.performer + " (" + f.year + "), CC BY 4.0");
+            }
+            assertEquals(f.id, true, credited);
         }
         assertEquals(true, Sample.FILMS_BASE.startsWith("https://chromaglass.art/"));
     }

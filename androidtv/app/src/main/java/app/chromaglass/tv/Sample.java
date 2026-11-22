@@ -32,8 +32,9 @@ package app.chromaglass.tv;
  * (ShowsTest checks every film says it).
  *
  * Since 12-tv-2h (the owner had asked for the YouTube films first) the sample
- * tries YouTube's own player before these files: FILMS below, the same six by
- * their YouTube ids, played one after another in a WebView (assets/films.html,
+ * tries YouTube's own player before these files: FILMS below, the same films
+ * by their YouTube ids (those already on the channel: in 34a-6d YouTube's daily
+ * upload limit held two back, which join when they are up), played one after another in a WebView (assets/films.html,
  * MainActivity.startFilms()), so a TV YouTube serves gets YouTube's adaptive
  * streams. When YouTube's player cannot play (no network to it, a film taken
  * down, error 150/152/153 in a WebView it refuses, or nothing for
@@ -84,12 +85,10 @@ final class Sample {
     }
 
     static final Film[] FILMS = {
-        new Film("nIzxLuUu8tk", "Neon Coral Reef", "Tears", "King Oliver's Creole Jazz Band, with Louis Armstrong", 1923),
-        new Film("j7afUdmWi2c", "Splodascope", "Riverboat Shuffle", "The Wolverine Orchestra, with Bix Beiderbecke", 1924),
-        new Film("WbqOB_OeEoM", "Aurora Borealis", "Whispering", "Paul Whiteman and His Ambassador Orchestra", 1920),
-        new Film("ij4wuO7HQH8", "Velvet Underground", "Careless Love Blues", "Bessie Smith, with Louis Armstrong", 1925),
-        new Film("6SIl6gNhcpE", "Galaxy", "Prelude in C-sharp minor", "Sergei Rachmaninoff", 1921),
-        new Film("9N4GEV-z2KE", "Solar Flare", "Vesti la giubba", "Enrico Caruso", 1907),
+        new Film("mIkBqddPS_c", "Splodascope", "Effervescence", "Scott Buckley", 2023),
+        new Film("-us9tmNVuWA", "Galaxy", "The Distant Sun", "Scott Buckley", 2019),
+        new Film("L20txtagBLw", "Neon Coral Reef", "Undertow", "Scott Buckley", 2019),
+        new Film("iAfSG01qJVo", "Velvet Underground", "Machina", "Scott Buckley", 2019),
     };
 
     /**
