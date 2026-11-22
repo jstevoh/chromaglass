@@ -1637,6 +1637,20 @@
       ]
     },
     {
+      "name": "The water's bioluminescence",
+      "shard": "lab4",
+      "run": "npm run glow",
+      "why": [
+        "Glow lights the water where the flow shears it past a threshold (PLAN 48c,",
+        "gpu/glow.ts): a still plate is dark and keeps its charge; a stroke spends charge",
+        "along its own path and not far from it or in its mirror; a drift under the",
+        "threshold spends nothing; a second stroke within the recharge glows less and a sea",
+        "stroked again and again tires, while a short recharge and a rest give the second",
+        "stroke back its first's light; off makes no glow; the plate draws it blue in the",
+        "band and nowhere else. On the lab's software WebGPU; lab4 held three checks."
+      ]
+    },
+    {
       "name": "The dials held in the solver reach their tops",
       "shard": "lab3",
       "run": "npm run widedials",

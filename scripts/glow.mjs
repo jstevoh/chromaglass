@@ -32,10 +32,18 @@
  *
  *   4. A second stroke too soon glows less. The stroke again down the same
  *      path half a second after the first (Recharge 8 s): its brightest
- *      moment, summed over the band, under 0.8 of the first's. Control, on a
- *      fresh plate: the same two strokes with Recharge 0.5 s and three
- *      seconds between them glow alike (within 15%), so it is the spent
- *      charge that dims the second, not the flow the first left behind.
+ *      moment, over the band, under 0.97 of the first's, and three more
+ *      strokes each half a second after the last each dimmer than the one
+ *      before, the fifth under 0.85 of the first. Why a tenth and not half:
+ *      a passing finger fires a cell for the few hundredths of a second its
+ *      shear lasts, and a cell spends a share of its store in a flash
+ *      (Lingulodinium gives several flashes from one store before it is
+ *      spent; GLOW_SPEND is that), so one pass dims the next a little and a
+ *      sea stirred again and again tires, as a wake does. Control, on a fresh
+ *      plate: the same two strokes with Recharge 0.5 s and three seconds
+ *      between them glow alike (within 2%), so it is the spent charge that
+ *      dims the second, not the flow the first left behind (measured, the
+ *      control's two match to the third decimal).
  *
  *   5. Off is off, and the plate draws it. Stepped at Glow 0 there is no
  *      glow solver at all. Drawn mid-stroke at Glow 1, the plate's picture is
@@ -109,8 +117,9 @@ try {
     r.lightMax = Math.max(...g.light);
 
     // 4. Again, half a second later.
-    await rest(30);
-    r.peak2 = await stroke(1.5);
+    r.peaks = [r.peak1];
+    for (let k = 0; k < 4; k++) { await rest(30); r.peaks.push(await stroke(1.5)); }
+    r.peak2 = r.peaks[1];
 
     // 3. The same stroke as a drift.
     await fresh();
@@ -156,8 +165,9 @@ check('a stroke lights (its band glows)', o.peak1 > 0.02, `band peak ${f(o.peak1
 check('the stroke spends charge along its path, not far from it', o.spentBand > 0.01 && o.spentBand > 10 * o.spentFar, `band ${f(o.spentBand)} far ${f(o.spentFar, 5)}`);
 check('and not in its mirror (a flow read upside down)', o.spentBand > 10 * o.spentMirror, `band ${f(o.spentBand)} mirror ${f(o.spentMirror, 5)}`);
 check('a drift under the threshold spends almost nothing', o.spentDrift < o.spentBand / 20, `drift ${f(o.spentDrift, 5)} vs stroke ${f(o.spentBand)}`);
-check('a second stroke within the recharge glows less', o.peak2 < 0.8 * o.peak1, `${f(o.peak2)} vs ${f(o.peak1)}`);
-check('control: rested past a short recharge, the second glows as the first', Math.abs(o.ctl2 / o.ctl1 - 1) < 0.15, `${f(o.ctl2)} vs ${f(o.ctl1)}`);
+check('a second stroke within the recharge glows less', o.peak2 < 0.97 * o.peak1, `${f(o.peak2)} vs ${f(o.peak1)}`);
+check('stroked again and again, the sea tires (each pass dimmer, the fifth under 0.85)', o.peaks.every((v, k) => k === 0 || v < o.peaks[k - 1]) && o.peaks[4] < 0.85 * o.peaks[0], o.peaks.map((v) => f(v, 3)).join(' → '));
+check('control: rested past a short recharge, the second glows as the first', Math.abs(o.ctl2 / o.ctl1 - 1) < 0.02, `${f(o.ctl2)} vs ${f(o.ctl1)}`);
 check('turned off, the glow goes', !o.keptOff, '');
 check('off from the start, no glow is made', !o.madeOff, '');
 check('the plate draws the glow blue in the band', o.picBand > 2, `blue−red up ${f(o.picBand, 2)} of 255`);
