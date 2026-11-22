@@ -3,13 +3,6 @@
 Part 3 of 3 of §14; it begins at 14ad (14af sits before it). The section starts in `14-show-at-the-gig.md`.
 
 ## 14af. The wall's "title bar" chip: it went on asking, and could not be closed (shipped, asked 2026-10-29)
-
-**Shipped** (2026-10-29): the chip says what is wrong in plain words, its button fills the
-wall in the Mac app from the app's side, the Mac app counts the window's own full screen as
-filling it, and an X hides it for that wall window. `npm run desktop`'s line "the
-title-bar chip comes up…". Story in `docs/plan-shipped.md` §14af. Judged on the owner's Mac
-in `docs/judging.md` §91.
-
 - **14af-1** (S) *A wall on the laptop's own screen.* With no projector, Send to wall puts the
   window beside the desk, and filling it covers the desk; the chip asks anyway. Ask the
   window's screen (Window Management's `getScreenDetails`, which `useCastSession` already
@@ -22,11 +15,6 @@ in `docs/judging.md` §91.
   Mac app now does.
 
 ## 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped, asked 2026-10-24)
-
-**Shipped** (2026-10-24): one camera list (`useCameras`, kept current on `devicechange`) and
-one picker (`CameraPicker.tsx`) in both places a camera opens, desk and phone alike. Story
-in `docs/plan-shipped.md` §14ad (moved 2026-10-29, 19m).
-
 - **14ad-1** (S) *The audio input does not come back either* (14g's first half): the same
   `devicechange` reopen, for the sound's input.
 - **14ad-2** (S) *Room Drive and Room Impact keep the old word.* The section is Motion
@@ -49,10 +37,6 @@ caught; a quiet bridge can be. It samples at the App's render rate, not the ear'
 and the change is a fixed 2 s fade wherever it lands (`App.tsx`, the On a New Song
 effect). `npm run music` only feeds it synthetic level traces.
 
-- ~~**14z-1**~~ (**shipped**): On a New Song opens on Keep (`npm run music`). Story in `docs/plan-shipped.md` §14z-1 (moved 2026-10-29, 19m-2).
-- **14z-2** (**shipped**): where a song ends and the next begins, measured on real songs.
-  Story in `docs/plan-shipped.md` §14z-2 (moved 2026-10-29, 19m).
-- ~~**14z-3**~~ (**shipped**): the change lands on a hit of the new song. Story in `docs/plan-shipped.md` §14z-3 (moved 2026-10-29, 19m-2). Judged on the owner's GPU: `docs/judging.md` §65.
 - **14z-4**: once the owner has judged §65 with their own music, On a New Song opens on
   New preset again (the `music` check's default line moves with it).
 - **14z-5**: the room tracker seeds its floor on the analyser's first frame, and an analyser
@@ -76,27 +60,6 @@ effect). `npm run music` only feeds it synthetic level traces.
   quiet passage as the room.
 
 ## 14ag. Your own video: played, poured, read and framed; the demo videos gone (shipped, asked 2026-11-13)
-
-Asked by the owner (2026-11-13): "if I load my own background video I can't 'pour' it, only
-load it to play. Let's just get rid of the demo videos that can be poured or played. People can
-figure out their own videos. Also, I'd like the visuals to be able to react to the video that's
-loaded." Then: zoom and move the video on the canvas for different dimensions, and the video's
-controls in a panel of their own to work during the show.
-
-**Shipped**: the three demo loops and the nine cartoons are gone (`public/video`, 76 MB;
-`lib/cartoons.ts`, `CartoonShelf.tsx`, `FilmShelves.tsx`, `npm run cartoons`; 14ac's shelf). One
-video is loaded at a time, by Settings → Video's Video file, the Dyes panel's Pour a video… or the
-phone's A video as dye, and its row (`VideoShelf.tsx`) plays it through the projector and pours it
-as dye, either or both, on the Video section, the Dyes panel and the phone's dye sheet. The film
-sense reads the video pouring when nothing is on the projector, so Film Drive and the film's
-patches react to a poured video too. Video Zoom (0.25 to 4), Video Across and Video Up (−1 to 1)
-frame the film on the plate, with Fit; zoomed out, the frame stops at its edge (no smeared
-border). Film is named Video, and its panel is on the Perform tab's deck. The assistant's `film`
-and `pour_file` take `loaded` (the video loaded) in place of `cartoon`; `show_state`'s media says
-which video is loaded; the framing is `set`. Check: `npm run myvideo`.
-
-Open, found building it:
-
 - **14ag-1** (S) *The pour is not framed.* Video Zoom and the slides move the projector's frame;
   the pour still lays the whole frame stretched over the square dish (`videoSample` in
   `wgsl/splat.ts`, `pourVideoFrameCpu`), so a 16:9 clip pours squashed. Give the pour the same
