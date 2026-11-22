@@ -126,13 +126,21 @@ try {
     await rest(5);
     await stroke(1.5 / 20);
     r.spentDrift = band(spent(await glowOf().read()));
-
-    // 4's control: a quick recharge and a long rest between.
+    // Its positive control: the same drift with the threshold twenty times lower must spend,
+    // so the 0 above is the threshold's and not a drift that made no flow at all.
     await fresh();
-    await rest(5, { glowRecharge: 0.5 });
-    r.ctl1 = await stroke(1.5, { glowRecharge: 0.5 });
-    await rest(180, { glowRecharge: 0.5 });
-    r.ctl2 = await stroke(1.5, { glowRecharge: 0.5 });
+    await rest(5, { glowShear: 1.5 });
+    await stroke(1.5 / 20, { glowShear: 1.5 });
+    r.spentDriftLow = band(spent(await glowOf().read()));
+
+    // 4's control: the same half-second rest, but Recharge at its floor (0.05 s refills to
+    // e^-10 in that rest). Only the store changes, so the first stroke's leftover flow is still
+    // there: if the second stroke still dimmed, the dimming would be that flow's, not the charge's.
+    await fresh();
+    await rest(5, { glowRecharge: 0.05 });
+    r.ctl1 = await stroke(1.5, { glowRecharge: 0.05 });
+    await rest(30, { glowRecharge: 0.05 });
+    r.ctl2 = await stroke(1.5, { glowRecharge: 0.05 });
 
     // 5. Off.
     await lab.step(1, P({ glow: 0 }));
@@ -148,8 +156,10 @@ try {
         for (let x = Math.floor(x0 * R); x < Math.ceil(x1 * R); x++) { const k = (y * R + x) * 4; t += px[k + 2] - px[k]; c++; }
       return t / c;
     };
-    const bmrBoth = (px, x0, x1, y0, y1) => Math.max(bmr(px, x0, x1, y0, y1), bmr(px, x0, x1, 1 - y1, 1 - y0));
-    r.picBand = bmrBoth(pics.on, 0.15, 0.65, 0.28, 0.42) - bmrBoth(pics.off, 0.15, 0.65, 0.28, 0.42);
+    // The band itself, never the larger of it and its mirror: the plate's uv runs up the picture
+    // (plateThinFilm.ts), so a glow read upside down lands in the mirror and must fail here.
+    r.picBand = bmr(pics.on, 0.15, 0.65, 0.28, 0.42) - bmr(pics.off, 0.15, 0.65, 0.28, 0.42);
+    r.picMirror = bmr(pics.on, 0.15, 0.65, 0.58, 0.72) - bmr(pics.off, 0.15, 0.65, 0.58, 0.72);
     r.picFar = bmr(pics.on, 0.05, 0.95, 0.85, 0.95) - bmr(pics.off, 0.05, 0.95, 0.85, 0.95);
     r.picSame = pics.off.every((v, k) => v === pics.off2[k]);
     return r;
@@ -159,18 +169,20 @@ try {
 }
 
 const f = (x, d = 4) => (Number.isFinite(x) ? x.toFixed(d) : String(x));
-console.log(`glow: still max ${f(o.stillMax, 6)} min charge ${f(o.stillMinCharge)}; stroke peak ${f(o.peak1)} brightest ${f(o.lightMax)}; spent band ${f(o.spentBand)} mirror ${f(o.spentMirror, 5)} far ${f(o.spentFar, 5)} drift ${f(o.spentDrift, 5)}; second ${f(o.peak2)} (${f(o.peak2 / o.peak1, 2)}×); control ${f(o.ctl1)} then ${f(o.ctl2)} (${f(o.ctl2 / o.ctl1, 2)}×); picture band ${f(o.picBand, 2)} far ${f(o.picFar, 2)}`);
+console.log(`glow: still max ${f(o.stillMax, 6)} min charge ${f(o.stillMinCharge)}; stroke peak ${f(o.peak1)} brightest ${f(o.lightMax)}; spent band ${f(o.spentBand)} mirror ${f(o.spentMirror, 5)} far ${f(o.spentFar, 5)} drift ${f(o.spentDrift, 5)} (low threshold ${f(o.spentDriftLow)}); second ${f(o.peak2)} (${f(o.peak2 / o.peak1, 2)}×); control ${f(o.ctl1)} then ${f(o.ctl2)} (${f(o.ctl2 / o.ctl1, 2)}×); picture band ${f(o.picBand, 2)} mirror ${f(o.picMirror, 2)} far ${f(o.picFar, 2)}`);
 check('a still plate is dark and keeps its charge', o.stillMax < 1e-4 && o.stillMinCharge > 0.999, `brightest ${f(o.stillMax, 6)}, lowest charge ${f(o.stillMinCharge)}`);
 check('a stroke lights (its band glows)', o.peak1 > 0.02, `band peak ${f(o.peak1)}`);
 check('the stroke spends charge along its path, not far from it', o.spentBand > 0.01 && o.spentBand > 10 * o.spentFar, `band ${f(o.spentBand)} far ${f(o.spentFar, 5)}`);
 check('and not in its mirror (a flow read upside down)', o.spentBand > 10 * o.spentMirror, `band ${f(o.spentBand)} mirror ${f(o.spentMirror, 5)}`);
 check('a drift under the threshold spends almost nothing', o.spentDrift < o.spentBand / 20, `drift ${f(o.spentDrift, 5)} vs stroke ${f(o.spentBand)}`);
+check('control: that drift under a threshold twenty times lower does spend', o.spentDriftLow > o.spentBand / 2, `drift ${f(o.spentDriftLow)} vs stroke ${f(o.spentBand)}`);
 check('a second stroke within the recharge glows less', o.peak2 < 0.97 * o.peak1, `${f(o.peak2)} vs ${f(o.peak1)}`);
 check('stroked again and again, the sea tires (each pass dimmer, the fifth under 0.85)', o.peaks.every((v, k) => k === 0 || v < o.peaks[k - 1]) && o.peaks[4] < 0.85 * o.peaks[0], o.peaks.map((v) => f(v, 3)).join(' → '));
 check('control: rested past a short recharge, the second glows as the first', Math.abs(o.ctl2 / o.ctl1 - 1) < 0.02, `${f(o.ctl2)} vs ${f(o.ctl1)}`);
 check('turned off, the glow goes', !o.keptOff, '');
 check('off from the start, no glow is made', !o.madeOff, '');
 check('the plate draws the glow blue in the band', o.picBand > 2, `blue−red up ${f(o.picBand, 2)} of 255`);
+check('and not in its mirror (a picture drawn upside down)', Math.abs(o.picMirror) < o.picBand / 10, `mirror ${f(o.picMirror, 2)}`);
 check('and not far from it', Math.abs(o.picFar) < Math.max(0.2, o.picBand / 10), `far ${f(o.picFar, 2)}`);
 check('control: the plate drawn twice at 0 is the same bytes', o.picSame, '');
 console.log(`${passed} passed, ${failed} failed`);
