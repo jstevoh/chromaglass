@@ -7849,6 +7849,24 @@ Caruso `9N4GEV-z2KE`, Rachmaninoff `6SIl6gNhcpE`, Whiteman `WbqOB_OeEoM`, Oliver
 `nIzxLuUu8tk`, Bessie `ij4wuO7HQH8`. Every card now opens its film; `npm run landingfilms`
 uses the real ids instead of its stand-ins, since it only stubs the ids that are null.
 
+**34a-6d, the films to modern ambient music (2026-11-22).** The owner, 2026-11-21: "we need
+to move all of the demo videos off of the old recordings. The quality is just too low." The
+Great 78 transfers were replaced by Scott Buckley's CC BY 4.0 library, a piece on each look
+its record had: Effervescence (Splodascope), Hymn to the Dawn (Solar Flare), The Distant Sun
+(Galaxy), Permafrost (Aurora Borealis), Undertow (Neon Coral Reef), Machina (Velvet
+Underground). Buckley was picked over Stellardrone, Kai Engel and others whose releases are
+NC or ND; his own Content ID setup skips any video whose description carries his credit line,
+which every description does word for word. `siteFilms.ts` swapped `record` for `music` and
+`PUBLIC_DOMAIN` for `LICENCE`; `npm run landingfilms` holds each piece to an https file, a
+SHA-256 and SOURCES.md naming its page, in place of the pre-1926 year test; `npm run
+sitefilms` gained a light check (a frame every 30 s above 6/255) and an album mode, and sends
+the song into the page in 8 MB slices (one base64 string over about 100 MB closed the page
+for pieces past 400 s). The renders run on the owner's Mac only while no deploy needs it.
+The TV samples went into `tv-films-1` with `npm run tvfilms`; ShowsTest's FILMS year bar
+became "each film is one of CLIPS with its exact CC BY 4.0 credit". Four films opened from
+the channel at merge (`mIkBqddPS_c`, `-us9tmNVuWA`, `L20txtagBLw`, `iAfSG01qJVo`); the
+rest wait on YouTube's daily upload limit (34a-6f). The 1920s films stay on the channel.
+
 ### 35a. One look for on, every name unique (2026-10-24)
 
 Reported: the owner, with the Video panel open and a loop playing, could not tell which of
