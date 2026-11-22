@@ -8,8 +8,8 @@ the component.
 
 ## Start here
 
-- `fluidSimulation.ts` (194 KB, grep it): `FluidSimulation`, one layer: its seeding
-  (`seedPreset`; `addOilDensity` lays a colour as the oil's own, PLAN 47z-1), pours and doses, and the hand-off to the GPU solver (`attachGpu`,
+- `fluidSimulation.ts` (184 KB, grep it): `FluidSimulation`, one layer: its seeding
+  (`seedPreset`; `addOilDensity` lays a colour as the oil's own, PLAN 47z-1), pours and doses, spin drag (`spinDrag(settings)` returning `{ nu, gap, tau }` for this layer's viscosity and `gpu.coverMetres`, PLAN 38v-4), and the hand-off to the GPU solver (`attachGpu`,
   `dropGpu`, `syncFromGpu`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.

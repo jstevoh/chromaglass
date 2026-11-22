@@ -38,7 +38,7 @@ import { tapFrameCopies } from '../lib/frameTaps';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
-import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, lookMotor, lookMotorRate } from '../lib/turntable';
+import { AutoSpin, GRIP_SECONDS, SpinHand, dishFollow, dishFrame, lookMotor, lookMotorRate } from '../lib/turntable';
 import { stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
@@ -4796,7 +4796,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               An angle that accumulates cannot be allowed to go non-finite
               (the note above); dishFrame returns a finite turn or none.
             */
-            const tau = dragSeconds(carrierViscosity(currentSettings.viscosity), fluidsRef.current[0]?.gpu?.coverUnits);
+            const tau = fluidsRef.current[l]?.spinDrag(patch.layer(l)).tau ?? 1;
             const frame = dishFrame(spinVelRef.current[l] ?? 0, dishNow, liquidSpinRef.current[l] ?? 0, realDt, tau);
             if (Number.isFinite(frame.liquid)) liquidSpinRef.current[l] = frame.liquid;
             if (fluidsRef.current[l]) {

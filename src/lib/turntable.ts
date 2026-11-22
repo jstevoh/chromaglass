@@ -145,6 +145,28 @@ export function dragSeconds(nu: number, gap = DISH_REST_GAP): number {
   return (h * h) / (12 * Math.max(1e-9, nu));
 }
 
+export interface SpinDrag { nu: number; gap: number; tau: number }
+
+/**
+ * The spin's drag on one plate layer (PLAN 38v-4): the kinematic viscosity `nu`
+ * (m²/s) the layer's solve drags with (`thicknessViscosity` on a thin gap,
+ * `carrierViscosity` with Thin Gap off), the layer's own cover gap `gap` (m,
+ * or the 2 mm rest gap when no solver is attached), and the plane-Poiseuille
+ * lag time `tau = gap² / (12 nu)` (s). Both `deriveStep` and the frame loop's
+ * `dishFrame` read this through `FluidSimulation.prototype.spinDrag` so the
+ * solver and the turntable share one liquid and one glass per layer.
+ */
+export function layerSpinDrag(
+  settings: { thinGap?: number; gapThickness?: number; viscosity?: string },
+  coverMetres?: number,
+  defaultThickness = 0.45,
+): SpinDrag {
+  const t = Number.isFinite(settings.gapThickness) ? settings.gapThickness! : defaultThickness;
+  const nu = (settings.thinGap ?? 1) > 0.5 ? thicknessViscosity(t) : carrierViscosity(settings.viscosity);
+  const gap = Number.isFinite(coverMetres) ? coverMetres! : DISH_GAP_METRES;
+  return { nu, gap, tau: (gap * gap) / (12 * Math.max(1e-9, nu)) };
+}
+
 /**
  * The liquid's bulk, following the dish: dω_l/dt = (Ω − ω_l)/τ, exactly over
  * the step. Non-finite inputs leave it where it was: this is integrated into
