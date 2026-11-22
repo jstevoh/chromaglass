@@ -177,3 +177,26 @@ water, so it never does.
   Drive off, the noise dials at 0. Check: the clean start under loud music adds nothing
   without a cord; every built-in look renders as before (`npm run panel`, `npm run desk`).
   (38v, from RS-53.)
+
+## 38w. Classic Light Show as a real dish (2026-11-21)
+
+The owner, 2026-11-21: Classic "looks nothing like a traditional liquid light show". Watched
+against the Joshua Light Show, Glenn McKay, Bill Ham and the period photographs (the gap list
+is in the project's files).
+
+- ~~**38w-1. Classic laid as oil cells in a coloured water on the lamp**~~ shipped
+  (`npm run classicdish`; the story in `docs/plan-shipped.md`).
+- **38w-2. Classic's motion as a hand's, measured** (S–M; Medium). The references rest about
+  40% of the time and swell every 12 to 20 s from a tilt, a press or a fresh pour. 38w-1 gave
+  the look a hand (Plate Rock, the kick's press) and stopped the motor, but nothing measures
+  the rest-and-swell rhythm in the app. Check: on the Mac, the flow's speed over a minute of
+  the band has a median under a third of its peaks, peaks 12–20 s apart (`moving` style).
+- **38w-3. A fresh pour's radial streaks** (M; Low–Medium). After a pour the references show
+  dye streaming out from the drop in rays, the Marangoni spread of a new drop on the water.
+  Classic's automation pours, but a drop lands as a disc. Model the spreading drop's surface
+  tension gradient (18c's drop impact is where it lands); measure the angular structure round
+  a fresh drop in the lab.
+- **38w-4. The old Classic's plate as a look of its own** (S; Low). The neon pools on black
+  that Classic was (11 blobs, screen blend, gooey) are the opposite of a real dish but were a
+  look some may want. Offer it as "Neon Pools" if the owner asks; until then it is gone.
+
