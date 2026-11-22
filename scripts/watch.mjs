@@ -1146,6 +1146,16 @@ async function selftest() {
   // only the dissolve's middle sample a cut, it would run to 4.7 s.
   check('F: the physics read measures across no fade: its longest shot is the first take, 4.1 s', Math.abs(DF.design.physics.longestShot - 4.1) < 0.06,
     `longest shot ${DF.design.physics.longestShot?.toFixed(2)} s`);
+  // The palette strip fits its width whatever its shares round to: a real film's palette
+  // (the Classic closeup's after take) once put its fifth edge at 961 of 960 and threw.
+  const tail = [0.4413815789473684, 0.18112985944976076, 0.1725455293062201, 0.12059180622009569, 0.084265625, 0.00008560107655502393]
+    .map((share, i) => ({ share, rgb: [40 * i + 10, 200, 90] }));
+  let strip = null, stripErr = '';
+  try { strip = paletteStrip(tail); } catch (e) { stripErr = e.message; }
+  // The sixth colour's share is 0.08 of a column, so it gets none and the fifth (red 170)
+  // must run to the last column: a strip that stops short or throws fails.
+  check('H: the palette strip fits its width when the shares round up past it', strip && strip.length === 960 * 96 * 3 && strip[959 * 3] === 170,
+    strip ? `last column red ${strip[959 * 3]} (the fifth colour's 170)` : `threw: ${stripErr}`);
   const why = (r, t0, t1) => r.turnedDown.filter(v => r.rows[v.to].t > t0 && r.rows[v.from].t < t1).map(v => v.why);
   const downs = r => r.turnedDown.map(v => `${r.rows[v.from].t.toFixed(1)}–${r.rows[v.to].t.toFixed(1)} s ${v.why}${v.left != null ? ` (left ${v.left.toFixed(2)})` : ''}`).join(', ') || 'none';
   check('G: a pour, a dye body spreading and the lamp dimming and coming back, in one take, are no cut and no dissolve',
