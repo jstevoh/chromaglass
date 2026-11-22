@@ -20,12 +20,11 @@ import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH 
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
-import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
+import { plateLook } from '../presetPlate';
 import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
-import { PALETTE_RGB, pickHarmony } from '../constants';
 import { THIN_GAP_THICKNESS, thinGapViscosity, NU_REF } from '../gpu/fluid';
 import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, SloshSpin, type SloshPress } from '../lib/slosh';
 import { OPEN_RIM, carrierViscosity, dragSeconds, dyeDensityContrast } from '../lib/turntable';
@@ -34,6 +33,7 @@ import { stirOf } from '../lib/stir';
 import { frameSway, rockStep } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { pourPictureCpu } from '../lib/videoFlow';
+import { seedDyes } from '../lib/pinnedDyes';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
@@ -1381,14 +1381,13 @@ export class FluidSimulation {
     return harmony;
   }
 
-  seedPreset(look: string, noise2D: (x: number, y: number) => number): number[] {
+  seedPreset(look: string, noise2D: (x: number, y: number) => number, dyes: readonly number[] | null = null): number[] {
     const presetId = plateLook(look);
     const S = this.size;
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
 
-    const harmony = PRESET_CONTRACTS[look] || pickHarmony();
-    const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
+    const { harmony, col, named } = seedDyes(look, dyes);
 
     const dishSum = () => {
       let s = 0;
@@ -1448,8 +1447,8 @@ export class FluidSimulation {
     switch (presetId) {
       case 'galaxy': {
         // Gold core (28i-7) + two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
-        this.splatBlob(cx, cy, 4.2, 3.8, 1.0, 0.8, 0.45);
-        this.splatBlob(cx, cy, 8.5, 1.8, 0.5, 0.25, 0.85);
+        this.splatBlob(cx, cy, 4.2, 3.8, ...named(1.0, 0.8, 0.45, 0));
+        this.splatBlob(cx, cy, 8.5, 1.8, ...named(0.5, 0.25, 0.85, 1));
         // Two logarithmic spiral arms
         for (let arm = 0; arm < 2; arm++) {
           const offset = arm * Math.PI;
@@ -1598,8 +1597,8 @@ export class FluidSimulation {
       }
 
       case 'solar-flare': {
-        this.splatBlob(cx, cy, 8, 6.0, 1.0, 0.95, 0.8);
-        this.splatBlob(cx, cy, 15, 3.0, 1.0, 0.5, 0.0);
+        this.splatBlob(cx, cy, 8, 6.0, ...named(1.0, 0.95, 0.8, 0));
+        this.splatBlob(cx, cy, 15, 3.0, ...named(1.0, 0.5, 0.0, 1));
         for (let f = 0; f < 8; f++) {
           const a = f * Math.PI * 2 / 8 + this.rng.centred() * 0.4;
           const c = col(f);

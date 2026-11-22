@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a picture palette recolours the plate (PLAN 43d-6)
+
+- **Palette from a picture or video** now changes the colours on the plate, not only the dyes
+  still to come: the plate takes the picture's colours over eight seconds, as does any palette
+  picked by hand. A look opened while a palette is locked is laid in that palette's dyes.
+
 ### Changed — three drawn stand-ins made physical (PLAN 38u-7, 38u-12, 38u-14)
 
 - **Rain Drip** needs the plate tipped (Gravity): the weight along a plate is g sin θ, nothing on a

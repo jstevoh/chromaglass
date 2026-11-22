@@ -126,6 +126,27 @@ nothing. A loop that needs less of a crossfade (a periodic stir locked to the ba
     as first written: on a Release kit render the cover can also be poured in as the first
     dye (`injectImage`) so a loop opens on it, as Apple's motion art asks. *Measure:* the
     film's first frame is closer to the cover than a plate from the default look's.
+  - **43d-6. The playing plate takes the picture's colours.** **Shipped 2026-11-21**
+    (`npm run pictureplate`): a palette chosen by hand recolours the plate in eight seconds,
+    and a look laid under a lock is laid in its dyes. Story in `docs/plan-shipped.md` §43d-6.
+  - **43d-7. A recolour by a real rinse.** *(M.)* 43d-6's eight seconds reuse Go's handover,
+    which thins the dye already laid to 2% by a rate no liquid has: a shortcut. On a real
+    plate the old colour leaves only by being carried off or out-poured: clear medium flowed
+    in from the rim that displaces the dyed liquid (the solver's own advection and the
+    rim's drain), or the new dyes poured in amounts that dilute the old by mass. Build that
+    and drop the thinning from the recolour. *Measure:* `pictureplate`'s 20 s line from a
+    rinse alone, and that the dye's mass leaves through the rim, not in place.
+  - **43d-8. A pale palette dims the plate over a minute.** *(S, found by 43d-6.)* With The
+    Starry Night's four pale, low-chroma dyes on Classic the lit share of the plate fell
+    from 81% to 64% at 60 s and 53% at 90 s (a look's own dyes: 76% to 71%). Find whether
+    the dye regulator reads a pale dye as "enough" sooner, or the plate lights it under the
+    threshold, and keep a pale palette as lit as a vivid one. *Measure:* the lit share at 90 s
+    with the Starry Night cover within 10% of the look's own.
+  - **43d-9. `seedPresetScaled` is never called.** *(XS, found by 43d-6.)* The scaled twin
+    of `FluidSimulation.seedPreset` has no caller anywhere in `src/`, so 43d-6 left it
+    seeding from the look's own dyes. Delete it, or route it through `seedDyes` if a caller
+    is planned. *Measure:* `grep -rn seedPresetScaled src` finds nothing, or finds a caller
+    that passes the lock.
   - **43d-5. Judge it on the Mac.** A Mac film of a look before and after a cover's palette
     (`docs/judging.md`), whether four dyes read as the cover's on both a lamp look and a
     dark one.

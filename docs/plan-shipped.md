@@ -15039,3 +15039,33 @@ creating a palette from it." It was 43d, "the cover sets the colours".
   within ΔE 0.5, the file saying its length was Infinity). `npm run phone`: the Dye
   sheet's button makes "From picture" the palette in the picture's four colours.
 
+### 43d-6. The playing plate takes the picture's colours (2026-11-21)
+
+`src/components/LiquidVisualizer.tsx` (`setHarmonyLock`, the handover), `src/sim/fluidSimulation.ts`
+(`seedPreset`), `src/app/usePaletteLock.ts`, `src/components/CastDisplay.tsx`,
+`src/lib/picturePalette.ts` (`PALETTE_RECOLOUR_SECONDS`), `src/lib/pinnedDyes.ts` (`seedDyes`, new),
+`src/components/paletteRecolour.ts` (`recolourHandoff`, `Handoff`, new), `scripts/pictureplate.mjs` (new).
+
+Reported 2026-11-21: setting a cover switched the harmony to the four picture dyes, but after
+a minute of play the plate still showed the look's colours, and new pours looked like the
+look's (magenta and violet on Classic).
+
+- **Why.** The pours did use the picture's dyes; the dye already laid stays on a lit plate
+  for minutes and a full plate gave the new pours no room. And `seedPreset` laid a look in
+  its own harmony whatever the lock said, so a look opened under a lock (a reload, Go, the
+  back plate) came up in the look's colours. Measured on Classic with The Starry Night as the
+  cover, the share of lit pixels whose hue is nearer a picture dye than a look dye: 0% before
+  the cover, 7.7% at 2 s, 7.4% at 15 s, 5.7% at 60 s, 5.1% at 90 s.
+- **What changed.** `seedPreset` takes the pinned dyes (all five calls pass the lock). A
+  palette chosen by hand (`selectPalette`, desk and phone alike, and a projector hearing a
+  new lock) runs a dye-only handover of `PALETTE_RECOLOUR_SECONDS` (8 s, the mood rule's
+  2 to 8): Go's thinning of the dye laid and a re-seed in the new dyes, without Go's
+  chemistry, liquids, heat or pours. The re-assert on mount passes no seconds, so a reload
+  does not wash the plate. A Go already running re-takes its seed in the new dyes.
+- **Measured.** Probe: 54.6% at 2 s, 100% at 15, 30 and 60 s, 99.6% at 90 s. `npm run
+  pictureplate` (new, 10 lines, laptop and phone): on the code before, 0.0% and 0.3% at
+  20 s and 0.0% at 45 s, red; with the fix 100% at both, the plate still lit (74% against
+  72% before).
+- **Left.** The thinning is a shortcut (43d-7, a real rinse); a pale palette dims the plate
+  over a minute (43d-8).
+

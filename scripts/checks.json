@@ -3697,6 +3697,17 @@
       ]
     },
     {
+      "name": "A picture palette recolours the plate",
+      "shard": "fifth",
+      "run": "node scripts/pictureplate.mjs",
+      "why": [
+        "A cover set as the palette recolours the plate that is playing (scripts/pictureplate.mjs,",
+        "PLAN.md 43d-6): the harmony used to switch while the plate kept the look's colours for",
+        "minutes. Reads the plate back on the laptop and the phone and classes its lit pixels by",
+        "hue against the look's dyes and the cover's. About two minutes."
+      ]
+    },
+    {
       "name": "Audio Impact 0 drops no bubbles",
       "shard": "fifth",
       "run": "node scripts/kickbubbles.mjs",

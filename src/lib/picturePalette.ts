@@ -68,6 +68,14 @@ export const PICTURE_HARMONY: number[] = Array.from({ length: PICTURE_DYES }, (_
 /** The palette lock's index for "From picture": one past the named harmonies, so a saved named lock keeps its index. */
 export const PICTURE_LOCK = COLOR_HARMONIES.length;
 export const PICTURE_PALETTE_NAME = 'From picture';
+/**
+ * How long a palette chosen by hand takes to recolour the plate (PLAN 43d-6):
+ * the old dye thins and the look's seed rises again in the chosen dyes, the
+ * handover a Go makes, dye only. Eight seconds is a slow mood change on a
+ * wall (the operating rule is 2 to 8), and long enough that a pick tried and
+ * changed again a moment later is not a flash.
+ */
+export const PALETTE_RECOLOUR_SECONDS = 8;
 /** The least CIELAB distance between two of a picture's dyes (two clearly different colours are 20 or more apart). */
 export const PICTURE_DYE_APART = 18;
 /** Each dye this far or more from black and from white, so it shows on a lamp look and a dark one alike (PLAN 28b's 40). */
