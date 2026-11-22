@@ -109,7 +109,7 @@ the host"; 13.7-ipad is the part of it that fits.
 
 ## ~~48c. Bioluminescent trails: the water glows where it is sheared~~ (shipped 2026-11-21)
 
-Shipped behind Glow, Glow Shear and Glow Recharge (`npm run glow` 13/13 on the lab's software
+Shipped behind Glow, Glow Shear and Glow Recharge (`npm run glow` 15/15 on the lab's software
 WebGPU). Story in `docs/plan-shipped.md` §48c; written here beside the cords because the music
 plays it through them. Not yet seen on the Mac (`docs/judging.md` §140). Three shortcuts are
 named in the code and each is an item:

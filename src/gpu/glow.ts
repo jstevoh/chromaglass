@@ -43,9 +43,12 @@ const MAX_STEP = 0.1;
 /** What the step asks of the glow (GpuStepParams.glow and its two dials): the front plate's alone, as the soap film's is. */
 export type GlowStepParams = { glow?: number; glowShear?: number; glowRecharge?: number };
 
+/** Glow off: one shared, frozen answer, so the default path makes no object a step (as the tank's NO_TANK). */
+const NO_GLOW: GlowStepParams = Object.freeze({});
+
 /** The step's glow settings for layer `layer`: none for a back plate, which the plate never draws a glow for. */
 export function glowStep(s: GlowStepParams, layer: number): GlowStepParams {
-  if (layer > 0 || !((s.glow ?? 0) > 0.001)) return {};
+  if (layer > 0 || !((s.glow ?? 0) > 0.001)) return NO_GLOW;
   return { glow: s.glow, glowShear: s.glowShear ?? GLOW_SHEAR, glowRecharge: s.glowRecharge ?? GLOW_RECHARGE };
 }
 
@@ -126,7 +129,9 @@ export class GlowPlate {
     this.f32[10] = seconds;
     this.f32[11] = 0;
     this.device.queue.writeBuffer(this.uni, 0, this.args);
-    let g = this.groups.find((e) => e.vel === vel && e.gap === gap);
+    // A plain loop, not find(): no closure made each step.
+    let g: (typeof this.groups)[number] | undefined;
+    for (const e of this.groups) if (e.vel === vel && e.gap === gap) { g = e; break; }
     if (!g) {
       const [a, b] = this.state;
       g = {

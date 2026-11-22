@@ -31,19 +31,22 @@
  *      spend a twentieth here and fail.
  *
  *   4. A second stroke too soon glows less. The stroke again down the same
- *      path half a second after the first (Recharge 8 s): its brightest
+ *      path 30 steps after the first (Recharge 8 s): its brightest
  *      moment, over the band, under 0.97 of the first's, and three more
- *      strokes each half a second after the last each dimmer than the one
+ *      strokes each 30 steps after the last each dimmer than the one
  *      before, the fifth under 0.85 of the first. Why a tenth and not half:
  *      a passing finger fires a cell for the few hundredths of a second its
  *      shear lasts, and a cell spends a share of its store in a flash
  *      (Lingulodinium gives several flashes from one store before it is
  *      spent; GLOW_SPEND is that), so one pass dims the next a little and a
  *      sea stirred again and again tires, as a wake does. Control, on a fresh
- *      plate: the same two strokes with Recharge 0.5 s and three seconds
- *      between them glow alike (within 2%), so it is the spent charge that
- *      dims the second, not the flow the first left behind (measured, the
- *      control's two match to the third decimal).
+ *      plate: the same two strokes and the same 30-step rest, with Recharge
+ *      at its 0.05 s floor (refilled to e^-10 in that rest), glow alike
+ *      (within 2%). Only the store changed and the first stroke's leftover
+ *      flow is still there, so it is the spent charge that dims the second,
+ *      not that flow (measured 0.1836 then 0.1837). And 3's positive
+ *      control: the same drift under a threshold twenty times lower spends,
+ *      so 3's nothing is the threshold's and not a drift with no flow.
  *
  *   5. Off is off, and the plate draws it. Stepped at Glow 0 there is no
  *      glow solver at all. Drawn mid-stroke at Glow 1, the plate's picture is
@@ -116,7 +119,7 @@ try {
     r.spentBand = band(s); r.spentMirror = mirror(s); r.spentFar = far(s);
     r.lightMax = Math.max(...g.light);
 
-    // 4. Again, half a second later.
+    // 4. Again, 30 steps later.
     r.peaks = [r.peak1];
     for (let k = 0; k < 4; k++) { await rest(30); r.peaks.push(await stroke(1.5)); }
     r.peak2 = r.peaks[1];

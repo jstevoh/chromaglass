@@ -1176,8 +1176,8 @@ export function PhoneStage(p: PhoneStageProps) {
           {/*
             The water's glow (PLAN 48c): plankton that flash blue where the
             music's hands above shear the water, and tire. Glow, and while it
-            is up the shear it fires at and its recharge, as the desk's Look
-            card has them, through the same mixer setting.
+            is up the shear it fires at and its recharge, as the desk's Camera
+            section has them, through the same mixer setting.
           */}
           {p.mixer && (
             <div className="mt-3">
