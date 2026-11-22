@@ -12,6 +12,7 @@ import type { PlateSolver } from '../gpu/solverTypes';
 import type { BubbleField } from '../lib/bubbles';
 import type { PouredLiquid, SpeciesSnapshot } from '../lib/bubbleLiquid';
 import type { LiquidPhase } from '../lib/liquidPhase';
+import { DISH_GAP_METRES } from '../lib/turntable';
 import type { VisualizerSettings } from '../types';
 import { GRID_SCALE, GRID_SIZE, particleFlowScale } from './constants';
 import type { FluidSimulation } from './fluidSimulation';
@@ -86,6 +87,7 @@ export function stepPlateBubbles(
 ): void {
   const vx = lead?.readVx, vy = lead?.readVy;
   const qk = particleFlowScale(lead, currentSettings);
+  bubbles.gapMetres = lead?.gpu?.coverMetres ?? DISH_GAP_METRES;
   bubbles.liquid(currentSettings);
   const thinGap = (currentSettings.thinGap ?? 1) > 0 && !!lead?.thinGap;
   const snap = thinGap && lead ? lead.speciesPoll.latest : null;

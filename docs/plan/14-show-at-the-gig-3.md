@@ -67,12 +67,32 @@ effect). `npm run music` only feeds it synthetic level traces.
 - **14ag-2** (S) *The video's own sound as a source.* "React to the video" could also mean its
   soundtrack: a Video entry in Sound's Source that plays the loaded file's audio into the ear.
   The film and the pour are muted today. Ask the owner before building.
-- **14ag-3** (M) *Blending video and liquid the way a real show does.* Four ways were put to the
-  owner (2026-11-13): the video as the lamp under the dish (refracted by the oil's thickness,
-  filtered by the dye, Beer–Lambert), the video poured as ink that the flow carries and thins,
-  the video's brightness as heat (buoyant and Marangoni currents from the picture's light), and
-  its motion stirring harder. Built in the order the owner picks; each as physics in the solver
-  or the light path, none as a shader overlay.
+- **14ag-3** (M) *The video as the lamp under the dish.* Shipped 2026-11-21 (`docs/plan-shipped.md`
+  14ag-3): the film can go under the front plate, where it is a picture in the lamp house, seen
+  through the liquid (Lamp on the video's row, desk and phone). Check: `npm run videolamp`.
+- **14ag-5** (S) *How far under the liquid the picture is.* `VIDEO_LAMP_DEPTH_M` (2 cm, in
+  `wgsl/plateLamp.ts`) sets how strongly the liquid's lenses bend the video under it: a drop's
+  power over the picture grows with the gap. A constant today; a Lamp Depth slider (0 to 10 cm,
+  MIDI, desk and phone, a default that keeps 2 cm) if the owner wants the lenses stronger or calmer
+  after judging (`docs/judging.md` §141).
+- **14ag-6** (M) *The other three ways a video and the liquid meet.* Of the four put to the owner
+  (2026-11-13), the lamp is built (14ag-3). Left: the video poured as ink that the flow carries
+  and thins (part of it is 14ag-1's framed pour), its brightness as heat (buoyant and Marangoni
+  currents from the picture's light), and its motion stirring harder. Built in the order the owner
+  picks; each as physics in the solver or the light path, none as a shader overlay.
+- **14ag-7** (S) *The back plate's liquid does not bend the lamp.* With two plates, the video in
+  the lamp is bent by the front plate's surface only (`lampBendAt` reads the front plate's optical
+  path). The back dish sits in the same light; its liquid should bend it too, once the two dishes
+  have their own heights in the projector's cone (18e-1). With Dish Spread on, the bend is off
+  (its plate uv is `dishToPlate`'s, which `lampBendAt` does not undo); undo that one too.
+- **14ag-8** (M) *Oil drops are flat slabs to the light.* Filmed on the owner's Mac (2026-11-14),
+  the video under Splodascope and Classic stays ruler-straight: dye in water barely moves the
+  index, and the solver's oil is a share of the column with a sharp edge and no thickness profile,
+  so it bends the picture only in a thin band at its rim. A real floating oil lens is a cap,
+  thickest in the middle, its shape set by the three surface tensions (Neumann's triangle) and
+  gravity; give the view the oil's thickness from that, in the solver, and the drops become
+  magnifiers over the lamp (and the plate's own `refractionOptics` reads them too). Not a plate
+  shader fake: the path is the solver's.
 - **14ag-4** (S) *The framing's pixels have no check.* `npm run myvideo` holds the controls and
   their settings, not where the frame lands: on software WebGPU the app's plate was still
   rebuilding thirty seconds in, so a corner read there measured nothing. Give the lab a film

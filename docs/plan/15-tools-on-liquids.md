@@ -214,16 +214,6 @@ Left, each its own plan item:
   radially, a source with no curl; the only real twist is the cover turned (Couette, 42b).
   Delete it. Check: the curl over a press's disc stays at the idle level, local and remote
   alike. (38v, from RS-36.)
-- **15g-19 The straw's lobes are clipped at a reach, not conserved** (S; Low). Where 15g-12
-  lets fingers form (two or more fit), each lobe reaches to `FINGER_REACH` 0.9 (`air.ts:58`),
-  `rimAt` (`:69-78`) never dips below 1, and `bubbles.ts:425-460` clips at rMax = N·0.07 and
-  drops the rest, so the bubble's area grows with its fingers. Air in a gap keeps its volume:
-  the lobes are a zero-mean change of the rim, with area A = V/b. Check: a fingered straw
-  bubble's area within 3% of its volume over the gap (`npm run straw`). §38's straw line under
-  "Also found" points here. (38v, from RS-15.)
-
-*The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
-
 ## 15f. Found with 15c
 
 - The Finger carries the oil (`carryMix`) whenever the dye mirror is current, and
@@ -381,13 +371,6 @@ and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
   oil and syrup parting where they meet and a finger mixing them; liquidsgpu has only the
   four liquids' scenes. Lay those four on the GPU the same way, with the same owed rule,
   before or with Brief 11, which changes the forces they would measure.
-- ~~**15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**~~
-  **Shipped** (2026-11-14): a bottle's weight down a rocked thin gap is a drive laid after
-  the gap keeps its flow (`liquidDrive`, `driveLiquids`), Darcy's w g sinθ h²/12ν read as
-  every body force is; a light bottle's lightness has a field of its own so the carry keeps
-  it; the soap's pull and the polar push no longer act between two glasses.
-  `npm run liquidfall` (a drop at Hele-Shaw's speed to 4%), and `liquidpush`'s thin-gap
-  reach asks the rock's way. Story in `docs/plan-shipped.md` §15e-10.
 - **15e-11. The CPU's stand-aside copy of the first pour (found with 15e-1).**
   `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so the first
   pour on a new solver lands in the CPU's copy too, which then never decays

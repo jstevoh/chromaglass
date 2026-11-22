@@ -34,7 +34,8 @@ import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
  * against, on one build and interleaved.
  */
 const LEAN_OFF = (() => { try { return new URLSearchParams(window.location.search).get('lean') === '0'; } catch { return false; } })();
-import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
+import { COVER_FULL_ML, coverNew } from '../lib/cover';
+import { DISH_GAP_FIELD_METRES, carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -142,6 +143,12 @@ export interface Opening {
    */
   soap: boolean;
   /**
+   * Faraday waves (PLAN 48f, gpu/faraday.ts): the shaken dish's four
+   * kernels, from the first step when the look opens with its shaker on
+   * (Shaker above nought Hz); every other look builds them behind the show.
+   */
+  faraday: boolean;
+  /**
    * The display's effects this look can reach (`displayLean.ts`): the
    * opening compiles a display with only these, and the whole one behind it.
    */
@@ -169,7 +176,9 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   const viscosity = s.viscosity ?? DEFAULT_SETTINGS.viscosity;
   const bed = (viscosity === 'thin' ? 0.8 : 1.7) * (1 + (s.platePressure ?? DEFAULT_SETTINGS.platePressure ?? 0) * 0.8);
   const dragRate = (0.04 + (s.spinDrag ?? DEFAULT_SETTINGS.spinDrag ?? 0.25) * 1.2) * bed;
-  const tau = dragSeconds(carrierViscosity(viscosity));
+  const ml = Number.isFinite(s.liquidMl) ? s.liquidMl! : COVER_FULL_ML;
+  const coverUnits = coverNew(ml).h / DISH_GAP_FIELD_METRES;
+  const tau = dragSeconds(carrierViscosity(viscosity), coverUnits);
   let dish = 0, liquid = 0;
   for (let k = 0; k < 180; k++) {
     dish = dishFollow(dish, motor, dragRate, 1 / 60);
@@ -203,6 +212,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
+    faraday: (s.faradayHz ?? 0) > 0,
     display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
   };
 }

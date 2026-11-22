@@ -55,7 +55,10 @@ const AIR_SKIRT: f32 = 3.0;
 const AIR_BOIL_FILM: f32 = 0.5333333;
 const AIR_BOIL_R: f32 = 0.017494;
 
-/** The longest a finger reaches past the round rim, as a fraction of the radius, at fingering 1. */
+/**
+ * Half the peak-to-trough spread in r² at fingering 1, matching the old
+ * FINGER_REACH = 0.9 scale while conserving the round bubble's area (PLAN 15g-19).
+ */
 const FINGER_REACH: f32 = 0.9;
 
 /*
@@ -63,18 +66,20 @@ const FINGER_REACH: f32 = 0.9;
 
   Fingers, not a flower: each a narrow lobe (a raised cosine taken to a high
   power), spaced unevenly (the angle warped by a slower wave), and each its
-  own length (a second, incommensurate wave), so the front reads as the air
-  pushing into the liquid where it gave first, as a blown bubble's does.
+  own length (low-harmonic modulation orthogonal to k >= 3). Because the
+  perturbation is zero-mean in r² (subtracting the exact mean 63/256 of
+  cos^10), the troughs dip where the liquid fingers inward and the bubble
+  keeps the round disc's area A = V / b at every fingering level (PLAN 15g-19).
 */
 fn rimAt(theta: f32, rim: vec4f) -> f32 {
   let f = clamp(rim.x, 0.0, 1.0);
   if (f <= 0.001) { return 1.0; }
-  let k = max(rim.y, 3.0);
+  let k = round(max(rim.y, 3.0));
   let ph = rim.z;
-  let warped = theta + 0.45 * sin(2.0 * theta + ph * 1.7) / k * 6.2831853;
-  let lobe = pow(0.5 + 0.5 * cos(k * warped + ph), 6.0);
-  let len = 0.55 + 0.45 * (0.5 + 0.5 * sin(3.0 * theta + ph * 2.3 + 1.1 * sin(5.0 * theta + ph)));
-  return 1.0 + f * FINGER_REACH * lobe * len;
+  let warped = theta + 0.3 * sin(theta + ph * 1.3) / k;
+  let lobe = pow(0.5 + 0.5 * cos(k * warped + ph), 5.0);
+  let len = 1.0 + 0.25 * sin(theta + ph * 2.3) + 0.20 * sin(2.0 * theta + ph * 1.7);
+  return sqrt(max(0.05, 1.0 + f * 2.0 * FINGER_REACH * (lobe * len - 63.0 / 256.0)));
 }
 `;
 
@@ -113,7 +118,7 @@ fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> VOut {
   let centre = vec2f(d.x * 2.0 - 1.0, 1.0 - d.y * 2.0);
   let f = fingers[i];
   // The quad reaches as far as the longest finger can, and the skirt past it.
-  let reach = 1.0 + clamp(f.x, 0.0, 1.0) * FINGER_REACH + AIR_SKIRT / (max(A.grid, 1.0) * max(d.z, 1e-6));
+  let reach = sqrt(1.0 + clamp(f.x, 0.0, 1.0) * 2.0 * FINGER_REACH * 1.25) + AIR_SKIRT / (max(A.grid, 1.0) * max(d.z, 1e-6));
   var o: VOut;
   o.pos = vec4f(centre + corner * (d.z * 2.0 * reach), 0.0, 1.0);
   o.local = corner * reach;

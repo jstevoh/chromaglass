@@ -9,15 +9,31 @@
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
     "cheap ones that hold the rest. `quarantine` (PLAN.md 19ak-1) lists a check's",
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
-    "still run and report and do not block. `scripts/checks.mjs` holds the rules."
+    "still run and report and do not block, on pull requests and, until 2026-12-06",
+    "(PLAN.md 19ak-18), on main's deploys too. `scripts/checks.mjs` holds the rules.",
+    "`shards.pr` (PLAN.md 19ak-20, the owner's call of 2026-11-22) is the Measure parts a",
+    "pull request runs: the node checks, typecheck and the build. Every other Measure part",
+    "and every Mac shard runs on main's deploy only, which no PR's run stands in for."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"], "pr": ["logic","sound"] },
   "checks": [
     {
       "name": "Typecheck",
       "shard": "logic",
       "run": "npm run lint",
       "always": true
+    },
+    {
+      "name": "The site builds",
+      "shard": "logic",
+      "run": "npx --no-install vite build",
+      "always": true,
+      "why": [
+        "The live site's own build, `vite build` (PLAN.md 19ak-20). A pull request runs",
+        "only the node checks since that item, and none of them builds `dist/`: the",
+        "browser parts did, so an import `tsc` accepts and Rollup refuses would have",
+        "been found first on main's deploy. About eleven seconds."
+      ]
     },
     {
       "name": "The scripts parse",
@@ -88,15 +104,26 @@
       ]
     },
     {
+      "name": "The music's hands as cords",
+      "shard": "logic",
+      "run": "npm run musiccords",
+      "why": [
+        "PLAN 38v-1: the frame loop's own music hands are gone and each is a cord",
+        "on every look. With the cords pulled loud music lays nothing; laid, each",
+        "pours within a tenth of what the block did at Sound Drive's 1x, and Sound",
+        "Drive and the cords' depths can go past it."
+      ]
+    },
+    {
       "name": "The kick's bloom",
       "shard": "logic",
       "run": "npm run kickbloom",
       "why": [
-        "The droplets each kick throws (Kick Bloom, lib/kickBloom.ts), run on a",
-        "recording sink: the dial scales the dye and the push each alone, and the",
-        "droplets clump rather than sit on one ring (moved from panel.mjs's grep",
-        "when the bloom left the frame loop, 19ai-10); and the music lays no dye",
-        "on a reagent area, Chemical Clock's gel or Red Cabbage's wells (25i-10)."
+        "The kick's bloom, a cord since 38v-1 (a gated dropper riding Kick Bloom),",
+        "played by the real hands: the dial scales its dye and at 0 lays none;",
+        "its drops clump rather than sit on one ring (lib/kickBloom.ts); and the",
+        "music lays no dye on a reagent area, Chemical Clock's gel or Red",
+        "Cabbage's wells (25i-10), in the loop or through its cords."
       ]
     },
     {
@@ -128,7 +155,7 @@
     {
       "name": "The turntable",
       "shard": "logic",
-      "run": "npm run turntable -- --owed=38v-4",
+      "run": "npm run turntable",
       "why": [
         "The spinning dish's CPU half: the liquid's lag behind the glass, Auto",
         "Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22)."
@@ -137,7 +164,7 @@
     {
       "name": "The glass gap, one number",
       "shard": "logic",
-      "run": "npm run gap -- --owed=puddle,settle,lift,pinch,readers,wired",
+      "run": "npm run gap -- --owed=puddle,settle,lift,pinch",
       "why": [
         "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
         "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
@@ -662,7 +689,7 @@
     {
       "name": "The drops",
       "shard": "logic",
-      "run": "npm run drops -- --owed=slide",
+      "run": "npm run drops",
       "why": [
         "Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,",
         "each drop its own colour, pressed flat where it touches, a swallowed",
@@ -952,7 +979,8 @@
         "a plate whose middle is bare frame the nearest pool from the first frame",
         "(the control: the frame on the aim is bare); with liquid on the aim Hold",
         "does not move; a hand's aim is obeyed; an empty plate lands on the first",
-        "pour; and the Close-up press goes in by the zoom and out with both."
+        "pour; the frame's zoom is the Macro Zoom alone, every closeup look carries",
+        "its own, and no Close-up press is left in src/ (QA-32c)."
       ]
     },
     {
@@ -1577,6 +1605,42 @@
       ]
     },
     {
+      "name": "The closeup's relief is the liquid's path",
+      "shard": "lab9",
+      "run": "npm run camrelief",
+      "timeout": 12,
+      "why": [
+        "The closeup's relief reads the optical path at the lens's disc (PLAN 18e-7,",
+        "camLap in src/gpu/wgsl/plateTransmit.ts), not the colour step between two",
+        "dyes it was handed until then (the owner's black lines, up close). A swell",
+        "of dye gathers light in its middle with the frame's light kept, a dome in the",
+        "gap moves nothing (the first build's ribbons on the Mac, PLAN 18e-12), and a",
+        "cluster of bubbles cut in one dye is left alone (a control without the air",
+        "mask finds the halo the path's nine-tap Laplacian drew on the Mac). The seam",
+        "itself is holeline's lines 6 to 6b. Lab, two builds; about two minutes on",
+        "SwiftShader (152 s, 2026-11-15), in lab9 beside glint."
+      ]
+    },
+    {
+      "name": "Faraday waves stand up from the liquid's physics (SwiftShader)",
+      "shard": "lab5",
+      "run": "npm run faraday",
+      "why": [
+        "The dish on a shaker (PLAN 48f, src/gpu/faraday.ts), the standing wave the",
+        "music's cord on Shake grows, on the app's own grid and substeps on the GPU",
+        "(scripts/faraday.mjs): no pattern at 0.7 of the threshold and its light",
+        "invisible; at 3x the threshold growth at the Mathieu equation's Floquet rate",
+        "within 20%; the pattern's wavelength within 10% of the dispersion relation's",
+        "root at 20, 50 and 100 Hz, saturated and finite under breaking steepness; and",
+        "the ring-down at the water's damping within 25% once the shake stops; the",
+        "dial's top (2 g at 10 and 150 Hz, and at 10 Hz in 0.1 s frames) finite and",
+        "unbroken; and the lab's real plate drawing it, its mean brightness held",
+        "within 2%, still again after the shaker goes off and on.",
+        "In lab5 beside the tank's GPU check: it opens the lab page and asks for a",
+        "WebGPU adapter. About twelve minutes on SwiftShader in a cloud session."
+      ]
+    },
+    {
       "name": "Polarised light",
       "shard": "lab9",
       "run": "npm run polar",
@@ -1714,7 +1778,7 @@
         "round things; two dyes in one liquid bend no light where they meet), so",
         "this asks that Boundary Contrast at 0.35, 1 and 2 moves no pixel in focus",
         "round a hole, at a pool's rim or across two dyes meeting, on the wall and",
-        "photographed, that the seam is no darker than the darker dye beside it,",
+        "photographed, and up close (PLAN 18e-7), that the seam is no darker than the darker dye beside it,",
         "and that the dial is live out of focus so nothing moving is the shader's",
         "answer. It also",
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
@@ -2726,7 +2790,7 @@
     {
       "name": "The straw bubble",
       "shard": "plate",
-      "run": "npm run straw -- --owed=area",
+      "run": "npm run straw",
       "why": [
         "Held still, the Blow grows a bubble with a fingered rim and a ring of satellites."
       ]
@@ -3433,6 +3497,18 @@
       ]
     },
     {
+      "name": "Classic Light Show lays a 1960s dish",
+      "shard": "open",
+      "run": "npm run classicdish",
+      "why": [
+        "Classic Light Show (PLAN 38w-1): its dish is a coloured water full of",
+        "round oil cells of many sizes, warm, with drops of the water held in",
+        "the big ones, where the old lay was eleven soft pools of dye on black",
+        "glass. Two 192² plates of 300 steps; in the open shard, beside",
+        "clockglass."
+      ]
+    },
+    {
       "name": "Clock Glass keeps its colours apart",
       "shard": "open",
       "run": "npm run clockglass",
@@ -3493,6 +3569,19 @@
         "gel wheel and the lumia in the lamp, over the lens and among the rest.",
         "On the fifth shard since PLAN.md 19w (on show before that, to even it",
         "with plate, 19h); it is the lab, so any shard will do."
+      ]
+    },
+    {
+      "name": "The video as the lamp under the dish",
+      "shard": "fifth",
+      "run": "npm run videolamp",
+      "why": [
+        "PLAN 14ag-3: the video under the front plate is a picture in the lamp,",
+        "seen through the liquid. The dye filters its light (the plate on the",
+        "white lamp times the film's colour), bare water shows it, Film Mix 0",
+        "leaves the look to the byte, the frame's edge passes the bare lamp, and",
+        "a glycerine pool's rim moves a striped picture and not a flat one. The",
+        "lab, beside the mixer's check on the same shard."
       ]
     },
     {
@@ -3614,7 +3703,6 @@
       "name": "The show opens without stopping",
       "shard": "open",
       "run": "npm run startup",
-      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "The show opens without stopping (scripts/startup.mjs): what the look",
         "opens with is built before it opens and the rest behind it, none is",
@@ -3693,6 +3781,10 @@
       "name": "The ear behind the wall",
       "shard": "open",
       "run": "node --experimental-strip-types scripts/ears.mjs",
+      "quarantine": [
+        { "line": "and it hears on the wall's asks", "plan": "19ad-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "covered with no wall, the worker's tick keeps the ear going", "plan": "19ad-1", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "The show keeps hearing while its window is hidden behind the wall's",
         "(scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second",
@@ -3781,7 +3873,6 @@
       "name": "Every tool does what it says",
       "shard": "tools",
       "run": "node scripts/tools.mjs",
-      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "Every other tool in the hand (asked for: \"check all of the tools to",
         "make sure they work in expected ways\"): each does what it says and",
@@ -3799,14 +3890,14 @@
       ]
     },
     {
-      "name": "The Close-up button lands on liquid",
+      "name": "The Macro Zoom pushed in lands on liquid",
       "shard": "tools",
       "run": "npm run closeupland",
       "timeout": 4,
       "why": [
-        "The desk's Close-up button on a plate cleared to one pool off the middle",
-        "(PLAN.md QA-32, the owner's blank plate): the 4x frame is lit, the",
-        "button lights and the knob reads 4x, and it comes out to the plate. The",
+        "The Macro Zoom pushed to 4x on a plate cleared to one pool off the middle",
+        "(PLAN.md QA-32, the owner's blank plate; QA-32c, the zoom the one control):",
+        "the 4x frame is lit, the chip reads 4x, and its minus brings it out to the plate. The",
         "controls: at 1x the pool is drawn, and the frame on the aim is bare glass.",
         "On the Mac: the app's frames; a cloud session runs it with PW_WEBGPU=1."
       ]
@@ -3857,6 +3948,7 @@
       "name": "The Live Show streams the picture",
       "shard": "fifth",
       "run": "npm run liveshow -- --stack --owed=stack",
+      "quarantine": [{ "line": "the Plate source's stream moves with the film", "plan": "19ak-19", "since": "2026-11-22", "until": "2026-12-06" }],
       "why": [
         "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
         "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
@@ -3938,7 +4030,6 @@
       "name": "The wall",
       "shard": "tools",
       "run": "npm run wall -- --owed=quarter,red,rung",
-      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-15", "until": "2026-12-06" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
         "how many times a second the whole screen is allowed to change.",
