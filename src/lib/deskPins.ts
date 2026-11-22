@@ -96,6 +96,8 @@ const SECTION_OF: Record<string, string> = {
   plateTiltX: 'tilt',
   faradayHz: 'tilt',
   faraday: 'tilt',
+  faradayRock: 'tilt',
+  faradayGain: 'tilt',
   plateTiltY: 'tilt',
   beatSqueeze: 'show',
   kickBloom: 'show',

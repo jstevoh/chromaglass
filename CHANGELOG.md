@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the standing waves move (PLAN 48f-6, 48f-9)
+
+- **Rock** (`faradayRock`, 0–2 Hz): the strobe slips off the Faraday waves so crests and
+  troughs trade places smoothly. The pattern now rides the plate's flow, streams its own mean
+  flow, and at a hard shake breaks up and re-forms as a new pattern. **Strength** (`faradayGain`, 1–8):
+  the lens's throw past real water, so a bass pulse reads on the wall. Settings → Tilt & Rock,
+  MIDI, the desks, the remote, the phone's Sound sheet. `npm run faraday`.
+
 ### Added — the music shakes the dish into Faraday waves (PLAN 48f)
 
 - **Shaker** and **Shake** (`faradayHz`, `faraday`, Settings → Tilt & Rock under Plate Rock; MIDI,

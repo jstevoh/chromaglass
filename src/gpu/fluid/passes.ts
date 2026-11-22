@@ -293,7 +293,9 @@ export class FluidPasses extends FluidFields {
       return;
     }
     if (!this.faradayPlate) this.faradayPlate = new FaradayPlate(this.device);
-    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0);
+    // The pattern rides the plate's own flow: the uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N);
+    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0, p.faradayRock ?? 0, this.ride(), travel);
   }
 
   /**

@@ -641,7 +641,7 @@ export class WebGPUPlate {
       // The rings' list the beads' mask was drawn from, read at the screen's resolution (38h-17).
       rings?.args ?? this.blankBeadArgs, rings?.beads ?? this.blankBeads, rings?.tiles ?? this.blankList,
       // The shaken dish's standing waves (48f), the front plate's alone.
-      fields[0].faraday?.h ?? this.blankStore,
+      fields[0].faraday?.eta ?? this.blankStore,
     ]));
     pass.draw(6);
     pass.end();

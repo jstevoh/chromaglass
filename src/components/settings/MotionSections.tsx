@@ -183,15 +183,41 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           settingKey="faradayHz"
         />
         {(settings.faradayHz ?? 0) > 0 && (
-          <Slider
-            label="Shake g"
-            value={settings.faraday ?? 0}
-            min={0}
-            max={2}
-            step={0.01}
-            onChange={(v: number) => onUpdate({ faraday: v })}
-            settingKey="faraday"
-          />
+          <>
+            <Slider
+              label="Shake g"
+              value={settings.faraday ?? 0}
+              min={0}
+              max={2}
+              step={0.01}
+              onChange={(v: number) => onUpdate({ faraday: v })}
+              settingKey="faraday"
+            />
+            {/*
+              Rock (48f-6): the strobe slipped off the waves, so the crests
+              and troughs trade places at its rate. Wave Strength: the
+              projector's throw past the dye, 1 real water's light, up to 8
+              so a bass pulse's pattern reads (wgsl/plateFaraday.ts).
+            */}
+            <Slider
+              label="Rock Hz"
+              value={settings.faradayRock ?? 0}
+              min={0}
+              max={2}
+              step={0.01}
+              onChange={(v: number) => onUpdate({ faradayRock: v })}
+              settingKey="faradayRock"
+            />
+            <Slider
+              label="Wave Strength"
+              value={settings.faradayGain ?? 1}
+              min={1}
+              max={8}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ faradayGain: v })}
+              settingKey="faradayGain"
+            />
+          </>
         )}
       </section>
       )}

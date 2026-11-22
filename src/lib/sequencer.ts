@@ -125,6 +125,8 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['tankHue', 1],
   ['faradayHz', 1],
   ['faraday', 0.01],
+  ['faradayRock', 0.01],
+  ['faradayGain', 0.05],
   ['lumia', 0.05],
   ['chemistry', 0.05],
   ['gelWheel', 0.05],

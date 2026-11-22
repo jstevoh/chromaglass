@@ -17,6 +17,7 @@ import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { musicStirOf, withMusicStir } from '../../lib/stir';
 import { musicShakeOf, withMusicShake } from '../../lib/shakeCord';
+import { FARADAY_GAIN_MAX, FARADAY_ROCK_MAX } from '../../lib/faraday';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -1169,6 +1170,12 @@ export function PhoneStage(p: PhoneStageProps) {
                   <Slider label="Shake" value={p.mixer.settings.faraday ?? 0} min={0} max={2} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ faraday: v })}
                     display={`${(p.mixer.settings.faraday ?? 0).toFixed(2)} g`} touch testId="phone-shake" midiKey="setting:faraday" />
+                  <Slider label="Rock" value={p.mixer.settings.faradayRock ?? 0} min={0} max={FARADAY_ROCK_MAX} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ faradayRock: v })}
+                    display={(p.mixer.settings.faradayRock ?? 0) > 0 ? `${(p.mixer.settings.faradayRock ?? 0).toFixed(2)} Hz` : 'Still'} touch testId="phone-rock" midiKey="setting:faradayRock" />
+                  <Slider label="Wave Strength" value={p.mixer.settings.faradayGain ?? 1} min={1} max={FARADAY_GAIN_MAX} step={0.05}
+                    onChange={(v) => p.mixer!.onSetting({ faradayGain: v })}
+                    display={`${(p.mixer.settings.faradayGain ?? 1).toFixed(1)}×`} touch testId="phone-wave-strength" midiKey="setting:faradayGain" />
                   <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
                     display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />

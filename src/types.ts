@@ -972,6 +972,8 @@ export interface VisualizerSettings {
   tankHue: number;            // the dye's glow, degrees of hue (47n)
   faradayHz: number;          // Shaker: the dish on a speaker, its drive's frequency in Hz; 0 is no shaker (PLAN 48f)
   faraday: number;            // Shake: the dish's peak acceleration, g; past the liquid's threshold it stands up in Faraday waves (48f)
+  faradayRock: number;        // Rock: the strobe slipped off the waves, Hz 0..2, so crests and troughs trade places (0 holds them still) (48f-6)
+  faradayGain: number;        // Strength: the projector's throw past the dye, 1 real water to 8, so the same waves bend more light (48f)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -1262,6 +1264,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   tankHue: 205,
   faradayHz: 0,             // no shaker under the dish: every look until a performer turns it on
   faraday: 0,
+  faradayRock: 0,           // the strobe locked to the crest: the pattern stands
+  faradayGain: 1,           // real water's light
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,

@@ -26,6 +26,7 @@ import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 import { BIREF_NM_PER_STRAIN } from '../lib/polar';
+import { FARADAY_GAIN_MAX } from '../lib/faraday';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
@@ -379,7 +380,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
     // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
-    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? 1 : 0);
+    // Its value is the Strength, the lens's throw over real water's (1 to 8, wgsl/plateFaraday.ts); 0 with no shaker.
+    const gain = Number.isFinite(s.faradayGain) ? Math.max(1, Math.min(FARADAY_GAIN_MAX, s.faradayGain as number)) : 1;
+    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? gain : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they

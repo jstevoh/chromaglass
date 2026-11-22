@@ -663,6 +663,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The dish on a speaker (PLAN 48f): the drive's frequency, and its shake in g, which the music's cord rides.
   { key: 'faradayHz',       label: 'Shaker',           min: 0, max: 150 },
   { key: 'faraday',         label: 'Shake',            min: 0, max: 2 },
+  { key: 'faradayRock',     label: 'Rock',             min: 0, max: 2 },
+  { key: 'faradayGain',     label: 'Wave Strength',    min: 1, max: 8 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.

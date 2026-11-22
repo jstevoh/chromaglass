@@ -2973,3 +2973,12 @@ standing waves at half the Shaker's frequency, drawn by the lamp's light through
    read on the wall; the light is the real lens of the water's surface, and a stronger
    default depth is a dial away.
 5. Watch for flicker: the pattern must hold still while it grows and fades, never strobe.
+6. The waves move (48f-6, 48f-9). Shaker 20 Hz, Shake 0.4, Rock 0.5: do the crests and
+   troughs trade places about once every two seconds, smoothly, with no flicker? Rock 0
+   holds them still again.
+7. Pour and swirl with the lattice up: does the pattern drift with the liquid's flow? Then
+   Shake to the top (2 g at 20 Hz): as it grows, does the lattice break up and move for some
+   seconds, then re-form as a new pattern (it settles; a real dish that hard keeps churning,
+   48f-12)? Does the break read as the water's, not a glitch?
+8. Wave strength (the phone's Sound sheet, Strength on the desk) 1 to 4 to 8, with a bass
+   cord on Shake: from what strength does a bass pulse read on the wall? Too harsh at 8?
