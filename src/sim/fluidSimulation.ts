@@ -14,7 +14,7 @@
  * GPU side alone. What it reads from the rest of `src/sim/` is the grid and
  * the solver's constants (`constants.ts`) and the step (`stepping.ts`).
  */
-import { layFinger } from '../lib/handSolid';
+import { layFinger, handEdge } from '../lib/handSolid';
 import { layBreath, holdBreath, breatheHeld, type HeldBreath } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH } from '../lib/handCarry';
 import { VisualizerSettings } from '../types';
@@ -28,7 +28,7 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { PALETTE_RGB, pickHarmony } from '../constants';
 import { THIN_GAP_THICKNESS, thinGapViscosity, NU_REF } from '../gpu/fluid';
 import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, SloshSpin, type SloshPress } from '../lib/slosh';
-import { OPEN_RIM, carrierViscosity, dragSeconds, dyeDensityContrast } from '../lib/turntable';
+import { OPEN_RIM, dyeDensityContrast, layerSpinDrag } from '../lib/turntable';
 import { DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
 import { frameSway, rockStep } from '../lib/plateRock';
@@ -38,7 +38,7 @@ import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
-import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
+import { RhythmSheet } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, BassPress, type Presser, type Stroke } from '../lib/squish';
 import { type Phrase } from '../lib/phrasing';
 import { stream, type Rng } from '../lib/rng';
@@ -46,9 +46,10 @@ import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
-import { SIM_STEP, stepCurrentCpu } from './stepping';
+import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
+import { SolverSeeds, takeBack, addShare, scaleSince } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
@@ -131,6 +132,7 @@ export class FluidSimulation {
   sparseDarkLook = false;
   /** Everything `addDensity` has been given, summed, so a frame's hand can be told from the music's. */
   private laidMass = 0;
+  private readonly seeds = new SolverSeeds();
   private handMarkMass = 0;
   /**
    * Dye a hand has laid on a seeded plate, as a mean over the dish, that the
@@ -1340,14 +1342,8 @@ export class FluidSimulation {
    */
   captureSeed(lay: () => void): Float32Array[] {
     const arrays = [this.density, this.densityR, this.densityG, this.densityB];
-    const before = arrays.map(a => a.slice());
-    lay();
-    const delta = arrays.map((a, c) => {
-      const d = new Float32Array(a.length);
-      for (let i = 0; i < a.length; i++) d[i] = a[i] - before[c][i];
-      a.set(before[c]);
-      return d;
-    });
+    const before = arrays.map(a => a.slice()), onSolver = this.seeds.capture(lay), delta = takeBack(arrays, before);
+    this.seeds.keep(delta, onSolver);
     this.dirty = true;
     return delta;
   }
@@ -1355,11 +1351,8 @@ export class FluidSimulation {
   /** Add `k` of a captured seed (see `captureSeed`) to the plate. */
   addSeedShare(seed: Float32Array[], k: number): void {
     if (!(k > 0)) return;
-    const arrays = [this.density, this.densityR, this.densityG, this.densityB];
-    for (let c = 0; c < 4; c++) {
-      const a = arrays[c], d = seed[c];
-      for (let i = 0; i < a.length; i++) a[i] += d[i] * k;
-    }
+    this.seeds.share(seed, this.gpu, k);
+    addShare([this.density, this.densityR, this.densityG, this.densityB], seed, k);
     this.dirty = true;
   }
 
@@ -1371,12 +1364,8 @@ export class FluidSimulation {
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
     const k = c01(w);
     const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
-    const harmony = this.seedPreset(presetId, noise2D);
-    const now = [this.density, this.densityR, this.densityG, this.densityB];
-    for (let c = 0; c < 4; c++) {
-      const a = now[c], b = before[c];
-      for (let i = 0; i < a.length; i++) a[i] = b[i] + (a[i] - b[i]) * k;
-    }
+    const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
+    scaleSince([this.density, this.densityR, this.densityG, this.densityB], before, k);
     this.dirty = true;
     return harmony;
   }
@@ -1951,6 +1940,8 @@ export class FluidSimulation {
           says what the references show instead.
         */
         const water = col(0);
+        const g = presetId === 'classic' && this.seeds.lay(this.gpu, S, this.rng.float, harmony.length, col, this.dishArea);
+        if (g) { this.laidMass += g; break; }
         layCrowd(presetId === 'clock-glass' || presetId === 'classic' ? presetId : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
           (x, y, d) => this.addDensity(x, y, d, water.r, water.g, water.b),
           (x, y, d, dye) => { const c = col(dye); this.addOilDensity(x, y, d, c.r, c.g, c.b); });
@@ -2035,7 +2026,7 @@ export class FluidSimulation {
       }
     }
 
-    this.seedMean = Math.max(0, dishSum() - beforeMean);
+    this.seedMean = Math.max(0, dishSum() - beforeMean + this.seeds.took());
     this.seedBudget = findPreset(look)?.settings.dyeBudget ?? 0.85;
     return harmony;
   }
@@ -2153,10 +2144,7 @@ export class FluidSimulation {
       */
       const radius = Math.round(radii[0] * GRID_SCALE);
       this.pressLift.press('kick', x, y, radius, amount, fingering, showNow());
-      this.sheet.setLiquid(nu);
-      // No deeper than the dome's rest under it (kickRoom): where the glasses touch, a kick presses nothing.
-      const u = (x + 0.5) / this.size, v = (y + 0.5) / this.size;
-      this.sheet.pressVolume(u, v, stampedVolume(amount, radii[0] / 128), radii[0] / 128, KICK_HOLD, kickRoom(u, v, curve));
+      pressSheetKick(this.sheet, this.size, x, y, amount, radii[0], nu, curve, this.gpu.coverMetres);
     } else {
       radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
       this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
@@ -2336,7 +2324,7 @@ export class FluidSimulation {
     if (this.gpu && this.thinGap && !ferroUnasked) {
       const m = moved ?? { x: dx, y: dy };
       if (!this.hands) this.hands = new Float32Array(GRID_AREA * 4);
-      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y) > 0) { this.rows.disc(y, r); this.handsLaid = true; }
+      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y, handEdge(this.size, this.gpu.coverMetres)) > 0) { this.rows.disc(y, r); this.handsLaid = true; }
       this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
       return;
     }
@@ -2938,6 +2926,9 @@ export class FluidSimulation {
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, spin: sp.spin, spinRate: sp.rate } : null);
   }
 
+  /** This layer's spin drag (38v-4): ν, gap (m), τ = h²/12ν. */
+  spinDrag(settings: VisualizerSettings) { return layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS); }
+
   private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
@@ -3171,6 +3162,7 @@ export class FluidSimulation {
       insurance against something that does not happen.
     */
     const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
+    const spin = layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS);
 
     return {
       dt, visc, nu,
@@ -3321,16 +3313,13 @@ export class FluidSimulation {
         note on Rotation Speed).
       */
       /*
-        The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
-        frame that turns with the liquid, the liquid's own speed (the
-        centrifuge), the bulk's drag time at the rest gap, and the liquid.
-        All but the last are zero on a dish nobody turns, and the swirl
-        does not run.
+        The spun dish (PLAN §22): the dish's speed in the liquid's frame,
+        the liquid's own, and this layer's drag (38v-4, layerSpinDrag).
       */
       spinDish: this.dishSpin - this.liquidSpin,
       spinLiquid: this.liquidSpin,
-      spinTau: dragSeconds(carrierViscosity(settings.viscosity), this.gpu?.coverUnits),
-      spinNu: carrierViscosity(settings.viscosity),
+      spinTau: spin.tau,
+      spinNu: spin.nu,
       spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
       particles: settings.particles ?? 0,
       particleLife: 4,

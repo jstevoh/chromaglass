@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   solver (src/gpu/faraday.ts): the Mathieu equation's growth exact in Fourier space. Off in
   every look until turned on. `npm run faraday`.
 
+### Added — Crisp Edges (PLAN 38w-15)
+
+- **Crisp Edges** (Settings → Look) draws the oil/water rim one pixel wide instead of the solver's band;
+  Classic uses it, with a denser crowd of smaller cells laid at the solver's own grid.
+
 ### Changed — three drawn stand-ins made physical (PLAN 38u-7, 38u-12, 38u-14)
 
 - **Rain Drip** needs the plate tipped (Gravity): the weight along a plate is g sin θ, nothing on a

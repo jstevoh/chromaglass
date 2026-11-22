@@ -9,7 +9,9 @@
  */
 
 import { HEAD, MAGNET_WGSL, PHASE_MEAN3, STAND_ASIDE, W } from './shared';
-import { FILM_TOP } from '../standing';
+import { FILM_H0 } from '../standing';
+import { SPIKE_PITCH } from '../spikes';
+import { DISH_GAP_FIELD_UV } from '../../../lib/turntable';
 
 export const PHASE_FORCE_KERNELS: Record<string, string> = {
   /*
@@ -203,7 +205,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   full there, the plate's flows pack the edge no deeper than they ever
   did, and the arcs go.
 */
-fn top(p: vec2i) -> f32 { return select(1.0, ${FILM_TOP.toFixed(3)}, textureLoad(stand, p, 0).r > 0.99); }
+fn top(p: vec2i) -> f32 {
+  let ft = (S.cover * ${DISH_GAP_FIELD_UV / (SPIKE_PITCH / (2 * Math.PI))} - 0.03) / ${FILM_H0};
+  return select(1.0, ft, textureLoad(stand, p, 0).r > 0.99);
+}
 // What a cell holds outside 0..its ceiling: above it (positive) or below
 // empty (negative), and whether the neighbour exists at all.
 fn bad(p: vec2i, n: i32) -> vec2f {

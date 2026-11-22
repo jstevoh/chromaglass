@@ -814,6 +814,8 @@ export interface VisualizerSettings {
   lampGround?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  /** The oil/water interface drawn as the step it really is, not the solver's few-cell band (PLAN 38w-15): 0 off, 1 sharp. */
+  crispEdges?: number;
   /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -1251,6 +1253,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
+  crispEdges: 0,            // off: the oil's edge drawn as the solver's band, as every look had it
   projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,

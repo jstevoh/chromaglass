@@ -9,6 +9,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `thinWarm.ts`: `thinWarmKernels(HEAD, COMMON, ROWS0)`, spread into `thinGapKernels`: the thin solve's warm start fitted to each step (`hsWarmDot`, `hsWarmFit`, `hsWarmScale`; PLAN 38r-12), and `WARM_GROUPS`, `WARM_FIT` for the solver's buffer.
 - `plate.ts` (194 KB, grep it): `DISPLAY_MAIN`, `DERIVE_WGSL`, `FINISH_WGSL`, `plateWgsl`: the composite.
 - `plateFields.ts`: `PLATE_FIELDS`, `PLATE_STRUCT`, the composite's uniforms.
+- `plateInterface.ts`: `INTERFACE_WGSL`, the oil/water rim drawn one pixel wide (`crispInterface`, Crisp Edges): each pixel in the Cahn–Hilliard band is read at the pure phase on its own side, from the tanh's own distance; in the display's VIEW block after `viewAt` (PLAN 38w-15; `npm run classicdish`).
 - `spikes.ts`, `magnetDisc.ts`: the magnet's field (`MAGNET_RADIUS`) and the spikes' onset. The liquid's own onset is worked out from the ferrofluid in SI (`ferroOnsetTesla`, `SPIKE_ONSET_REAL`, the target; the plate still runs on the lab's `SPIKE_ONSET` until PLAN 38k-7; `FERRO_MS_TESLA`, `FERRO_CHI`, `FERRO_DENSITY`, `WATER_DENSITY`, `MAGNET_BR`; PLAN 38k), and the WGSL gives the field as a vector too (`magnetVec`, `magnetDiscFieldVec`) so several magnets add as fields. `standing.ts` exports `LIFT_ONSET`, the film's lift scale against the onset.
 
 ## Contracts
@@ -22,7 +23,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 - `air.ts`: air splat (`AIR_SPLAT_WGSL`, `AIR_BOIL_WGSL`), and `AIR_RIM_WGSL`, shared with the plate: a bubble's fingered rim (`rimAt`) and what the field's fourth channel says, which bubble of the list a texel is (`AIR_LOOK_*`, `AIR_LOOK_SPAN` exported, PLAN 38h-15). `splat.ts`: pours. `stats.ts`: field summaries.
 - `camera.ts`, `cameraFields.ts`: camera pass.
-- `ferroDrop.ts`: closeup drop. `standing.ts`: domes.
+- `ferroDrop.ts`: closeup drop (`gapLc(gapMetres)`). `standing.ts`: domes (`filmTop(gapMetres)`).
 - `plateFilm.ts`: `FILM_FRAME_WGSL`, the film projector's frame on the plate (`filmFrame`, `filmOver`): Video Zoom, Across and Up, the frame's edge, its key and blend (PLAN 14ag).
 - `plateLamp.ts`: `LAMP_MIX_WGSL`, the lamp under the front plate (`mixLamp`, moved from `plate.ts`) with the video as one of its rows, and `lampBendAt`, the liquid's refraction of the picture under it (thin-prism, grad((n − 1)h) from the derive pass's path and the view's depth), and `VIDEO_LAMP_DEPTH_M` (PLAN 14ag-3; `npm run videolamp`).
 - `plateThinFilm.ts`: `THIN_FILM_WGSL`, Thin Film's rings over the plate, the film's amount read through a B-spline (PLAN 1i; `npm run filmrings`).

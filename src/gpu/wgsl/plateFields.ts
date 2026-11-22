@@ -67,6 +67,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'dishSpread', type: 'f32' },
   { name: 'droplets', type: 'f32', note: 'satellite micro-droplets on the glass' },
   { name: 'edgeRelief', type: 'f32', note: 'meniscus at every blob edge, at any zoom' },
+  { name: 'crispEdges', type: 'f32', note: 'the oil/water interface drawn one pixel wide (plateInterface.ts)' },
   { name: 'exposure', type: 'f32', note: 'plate-wide film exposure' },
   { name: 'filmGain', type: 'f32', note: 'maps the density above that level onto full opacity' },
   { name: 'pitchClass', type: 'f32', note: 'audio feature: True Synesthesia base hue' },

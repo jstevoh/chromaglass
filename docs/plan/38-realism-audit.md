@@ -18,20 +18,6 @@ the "Closer 3D macro view" work owns now (14ab-6, #601).
 The music's stir, from the third pass (38u, 2026-11-13; its ranked list is in section 38u,
 at the foot of this file):
 
-- **38u-16. A look saved before 38u-5 has no stir cord** (S; Medium). The built-in looks gain
-  the cord where they are defined; a look the owner saved earlier, a draft, and a look built
-  from the defaults keep their own cords and so stir less with music than they did, until
-  Music Stir is raised (the phone) or the patch is added (Patches). Give a saved look the
-  cord once as it is read (`sanitizeSettings`), with a mark in the saved look that says it
-  has been asked, so a cord the owner pulls stays pulled. Check: `musicstir` gains a saved
-  look from before, read back with its cord, and one with the mark and no cord, left alone.
-
-How it is ranked: what a person would see change on the wall, against what it costs to
-build and what it adds to the frame. S is under a day, M a few days, L a week or more.
-Every item here keeps today's look reachable until the Mac has judged the new one (the
-operating rules), and each ships from its own thread with the check that measures it
-written first. Line numbers are as read on main at d07ac31.
-
 ## The top picks
 
 - **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes
@@ -557,14 +543,12 @@ written first. Line numbers are as read on main at d07ac31.
       glass's 1.5 N, would put the half-settle at 40 ms or more. `lib/cover.ts` is viscous only
       (Stefan, as `npm run gap` 14, 20 and 21 hold it); give the cover the unsteady squeeze
       (ρ r² ḧ/h terms) and re-aim the water rows from it. The thick carrier is inside the theory.
-    - **38r-17. The rest gap's other readers** (S-M). Still at the 2 mm constant: `FILM_TOP`
-      (`wgsl/standing.ts`, compiled into phaseForces), `GAP_LC` (`wgsl/ferroDrop.ts`), the
-      bubbles' `gapMetres` (`lib/bubbles.ts`, set by the visualizer), the rhythm sheet's h₀
-      (`lib/sheet.ts`), the kick's `dentRadius` (`lib/squish.ts`), `handEdge`
-      (`lib/handSolid.ts`), the opening's drag time (`gpu/opening.ts`). Each to the solver's
-      `coverMetres`/`coverUnits`. `forces.ts`'s `nominal` stays the 2 mm on purpose: it is the
-      old plate's absolute depth drag, so a thinner cover already slows it.
-      38v (2026-11-21): more readers of a nominal gap: the milk's scatter is laid through sd =
+    - **38r-17. The rest gap's other readers** (S-M). *Part 1 (the seven readers: `FILM_TOP`,
+      `GAP_LC`, `bubbles.gapMetres`, `sheet.h0`, `kickPress`/`dentRadius`, `handEdge`, and
+      `opening.ts`'s `dragSeconds`) shipped; story in `docs/plan-shipped.md` §38r-17.* `forces.ts`'s
+      `nominal` stays the 2 mm on purpose: it is the old plate's absolute depth drag, so a thinner
+      cover already slows it.
+      Still open (the 38v half — check first: Claude): the milk's scatter is laid through sd =
       sc·6·gap, 6 mm (`plate.ts:195-208`), and its transmission through about 1 mm
       (`milkTransmission`, `plate.ts:634-641`), where `DISH_GAP_METRES` is 0.002; and the
       glint's `GAP_METRES` (`src/lib/glint.ts:95`). Through the real gap Kubelka–Munk gives R

@@ -127,7 +127,11 @@ export const PHASE_VIEW_TOP = 8;
   the plate went to NaN; it is also what refills a cell the flow's limiter
   takes below empty there, as it does everywhere else.
 */
-export const FILM_TOP = (DISH_GAP_METRES / DISH_METRES / (SPIKE_PITCH / (2 * Math.PI)) - 0.03) / FILM_H0;
+/** How many full cells' depth fit in `gapMetres` under the standing film (less the 0.03 l_c precursor). */
+export function filmTop(gapMetres = DISH_GAP_METRES): number {
+  return (gapMetres / DISH_METRES / (SPIKE_PITCH / (2 * Math.PI)) - 0.03) / FILM_H0;
+}
+export const FILM_TOP = filmTop();
 
 /*
   The noise every real layer has, as a pressure on it, in the film's units

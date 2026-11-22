@@ -33,10 +33,20 @@
  *      any oil's, more than the old lay's share of dye on black glass
  *   2. the cells stay apart: of the oil discs laid, at least KEPT are still
  *      cells (4-connected regions of the oil over a half, SPECK cells up)
- *      after five seconds, and no more than CELLS_MAX
- *   3. of many sizes, in the references' scale: the median cell's diameter
- *      between 5% and 15% of the dish's, and the biggest at least three
- *      times the smallest's
+ *      after five seconds, at least CELLS_MIN of them (complexity: the
+ *      round-three lay packed 75) and no more than CELLS_MAX
+ *   3. of many sizes: the median cell's diameter between 5% and 15% of the
+ *      frame's height (FRAME: the wall shows the middle of the plate,
+ *      uvToFluid), the biggest at least three times the smallest's and no
+ *      more than BIGGEST_MAX of the frame.
+ *      Until PLAN 38w-8 this was 5–15% of the dish. It moved because the
+ *      owner judged the dish-sized cells short of the references' detail
+ *      ("complexity and clarity", 2026-11-21), and on the like-for-like
+ *      measure the app's forms were still the bigger: the watch tool's form
+ *      scale (a correlation length, as a share of the width, not a diameter)
+ *      read 9.0% on the round-two film against 5.1% on the stills. This bar
+ *      is a diameter, so it is a proxy for that; PLAN 38w-11 replaces it
+ *      with the watch tool's own measure run on the lab's render
  *   4. drops of the water stay held inside cells: of the drops laid, at
  *      least HELD still lie in water the oil closes round (no path through
  *      water to the dish's own), where they were laid
@@ -47,7 +57,10 @@
  *   6. and the oil holds the colour laid in it as its own (Oil Bodies): of
  *      the colour laid in the oil, at least CARRIED is the oil's, inside the
  *      oil, after five seconds
- *   7. and the lines read the liquid, not the lay: the bare dish (the same
+ *   7. the rims are crisp (Crisp Edges): drawn on a RIM_PX wall, the median
+ *      10-90 rise across a rim is at most RIM_SHARP pixels at the look's
+ *      Crisp Edges and at least RIM_SOFT with it off
+ *   8. and the lines read the liquid, not the lay: the bare dish (the same
  *      lay with Film Hold and Oil Bodies off) fails 2 and 6.
  *
  * Measured while writing this (lab, 192², 300 steps) and printed below.
@@ -64,15 +77,61 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const N = 192;
+/*
+  The plate is stepped at 384², the solver's grid, with the CPU's own 192²
+  beside it. Since PLAN 38w-8 the app lays Classic's dye at the solver's
+  grid (FluidInputs.layDye), and only there: a lay that fell back to the
+  192² and its bilinear is the softer dish the owner judged short of the
+  references ("complexity and clarity", 2026-11-21), and the line "laid at
+  the solver's grid" fails it. The app's solver is 768² on the Mac; 384² is
+  the finest the lab steps in a CI minute, and the lay's floors are the
+  solver's cells (classicFloors), so this is the app's dish one grid coarser.
+*/
+const N = Number(process.env.CLASSICDISH_N) || 384;
+const GRID = 192;
 const STEPS = 300;
 const SEEDS = [1, 2];  // two dishes the app could lay: a look that only works on one seed is not the look
 const DISH = 0.45;     // the dish's radius in plate units, as clockglass.mjs measures it
 const SPECK = 6;       // cells, for a region of oil to be a cell (filmhold.mjs)
 const DROP = 3;        // cells, for a region of water inside oil to be a drop
 const DYED = 0.85, WET = 0.3;
+const WALL = 10 / 16;  // the wall's height over its width: the film's 1280x800
+// The frame's height on the wall, as a share of the dish's diameter: uvToFluid
+// (plate.ts) shows H / (1.5·max(W, H)) of the plate high, 0.42 at 16:10.
+const FRAME = WALL / 1.5 / (2 * DISH);
 const KEPT = 0.9;      // of the cells laid, still apart after five seconds
-const CELLS_MAX = 120;  // the lay draws ninety (CLASSIC_DROPS) and packs what fits: 45 and 31 on the two seeds; more than that cannot be the lay
+const CELLS_MAX = 300;  // the lay draws 900 (CLASSIC_DROPS) and packs what fits: 168 and 160 on the two seeds at 384²; more than that cannot be the lay
+/*
+  Complexity, the owner's first word (2026-11-21). The two stills the owner
+  pointed at (refsheet.jpg's first two, Liquid Loops 1969) each hold eighty
+  to a hundred round forms, most of them a few percent of the frame across
+  and the biggest about a fifth of it. The round-three lay packed 75 and 74
+  cells into the whole dish, the biggest 44% of the frame's height, so the
+  frame held thirty-odd forms dominated by four or five. The bar asks for
+  more cells than that lay could pack, and no cell big enough to fill a
+  quarter of the frame's height.
+*/
+const CELLS_MIN = 120;
+const BIGGEST_MAX = 0.25;
+const RIM_PX = 1024;   // the rim check's render: a 1280-pixel wall shows about this much of the plate
+const RIM_SHARP = 1.5;  // px, the rim's median 10-90 rise with Crisp Edges: one antialiased pixel
+const RIM_SOFT = 4;     // px, and without it: the solver's band, 8 px when measured
+const RIM_RISES = 500;  // crossings to take a median of (2173 off, 2330 on when measured, seed 1)
+const RIM_GATE = 3;     // px either side of a crossing where the oil fraction must cross one half for it to be a rim
+/*
+  Where a render pixel sits on the plate: the plate shader's uvToFluid at
+  camZoom 1, no turn and the centre at the middle, p = 0.5 + (uv - 0.5) / 1.5,
+  with the render's rows running down where the plate's v runs up. A first
+  version read the oil one to one (pixel x/n is plate x/n) and found as many
+  rims with the oil read upside down as right way up, 245 against 216: it
+  was reading the oil a third of the frame away, at chance. With this map it
+  reads the oil under the pixel.
+*/
+const RIM_VIEW = 1.5;
+const RIM_AA = 0.3;     // the share of the on arm's rim rises with a pixel between 10% and 90%: antialiased, not a staircase
+const RIM_KEEP = 0.9;   // the on arm keeps at least this much of the off arm's share of rims (not dropped from the median)
+const RIM_SPAN = 60;    // levels of green between the 10th and 90th percentiles
+const RIM_RELIEF = 0.7; // the meniscus's share of the picture with Crisp Edges, against without
 const HELD = 0.75;     // of the drops laid, still held where they were laid
 const WARM = 0.6;
 const CARRIED = 0.9;
@@ -106,18 +165,28 @@ const app = await import(pathToFileURL(out).href);
 
 const appLay = (seed) => {
   app.setShowSeed(seed);
-  const sim = new app.FluidSimulation(N, 0, 0, 0.1);
-  const mixes = [], water = new Array(N * N * 4).fill(0), oil = new Array(N * N * 4).fill(0);
-  let into = water;
-  sim.gpu = new Proxy({ N, addMix: (x, y, r, o) => { mixes.push({ x, y, r, oil: o.oil }); } }, { get: (t, k) => t[k] });
-  sim.addDensity = (x, y, d, r = 1, g = 1, b = 1) => {
-    const a = app.dyeAbsorbances(r, g, b), k = (x + y * N) * 4;
-    for (let ch = 0; ch < 3; ch++) into[k + ch] += d * a[ch];
-    into[k + 3] += d;
-  };
-  sim.addOilDensity = (x, y, d, r, g, b) => { into = oil; try { sim.addDensity(x, y, d, r, g, b); } finally { into = water; } };
+  const sim = new app.FluidSimulation(GRID, 0, 0, 0.1);
+  const mixes = [];
+  let water = null, oil = null, shares = 0, onCpu = 0;
+  // The solver's side of the lay: the oil (addMix), and the dye at its own grid (layDye), added whole (layShare 1).
+  sim.gpu = new Proxy({
+    N,
+    addMix: (x, y, r, o) => { mixes.push({ x, y, r, oil: o.oil }); },
+    layDye: (dye, o) => {
+      // As the real one (FluidInputs.layDye) does: a lay at any other size is refused, and falls back.
+      if (dye.length !== N * N * 4 || o.length !== N * N * 4) return false;
+      oil = Array.from(o);
+      water = Array.from(dye, (v, i) => v - oil[i]);
+      return true;
+    },
+    layShare: (k) => { shares += k; },
+  }, { get: (t, k) => t[k] });
+  // Anything the look still lays on the CPU's grid, which for Classic should be nothing.
+  sim.addDensity = (x, y, d) => { onCpu += d; };
+  sim.addOilDensity = (x, y, d) => { onCpu += d; };
   sim.seedPreset('classic', () => 0);
-  return { mixes, water, oil };
+  if (!water) throw new Error('Classic did not lay its dye at the solver\'s grid (layDye): the lay fell back to the CPU\'s 192²');
+  return { mixes, water, oil, shares, onCpu };
 };
 
 // CLASSICDISH_DUMP=<dir> writes each plate there as a PNG, to look at.
@@ -305,8 +374,88 @@ try {
     + `${r.held} of ${r.laidDrops} drops held, ${r.colours} oil colours, warm ${pc(r.warm)}, carried ${pc(r.carried)}`;
   const lays = SEEDS.map(appLay);
   const abs = (await page.evaluate(() => lab.look('classic').dyes)).map((c) => Array.from(app.dyeAbsorbances(c.r, c.g, c.b)));
-  const nows = [];
-  for (let i = 0; i < SEEDS.length; i++) nows.push(await run('now', lays[i]));
+  /*
+    Clarity, the owner's second word: the rims between the water and the oil
+    cells crisp, not a smear (Crisp Edges, plateInterface.ts, PLAN 38w-15).
+    After each seed's dish is stepped, it is drawn at RIM_PX, the size a wall
+    shows it at, at the look's own Crisp Edges and with it off, both with
+    Edge Relief 0 so the width read is the step between the two liquids'
+    colours and not the meniscus line drawn over it. Every second row is
+    walked for the places the green channel (normalised to its 10th and 90th
+    percentiles, which every dye here changes) crosses its middle, and each
+    crossing's rise is the run of pixels strictly between 10% and 90% about it.
+
+    Only a rim counts: a crossing is a rim when the oil fraction (the
+    solver's own mix field, read at the crossing's plate point) is on
+    opposite sides of one half RIM_GATE pixels either side of it. The soft
+    dye inside the cells (38w-16), the mottle in the water and the like are
+    crossings too, printed as "other", and would pad the off arm's width if
+    they counted. The same gate read with the rows upside down must find
+    far fewer rims, or it is not reading where the oil is. A rim whose walk
+    does not reach 10% and 90% within 40 pixels (a low-contrast pair, a
+    grazing row) is dropped, and the drops are counted: the on arm must keep
+    at least RIM_KEEP of the off arm's share, so a halo or an overshoot that
+    never reaches 90% cannot leave the median by dropping out of it. A
+    median of 0 is a hard step with no antialiasing, a staircase, so at
+    least RIM_AA of the on arm's rises must have a pixel between. And the
+    plate's green must span RIM_SPAN levels, so a flat frame's one-level
+    noise is not read as rims.
+
+    The meniscus: Edge Relief draws a dark and a bright line round every
+    cell, the light the curved oil surface bends. Crisp Edges must not erase
+    it (a first version did, reading the relief at the moved point, out in
+    the flat phase). The relief's share of the picture is the mean |green
+    with the look's Edge Relief - green with 0|, and with Crisp Edges on it
+    must be at least RIM_RELIEF of what it is off.
+  */
+  await page.evaluate(({ RIM_PX, RIM_GATE, RIM_VIEW }) => {
+    window.rimMeasure = async () => {
+      const s = lab.look('classic').settings, n = RIM_PX, ce = s.crispEdges ?? 0;
+      const m = await lab.chemistry('mix');
+      if (!m) return null;
+      const fn = m.n, M = m.data;
+      const at = (i, j) => M[(Math.min(fn - 1, Math.max(0, j)) * fn + Math.min(fn - 1, Math.max(0, i))) * 4];
+      const oil = (u, v) => {
+        const x = u * fn - 0.5, y = v * fn - 0.5, i = Math.floor(x), j = Math.floor(y), a = x - i, b = y - j;
+        return (at(i, j) * (1 - a) + at(i + 1, j) * a) * (1 - b) + (at(i, j + 1) * (1 - a) + at(i + 1, j + 1) * a) * b;
+      };
+      const draw = (c, relief) => lab.render(n, { ...s, crispEdges: c, edgeRelief: relief }, { zoom: 1, macroAmount: 0 });
+      const green = (px) => { const G = new Float32Array(n * n); for (let q = 0; q < n * n; q++) G[q] = px[q * 4 + 1]; return G; };
+      const stats = (ws) => {
+        ws.sort((p, q) => p - q);
+        return { rises: ws.length, p25: ws[ws.length >> 2] ?? 0, median: ws[ws.length >> 1] ?? 0, p75: ws[(ws.length * 3) >> 2] ?? 0, aa: ws.length ? ws.filter((w) => w >= 1).length / ws.length : 0 };
+      };
+      const widths = (G, flip) => {
+        const so = Array.from(G).sort((p, q) => p - q), lo = so[Math.floor(so.length * 0.1)], hi = so[Math.floor(so.length * 0.9)];
+        const g = (q) => (G[q] - lo) / Math.max(1, hi - lo);
+        const rim = [], other = []; let dropped = 0;
+        for (let y = 2; y < n - 2; y += 2) {
+          const r = y * n, v = 0.5 + (flip ? 1 : -1) * ((y + 0.5) / n - 0.5) / RIM_VIEW, pu = (x) => 0.5 + (x / n - 0.5) / RIM_VIEW;
+          for (let x = 2; x < n - 3; x++) {
+            const a = g(r + x), b = g(r + x + 1);
+            if ((a - 0.5) * (b - 0.5) >= 0 || Math.abs(a - b) < 0.02) continue;
+            const isRim = (oil(pu(x + 1 - RIM_GATE), v) - 0.5) * (oil(pu(x + 1 + RIM_GATE), v) - 0.5) < 0;
+            const up = b > a; let i = x, j = x + 1;
+            while (i > 0 && (up ? g(r + i) > 0.1 : g(r + i) < 0.9) && x - i < 40) i--;
+            while (j < n - 1 && (up ? g(r + j) < 0.9 : g(r + j) > 0.1) && j - x < 40) j++;
+            if (x - i < 40 && j - x < 40) (isRim ? rim : other).push(j - i - 1);
+            else if (isRim) dropped++;
+          }
+        }
+        const st = stats(rim);
+        return { span: hi - lo, ...st, kept: st.rises / Math.max(1, st.rises + dropped), dropped, other: stats(other) };
+      };
+      const onG = green(await draw(ce, 0)), offG = green(await draw(0, 0));
+      const relief = async (c, G0) => { const G = green(await draw(c, s.edgeRelief ?? 0)); let d = 0; for (let q = 0; q < n * n; q++) d += Math.abs(G[q] - G0[q]); return d / (n * n); };
+      return {
+        ce, edgeRelief: s.edgeRelief ?? 0, on: widths(onG, false), off: widths(offG, false),
+        offFlipped: widths(offG, true).rises,
+        reliefOn: await relief(ce, onG), reliefOff: await relief(0, offG),
+      };
+    };
+  }, { RIM_PX, RIM_GATE, RIM_VIEW });
+  const nows = [], rims = [];
+  for (let i = 0; i < SEEDS.length; i++) { nows.push(await run('now', lays[i])); rims.push(await page.evaluate(() => window.rimMeasure())); }
   const before = await run('before', null);
   /*
     The control: the first dish again with the look's oil physics off (Film
@@ -320,21 +469,32 @@ try {
   if (DUMP) for (const [name, r] of [['now', nows[0]], ['before', before], ['bare', bare]]) writeFileSync(`${DUMP}/classicdish-${name}.png`, Buffer.from(r.png, 'base64'));
 
   const kept = (r) => r.laidCells > 0 && r.cells >= KEPT * r.laidCells && r.cells <= CELLS_MAX;
+  const complex = (r) => kept(r) && r.cells >= CELLS_MIN;
   const heldOk = (r) => r.laidDrops > 0 && r.held >= HELD * r.laidDrops;
   const all = (p) => nows.every(p);
   const each = (g) => nows.map(g).join('; ');
+  check(`the dye is laid at the solver's ${N}² and none on the CPU's ${GRID}² (PLAN 38w-8)`, lays.every((l) => l.shares === 1 && l.onCpu === 0),
+    lays.map((l) => `${l.shares} share, ${l.onCpu.toFixed(1)} on the CPU`).join('; '));
   check('the dish is full of the water\'s dye, where the old lay left black glass', all((r) => r.dyed >= DYED && r.dyed > before.dyed),
     `${each((r) => pc(r.dyed))} of the water against ${pc(before.dyed)}`);
-  check(`at least ${pc(KEPT)} of the cells laid are still apart after five seconds`, all(kept),
+  check(`at least ${pc(KEPT)} of the cells laid are still apart after five seconds, and at least ${CELLS_MIN} of them`, all(complex),
     `${each((r) => `${r.cells} of ${r.laidCells}`)} (the old lay: ${before.cells})`);
-  check('of many sizes, the median 5–15% of the dish across', all((r) => r.median >= 0.05 && r.median <= 0.15 && r.biggest >= 3 * r.smallest),
-    each((r) => `median ${pc(r.median)}, ${pc(r.smallest)} to ${pc(r.biggest)}`));
+  check(`of many sizes, the median 5–15% of the frame's height across and none over ${pc(BIGGEST_MAX)}`, all((r) => r.median / FRAME >= 0.05 && r.median / FRAME <= 0.15 && r.biggest >= 3 * r.smallest && r.biggest / FRAME <= BIGGEST_MAX),
+    each((r) => `median ${pc(r.median / FRAME)} of the frame, ${pc(r.smallest / FRAME)} to ${pc(r.biggest / FRAME)}`));
   check(`at least ${pc(HELD)} of the drops of water laid in cells are still held there`, all(heldOk),
     `${each((r) => `${r.held} of ${r.laidDrops}`)}`);
   check(`the oil in at least three colours, at least ${pc(WARM)} of it warm`, all((r) => r.colours >= 3 && r.warm >= WARM),
     each((r) => `${r.colours} colours, warm ${pc(r.warm)}`));
   check(`and the oil holds at least ${pc(CARRIED)} of the colour laid in it as its own, inside the oil`, all((r) => r.carried >= CARRIED),
     each((r) => pc(r.carried)));
+  const rimFmt = (r) => `median ${r.median} px (p25 ${r.p25}, p75 ${r.p75}, ${pc(r.aa)} antialiased, ${r.rises} rims, ${pc(r.kept)} kept, span ${r.span}; other edges median ${r.other.median} of ${r.other.rises})`;
+  const rimOk = (r) => r && r.ce > 0 && r.on.span >= RIM_SPAN && r.off.span >= RIM_SPAN && r.on.rises >= RIM_RISES && r.off.rises >= RIM_RISES
+    && r.on.median <= RIM_SHARP && r.on.aa >= RIM_AA && r.off.median >= RIM_SOFT && r.on.kept >= RIM_KEEP * r.off.kept && r.offFlipped < r.off.rises / 2;
+  check(`the rims are crisp on a ${RIM_PX}-pixel wall: at the look's Crisp Edges the median rise across an oil rim is at most ${RIM_SHARP} px and antialiased, and at least ${RIM_SOFT} px with it off (PLAN 38w-15)`,
+    rims.every(rimOk), rims.map((r, i) => r ? `seed ${SEEDS[i]}: Crisp Edges ${r.ce}: ${rimFmt(r.on)}; off: ${rimFmt(r.off)}; the gate upside down ${r.offFlipped} rims` : `seed ${SEEDS[i]}: no mix field`).join(' | '));
+  check(`and the meniscus round the cells is kept: Edge Relief's share of the picture with Crisp Edges at least ${pc(RIM_RELIEF)} of it without`,
+    rims.every((r) => r && r.edgeRelief > 0 && r.reliefOff > 0.5 && r.reliefOn >= RIM_RELIEF * r.reliefOff),
+    rims.map((r, i) => r ? `seed ${SEEDS[i]}: ${r.reliefOn.toFixed(2)} against ${r.reliefOff.toFixed(2)} levels at Edge Relief ${r.edgeRelief}` : 'none').join('; '));
   check('the lines read the liquid: with Film Hold and Oil Bodies off the same dish fails them', !kept(bare) && bare.carried < CARRIED,
     `${bare.cells} of ${bare.laidCells} cells apart, ${pc(bare.carried)} carried`);
 } finally {

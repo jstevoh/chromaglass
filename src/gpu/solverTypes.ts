@@ -323,6 +323,15 @@ export interface PlateSolver {
   /** Lay the oil cell for cell, replacing the mix (Foam Cells' pressed drops, PLAN 47z-5): `oil` is asked at each cell's middle in plate units, with the mix's size. */
   layOil?(oil: (x: number, y: number, n: number) => number): void;
   /**
+   * A look's dye laid at the solver's own grid (PLAN 38w-8): `dye` N²×4 in the
+   * CPU's delta format (absorbance × amount per channel, then the amount),
+   * `oil` the oil's own colour of it in the same format, or null. Held until
+   * the next lay; false when the arrays are not N² (the caller then lays on
+   * the CPU's grid). `layShare(k)` adds k of it to the plate.
+   */
+  layDye?(dye: Float32Array, oil: Float32Array | null): boolean;
+  layShare?(k: number): void;
+  /**
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
    * over the rim, and, for a liquid that mixes with the clear one (`sp`),
