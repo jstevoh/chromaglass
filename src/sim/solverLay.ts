@@ -201,6 +201,14 @@ export class OwedLay {
    * arrays, to take back and lay again at the attach.
    */
   lay<T>(free: boolean, look: string, noise: Noise, f: () => T): T {
+    /*
+      Any later lay supersedes what was owed, whether or not it is owed in
+      turn. A Go before the device is up lays the next look through a capture
+      (not free), and an owed Classic kept past it had its oil laid into the
+      middle of the new look's glide at the attach (found in review). What the
+      plate shows from here is the new lay, so nothing older is owed.
+    */
+    this.owed = null;
     const arrays = this.arrays();
     const before = free && SOLVER_OIL_LOOKS.has(plateLook(look)) ? arrays.map(a => a.slice()) : null;
     const out = f();

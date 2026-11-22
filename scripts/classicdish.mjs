@@ -66,7 +66,8 @@
  *      10-90 rise across a rim is at most RIM_SHARP pixels at the look's
  *      Crisp Edges and at least RIM_SOFT with it off
  *   8. and no dark halo rings the cells: the water 2-8 px outside a rim is at
- *      least HALO as bright as with Edge Relief off, where the old 0.6 was not
+ *      least HALO as bright as the open water 16 px or more from any oil, in
+ *      the same picture, where the old Edge Relief 0.6 was not
  *   9. and the lines read the liquid, not the lay: the bare dish (the same
  *      lay with Film Hold and Oil Bodies off) fails 2 and 6.
  *
@@ -138,14 +139,24 @@ const RIM_VIEW = 1.5;
 const RIM_AA = 0.3;     // the share of the on arm's rim rises with a pixel between 10% and 90%: antialiased, not a staircase
 const RIM_KEEP = 0.9;   // the on arm keeps at least this much of the off arm's share of rims (not dropped from the median)
 const RIM_SPAN = 60;    // levels of green between the 10th and 90th percentiles
-const HALO = 0.95;      // the water's light beside a cell, in the look against with no Edge Relief at all
+/*
+  The water's light beside a cell, against the open water's in the same
+  picture. Measured on Metal, seeds 1 and 2: 94.9% and 94.6% at Classic's
+  Edge Relief 0, 86.2% and 87.8% drawn at the old 0.6. The bar sits between,
+  nearer the clean dish. The 5% the ring is darker at Edge Relief 0 is not a
+  drawn halo (nothing at 0 shades by slope); it has not been traced yet, and
+  is noted in 38w-25 with the meniscus that will change it anyway.
+*/
+const HALO = 0.92;
 const HALO_OLD = 0.6;   // the Edge Relief Classic had before 38w-23, whose halo the instrument must see
 /*
-  The spread of the oil's cover over the frame's boxes (PLAN 38w-22). On the
-  laid discs, before any step: the round-three packing read 5 to 9% on three
-  seeds, the poured lay 30 to 43%. The bar sits between, nearer the packed
-  lay than the poured one, so it fails a dish packed edge to edge and passes
-  any lay that leaves open water somewhere in the frame.
+  The spread of the oil's cover over the frame's boxes (PLAN 38w-22). The bar
+  was chosen on the laid discs, before any step: the round-three packing read
+  5 to 9% on three seeds, the poured lay 30 to 43%. The line reads the plate
+  after five seconds, where the poured lay read 24.9% and 24.2% on the two
+  seeds, so its margin there is about 6 points, not the 12 the discs gave.
+  A packed lay has not been measured on the plate after five seconds; the
+  stepping smooths the cover, so it reads at or under its 5 to 9% laid.
 */
 const SPREAD = 0.18;
 const HELD = 0.75;     // of the drops laid, still held where they were laid
@@ -204,6 +215,33 @@ const appLay = (seed) => {
   if (!water) throw new Error('Classic did not lay its dye at the solver\'s grid (layDye): the lay fell back to the CPU\'s 192²');
   return { mixes, water, oil, shares, onCpu };
 };
+
+/*
+  The lay owed to the solver (PLAN 38w-21). The app seeds its opening look
+  before the GPU device is up, so Classic is laid first on the CPU's grid with
+  no solver, and laid again on the solver at the attach; appLay above lays on
+  a solver it already has, so it never sees that path. Here the plate is
+  seeded with no solver, then handed a stand-in at attachGpu, which must take
+  Classic's CPU dye back out and lay its oil (addMix) there. And a Go before
+  the attach supersedes it: the next look laid through captureSeed, as the
+  handoff lays it, leaves nothing owed, so the attach lays no Classic oil
+  into the new look's glide (found in review: the owed lay survived it).
+*/
+const owedAttach = (go) => {
+  app.setShowSeed(1);
+  const sim = new app.FluidSimulation(GRID, 0, 0, 0.1);
+  const mass = () => sim.dye().reduce((t, a) => { for (let i = 0; i < a.length; i++) t += a[i]; return t; }, 0);
+  sim.seedPreset('classic', () => 0);
+  const laid = mass();
+  if (go) sim.captureSeed(() => { sim.seedPreset(go, () => 0); });
+  let mixes = 0;
+  const stub = { N, addMix: () => { mixes++; }, layDye: (dye, o) => dye.length === N * N * 4 && o.length === N * N * 4, layShare: () => {}, clear: () => {} };
+  // Anything else the attach asks of a solver is a no-op here: only the lay is under test.
+  sim.attachGpu(new Proxy(stub, { get: (t, k) => (k in t ? t[k] : typeof k === 'string' && k !== 'then' && k !== 'takeOver' ? () => undefined : undefined) }));
+  return { laid, left: mass(), mixes };
+};
+const owed = owedAttach(null), superseded = owedAttach('comet');
+console.log(`owed: CPU dye ${owed.laid.toFixed(0)} laid, ${owed.left.toFixed(0)} left after attach, ${owed.mixes} oil drops on the solver; after a Go to comet ${superseded.mixes}`);
 
 // CLASSICDISH_DUMP=<dir> writes each plate there as a PNG, to look at.
 const DUMP = process.env.CLASSICDISH_DUMP;
@@ -460,13 +498,17 @@ try {
     0, and the claim is the one the owner can see: the water just outside
     each cell is as bright as the water is. The ring is the water pixels
     (oil fraction under one half) with oil within 8 px but none within 2,
-    on the solver's own mix field as above. Its mean light (Rec. 709
-    luminance) in the look's picture must be at least HALO of the same
-    pixels drawn with Edge Relief 0, so whatever comes to draw a rim later
-    (18e-2, the oil's own meniscus) may brighten it or darken it a little,
-    not ring it in black. And the instrument must see a halo when there is
-    one: with the old HALO_OLD the same ratio must fall under HALO, or the
-    ring is not where the halo was and the line proves nothing.
+    on the solver's own mix field as above; the open water is the water
+    pixels with no oil within 16 px. In the look's own picture the ring's
+    mean light (Rec. 709 luminance) must be at least HALO of the open
+    water's. The first version divided by the same ring drawn at Edge
+    Relief 0, which with Classic at 0 was the same draw: it read 1.000
+    whatever the picture held, and a dark ring from anything but Edge
+    Relief (the meniscus 38w-25 will draw included) sat in both and never
+    showed (found in review). Against the open water any darkening at the
+    rims counts, whatever draws it. And the instrument must see a halo when
+    there is one: drawn with the old HALO_OLD the same ratio must fall under
+    HALO, or the ring is not where the halo was and the line proves nothing.
   */
   await page.evaluate(({ RIM_PX, RIM_GATE, RIM_VIEW, HALO_OLD }) => {
     window.rimMeasure = async () => {
@@ -519,18 +561,22 @@ try {
         for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) { let m = 0; for (let k = Math.max(0, y - r); k <= Math.min(n - 1, y + r) && !m; k++) m = h[k * n + x]; out[y * n + x] = m; }
         return out;
       };
-      const in8 = near(8), in2 = near(2), ring = [];
-      for (let q = 0; q < n * n; q++) if (!O[q] && in8[q] && !in2[q]) ring.push(q);
+      const in8 = near(8), in2 = near(2), in16 = near(16), ring = [], open = [];
+      for (let q = 0; q < n * n; q++) {
+        if (!O[q] && in8[q] && !in2[q]) ring.push(q);
+        if (!in16[q]) open.push(q);
+      }
       const light = async (relief) => {
-        const px = await draw(ce, relief); let t = 0;
-        for (const q of ring) t += 0.2126 * px[q * 4] + 0.7152 * px[q * 4 + 1] + 0.0722 * px[q * 4 + 2];
-        return t / Math.max(1, ring.length);
+        const px = await draw(ce, relief);
+        const mean = (qs) => { let t = 0; for (const q of qs) t += 0.2126 * px[q * 4] + 0.7152 * px[q * 4 + 1] + 0.0722 * px[q * 4 + 2]; return t / Math.max(1, qs.length); };
+        const r = mean(ring), w = mean(open);
+        return { water: w, ratio: r / Math.max(1e-6, w) };
       };
-      const bare = await light(0);
+      const look = await light(s.edgeRelief ?? 0), old = await light(HALO_OLD);
       return {
         ce, edgeRelief: s.edgeRelief ?? 0, on: widths(onG, false), off: widths(offG, false),
         offFlipped: widths(offG, true).rises,
-        ring: ring.length, bare, look: (await light(s.edgeRelief ?? 0)) / Math.max(1e-6, bare), old: (await light(HALO_OLD)) / Math.max(1e-6, bare),
+        ring: ring.length, open: open.length, bare: look.water, look: look.ratio, old: old.ratio,
       };
     };
   }, { RIM_PX, RIM_GATE, RIM_VIEW, HALO_OLD });
@@ -553,6 +599,9 @@ try {
   const heldOk = (r) => r.laidDrops > 0 && r.held >= HELD * r.laidDrops;
   const all = (p) => nows.every(p);
   const each = (g) => nows.map(g).join('; ');
+  check(`a Classic seeded before the solver is up is laid on it at the attach: its CPU dye taken back and its oil laid, and none after a Go before the attach (PLAN 38w-21)`,
+    owed.laid > 0 && owed.left < owed.laid * 0.01 && owed.mixes >= CELLS_MIN && superseded.mixes === 0,
+    `${owed.laid.toFixed(0)} of dye laid on the CPU, ${owed.left.toFixed(0)} left after the attach, ${owed.mixes} drops of oil laid; ${superseded.mixes} after a Go to comet`);
   check(`the dye is laid at the solver's ${N}² and none on the CPU's ${GRID}² (PLAN 38w-8)`, lays.every((l) => l.shares === 1 && l.onCpu === 0),
     lays.map((l) => `${l.shares} share, ${l.onCpu.toFixed(1)} on the CPU`).join('; '));
   check('the dish is full of the water\'s dye, where the old lay left black glass', all((r) => r.dyed >= DYED && r.dyed > before.dyed),
@@ -574,9 +623,9 @@ try {
     && r.on.median <= RIM_SHARP && r.on.aa >= RIM_AA && r.off.median >= RIM_SOFT && r.on.kept >= RIM_KEEP * r.off.kept && r.offFlipped < r.off.rises / 2;
   check(`the rims are crisp on a ${RIM_PX}-pixel wall: at the look's Crisp Edges the median rise across an oil rim is at most ${RIM_SHARP} px and antialiased, and at least ${RIM_SOFT} px with it off (PLAN 38w-15)`,
     rims.every(rimOk), rims.map((r, i) => r ? `seed ${SEEDS[i]}: Crisp Edges ${r.ce}: ${rimFmt(r.on)}; off: ${rimFmt(r.off)}; the gate upside down ${r.offFlipped} rims` : `seed ${SEEDS[i]}: no mix field`).join(' | '));
-  check(`and no dark halo rings the cells: the water 2–8 px outside a rim keeps at least ${pc(HALO)} of its light without Edge Relief, where the old ${HALO_OLD} did not (PLAN 38w-23)`,
-    rims.every((r) => r && r.ring >= 10000 && r.bare > 8 && r.look >= HALO && r.old < HALO),
-    rims.map((r, i) => r ? `seed ${SEEDS[i]}: ${pc(r.look)} at Edge Relief ${r.edgeRelief}, ${pc(r.old)} at ${HALO_OLD}, over ${r.ring} px of ring at ${r.bare.toFixed(0)} levels` : 'none').join('; '));
+  check(`and no dark halo rings the cells: the water 2–8 px outside a rim is at least ${pc(HALO)} as bright as the open water, where the old Edge Relief ${HALO_OLD} was not (PLAN 38w-23)`,
+    rims.every((r) => r && r.ring >= 10000 && r.open >= 10000 && r.bare > 8 && r.look >= HALO && r.old < HALO),
+    rims.map((r, i) => r ? `seed ${SEEDS[i]}: ${pc(r.look)} at Edge Relief ${r.edgeRelief}, ${pc(r.old)} at ${HALO_OLD}, over ${r.ring} px of ring against ${r.open} px of open water at ${r.bare.toFixed(0)} levels` : 'none').join('; '));
   check('the lines read the liquid: with Film Hold and Oil Bodies off the same dish fails them', !kept(bare) && bare.carried < CARRIED,
     `${bare.cells} of ${bare.laidCells} cells apart, ${pc(bare.carried)} carried`);
 } finally {

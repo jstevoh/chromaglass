@@ -249,6 +249,9 @@ is in the project's files).
   set by the oil's index step (about 1.47 against 1.33), not by the dye. Build 18e-2 (deflection
   by the gradient of the optical path, the oil's thickness in it), then give Classic a narrow
   rim at the crisp edge from it and turn the classicdish no-halo line into "a rim, and no halo".
+  Untraced on the way: at Edge Relief 0 the water 2–8 px outside a rim is already about 5%
+  darker than open water (94.9% and 94.6% on Metal), with no slope shading drawn. Find what
+  darkens it (dye crowded at the rim by the flow, or the plate's own blur) before the rim goes in.
 - **38w-26. `readField` and `fluids[0].n` report the CPU mirror, not the GPU grid** (S; Medium).
   In the app on Metal the solver runs at 512² or 768², but `chromaglassDebug().fluids[0].n`
   and `readField` answer 192², the CPU mirror's. A check or probe reading them thinks the plate
