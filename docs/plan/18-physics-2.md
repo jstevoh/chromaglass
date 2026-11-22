@@ -263,15 +263,7 @@ Left from 18h, each its own item:
 
 ## 18i. Bubbles and beads live by physics, not timers (shipped)
 
-- **18i-2** The beads still run on dials, not on the gap (M; Medium–High). `beads.ts:420-445`
-  slides them by tiltX·500; `viscosityRatio` is 1.5 (`:209`); they merge at 0.02 a step
-  (`:579`), repel at 0.25 (`:639`), age by `innerLife` (`:146`), are clamped (`:675`), and are
-  populated every 30 frames (`:300-349`, `LiquidVisualizer.tsx:4417`), though `MERGE_TAU_S` is
-  already Paterson's. A pancake between glasses lags the liquid at 2U/(1 + λ), slides at Δρ g
-  sinθ b²/(12μ(1 + λ)), and merges on Paterson's τ = 2μR³/(b²σ). Write each rate as 1 −
-  exp(−dt/τ), make beads only from pours and break-up, and let them leave over the rim. Check:
-  a bead's slide within 15% of that speed, and the merge count the same at 30 and 60 steps a
-  second. With 15g-17. (38v, from RS-11.)
+- ~~**18i-2**~~ **shipped**: `BeadField.setLiquid({ gapMetres, muOut, muIn, deltaRho, sigma })` slides by Δρ g sinθ b² / (12 μ_out (1 + λ)), every per-step drop rate is 1 − exp(−dt/τ) (Paterson coalescence, repel, attract, recolour), drops leave over the open circular rim, and `stepPlateBeads` (`src/sim/beadStep.ts`) wires the live gap and carrier/oil properties from the frame loop (`npm run drops` 33/33; story in [`docs/plan-shipped.md`](../plan-shipped.md) §18i-2). Left: retiring the 30-frame `populate` timer once presets/pours seed beads directly (currently required by `npm run webgpu` and presets with `beads > 0`), and `15g-17` (PR #914).
 
 ## 18k. Smaller ones
 

@@ -662,7 +662,7 @@
     {
       "name": "The drops",
       "shard": "logic",
-      "run": "npm run drops -- --owed=slide",
+      "run": "npm run drops",
       "why": [
         "Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,",
         "each drop its own colour, pressed flat where it touches, a swallowed",
