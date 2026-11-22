@@ -78,3 +78,10 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   on any plate a bottle was poured on (`stepLiquids`); `npm run liquidpush`, and
   `liquidsgpu`'s five "a still plate" lines owed to it gate. Story in
   `docs/plan-shipped.md` §15e-1.
+- ~~**15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**~~
+  **Shipped** (2026-11-14): a bottle's weight down a rocked thin gap is a drive laid after
+  the gap keeps its flow (`liquidDrive`, `driveLiquids`), Darcy's w g sinθ h²/12ν read as
+  every body force is; a light bottle's lightness has a field of its own so the carry keeps
+  it; the soap's pull and the polar push no longer act between two glasses.
+  `npm run liquidfall` (a drop at Hele-Shaw's speed to 4%), and `liquidpush`'s thin-gap
+  reach asks the rock's way. Story in `docs/plan-shipped.md` §15e-10.

@@ -142,6 +142,12 @@ export interface Opening {
    */
   soap: boolean;
   /**
+   * Faraday waves (PLAN 48f, gpu/faraday.ts): the shaken dish's four
+   * kernels, from the first step when the look opens with its shaker on
+   * (Shaker above nought Hz); every other look builds them behind the show.
+   */
+  faraday: boolean;
+  /**
    * The display's effects this look can reach (`displayLean.ts`): the
    * opening compiles a display with only these, and the whole one behind it.
    */
@@ -203,6 +209,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
+    faraday: (s.faradayHz ?? 0) > 0,
     display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
   };
 }

@@ -149,6 +149,11 @@ export function parseManifest(text, where = 'scripts/checks.json') {
   if (!Array.isArray(measure) || !Array.isArray(mac) || !measure.length || !mac.length) bad('needs shards.measure and shards.mac, each a list');
   const all = [...measure, ...mac];
   if (new Set(all).size !== all.length) bad('a shard is named twice');
+  // The Measure parts a pull request runs (PLAN.md 19ak-20): optional, and
+  // when given, a non-empty list of Measure parts. reach.mjs runs every part
+  // when it is missing, so a tree from before it reads as it did.
+  const pr = m.shards?.pr;
+  if (pr !== undefined && (!Array.isArray(pr) || !pr.length || pr.some((s) => !measure.includes(s)))) bad('shards.pr, when given, is a list of Measure parts');
   if (!Array.isArray(m.checks) || !m.checks.length) bad('has no checks');
   const seen = new Set();
   for (const [i, c] of m.checks.entries()) {
@@ -180,7 +185,7 @@ export function parseManifest(text, where = 'scripts/checks.json') {
     seen.add(key);
   }
   for (const s of all) if (!m.checks.some((c) => c.shard === s)) bad(`shard ${s} has no checks`);
-  return { shards: { measure, mac }, checks: m.checks };
+  return { shards: { measure, mac, ...(pr ? { pr } : {}) }, checks: m.checks };
 }
 
 export const loadManifest = () => parseManifest(fs.readFileSync(MANIFEST, 'utf8'), path.relative(ROOT, MANIFEST));
@@ -647,7 +652,7 @@ async function selftest() {
   say(/^\s+part: \$\{\{ fromJSON\(needs\.reach\.outputs\.parts\) \}\}\s*$/m.test(wf), 'Measure\'s matrix is the parts reach selected (the manifest\'s measure shards unless the diff is only checks and documents)');
   say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.only \}\}/.test(wf), 'and the names reach selected are passed to the part\'s runner');
   say(/^\s+shard: \$\{\{ fromJSON\(needs\.reach\.outputs\.shards\) \}\}\s*$/m.test(wf), 'the Mac matrix is the shards reach selected');
-  say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.maconly \}\}/.test(wf) && /ESBUILD_MODULE: /.test(wf), 'and the Mac\'s names are passed to the shard\'s runner, read with the esbuild the reach job installs (19ak-2)');
+  say(!/outputs\.maconly/.test(wf), 'and the Mac runs every check of its shard: only main\'s deploy runs one (19ak-20)');
   say(/run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.part \}\}/.test(wf) && /run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.shard \}\}/.test(wf), 'Measure and the Mac run their shard from the manifest');
   // The workflow's own tools (which files reach, the runner, the guard on a
   // PR's bars, whether the owner's Mac is free of other work before a shard,

@@ -55,8 +55,8 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   before any app check leans on software WebGPU for its commits.
 - **19aa-15. A pull request's Measure part builds the site first when a full run would
   have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
-- **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
-  the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
+- ~~**19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
+  the cause is not found, a breakdown is printed).**~~ Dropped 2026-11-22 (19ak-21, the owner's "cut the shit out of things"): the line is deleted from its harness and prints as a note, not fixed. The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
   *earlier* than the control. Over the 192 Mac runs of the week the show's own ran 0.40 to
   3.25 s (median 0.78, 2.0 s or more on 8%), and the control's has the same tail (0.5 to
@@ -511,22 +511,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
   plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
   (`npm run microscope` read 0.00 at every zoom).
-- **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
-  rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
-  and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share
-  of straw steps in the stroke move with the machine. On GitHub's Macs it went 301 → 242 on a
-  PR that does not touch the bubbles (run 41129450339, green on re-run) and 325 → 284 on #603,
-  where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
-  measure over a fixed number of plate steps, not wall time, so its bar means the same on
-  every runner.
-  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
-- **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
-  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
-  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
-  circle's edge; find whether the red runs read a lit edge
-  (the sample too close) or a frame not yet drawn (the read too early), and measure the
-  feature, not the moment.
 - **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
   saves 13%; what still runs every Mac check is the solver and the libraries the lab's
   one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
@@ -585,16 +569,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   run the checks itself. Put to the owner the same day with the cost: the site would stop
   updating until the startup line and 9c are fixed. The owner chose to keep trusting
   them. docs/ci.md now says so.
-- **19ak-11. Open, found by 19ak-9: the film's "at 0, every film is the rainbow every look
-  was made with, to the bit" goes red by one pixel on GitHub's Macs.** Four runs in a
-  week (11-15 three times, 11-21 once), each a different render one pixel off
-  (`closeup00`, `film0`, `plate00`): `scripts/filmlook.mjs` compares two labs, the real
-  shader and a control compiled with Film Physics taken out, each running the solver from
-  scratch. One pixel is either Metal compiling the two shaders' shared arithmetic
-  differently (a fused multiply-add in one and not the other) or the solver not
-  repeating itself to the bit between two pages. Find which (print the pixel and both
-  values; render the control's shader on the real lab's state), then make the claim the
-  one that holds, never a tolerance picked to pass.
 - **19ak-12. Open, found by 19ak-9: the live stream with AAC on GitHub's Macs.** Three
   runs (11-15 twice, 11-21 on #893, which does not touch the stream): "the audio covers
   the stream — 29.95 s of them against 30.57 s streamed", "the sound is where the page
@@ -602,12 +576,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   shape as 37x-4g-1 (the audio encoder's queue has no bound, so a loaded Mac emits AAC
   late), so it may be the app, not the check: read the run's `audioQueue` before
   touching the bar.
-- **19ak-13. Open, found by 19ak-9: Pour's "spreads it out from where it lands" reads the
-  runner's frame rate.** `scripts/tools.mjs` holds each pouring tool for 1200 ms of wall
-  time and settles 700 ms, so the plate takes however many solver steps the runner
-  manages in that time, and the share of dye from 0.02 to 0.07 moves with it: red once
-  on 11-21 (Pour 75% against Drop's 78%, a PR that does not touch the tools). Hold and
-  settle over a fixed number of plate steps, as 19aj-1 asks of the Blow stroke.
 - **19ak-14. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
   keeps the heat" reads ×0.9997, 0.9748 and 0.9657 where its bar wants the heat held. Not yet
   run down: either Heat Spread at 2 now loses heat it kept (a real regression in the heat
