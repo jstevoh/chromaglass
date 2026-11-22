@@ -101,3 +101,9 @@ each band.
   strongest moment and the longest rest, the light and colour drift, the reorganisations and
   the hold on the music, and the look in a line. It is `## Overall` in summary.md and `## How it
   felt` in diff.md, with how the arc changed.
+- ~~**47x-10**~~ the flow read aliased (shipped, this PR). The words check's drifting
+  stripes (a 64-pixel period moving a pixel a frame) move almost half their period in the
+  second the physics read pairs over, so the backward shift matched as well as the true one:
+  one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
+  two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
+  one sample then lags of 3, 8 and 10, each seeded from the last.
