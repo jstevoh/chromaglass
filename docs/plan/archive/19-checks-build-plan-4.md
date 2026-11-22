@@ -39,3 +39,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   it again. `-- --self-test` plays both through a stub (`fetchRetrying`, `deploys` with
   an injected `get`), which also covers part of 19am-5 (the jobs and re-run reads fail
   over; paging and the GraphQL read are still unplayed).
+
+## 19al. The handoff between the two tools waits on whoever notices (2026-11-07)
+
+- **19al-9. Shipped (2026-11-22): per-area rules split out of `CLAUDE.md` and synced to `.agents/rules/`, plus `Failed:` in the handoff block.** Moved area rules out of `CLAUDE.md` (13,387 → 7,949 bytes) into seven files under `.claude/rules/` (`gpu`, `checks`, `ci`, `plan`, `phone`, `desks-settings`, `server`), added `scripts/syncrules.mjs` (`npm run rules` and `--check` in `scripts/checks.json`'s `logic` shard) to generate `.agents/rules/` with `model_decision` frontmatter under the 24,000-byte per-file cap, updated `AGENTS.md`, `docs/README.md` and `scripts/README.md`, and added `Failed:` to `docs/handoff.md`'s PR handoff block.
