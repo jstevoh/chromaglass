@@ -4,7 +4,7 @@ import type { VisualizerSettings } from '../types';
 import { rideSlot, type SettingRide } from '../lib/ride';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import { type ShowIntervalHandle, clearShowInterval, showNow, showInterval } from '../lib/showClock';
-import { COLOR_HARMONIES } from '../constants';
+import { lockHarmony } from '../lib/picturePalette';
 import { isUserPresetId } from '../lib/userPresets';
 import type { MusicIntelResult } from '../hooks/useMusicIntelligence';
 import type { ScreenLike } from '../hooks/useCastSession';
@@ -204,7 +204,7 @@ export function useWallLook({
     const v = visualizerRef.current;
     // Composed at the wall's shape, letterboxed in the preview as the one engine was.
     v?.setStage(stageRef.current);
-    if (paletteLock != null) v?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
+    if (paletteLock != null) v?.setHarmonyLock(lockHarmony(paletteLock));
     /*
       A saved look's dyes are handed over; a built-in's come from its own
       tables. The plate tables are module constants both engines read, and
