@@ -151,7 +151,7 @@ async function wallChecks(d, label) {
   check('phone: the remote opens on Draw', await page.getByTestId('remote-draw').isVisible().catch(() => false) && !(await page.getByTestId('remote-main').count()));
   check('phone: and is linked', await linked(page));
   check('phone: the phone layout', (await page.getByTestId('remote-draw').getAttribute('data-layout')) === 'phone');
-  check('phone: it names the look', (await page.getByTestId('draw-linked').innerText()).includes('Classic'), await page.getByTestId('draw-linked').innerText());
+  check('phone: it names the look', (await page.getByTestId('draw-linked').innerText()).includes('Lava Pop'), await page.getByTestId('draw-linked').innerText());
   const w = await wallChecks(d, 'phone');
 
   // Sizes and rails.

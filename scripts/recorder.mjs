@@ -24,6 +24,7 @@
  *     hands back an empty file, and the app quietly does not save it: no
  *     download, no error. `AUTOPLAY` is that flag, for `launchChromium`.
  */
+import { untilFlowerFree } from './flowergate.mjs';
 export const AUTOPLAY = '--autoplay-policy=no-user-gesture-required';
 
 /** Before `goto`: the synthesised band plays instead of asking for a microphone. */
@@ -101,6 +102,8 @@ export async function viaPalette(page, query) {
  * from, so a page's own `Date.now()` samples can be placed on the take.
  */
 export async function recordTake(page, seconds, file, cues = []) {
+  // No take of a build that draws the flower (PLAN 31s-8, scripts/flowergate.mjs).
+  await untilFlowerFree({ page });
   await viaPalette(page, 'Record: Plate video');
   const t0 = Date.now();
   const at = s => page.waitForTimeout(Math.max(0, t0 + s * 1000 - Date.now()));

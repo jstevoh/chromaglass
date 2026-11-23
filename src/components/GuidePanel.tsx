@@ -91,10 +91,10 @@ const SECTIONS: Section[] = [
         </P>
         <H>The first two minutes</H>
         <Rows items={[
-          ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Classic Light Show</Em> preset — slow luminous blobs, the meditative 1960s look.</>],
+          ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Lava Pop</Em> preset — round cells of oil in a coloured water, lit from below by the lamp: the 1960s clock-glass dish.</>],
           ['2. Give it sound', <>The quickest is <Em>Band</Em>: a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Mic</Em>, <Em>System</Em> and <Em>File</Em> are the real inputs.</>],
           ['3. Pick a preset palette', <>Click the name under the ChromaGlass title. The preset palettes come in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
-          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw (held still on layer 1 it blows a bubble that grows while you hold, its rim breaking into fingers), <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
+          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> is your breath: drag and it runs along the surface the way you dragged, a long plume ahead of your hand that keeps going that way while you hold; press without moving on layer 1 and it is a straw, one round bubble that grows while you hold, <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
         <H>Your first show, in order</H>
         <P>
@@ -200,8 +200,8 @@ const SECTIONS: Section[] = [
           the dilution: the app picks from it evenly, so the inert entries are how a preset
           says <Em>mostly nothing, once in a while something</Em>.{' '}
           <C>water, water, soap</C> is a plate broken open every third dose;{' '}
-          <C>soap, silicone</C> never stops reacting. Classic Light Show is the first,
-          Lacing Run is the second.
+          <C>soap, silicone</C> (Acid Trip's) never stops reacting. Lava Pop
+          pours <C>oil, water, oil</C>, the two that will not mix.
         </P>
         <P>
           A show that runs itself adds liquid for hours and pours none of it out, so each
@@ -347,7 +347,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Plate Pressure', <>A standing radial spread from the middle, as if the glass were slightly bowed.</>],
           ['Glass Smear', <>Slow wandering of the whole field, the way a plate on a warm projector drifts.</>],
-          ['Rain Drip', <>Occasional downward streaks.</>],
+          ['Rain Drip', <>Heavy colour runs downhill in streaks, as far as the plate is tipped (Gravity). Flat, nothing runs.</>],
           ['Fingering', <>Settings → Show. With it up, a press does not thin evenly: the film thins more along a ring of spokes and the outflow follows them, so the front breaks into radial fingers instead of a smooth ring. The physics is Saffman–Taylor — thin liquid shooting through thick.</>],
         ]} />
         <H>Heat and polarity</H>
@@ -386,7 +386,7 @@ const SECTIONS: Section[] = [
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
           ['Music Sync', <>The camera cuts on kicks. Its punch on the bass, push with the energy and tremor from the treble are the frame moving with the music, so they ride Frame Sway (Show), which is 0 unless you turn it up.</>],
           ['Paint Cells / Cell Size', <>Opt-in, off by default: synthesised cells at magnification, the rings a pour painting makes. No shipped look turns them on.</>],
-          ['Macro Lacing / Edge Detail / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Edge Detail is the fine boundary structure, and Relief the apparent thickness of the film, which is always on.</>],
+          ['Macro Lacing / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Relief is the apparent thickness of the film, which is always on.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],
         ]} />
         <Note>
@@ -495,7 +495,7 @@ const SECTIONS: Section[] = [
         <H>The keyboard</H>
         <Rows items={[
           ['B', <>Blackout — fades the plate down and back. The panic button, and the one to leave your hand near.</>],
-          ['+ / −', <>Macro zoom, 1× to 16×. <C>+</C> with the closeup off turns it on gently at 2×; <C>−</C> never turns it off.</>],
+          ['+ / −', <>Macro zoom, 1× to 16×, the closeup's one control. <C>+</C> from the plate comes in gently; <C>−</C> down to 1× is the whole plate again.</>],
           ['[ / ]', <>Less or more of the tool in hand: the dye a drop lays, the pressure of a press, the wind, the drag, the magnet's pull. Each tool keeps its own <Em>Amount</Em>; 1× is the usual.</>],
           ['Alt-drag', <>In the closeup, pans the camera; <C>Alt</C>-click fixes it on the spot under the pointer. <Em>Hold</Em>, <Em>Follow</Em> and <Em>Auto</Em> on the zoom chip say who moves it.</>],
           ['?', <>This manual.</>],
@@ -507,8 +507,9 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Second display</Em> opens a window on a projector that mirrors this canvas pixel
           for pixel — one render, at the projector's own resolution, with the laptop
-          keeping the controls. <Em>Network display</Em> gives an address any browser on the
-          same Wi-Fi can open. <Em>Chromecast</Em> uses Chrome's own picker.
+          keeping the controls. <Em>Network display</Em> gives an https address any browser on
+          the same Wi-Fi can open; its browser warns once that the connection is not private
+          (Advanced, then Proceed), since the GPU runs only on a secure page. <Em>Chromecast</Em> uses Chrome's own picker.
         </P>
       </>
     ),

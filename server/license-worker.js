@@ -25,6 +25,7 @@ import {
 import { SYNC_PATH, handleSync } from './cloud-sync.js';
 import { TV_PREFIX, handleTv } from './tv-code.js';
 import { addPack, packFields, packForProduct, removePack } from './license-packs.js';
+import { ipKey, takeMemoryTurn } from './turns.js';
 
 const ALLOWED_ORIGINS = [
   /^https:\/\/(www\.)?chromaglass\.art$/,
@@ -654,7 +655,12 @@ async function verifyFirebaseIdToken(idToken, env) {
   if (typeof payload.iat !== 'number' || payload.iat > nowSec + 300) return null;
   if (typeof payload.sub !== 'string' || !payload.sub) return null;
   if (typeof payload.email !== 'string' || !payload.email.includes('@')) return null;
-  if (payload.email_verified === false) return null;
+  // Only an address the token says was proved. This read `=== false`, so a token with no such
+  // claim passed; Google, Apple and password sign-ins always carry it, so nothing reached the
+  // hole, but /keys, /tv/claim and /sync hand out by email and this line is all that keeps a
+  // buyer's keys from an account that merely typed their address (firebase-token.js already
+  // asks for `=== true`; the security review of 2026-11-13).
+  if (payload.email_verified !== true) return null;
 
   const expectedAud = env.FIREBASE_PROJECT_ID || 'chromaglass';
   if (payload.aud && payload.aud !== expectedAud && payload.aud !== 'demo-chromaglass') {
@@ -756,21 +762,48 @@ async function getGoogleJwks(env, kid) {
   return jwksInFlight;
 }
 
-// The address Cloudflare saw the request come from; none outside Cloudflare (the local checks),
-// where there is nobody to count.
+// The address Cloudflare saw the request come from, IPv6 cut to its /64 (server/turns.js);
+// none outside Cloudflare (the local checks), where there is nobody to count.
 function addressOf(request) {
-  return request.headers.get('CF-Connecting-IP') || '';
+  return ipKey(request.headers.get('CF-Connecting-IP') || '');
 }
 
+// The two allowances only a caller holding something can spend, so they stay exact, in KV:
+// a signed key's own asks (`key`, counted after its signature is good) and a signed-in
+// account's wrong TV codes (`tvclaim`). Every other kind is an address's, which anyone can
+// spend, so it is counted in the isolate's memory and writes nothing (server/turns.js, the
+// security review of 2026-11-13: a KV counter on those let one script spend the account's
+// whole day of KV writes and stop the webhook, activations and TV links with it).
+const KV_COUNTED_TURNS = new Set(['key', 'tvclaim']);
+
 /**
- * Takes one of `who`'s asks this hour from the Worker's KV, or returns the seconds until the
- * next hour when they are spent. KV is eventually consistent and takes no atomic add, so two
- * asks in the same instant can both read the same count: the limit is a brake on a script that
- * sends hundreds, not an exact meter. The counter dies with its hour (`expirationTtl`).
+ * Takes one of `who`'s asks this hour, or returns the seconds until the next hour when they
+ * are spent. An address's kinds go to `takeMemoryTurn`; /tv/code, the one of them that files a
+ * record for a stranger, also asks Cloudflare's Rate Limiting binding when the deploy binds one
+ * as `TV_CODE_LIMITER`, which counts across isolates and writes no KV (a binding that throws
+ * leaves the memory count standing rather than shutting the route).
+ *
+ * The KV kinds: KV is eventually consistent and takes no atomic add, so two asks in the same
+ * instant can both read the same count: the limit is a brake on a script that sends hundreds,
+ * not an exact meter. The counter dies with its hour (`expirationTtl`).
  */
 async function takeActivateTurn(request, env, kind, who, limitSetting, fallback) {
   if (!who) return 0;
   const limit = Number(limitSetting) > 0 ? Number(limitSetting) : fallback;
+  if (!KV_COUNTED_TURNS.has(kind)) {
+    const wait = takeMemoryTurn(kind, who, limit);
+    if (wait) return wait;
+    const limiter = kind === 'tvcode' ? env.TV_CODE_LIMITER : null;
+    if (limiter && typeof limiter.limit === 'function') {
+      try {
+        const { success } = await limiter.limit({ key: `${kind}:${who}` });
+        if (!success) return 60;
+      } catch {
+        // The binding is out of reach: the isolate's own count above still holds.
+      }
+    }
+    return 0;
+  }
   const hour = Math.floor(Date.now() / 3_600_000);
   const k = `rl:activate:${kind}:${who}:${hour}`;
   const used = Number(await env.LICENSE_KV.get(k)) || 0;
