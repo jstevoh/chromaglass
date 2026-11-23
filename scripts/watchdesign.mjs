@@ -311,10 +311,16 @@ export function palette(acc, k = 6) {
 /** The palette as a strip, each colour as wide as its share. RGB24, w×h. */
 export function paletteStrip(pal, w = 960, h = 96) {
   const img = Buffer.alloc(w * h * 3);
-  let x0 = 0;
+  // Each edge is placed from the running share, not from the last edge plus this share:
+  // rounding each step on top of the last one drifted a column per colour, and on a
+  // Classic closeup film (shares 0.44, 0.18, 0.17, 0.12, 0.08, 0.0001) the fifth edge
+  // landed at 961 of 960, so the last colour ran backwards and Buffer.set threw past the
+  // end, killing the whole read (47x-3).
+  let x0 = 0, run = 0;
   const tot = pal.reduce((s, p) => s + p.share, 0) || 1;
   pal.forEach((p, i) => {
-    const x1 = i === pal.length - 1 ? w : Math.round(x0 + (p.share / tot) * w);
+    run += p.share;
+    const x1 = i === pal.length - 1 ? w : Math.min(w, Math.round((run / tot) * w));
     for (let y = 0; y < h; y++) for (let x = x0; x < x1; x++) img.set(p.rgb, (y * w + x) * 3);
     x0 = x1;
   });

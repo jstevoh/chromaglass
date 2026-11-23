@@ -33,6 +33,9 @@
  *      every build has settled
  *   9b. and it is still from the page's first frame until then, through
  *      Chromium starting the GPU
+ *   9c. its loading line says what the show is waiting for, in order, counts
+ *      the opening's builds to the last, and never changes its words while a
+ *      render pipeline compiles
  *
  * And it prints how much of the wait it covered: from the first paint to
  * the plate's first step, the share of that time the intro was up.
@@ -156,8 +159,10 @@ async function open(query, { viewport = { width: 1440, height: 900 }, phone = fa
   page.on('pageerror', (e) => console.log(`   page error: ${e.message}`));
   // What the app says of its own opening ("ChromaGlass: …", a warning when
   // the pipelines were not all built ahead), kept to print beside a failure.
+  // A lost device too: its line does not name the app, and a loss rebuilds
+  // the whole setup, the one sign of it from outside (PLAN 14v-12b).
   page.cgSaid = [];
-  page.on('console', (m) => { if (/ChromaGlass/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
+  page.on('console', (m) => { if (/ChromaGlass|device lost/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
   if (slow) {
     const cdp = await context.newCDPSession(page);
     await cdp.send('Network.enable');
@@ -281,7 +286,7 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     // The last of its builds to settle: `builds` is [key, from, ms], tiling
     // the opening's wall time (gpu/prepare.ts, `buildInTurn`).
     const built = p?.builds?.length ? Math.max(...p.builds.map(([, a, ms]) => a + ms)) : null;
-    return { opening: p ? { at: p.at, end: p.at + p.ms, built } : null, stages: all ? all.map((x) => x.stage) : null, debug: d ? Object.keys(d).length : null, pipelines: typeof d?.pipelines };
+    return { opening: p ? { at: p.at, end: p.at + p.ms, built, asked: p.asked, settles: (p.builds ?? []).map(([, a, ms]) => a + ms) } : null, stages: all ? all.map((x) => x.stage) : null, debug: d ? Object.keys(d).length : null, pipelines: typeof d?.pipelines };
   });
   const opening = log.opening;
   if (!opening) console.log(`     no opening to read: ${log.debug ?? 'no'} debug keys, pipelines ${log.pipelines}, prepares ${JSON.stringify(log.stages)}; ${at.renders?.length ?? 0} render compiles seen in all; the app said ${JSON.stringify(page.cgSaid)}`);
@@ -333,6 +338,38 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   check('9b. and it is still from the first frame the page draws until then',
     opening !== null && beforeAsk.length > 0 && early[0][3] === 1 && early.every(([, m, p]) => !m && p >= 4),
     `${early.length} frames up before the opening was built, from frame ${early.length ? early[0][3] : 'none'}, ${early.filter(([, m]) => m).length} of them moving, at least ${pausedLeast} animations paused on each; ${beforeAsk.length} of them before the first was asked (${firstAsk === null ? 'never' : s(firstAsk)}), ${beforeAsk.filter(([, m]) => m).length} moving`);
+  /*
+    The loading line (PLAN.md 14v-12). What was asked (the owner,
+    2026-11-14): on a phone the show took about thirty seconds to start with
+    nothing to say it was getting anywhere; show a loading state while
+    there are no visuals, with updates. Its own record (`introStage`) says
+    what it showed and when: the stages in order (the GPU starting, the
+    builds counted, the first frame coming; "Loading" is the page's own
+    markup and not recorded), the count reaching the last build, and the
+    first frame's words before the plate stepped. And the reason it is built as it is:
+    a new picture while a render pipeline compiles waits in the GPU process
+    behind it on a Mac (line 9 has the runs), so no change of words falls in
+    the render compiles line 9 reads. A run in which no build settled during
+    those compiles would hold back nothing and prove nothing, so some must
+    have (their count is printed, and must be above none).
+  */
+  const said = rec.stages ?? [];
+  const ORDER = ['load', 'gpu', 'build', 'first'];
+  const kinds = said.map(([, k]) => k);
+  const inOrder = kinds.every((k, i) => i === 0 || ORDER.indexOf(k) >= ORDER.indexOf(kinds[i - 1]));
+  const counts = said.filter(([, k]) => k === 'build');
+  const lastCount = counts.length ? counts[counts.length - 1] : null;
+  // The count is a counter and its total is the opening's own list, so
+  // neither can go wrong here; what can is the line never reaching the end
+  // (the last builds settling inside a compile and nothing saying so after).
+  const counted = counts.length > 2 && lastCount !== null && lastCount[2] === lastCount[3];
+  const firstWords = said.find(([, k]) => k === 'first');
+  const beforeStep = !!firstWords && at.steppedAt !== undefined && firstWords[0] <= at.steppedAt + 1;
+  const changedInCompile = said.filter(([t]) => inCompile(t));
+  const heldBack = opening ? opening.settles.filter((t) => inCompile(t)).length : 0;
+  check('9c. its loading line says what the show waits for, counts the opening\'s builds, and holds its words while a render pipeline compiles',
+    inOrder && kinds.includes('gpu') && counted && beforeStep && renders.length > 0 && heldBack > 0 && changedInCompile.length === 0,
+    `${said.length} changes: ${[...new Set(kinds)].join(' → ') || 'none'}; ${counts.length} counts, the last ${lastCount ? `${lastCount[2]} of ${lastCount[3]}` : 'none'} (the opening asked ${opening?.asked ?? '?'}); the first frame's words at ${firstWords ? s(firstWords[0]) : 'never'}, the plate stepped at ${at.steppedAt === undefined ? 'never' : s(at.steppedAt)}; ${changedInCompile.length} changes during the ${renders.length} render compiles, ${heldBack} builds settled during them and held back`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {
@@ -506,4 +543,12 @@ await browser.close();
 server.close();
 const failed = checks.filter((c) => !c.ok).length;
 console.log(failed ? `\n${failed} of ${checks.length} FAILED` : `\nall ${checks.length} ok`);
+// The runner (scripts/checks.mjs) honours a quarantined line (PLAN.md 19ak-1)
+// only when the harness also says how many of its lines passed, in its own
+// words, so a crash after the quarantined line cannot pass for it. This
+// harness never printed that tally, so 19ak-9's quarantine of 9c could never
+// hold: every pull request that ran the browser shard went red on 9c alone
+// (found 2026-11-21 on the webpage films' run). The tally is the same count
+// as the line above, in the form the runner reads.
+console.log(`${checks.length - failed}/${checks.length} checks passed`);
 process.exit(failed ? 1 : 0);

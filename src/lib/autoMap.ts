@@ -215,7 +215,7 @@ export const RIDE_ORDER: (keyof VisualizerSettings)[] = [
  */
 export const ACTION_ORDER: MidiAction[] = [
   'go', 'blackout-toggle', 'tap-tempo', 'cue-next', 'cue-prev', 'revert',
-  'play-toggle', 'automate-toggle', 'macro-toggle', 'lucky',
+  'play-toggle', 'automate-toggle', 'lucky',
   'drain', 'clear', 'seed', 'overlays-toggle', 'record-toggle',
   'seq-play-pause', 'seq-next', 'seq-prev',
   'preset-next', 'preset-prev', 'tempo-clear', 'scene-toggle',
