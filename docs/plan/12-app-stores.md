@@ -198,17 +198,12 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- **12-ctl-1: the songs on the phone (shipped; story in `docs/plan-shipped.md` §12-ctl-1).**
-  A Songs screen one tap from Draw and from Controls: the laptop's set list (tap to arm an item
-  for the next Go) and its song shows (Run, Stop, Follow songs), sent as `RemoteState.setList`
-  and `RemoteState.songs`; `npm run controller` lines `setlist`, `songs`, `display`.
 - **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
   which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
   Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is
   refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
   camera (it opens the show server's own remote in the browser) and the app. *Measure:*
   `controller` line `scan`.
-- ~~**12-ctl-3**~~ *(shipped 2026-11-11)*: the Android app, a Capacitor project beside `ios/`; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
   when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,
@@ -281,15 +276,6 @@ fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs
 App Store Connect record from 12-ship. Size: M, after route 2's first PR, and
 after 12-tv-hls (below).
 
-**12-tv-1: the stream and the `/tv` page (shipped, PR 1 of route 2; story in
-`docs/plan-shipped.md` §12-tv-1).** The show's page sends the wall's canvas to a
-TV on the network as WebRTC video, signalled through the show server's relay
-(`src/lib/tvFeed.ts`, `server/remote-server.js`'s `tv` role); `/tv?key=…` plays it
-with no GPU (`src/components/TvDisplay.tsx`), films while the show is off; Home or
-Pro on the laptop, three TVs at most; `npm run tv`.
-
-What route 2 still needs, found while building 12-tv-1:
-
 - **12-tv-2: the Android TV app, the Bonjour advert and pairing by four digits
   (shipped 2026-11-12, merged with 12-tv-2b after #768 sat green unmerged; story in
   `docs/plan-shipped.md` §12-tv-2).** `androidtv/`
@@ -322,13 +308,6 @@ What route 2 still needs, found while building 12-tv-1:
   its unit tests (every clip carries its credit). Owed by the owner: the upload key
   (one command), then the Play Console steps (create the app, the forms, the TV
   form factor, the first upload by hand).
-- **12-tv-remote: the TV's remote picks the look (shipped 2026-11-12; story in
-  `docs/plan-shipped.md` §12-tv-remote).** Asked 2026-11-12, the TV staying a
-  receiver: right and left play the next and previous preset on the Mac, OK a
-  random one, up, down or Menu the list. The relay lets a TV pick only a preset
-  the laptop listed, one every 0.4 s (`server/tv-remote.js`); the page reads the
-  D-pad (`src/components/TvRemote.tsx`), the app passes on Menu and Back; the
-  phone version is a tap bar. `npm run tvremote`; on a real TV `docs/judging.md` §126.
 - **12-tv-remote-2: more than presets from the remote (S, if asked).** The remote
   picks presets only. The owner's own looks and the set list's songs are the next
   things a sofa might want (the set list's Go is `cue-set-item` on the phone), and
@@ -338,16 +317,34 @@ What route 2 still needs, found while building 12-tv-1:
   could send each bundle to the internal track itself with the Play Developer API
   (a Google Cloud service account the owner adds in Play Console → Users and
   permissions, its JSON as a secret). Shared with 12-ctl-ship's upload job.
+- **12-promo-1: the website in every app (S, built 2026-11-15).** The owner,
+  2026-11-14: "put sufficient advertisements into all of the apps period tv, phone,
+  whatever", pointing at the website "to try more free chromaglass.art visuals", and
+  "Don't point them to purchase". One sentence in all of them, "Try more free visuals
+  at chromaglass.art", with no price, tier or call to buy (which also keeps the store
+  apps clear of steering to purchases outside them). The Google TV app had it from
+  12-tv-2h (start screen, QR corner). The Apple TV app now has it too
+  (`tvos/App/Sources/SiteCorner.swift`): the words beside a QR code for
+  https://chromaglass.art drawn by CoreImage, on the address screen and over the
+  black screen while it looks for the Mac, never over the live picture and not on
+  the sign-in screen, whose own big code would be confused with it. The iPhone and
+  Android phone apps have a tappable link (`src/components/SiteLink.tsx`) in More,
+  on the laptop form and in the app bar over the remote, which Capacitor opens in
+  the system browser (no `allowNavigation` hosts); the website shows none. Check:
+  `npm run applink` (the words, nothing that sells, the TVs' copies the same, the
+  Apple TV corner kept off the live picture; the link in all three places in the
+  app, leaving for the site; none on the website). Unseen: the Apple TV corner on a
+  screen (the tvOS build in `tvos.yml` compiles it), the link opening Safari or
+  Chrome on a real phone (`docs/judging.md` §16).
 - **12-tv-2c: judged on a real TV (S, the owner's eyes).** Side-load the
   workflow's APK on a Google TV, pair it with the Mac app, watch an evening.
   Unseen so far: NsdManager against the advert on a real network, the advert
   beside the Mac's own mDNSResponder (both on udp 5353; it works on Linux in
   the check, and Node Bonjour libraries share the port the same way on macOS),
   and the WebView's WebRTC decode on a TV box. `docs/judging.md` §125; the
-  sample film (12-tv-2b) on the TV too: Back returns to the list, and a Mac
-  starting its show replaces it.
-- ~~**12-tv-2f: the samples are the channel's films; the logo on the loading screen.**~~
-  (shipped 2026-11-14; story in `docs/plan-shipped.md` §12-tv-2f.)
+  sample film (12-tv-2b) on the TV too: the YouTube films play (12-tv-2h), or the
+  site's do when YouTube will not, Back returns to the list, and a Mac starting
+  its show replaces it.
 - **12-tv-2g: the films on storage made for streaming (S, if needed).** 12-tv-2f
   serves the six films from a release of the repository behind the site's
   `/films/` redirect: free, but a release is for downloads, not for streaming to
@@ -383,6 +380,61 @@ What route 2 still needs, found while building 12-tv-1:
   no sound: the music plays where the Mac plays it. Sending the show's audio as a
   second track would keep it in step with the picture (WebRTC syncs the two),
   for a Mac whose music should come out of the TV.
+- **12-tv-loops: six calm half-hour loops for a TV with no Mac (M, built
+  2026-11-15, thread "Make calming 30-minute loops for the TV apps").** The
+  owner, 2026-11-14: "audio free visuals that the appletv and googletv apps can
+  use. like 10 different 30 minute loops that evolve over time and are calming."
+  Films, not something the TV draws: a TV's web view has no WebGPU, tvOS has no
+  web view, and the TV is a receiver (above). Each is the app's own Render a song
+  of one calm look (`src/lib/tvLoops.ts`: Chemical Clock first, then Clock Glass,
+  Aurora Borealis, Jellyfish Bloom, Velvet Underground, Lava Lamp; six, not ten:
+  the owner, 2026-11-15, "Let's stick with 6 loops. We don't need 10"; Classic
+  and Galaxy were made and failed the judge's light line, dimming with nothing
+  heard) with Evolve on and a song of silence, so
+  nothing moves with music and every change is the liquid's or Evolve's slow
+  moves. The loop is an edit of the finished film (the Canvas loop's way, 43b):
+  a minute's warm-up, the half hour, and twenty seconds crossfaded into its
+  start, so it comes round with no seam. H.264 High 4.1, 1080p30, no audio
+  track, on the GitHub pre-release `tv-loops-1`, reached at
+  `https://chromaglass.art/loops/<id>.mp4` (firebase.json's 302). Made on a Mac by
+  `npm run tvloops` (the render hook's new `toDisk`: half an hour is too long to
+  hold in a page) and judged by it: length, no audio, the seam one step across
+  a keyframe, no cut inside, moving every minute, its light and pattern kept;
+  `npm run tvloops -- --controls` shows the judge each fault on films it makes
+  (CI, `sound`). No phone part: the phone is the controller and the loops are
+  for a TV with no show to control.
+- **12-tv-loops-2: the TV apps play them (M, built 2026-11-15, thread "Ship the
+  calm loops in the TV apps").** The owner approved the six, 2026-11-15: "The loops
+  are fine. Ship them." Android TV: "Watch a calm loop" beside "Watch a sample film"
+  on the start screen (one row, so a listed Mac never pushes the help off 540 dp);
+  `Loops.java` is the app's copy of the list, `MainActivity.startLoops()` plays the
+  one played last (the Chemical Clock the first time) in a `VideoView` with
+  `setLooping`, round and round on the file's own crossfaded seam; Left and Right
+  step to another, any key brings the name back, Back is the list. A Mac that turns
+  up does not take over, unlike the sample: a TV that jumped to the show halfway
+  through a calm half hour is not calm, and Back shows the Mac waiting. One loop
+  round and round, not the six in turn: a cut from one liquid to another every half
+  hour is the opposite of what was asked. Apple TV: "Watch a calm loop" on the
+  sign-in and address screens, with no pass (the loops are the website's free
+  films, not the show), `CalmLoops.swift`: `AVQueuePlayer` with `AVPlayerLooper`,
+  muted, the idle timer off while it plays, the same keys (Menu back). That is also
+  12-tv-apple-9's "something for App Review to see". `npm run presskit` holds both
+  copies to `tvLoops.ts` (ids, titles, order, the address) and the site's `/loops/`
+  redirect to the release; `LoopsTest` holds the stepping and the caption. No phone
+  part: the phone is the controller, and the loops are for a TV with no show to
+  control. Not seen yet on a real TV: Android TV build to Play's Internal testing,
+  the Apple TV build goes up with 12-tv-apple-7's TestFlight recipe.
+- **12-tv-loops-2b: the `/tv` page plays them too (S).** Found building 12-tv-loops-2:
+  a browser or a TV's web view on `/tv` with no show still plays the sample films
+  only; its `films` state could offer the loops, muted, from the same list.
+- **12-tv-loops-3: the loops on the channel (S).** The same six files to
+  YouTube as ambient films (uploading is a standing OK), titled by look, so the
+  channel has a long calm film of each.
+- **12-tv-loops-4: Evolve's pace for a half hour (S, after the owner judges the
+  six).** The loops use each look's own Evolve Speed. If a loop reads too busy or
+  too still over half an hour, the fix is a slower or quicker `automateRate` for
+  that loop in `tvLoops.ts` (a field it does not have yet), never a change to the
+  look the show plays.
 
 Progress (2026-11-08): the transport is settled without HLS. LiveKit's
 `webrtc-xcframework` (MIT, a binary Swift package of Google's libwebrtc, tag
@@ -440,10 +492,6 @@ runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
   against the Mac app's own show and the live Worker, then on an Apple TV (judging),
   and sign it with the owner's team for TestFlight once the App Store Connect record
   exists (12-ship).
-
-**~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
-`/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
-§12-tv-signin.** Open from it:
 
 - **12-tv-signin-1, the TVs read it.** The Apple TV app (12-tv-apple) and the
   Google TV shell (route 2) call `/tv/code` and `/tv/poll`, show the code and a QR

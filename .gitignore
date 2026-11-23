@@ -33,6 +33,7 @@ dist-signin-off/
 dist-accountlink/
 dist-tiers/
 dist-landing/
+dist-sitefilms/
 
 # Scratch space for measurement runs (scripts/detail.mjs inputs and outputs).
 scratch/
@@ -54,3 +55,6 @@ server/.show-key
 server/.assistant
 server/.tvs.json
 server/.license.json
+
+# The show server's https certificate (PLAN 14m-https), made on its first launch.
+server/.tls/

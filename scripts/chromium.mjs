@@ -16,6 +16,7 @@
  */
 
 import { existsSync } from 'node:fs';
+import { basename } from 'node:path';
 
 // A harness's port comes with its browser: most import only this file, and a
 // port asked for in scripts/ports.mjs moves with the runner the shard is on,
@@ -24,6 +25,19 @@ export { port, untilServing } from './ports.mjs';
 // And on the owner's Mac, a deploy's shard comes first: a launch waits while
 // one holds the Mac (PLAN.md 19ah-9a, scripts/macdeploy.mjs).
 import { untilMacDeployDone } from './macdeploy.mjs';
+// And one film at a time on the owner's Mac (PLAN.md 19ak-23): after the
+// deploy wait, a harness acquires the FIFO film lock once per process.
+import { acquireFilmLock } from './maclock.mjs';
+
+let filmLockPromise = null;
+function ensureFilmLock() {
+  if (!filmLockPromise) {
+    const script = process.argv[1] ? basename(process.argv[1]) : 'chromium';
+    filmLockPromise = acquireFilmLock({ label: `${script} (${basename(process.cwd())})` })
+      .catch((err) => { filmLockPromise = null; throw err; });
+  }
+  return filmLockPromise;
+}
 
 const SANDBOX = '/opt/pw-browsers/chromium';
 
@@ -159,6 +173,7 @@ export const BASE_ARGS = [
  */
 export async function launchChromium(chromium, { args = [], present = false, ...opts } = {}) {
   await untilMacDeployDone();
+  await ensureFilmLock();
   const executablePath = chromiumPath();
   // Headed wins over a harness's own `headless: true`: it asked to present.
   const display = PRESENTS && (present || !!process.env.PW_PRESENT) ? await virtualDisplay() : null;

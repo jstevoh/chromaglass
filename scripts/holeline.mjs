@@ -63,12 +63,25 @@
  *      own curve through the grade) against main's 43, so SEAM is 6. This
  *      is the one line that would see a line the dial did not scale
  *
- * Printed, not judged: the closeup (2x, centred on the seam, the dial at 1
- * against 0). Up close the colour step is still read, as the closeup's
- * relief (the derive pass's camera branch in wgsl/plate.ts says why it is
- * kept and what was tried in its place), so there a seam between two dyes
- * is still shaded darker and the dial still moves it: PLAN 18e-7, whose
- * build turns these printed numbers into lines.
+ *   6. the closeup (2x, centred on the seam, the dial at 1 against 0), at one
+ *      depth and at depths five times apart: the dial moves no pixel between
+ *      30% and 70% of the frame by more than MAX_MOVE, and at one depth no
+ *      pixel there is darker than the darker dye beside it, or brighter than
+ *      the brighter, by more than SEAM_CLOSE levels. Until PLAN 18e-7 the
+ *      closeup's relief was handed the colour step between two dyes (the
+ *      derive pass's camera branch), so up close the seam stayed: printed
+ *      on main the day it went, the dial moved 87 levels at one depth and
+ *      116 at depths apart. Its relief now reads the optical path
+ *      (camLap, wgsl/plateTransmit.ts; npm run camrelief asks the rest of
+ *      it), and two dyes at one depth make no step in it. At depths apart the
+ *      path does step (the dye's stand-in index), and the soft shadow and
+ *      bright pair it draws there is the relief's, not the dial's, so only
+ *      the dial is asked of it, with the sides shown to be two colours.
+ *   6a. and the relief is drawing in those closeups: against the same
+ *      closeup with Macro Relief at 0, at one depth it moves the seam band
+ *      by no more than MAX_MOVE (no line comes back at any dial) and at
+ *      depths apart by more than RELIEF_LIVE (so the zeros of line 6 are
+ *      the dial's, not a closeup that draws nothing)
  *
  * Not asked here: the back plate. Its painted bright rim (the dye's slope
  * times the dial, refractionOptics note 5, PLAN 18e-1) is kept, drawn on a
@@ -99,8 +112,8 @@
  *      biggest of the three channels) is under MAX_GLOW levels. A mean of
  *      the size of the deviation, not the signed mean, so the lit side's
  *      pale ring and the opposite dark one do not cancel. Pixels near another
- *      hole are left out. The control (CONTROL_AIR: the shader with airNear's
- *      call taken out of the lead layer's normal) must find the glow: over CONTROL_GLOW
+ *      hole are left out. The control (CONTROL_AIR: plateSlope.ts with
+ *      AIR_HELD at 0, so the air is read as dye at zero again) must find the glow: over CONTROL_GLOW
  *      on every hole of 5 cells or more (a hole of 3 or 1.8 cells is smaller
  *      than the relief's own tap, so what the glow is there is printed)
  *   5. the pool's rim into clear liquid keeps its relief: what Edge Relief
@@ -120,25 +133,26 @@ const check = (name, ok, detail = '') => {
 
 const N = 256, SIZE = 768;
 const MOVED = 24, MAX_MOVE = 4, HALO_OUT = 6, RIM_SLACK = 1.5;
-const DIALS = [0.35, 1, 2], LIVE = 3, SEAM = 6, SIDES = 60;
+const DIALS = [0.35, 1, 2], LIVE = 3, SEAM = 6, SIDES = 60, SEAM_CLOSE = 8, RELIEF_LIVE = 5;
 const SIZES = [1.8, 3, 5, 8, 14];
 const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
 
 /*
-  The 33b control: wgsl/plate.ts with the air's mask taken off the lead layer's
-  normal, so the dye's relief is drawn at a hole as it was. As above, the edit
-  is found once or it throws.
+  The 33b control: wgsl/plateSlope.ts with AIR_HELD at 0, so the slope reads a
+  bubble's air as dye fallen to zero and the dye's relief is drawn at a hole as
+  it was before 33b (PLAN 31s-8 moved the air from a mask on the display's
+  normal into the slope itself). As above, the edit is found once or it throws.
 */
 const CONTROL_AIR = {
   name: 'no-air-mask',
   setup(b) {
-    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plate\.ts$/ }, async (a) => {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plateSlope\.ts$/ }, async (a) => {
       const { readFileSync } = await import('node:fs');
       let s = readFileSync(a.path, 'utf8');
-      const cut = 'vec3f(0.0, 0.0, 1.0), airNear(fuv0)';
+      const cut = 'const AIR_HELD: f32 = 1.0;';
       const found = s.split(cut).length - 1;
-      if (found !== 1) throw new Error(`holeline: the air control found ${found} of 1 "${cut}" in wgsl/plate.ts`);
-      s = s.replace(cut, 'vec3f(0.0, 0.0, 1.0), 0.0');
+      if (found !== 1) throw new Error(`holeline: the air control found ${found} of 1 "${cut}" in wgsl/plateSlope.ts`);
+      s = s.replace(cut, 'const AIR_HELD: f32 = 0.0;');
       return { contents: s, loader: 'ts' };
     });
   },
@@ -258,10 +272,10 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
     let close = null;
     if (closeup) {
       const cam = { zoom: 2, macroAmount: 1, cx: 0.5, cy: 0.5 }, lo = Math.ceil(0.3 * W), hi = Math.floor(0.7 * W);
-      const c1 = await shot(1, over, cam), c0 = await shot(0, over, cam);
-      let max = 0;
-      for (let y = lo; y < hi; y++) for (let x = lo; x < hi; x++) max = Math.max(max, moved(c1, c0, x + y * W));
-      close = { ...seam(c1, Math.floor(0.25 * W), Math.floor(0.75 * W), lo, hi, lo, hi), max };
+      const c1 = await shot(1, over, cam), c0 = await shot(0, over, cam), cf = await shot(1, { ...over, macroRelief: 0 }, cam);
+      let max = 0, relief = 0;
+      for (let y = lo; y < hi; y++) for (let x = lo; x < hi; x++) { max = Math.max(max, moved(c1, c0, x + y * W)); relief = Math.max(relief, moved(c1, cf, x + y * W)); }
+      close = { ...seam(c1, Math.floor(0.25 * W), Math.floor(0.75 * W), lo, hi, lo, hi), max, relief };
     }
     return { max: r.max, n: r.n, ...on, close };
   };
@@ -391,7 +405,7 @@ for (const h of now.halo) console.log(`     hole ${h.cells.toFixed(1)} cells: at
 console.log(`     pool rim into water: at most ${now.rim.max} (${now.rim.n} pixels); out of focus the dial moves it ${now.live.toFixed(2)} on average`);
 for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven'], ['near hues, about 0.08 apart', 'near'], ['near hues, about 0.2 apart', 'nearer'], ['one depth, photographed', 'photo']]) {
   const r = now[k];
-  console.log(`     two dyes meeting, ${name}: at most ${r.max} (${r.n} pixels); the seam ${r.dark} darker than the darker dye beside it and ${r.bright} brighter than the brighter, the two sides ${r.sides} apart${r.close ? `; in the closeup (printed, 18e-7) the dial moves at most ${r.close.max}, the seam ${r.close.dark} and ${r.close.bright}, sides ${r.close.sides} apart` : ''}`);
+  console.log(`     two dyes meeting, ${name}: at most ${r.max} (${r.n} pixels); the seam ${r.dark} darker than the darker dye beside it and ${r.bright} brighter than the brighter, the two sides ${r.sides} apart${r.close ? `; in the closeup the dial moves at most ${r.close.max} and the relief ${r.close.relief}, the seam ${r.close.dark} and ${r.close.bright}, sides ${r.close.sides} apart` : ''}`);
 }
 
 // The plates are what they say, before anything is judged on them.
@@ -408,6 +422,13 @@ for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'une
   check(`3. no line where two dyes meet, ${name} (at most ${now[k].max} levels ≤ ${MAX_MOVE})`, now[k].max <= MAX_MOVE);
 }
 check(`3b. the seam is the two dyes' own absorbance (${now.even.dark} levels darker than the darker side, ${now.even.bright} brighter than the brighter, ≤ ${SEAM}; the sides ${now.even.sides} apart > ${SIDES})`, now.even.dark <= SEAM && now.even.bright <= SEAM && now.even.sides > SIDES);
+for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven']]) {
+  check(`6. up close the dial moves nothing where two dyes meet, ${name} (at most ${now[k].close.max} levels ≤ ${MAX_MOVE}; the sides ${now[k].close.sides} apart > ${SIDES})`, now[k].close.max <= MAX_MOVE && now[k].close.sides > SIDES);
+}
+check(`6a. and the relief is drawing there: at one depth it moves the seam ${now.even.close.relief} levels (≤ ${MAX_MOVE}: no step in the path, no line), at depths apart ${now.uneven.close.relief} (> ${RELIEF_LIVE}: the path steps, so a 0 above is the dial's and not a blank closeup)`,
+  now.even.close.relief <= MAX_MOVE && now.uneven.close.relief > RELIEF_LIVE);
+check(`6b. and up close the seam at one depth is the two dyes' own (${now.even.close.dark} levels darker than the darker side, ${now.even.close.bright} brighter than the brighter, ≤ ${SEAM_CLOSE}; the sides ${now.even.close.sides} apart > ${SIDES})`,
+  now.even.close.dark <= SEAM_CLOSE && now.even.close.bright <= SEAM_CLOSE && now.even.close.sides > SIDES);
 
 for (const [name, r] of [['the shader', glowNow], ['the control (no air mask)', glowThen]]) {
   console.log(`   ${name}, the dye ${HOLE_FROM} to ${HOLE_TO} cells past a hole's rim, from the dye ${HOLE_REF} cells out:`);

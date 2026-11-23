@@ -25,12 +25,15 @@ import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
+import { BIREF_NM_PER_STRAIN } from '../lib/polar';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+/** Video Zoom as the plate takes it (PLAN 14ag): its travel, and 1 (as it always landed) for a look saved before it. */
+export const filmZoomOf = (z: number | undefined) => (Number.isFinite(z) ? clamp(z as number, 0.25, 4) : 1);
 
 /**
  * The frame, as the uniforms read it.
@@ -214,6 +217,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
       // Cover-fit: crop whichever axis the frame has too much of.
       const va = v.videoWidth / v.videoHeight, ca = width / height;
       if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
+      // Video Zoom over the cover-fit (PLAN 14ag): 2 shows half the frame's span, 0.5 twice it.
+      const zoom = filmZoomOf(s.filmZoom);
+      filmScaleX /= zoom;
+      filmScaleY /= zoom;
     }
   }
 
@@ -271,7 +278,18 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('sideLight', side * SIDE_RADIANCE);
   pack.set('sideColor', ...sideLampColour(Number.isFinite(s.sideLightHue) ? s.sideLightHue : 30));
   pack.set('sideLamp', ...sideLampPlace(Number.isFinite(s.sideLightAngle) ? s.sideLightAngle : 160));
+  /*
+    Polarised light (PLAN 31p-1; lib/polar.ts). 0, and so out of the beam,
+    for every look saved before it. The analyser's angle is taken mod 180:
+    a polarising sheet turned half round is the same sheet.
+  */
+  pack.set('polariser', Number.isFinite(s.polariser) ? clamp01(s.polariser) : 0);
+  const an = Number.isFinite(s.analyserAngle) ? s.analyserAngle : 90;
+  pack.set('analyserAngle', ((((an % 180) + 180) % 180) * Math.PI) / 180);
+  pack.set('quarterWave', Number.isFinite(s.quarterWave) ? clamp01(s.quarterWave) : 1);
+  pack.set('birefringence', Math.max(0, Number.isFinite(s.birefringence) ? s.birefringence : 0.3) * BIREF_NM_PER_STRAIN);
   pack.set('edgeRelief', s.edgeRelief ?? 0);
+  pack.set('crispEdges', Number.isFinite(s.crispEdges) ? clamp01(s.crispEdges as number) : 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));
   pack.set('transmission', clamp01(s.transmission ?? 1));
@@ -354,7 +372,16 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('spectral', clamp01(s.spectralOptics ?? 0));
     // The photograph has its own ground, the paper, and lays the dye over
     // it as transmission already; the lamp's is the projector's.
-    pack.set('lampGround', !photo && Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0);
+    // A video in the lamp (PLAN 14ag-3) is a picture under the dish, and a
+    // picture under the dish is only seen through the dye: on the black
+    // ground the dye is painted as light and nothing under it shows. So the
+    // video brings the lamp ground up with it, by Film Mix: at 1 the look is
+    // on the lamp (the video, filtered by the dye), at 0 on its own ground,
+    // and a look already on the lamp stays there. Only while a film plays.
+    const ground = Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0;
+    const fm = Number.isFinite(s.filmMix) ? clamp01(s.filmMix as number) : 0.7;
+    const videoLamp = filmOn && pos.film < pos.front ? fm : 0;
+    pack.set('lampGround', !photo ? ground + (1 - ground) * videoLamp : 0);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     // The clear film's dye (PLAN 20b-13): the colour one unit lets through, and the dial.
@@ -368,6 +395,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('soapFilm', Number.isFinite(s.soapFilm) ? clamp01(s.soapFilm) : 0);
     const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
+    // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
+    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? 1 : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they
@@ -412,6 +441,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
     pack.set('filmKey', clamp(s.filmKey ?? 0.18, 0, 0.9));
     pack.set('filmScale', filmScaleX, filmScaleY);
+    pack.set('filmPan', clamp(s.filmX ?? 0, -1, 1), clamp(s.filmY ?? 0, -1, 1));
   }
   {
     const throw1 = view.layer1;

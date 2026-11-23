@@ -79,7 +79,7 @@ itself**:
 What the app keeps where: stream keys in the **macOS Keychain** (`desktop/keys.js`,
 `security` by the app's bundle id), never in `show.json`, the log or the crash report; the
 destination list (name, server, orientation) in userData. The Live Show panel is the Mac
-app's and Pro only (§23's tier gates); the phone's Play screen shows live state and can
+app's, on a Home or Pro licence (§23's tier gates; Pro only until 23.21); the phone's Play screen shows live state and can
 stop the stream (§37x-4's phone version).
 
 ## What the owner does once
@@ -93,7 +93,7 @@ stop the stream (§37x-4's phone version).
 
 ## The Live Show panel (37x-4d, 2026-10-30)
 
-In the Mac app, + Panel → Live Show (Pro). Each destination is added by its platform, a name,
+In the Mac app, + Panel → Live Show (Home and Pro). Each destination is added by its platform, a name,
 its shape and its key; the key goes to the keychain store and the panel shows only that it is
 kept. "For tests" marks the unlisted broadcast Test streams to; Go live streams to every
 destination that is on and not for tests, after a second press that names them. The upload
