@@ -130,6 +130,15 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="edgeRelief"
         />
         <Slider
+          label="Crisp Edges"
+          value={settings.crispEdges ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ crispEdges: v })}
+          settingKey="crispEdges"
+        />
+        <Slider
           label="Projector Focus"
           value={settings.projectorFocus ?? 0.5}
           min={0}
@@ -482,6 +491,9 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
             />
             <Slider label="Film Angle" value={settings.soapFilmAngle ?? 0} min={0} max={70} step={1} onChange={(v: number) => onUpdate({ soapFilmAngle: v })}
               settingKey="soapFilmAngle"
+            />
+            <Slider label="Frame Tilt" value={settings.soapFilmTilt ?? 90} min={0} max={90} step={1} onChange={(v: number) => onUpdate({ soapFilmTilt: v })}
+              settingKey="soapFilmTilt"
             />
           </>
         )}

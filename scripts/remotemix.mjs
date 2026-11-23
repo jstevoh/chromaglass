@@ -76,7 +76,12 @@ const errors = [];
 try {
   const display = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   display.on('pageerror', e => errors.push(`display: ${e.message}`));
-  await display.goto(`${BASE}/?debug&look=classic&dpr=0.35&key=${KEY}`, { waitUntil: 'networkidle' });
+  /*
+    On Comet River, a look of two plates: the Mixer's back row below takes the
+    back plate, and since 38w-1 (#917) Classic is one dish on one plate, so
+    on Classic that row was never drawn and the run timed out waiting for it.
+  */
+  await display.goto(`${BASE}/?debug&look=comet&dpr=0.35&key=${KEY}`, { waitUntil: 'networkidle' });
   const shown = () => display.evaluate(() => window.chromaglassSettings?.());
   for (let i = 0; i < 40 && !(await shown()); i++) await display.waitForTimeout(250);
 

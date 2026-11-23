@@ -15,6 +15,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
   to the dish's and the rings shift. 0 leaves the look as it was.
 
+### Added — Soap Film's big swirls and Frame Tilt (PLAN 32k, 32h, 32d-1)
+
+- Soap Film folds into big marbled swirls: the film's large motions run while its small patches
+  crawl (its surface viscosity against the air's drag), and the air over it is a fluid of its own
+  that the plate's flow and the film's plumes set turning.
+- Frame Tilt (Settings → Camera with Soap Film up, MIDI, the phone): how the frame is held. 90
+  hangs it (the default, today's film), so gravity drains it into level bands; toward 0 it lies
+  flat and keeps its swirls. The look Soap Film holds it at 12°.
+
+### Removed — the Close-up button; the Macro Zoom is the way in and out (PLAN QA-32c)
+
+- The **Close-up** button on the desk, the side rail's **Macro**, the remote's Closeup switch,
+  the palette's "Macro closeup", the **Macro** pad action and the gamepad's R3 are gone. Push
+  the **Macro Zoom** up to come in (it still lands on the nearest liquid) and down to 1× for
+  the whole plate. On the phone the microscope opens the Macro Zoom slider, and the side rail
+  has a Zoom slider where its Macro button was.
+- A controller's factory map keeps every button where it was: the pad that was Macro is Tap
+  Tempo (Watch the Room on the APC40).
+
+### Added — the music shakes the dish into Faraday waves (PLAN 48f)
+
+- **Shaker** and **Shake** (`faradayHz`, `faraday`, Settings → Tilt & Rock under Plate Rock; MIDI,
+  the desks, the remote and the phone's Sound sheet), and **Music Shake** on the phone (on the
+  desk, the cord in Patches): the dish sat on a speaker at a frequency, shaken at a peak
+  acceleration in g, with the music's bass on Shake through a cord. Past the water's threshold
+  the surface stands up in a standing lattice at half the speaker's frequency, its cells the
+  water's own wavelength (36 mm at 10 Hz, 11 mm at 40, 4 mm at 150), growing as the bass swells
+  and ringing down as it fades, drawn by the lamp's light through the wavy surface. Its own
+  solver (src/gpu/faraday.ts): the Mathieu equation's growth exact in Fourier space. Off in
+  every look until turned on. `npm run faraday`.
+
+### Added — Crisp Edges (PLAN 38w-15)
+
+- **Crisp Edges** (Settings → Look) draws the oil/water rim one pixel wide instead of the solver's band;
+  Classic uses it, with a denser crowd of smaller cells laid at the solver's own grid.
+
+### Changed — three drawn stand-ins made physical (PLAN 38u-7, 38u-12, 38u-14)
+
+- **Rain Drip** needs the plate tipped (Gravity): the weight along a plate is g sin θ, nothing on a
+  level one. Seven looks that lean on it now sit on a plate tipped about 15 degrees;
+  Velvet Underground on one tipped about 3 degrees, so its pools stay pools and still drift.
+- **A clear oil drop** is drawn with the same dark ring as in dyed liquid (it was a third of it);
+  the clear oil's tint fades over the meniscus.
+- **Polarity** pushes unlike colours apart the same everywhere; a noise had pulled them together in patches.
 ### Added — Polarised light (PLAN 31p-1)
 
 - **Polarisers** (Settings → Lamp & Light, MIDI, the desks and the phone): sheets under the
