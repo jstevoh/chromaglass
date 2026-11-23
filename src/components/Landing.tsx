@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
+import { SiteFilms, anyFilmOpens } from './LandingFilms';
 import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /*
  * The channel the looks are filmed for (PLAN 34a-8). The owner asked, on
  * 2026-11-08, for the homepage to point at it: six films went public that day,
- * each a look played to a 1920s record, and a visitor deciding whether to press
+ * each a look played to a 1920s record (modern ambient music since 2026-11-21,
+ * PLAN 34a-6d), and a visitor deciding whether to press
  * Play free learns more from a minute of the plate moving to music than from
  * any still on this page. The handle, not a channel id, so the link reads as
  * what it is if someone copies it. It sits in the header, beside Sign in, so a
@@ -122,13 +124,14 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
   {
     id: 'home',
     name: 'Home',
-    price: '$35',
+    price: '$29',
     buy: CHECKOUT_HOME_URL,
     lines: [
       'Full-length recording, 1080p and 4K render, no mark',
       'Phone remote',
       'Song ID with timed lyrics',
       'Your own logo on the glass',
+      'Live Show: stream to YouTube, Twitch and the rest',
       'The Mac app: the show offline, the phone remote built in',
     ],
   },
@@ -253,7 +256,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             Free in your browser for good, nothing to install. You sign in once with Google, Apple, an emailed link or a password.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
-            Home $35 · Pro $199 · pay once, no subscription
+            Home $29 · Pro $199 · pay once, no subscription
           </p>
         </div>
       </section>
@@ -291,8 +294,18 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           className="mt-6 inline-flex min-h-[44px] items-center gap-2.5 text-[15px] text-text-2 underline-offset-4 transition-colors hover:text-text hover:underline"
         >
           <YouTubeMark className="h-[17px] w-[24px] shrink-0" />
-          Watch the looks move to 1920s records on our YouTube channel
+          Watch the looks move to music on our YouTube channel
         </a>
+      </section>
+
+      {/* Films: six pieces of modern ambient music, each played whole by a look (LandingFilms.tsx, PLAN.md 34a-6, 34a-6d). */}
+      <section id="films" className="mx-auto w-full max-w-[1120px] px-4 pb-16 sm:px-8 sm:pb-24">
+        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Six pieces of ambient music</h2>
+        <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
+          The app listening to six pieces by the composer Scott Buckley and playing each from the first note to the last, with nothing added afterwards.
+          The music is his, under CC BY 4.0.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
+        </p>
+        <SiteFilms />
       </section>
 
       {/* How it works */}
@@ -317,7 +330,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
           The whole plate is free in your browser, and it stays free: this is not a trial. Home and Pro add the Mac app and what a show needs:
           full-length recordings with no mark, the phone remote, OSC and Art-Net for a rig. Pay once, no subscription. Start with Home and move to
-          Pro later for the $164 difference. The store opens in a new tab: buy with the email you will sign in with, so the app finds your licence.
+          Pro later for the $170 difference. The store opens in a new tab: buy with the email you will sign in with, so the app finds your licence.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {TIERS.map((t) => (

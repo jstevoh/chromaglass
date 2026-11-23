@@ -44,7 +44,7 @@ export type MidiAction =
    * drop where the whole wall turns back on itself, and a moment wants a pad.
    */
   | 'spin-reverse' | 'spin-auto'
-  | 'play-toggle' | 'automate-toggle' | 'overlays-toggle' | 'macro-toggle'
+  | 'play-toggle' | 'automate-toggle' | 'overlays-toggle'
   | 'seq-play-pause' | 'seq-next' | 'seq-prev' | 'seq-stop'
   | 'preset-next' | 'preset-prev'
   /** The house lights: fade the plate to black and back. */
@@ -262,7 +262,7 @@ export interface SoundBinding {
 const NOT_ON_A_BEAT: ReadonlySet<MidiAction> = new Set<MidiAction>([
   // Toggles: every one in the action list.
   'record-toggle', 'performance-toggle', 'scene-toggle', 'play-toggle', 'overlays-toggle',
-  'blackout-toggle', 'automate-toggle', 'macro-toggle', 'seq-play-pause',
+  'blackout-toggle', 'automate-toggle', 'seq-play-pause',
   // Not toggles, and still not a drum's to press.
   'tap-tempo', 'tempo-clear', 'bank-next', 'bank-prev',
   // The mixer's order: on a kick it would reshuffle the stack every beat.
@@ -315,6 +315,8 @@ const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', '
   'frameSway',
   // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
   'slosh',
+  // So are the Tilt knobs: a kick routed to them would be the sound tipping the plate (lib/handTilt.ts).
+  'plateTiltX', 'plateTiltY',
   // Tank is whether the picture is a tank or the dish (PLAN 47n): the whole frame, never the beat's (sceneMap NOT_A_TARGET).
   'tank',
   ...FADE_CONTROLS.map(c => String(c.key))]);
@@ -475,7 +477,7 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'seed': 'Seed', 'clear': 'Clear', 'drain': 'Drain', 'lucky': 'Randomise',
   'spin-front': 'Spin Front Plate', 'spin-back': 'Spin Back Plate',
   'spin-reverse': 'Reverse Spin', 'spin-auto': 'Auto Spin: Next',
-  'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
+  'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
   'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record a Take',
@@ -536,6 +538,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
   { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
+  // A hand's tip of the flat plate, on two knobs (lib/handTilt.ts, PLAN 18a-13m): the middle is level.
+  { key: 'plateTiltX',      label: 'Tilt Left/Right',  min: -1, max: 1 },
+  { key: 'plateTiltY',      label: 'Tilt Up/Down',     min: -1, max: 1 },
   { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 4, curve: 1.5, wanderSpan: 1.5 },
   { key: 'melodyWalk',      label: 'Melody Walk',      min: 0, max: 2, wanderSpan: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
@@ -549,6 +554,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
+  { key: 'crispEdges',      label: 'Crisp Edges',      min: 0, max: 1 },
   { key: 'projectorFocus',  label: 'Projector Focus',  min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
   // The Roy look's own: the plate printed as a comic, a knob to print it by.
@@ -602,6 +608,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // ride between a verse and a chorus.
   { key: 'filmDrive',       label: 'Film Drive',       min: 0, max: 1 },
   { key: 'filmImpact',      label: 'Film Impact',      min: 0, max: 1 },
+  // The video framed by hand mid-show (PLAN 14ag): a knob to push in on a
+  // face, two to slide a 4:3 reel or a portrait phone clip where it reads.
+  { key: 'filmZoom',        label: 'Video Zoom',       min: 0.25, max: 4 },
+  { key: 'filmX',           label: 'Video Across',     min: -1, max: 1 },
+  { key: 'filmY',           label: 'Video Up',         min: -1, max: 1 },
   { key: 'soundImpact',     label: 'Sound Impact',     min: 0, max: 1 },
   // The fourth master, over the LFOs and envelopes. It had a setting and a
   // reader and no control anywhere, so a shape patch could not be pulled down
@@ -628,6 +639,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'soapFilm',        label: 'Soap Film',        min: 0, max: 1 },
   { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
   { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
+  { key: 'soapFilmTilt',    label: 'Frame Tilt',       min: 0, max: 90 },
   // Glitter in the liquid and the lens photographing it (PLAN 47e, 47d): a
   // fader for how much, and the f-number on a curve, so the knob's travel
   // spends as long on the wide-open discs as on the stopped-down stars.
@@ -637,12 +649,22 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'sideLight',       label: 'Side Light',       min: 0, max: 1 },
   { key: 'sideLightHue',    label: 'Side Colour',      min: 0, max: 360 },
   { key: 'sideLightAngle',  label: 'Side Angle',       min: 0, max: 360 },
+  // Polarised light (PLAN 31p-1): the sheets in or out, the analyser's turn (a knob swept
+  // from crossed to parallel swings every colour to its complement), and how hard the
+  // liquid's stretch turns the light.
+  { key: 'polariser',       label: 'Polarisers',       min: 0, max: 1 },
+  { key: 'analyserAngle',   label: 'Analyser',         min: 0, max: 180 },
+  { key: 'quarterWave',     label: 'Quarter Wave',     min: 0, max: 1 },
+  { key: 'birefringence',   label: 'Birefringence',    min: 0, max: 1 },
   { key: 'tank',            label: 'Tank',             min: 0, max: 1 },
   { key: 'tankFeed',        label: 'Feed',             min: 0, max: 6 },
   { key: 'tankWeight',      label: 'Dye Weight %',     min: 0.05, max: 3 },
   { key: 'tankNozzle',      label: 'Nozzle',           min: 0, max: 1 },
   { key: 'tankDrain',       label: 'Drain',            min: 0, max: 1 },
   { key: 'tankHue',         label: 'Glow Hue',         min: 0, max: 360 },
+  // The dish on a speaker (PLAN 48f): the drive's frequency, and its shake in g, which the music's cord rides.
+  { key: 'faradayHz',       label: 'Shaker',           min: 0, max: 150 },
+  { key: 'faraday',         label: 'Shake',            min: 0, max: 2 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
@@ -1059,7 +1081,9 @@ export function apcMiniMk2Map(presetIds: string[]): MidiMap {
   const scenes: MidiAction[] = ['seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop', 'seed', 'drain', 'clear', 'lucky'];
   scenes.forEach((a, i) => b.push(bind(note(112 + i), { kind: 'action', action: a })));
   // Track buttons: toggles.
-  const tracks: MidiAction[] = ['play-toggle', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'preset-prev', 'preset-next'];
+  // The third was Macro, the closeup's on/off; the closeup is the Macro Zoom
+  // alone now (PLAN QA-32c), and a pad keeps its place with Tap Tempo on it.
+  const tracks: MidiAction[] = ['play-toggle', 'automate-toggle', 'tap-tempo', 'overlays-toggle', 'preset-prev', 'preset-next'];
   tracks.forEach((a, i) => b.push(bind(note(100 + i), { kind: 'action', action: a })));
   // Faders.
   const faders: (keyof VisualizerSettings)[] = ['audioImpact', 'automateRate', 'globalSpeed', 'dyeBudget', 'turbulenceScale', 'plateRock', 'bubbles', 'saturationBoost', 'camera'];
@@ -1077,7 +1101,7 @@ export function nanoKontrol2Map(): MidiMap {
   // S buttons (CC 32–39): actions; M buttons (48–55): toggles.
   const s: MidiAction[] = ['seed', 'clear', 'drain', 'lucky', 'seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop'];
   s.forEach((a, i) => b.push(bind(cc(32 + i), { kind: 'action', action: a })));
-  const m: MidiAction[] = ['play-toggle', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'preset-prev', 'preset-next'];
+  const m: MidiAction[] = ['play-toggle', 'automate-toggle', 'tap-tempo', 'overlays-toggle', 'preset-prev', 'preset-next'];
   m.forEach((a, i) => b.push(bind(cc(48 + i), { kind: 'action', action: a })));
   // Transport: play 41, stop 42, prev track 58, next track 59.
   b.push(bind(cc(41), { kind: 'action', action: 'seq-play-pause' }));
@@ -1129,7 +1153,9 @@ export function apc40Mk2Map(presetIds: string[]): MidiMap {
   b.push(bind(note(80), { kind: 'action', action: 'drain' }));
   b.push(bind(note(81), { kind: 'action', action: 'clear' }));
   // Clip stop buttons (note 52 on channels 1–8): Seed and the toggles.
-  const stops: MidiAction[] = ['seed', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'revert'];
+  // The third was Macro, the closeup's on/off; the closeup is the Macro Zoom
+  // alone now (PLAN QA-32c), so the pad watches the room instead.
+  const stops: MidiAction[] = ['seed', 'automate-toggle', 'scene-toggle', 'overlays-toggle', 'revert'];
   stops.forEach((a, ch) => b.push(bind(note(52, ch), { kind: 'action', action: a })));
   b.push(bind(note(91), { kind: 'action', action: 'play-toggle' }));     // play
   b.push(bind(note(92), { kind: 'action', action: 'blackout-toggle' })); // stop
@@ -1175,7 +1201,7 @@ export function launchpadMap(presetIds: string[]): MidiMap {
   for (let i = 0; i < 8; i++) b.push(bind(note(10 + 1 + i), { kind: 'dye', paletteIndex: 8 + i }));
   const top: MidiAction[] = ['seed', 'drain', 'clear', 'lucky', 'seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop'];
   top.forEach((a, i) => b.push(bind(cc(91 + i), { kind: 'action', action: a })));
-  const side: MidiAction[] = ['play-toggle', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'blackout-toggle', 'record-toggle', 'preset-prev', 'preset-next'];
+  const side: MidiAction[] = ['play-toggle', 'automate-toggle', 'tap-tempo', 'overlays-toggle', 'blackout-toggle', 'record-toggle', 'preset-prev', 'preset-next'];
   side.forEach((a, i) => b.push(bind(cc(89 - 10 * i), { kind: 'action', action: a })));
   return { format: MIDI_FORMAT, version: 1, name: 'Launchpad', device: 'Launchpad Mini mk3 / X (programmer mode)', bindings: b };
 }
@@ -1197,7 +1223,7 @@ export function launchControlXlMap(): MidiMap {
   row3.forEach((k, i) => b.push(bind(cc(49 + i), setting(k))));
   const focus: MidiAction[] = ['seed', 'drain', 'clear', 'lucky', 'seq-play-pause', 'seq-prev', 'seq-next', 'seq-stop'];
   [41, 42, 43, 44, 57, 58, 59, 60].forEach((n, i) => b.push(bind(note(n), { kind: 'action', action: focus[i] })));
-  const control: MidiAction[] = ['play-toggle', 'automate-toggle', 'macro-toggle', 'overlays-toggle', 'blackout-toggle', 'record-toggle', 'preset-prev', 'preset-next'];
+  const control: MidiAction[] = ['play-toggle', 'automate-toggle', 'tap-tempo', 'overlays-toggle', 'blackout-toggle', 'record-toggle', 'preset-prev', 'preset-next'];
   [73, 74, 75, 76, 89, 90, 91, 92].forEach((n, i) => b.push(bind(note(n), { kind: 'action', action: control[i] })));
   return { format: MIDI_FORMAT, version: 1, name: 'Launch Control XL', device: 'Launch Control XL', bindings: b };
 }
@@ -1281,6 +1307,14 @@ const KNOB_CCS: Record<FactoryMapId, (s: MidiSource) => boolean> = {
  * takes a row of its own at the top of the panel. A fader is drawn as a slider
  * only where a profile knows it is one. The Rides strip is unaffected: it
  * draws every control as a fader whatever it is learned to.
+ *
+ * And then the desk stopped drawing by it (PLAN 8d-3, the owner, 2026-11-22):
+ * the APC mini mk2's factory map rides Bubbles and Saturation on faders, so
+ * the Recipe drew those two as sliders among its knobs, the same fault from
+ * another door. A panel's kind of control is now the panel's (`ControlGrid`
+ * in `desk/DeskPanels.tsx`, `npm run panelkinds`). This still says which of
+ * a profiled board's CCs are faders, for the controller's picture and learn
+ * (8d-2), and nothing on the desk asks it.
  */
 export function controlKindOf(map: MidiMap | null | undefined, key: keyof VisualizerSettings, inputName?: string | null): 'fader' | 'encoder' | null {
   const b = map?.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);

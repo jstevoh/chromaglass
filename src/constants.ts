@@ -40,7 +40,14 @@ export const PALETTE = [
 export const DROPPER_COLORS = PALETTE.map(c => c.hex);
 
 // RGB-only list for the fluid simulation (avoids re-parsing hex every frame).
-export const PALETTE_RGB = PALETTE.map(({ r, g, b }) => ({ r, g, b }));
+// After the 24 named dyes come four slots for a picture's own colours (PLAN
+// 43d): written only by lib/picturePalette.ts `setPictureDyes`, read like any
+// dye by an index. They are not named dyes, so PALETTE and its count are not
+// theirs, and a mid grey until a picture is read.
+export const PALETTE_RGB: { r: number; g: number; b: number }[] = [
+  ...PALETTE.map(({ r, g, b }) => ({ r, g, b })),
+  ...Array.from({ length: 4 }, () => ({ r: 0.5, g: 0.5, b: 0.5 })),
+];
 
 // ── Color harmonies ──────────────────────────────────────────────────
 // Curated sets of 3-5 complementary colors from the palette.

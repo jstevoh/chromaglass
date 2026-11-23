@@ -6,6 +6,7 @@ import { CAST_CHANNEL, type CastMessage, type CastState } from '../lib/castProto
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { LOCKUP_URL } from '../brand';
+import { setPictureDyes } from '../lib/picturePalette';
 
 /**
  * The cast receiver: the show on the second screen.
@@ -376,6 +377,7 @@ function CastReceiver() {
       lastPresetSeq.current = state.presetSeq;
       visualizerRef.current?.applyPreset(state.presetId);
     }
+    if (state.pictureDyes) setPictureDyes(state.pictureDyes);
     visualizerRef.current?.setHarmonyLock(state.harmonyLock);
   }, [state]);
 

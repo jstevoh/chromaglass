@@ -70,6 +70,22 @@
  *      bottom tenth and has no step at 0.1; and the frame hands the dial
  *      and the band to the motor apart (read from its source, as `npm run
  *      backplate` reads the plate's own motor).
+ *  16. on a thin gap each layer's spin drags with the liquid its thin solve
+ *      drags with (PLAN 38v-4): spinNu is the Thickness dial's 10^(3t)
+ *      mm²/s, not the Viscosity word's, and spinTau is that liquid's
+ *      h²/12ν at the 2 mm gap, read from the real step's lastStep;
+ *  17. and under its own glass: each layer's spinDrag gives the τ of its
+ *      own cover gap (one at 1.5 mm, one at 3 mm), and the frame loop's lag
+ *      for layer l is layer l's, not Layer 0's (read from its source).
+ *
+ * Owed lines. A line for work not built yet is named by its plan id and
+ * passed in as `--owed=<ids>` on the run line in scripts/checks.json. An
+ * owed line prints " owed" while the code is still in main's state (a
+ * state worked out from something the build changes: a missing method, a
+ * value read off the step that equals the old wrong one), fails loudly if
+ * it passes ("no longer owed: take the id out") so the run line is kept
+ * honest, and fails if the build has moved off main's state and still
+ * misses. An unknown id is a FAIL, so a typo cannot excuse a line.
  */
 import {
   AutoSpin, SpinHand, SPIN_RATE, SPIN_TEMPO, SPIN_OFF, WATER_NU, THICK_NU, OIL_NU,
@@ -83,6 +99,18 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol * Math.abs(b);
+
+const IDS = ['38v-4'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice(7).split(',').filter(Boolean) : []);
+for (const id of owed) if (!IDS.includes(id)) check(`--owed names ${id}, which no line here carries`, false, `known: ${IDS.join(', ')}`);
+// One line of an item: an ordinary check when the item is not owed; when it is, " owed" only while main's state holds.
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(`${name} (${id})`, ok, detail);
+  if (ok) return check(`${name} (${id})`, false, `no longer owed: take ${id} out of --owed — ${detail}`);
+  if (!mainState) return check(`${name} (${id})`, false, `built and misses — ${detail}`);
+  console.log(` owed  ${name} (${id}) — ${detail}`);
+};
 
 // 1
 const tw = dragSeconds(WATER_NU), tt = dragSeconds(THICK_NU), to = dragSeconds(OIL_NU);
@@ -439,6 +467,133 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
     && /const motorRate = lookMotorRate\(asked\)/.test(code) && !/\btwist\b/.test(code)
     && begin > 0 && band > begin && ways.length === 4 && ways.every((w) => allowed.includes(w)),
     `motorWay set ${ways.length} times: ${ways.join(' · ')}`);
+}
+
+// 16 and 17: each layer's spin on its own liquid and its own glass (PLAN 38v-4)
+{
+  /*
+    What the audit found (PLAN 38v-4, from RS-50). The spin's drag is the
+    gap's, k = 12ν/h², and its lag behind the glass is τ = h²/12ν: both are
+    the one liquid in the one gap the thin solve drags with. The step took
+    the spin's ν from the look's Viscosity *word* (carrierViscosity: water,
+    1 mm²/s, or the thick liquid, 20 mm²/s) while the thin solve, on every
+    look since Thin Gap went on everywhere, drags with the Thickness dial's
+    ν, 10^(3t) mm²/s, 22.4 mm²/s at the default 0.45. Nine 'thin' looks
+    run on that: water's 1 mm²/s against 22.4, so a lag 22 times too long
+    and a swirl 22 times too free. And the frame loop worked every layer's
+    lag out at Layer 0's cover gap, so a second plate under a heavier or
+    lighter glass lagged at the first one's.
+
+    The law, worked here from the dial and the millimetres and not from the
+    code's own functions (a build that changed both the same wrong way
+    would otherwise pass):
+
+        ν(t) = 10⁻⁶ · 10^(3t) m²/s        (water at 0, glycerine at 1)
+        τ    = h² / (12 ν)                  (plane Poiseuille drag between two glasses)
+
+    The step is the real FluidSimulation's on its CPU path, bundled here as
+    `npm run musicstir` bundles it, so what is read is the spinNu and
+    spinTau the GPU is handed (lastStep), not a function the step might not
+    call. Two layers that differ in word and dial both ways round, and no
+    dial at 0, where water's 1 mm²/s is the word's too and a step reading
+    the word would pass by coincidence.
+
+    A build that only imitates this cannot pass it: a spinNu scaled to look
+    right on the default look misses the second layer's dial; a τ fixed
+    for the dial but at the rest gap misses line 17's glasses; and a frame
+    loop still reading Layer 0 is read off its source (node never runs the
+    frame loop, as `npm run musicstir` says of its side doors).
+
+    The API the build adds (named here, so the line below can call it):
+
+        FluidSimulation.prototype.spinDrag(settings: VisualizerSettings)
+          → { nu: number, gap: number, tau: number }
+
+      nu  m²/s, the liquid the thin solve drags with on a thin gap
+          (thinGapViscosity(settings.gapThickness)), the word's
+          (carrierViscosity) with Thin Gap off;
+      gap metres, this layer's own cover gap (this.gpu.coverMetres; the
+          2 mm rest gap with no solver attached);
+      tau seconds, gap² / (12 nu).
+
+    deriveStep's spinNu and spinTau are its nu and tau, and the frame
+    loop's dishFrame for layer l takes fluidsRef.current[l].spinDrag(...).tau.
+  */
+  globalThis.GPUTextureUsage = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+  globalThis.GPUBufferUsage = { MAP_READ: 1, MAP_WRITE: 2, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256, QUERY_RESOLVE: 512 };
+  globalThis.GPUMapMode = { READ: 1, WRITE: 2 };
+  globalThis.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+  const { build } = await import('esbuild');
+  const { pathToFileURL } = await import('node:url');
+  const out = 'node_modules/.cache/turntable-sim.mjs';
+  await build({
+    stdin: {
+      contents: "export { FluidSimulation } from './src/sim/fluidSimulation';\nexport { DEFAULT_SETTINGS } from './src/types';",
+      resolveDir: process.cwd(), loader: 'ts',
+    },
+    bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'warning',
+  });
+  const { FluidSimulation, DEFAULT_SETTINGS } = await import(pathToFileURL(`${process.cwd()}/${out}`).href);
+  const nuOf = (t) => 1e-6 * 10 ** (3 * t);          // the Thickness dial, m²/s
+  const tauOf = (h, nu) => (h * h) / (12 * nu);      // h in metres
+  const H = 0.002;                                   // the sandwich's rest gap (PLAN 38r)
+  const WORD = { thin: 1e-6, thick: 2e-5 };          // what the Viscosity word asked for
+  const noise = (x, y) => Math.sin(x * 1.7 + 0.3) * Math.cos(y * 1.3 - 0.8);
+  const layers = [
+    { viscosity: 'thin', gapThickness: 0.45 },       // the default dial under a 'thin' look: the nine looks' case
+    { viscosity: 'thick', gapThickness: 0.15 },      // a thick word over a thin dial: the mismatch the other way
+  ];
+  const stepped = layers.map((o, l) => {
+    const sim = new FluidSimulation(48, 0, 0, 0.1);
+    sim.layerIndex = l;
+    const s = { ...DEFAULT_SETTINGS, ...o, thinGap: 1, layerCount: 2 };
+    sim.step(s, 0, noise);
+    return { sim, s, o, p: sim.lastStep };
+  });
+  const nuOk = stepped.every(({ o, p }) => p && p.thinGap > 0 && near(p.spinNu, nuOf(o.gapThickness), 1e-9));
+  const nuWord = stepped.every(({ o, p }) => p && p.spinNu === WORD[o.viscosity]);
+  line('38v-4', 'on a thin gap each layer\'s spin reads the liquid its thin solve drags with: spinNu = 10^(3t) mm²/s',
+    nuOk, stepped.map(({ o, p }) => `${o.viscosity} at Thickness ${o.gapThickness}: ${p ? (p.spinNu * 1e6).toFixed(2) : 'no step'} mm²/s, the dial's ${(nuOf(o.gapThickness) * 1e6).toFixed(2)}`).join('; '), nuWord);
+  const tauOk = stepped.every(({ o, p }) => p && near(p.spinTau, tauOf(H, nuOf(o.gapThickness)), 1e-6));
+  const tauWord = stepped.every(({ o, p }) => p && near(p.spinTau, tauOf(H, WORD[o.viscosity]), 1e-6));
+  line('38v-4', 'and its lag is that liquid\'s at the 2 mm gap: spinTau = h²/12ν',
+    tauOk, stepped.map(({ o, p }) => `${o.viscosity}: ${p ? (p.spinTau * 1000).toFixed(1) : 'n/a'} ms, h²/12ν ${(tauOf(H, nuOf(o.gapThickness)) * 1000).toFixed(1)} ms`).join('; '), tauWord);
+
+  /*
+    17. Each layer its own glass. The cover's gap is the solver's
+    (gpu.coverMetres, lib/cover.ts settling the glass on its liquid), so a
+    layer stands in for its solver with only the two numbers the gap is
+    read by, one glass at 1.5 mm and the other at 3 mm. Neither is the rest
+    gap, so a spinDrag that ignores the glass misses both.
+  */
+  const glasses = [0.0015, 0.003];
+  const has = stepped.every(({ sim }) => typeof sim.spinDrag === 'function');
+  let dragOk = has;
+  const told = [];
+  for (let l = 0; l < stepped.length && has; l++) {
+    const { sim, s, o } = stepped[l];
+    const h = glasses[l];
+    const was = sim.gpu;
+    sim.gpu = { coverMetres: h, coverUnits: h / (H / 0.03) };
+    let d = null;
+    try { d = sim.spinDrag(s); } catch (e) { told.push(`layer ${l} threw ${e.message}`); }
+    sim.gpu = was;
+    const want = tauOf(h, nuOf(o.gapThickness));
+    const good = !!d && near(d.nu, nuOf(o.gapThickness), 1e-9) && near(d.gap, h, 1e-9) && near(d.tau, want, 1e-6);
+    dragOk &&= good;
+    told.push(`layer ${l} under ${h * 1000} mm: ${d ? `${(d.tau * 1000).toFixed(2)} ms` : 'nothing'}, h²/12ν ${(want * 1000).toFixed(2)} ms`);
+  }
+  line('38v-4', 'each layer reads its own glass: spinDrag gives each layer the τ of its own cover gap',
+    dragOk, has ? told.join('; ') : 'no spinDrag on the layer (the API this line names)', !has);
+  const viz = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  // The statement the frame loop's dishFrame takes its lag from: from the last `const tau =` before it.
+  const at = viz.indexOf('dishFrame(spinVelRef.current[l]');
+  const from = viz.lastIndexOf('const tau =', at), stmt = from >= 0 && at > from ? viz.slice(from, viz.indexOf(';', from) + 1) : '';
+  const loopOk = /fluidsRef\.current\[l\]\??\.spinDrag\(/.test(stmt) && !/fluidsRef\.current\[0\]/.test(stmt) && !/carrierViscosity/.test(stmt);
+  const loopMain = /fluidsRef\.current\[0\]\?*\.gpu\?*\.coverUnits/.test(stmt) && /carrierViscosity\(/.test(stmt);
+  line('38v-4', 'and the frame loop\'s lag for layer l is layer l\'s spinDrag, not Layer 0\'s glass and the word\'s liquid',
+    loopOk, stmt ? stmt.replace(/\s+/g, ' ').trim() : 'no dishFrame for layer l found', loopMain);
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');

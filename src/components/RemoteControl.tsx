@@ -6,7 +6,7 @@ import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import { useRemoteLink } from '../hooks/useRemoteLink';
-import { SwitchPill, LIT, LIVE } from './ui';
+import { LIT, LIVE } from './ui';
 import { LensCap } from './ui/Playful';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
@@ -25,7 +25,6 @@ import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
 import { RemoteSongs } from './RemoteSongs';
-import { closeupIn, closeupToggle } from '../lib/macroLanding';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -768,6 +767,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <Slider label="Melody Walk" field="melodyWalk" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
+          {/* The two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a look saved before them reads level, not the slider's −1. */}
+          <Slider label="Tilt Left/Right" field="plateTiltX" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltX') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Tilt Up/Down" field="plateTiltY" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltY') ?? 0) as number} {...sliderProps} connected={connected} />
           <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The dish's own turning (PLAN.md §22): Auto Spin's mode and its
@@ -802,6 +804,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <>
               <Slider label="Drain Rate" field="soapFilmRate" step={0.25} format={(v) => `${v.toFixed(2)}×`} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
               <Slider label="Film Angle" field="soapFilmAngle" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Frame Tilt" field="soapFilmTilt" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
@@ -814,6 +817,20 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <>
               <Slider label="Side Colour" field="sideLightHue" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
               <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
+          {/* The dish on a speaker (PLAN 48f): Shaker's frequency, and while it is on, how hard it shakes. */}
+          <Slider label="Shaker" field="faradayHz" step={1} format={(v) => (v > 0 ? `${Math.round(v)} Hz` : 'Off')} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.faradayHz ?? 0) > 0 && (
+            <Slider label="Shake" field="faraday" step={0.01} format={(v) => `${v.toFixed(2)} g`} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/* Polarised light (PLAN 31p-1), and while the sheets are in the analyser's turn and the liquid's strength, as on the desk. */}
+          <Slider label="Polarisers" field="polariser" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.polariser ?? 0) > 0.001 && (
+            <>
+              <Slider label="Analyser" field="analyserAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('analyserAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Quarter Wave" field="quarterWave" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('quarterWave') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Birefringence" field="birefringence" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('birefringence') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
@@ -905,25 +922,20 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <PhoneInkTitle settings={settings} onSetting={patch} disabled={!connected} testId="remote-ink-title" />
           </div>
 
-          {/* Macro camera */}
-          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={closeupIn(settings ?? {})}
-              onClick={() => patch(closeupToggle(settings ?? {}))}
-              disabled={!connected}
-              data-testid="remote-macro-toggle"
-              className="flex w-full items-center justify-between disabled:opacity-30"
-            >
-              <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
-                <Microscope size={15} /> Macro Closeup
-              </span>
-              <SwitchPill on={closeupIn(settings ?? {})} />
-            </button>
-            {closeupIn(settings ?? {}) && (
-              <div className="mt-4">
-                <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+          {/*
+            Macro camera. Its head was a Closeup switch, 4x in and the plate
+            out; the owner asked for the Close-up button gone everywhere
+            (2026-11-14), so the Macro Zoom is here always and is the way in:
+            at 1x the whole plate, up from there the closeup (PLAN QA-32c).
+            The camera's own dials follow it in.
+          */}
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-macro">
+            <span className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+              <Microscope size={15} /> Macro Closeup
+            </span>
+            <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+            {((value('macroZoom') as number | undefined) ?? 1) > 1.05 && (
+              <div>
                 <Slider label="Chase Speed" field="macroChase" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Shot Length" field="macroHold" step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
