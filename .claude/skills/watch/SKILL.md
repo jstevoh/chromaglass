@@ -19,12 +19,14 @@ npm run watch -- clip.webm --out … --from 30 --to 90 --frames 36 --at 41.5,62
 npm run watch -- room.mkv --out … --crop 0.52,0.10,0.22,0.40   # only the projection (disables autocrop)
 npm run watch -- clip.mkv --out … --no-autocrop                # skip letterbox/pillarbox autocrop
 npm run watch -- our-take.webm --out … --vs <scratchpad>/<reference>   # ours against it
+npm run watch -- our-take.webm --out … --vs <reference> --settings s.json # include current setting values in ## Settings to try
 npm run watch -- --before A --after B --out <scratchpad>/<name>       # what changed between two films
 npm run watch -- film.mkv --out … --keep <name> --note "why"   # into the reference library
 npm run watch -- our-take.webm --out … --vs <name>   # against a kept reference, no fetch
 npm run watch -- --refs         # the library, with each reference's numbers
 npm run watch -- --selftest     # synthetic clips, frames and flows with known answers
 npm run watchwords              # vocabulary and before/after diff contract check
+npm run watchcard               # footage robustness, report card & gap settings check
 ```
 
 ## The routine for a link the owner sends
@@ -48,12 +50,16 @@ npm run watchwords              # vocabulary and before/after diff contract chec
    global camera pan share, and compression softness flags — or `clean`), **Overall** section (the whole
    film's arc and feel in one paragraph: whether it builds, settles, swells or holds, its
    Laban character, where its strongest moment and longest rest fall, how the light and
-   colour drift, whether it goes with the music, and the look in a line), then its
-   **In words** section
+   colour drift, whether it goes with the music, and the look in a line), **Report card**
+   section (the seven canons calibrated against real shows — Unity, Complexity, Intensity, Arc,
+   Surprise, Music fit, Restraint — plus verdict and Spearman ratings agreement when `ratings.json`
+   is present), then its **In words** section
    (every word with the number that chose it, its source in `docs/watch-words.md`,
    and `(may vary from take to take)` on unsteady measures), followed by the Design,
    Physics and Techniques sections. Take `--at` stills of what matters.
-   With `--vs`, a **Reference in words** section appears beside it.
+   With `--vs`, a **Reference in words** section, **Report card (side by side)** table,
+   and **Settings to try** section (physical controls listed ahead of post grades, with
+   current values when `--settings` is supplied) appear beside the gaps.
    For a before/after pair, run `--before A --after B --out <dir>` to write
    `diff.md` (changes ranked in just-noticeable steps and what held, a **Near an
    edge** note for words that differ while their measure moved under a step, a **How

@@ -185,3 +185,15 @@ same look; the paragraph says so.
 | **Surprise** | Pattern breaks without chaotic churn (inverted U) | reorganisations/min, swells/min | David Huron; Daniel Berlyne |
 | **Music fit** | Motion breathing with loudness ("not graded" without audio) | motion-sound correlation, best lag | David Huron |
 | **Restraint** | Dark space and pauses between moves | near-black share, longest rest, calm share | the wet show |
+
+## From a gap to a setting
+
+`scripts/watchsettings.mjs` (`MEASURE_SETTINGS`, `gapSettings`) connects every ranked comparison gap (`compareDesign`, `comparePhysics`, and `reportCard`) to keys of `DEFAULT_SETTINGS` (`src/types.ts`). Every entry states which way to turn the control to raise the measure (and `gapSettings` flips it when a gap asks to lower the measure).
+
+Following the real-physics rule, physical controls always come first and are labeled apart from post grades:
+
+- **Colour & intensity**: adjust `dyeBudget`, `transmission` (Beer–Lambert optical depth), `hueJourney`, `polarity`, `dimmer`, `lampWarmth`, `lampHotspot`, `lampGround`, and `boundaryContrast` before post grades (`saturationBoost`, `exposure`, `ledContrast`, `ledHue`).
+- **Edges, scale & flow**: adjust `diffusionRate`, `polarity`, `focus`, `turbulenceScale`, `turbulenceDetail`, `oilTension`, `beads`, `oilBodies`, `filmHold`, `blobSurfaceTension`, `advection`, `globalSpeed`, `damping`, `gapThickness`, `rotationSpeed`, `plateTiltX` before `postBlurRadius`.
+- **Arc, surprise, restraint & sync**: adjust `surge`, `pacing`, `automateRate`, `damping`, `audioImpact`, `soundImpact`, `sensitivity`, `beatPrediction`, `beatLead`, and `kickBloom`.
+
+Under `--vs`, any gap of 1.0 just-noticeable step or larger appears under `## Settings to try` with 1 to 3 settings; if `--settings file.json` (or a take's own `settings` metadata) is supplied, each suggestion includes the setting's current value.

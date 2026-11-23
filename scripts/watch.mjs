@@ -70,8 +70,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { physicsAcc, physicsFrame, physicsSummary, physicsLines, comparePhysics, techniqueLines } from './watchphysics.mjs';
-import { designFrame, designSummary, designLines, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
+import { physicsAcc, physicsFrame, physicsSummary, physicsLines, physicsGaps, comparePhysics, techniqueLines } from './watchphysics.mjs';
+import { designFrame, designSummary, designLines, designGaps, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
 import { thumb, findDissolves } from './watchcuts.mjs';
 import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
@@ -79,10 +79,11 @@ import { overall } from './watchoverall.mjs';
 import { describe } from './watchwords.mjs';
 import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watchfootage.mjs';
 import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
+import { gapSettings } from './watchsettings.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -113,6 +114,7 @@ function parseArgs(argv) {
     // projection or the plate. `--no-autocrop` turns off letterbox/pillarbox detection.
     else if (a === '--crop') { const [x, y, w, h] = v().split(',').map(Number); if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) opt.crop = { x, y, w, h }; else fail('--crop wants x,y,w,h as fractions, e.g. 0.5,0,0.25,0.35', 2); }
     else if (a === '--no-autocrop') opt.noAutocrop = true;
+    else if (a === '--settings') opt.settings = v();
     else if (a === '--selftest') opt.selftest = true;
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else if (!opt.input) opt.input = a;
@@ -769,6 +771,16 @@ async function watch() {
   ds.physics = ps;
   const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))];
   let refWords = null, refTitle = null, refDoc = null;
+  let takeSettings = null;
+  if (opt.settings) {
+    if (typeof opt.settings === 'string') {
+      try { takeSettings = JSON.parse(fs.readFileSync(path.resolve(opt.settings), 'utf8')); } catch { fail(`--settings: could not read JSON at ${opt.settings}`, 2); }
+    } else if (typeof opt.settings === 'object') {
+      takeSettings = opt.settings;
+    }
+  } else if (info?.settings && typeof info.settings === 'object') {
+    takeSettings = info.settings;
+  }
   if (opt.vs) {
     // A path to a design.json, a folder holding one, or a kept reference's name.
     const vf = resolveRef(opt.vs);
@@ -779,6 +791,8 @@ async function watch() {
     refWords = ref.words?.lines?.length ? ref.words : describe({ design: ref });
     designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
     if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
+    const allGaps = [...designGaps(ref, ds).rows, ...(ref.physics ? physicsGaps(ref.physics, ps).rows : [])];
+    designOut.push('', ...gapSettings(allGaps, takeSettings));
   }
 
   const buckets = Math.min(40, n);

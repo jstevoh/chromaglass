@@ -20,6 +20,7 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { watchVideo, findFfmpeg } from './watch.mjs';
 import { reportCard, REAL_SHOW_CARDS } from './watchcard.mjs';
+import { MEASURE_SETTINGS } from './watchsettings.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const W = 320, H = 180, FPS = 24;
@@ -343,6 +344,42 @@ async function runSuite(runWatch, dir, clips) {
     intAg && intAg.n === 4 && Number.isFinite(intAg.rho) && uniAg && uniAg.n === 4
       && ratedSum.includes("Spearman's rho") && ratedSum.includes('n=4'),
     `Intensity rho=${intAg?.rho?.toFixed(2)} (n=${intAg?.n}), Unity rho=${uniAg?.rho?.toFixed(2)} (n=${uniAg?.n})`);
+
+  // (h) settings: every key in MEASURE_SETTINGS is in DEFAULT_SETTINGS, physics precede grades,
+  // and --vs on a duller take prints "## Settings to try" naming a key with way raise for colourfulness.
+  const typesSrc = fs.readFileSync(path.join(HERE, '..', 'src', 'types.ts'), 'utf8');
+  const dsStart = typesSrc.indexOf('export const DEFAULT_SETTINGS');
+  const dsEnd = typesSrc.indexOf('\n};', dsStart);
+  const dsBlock = dsStart >= 0 && dsEnd > dsStart ? typesSrc.slice(dsStart, dsEnd) : '';
+  const defaultKeys = new Set();
+  for (const line of dsBlock.split('\n')) {
+    const clean = line.replace(/\/\/.*$/, '');
+    for (const m of clean.matchAll(/(?:^|[{\s,])([a-zA-Z0-9_]+)\s*:/g)) {
+      if (m[1] !== 'VisualizerSettings' && m[1] !== 'DEFAULT_SETTINGS') defaultKeys.add(m[1]);
+    }
+  }
+  const allKeys = Object.values(MEASURE_SETTINGS).flat().map(e => e.key);
+  const unknownKeys = allKeys.filter(k => !defaultKeys.has(k));
+  const physicsBeforeGrade = Object.values(MEASURE_SETTINGS).every(entries => {
+    let seenGrade = false;
+    for (const e of entries) {
+      if (e.kind === 'grade') seenGrade = true;
+      else if (seenGrade && e.kind === 'physics') return false;
+    }
+    return true;
+  });
+  const settingsFile = path.join(dir, 'take-settings.json');
+  fs.writeFileSync(settingsFile, JSON.stringify({ dyeBudget: 0.42, transmission: 0.85, saturationBoost: 1.2 }));
+  const rVs = await runWatch(clips.grey, { out: path.join(dir, 'out-vs'), vs: rPlain.out, settings: settingsFile, rate: 4, quiet: true });
+  const vsSum = fs.readFileSync(path.join(rVs.out, 'summary.md'), 'utf8');
+  const setIdx = vsSum.indexOf('## Settings to try');
+  const setSec = setIdx >= 0 ? vsSum.slice(setIdx) : '';
+  const colLine = setSec.split('\n').find(l => l.includes('**colourfulness**')) ?? '';
+  const raiseMatch = colLine.includes('raise `dyeBudget`') && colLine.includes('now 0.42');
+  rec('h', 'settings: every MEASURE_SETTINGS key exists in DEFAULT_SETTINGS, physics come before grades, and --vs names raise for colourfulness on a duller take',
+    unknownKeys.length === 0 && physicsBeforeGrade && vsSum.includes('## Settings to try')
+      && vsSum.includes('## Report card (side by side') && raiseMatch,
+    `unknown=[${unknownKeys.join(',')}], physicsFirst=${physicsBeforeGrade}, colLine="${colLine.slice(0, 90)}"`);
 
   return out;
 }

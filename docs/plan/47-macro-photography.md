@@ -422,12 +422,6 @@ an unsteady measure says "may vary from take to take", and every word names its 
   take of a moving fluid: run two takes of one look through it and find which of its sentences
   hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
   check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
-- ~~**47x-10**~~ the flow read aliased (shipped, this PR). The words check's drifting
-  stripes (a 64-pixel period moving a pixel a frame) move almost half their period in the
-  second the physics read pairs over, so the backward shift matched as well as the true one:
-  one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
-  two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
-  one sample then lags of 3, 8 and 10, each seeded from the last.
 - **47x-11** two takes of one look still read as changed on Ubuntu. On main's deploy of
   2026-11-22 (f825ee6b, Measure sound, after 47x-10 shipped) "drift → drift2 (the same look,
   another phase): no steady change past a step" failed with show/turnover and show/own flow
@@ -437,21 +431,7 @@ an unsteady measure says "may vary from take to take", and every word names its 
   not the bar. Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the
   check now closes on the "n/m checks passed" tally a quarantine counts against, where its old
   "watchwords: 1 of 58 FAIL" line read as a second FAIL and no quarantine could match.
-- **47x-10** An artistic report card (`scripts/watchcard.mjs`): `reportCard(read, { cal, ratings })`
-  scores seven canons (Unity, Complexity, Intensity, Arc, Surprise, Music fit, Restraint)
-  from 0 to 10 by calibrating each measure against real liquid shows in `REAL_SHOW_CARDS`
-  using the existing just-noticeable steps, prints `## Report card` in `summary.md` and side
-  by side under `--vs`, and computes Spearman's rho against a library `ratings.json`.
-- ~~**47x-11**~~ Reading YouTube footage honestly (**shipped**, this PR: `scripts/watchfootage.mjs`): crops black-and-still
-  letterbox/pillarbox bars (`--crop` wins, `--no-autocrop` disables), masks burnt-in sharp
-  still overlays out of every read, excludes title-card spans, estimates global camera
-  translation from block flow (`cameraShare`, keeping `wholeShare`), and flags detail
-  measures unreliable under compression softness.
-- **47x-12** From a gap to the settings that close it (`scripts/watchsettings.mjs`): `MEASURE_SETTINGS`
-  maps every comparable measure to `DEFAULT_SETTINGS` keys (`src/types.ts`) with real physics
-  before post grades, and `gapSettings(gaps)` writes `## Settings to try` under `--vs` (with
-  current values when `--settings` or a take's settings block is given).
-- **47x-13** refit the card's bands from the owner's ratings once there are enough.
+- **47x-15** refit the card's bands from the owner's ratings once there are enough.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
