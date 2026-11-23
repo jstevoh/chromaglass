@@ -171,3 +171,17 @@ In a before/after pair, **How it felt** puts both paragraphs side by side and sa
 arc, the character, the peak, the surges and the hold on the music changed. Swells, rests and
 the peak's place come from one take of a moving fluid and can differ between two takes of the
 same look; the paragraph says so.
+
+## The report card
+
+`scripts/watchcard.mjs` (`reportCard`) grades a film across seven canons from 0 to 10 against calibrated moving liquid light shows (`REAL_SHOW_CARDS`), falling with each just-noticeable step outside the real-show band (the step sizes `compareDesign`, `comparePhysics`, and `compareReads` already use). Unreliable or missing measures (e.g., silent films on *Music fit*, or compression-softened footage on *Complexity*) stay ungraded (`null`) rather than scoring zero.
+
+| Canon | What it grades | Measures | Sources |
+|---|---|---|---|
+| **Unity** | Two or three related hues held long enough | hues a frame, hue spread, main hues' gap, lifetime, reorganisations/min | Monroe Beardsley (*Aesthetics*, 1958) |
+| **Complexity** | Multi-scale detail without greyed colour mud (inverted U) | spectrum slope, forms a frame, form scale, colour mud penalty | Monroe Beardsley; George Birkhoff (*Aesthetic Measure*, 1933); Daniel Berlyne (*Aesthetics and Psychobiology*, 1971) |
+| **Intensity** | Contrast, vivid colourfulness, true darks | RMS contrast, colourfulness, near-black share, p5 luminance | Monroe Beardsley |
+| **Arc** | Build, peak, and release against flat drift | arc shape, thirds spread, peak over median, surge spread | Leonard Meyer (*Emotion and Meaning in Music*, 1956); David Huron (*Sweet Anticipation*, 2006) |
+| **Surprise** | Pattern breaks without chaotic churn (inverted U) | reorganisations/min, swells/min | David Huron; Daniel Berlyne |
+| **Music fit** | Motion breathing with loudness ("not graded" without audio) | motion-sound correlation, best lag | David Huron |
+| **Restraint** | Dark space and pauses between moves | near-black share, longest rest, calm share | the wet show |

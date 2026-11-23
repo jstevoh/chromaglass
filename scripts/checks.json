@@ -474,16 +474,18 @@
       ]
     },
     {
-      "name": "Watching footage honestly",
+      "name": "Watching footage, report card & ratings",
       "shard": "sound",
       "run": "npm run watchcard",
       "why": [
-        "The watch tool's YouTube footage robustness (47x-11, watchfootage.mjs):",
+        "The watch tool's YouTube footage robustness (47x-11, watchfootage.mjs)",
+        "and artistic report card + ratings agreement (47x-10, watchcard.mjs):",
         "synthetic clips encoded with ffmpeg prove letterbox autocrop vs",
         "dark-ground plates, still overlay masking, title-card span exclusion,",
-        "global camera subtraction, and compression-softness reliability flags,",
-        "with mutants that break autocrop, camera, and compression. In the sound",
-        "shard for its ffmpeg."
+        "global camera subtraction, compression-softness reliability flags,",
+        "canon scoring and REAL_SHOW_CARDS self-check, and Spearman ratings",
+        "agreement, with mutants that break autocrop, camera, compression,",
+        "and card calibration. In the sound shard for its ffmpeg."
       ]
     },
     {

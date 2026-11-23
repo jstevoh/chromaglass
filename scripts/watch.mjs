@@ -78,6 +78,7 @@ import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
 import { overall } from './watchoverall.mjs';
 import { describe } from './watchwords.mjs';
 import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watchfootage.mjs';
+import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
@@ -767,12 +768,13 @@ async function watch() {
   }
   ds.physics = ps;
   const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))];
-  let refWords = null, refTitle = null;
+  let refWords = null, refTitle = null, refDoc = null;
   if (opt.vs) {
     // A path to a design.json, a folder holding one, or a kept reference's name.
     const vf = resolveRef(opt.vs);
     let ref = null;
     try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs}, and no reference of that name (npm run watch -- --refs lists them; watch the reference first, with this version of the tool)`, 2); }
+    refDoc = ref;
     refTitle = ref.title ?? vf;
     refWords = ref.words?.lines?.length ? ref.words : describe({ design: ref });
     designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
@@ -792,8 +794,15 @@ async function watch() {
   const readForText = { out, rows: useRows, cuts: activeCuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, sheets, tiles, picks, timeline, span: activeSpan, pr, w, h, rate };
   const words = describe(readForText);
   const ov = overall({ ...readForText, words });   // the whole film's arc and feel, before the words one measure at a time (47x-8)
-  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, words, overall: ov, sheets, tiles, picks, timeline, span, pr, w, h, rate };
-  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, sync, footage: ftOut, words }, null, 1) + '\n');
+  const { ratings, libDirs } = loadRatings();
+  const card = reportCard({ ...readForText, overall: ov }, { ratings, libDirs });
+  if (refDoc) {
+    const refCard = refDoc.card?.canons?.length ? refDoc.card : reportCard(refDoc);
+    designOut.push('', ...formatSideBySideCards(card, refCard, refTitle));
+  }
+  const cardOut = { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines };
+  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, words }, null, 1) + '\n');
   const palettePng = path.join(out, 'palette.png');
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
 
@@ -815,6 +824,10 @@ async function watch() {
     '## Overall',
     '',
     ...result.overall.lines,
+    '',
+    '## Report card',
+    '',
+    ...card.lines,
     '',
     '## In words',
     '',

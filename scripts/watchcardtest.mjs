@@ -19,6 +19,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { watchVideo, findFfmpeg } from './watch.mjs';
+import { reportCard, REAL_SHOW_CARDS } from './watchcard.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const W = 320, H = 180, FPS = 24;
@@ -183,6 +184,48 @@ function panFrame(t, { camPctPerSec, dishOwnPctPerSec = 0 }) {
   return buf;
 }
 
+function flatGreyFrame() {
+  const buf = Buffer.alloc(W * H * 3);
+  buf.fill(128);
+  return buf;
+}
+
+// Slow two-hue plate on black with a quiet hold in the middle third.
+function slowTwoFrame(t) {
+  const buf = Buffer.alloc(W * H * 3);
+  const pause = t >= 1.2 && t <= 2.4 ? 1.2 : (t > 2.4 ? t - 1.2 : t);
+  const cx1 = 120 + 18 * Math.sin(pause * 0.6), cy1 = 90 + 10 * Math.cos(pause * 0.5);
+  const cx2 = 195 + 16 * Math.cos(pause * 0.5), cy2 = 95 + 12 * Math.sin(pause * 0.6);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 3;
+      const d1 = Math.exp(-(((x - cx1) ** 2 + (y - cy1) ** 2) / (2 * 24 ** 2)));
+      const d2 = Math.exp(-(((x - cx2) ** 2 + (y - cy2) ** 2) / (2 * 22 ** 2)));
+      buf[i] = Math.min(255, Math.round(230 * d1 + 220 * d2));
+      buf[i + 1] = Math.min(255, Math.round(80 * d1 + 170 * d2));
+      buf[i + 2] = Math.min(255, Math.round(20 * d1 + 25 * d2));
+    }
+  }
+  return buf;
+}
+
+// Dense many-hued fast-churning pattern filling 100% of the frame with rapid hue shifts.
+function fastDenseFrame(f, t) {
+  const buf = Buffer.alloc(W * H * 3);
+  const phase = Math.floor(t * 2.5) * 1.9 + t * 5.5;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const hue = (((x * 3.5 + y * 2.2) / 35 + phase + 0.8 * Math.sin(x * 0.08 - t * 4)) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const r = Math.round(135 + 115 * Math.cos(hue));
+      const g = Math.round(135 + 115 * Math.cos(hue - (2 * Math.PI) / 3));
+      const b = Math.round(135 + 115 * Math.cos(hue - (4 * Math.PI) / 3));
+      const i = (y * W + x) * 3;
+      buf[i] = r; buf[i + 1] = g; buf[i + 2] = b;
+    }
+  }
+  return buf;
+}
+
 async function runSuite(runWatch, dir, clips) {
   const out = [];
   const rec = (id, name, ok, detail) => out.push({ id, name, ok: !!ok, detail });
@@ -238,6 +281,69 @@ async function runSuite(runWatch, dir, clips) {
       && rLo.design.physics?.spectrum?.reliable === false && loSum.includes('unreliable (compression)'),
     `hi=${rHi.footage?.reliable?.detail} (bpp=${rHi.footage?.bpp?.toFixed(3)}), lo=${rLo.footage?.reliable?.detail} (blk=${rLo.footage?.blockiness?.toFixed(2)}, bpp=${rLo.footage?.bpp?.toFixed(3)})`);
 
+  // (f) report card: ranges, no-sound Music fit null, REAL_SHOW_CARDS >= 6, flat grey low Intensity/Complexity,
+  // and dense/many-hued/fast lower on Unity & Restraint than slow two-hue on black.
+  const CANON_NAMES = ['Unity', 'Complexity', 'Intensity', 'Arc', 'Surprise', 'Music fit', 'Restraint'];
+  const cPlain = rPlain.card;
+  const shapesOk = Array.isArray(cPlain?.canons) && cPlain.canons.length === 7
+    && cPlain.canons.every((c, i) => c.name === CANON_NAMES[i] && typeof c.why === 'string' && c.why.length > 0
+      && (c.score === null || (typeof c.score === 'number' && c.score >= 0 && c.score <= 10)));
+  const mfPlain = cPlain?.canons?.find(c => c.name === 'Music fit');
+  const cLoComp = rLo.card?.canons?.find(c => c.name === 'Complexity');
+  const calSelfOk = REAL_SHOW_CARDS.every(row => {
+    const cr = reportCard(row);
+    return cr.canons.every(c => c.score === null || c.score >= 6);
+  });
+  const rGrey = await runWatch(clips.grey, { out: path.join(dir, 'out-grey'), rate: 4, quiet: true });
+  const rSlow = await runWatch(clips.slowTwo, { out: path.join(dir, 'out-slow'), rate: 4, quiet: true });
+  const rFast = await runWatch(clips.fastDense, { out: path.join(dir, 'out-fast'), rate: 4, quiet: true });
+  const canonOf = (r, name) => r.card?.canons?.find(c => c.name === name)?.score;
+  const gInt = canonOf(rGrey, 'Intensity'), gCmp = canonOf(rGrey, 'Complexity');
+  const sUni = canonOf(rSlow, 'Unity'), fUni = canonOf(rFast, 'Unity');
+  const sRes = canonOf(rSlow, 'Restraint'), fRes = canonOf(rFast, 'Restraint');
+  const plainSum = fs.readFileSync(path.join(rPlain.out, 'summary.md'), 'utf8');
+  const fOk = shapesOk && mfPlain?.score === null && cLoComp?.score === null && calSelfOk
+    && plainSum.includes('## Report card') && plainSum.indexOf('## Report card') > plainSum.indexOf('## Overall')
+    && gInt != null && gInt <= 4 && gCmp != null && gCmp <= 2
+    && fUni != null && sUni != null && fUni < sUni && fRes != null && sRes != null && fRes < sRes;
+  rec('f', 'report card: bounds, no-sound Music fit null, calibration rows >= 6, flat grey low, fast/dense < slow two-hue on Unity & Restraint',
+    fOk,
+    `mf=${mfPlain?.score}, compLo=${cLoComp?.score}, calSelf=${calSelfOk}, grey(I=${gInt},C=${gCmp}), slow(U=${sUni},R=${sRes}), fast(U=${fUni},R=${fRes})`);
+
+  // (g) ratings: temp library ratings.json read and Spearman rho printed with n
+  const tmpLib = path.join(dir, 'temp-lib');
+  fs.mkdirSync(tmpLib, { recursive: true });
+  const rateFilms = [
+    { name: 'grey-film', doc: JSON.parse(fs.readFileSync(path.join(rGrey.out, 'design.json'), 'utf8')), intensity: 1, unity: 3 },
+    { name: 'slow-film', doc: JSON.parse(fs.readFileSync(path.join(rSlow.out, 'design.json'), 'utf8')), intensity: 4, unity: 5 },
+    { name: 'plain-film', doc: JSON.parse(fs.readFileSync(path.join(rPlain.out, 'design.json'), 'utf8')), intensity: 5, unity: 4 },
+    { name: 'fast-film', doc: JSON.parse(fs.readFileSync(path.join(rFast.out, 'design.json'), 'utf8')), intensity: 3, unity: 1 },
+  ];
+  const ratingsObj = {};
+  for (const rf of rateFilms) {
+    const fDir = path.join(tmpLib, rf.name);
+    fs.mkdirSync(fDir, { recursive: true });
+    fs.writeFileSync(path.join(fDir, 'design.json'), JSON.stringify(rf.doc));
+    ratingsObj[rf.name] = { intensity: rf.intensity, unity: rf.unity, note: 'synthetic test' };
+  }
+  fs.writeFileSync(path.join(tmpLib, 'ratings.json'), JSON.stringify(ratingsObj, null, 2));
+  const prevEnv = process.env.CHROMAGLASS_REFERENCES;
+  let rRated = null, ratedSum = '';
+  try {
+    process.env.CHROMAGLASS_REFERENCES = tmpLib;
+    rRated = await runWatch(clips.plain, { out: path.join(dir, 'out-rated'), rate: 4, quiet: true });
+    ratedSum = fs.readFileSync(path.join(rRated.out, 'summary.md'), 'utf8');
+  } finally {
+    if (prevEnv === undefined) delete process.env.CHROMAGLASS_REFERENCES;
+    else process.env.CHROMAGLASS_REFERENCES = prevEnv;
+  }
+  const intAg = rRated?.card?.agreement?.Intensity;
+  const uniAg = rRated?.card?.agreement?.Unity;
+  rec('g', 'ratings: ratings.json in a temp library is read and prints Spearman agreement with n',
+    intAg && intAg.n === 4 && Number.isFinite(intAg.rho) && uniAg && uniAg.n === 4
+      && ratedSum.includes("Spearman's rho") && ratedSum.includes('n=4'),
+    `Intensity rho=${intAg?.rho?.toFixed(2)} (n=${intAg?.n}), Unity rho=${uniAg?.rho?.toFixed(2)} (n=${uniAg?.n})`);
+
   return out;
 }
 
@@ -245,6 +351,7 @@ const MUTANTS = [
   { id: 'a', file: 'watchfootage.mjs', find: 'if (!top && !bottom && !left && !right) return null;', replace: 'return null;' },
   { id: 'd', file: 'watchphysics.mjs', find: 'return { cu, cv, speed: Math.hypot(cu, cv), share, rmsFluid: Math.sqrt(rem / n) };', replace: 'return { cu: 0, cv: 0, speed: 0, share: 0, rmsFluid: Math.sqrt(tot / Math.max(1, n)) };' },
   { id: 'e', file: 'watchfootage.mjs', find: 'if (blockiness >= 1.30) {\n    detailOk = false;', replace: 'if (false && blockiness >= 1.30) {\n    detailOk = false;' },
+  { id: 'f', file: 'watchcard.mjs', find: 'const BAND_SCORE = 9.0;', replace: 'const BAND_SCORE = 2.0;' },
 ];
 
 // For mutant (e), ensure all unreliable branches in analyseFootage are bypassed together
@@ -292,6 +399,12 @@ async function runMutant(m, clips, tmpRoot) {
       const linePassed = rLo.footage?.reliable?.detail === false;
       return { ok: !linePassed, detail: linePassed ? 'compression STILL passed under mutant' : `caught: reliable.detail=${rLo.footage?.reliable?.detail}` };
     }
+    if (m.id === 'f') {
+      const cMod = await import(`${pathToFileURL(path.join(mDir, 'watchcard.mjs')).href}?v=${Date.now()}`);
+      const cr = cMod.reportCard(REAL_SHOW_CARDS[1]);
+      const linePassed = cr.canons.every(c => c.score === null || c.score >= 6);
+      return { ok: !linePassed, detail: linePassed ? 'REAL_SHOW_CARDS self-check STILL >= 6 under mutant' : `caught: Intensity=${cr.canons.find(c => c.name === 'Intensity')?.score}` };
+    }
     return { ok: false, detail: 'unknown mutant' };
   } finally {
     fs.rmSync(mDir, { recursive: true, force: true });
@@ -316,6 +429,9 @@ try {
       sec: 3.0, bitrate: '18k', extraArgs: ['-qmin', '52', '-qmax', '63'],
       frame: f => panFrame(f / FPS, { camPctPerSec: 1.5, dishOwnPctPerSec: 2.5 }),
     }),
+    grey: await encodeWebm(path.join(tmpDir, 'grey.webm'), { sec: 3.0, frame: () => flatGreyFrame() }),
+    slowTwo: await encodeWebm(path.join(tmpDir, 'slow-two.webm'), { sec: 4.0, frame: f => slowTwoFrame(f / FPS) }),
+    fastDense: await encodeWebm(path.join(tmpDir, 'fast-dense.webm'), { sec: 4.0, frame: f => fastDenseFrame(f, f / FPS) }),
   };
 
   const lines = await runSuite(watchVideo, tmpDir, clips);
