@@ -221,17 +221,29 @@ async function songFilm(page, wav, f, file) {
   const meta = await page.evaluate(async ({ w, h, fps, seed }) => {
     const song = window.__siteSong;
     window.__siteSong = null;
-    const r = await window.chromaglassRender({ song: song.buffer, width: w, height: h, fps, seed });
-    window.__siteFilm = r.bytes;
-    return { phase: r.phase, message: r.message, format: r.format, length: r.bytes?.length ?? 0 };
+    // `raw`: the film stays an array in the page and comes out a slice at a
+    // time. Asked for whole, as one base64 string, Cylinder Seven (532 s,
+    // 424.1 MB) came back empty: past about 400 MB the string is longer than
+    // V8 allows, and the render that had finished read as "ended done".
+    const r = await window.chromaglassRender({ song: song.buffer, width: w, height: h, fps, seed, raw: true });
+    const bytes = window.chromaglassRenderBytes;
+    return { phase: r.phase, message: r.message, format: r.format, length: bytes?.length ?? 0, said: r.length };
   }, { w: W, h: H, fps: FPS, seed: f.seed });
-  if (meta.phase !== 'done' || !meta.length) throw new Error(`${f.id}: the render ended ${meta.phase}: ${meta.message}`);
+  if (meta.phase !== 'done' || !meta.length) throw new Error(`${f.id}: the render ended ${meta.phase} with ${meta.length} bytes: ${meta.message}`);
+  if (meta.said !== meta.length) throw new Error(`${f.id}: the render said ${meta.said} bytes and left ${meta.length}`);
   const parts = [];
   for (let at = 0; at < meta.length; at += SLICE) {
-    parts.push(Buffer.from(await page.evaluate(({ at, n }) => window.__siteFilm.slice(at, at + n), { at, n: SLICE }), 'base64'));
+    parts.push(Buffer.from(await page.evaluate(({ at, n }) => {
+      const part = window.chromaglassRenderBytes.subarray(at, at + n);
+      let bin = '';
+      for (let i = 0; i < part.length; i += 0x8000) bin += String.fromCharCode(...part.subarray(i, i + 0x8000));
+      return btoa(bin);
+    }, { at, n: SLICE }), 'base64'));
   }
-  await page.evaluate(() => { window.__siteFilm = null; });
-  fs.writeFileSync(file, Buffer.concat(parts));
+  await page.evaluate(() => { window.chromaglassRenderBytes = null; });
+  const film = Buffer.concat(parts);
+  if (film.length !== meta.length) throw new Error(`${f.id}: ${film.length} bytes read back of ${meta.length}`);
+  fs.writeFileSync(file, film);
   console.log(`  ${f.id}: ${meta.message} (${((Date.now() - t0) / 1000).toFixed(0)} s here)`);
 }
 

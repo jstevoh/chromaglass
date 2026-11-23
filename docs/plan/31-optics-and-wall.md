@@ -320,6 +320,18 @@ lens-shaped drop, no shadow beside it.*
   `sitefilms` (and its `--films-from`), `tvloops` (and `--from-raw`) and `tvfilms --from`.
   Left out on purpose: `render-app` and `clipApp` record only for their own checks, and
   `landingfilms` and `render.mjs` record nothing.
+- **31s-11. The flower gate checked another tree.** *(Shipped with 34a-6f.)* A harness's bundle
+  runs from `node_modules/.cache`, and the gate found `scripts/flower.mjs` from the bundle's own
+  path. In a worktree whose `node_modules` is a link to another checkout (`~/cg-ambient` links to
+  `~/chromaglass-main`), Node names the bundle by the link's target, so the gate ran the other
+  checkout's check: there it was too old to have one and refused, but a checkout with the fix
+  would have passed a tree that still draws the flower. `flowergate.mjs` now runs the check in
+  the tree the harness runs in (the working directory, where npm starts a script) when it has one.
+- **31s-12. Open: linked worktrees share one bundle cache.** The same link means every harness a
+  linked worktree runs (`sitefilms`, `film`, `showreel` …) writes its bundle to the other
+  checkout's `node_modules/.cache/<name>.mjs`, so two sessions running the same harness from two
+  trees overwrite each other's bundle between build and start. Bundle into the tree's own
+  `scratch/` (git-ignored), or name the bundle by the tree.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see

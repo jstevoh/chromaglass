@@ -99,8 +99,17 @@ export async function pageHasFix(page) {
 function check() {
   return new Promise((resolve) => {
     // The bundled harnesses run from node_modules/.cache, so the check is found from the repo root.
+    // The tree being filmed is the one the harness runs in (npm runs a script from its package's
+    // root), and that comes first: a worktree whose node_modules is a link to another checkout's
+    // runs its bundle from that checkout's node_modules/.cache, since Node follows the link to
+    // name the module, and the root worked out from the bundle's own path was the other checkout.
+    // Found 2026-11-22 (34a-6f) filming from ~/cg-ambient, whose node_modules links to
+    // ~/chromaglass-main: the gate ran chromaglass-main's flower check, not the tree it was about
+    // to film. That checkout was old enough to have no check and the gate refused, but one with
+    // the fix would have passed a tree that still draws the flower.
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const root = here.includes(`${path.sep}node_modules${path.sep}`) ? here.slice(0, here.indexOf(`${path.sep}node_modules${path.sep}`)) : path.resolve(here, '..');
+    const fromBundle = here.includes(`${path.sep}node_modules${path.sep}`) ? here.slice(0, here.indexOf(`${path.sep}node_modules${path.sep}`)) : path.resolve(here, '..');
+    const root = fs.existsSync(path.join(process.cwd(), 'scripts', 'flower.mjs')) ? process.cwd() : fromBundle;
     let out = '';
     const p = spawn(process.execPath, [path.join(root, 'scripts', 'flower.mjs')], { cwd: root });
     const kill = setTimeout(() => { out += `\nFAIL the flower check ran past ${LIMIT_MS / 60_000} minutes and was stopped`; p.kill('SIGKILL'); }, LIMIT_MS);

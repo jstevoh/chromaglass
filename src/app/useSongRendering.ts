@@ -158,9 +158,21 @@ export function useSongRendering({
       it stands in for the picker; `hashFrames: false` spares a long render a
       digest of every frame it does not need.
     */
+    /*
+      `raw` (PLAN 34a-6f): the film's bytes stay where they are, on
+      `window.chromaglassRenderBytes`, and `bytes` comes back null with only
+      their `length`. The base64 answer is one string, and a string has a
+      ceiling: V8 holds at most 2^29 - 24 characters (about 537 million), so
+      a film past about 400 MB, whose base64 is a third longer again, cannot
+      be one. Cylinder Seven (532 s at 1080p30) rendered whole, 424.1 MB, and
+      came back with no bytes at all, so the album could not be joined. A
+      script that asks for `raw` reads the array back a slice at a time, the
+      way `npm run sitefilms` already hands the song in. A short render keeps
+      the string, so the checks that compare two renders read as before.
+    */
     window.chromaglassRender = async (o: {
       song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number;
-      toDisk?: boolean; hashFrames?: boolean;
+      toDisk?: boolean; hashFrames?: boolean; raw?: boolean;
     }) => {
       const s = settingsRef.current;
       const song = o.song ? new Blob([o.song]) : musicFileRef.current?.url;
@@ -170,13 +182,14 @@ export function useSongRendering({
         levels: { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false },
         test: { keepInMemory: !o.toDisk, hashFrames: o.hashFrames ?? true, maxFrames: o.maxFrames },
       });
+      window.chromaglassRenderBytes = r.bytes ?? null;
       let b64: string | null = null;
-      if (r.bytes) {
+      if (r.bytes && !o.raw) {
         let bin = '';
         for (let i = 0; i < r.bytes.length; i += 0x8000) bin += String.fromCharCode(...r.bytes.subarray(i, i + 0x8000));
         b64 = btoa(bin);
       }
-      return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, frameHashes: r.frameHashes, frameDigests: r.frameDigests, bytes: b64 };
+      return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, frameHashes: r.frameHashes, frameDigests: r.frameDigests, bytes: b64, length: r.bytes?.length ?? 0 };
     };
   }, [songRender.start]);
 
