@@ -2,6 +2,7 @@ import type { VisualizerSettings } from '../types';
 import type { SongSection } from './songShape';
 import { THEMES, moveTargets } from './drift';
 import { stream } from './rng';
+import { PIN_RANGE } from './deskPins';
 
 /**
  * Evolve's timing: one slow move at a time, steered by the song over minutes.
@@ -109,6 +110,19 @@ export interface EvolveStep {
 
 export const GLIDE_MIN = 30;
 export const GLIDE_MAX = 90;
+/**
+ * The fastest a dial may travel, as a share of its whole range a second, at
+ * the glide's steepest (a smoothstep peaks at 1.5 times its mean speed). At
+ * full Evolve Speed a glide is a few seconds long, and a move's target is
+ * drawn from the dial's window without regard to that: on the Classic look
+ * (PLAN 38w) particleMix went 0.69 to 0.50 in 5.4 s, 5.3 % of its travel a
+ * second, past the 5 % the owner's slow-change rule allows. A dial that fast
+ * reads as a jump, not a drift. So a short glide takes a shorter step, the
+ * way the camera's aim already does, rather than a longer glide: the glide's
+ * length is what Evolve Speed means, and the step is what it may cover in it.
+ * 4 %, not 5 %, so a move that starts mid-glide from a moving dial stays under.
+ */
+export const DIAL_RATE_MAX = 0.04;
 /** A palette change at most this often, seconds, so a run of short sections does not flicker colours. */
 const PALETTE_GAP = 75;
 /**
@@ -338,6 +352,12 @@ export class SlowEvolve {
         }
         seconds *= (1.15 - 0.3 * PACE_PIVOT) * (0.88 + 0.24 * this.rand());
         const move: EvolveMove = { theme: t.name, to, seconds: pace * clamp(seconds, GLIDE_MIN, GLIDE_MAX), lean: this.lean, cue };
+        for (const k of Object.keys(to)) {
+          const spec = PIN_RANGE.get(k), now = current[k as keyof VisualizerSettings];
+          if (!spec || typeof now !== 'number') continue;
+          const most = DIAL_RATE_MAX * (spec.max - spec.min) * move.seconds / 1.5;
+          to[k] = now + clamp(to[k] - now, -most, most);
+        }
         if ((current.macroZoom ?? 1) > 1.05 && (current.macroCamera ?? 'hold') !== 'auto') {
           /*
             The camera never goes faster than at the default, however fast the

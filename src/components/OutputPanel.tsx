@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
-import { Knob, LIT } from './ui';
+import { LIT } from './ui';
 import {
   DEFAULT_OUTPUT, IDENTIFY_MS, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
@@ -310,11 +310,17 @@ function CornerPad({ value, onChange, flipX, flipY, aspect }: {
   );
 }
 
-const Row = ({ label, value, min, max, step, onChange, format }: {
+/*
+  A slider row, the Wall panel's one kind of control (`data-slider`, which
+  `npm run panelkinds` counts). `resetTo` is the knob's double-click it took
+  over from Gain and Gamma; `help` its tip, as the title.
+*/
+const Row = ({ label, value, min, max, step, onChange, format, resetTo, help, testId }: {
   label: string; value: number; min: number; max: number; step: number;
   onChange: (v: number) => void; format?: (v: number) => string;
+  resetTo?: number; help?: string; testId?: string;
 }) => (
-  <div className="mb-3 flex flex-col gap-1.5">
+  <div className="mb-3 flex flex-col gap-1.5" data-slider data-testid={testId} title={help}>
     <div className="flex items-center justify-between">
       <span className="text-xs font-bold uppercase tracking-widest opacity-70">{label}</span>
       <span className="font-mono text-[10px] opacity-50">{format ? format(value) : value.toFixed(2)}</span>
@@ -322,6 +328,7 @@ const Row = ({ label, value, min, max, step, onChange, format }: {
     <input
       type="range" min={min} max={max} step={step} value={value} aria-label={label}
       onChange={e => onChange(parseFloat(e.target.value))}
+      onDoubleClick={resetTo != null ? () => onChange(resetTo) : undefined}
       // The settings' own rail (index.css): this was a 4px bar, which on a
       // desk panel is a control you cannot find in the dark (`npm run layout`).
       className="set-range"
@@ -451,16 +458,17 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
       <Row label="Mask Edge"   value={output.maskFeather} min={0} max={0.25} step={0.005} onChange={v => set({ maskFeather: v })} />
 
       {/*
-        Gain and Gamma as knobs (the design's Wall pane, PLAN.md 8e): set once
-        for a room, not ridden, which is what the desk draws a knob for. At
-        56, the size the design keeps for Load-in and the Stage sheet. A
-        double-click puts each back at 1, untouched.
+        Gain and Gamma were the panel's two knobs (the design's Wall pane,
+        PLAN.md 8e), among its slider rows. One panel, one kind of control
+        (PLAN 8d-3, the owner, 2026-11-22: a panel that mixes sliders and knobs
+        reads as broken), so they are rows like the rest, and keep the knob's
+        double-click back to 1.
       */}
-      <div className="mb-3 flex gap-3" data-testid="output-grade">
-        <Knob label="Output gain" help="Overall brightness of what goes to the projector. One leaves the picture as drawn." value={output.gain} min={0.2} max={3} step={0.05} display={`${output.gain.toFixed(2)}×`}
-          onChange={v => set({ gain: v })} resetTo={1} size={56} testId="output-gain" />
-        <Knob label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05} display={output.gamma.toFixed(2)}
-          onChange={v => set({ gamma: v })} resetTo={1} size={56} testId="output-gamma" />
+      <div className="mb-3" data-testid="output-grade">
+        <Row label="Output gain" help="Overall brightness of what goes to the projector. One leaves the picture as drawn." value={output.gain} min={0.2} max={3} step={0.05} format={v => `${v.toFixed(2)}×`}
+          onChange={v => set({ gain: v })} resetTo={1} testId="output-gain" />
+        <Row label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05}
+          onChange={v => set({ gamma: v })} resetTo={1} testId="output-gamma" />
       </div>
 
       {/* Not a switch: the one Flash Limit switch is in Master. A state line only,

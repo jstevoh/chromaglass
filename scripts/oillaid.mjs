@@ -153,10 +153,10 @@ check('a regrid before the first solver has spoken does not lay the oil twice (t
 
 // Controls.
 {
-  const a = newSim(), ga = standIn(); a.attachGpu(ga); lay(a, 'classic');
-  const b = newSim(), gb = standIn(); lay(b, 'classic'); b.attachGpu(gb);
+  const a = newSim(), ga = standIn(); a.attachGpu(ga); lay(a, 'comet');
+  const b = newSim(), gb = standIn(); lay(b, 'comet'); b.attachGpu(gb);
   check('a look with no oil lays none, with a solver or before one', oily(ga.oil) === 0 && oily(gb.oil) === 0, `${oily(ga.oil)} and ${oily(gb.oil)}`);
-  const c = newSim(), gc = standIn(); lay(c, 'lava-lamp'); lay(c, 'classic'); c.attachGpu(gc);
+  const c = newSim(), gc = standIn(); lay(c, 'lava-lamp'); lay(c, 'comet'); c.attachGpu(gc);
   check('a plate cleared before its solver came keeps none of the cleared look\'s oil', oily(gc.oil) === 0, `${oily(gc.oil)}`);
   // No clear between them: both wait, so it is clearAll that empties, not the second lay.
   const d = newSim(), gd = standIn(); lay(d, 'lava-lamp'); restartStreams('lay:clock-glass', 'plate.'); d.seedPreset('clock-glass', noise); d.attachGpu(gd);

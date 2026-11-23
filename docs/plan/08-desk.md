@@ -2,20 +2,6 @@
 
 **Shipped**, with the proposals below open. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-~~**8-v2** Desk v2, the owner's design of 2026-10-10: one desk in three layouts (Build,
-Gig, Load-in), every panel docked, floated, folded or closed, knobs for encoders, the
-panel browser (⌘P) and the Stage sheet (⌘,)~~ (shipped; story in `docs/plan-shipped.md`
-§8; checks `npm run desklayout` and `npm run layout`).
-
-~~**8-tabs** The tabs are the owner's (asked 2026-10-27): every chip across the top is a
-set of panels, renamed, reordered, added (empty or a copy) and deleted from the pencil
-beside them, with Perform, Sequence and Setup shipped as the three to start from. Build
-and Gig fold into Perform, Load-in and the Sound screen into Setup; the Sequence and
-Sound screens are panels (Songs, Sequences, Music & Drone); an older desk's rearranged
-layout is kept as a tab of its own; the phone has the same tabs in More › Tabs~~ (shipped;
-`src/lib/deskTabs.ts`; checks `npm run desklayout`, `npm run layout`, `npm run phone`).
-Open from it:
-
 - ~~**8-tabs-a** The tabs live in the browser's storage, so a phone and a laptop each
   have their own~~ (shipped: `deskTabs`, a synced store in `src/lib/cloudSync.ts`, read
   again in `useDeskTabs`; which tab is up stays the machine's; `npm run cloudsync` 14;
@@ -36,11 +22,6 @@ Open from it:
 
 Open from Desk v2, each its own thread (the UI lane):
 
-- ~~**8-play** (M) Play, the design's screens 3a and 3b: a phone's own screen for
-  someone listening, not performing (the plate edge to edge, eight dyes, Drop · Blow ·
-  Press, six sliders, the looks, Follow the music, Share clip). A phone opens on it;
-  `/play` is it on an iPad or a laptop~~ (shipped; story in `docs/plan-shipped.md` §8;
-  check `npm run phone`'s Play part).
 - **8-play-a** (S) The iPhone app's Laptop remote from Play. Play here lands on Play,
   and the way back to the remote is All controls › More › Laptop remote, two taps
   deeper than it was. Draw (8-draw, shipped) is the remote's new face; Play's tray
@@ -71,13 +52,24 @@ Open from Desk v2, each its own thread (the UI lane):
     - **8-draw-a-3** (S) OSC's `/blow`, `/drop`, `/press` still take the plate's point,
       not the wall's, so a TouchOSC pad has the old pad's fault (only its middle lands
       under the finger). A `/wall/...` form, or a flag argument, as the remote's `wall`.
-    - ~~**8-draw-a-4** A slow show starved the pad: 3 pictures out at once gave 6.3/s at
-      14 frames~~ (shipped 2026-10-29; `docs/plan-shipped.md` §8-draw-a).
     - **8-draw-a-5** (S) `drawwall --app` reads the pad at whatever rate the runner
       draws, so the real plate's slow trip is tested only when a runner happens to be
       starved (the stand-in's held reads cover the sender). A phase that slows the
       display itself, a page in the same browser loading the shared GPU until the show
       draws about 14 frames, would test it on every run. *Measure:* the line's trace.
+    - **8-draw-a-7** (S) Found 2026-11-21 (the main-green thread), beside 8-draw-a-6:
+      the control's red is not the plate's noise. Four GitHub Mac runs on two heads
+      (#896's branch ad85989 twice, #893's f1e11db) read the same numbers, "cell 21:
+      292 to 294, most changed 33 (499 to 505), median 383 to 392, centre none"; the
+      runs that pass read median 3 or 4 there, and the turned press just before read
+      median 3 or 4 on every run. Something moves the whole picture, the same way, in
+      the window after an old-style controller says hello and drops four times. The
+      heads share no commit the green heads lack (#896 is the tilt knobs; #893 carries
+      #872's slosh wake and #700's https), so the two may be one mechanism reached two
+      ways, the liquid tipped or sloshed. The control now prints what the display did
+      over its window (its own frame's median change, the lead plate's tip and rock,
+      the dishes' spin, the rung, the steps). Read the next red and fix the cause; do
+      not re-take the window until it is known.
   - **8-draw-b** (S) The phone's Draw has no bottle, Spin or Tilt (the design's four
     tools only); they are in Controls. A bottle tile on the phone, or a long press on
     Drop for the bottle list, would put soap on the plate from Draw.
@@ -116,13 +108,6 @@ Open from Desk v2, each its own thread (the UI lane):
     window is painted from the wall's canvas and never the copy's, and which settings
     each engine was handed; a picture of the window against a look changed in Preview
     would be the last word (`docs/judging.md` §49 for the owner's eye meanwhile).
-  - ~~**8b-6** `draftwall`'s fade line read one moment, 0.4 s after Send~~ (fixed
-    2026-10-11: it watches the whole fade; story in `docs/plan-shipped.md`, 8b).
-- ~~**8c** Knobs turn round their ring as well as up and down; a double-click goes back to
-  the look's own value (a double tap on Play's sliders)~~ (shipped; story in
-  `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
-- ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
-  XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
 - ~~**8e** Load-in's Wall panel: the test pattern and Identify, and Output's Gain and Gamma
   as knobs~~ (shipped; checks `npm run wallpattern`, `npm run map`, `npm run layout`).
   - **8e-1** (S) The wall test from the phone. The remote has no Load-in at all (no
@@ -135,9 +120,6 @@ Open from Desk v2, each its own thread (the UI lane):
     same actions on both"), so the switch is in the Wall panel, which Load-in opens by
     default. Moving it to the bar means deciding with the owner whether the bar may
     differ by layout.
-- ~~**8f** A QR code on the Phone · iPad panel, drawn without a library~~ (shipped; checks
-  `npm run qr`, `npm run layout`).
-  - ~~**8f-1** The code whenever nothing is linked, and Link another while phones are~~ (shipped; check `npm run phonelink`).
 - ~~**8g** A panel in a window of its own, for a laptop and a monitor at a gig~~ (shipped;
   check `npm run layout`).
   - **8g-1** (S) The keys in a panel's window. ⌘1–3, ⌘P, Tab and the show's keys (Go,
@@ -180,14 +162,3 @@ Open from Desk v2, each its own thread (the UI lane):
   in `docs/plan-shipped.md` §8j (moved 2026-10-29, 19m).
   - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
     its names are whole, but the line would help there too.
-  - ~~**8j-2** Cards that stuck and stacked~~ (the owner, 2026-10-24). **Shipped**: a drag ends on a lost capture, a release anywhere, a buttonless move or lost focus, and one card is up at a time (`npm run layout`, `npm run phone`). Which gesture on the owner's Mac swallowed the release is not known. Story in `docs/plan-shipped.md` §8j-2 (moved 2026-10-29, 19m-2).
-  - ~~**8j-3** Hover cards wait much longer~~ (the owner, 2026-10-27). **Shipped** (#509): one `TIP_DELAY_MS` (1.5 s) for the knob cards and the `title=` tips (`src/lib/titleTips.ts`; `npm run layout`, `npm run phone`); the remote and cast pages do not install it. Story in `docs/plan-shipped.md` §8j-3 (moved 2026-10-29, 19m-2).
-
-*Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
-picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
-pick lists). `gallery.yml` already photographs every preset; ship those photographs as
-thumbnails, and have Save Look keep a still of the plate in the preset file, sent to a
-receiver once rather than in every cast state (the lesson of S0's logo, in
-`docs/stability-plan.md`). The phone's Looks sheet, where rows are smallest, gains most.
-*Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
-row; the cast state's size is unchanged.
