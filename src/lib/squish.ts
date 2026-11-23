@@ -470,9 +470,10 @@ export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = DISH_GAP_ME
  * middle as the glass's three stacked (each bowl's middle is three times its
  * amount, so the one dent carries all three's).
  */
-export function kickPress(nu: number, sway: number): { radii: number[]; share: number } {
+export function kickPress(nu: number, sway: number, gapMetres?: number): { radii: number[]; share: number } {
   if (Number.isFinite(sway) && sway > 0) return { radii: KICK_RADII, share: 1 };
-  return { radii: [Math.max(4, Math.round(dentRadius(nu) * 128))], share: KICK_RADII.length };
+  const h = Number.isFinite(gapMetres) ? gapMetres! : DISH_GAP_METRES;
+  return { radii: [Math.max(4, Math.round(dentRadius(nu, KICK_HOLD, h) * 128))], share: KICK_RADII.length };
 }
 /** How long the glass takes to give a kick's press back (s): a third of a second, done before the next kick at 120 bpm. */
 export const KICK_RELEASE = 1 / 3;

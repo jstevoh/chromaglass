@@ -24,7 +24,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, LAVA_BODIES, lavaLampCell, foamSeeds, foamCell, FOAM_WASH, FOAM_CELL_DYE } from '../src/lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, classicDiscs, classicCell, LAVA_BODIES, lavaLampCell, foamSeeds, foamCell, FOAM_WASH, FOAM_CELL_DYE } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
@@ -84,7 +84,7 @@ let lab: Lab | null = null;
  *  rasteriser's (`npm run lampzero`) reads this rather than trusting the flags. */
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
-let lastDrop: { n: number; h: Float32Array } | null = null;
+let lastDrop: { n: number; h: Float32Array; z: Float32Array } | null = null;
 /** The colour drops on their way in (PLAN 18c-2), drained a step at a time by `step` as the app's sim drains its own. */
 const drops = makeDropQueue();
 const api = {
@@ -428,6 +428,13 @@ const api = {
   },
   /** One cell of the splodascope's lay, as seedPreset lays it. */
   splodascopeCell,
+  /** Classic's dish as the app lays it on an `n`-cell grid (src/lib/oilLay.ts, PLAN 38w-8: the solver's grid in the app, 192 the CPU's), from a seeded stream of the lab's own. */
+  classicDiscs(seed: number, dyes: number, n = 192) {
+    let s = seed;
+    return classicDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes, n);
+  },
+  /** One cell of Classic's lay, as seedPreset lays it. */
+  classicCell,
   /** Foam Cells' pressed drops as the app lays them on an `n`-cell grid (src/lib/oilLay.ts, PLAN 47z-5), from a seeded stream of the lab's own; one cell of the lay; and its dye's depths. */
   foamSeeds(seed: number, dyes: number, n: number) {
     let s = seed;
@@ -857,11 +864,11 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    // Asked for the air field and there is none: airNear would read a blank
-    // and be 0, which a check of the flat dye beside a hole would take for the
+    // Asked for the air field and there is none: the slope would read a blank
+    // and hold nothing, which a check of the flat dye beside a hole would take for the
     // mask not being there. Say so instead.
     if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
-    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, faraday: l.solver.fields.faraday, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
@@ -913,6 +920,8 @@ const api = {
   },
   /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
   dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
+  /** Both the solved drop height h and the packed height z = min(h + domes, gap) in l_c (PLAN 29a-11). */
+  dropSurface() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h), z: Array.from(lastDrop.z) } : null; },
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

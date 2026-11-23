@@ -9,6 +9,12 @@ import { linkLine, tempoSourceName } from '../../lib/tempo';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 import type { AudioData } from '../../hooks/useAudioAnalyzer';
+import { musicRouteOf, withMusicRoute, ROUTE_ROLES } from '../../lib/musicCords';
+import type { AudioFeature } from '../../types';
+
+type MusicRoute = keyof typeof ROUTE_ROLES;
+/** What each coarse route's cords are, for its label. */
+const ROUTE_NAMES: Record<MusicRoute, string> = { velocity: 'the press', density: 'the pulse', color: 'the bottle' };
 import { useEarView, type EarView } from '../../hooks/useEarView';
 
 /*
@@ -343,11 +349,15 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         {/* What each band of the sound moves: Sound Mappings, as was. */}
         <span className="mb-2 mt-4 block text-[11px] font-medium uppercase tracking-wide text-white/40">What the sound moves</span>
         {/*
-          The selects below are the fixed wiring — which audio band drives
-          velocity, density and colour — and they stay, because they are what
-          the solver reads directly. The other way in is a patch, which can
-          take *any* audio feature to *any* setting; Sound Impact, the master
-          over those, sits with the patch bay under Patches.
+          The selects below are the coarse wiring: which reading the look's
+          music cords take (PLAN 38v-1, lib/musicCords.ts). Velocity is what
+          the Press cord reads, density the pulse's pour and heat, colour the
+          Bottle cord that picks which dye pours. They were read by the
+          frame loop's own hands until those became cords; now each select
+          rewires its cords, which are on the patch bay with every other, and
+          "none" leaves them plugged in reading nothing. Sound Impact, the
+          master over every sound cord, sits with the patch bay under Patches;
+          Sound Drive, above, is the master over these.
 
           Rotation was a fourth select here, the same `audioMappings.rotation`
           as Plate Spin's "Driven by": two drawings of one route, the one here
@@ -356,14 +366,16 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         */}
         {['velocity', 'density', 'color'].map((param) => (
           <div key={param} className="flex flex-col gap-2 mb-4">
-            <span className="text-[13px] font-medium text-text">{param}</span>
+            <span className="text-[13px] font-medium text-text">{param} <span className="text-white/40 font-normal">({ROUTE_NAMES[param as MusicRoute]})</span></span>
             <select
-              value={settings.audioMappings[param as keyof typeof settings.audioMappings]}
+              value={musicRouteOf(settings.sceneMappings, param as MusicRoute)}
+              data-testid={`sound-route-${param}`}
               onChange={(e) => onUpdate({
                 audioMappings: {
                   ...settings.audioMappings,
                   [param]: e.target.value
-                }
+                },
+                sceneMappings: withMusicRoute(settings, param as MusicRoute, e.target.value as AudioFeature, null),
               })}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:border-white/30 transition-all"
             >

@@ -99,7 +99,7 @@ export const OWNER = {
 };
 
 export const INTENT = {
-  classic: ['dish', '"the 1960s overhead projector at its most meditative"'],
+  classic: ['dish', '"lit from below by the projector\'s lamp": dye in a dish'],
   galaxy: ['light', '"spiral arms of starlight swirl through the void"'],
   cyberpunk: ['light', '"neon fluids": neon is light, not a filter'],
   'acid-trip': ['dish', '"under a turning colour gel": a gel is a filter on a lamp'],

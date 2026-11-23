@@ -37,26 +37,63 @@
  *     Relief / 3D is, since the drop is drawn as a camera sees it, and the
  *     projector's plate is not a camera's.
  *
+ *  6. A glass pressed down on the drop squeezes it, it does not cut it
+ *     (PLAN 29a-11, owed). The plate pressed to a 0.8 mm gap all over before
+ *     the same drop is laid, against the plate at its 2 mm rest: the drop's
+ *     volume, the integral of h over the plate, is the same within 0.5%,
+ *     and nowhere does the surface the display is handed (z, the packed
+ *     flow's third channel) stand above the glass over it, pressed or at
+ *     rest. See the line's comment for why.
+ *
+ *   npm run ferrodrop -- --owed=29a-11
+ *
+ * Each line under an id in `--owed` is printed as owed while what it asks
+ * for is absent (the convention of `npm run gap`): the PR that builds the
+ * item takes its id out of `--owed` in scripts/checks.json and never edits
+ * a line or a bar. A build that is there and misses is red, owed or not,
+ * and an owed line that passes is red until its id is taken out.
+ *
  * Lab only (the real solver and plate shader on software WebGPU); a few
  * minutes on a cloud box, seconds on the Mac.
  */
 import { openLab } from './lab.mjs';
-import { DISH_GAP_METRES, DISH_METRES } from '../src/lib/turntable.ts';
+import { DISH_GAP_METRES, DISH_METRES, DISH_REST_GAP } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
+const IDS = ['29a-11'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknown = [...owed].filter((id) => !IDS.includes(id));
+if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+/** `mainState`: what the line is owed for is absent, which is the only state an owed line is excused in. */
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
 
 const N = 256;
 const R = 0.04;          // the drop's radius as poured, in plate widths
 const LC = 0.04 / (2 * Math.PI);   // l_c in plate widths (SPIKE_PITCH / 2π)
 const SIZE = 384;
+/*
+  The pressed gap of line 6 (PLAN 29a-11), in the solver's gap field: the
+  field is DISH_REST_GAP at the 2 mm rest (lib/turntable.ts), so 0.8 mm is
+  0.4 of it. 0.8 mm is 0.63 l_c, well under the 1.49 l_c the solve caps a
+  drop at today, so a solve that ignores the live gap stands a drop more
+  than twice as tall as the glass over it.
+*/
+const PRESSED_METRES = 0.0008;
+const PRESSED = DISH_REST_GAP * PRESSED_METRES / DISH_GAP_METRES;
 
 const { page, close } = await openLab();
 try {
-  const result = await page.evaluate(async ({ N, R, SIZE }) => {
+  const result = await page.evaluate(async ({ N, R, SIZE, PRESSED, REST }) => {
     const settings = (relief) => ({ ...lab.look('ferro-paint').settings, ferroLabyrinth: 0, macroCells: 0, macroLacing: 0, macroRelief: relief });
     const lay = async (dye) => {
       await lab.create(N);
@@ -85,6 +122,48 @@ try {
     const dyedFlat = await lab.render(SIZE, settings(0), cam);
     await lay(false);
     const clear = await lab.render(SIZE, settings(0.7), cam);
+
+    /*
+      6. Pressed (PLAN 29a-11). The glass is brought down to 0.8 mm over the
+      whole plate through the cover's own ledger (lib/cover.ts, PLAN 38r-5):
+      the same 157 g glass on 0.4 of the default 62.8 mL settles at 0.4 of
+      the 2 mm gap, from its first step and held there (measured
+      2026-11-21: coverMetres 0.00080, the squeeze field 0.01199 in every
+      cell, against 0.03 at rest). Not the gap column of the velocity
+      deltas: laid there it never reached the squeeze field at all (0.030
+      everywhere after ten steps, on the old plate and the thin one), and
+      not Cover Hand's press, which keeps closing the film for seconds
+      (0.69 to 0.32 mm over 120 steps) and so has no one gap to hold the
+      drop against. Then the drop is laid and settled as in lay(). The
+      control is the default liquid's 2 mm. The drop is the same ferrofluid
+      on the same footprint in both, so its volume must be the same.
+    */
+    const pressedArm = async (share) => {
+      await lab.create(N);
+      lab.flush();
+      const glass = { liquidMl: 62.8 * share };
+      await lab.step(10, glass);
+      lab.addPhase(0.5, 0.5, R, 1);
+      await lab.step(20, { ...glass, phaseSharp: 0.75, phaseDisplace: 0 });
+      await lab.render(64, settings(0.7), cam);
+      const hs = lab.dropHeight();
+      // The surface the display is handed, if the lab can read it (dropSurface, the API line 6 asks for).
+      const surf = typeof lab.dropSurface === 'function' ? lab.dropSurface() : null;
+      const sq = await lab.squeeze();
+      const ph = await lab.phase();
+      // The gap over the drop: the least and most of the field where the ferrofluid is.
+      let gMin = Infinity, gMax = 0, sumC = 0;
+      for (let k = 0; k < ph.data.length; k++) {
+        sumC += ph.data[k];
+        if (ph.data[k] > 0.05 && sq.n === ph.n) { gMin = Math.min(gMin, sq.gap[k]); gMax = Math.max(gMax, sq.gap[k]); }
+      }
+      return {
+        vol: hs.h.reduce((s, v) => s + v, 0), maxH: Math.max(...hs.h), sumC, gMin, gMax,
+        maxZ: surf ? Math.max(...surf.z) : null,
+      };
+    };
+    const rest = await pressedArm(1);
+    const pressed = await pressedArm(PRESSED / REST);
 
     // The drop on screen: the flat drawing's black disc.
     const disc = (px) => {
@@ -131,8 +210,9 @@ try {
       volStill: vol(still.h), volLeaned: vol(leaned.h),
       flat: spread(flat), lit: spread(lit), d, bx, by,
       dyed: colour(dyed, dd), clear: colour(clear, disc(flat)), differ: same,
+      rest, pressed,
     };
-  }, { N, R, SIZE });
+  }, { N, R, SIZE, PRESSED, REST: DISH_REST_GAP });
 
   // 1. The surface.
   const { n, still, leaned, ph } = result;
@@ -209,6 +289,63 @@ try {
     `blue ${cb.toFixed(0)} → ${db.toFixed(0)}, red ${cr.toFixed(0)} → ${dr.toFixed(0)}`);
   // 5. The plate.
   check('the plate at 1x is the same to the byte at any Relief / 3D', result.differ === 0, `${result.differ} bytes differ`);
+  // 6. Pressed (PLAN 29a-11).
+  {
+    const { rest, pressed } = result;
+    // The gap field in l_c: DISH_GAP_METRES at DISH_REST_GAP, over the dish's width, over l_c in plate widths.
+    const lcOf = (field) => field * (DISH_GAP_METRES / DISH_REST_GAP) / DISH_METRES / LC;
+    const gapRest = lcOf(rest.gMin), gapPressed = lcOf(pressed.gMin);
+    /*
+      First that the press is there and the drop is the same drop, or the
+      line measures nothing: the gap over the ferrofluid is the 0.8 mm asked
+      (to 2%, and even across the drop to 1%), the control's the 2 mm rest,
+      and the ferrofluid laid is the same (Σc to 1%), since the volume the
+      line compares is the drop's own.
+    */
+    const landed = Math.abs(pressed.gMin / PRESSED - 1) < 0.02 && pressed.gMax / pressed.gMin < 1.01
+      && Math.abs(rest.gMin / DISH_REST_GAP - 1) < 0.02 && Math.abs(pressed.sumC / rest.sumC - 1) < 0.01;
+    check('line 6\'s press lands: the gap over the drop is 0.8 mm (to 2%), the control\'s 2 mm, the same ferrofluid laid in both (Σc to 1%)',
+      landed,
+      `gap over the drop ${(pressed.gMin * DISH_GAP_METRES / DISH_REST_GAP * 1000).toFixed(3)}–${(pressed.gMax * DISH_GAP_METRES / DISH_REST_GAP * 1000).toFixed(3)} mm pressed, ${(rest.gMin * DISH_GAP_METRES / DISH_REST_GAP * 1000).toFixed(3)} mm at rest; Σc ${pressed.sumC.toFixed(1)} against ${rest.sumC.toFixed(1)}`);
+    /*
+      Why this and not the obvious thing. A drop between two glasses is
+      incompressible: a glass pressed down on it squeezes it thinner and
+      wider and keeps every bit of its volume, V = ∫h dA, and nothing of it
+      stands above the glass, z ≤ b at every point (b the live gap). Both
+      halves of that are needed and neither is enough alone. Today the solve
+      caps h at 0.95 GAP_LC, a constant (gpu/ferroDrop.ts A.more.y: 1.49 l_c,
+      the rest gap's), whatever the glass is doing, and throws the excess
+      away; pressed to 0.8 mm (0.63 l_c) the volume is therefore exactly
+      what it was, and the drop stands 2.4 times through the glass. A build
+      that only clamps h to the live gap gets the second half and loses the
+      volume over the plateau (a disc of 1.49 l_c cut to 0.63 loses more
+      than half of it); one that scales the drawn surface down to fit, which
+      looks the same in a picture, loses it too. Only spreading the excess
+      to the neighbours (the item's build) keeps both. And the surface the
+      display draws is z, not h: packVelDrop adds FILM_H0 l_c a cell past
+      full to h, up to 2.1 l_c over a 1.56 l_c gap, so the line reads z as
+      the display is handed it, and z must keep min(h + domes, b).
+
+      The API the build adds for it (scripts/lab-entry.ts):
+        lab.dropSurface() → { n, h: number[], z: number[] } | null
+      the last render's drop, n × n row by row, both in l_c: h the solve's
+      height as dropHeight() reads it today, z the third channel packVelDrop
+      wrote into the packed flow that render (FerroDrop.read() extended to
+      copy it). The live gap the solve reads is the view's (packView's w,
+      the squeeze field), the same field this line reads with lab.squeeze().
+
+      mainState: the solve's tallest cell over the pressed gap by more than
+      a tenth, which is the solve ignoring the live gap. A build that reads
+      the gap and loses the volume is not excused (it is red), nor is one
+      that keeps the volume and lets z through the glass.
+    */
+    const kept = pressed.vol / rest.vol;
+    const zOk = pressed.maxZ !== null && rest.maxZ !== null && pressed.maxZ <= gapPressed * 1.005 && rest.maxZ <= gapRest * 1.005;
+    line('29a-11', 'a drop pressed to a 0.8 mm gap keeps its volume (∫h dA within 0.5% of the 2 mm rest\'s) and stands nowhere above the glass (z ≤ the live gap, pressed and at rest)',
+      landed && Math.abs(kept - 1) < 0.005 && zOk,
+      `volume ${(kept * 100).toFixed(2)}% of the rest's; tallest h ${pressed.maxH.toFixed(3)} l_c pressed under a ${gapPressed.toFixed(3)} l_c gap, ${rest.maxH.toFixed(3)} at rest under ${gapRest.toFixed(3)}; tallest z ${pressed.maxZ === null ? 'unread (no lab.dropSurface)' : `${pressed.maxZ.toFixed(3)} pressed, ${rest.maxZ.toFixed(3)} at rest`}`,
+      pressed.maxH > 1.1 * gapPressed);
+  }
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

@@ -1547,17 +1547,12 @@ try {
   // And only against one device's compile, as the line above holds it.
   const rate = cWait?.compile > 0 && cDevices === 1 && oWait && oldWay.length ? oWait.compile / cWait.compile : null;
   console.log(`     1b, the wait to moving for good split up: ${sayWait(oWait)}; for ?prepare=0 ${sayWait(cWait)}`);
-  check(`and it is moving for good no later than the old way was, Chromium's and the GPU's compile apart (with ${STEADY_SLACK_S} s to spare)`,
-    // A control that never ran steadily is no bar at all: its window now
-    // runs to when it was seen running (see the watch), and one that never
-    // was would otherwise hand the show a late one. One that never stopped
-    // for its compile was not cold, and prices nothing.
-    o.steadyFrom != null && c.running && c.steadyFrom != null && o.steadyFrom / 1000 <= FIRST_STEP_MAX_S
-      && !!oWait && !!cWait && cDevices === 1 && cWait.compile > 0 && oWait.own <= cWait.own + STEADY_SLACK_S,
-    `the show's own ${oWait ? `${oWait.own.toFixed(2)} s` : 'unread'} against ${cWait ? `${cWait.own.toFixed(2)} s` : 'unread'} for ?prepare=0`
-      + `${cWait && !(cWait.compile > 0) ? ' (it never stopped for what it built on its frames, so its cache was not cold)' : ''}`
-      + `${cDevices === 1 ? '' : ` (the control had ${cDevices} devices, so its compile is no bar)`}`
-      + `; moving for good from ${secs(o.steadyFrom)}, against ${secs(c.steadyFrom)}${c.running ? '' : ' (never running steadily)'}, read to ${secs(c.watch)}`);
+  // "and it is moving for good no later than the old way was" stood here
+  // until PLAN.md 19ak-21 (2026-11-22): it held the show's own wait to the
+  // control's plus a slack, two noisy residuals of the runner's GPU start,
+  // and in seven weeks of reds (19aa-7) it never found a slow opening the
+  // other lines here missed; the most frequent flaky line in CI. The 1b
+  // breakdown above still prints.
   check(`and it built the old way's pipelines no slower than the old way compiled them on its frames (at most ${COMPILE_RATIO}×)`,
     rate != null && rate <= COMPILE_RATIO,
     rate == null ? `nothing to compare${cDevices === 1 ? '' : ` (the control had ${cDevices} devices)`}` : `${oWait.compile.toFixed(2)} s building ${oWait.shared} of the ${oldWay.length} ahead, against ${cWait.compile.toFixed(2)} s stopped for them: ${rate.toFixed(2)}×`);

@@ -109,7 +109,12 @@ Controls: each check-skeptic control run and what it read (red where it should b
 Review owed: before-merge, sampled or none, then why and what was only done by hand
 Check changes: "none", or one list line per change to a check's bar or input (below)
 Left: the next concrete step, if the work stops here
+Failed: each approach tried that did not work, and why, or none
 ```
+
+`Failed:` records dead ends and why they failed so the next run, or Claude fixing a red
+PR, does not spend hours retrying something already ruled out. It is not enforced by any
+check (`checkguard` does not require it).
 
 Two of these lines are read by programs, so keep their shape: `Plan item:` starts a
 line and is followed by the item's id and a space (`ready.yml` copies the id into its
@@ -197,7 +202,8 @@ One or two lines is enough: what, where, when, and what is now no longer owed.
 ## Stopping halfway
 
 When a session runs out of credit mid-task: push what it has, even if it is red, fill in
-`Left:` with the very next step, and add the `handoff` label. The other tool picks it up
+`Left:` with the very next step and `Failed:` with anything already tried that did not work,
+and add the `handoff` label. The other tool picks it up
 with `gh pr checkout <n>`, reads the PR body and the one plan section (`docs/plan/`), then removes
 the label and carries on in the same PR.
 

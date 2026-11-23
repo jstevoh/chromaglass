@@ -2822,9 +2822,7 @@ at one frame. Whether the looks read better without the line is only seen here.
    line along a boundary, or the colours duller than before.
 2. Any look with two layers (Comet River is one): the back plate's rims are still a little
    brighter than its dye, as before.
-3. **Macro Zoom** to 4x on Comet River: unchanged by this (PLAN 18e-7). Where two colours
-   meet up close there is still a darker band; that is the closeup's relief reading the colour
-   step, and it goes when the closeup shades from the liquid's own optical path.
+3. **Macro Zoom** to 4x on Comet River: judged in §142 (PLAN 18e-7 took the band up close).
 4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
    Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
 5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
@@ -2896,3 +2894,131 @@ private; choose Advanced, then Proceed (Safari: Show Details, then visit this we
 plate should then come up and follow the laptop, as a projector on HDMI does. Say which
 browsers took it, and whether the warning came back on a later visit (it should not on the same
 device, unless the laptop's Wi-Fi address changed).
+
+## 137. A palette from any picture or video (PLAN 43d)
+
+"Palette from a picture or video" (the Dyes panel, under Palette; the phone's Dye sheet)
+takes a file's four main colours as the dyes, shown as "From picture" in the palette list
+and locked like any palette. Only the dye colours change: the look's liquids, motion and
+settings are the look's. A video's colours are taken from eight frames across it.
+
+1. With Classic up, press it and pick an album cover with two or three strong colours. Do
+   the four swatches on the button read as the cover's colours? Good: a person who knows
+   the cover would name them. Bad: a colour the cover does not have, or the cover's main
+   colour missing.
+2. Watch the plate for a minute on a lamp look (Liquid Light Lab or Overhead) and a dark
+   one (Classic): does every dye show on both? Bad: a dye that vanishes into the ground.
+3. A cover that is mostly black or white with one colour (a black sleeve, a pink title):
+   the palette should be that colour in strengths, not grey. Say if it looks dull.
+4. A video of a few seconds with changing scenes: are colours from its later scenes in
+   the palette, not only the first shot's?
+5. Reload the page: "From picture" is still the palette, in the same four colours.
+
+## 138. Polarised light (PLAN 31p-1)
+
+**Judged 2026-11-14.** The owner watched the Mac films (lamp and dye looks, before and after) and approved the look.
+
+The check (`npm run polar`) proves the laws against Jones matrices and the spectrum, that off
+is off to the byte, that a still plate between crossed sheets is black and a stirred one
+lights in colour, and that the quarter-wave plates take the dark lines out, on the lab's
+software WebGPU at one frame. How the bands move with the music at sixty frames is only seen
+here.
+
+1. Open any look with Turbulence up (or the music on, which stirs it through its cord).
+   Settings → Lamp & Light → **Polarisers** to 1. Good: rainbow bands where the liquid moves,
+   broad and smooth like the photograph's dishes, flowing with the liquid and darker where it
+   is calm. Bad: a flat tint everywhere, bands that slide over still dye, speckle or noise.
+2. **Analyser** from 90 down to 0: the dark field turns white and every band swings to its
+   opposite colour. Bad: a jump, or bands that do not change.
+3. **Quarter Wave** to 0: dark curving arms appear through the bands; back to 1, they go.
+4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
+   pinks and greens. The default 0.3 should feel like the photograph.
+5. Polarisers at 0 on any look: the look exactly as before.
+
+## 139. Three physics fixes: Rain Drip needs a tilt, the clear drop's lens, colours push apart (PLAN 38u-7, 38u-12, 38u-14)
+
+Looks change here on purpose. Judge from the film (before and after, same looks).
+
+1. Acid Trip, Neon Coral Reef (Rain Drip 0.4 to 0.6, now on a plate tipped
+   about 15 degrees): the streaks run down at a quarter of the old pull. Good: still streaks,
+   slower, with the heavy colour sinking in fingers. Bad: nothing runs, or the tilt's buoyancy
+   changes the look past what you want (then raise Rain Drip, or set Gravity lower).
+2. Classic on a level plate: no downhill streaks at all now (its Rain Drip 0.15 had a trace).
+   Velvet Underground on a plate tipped about 3 degrees (its 0.6 streaked its pools, which should
+   stay pools): the three pools stay apart and drift slowly, no streaks running out of them.
+3. Pour a clear drop (no dye) on bare water, projected: its dark ring is as strong as a dyed
+   drop's, thin and clear, not a faint ghost.
+4. Two colours side by side with Polarity up: the line between them stays an even edge, no
+   patches where they smear into each other.
+
+## 140. Faraday waves: the music shakes the dish (PLAN 48f)
+
+Settings → Tilt & Rock (the phone's Sound sheet): Shaker sits the dish on a speaker at a
+frequency, Shake is how hard it shakes in g, and the phone's Music Shake puts the music's
+bass on Shake through a cord (on the desk, that cord is laid in Patches: bass onto Shake). Past the water's threshold the surface stands up in a lattice of
+standing waves at half the Shaker's frequency, drawn by the lamp's light through it.
+
+1. On Classic, Shaker 40 Hz, Shake 0.05: nothing should show (under the threshold, about
+   0.09 g at 40 Hz). Raise Shake slowly to 0.3 and wait two seconds: does a fine lattice
+   of light grow over the dye? Bad: a pattern that flashes on at once, or none at all.
+2. With the lattice up, sweep Shaker from 20 to 120 Hz: do the cells get finer as it
+   rises (about 2 cm across at 20 Hz, 5 mm at 120)? Good: it reads as water, not a
+   texture laid over the plate.
+3. Shake to 0: does the lattice settle away over a second or two, not vanish?
+4. Shake 0, Music Shake 50% on the phone (or the bass cord on Shake in Patches), a song
+   with a strong bass: does the lattice grow with the
+   bass lines and settle in the quiet bars? Say whether it is too faint or too strong to
+   read on the wall; the light is the real lens of the water's surface, and a stronger
+   default depth is a dial away.
+5. Watch for flicker: the pattern must hold still while it grows and fades, never strobe.
+
+## 141. The video as the lamp under the dish (PLAN 14ag-3)
+
+The check (`npm run videolamp`) proves the dye filters the video's light by the same share it
+takes of a white lamp, that bare water shows the video, and that a glycerine pool's rim moves a
+striped picture, on the lab's software WebGPU at one frame. Whether it reads as a lamp under a
+dish, and how strong the lenses should be, is only seen here.
+
+1. Load a video, Play it, press **Lamp** on its row. Good: the video is the light; where the dye
+   is thick it goes dark and tinted, where the water is clear it shows plainly, and the colours
+   mix like gels over a light table. Bad: the video laid on top of the dye, or the plate gone flat
+   white with the video faint.
+2. An oil look (Splodascope, Oil & Water): the picture under each drop should be bent and
+   magnified a little, and slide as the drops move. Say if the bending is too weak to notice or
+   too strong (14ag-5 gives it a slider if so).
+3. Film Mix from 1 down to 0: the look fades back to its own ground with no jump at 0.
+4. Press Lamp again: the video goes back over the plate, as Play showed it before.
+
+## 142. No black lines up close, and the closeup's depth from the liquid (PLAN 18e-7)
+
+Judged 2026-11-15 by the owner on the Mac's frame-locked films of main against the fix: "Looks good"
+(Comet River 4x and Classic 6x better than main, Splodascope 4x about the same).
+
+The checks (`npm run holeline` lines 6 to 6b, `npm run camrelief`) prove in the lab that up close
+Boundary Contrast moves nothing, a seam between two dyes is no darker than its two dyes, a swell
+gathers light and a cluster of bubbles stays clean. How the closeup reads at 60 fps is only seen
+here.
+
+1. **Macro Zoom** to 4x on **Comet River**: where two colours meet there is no dark band, up close
+   as on the wall (§132). Bad: a darker line along any boundary between two colours.
+2. The same closeup: it still has depth. A thick pool's edge into clear water carries a soft
+   shadow on one side and a bright edge on the other, as wide as the lens's blur. Bad: the
+   closeup flat as a printed photograph, or the relief a hard outline.
+3. **Splodascope** or any look with bubbles, up close: no white patch or bright halo round a
+   cluster of bubbles. Bad: a bubble's surroundings brighter than the dye away from it.
+4. Macro Relief from 0 to 1 up close: the shading deepens and widens a little; the frame's
+   brightness stays about the same. Boundary Glow from 0 to 1 up close: nothing moves.
+
+## 143. A clear drop's bright rim falls inside its disc (PLAN 18e-9)
+
+The check (`npm run derive -- --owed=grad`) proves in the lab that `calcOpl`'s optical path
+through a clear film is `(n_water + 0.087·film)·h` across gaps and film shares, and that the
+path's Laplacian is negative just inside a clear drop's edge and positive just outside. How
+a clear film drop looks on a projected plate is judged here.
+
+1. Turn on **Clear Film** (or a look with clear film drops) and turn **Projector Focus** off
+   centre (toward 0.8 or 0.2): a clear drop's bright rim (at positive defocus) falls inside
+   its disc, like a converging lens of higher index than water, not reversed outside it.
+2. With **Lamp** on a video row under the front plate, a clear drop over a patterned video
+   refracts the picture consistently with a higher-index lens (`lampDepthAt` uses the same
+   gap height).
