@@ -1146,7 +1146,7 @@ check('and a new song does not repaint a look being built', /if \(designing\) re
 check('saving can write over the look in hand', /const saveOver = useCallback/.test(presetHook));
 check('and saving is no longer a download', !/upsert\(p\);\n    downloadText/.test(presetHook) && /const exportPreset/.test(presetHook));
 check('and there is a way to start from nothing',
-  /const newLook = \(\) => \{/.test(app) && /setSettings\(\{ \.\.\.DEFAULT_SETTINGS \}\)/.test(app));
+  /const newLook = \(\) => \{/.test(app) && /setSettings\(\{ \.\.\.NEW_LOOK \}\)/.test(app));
 check('and the document says when it is unsaved', /setDocDirty\(true\)/.test(app) && /edited=\{docDirty\}/.test(app));
 // One flag, not two: `lookEdited` was derived from the pinned preset and could
 // not be true of an empty plate somebody had since painted.
@@ -1752,7 +1752,6 @@ check('and neither starts over the limit',
     ['parity', 'compared the two solvers; the CPU one went at P7'],
     ['post', 'compared the post chain against its GLSL twin; both went at P7'],
     ['uniforms', 'compared the two uniform packs field for field; the WebGL one went at P7'],
-    ['clip', 'docs/clip-plan.md plans it; scripts/clip* are local-only and run with node'],
   ]);
   const have = new Set(Object.keys(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts));
   const walk = (dir, out = []) => {

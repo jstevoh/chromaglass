@@ -285,38 +285,64 @@ export const SLOSH_SPIN_RUN = 1.5;
 /** The Courant number the spun dish's step is cut to (sloshSteps): under the resting dish's worst forcing, 0.76, and SLOSH_COURANT_MAX. */
 export const SLOSH_SPIN_COURANT = 0.7;
 /**
- * Below these the spin alone does not wake the dish (PLAN 22n): a speed whose
+ * Below this the spin alone does not wake the dish (PLAN 22n): a speed whose
  * heap, Ω²R²/2g, is under a hundredth of the rest depth (0.34 rad/s, a turn
- * every eighteen seconds), and a change of speed under 0.25 rad/s². The looks'
- * own motors turn their dishes at 0.001 to 0.31 rad/s, so a look nobody spins
- * leaves the dish asleep and costs what it did; a hand on the Spin tool, a
- * flick or Auto Spin above three rev/min wakes it. A dish already awake for
- * another reason (a tilt, a kick) feels the spin at any speed.
+ * every eighteen seconds), and the same for the liquid's lag behind a change of
+ * speed (SloshSpin). The looks' own motors turn their dishes at 0.001 to 0.31
+ * rad/s, so a look nobody spins leaves the dish asleep and costs what it did; a
+ * hand on the Spin tool, a flick or Auto Spin above three rev/min wakes it. A
+ * dish already awake for another reason (a tilt, a kick) feels the spin at any
+ * speed.
  */
 export const SLOSH_SPIN_MIN = Math.sqrt((0.01 * SLOSH_REST_DEPTH * 2 * SLOSH_G) / (SLOSH_RADIUS * SLOSH_RADIUS));
-export const SLOSH_SPIN_ACCEL_MIN = 0.25;
 /**
  * What the visualizer hands the dish of its glass's spin each frame (PLAN 22n;
  * fluidSimulation stepSlosh): Ω, the whole dish's speed that frame (the hand,
  * Auto Spin, the look's motor, a flick: its dishSpin), Ω̇ as its change since
- * the last frame, and whether that is enough to wake the dish by itself
+ * the last step, and whether either is enough to wake the dish by itself
  * (spinWakes). Here, beside the dish, so the visualizer's file does not grow.
+ *
+ * What wakes it on a change of speed is the liquid's lag behind the glass, not
+ * the rate of the change. The first version woke on Ω̇ past 0.25 rad/s², and on
+ * the owner's Mac (deploy 835, `npm run startup`) five looks with a motor of
+ * 0.02 to 0.09 rad/s (Fractal Dream, Velvet Underground, Cell Bloom, Chemical
+ * Clock, Clock Glass) woke the dish in their opening, before the kernels the
+ * opening had not asked for were built: the dish's speed is moved once a frame
+ * over the frame's real time, and a frame that stalls while the pipelines
+ * compile moves it most of the way to the motor in one step, which over the
+ * solver's sixtieth of a second reads as several rad/s². The change was a
+ * twentieth of what can be seen. The liquid lags a change of speed by that
+ * change, and the lag runs out at the dish's drag (r, 1/s, the one its solve
+ * takes), so the lag is summed here and let go at r: it wakes the dish past the
+ * same speed a steady spin needs, whatever time the change was read over. A
+ * flick of 1.9 rad/s or a hard stop from Auto Spin does on water and the default
+ * Thickness (past Thickness 0.8 the liquid follows the glass within a frame, and
+ * only a speed past that bar wakes it); a motor coming up to its own speed,
+ * however the frames fall, does not. Euler's force while the
+ * dish runs is still Ω̇ as read, step by step: the impulse it gives is the
+ * change of speed, which is right however the frames fell.
  */
 export class SloshSpin {
   private was = 0;
-  read(spin: number, dt: number): { spin: number; rate: number; wakes: boolean } {
+  private lag = 0;
+  /** `dt` 0 is a frame the dish is not stepped in (off the thin gap): the speed is kept, the lag forgotten. */
+  read(spin: number, dt: number, r: number): { spin: number; rate: number; wakes: boolean } {
     const w = Number.isFinite(spin) ? spin : 0;
-    const r = dt > 0 && Number.isFinite(dt) ? (w - this.was) / dt : 0;
+    const stepped = dt > 0 && Number.isFinite(dt);
+    const change = w - this.was;
     this.was = w;
-    const rate = Number.isFinite(r) ? r : 0;
-    return { spin: w, rate, wakes: spinWakes(w, rate) };
+    const q = stepped ? change / dt : 0;
+    const rate = Number.isFinite(q) ? q : 0;
+    const lag = stepped ? (this.lag + change) * Math.exp(-Math.max(0, r) * dt) : 0;
+    this.lag = Number.isFinite(lag) ? lag : 0;
+    return { spin: w, rate, wakes: spinWakes(w, this.lag) };
   }
-  reset(): void { this.was = 0; }
+  reset(): void { this.was = 0; this.lag = 0; }
 }
 
-/** Whether the dish's spin (rad/s) and its change (rad/s²) are enough to wake the dish by themselves. */
-export function spinWakes(spin: number, spinRate: number): boolean {
-  return (Number.isFinite(spin) && Math.abs(spin) > SLOSH_SPIN_MIN) || (Number.isFinite(spinRate) && Math.abs(spinRate) > SLOSH_SPIN_ACCEL_MIN);
+/** Whether the dish's spin (rad/s), or the liquid's lag behind a change of it (rad/s, SloshSpin), is enough to wake the dish by itself. */
+export function spinWakes(spin: number, lag: number): boolean {
+  return (Number.isFinite(spin) && Math.abs(spin) > SLOSH_SPIN_MIN) || (Number.isFinite(lag) && Math.abs(lag) > SLOSH_SPIN_MIN);
 }
 
 /**

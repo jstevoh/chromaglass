@@ -7,10 +7,11 @@
  * stream the loop does.
  */
 import { WORKING_DYES } from '../presetPlate';
-import { PALETTE_RGB } from '../constants';
+import { PALETTE } from '../constants';
 import { stream } from '../lib/rng';
 
-export const PALETTE_COUNT = PALETTE_RGB.length;
+/** The named dyes (constants.ts PALETTE_RGB carries four picture slots after them, PLAN 43d). */
+export const PALETTE_COUNT = PALETTE.length;
 
 /*
   The show's dice, one stream per purpose (lib/rng.ts).

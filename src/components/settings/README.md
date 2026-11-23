@@ -17,6 +17,7 @@ holds the three longest:
 | `SoundSection.tsx` | `audio-input` |
 | `RoomFilmSections.tsx` | `room`, `film` |
 | `PatchesSection.tsx` | `patches` |
+| `HandControls.tsx` | none of its own: a hand cord's Size, Roam, Volume, Drops and masters, under its row in `patches` (PLAN 38v-1) |
 | `MidiSection.tsx` | `midi` |
 | `LookSections.tsx` | `look`, `show`, `camera`, `stock`, `lamp`, `macro` |
 | `MoireSection.tsx` | `moire`, the moiré pack's sheets (PLAN 45a) |

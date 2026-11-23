@@ -77,9 +77,48 @@ public class ShowsTest {
     @Test public void everySampleFilmComesFromTheSiteAndSaysWhatItPlays() {
         assertEquals(6, Sample.CLIPS.length);
         for (Sample.Clip c : Sample.CLIPS) {
-            assertEquals(c.url, true, c.url.matches("https://chromaglass\\.art/films/[a-z]+\\.mp4"));
-            assertEquals(c.look, true, !c.look.isEmpty() && c.credit.matches("\u201c.+\u201d, .+ \\(19[0-2][0-9]\\)"));
+            assertEquals(c.url, true, c.url.matches("https://chromaglass\\.art/films/[a-z-]+\\.mp4"));
+            assertEquals(c.look, true, !c.look.isEmpty() && c.credit.matches("\u201c.+\u201d, .+ \\(20[0-9][0-9]\\), CC BY 4\\.0"));
         }
+    }
+
+    // The YouTube films (Sample.FILMS, 12-tv-2h): each a real YouTube id, no
+    // film twice, and each named on screen by its look and its music. Since
+    // 34a-6d the music is modern and under CC BY 4.0, not a pre-1926 record,
+    // so the old "public domain by its year" bar is gone; in its place every
+    // film must be one of CLIPS (the same look, title, composer and year), the list
+    // whose credits name the licence, so no film can carry music the TV does
+    // not credit.
+    @Test public void everyFilmIsAYouTubeIdWithItsRecordNamed() {
+        assertEquals(true, Sample.FILMS.length >= 4);
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (Sample.Film f : Sample.FILMS) {
+            assertEquals(f.id, true, f.id.matches("[A-Za-z0-9_-]{11}"));
+            assertEquals(f.id, true, ids.add(f.id));
+            assertEquals(f.id, false, f.look.isEmpty() || f.title.isEmpty() || f.performer.isEmpty());
+            boolean credited = false;
+            for (Sample.Clip c : Sample.CLIPS) {
+                credited |= c.look.equals(f.look) && c.credit.equals("\u201c" + f.title + "\u201d, " + f.performer + " (" + f.year + "), CC BY 4.0");
+            }
+            assertEquals(f.id, true, credited);
+        }
+        assertEquals(true, Sample.FILMS_BASE.startsWith("https://chromaglass.art/"));
+    }
+
+    // The page gets the list as JSON where FILMS_JSON stood, every film in it,
+    // and nothing in a name can end the script it sits in.
+    @Test public void thePageGetsTheListAndNoNameCanBreakOutOfIt() {
+        String page = Sample.page("<script>var FILMS = FILMS_JSON;</script>");
+        assertEquals(false, page.contains("FILMS_JSON"));
+        // Every field under the name films.html reads it by (f.look, f.title, ...):
+        // a renamed key would leave the TV's caption saying "undefined".
+        for (Sample.Film f : Sample.FILMS) {
+            String one = "{\"id\":" + Sample.json(f.id) + ",\"look\":" + Sample.json(f.look)
+                + ",\"title\":" + Sample.json(f.title) + ",\"performer\":" + Sample.json(f.performer)
+                + ",\"year\":" + f.year + "}";
+            assertEquals(f.id, true, page.contains(one));
+        }
+        assertEquals("\"a\\\"b\\u003c/script>\"", Sample.json("a\"b</script>"));
     }
 
     @Test public void theSampleGoesRoundAndRound() {

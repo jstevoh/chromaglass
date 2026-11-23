@@ -25,6 +25,24 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/*
+  Owed lines: each printed as owed while what it asks for is absent (its
+  last argument says whether it is), and the PR that builds it takes its id
+  out of --owed in scripts/checks.json. A build that is there and misses is
+  red, owed or not.
+*/
+const IDS = ['area'];
+const owedFlag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(owedFlag ? owedFlag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknownOwed = [...owed].filter((id) => !IDS.includes(id));
+if (unknownOwed.length) check('every id in --owed is a line of this check', false, `unknown: ${unknownOwed.join(', ')} (known: ${IDS.join(', ')})`);
+const owedCheck = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
+
 // ── The list ────────────────────────────────────────────────────────
 {
   const out = 'node_modules/.cache/straw-bubbles.mjs';
@@ -109,13 +127,30 @@ const check = (name, ok, detail = '') => {
         const qx = Math.round((cx + Math.cos(a) * r * 0.6) * n - 0.5), qy = Math.round((cy + Math.sin(a) * r * 0.6) * n - 0.5);
         inside += air.data[qx + qy * n] > 0.5 ? 1 : 0; inN++;
       }
-      return { out: out / outN, inside: inside / inN };
+      // All the air in the field, in cells: the bubble's area as drawn (PLAN 15g-19).
+      let area = 0;
+      for (let i = 0; i < n * n; i++) area += air.data[i] > 0.5 ? 1 : 0;
+      return { out: out / outN, inside: inside / inN, area };
     }, fing);
     const round = await ring(0), fingered = await ring(1);
     check('a round bubble is round in the air field', round.inside > 0.95 && round.out < 0.02,
       `${(100 * round.inside).toFixed(0)}% air inside, ${(100 * round.out).toFixed(0)}% at 1.35 of its radius`);
     check('a fingered one reaches out in fingers, not a bigger disc', fingered.inside > 0.95 && fingered.out > 0.08 && fingered.out < 0.6,
       `${(100 * fingered.out).toFixed(0)}% of the circle at 1.35 of its radius is air`);
+    /*
+      PLAN 15g-19, written before the build. Air between two glasses keeps
+      its volume: a bubble of air V in a gap b covers A = V/b whatever its
+      rim does, so fingers are a zero-mean change of the rim, lobes out and
+      the liquid between them in. On main the rim only reaches out (rimAt
+      never dips below 1), so the same bubble covers more of the plate the
+      more it fingers, the air made from nothing. Held here against the same
+      bubble round, which is V/b by construction. The PR that builds it takes
+      "area" out of --owed in scripts/checks.json and changes nothing here.
+    */
+    owedCheck('area', 'a fingered bubble covers the area its air does: within 3% of the same bubble round (A = V/b)',
+      Math.abs(fingered.area / round.area - 1) < 0.03,
+      `${fingered.area} cells of air fingered, ${round.area} round (${(fingered.area / round.area).toFixed(3)}x; bar 0.97 to 1.03)`,
+      fingered.area > round.area * 1.03);
   } finally { await close(); }
 }
 

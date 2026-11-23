@@ -8,14 +8,15 @@
  * code that runs, on a sink that records every droplet, and keeps the grep
  * only for what stays in the loop: what the loop hands the bloom.
  *
- *  1. The dial (Kick Bloom). The loop throws a bloom only on a kick with the
- *     dial over 0, and hands it the dial twice: in the dye's gain (with the
- *     fill's room, `autoAmp * pourDt * bloomGain`) and as the push's. And the
- *     bloom honours both: the dye it lays and the push it gives scale with
- *     their gains, each alone (twice the dye's gain, twice the dye and the
- *     same push), and a dye's gain of 0 lays no dye at all while the push is
- *     still thrown.
- *  2. Not a ring (the owner, 2026-10-21). Over 200 seeded kicks, the
+ *  1. The dial (Kick Bloom). Since PLAN 38v-1 the bloom is a cord on every
+ *     look the music plays (lib/musicCords.ts): the kick's hit, gated, on a
+ *     dropper that lets go a slug of drops and a dose of the bottle's liquid,
+ *     riding Sound Drive and Kick Bloom as masters. Played by the real hands
+ *     (lib/areaCords.ts) for 40 kicks: twice the dial lays twice the dye, and
+ *     at 0 no drop and no dose. (The droplets' push went with the frame
+ *     loop's block: a drop's own volume pushes the liquid aside.)
+ *  2. Not a ring (the owner, 2026-10-21). Over 200 seeded slugs of about
+ *     eight drops (lib/kickBloom.ts scatterBloom, as the bloom cord lays them), the
  *     droplets' angles round the burst's centre are not evenly spaced: in a
  *     kick of n droplets on one circle every gap is 2π/n; here the largest
  *     gap in a kick averages well over twice that (a lobe of clumps and an
@@ -40,10 +41,16 @@
  *     old autoInject; the gate moved to the energy argument; an ungated pour
  *     of a colour read without a ternary; a colour destructured; an ungated
  *     pour of the bloom's colour beside the bloom; the gate of another area.
+ *     Two such pours are left in the loop (the automation's); the music's
+ *     left it for the cords, so (d): Red Cabbage's music cords, under loud
+ *     music and twenty kicks, lay no dye in its two reagent wells and drop
+ *     the reagent once a kick.
  */
 import { readFileSync } from 'node:fs';
-import { throwKickBloom } from '../src/lib/kickBloom.ts';
-import { musicDyeIn, reagentArea } from '../src/lib/areaCords.ts';
+import { scatterBloom } from '../src/lib/kickBloom.ts';
+import { musicDyeIn, reagentArea, AreaHands, plateArea } from '../src/lib/areaCords.ts';
+import { cordReading } from '../src/lib/sceneMap.ts';
+import { PRESETS } from '../src/presets.ts';
 import { PRESET_AREAS } from '../src/lib/plateAreas.ts';
 import { makeRng } from '../src/lib/rng.ts';
 
@@ -56,41 +63,69 @@ const check = (name, ok, detail = '') => {
 const vis = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
 const bloomSrc = readFileSync('src/lib/kickBloom.ts', 'utf8');
 
-/** One kick on a recording sink: the dye laid, the push given, each droplet's cell. */
-function kick(seed, dyeGain, pushGain, hit = 0.8) {
+/** One kick's scatter on a recording sink: the dye laid and each drop's cell (lib/kickBloom.ts scatterBloom). */
+function kick(seed, total = 7.3, drops = 8) {
   const dice = makeRng(seed, 'kickbloom');
-  const rec = { dye: 0, push: 0, dyed: 0, cells: [] };
+  const rec = { dye: 0, dyed: 0, cells: [] };
+  scatterBloom((x, y, a) => { rec.dye += a; rec.dyed++; rec.cells.push([x, y]); }, () => dice.float(), 128, 128, 24, total, drops);
+  return rec;
+}
+
+/** A look's bloom cord, played by the real hands on a recording sink for `kicks` kicks of `hit`, under these masters. */
+function bloomOf(cords, masters, kicks = 40, hit = 0.8) {
+  const hands = new AreaHands();
+  const plate = plateArea(5);
+  const rec = { dye: 0, drops: 0, doses: 0 };
   const sink = {
-    addDensity(x, y, a) { rec.dye += a; rec.dyed++; },
-    addVelocity(x, y, vx, vy) { rec.push += Math.hypot(vx, vy); rec.cells.push([x, y]); },
+    heat() {}, dye() {}, paddle() {},
+    drop(x, y, a, c, slug) { if (slug) { rec.dye += a; rec.drops++; } },
+    dose() { rec.doses++; },
   };
-  throwKickBloom(sink, dice, 256, 128, 128, 24, { r: 1, g: 0.5, b: 0.2 }, hit, dyeGain, pushGain);
+  const dice = makeRng(7, 'kickbloom-cord');
+  for (let k = 0; k < kicks; k++) {
+    for (let step = 0; step < 30; step++) {
+      const v = step < 3 ? hit : 0;
+      const ctx = { sound: { features: {} }, shape: null, room: null, film: null, hits: { value: () => v }, roomImpact: 0, filmImpact: 0, soundImpact: 1, shapeImpact: 1, masters };
+      hands.step(cords, null, (m, band) => cordReading(ctx, m, 0, band), 1 / 60, plate, masters);
+      hands.lay(sink, 192, 1 / 60, () => ({ r: 1, g: 1, b: 1 }), 0, { pace: 1, dice: () => dice.float(), plate });
+    }
+  }
   return rec;
 }
 
 // ── 1. The dial ──
+/*
+  Since PLAN 38v-1 the bloom is a cord on every look: the kick's hit, gated,
+  on a dropper that lets go a slug of drops, riding Sound Drive and Kick
+  Bloom as its masters. The dial is the second master: twice the dial, twice
+  the dye; at 0 none at all, and no dose either.
+*/
 {
-  const burst = vis.slice(vis.indexOf('const bloomGain'), vis.indexOf('// The beat dose'));
-  check('the loop throws the bloom only on a kick with Kick Bloom over 0, and hands it the dial in the dye\'s gain and as the push\'s',
-    /kickBloom \?\? 1/.test(burst) && /bloomGain > 0/.test(burst)
-      && /throwKickBloom\([^;]*autoAmp \* pourDt \* bloomGain[^,;]*, bloomGain\);/.test(burst),
-    'src/components/LiquidVisualizer.tsx');
-  const a = kick(1, 1, 1), b = kick(1, 2, 1), c = kick(1, 1, 2), z = kick(1, 0, 1);
-  const r = (x, y) => x / y;
-  check('the bloom scales its dye with the dye\'s gain and its push with the push\'s, each alone',
-    Math.abs(r(b.dye, a.dye) - 2) < 1e-9 && Math.abs(r(b.push, a.push) - 1) < 1e-9
-      && Math.abs(r(c.push, a.push) - 2) < 1e-9 && Math.abs(r(c.dye, a.dye) - 1) < 1e-9,
-    `dye x${r(b.dye, a.dye).toFixed(3)} push x${r(c.push, a.push).toFixed(3)}; the other x${r(b.push, a.push).toFixed(3)}, x${r(c.dye, a.dye).toFixed(3)}`);
-  check('a dye\'s gain of 0 lays no dye, and the push is still thrown',
-    a.dyed > 0 && z.dyed === 0 && z.dye === 0 && Math.abs(z.push - a.push) < 1e-9,
-    `${z.dyed} droplets dyed of ${z.cells.length}; push ${z.push.toFixed(3)} against ${a.push.toFixed(3)}`);
+  const bad = [];
+  let looks = 0;
+  for (const p of PRESETS) {
+    if (!((p.settings.audioImpact ?? 0.45) > 0.01)) continue;
+    looks++;
+    const b = (p.settings.sceneMappings ?? []).filter(m => m.role === 'bloom');
+    if (!b.length || !b.every(m => m.source === 'hits' && m.feature === 'kickHit' && m.mode === 'gate' && m.setting === 'areaPour'
+      && m.volume > 0 && m.masters?.includes('kickBloom') && m.masters?.includes('audioImpact'))) bad.push(p.id);
+  }
+  check('every look the music plays carries the kick\'s bloom as a gated dropper on the kick, riding Sound Drive and Kick Bloom',
+    looks >= 30 && bad.length === 0, bad.length ? bad.join(', ') : `${looks} looks`);
+  const cords = PRESETS.find(p => p.id === 'classic').settings.sceneMappings.filter(m => m.role === 'bloom');
+  const one = bloomOf(cords, { audioImpact: 1, kickBloom: 1 });
+  const two = bloomOf(cords, { audioImpact: 1, kickBloom: 2 });
+  const none = bloomOf(cords, { audioImpact: 1, kickBloom: 0 });
+  check('Kick Bloom scales the slug\'s dye (twice the dial, twice the dye) and at 0 lays none and doses nothing',
+    one.drops > 40 * 4 && Math.abs(two.dye / one.dye - 2) < 0.15 && none.dye === 0 && none.drops === 0 && none.doses === 0 && one.doses === 40,
+    `dye x${(two.dye / one.dye).toFixed(3)}; ${one.drops} drops and ${one.doses} doses in 40 kicks; at 0 ${none.drops} drops, ${none.doses} doses`);
 }
 
 // ── 2. Not a ring ──
 {
   let gapRatio = 0, kicks = 0, fewest = Infinity, most = 0;
   for (let s = 0; s < 200; s++) {
-    const k = kick(100 + s, 1, 1);
+    const k = kick(100 + s);
     const n = k.cells.length;
     fewest = Math.min(fewest, n); most = Math.max(most, n);
     if (n < 3) continue;
@@ -102,7 +137,7 @@ function kick(seed, dyeGain, pushGain, hit = 0.8) {
   }
   gapRatio /= kicks;
   check('the droplets are clumps at random angles, not evenly round one circle (largest gap over 2.3x an even ring\'s)',
-    gapRatio > 2.3 && bloomSrc.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(bloomSrc),
+    gapRatio > 2.3 && bloomSrc.includes('lobeAt') && !/\(d \/ n\) \* Math\.PI \* 2/.test(bloomSrc),
     `largest gap ${gapRatio.toFixed(2)}x an even ring's, over ${kicks} kicks`);
   check('5 to 11 droplets a kick, both ends reached', fewest === 5 && most === 11, `${fewest} to ${most}`);
 }
@@ -161,7 +196,7 @@ function kick(seed, dyeGain, pushGain, hit = 0.8) {
     return out;
   };
   // The calls that lay colour, and which argument carries the share for each.
-  const LAYERS = { autoInject: (g) => g[9] ?? '', addDensity: (g) => g[2] ?? '', throwKickBloom: (g) => g[8] ?? '' };
+  const LAYERS = { autoInject: (g) => g[9] ?? '', addDensity: (g) => g[2] ?? '' };
   const callAround = (at) => {
     let best = null;
     for (const name of Object.keys(LAYERS)) {
@@ -199,8 +234,28 @@ function kick(seed, dyeGain, pushGain, hit = 0.8) {
     if (!ok) misses.push(`${name} of ${v}: the share is '${share.slice(0, 60)}'`);
   }
   check('every pour of an area\'s colour in the frame loop carries musicDyeIn of that area, in the argument that lays the colour',
-    reads >= 7 && calls.size >= 8 && misses.length === 0,
+    // Two now: the music's own pours left the loop for the cords (PLAN 38v-1); (d) holds those.
+    reads >= 2 && calls.size >= 2 && misses.length === 0,
     misses.length ? misses.join(' | ') : `${reads} colours read, ${calls.size} pours`);
+}
+
+// (d) The music's cords in a reagent area: loud music and every kick, and no dye laid, only the reagent's drops.
+{
+  const look = PRESETS.find(p => p.id === 'red-cabbage');
+  const areas = PRESET_AREAS['red-cabbage'];
+  const cords = look.settings.sceneMappings.filter(m => m.role && m.area !== undefined);
+  const hands = new AreaHands();
+  const got = { dye: 0, drops: 0, liquid: 0 };
+  const sink = { heat() {}, paddle() {}, dye(x, y, a) { got.dye += a; }, drop(x, y, a) { got.drops += a; }, liquid() { got.liquid++; }, dose() {} };
+  const loud = { bass: 90, mid: 85, treble: 80, volume: 90, energy: 0.8, timbre: 60, complexity: 60, features: {} };
+  for (let step = 0; step < 600; step++) {
+    const v = step % 30 < 3 ? 0.9 : 0;
+    const ctx = { sound: loud, shape: null, room: null, film: null, hits: { value: () => v }, roomImpact: 0, filmImpact: 0, soundImpact: 1, shapeImpact: 1, masters: { audioImpact: 1, kickBloom: 1 } };
+    hands.step(cords, areas, (m, band) => cordReading(ctx, m, 0, band), 1 / 60, plateArea(5), ctx.masters);
+    hands.lay(sink, 192, 1 / 60, () => ({ r: 1, g: 1, b: 1 }), 0, { pace: 1 });
+  }
+  check('the music\'s cords in Red Cabbage\'s reagent wells lay no dye under loud music and twenty kicks, only drops of the reagent',
+    cords.length >= 3 && got.dye === 0 && got.drops === 0 && got.liquid >= 20, `${cords.length} cords; dye ${got.dye}, dropper ${got.drops}, ${got.liquid} reagent drops`);
 }
 
 const failed = checks.filter(c => !c.ok);
