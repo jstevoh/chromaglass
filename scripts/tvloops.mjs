@@ -392,6 +392,7 @@ async function makeAll() {
   const { chromium } = await import('playwright');
   const { launchChromium } = await import('./chromium.mjs');
   const { AUTOPLAY, untilRunning } = await import('./recorder.mjs');
+  const { untilFlowerFree } = await import('./flowergate.mjs');
   const { isGpuEngine } = await import('./frame.mjs');
   const loops = TV_LOOPS.filter((l) => !ONLY || ONLY.includes(l.id));
   if (!loops.length) throw new Error(`no loop called ${ONLY}`);
@@ -411,7 +412,12 @@ async function makeAll() {
     process.on('exit', stop);
     for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(); process.exit(130); });
     await new Promise((r) => setTimeout(r, 2500));
+    // Before the app opens: no loop of a build that draws the flower (PLAN 31s-8, scripts/flowergate.mjs).
+    await untilFlowerFree({ dist: DIST });
     browser = await launchChromium(chromium, { args: [AUTOPLAY] });
+  } else {
+    // A film rendered earlier, cut and maybe uploaded here: at least the source must be clean.
+    await untilFlowerFree();
   }
   const filmSeconds = WARM_S + LOOP_S + SEAM_S;
   const silence = silenceWav(filmSeconds + 1);

@@ -249,3 +249,14 @@ Open, from building 9i:
   default cord on `magnetStrength` and `magnetWalk`, so Impact and the patch govern it and the
   desk shows it. Check: with `sceneMappings` empty, `lastMagnetRef` is the same under loud
   music and silence. 9j points here. (38v, from RS-44.)
+
+- **9e-1. The magnet's domes come up short on some Mac runs** (S; Medium). `npm run spikes`
+  on main's deploy of 2026-11-22 (f825ee6b, WebGPU plate shard): "held close under a pool,
+  the magnet parts it into domes" read 21 domes in 7 pieces (the bar wants 8 pieces), and "the
+  plate lights a point on the domes" 7 of the 21 lit (it wants 8, and half). Deploys 869 and
+  872 read 28 domes and 16 pieces; 871 (2026-11-21, before #932's Cahn–Hilliard pacing) read
+  21 and 6, so it predates #932 but now repeats. Find whether the pool parts later on a busy
+  runner (the check's settle counted in frames or in seconds), or whether the Rosensweig
+  wavelength the solver resolves sits near the grid's pitch so a pool either breaks into
+  pieces or stays joined by thin necks. Don't lower the bar: those two lines are quarantined on
+  PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes them out.

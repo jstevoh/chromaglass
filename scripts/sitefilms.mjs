@@ -90,6 +90,7 @@ import path from 'node:path';
 import { launchChromium, port } from './chromium.mjs';
 import { isGpuEngine } from './frame.mjs';
 import { AUTOPLAY, untilRunning } from './recorder.mjs';
+import { untilFlowerFree } from './flowergate.mjs';
 import { SITE_FILMS, CHANNEL_ALBUMS, LOOP_SECONDS, LOOP_BLEND_S, FADE_IN_S, FADE_OUT_S, LICENCE, creditOf } from '../src/lib/siteFilms.ts';
 
 // Asked of ports.mjs, so it moves with its runner's block and never meets
@@ -161,6 +162,9 @@ let browser = null;
   webpage. Vite takes a variable already in the environment over the file's,
   so these, set empty, are what the build sees.
 */
+// Films made earlier and only cut here: their run was gated when it recorded them, and this asks
+// the source again so none goes up while the source still draws the flower (PLAN 31s-8).
+if (FILMS_FROM && !BANNER) await untilFlowerFree();
 if (BANNER || !FILMS_FROM) {
   console.log('sitefilms: building the site with no sign-in…');
   execFileSync('npx', ['vite', 'build', '--outDir', DIST, '--emptyOutDir'], {
@@ -173,6 +177,8 @@ if (BANNER || !FILMS_FROM) {
   process.on('exit', stop);
   for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(); process.exit(130); });
   await new Promise((r) => setTimeout(r, 2500));
+  // Before the app opens: no film of a build that draws the flower (PLAN 31s-8, scripts/flowergate.mjs).
+  await untilFlowerFree({ dist: DIST });
   browser = await launchChromium(chromium, { args: [AUTOPLAY] });
 }
 

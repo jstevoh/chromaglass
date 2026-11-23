@@ -242,16 +242,17 @@ is in the project's files).
   against the check's half (0.44 at 0.25). A held press on the floor has no squeeze, so it
   should push nothing; Classic is back at 0.25 until both are found, and the fix runs
   heldpress at 0.4 flat as well.
-- **38w-20. Warm cells still read soft in the app with Crisp Edges on** (M; High). Filmed in
-  the app on Metal (seed 1, 512² grid, 1280x800 canvas, after 12 s): the cyan cells' rims are
-  one crisp pixel, but the red and orange cells' rims are a soft three or four pixels, and
-  turning Crisp Edges off leaves them unchanged. Edge Relief adds a broad dark band just inside
-  them (it reads the solver's band at `rim0`, unmoved), but Edge Relief at 0 still leaves the
-  rim soft, so the relief is not the cause. Not measured yet, two guesses: those cells' oil band
-  is wider than 3.5 cells, which `crispInterface`'s `real` gate leaves alone on purpose as real
-  diffusion; or their dye has leaked out into the water (about 7% of it in the lab), so the
-  colour's edge is not the oil's. First read the band half-width (`eps / h.x`) and the dye
-  outside the oil at those rims in the app, then fix the cause in the solver (why warm cells
-  spread wider than cyan) and not in the plate. Once the rim is sharp, draw the meniscus as a
-  narrow line at the crisp rim (the chain rule through the warp), not as the band-wide halo.
+- **38w-25. Classic's meniscus from the oil, not the dye** (M; High, after 18e-2). A real cell's
+  rim is the light its curved oil surface bends: a thin dark and bright line at the oil's edge,
+  set by the oil's index step (about 1.47 against 1.33), not by the dye. Build 18e-2 (deflection
+  by the gradient of the optical path, the oil's thickness in it), then give Classic a narrow
+  rim at the crisp edge from it and turn the classicdish no-halo line into "a rim, and no halo".
+  Untraced on the way: at Edge Relief 0 the water 2–8 px outside a rim is already about 5%
+  darker than open water (94.9% and 94.6% on Metal), with no slope shading drawn. Find what
+  darkens it (dye crowded at the rim by the flow, or the plate's own blur) before the rim goes in.
+- **38w-26. `readField` and `fluids[0].n` report the CPU mirror, not the GPU grid** (S; Medium).
+  In the app on Metal the solver runs at 512² or 768², but `chromaglassDebug().fluids[0].n`
+  and `readField` answer 192², the CPU mirror's. A check or probe reading them thinks the plate
+  is coarser than it is (this thread lost an hour to it). Report the GPU grid, or name the field
+  `cpuN`, and say in `src/lib/checkHooks.ts` which grid each hook reads.
 
