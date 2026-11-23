@@ -503,7 +503,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 5 | Playing it: sound learn, shutter, and a look link | [`05-playing-it.md`](docs/plan/05-playing-it.md) |  | 8 |
 | 6 | Render a song | [`06-render-a-song.md`](docs/plan/06-render-a-song.md) |  | 1 |
 | 8 | The desk: the laptop is a control surface, not the show | [`08-desk.md`](docs/plan/08-desk.md) |  | 13 |
-| 9 | Ferrofluid after the references | [`09-ferrofluid.md`](docs/plan/09-ferrofluid.md) |  | 20 |
+| 9 | Ferrofluid after the references | [`09-ferrofluid.md`](docs/plan/09-ferrofluid.md) |  | 21 |
 | 10 | Playing like a show | [`10-playing-like-a-show.md`](docs/plan/10-playing-like-a-show.md) |  | 23 |
 | 11 | The mixer | [`11-mixer.md`](docs/plan/11-mixer.md) |  | 12 |
 | 12 | ChromaGlass in the App Store and Google Play | [`12-app-stores.md`](docs/plan/12-app-stores.md) |  | 39 |
@@ -552,7 +552,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 33 |
 | 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 8 |
 | 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46r, one args name one value a step, **shipped** (`npm run argnames`); 46a-46e builds to Antigravity after its queue; the audit of 2026-11-13: 46f (the ear's view and the clock out of the shell) and 46g (liquids carried only once poured) **shipped**, 46h-46q, 46s and 46t written | 18 |
-| 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 43 |
+| 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 44 |
 | 48 | Ideas: more compelling visuals from real phenomena (brainstormed 2026-11-21) | [`48-ideas-visuals.md`](docs/plan/48-ideas-visuals.md) |  | 15 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 3 |
 
