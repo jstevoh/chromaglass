@@ -125,6 +125,18 @@
       ]
     },
     {
+      "name": "The lively looks at a real show's pace",
+      "shard": "logic",
+      "run": "npm run pace",
+      "why": [
+        "PLAN 48q: the lively looks turned over several times slower than a real",
+        "show. Each carries its harder rock, rhythm sheet and pours whole after",
+        "every pass, never quieter than before, inside the dials, runs a liquid",
+        "thinner than light oil and no thinner than water (Thickness), and the moire",
+        "pack keeps its own pace. The film's turnover and colour are `-- --film` on the Mac."
+      ]
+    },
+    {
       "name": "The kick's bloom",
       "shard": "logic",
       "run": "npm run kickbloom",
@@ -354,6 +366,19 @@
         "for a grace after it ends, never for a shard that gave up or died; macbusy.sh's",
         "own marks read back; the last step fails when a look between the checks found",
         "the Mac busy, and the watchdog reads that failure as busy too."
+      ]
+    },
+    {
+      "name": "One film at a time on the owner's Mac",
+      "shard": "logic",
+      "run": "npm run maclock -- --selftest",
+      "why": [
+        "The Mac film lock and FIFO queue (scripts/maclock.mjs, PLAN.md 19ak-23):",
+        "exclusive execution, FIFO ordering across queued waiters, dead-pid and",
+        "over-timeout stale recovery, manual one-line locks honoured and aged,",
+        "timeout cleanup, CG_FILM_LOCK_HELD nesting, stale-rename race protection,",
+        "--max-wait exit 75 with no leftover ticket, deploy-mark priority, and",
+        "scripts/macbusy.sh refusing a live film.lock."
       ]
     },
     {
@@ -1781,6 +1806,18 @@
       ]
     },
     {
+      "name": "A colour's edge stays sharp on the thin gap",
+      "shard": "lab2",
+      "run": "npm run dyeedge",
+      "why": [
+        "The thin gap's dye flux keeps an edge as sharp as the grid can hold (PLAN.md 1l,",
+        "scripts/dyeedge.mjs): three flat discs on Galaxy's gap turned two hundred steps",
+        "by a solid swirl keep their colour, overshoot nowhere, and leave under 0.62",
+        "part-full cells per full cell (minmod left 0.713, the MC limiter 0.541, an exact",
+        "carry about 0.29). Lab at 128², so SwiftShader runs it in under a minute."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
@@ -1842,7 +1879,7 @@
         "and that the dial is live out of focus so nothing moving is the shader's",
         "answer. It also",
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
-        "with airNear's mask taken off finds the glow again), and a pool's edge",
+        "with the slope's air hold taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
         "so it sits here beside lampzero rather than in the Mac queue.",
         "In a Measure part of its own, `lab4`, since main's deploys 667 and 670",
@@ -2845,6 +2882,15 @@
       "why": [
         "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
         "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
+      ]
+    },
+    {
+      "name": "The flower",
+      "shard": "plate",
+      "run": "npm run flower",
+      "why": [
+        "No ghost copies of a thin rim one cell apart round a drop or a bubble (PLAN 31s-8): the slope reads each tap as its cell's mean, so a rim thinner than a cell is not copied at every tap offset.",
+        "The point-read control (each tap read at one texel again, what drew the flower) must read the comb, or the measure sees nothing."
       ]
     },
     {

@@ -52,3 +52,41 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   Edges, 1 in Classic): 8 px → 1 px median (the one antialiased pixel), `npm run classicdish`'s rim line. A render-side
   reconstruction of the solver's level set, not a change to the solver: 38w-18 is the solver's
   own sharp interface.
+- ~~**38w-20. Warm cells still read soft in the app with Crisp Edges on**~~ (fixed 2026-11-22 by 38w-23: the soft warm rims were Edge Relief's dye-slope halo; with Classic's Edge Relief at 0 every cell's rim is the crisp pixel cyan already had, probed on Metal at seed 1) (M; High). Filmed in
+  the app on Metal (seed 1, 512² grid, 1280x800 canvas, after 12 s): the cyan cells' rims are
+  one crisp pixel, but the red and orange cells' rims are a soft three or four pixels, and
+  turning Crisp Edges off leaves them unchanged. Edge Relief adds a broad dark band just inside
+  them (it reads the solver's band at `rim0`, unmoved), but Edge Relief at 0 still leaves the
+  rim soft, so the relief is not the cause. Not measured yet, two guesses: those cells' oil band
+  is wider than 3.5 cells, which `crispInterface`'s `real` gate leaves alone on purpose as real
+  diffusion; or their dye has leaked out into the water (about 7% of it in the lab), so the
+  colour's edge is not the oil's. First read the band half-width (`eps / h.x`) and the dye
+  outside the oil at those rims in the app, then fix the cause in the solver (why warm cells
+  spread wider than cyan) and not in the plate. Once the rim is sharp, draw the meniscus as a
+  narrow line at the crisp rim (the chain rule through the warp), not as the band-wide halo.
+- ~~**38w-21. The look's lay reaches the GPU solver at its first attach**~~ (shipped 2026-11-22,
+  `OwedLay` in `src/sim/solverLay.ts`). A look applied before the GPU solver attached laid its
+  dish on the CPU's 192² mirror only and the GPU started from the default plate; the lay is now
+  owed and taken once by `attachGpu`. `npm run classicdish`'s first line (the dye laid at the
+  solver's grid, none on the CPU's).
+- ~~**38w-22. Classic's oil poured, not packed**~~ (shipped 2026-11-22, `classicDiscs` in
+  `src/lib/oilLay.ts`). The owner, round four: "too symmetric". The drops now fall along
+  fourteen random-walk pours with log-normal sizes, a tenth sprayed anywhere, drops in a pour
+  joining where they touch, each drop aimed up to twelve times at open water before it counts
+  as lost (more pours did not add bodies: crossing paths lost them), and one to three water
+  drops held in the big cells. Checked by the spread of the oil's cover over 6 by 4 boxes (at
+  least 18% of its mean; 24.9% and 24.2%, packed 5–9%) and 133 and 134 bodies apart (at least 120).
+- ~~**38w-23. Edge Relief off in Classic: no dark lattice round the cells**~~ (shipped
+  2026-11-22). Probed on Metal (seed 1, 1280x800): Edge Relief 0.6 drew a wide dark halo, squared
+  to the grid, round every warm cell, because `refractionOptics` (wgsl/plate.ts) darkens by the
+  slope of the dye (shortcut notes 1 and 6) and the warm cells carry the heaviest dye; cyan, at
+  the water's density, got none. That halo was both the lattice the owner called too symmetric
+  and 38w-20's soft red rims. At 0 the cells are round and crisp. classicdish's meniscus line
+  became a no-halo line: the water 2-8 px outside a rim keeps at least 95% of its light against
+  Edge Relief 0, and the old 0.6 must fail it. **Shortcut named:** Classic now draws no meniscus
+  at all; 38w-25 brings back the oil's own.
+- ~~**38w-24. Classic moves: the hand rocks the dish harder**~~ (shipped 2026-11-22). The owner,
+  round four: "it needs movement". Filmed at 1280x800, 25 s with the built-in band: at Plate Rock
+  0.55 the frame changed by 0.95 grey levels a half-second and 13 from first frame to last; at
+  0.8 by 3.25 and 21. The rock is the real one (lib/plateRock.ts: the gap tips, the oil slides
+  at Darcy's speed in it), only stronger.

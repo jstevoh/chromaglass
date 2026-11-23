@@ -83,3 +83,35 @@
   (§1) retired it; Evolve never raises it. Remove the pass, the slider and the CC with a
   settings migration that drops the key. Check: `npm run panel` and `npm run desk` pass and a
   saved look with Sharpness loads. (38v, from RS-9.)
+- **1l. The thin gap's dye carry rounded every edge it moved** (asked 2026-11-22: Galaxy
+  looked like a blurry lens, not a sharp Hubble picture of a galaxy). `bodyAdvect`'s MUSCL
+  flux limited its slope with minmod, which falls back to first-order upwind at every edge
+  of colour; its numerical diffusion (about 1e-7 m²/s at a look's speeds) is some three
+  hundred times dye's own in water, so the carry, not the liquid, made every edge a ramp.
+  **Shipped** with the monotonized central limiter (still TVD, second order in smooth
+  colour). `npm run dyeedge`: part-full cells per full cell 0.713 → 0.541 (an exact carry
+  is about 0.29), colour kept to 0.000%, no overshoot.
+- **1m. mixAdvect and the phase field still limit with minmod** (found building 1l).
+  `mixAdvect` (the oil's fraction, `carry.ts`) and the phase step (`phase.ts`) carry an
+  interface profile that their relaxation holds to a set width, so MC may fight it rather
+  than sharpen anything real. Try MC on each in the lab and keep it only if the profile's
+  width holds and `oilmass`-style totals stay put; unbuilt.
+- **1n. Galaxy still read as a soft lens after 1l** (the same ask). Two causes the limiter
+  cannot reach. The dye lives on the flow's grid and is resampled every step, so its edge
+  spreads to about four cells, where real dye (Schmidt number near 10³) folds into threads
+  far finer than the flow. And Galaxy inherited Edge Relief 0.4, which shades the dye's
+  slope as a meniscus, though it is dye in thin water with no interface to bend light: a
+  grey smoke round every arm. **Shipped** in the preset: particles 0.5 (mix 0.6), which
+  carry dye as points that are never resampled, and Edge Relief 0, as Classic has it
+  (38w-23). Same seeded frame, `sharp.mjs` hard-edge share: 8.0% before, 15.0% with
+  particles 0.5 (20.6% at 0.8, which drew dark speckled rims, so not that); Edge Relief 0
+  alone 9.2% to 13.2%. Before/after beside a Hubble picture went to the owner to judge.
+  `src/presets.ts` is now 48 bytes under the 100 KB bar: the next preset change splits it first.
+- **1o. Particles are drawn on top of the dye, not as the dye, and the governor does not
+  count them** (found building 1n). H1's particles splat their colour additively over the
+  grid's dye, so a thread is drawn twice (once soft from the grid, once sharp from the
+  points) and dye mass is not conserved between the two: a shortcut for speed. The real
+  phenomenon is one dye carried at sub-grid scale; replace it with particles that own their
+  share of the dye (deposit on birth, return on death) or a sub-grid scalar. Galaxy at
+  particles 0.5 measured about 10 ms more per frame headless under load, which the governor
+  does not see, so a phone may drop frames before it sheds anything. Unbuilt.

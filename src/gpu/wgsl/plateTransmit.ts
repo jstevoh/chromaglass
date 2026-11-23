@@ -119,7 +119,7 @@ fn defocusShadow(t: texture_2d<f32>, uv: vec2f) -> f32 {
   blew a cluster of bubbles up to flat white (17% of a frame on the Mac).
   A bubble's wall is the traced bubble's to draw (closeupDepth.ts): its air
   is not liquid, so a tap that lands in it reads the middle's path instead,
-  and near a hole the term fades out, as airNear flattens the dye's normal.
+  and near a hole the term fades out, as the slope holds the air (plateSlope.ts).
 
   CAMERA_DISC is how fast the camera's disc grows with dz, in the derive
   pass's spacings, against the projector's 4: a macro lens is stopped down
