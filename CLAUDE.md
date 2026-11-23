@@ -123,5 +123,5 @@ by `npm run rules`):
 - `.claude/rules/ci.md` — `.github/**`, `scripts/checks.json`, `scripts/reach.mjs`, `scripts/deploygate.sh`: `checks.yml`, `deploy.yml`, Mac runner, `steward`
 - `.claude/rules/plan.md` — `PLAN.md`, `docs/plan/**`: reading and updating the plan, `planarchive.mjs`, `planmove.mjs`
 - `.claude/rules/phone.md` — `src/components/phone/**`: shares/never forks, `npm run phone`
-- `.claude/rules/desks-settings.md` — `src/components/desk/**`, `src/components/settings/**`, `src/types.ts`: desks never call GPU code, `panel`, `desk`, `setting-auditor`
+- `.claude/rules/desks-settings.md` — `src/components/desk/**`, `src/components/settings/**`, `src/types.ts`: desks never call GPU code, one panel one kind of control (`panelkinds`), `panel`, `desk`, `setting-auditor`
 - `.claude/rules/server.md` — `server/**`: accounts/keys/`tierGates`, `review-owed`, `crash-triage`

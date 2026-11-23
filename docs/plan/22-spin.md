@@ -92,7 +92,7 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
   glass's 0.609. The physics now does what 38v-4 says; the check measures the old model.
   *Fix:* read the drag time from `layerSpinDrag` on the page's settings, and ask whether a
   flick still trails visibly on a thin plate (a thick, water-thin look, or Thin Gap off, if the
-  trailing is the feature to keep). Four lines quarantined (the turntable line still passes) on PRs and main's deploys
+  trailing is the feature to keep). Five lines quarantined on PRs and main's deploys (the turntable line, "a dish the turntable turns drags the same water the same way", passed on ebfa3324's deploy and failed on f825ee6b's, 1.829 rad/s against a drag time wanting 1.132, so it joined the other four the same day)
   2026-11-22 to 2026-12-06 (19ak-18); `flick.mjs` now prints the "n/m checks passed" tally a
   quarantine is counted against. The fix takes the entries out.
 - ~~**22r. The spin's weight is a tanh, not the density**~~ (S; Low; **spin half shipped**, `npm run dish` 10). `weightAt` in `src/gpu/wgsl/fluid/forces.ts` is now linear in `dye.a − S.meanD` (18m-3). Story in [`docs/plan-shipped.md`](docs/plan-shipped.md) §22r. Open: `currentForces` (`src/gpu/wgsl/fluid/forces.ts:325`) still passes `dye.a − S.meanD` through `tanh` for tilt (`S.rock`) and gravity (`S.curGrav`), clamped at `maxCur` and not reached by `npm run dish`. (38v, from RS-5.)
