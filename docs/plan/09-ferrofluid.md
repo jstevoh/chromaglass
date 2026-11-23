@@ -14,7 +14,6 @@ comes through the liquid, but these films are lit from the front.
 What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
 (`/mnt/project-files/ferrofluid-look/watch/`), in the order to fix them:
 
-- **9b. Maze detail**, shipped in #167: Maze Detail (0 to 1) divides `MAZE_PERIOD` by up to three, Ferro Maze at 0.5 (`npm run maze`). Whether it now matches the reference is for the Mac. Story in `docs/plan-shipped.md` §9b (moved 2026-10-29, 19m-2).
 - **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
   white table clips (32 % of the frame blown); no visible pulse on the kick.
 
@@ -208,7 +207,6 @@ Open, from building 9i:
     face is a fixed 0.06 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
     Saying the setting as the gap itself would be plainer, but changes every
     saved look's magnet; worth doing with a look version bump.
-- **9w. Carry the ferrofluid across a new solver** (**shipped**): the old solver copies the ferrofluid, the mix and the reactions on the GPU before it goes (`handOver`/`takeOver` in `gpu/fluid.ts`; `npm run regrid`, `npm run magnet` check 8 on the Mac). Not carried: Oil Bodies' share of the dye, the glass's press, the particles, and 20b's clear film (#259; to be carried the same way). Not checked anywhere yet: that the app keeps the carry until the new solver's first readback, so an out-of-memory retry after a climb gets it, and that after a lost device the app's next solver refuses the old carry and lays the look's ferrofluid as before (the lab checks only a second device's refusal). Story in `docs/plan-shipped.md` §9w (moved 2026-10-29, 19m-2).
 - **9z. The dye at its own grid across a new solver.** Found while doing 9w: the
   dye and the flow cross a move of the grid through the CPU's 192² arrays
   (`FluidSimulation.attachGpu`, `pullStateFromGpu`), so a plate on 384² to 1024²
@@ -243,16 +241,6 @@ Open, from building 9i:
   stand inside the radius where |B_z| passes the onset and none in the ring past the rim where
   |B| is still high. (38v, from RS-20.)
 
-- **9ae. The ferrofluid rounds at the step rate, not in seconds** (S; Medium). The
-  Cahn–Hilliard mobility in `fluid.ts:1393-1401` is 0.006 + 0.012·phaseSharp a substep,
-  `CH_SUBSTEPS` 4 (`constants.ts:392`), with no `magnetSeconds` and no grid size in it: when
-  the governor drops to 30 steps a second (`governor.ts:112`) a ferro body rounds half as fast
-  in a second, and at 384² it rounds slower than at 256². The display's rate does not matter;
-  the step's does. A drop between plates relaxes on τ = 12μR³/(b²σ). Scale the mobility by the
-  step's seconds and Δx² so the rounding time is that τ. Check: a stretched ferro body's
-  aspect ratio after 2 s within 5% at 60 against 30 steps a second and at 256² against 384².
-  38e points here. (38v, from RS-23.)
-
 - **9af. The magnet's strength and walk ride the music outside the cords** (S; Medium).
   `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.55 +
   0.35·energy + 0.45·env)) and speeds its walk on the music whatever the patch says (no
@@ -261,3 +249,14 @@ Open, from building 9i:
   default cord on `magnetStrength` and `magnetWalk`, so Impact and the patch govern it and the
   desk shows it. Check: with `sceneMappings` empty, `lastMagnetRef` is the same under loud
   music and silence. 9j points here. (38v, from RS-44.)
+
+- **9e-1. The magnet's domes come up short on some Mac runs** (S; Medium). `npm run spikes`
+  on main's deploy of 2026-11-22 (f825ee6b, WebGPU plate shard): "held close under a pool,
+  the magnet parts it into domes" read 21 domes in 7 pieces (the bar wants 8 pieces), and "the
+  plate lights a point on the domes" 7 of the 21 lit (it wants 8, and half). Deploys 869 and
+  872 read 28 domes and 16 pieces; 871 (2026-11-21, before #932's Cahn–Hilliard pacing) read
+  21 and 6, so it predates #932 but now repeats. Find whether the pool parts later on a busy
+  runner (the check's settle counted in frames or in seconds), or whether the Rosensweig
+  wavelength the solver resolves sits near the grid's pitch so a pool either breaks into
+  pieces or stays joined by thin necks. Don't lower the bar: those two lines are quarantined on
+  PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes them out.

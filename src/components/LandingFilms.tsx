@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { SITE_FILMS, PUBLIC_DOMAIN, archiveUrl, type SiteFilm } from '../lib/siteFilms';
+import { SITE_FILMS, LICENCE, type SiteFilm } from '../lib/siteFilms';
 
 /**
- * The webpage's films (PLAN.md 34a-6): six records from before 1926, each a
- * card that is a still, turns into a few seconds of its film moving, and,
- * once the film is on the channel, opens the whole record large, with its
+ * The webpage's films (PLAN.md 34a-6, 34a-6d): six pieces of modern ambient
+ * music, each a card that is a still, turns into a few seconds of its film
+ * moving, and, once the film is on the channel, opens the whole piece large, with its
  * sound. They are a row of their own under the gallery of looks
  * (`src/lib/siteFilms.ts` says why there and not in place of it).
  *
@@ -23,7 +23,7 @@ import { SITE_FILMS, PUBLIC_DOMAIN, archiveUrl, type SiteFilm } from '../lib/sit
  * - The film opens over the page from youtube-nocookie.com, which sets no
  *   cookie until play, at the size of the screen; Escape, the close button or
  *   a click outside it closes it and gives the focus back to its card. The
- *   record's credit is under it, with the archive's page for the transfer.
+ *   music's credit is under it, linking the composer's page and the licence.
  */
 
 const reducedMotion = (): boolean => {
@@ -54,12 +54,12 @@ function Card({ film, playing, onWant, onOpen }: {
     else v.pause();
   }, [playing, armed]);
 
-  const { id, record } = film;
+  const { id, music } = film;
   const picture = (
     <div className="relative aspect-[8/5] w-full overflow-hidden bg-black">
       <img
         src={`/landing/films/${id}.webp`}
-        alt={`${film.lookName}, the look playing ${record.title} by ${record.performer}`}
+        alt={`${film.lookName}, the look playing ${music.title} by ${music.artist}`}
         width={640}
         height={400}
         loading="lazy"
@@ -94,8 +94,8 @@ function Card({ film, playing, onWant, onOpen }: {
   const words = (
     <div className="px-4 pb-4 pt-3 text-left">
       <p className="text-[12px] font-medium uppercase tracking-[0.06em] text-muted">{film.kind} · {film.lookName}</p>
-      <p className="mt-1 text-[14px] font-medium">{record.title}</p>
-      <p className="mt-0.5 text-[13px] leading-snug text-muted">{record.performer}</p>
+      <p className="mt-1 text-[14px] font-medium">{music.title}</p>
+      <p className="mt-0.5 text-[13px] leading-snug text-muted">{music.artist}</p>
     </div>
   );
   const hover = {
@@ -107,7 +107,7 @@ function Card({ film, playing, onWant, onOpen }: {
   return (
     <li data-cg-look={id} className="w-[78%] shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-surface min-[560px]:w-auto">
       {onOpen ? (
-        <button type="button" aria-label={`Watch ${record.title} by ${record.performer}, played by ${film.lookName}, with its sound`} onClick={onOpen} className={`block w-full ${ring}`} {...hover}>
+        <button type="button" aria-label={`Watch ${music.title} by ${music.artist}, played by ${film.lookName}, with its sound`} onClick={onOpen} className={`block w-full ${ring}`} {...hover}>
           {picture}{words}
         </button>
       ) : (
@@ -125,8 +125,8 @@ function Player({ film, onClose }: { film: SiteFilm; onClose: () => void }) {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [onClose]);
-  const { record } = film;
-  const title = `${record.title}, played by ${film.lookName}`;
+  const { music } = film;
+  const title = `${music.title}, played by ${film.lookName}`;
   return (
     <div
       role="dialog"
@@ -138,7 +138,7 @@ function Player({ film, onClose }: { film: SiteFilm; onClose: () => void }) {
     >
       <div className="w-full max-w-[min(1280px,calc((100svh-160px)*16/9))]">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-[15px] font-medium text-white">{record.title} <span className="text-white/60">· {film.lookName}</span></p>
+          <p className="text-[15px] font-medium text-white">{music.title} <span className="text-white/60">· {film.lookName}</span></p>
           <button ref={close} type="button" onClick={onClose} aria-label="Close the film" className={`min-h-[44px] min-w-[44px] rounded-lg text-[22px] leading-none text-white/80 hover:text-white ${ring}`}>×</button>
         </div>
         <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
@@ -152,8 +152,8 @@ function Player({ film, onClose }: { film: SiteFilm; onClose: () => void }) {
           />
         </div>
         <p data-cg-credit="" className="mt-2 text-[12px] leading-snug text-white/60">
-          Music: “{record.title}” by {record.performer} ({record.published}), {PUBLIC_DOMAIN.name}.{' '}
-          <a className="underline hover:text-white" href={archiveUrl(film)} target="_blank" rel="noopener noreferrer">Great 78 Project transfer</a>.
+          Music: <a className="underline hover:text-white" href={music.page} target="_blank" rel="noopener noreferrer">“{music.title}” by {music.artist}</a> ({music.year}), released under{' '}
+          <a className="underline hover:text-white" href={LICENCE.url} target="_blank" rel="noopener noreferrer">{LICENCE.name}</a>.
         </p>
       </div>
     </div>

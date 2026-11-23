@@ -17,8 +17,9 @@ import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
-import { SoapFilmPlate, SOAP_PLATE_DX } from '../soapFilmPlate';
+import { SoapFilmPlate, SOAP_PLATE_DX, soapLean } from '../soapFilmPlate';
 import { TankPlate } from '../tankPlate';
+import { FaradayPlate } from '../faraday';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
@@ -277,6 +278,22 @@ export class FluidPasses extends FluidFields {
   protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
     this.stepSoapPlate(enc, p);
     this.stepTankPlate(enc, p);
+    this.stepFaradayPlate(enc, p);
+  }
+
+  /**
+   * The dish on a shaker (PLAN 48f, gpu/faraday.ts): made the first time
+   * Shaker is up, stepped on the show's own seconds at the Shake the patch
+   * bay folded (a cord carries the music there). Turned off, it goes, and
+   * the next time the water is still.
+   */
+  protected stepFaradayPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.faradayHz ?? 0) > 0)) {
+      if (this.faradayPlate) { this.faradayPlate.dispose(); this.faradayPlate = null; }
+      return;
+    }
+    if (!this.faradayPlate) this.faradayPlate = new FaradayPlate(this.device);
+    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0);
   }
 
   /**
@@ -305,7 +322,9 @@ export class FluidPasses extends FluidFields {
       if (this.soapPlate) { this.soapPlate.dispose(); this.soapPlate = null; }
       return;
     }
-    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device);
+    const lean = soapLean(p.soapFilmTilt);
+    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device, undefined, lean);
+    this.soapPlate.lean = lean;
     const rate = Math.max(0, p.soapFilmRate ?? 1);
     // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement), in the frame's metres.
     const travel = p.dt * p.advection * ((this.N - 2) / this.N) * this.soapPlate.field.nx * SOAP_PLATE_DX / SOAP_FRAME_SPAN;
@@ -1020,10 +1039,12 @@ export class FluidPasses extends FluidFields {
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+    /* The oil bodies' viscosity (hsPrep's oilBody, PLAN 27f-7). */
+    const oilMix = this.mixLive && this.mix ? this.mix.read : this.blank('rgba');
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}:${oilMix.label}`,
       this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, this.airPush, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev, oilMix]);
     this.vel.swap();
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),

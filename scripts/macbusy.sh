@@ -82,6 +82,7 @@
 #   bash scripts/macbusy.sh --selftest    (the rule against made-up process lists)
 set -uo pipefail
 CPU_FLOOR=5
+HERE="$(cd "$(dirname "$0")" && pwd)"
 MARKS="${MAC_DEPLOY_MARKS:-$HOME/.chromaglass-runner}"
 AGAIN="${RUNNER_TEMP:-/tmp}/macbusy-again.txt"
 
@@ -247,6 +248,21 @@ if [ "${1:-}" = --end ]; then
   exit 0
 fi
 
+# Check whether a live (non-stale) film.lock holds the Mac (PLAN.md 19ak-23),
+# using maclock.mjs so the stale rules live in one place.
+filmlock() {
+  command -v node >/dev/null 2>&1 || return 0
+  local json
+  json=$(node "$HERE/maclock.mjs" status --json 2>/dev/null) || return 0
+  node -e '
+    const s = JSON.parse(process.argv[1]);
+    if (s.lock && !s.lock.stale) {
+      const who = s.lock.line1 || s.lock.label || "unknown";
+      console.log(`film.lock held (${Math.round(s.lock.ageSec)}s): ${who}`);
+    }
+  ' "$json" 2>/dev/null || true
+}
+
 again=false red=false
 [ "${1:-}" = --again ] && { again=true; shift; }
 $again && [ "${1:-}" = --after-red ] && { red=true; shift; }
@@ -254,7 +270,10 @@ limit="${1:-120}"
 $again || mark begin
 waited=0
 while :; do
-  now=$(ps -axwwo pid=,ppid=,%cpu=,command= | others $$)
+  now=$(
+    ps -axwwo pid=,ppid=,%cpu=,command= | others $$
+    filmlock
+  )
   [ -z "$now" ] && { $again && [ "$waited" -eq 0 ] || echo "the owner's Mac is free of other work after ${waited}s"; exit 0; }
   if $red; then
     echo "::error title=The owner's Mac is busy::the check before this went red while other work drew with the owner's Mac's GPU (listed below): the red was measured beside it, so the shard stops here"

@@ -31,8 +31,12 @@ the code's entry points, the checks to add and the scenes to match, in
   - **29a-3.** The picture's drop is taller than the solver's layer (0.3 l_c a full
     cell); carry the drop's volume in the solver as the bead's thickness, so the drop the
     flow moves is the drop the picture draws.
-    38v (2026-11-21): the drop's height is also clipped at a fixed gap and its excess lost:
-    29a-11.
+    38v (2026-11-21): the drop's height was also clipped at a fixed gap and its excess lost
+    (~~29a-11~~, shipped): `FerroDrop` now reads the live squeeze field (`view.w`), spreads
+    excess above `0.95 · gap` out to neighbours via a conservative Baiocchi obstacle pass
+    ($h = h_0 + \Delta\phi$, FMG Red-Black SOR) and `packVelDrop` clamps `z = min(h + domes, gap)`.
+    `dropRelax` still bounds the unsqueezed plateau at `0.95 · GAP_LC` until 29a-3 carries the
+    drop's volume in the solver itself.
   - **29a-4.** The magnet's volume shift is held to its mean over all the ferrofluid on
     the plate, not drop by drop.
   - **29a-5.** The magnets' radius is the default Magnet Size's in the solve (the plate's
@@ -67,14 +71,6 @@ the code's entry points, the checks to add and the scenes to match, in
     uniform (`dropSolved`, `ferroDrop.ts:266-267`). Check: a ferro closeup's ground matches
     Relief 0's within a few levels, and milk outside a ferro domain keeps `dropSolved` 0.
     (38v, from RS-25.)
-  - **29a-11.** (S; Medium) The drop is clipped to a fixed gap and loses volume.
-    `ferroDrop.ts:121` caps its height at 0.95·`GAP_LC`, a constant; the GPU clamps it point
-    by point (`wgsl/ferroDrop.ts:161-163`) and throws the excess away; and `packVelDrop`
-    (`:190`) writes z = h + `FILM_H0`·max(phase − 1, 0), up to 2.1 l_c over a 1.56 l_c gap, so
-    the drawn drop passes through the cover. A drop squeezed by a glass spreads and keeps its
-    volume. Push the cap's excess out to the neighbours, read the live gap, and write z =
-    min(h + domes, gap). Check: pressed to 0.8 mm, ∫h dA within 0.5% and no z over the gap.
-    Updates 29a-3. (38v, from RS-21.)
 - **29b. Dye on the drop: carried, spread, and shed off its back.** The water over the
   drop is the gap less the drop's height and is dragged with the drop's surface (no slip
   on the drop, no shear at the top glass's far side through the thin film), so its dye
@@ -156,10 +152,6 @@ the code's entry points, the checks to add and the scenes to match, in
     coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law, with
     the rim's own factor `share·(ν_clear/ν_ff)^(1−φ)` applied per cell as the shader applies it,
     and a bar of 20% (the weak drop reads about -6% on software WebGPU, the strong one about +4%).
-  - ~~**29c-7. A resting drop dissolves into its halo.**~~ **Shipped** (#373; `npm run ferrorest` 4/4; the deep plate's `phaseCH` stays as on `main`, under **29c-1**). Story in `docs/plan-shipped.md` §29c-7 (moved 2026-10-29, 19m-2).
-  - ~~**29c-8. A dragged drop loses its trailing rim to the oil's return flow.**~~ **Shipped** (#495; two-phase carry, `phaseVelocity` in `src/gpu/wgsl/fluid.ts`; `npm run ferrodrag` 3/3 on the Mac GPU). Story in `docs/plan-shipped.md` §29c-8 (moved 2026-10-29, 19m-2).
-  - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (`npm run ferrodrag` on the show shard, `ferrohold` 5/5 on Metal). Story in `docs/plan-shipped.md` §29c-10 (moved 2026-10-29, 19m-2).
-  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~ **Shipped** (`npm run ferrodrag -- --thinoff` in CI, Metal 5/5). Story in `docs/plan-shipped.md` §29c-11 (moved 2026-10-29, 19m-2).
   - **29c-12. Key `phaseVel()`'s default off `thinLive` before `phaseCompress` reaches the deep plate.**
     `runPhaseCompress` and `runPhasePlanned` call `phaseVel()` with `thin = true`, which today runs only
     on a thin step. Once `phaseCompress` moves onto the deep plate (29c-1), that default must be keyed
