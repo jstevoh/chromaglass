@@ -474,6 +474,19 @@
       ]
     },
     {
+      "name": "Watching footage honestly",
+      "shard": "sound",
+      "run": "npm run watchcard",
+      "why": [
+        "The watch tool's YouTube footage robustness (47x-11, watchfootage.mjs):",
+        "synthetic clips encoded with ffmpeg prove letterbox autocrop vs",
+        "dark-ground plates, still overlay masking, title-card span exclusion,",
+        "global camera subtraction, and compression-softness reliability flags,",
+        "with mutants that break autocrop, camera, and compression. In the sound",
+        "shard for its ffmpeg."
+      ]
+    },
+    {
       "name": "Following a song",
       "shard": "logic",
       "run": "npm run songfollow",

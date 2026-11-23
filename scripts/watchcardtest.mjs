@@ -1,0 +1,336 @@
+#!/usr/bin/env node
+/**
+ * `npm run watchcard`: contract check for PLAN 47x footage robustness,
+ * artistic report card, rating agreement, and gap-to-setting suggestions.
+ *
+ * Builds synthetic WebM clips via ffmpeg (no network or reference library),
+ * checks the returned objects and output files (never trusting self-reports
+ * alone), and runs code mutants against copied modules to prove lines (a),
+ * (d), and (e) fail when their rules are broken.
+ *
+ * Run it:
+ *   FFMPEG=/opt/homebrew/Cellar/ffmpeg-full/9.0.2_1/bin/ffmpeg npm run watchcard
+ *   node scripts/watchcardtest.mjs --no-mutants
+ */
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { watchVideo, findFfmpeg } from './watch.mjs';
+
+const HERE = path.dirname(new URL(import.meta.url).pathname);
+const W = 320, H = 180, FPS = 24;
+const MUTANTS_ON = !process.argv.includes('--no-mutants');
+
+const results = [];
+const check = (name, ok, detail) => {
+  results.push(!!ok);
+  console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name} — ${detail}`);
+};
+
+const ff = findFfmpeg();
+if (!ff) {
+  console.error('ffmpeg not found (set FFMPEG=...)');
+  process.exit(2);
+}
+
+// 5x7 bitmap glyphs for crisp deterministic title cards and corner logos (no font deps).
+const FONT5X7 = {
+  ' ': [0, 0, 0, 0, 0, 0, 0],
+  '0': [14, 17, 19, 21, 25, 17, 14],
+  '1': [4, 12, 4, 4, 4, 4, 14],
+  '6': [6, 8, 16, 30, 17, 17, 14],
+  '8': [14, 17, 17, 14, 17, 17, 14],
+  '9': [14, 17, 17, 15, 1, 2, 12],
+  'A': [14, 17, 17, 31, 17, 17, 17],
+  'C': [14, 17, 16, 16, 16, 17, 14],
+  'D': [30, 17, 17, 17, 17, 17, 30],
+  'E': [31, 16, 16, 30, 16, 16, 31],
+  'F': [31, 16, 16, 30, 16, 16, 16],
+  'H': [17, 17, 17, 31, 17, 17, 17],
+  'I': [14, 4, 4, 4, 4, 4, 14],
+  'L': [16, 16, 16, 16, 16, 16, 31],
+  'M': [17, 27, 21, 21, 17, 17, 17],
+  'O': [14, 17, 17, 17, 17, 17, 14],
+  'R': [30, 17, 17, 30, 20, 18, 17],
+  'S': [15, 16, 16, 14, 1, 1, 30],
+  'T': [31, 4, 4, 4, 4, 4, 4],
+  'U': [17, 17, 17, 17, 17, 17, 14],
+  'V': [17, 17, 17, 17, 17, 10, 4],
+  'W': [17, 17, 17, 21, 21, 27, 17],
+};
+
+function drawText(buf, text, x0, y0, scale, rgb) {
+  let x = x0;
+  for (const ch of text.toUpperCase()) {
+    const rows = FONT5X7[ch] ?? FONT5X7[' '];
+    for (let ry = 0; ry < 7; ry++) {
+      for (let rx = 0; rx < 5; rx++) {
+        if (!((rows[ry] >> (4 - rx)) & 1)) continue;
+        for (let sy = 0; sy < scale; sy++) {
+          for (let sx = 0; sx < scale; sx++) {
+            const px = x + rx * scale + sx, py = y0 + ry * scale + sy;
+            if (px < 0 || px >= W || py < 0 || py >= H) continue;
+            const i = (py * W + px) * 3;
+            buf[i] = rgb[0]; buf[i + 1] = rgb[1]; buf[i + 2] = rgb[2];
+          }
+        }
+      }
+    }
+    x += 6 * scale;
+  }
+}
+
+async function encodeWebm(outPath, { sec, fps = FPS, bitrate = '2M', extraArgs = [], frame }) {
+  const args = [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${W}x${H}`, '-r', String(fps), '-i', 'pipe:0',
+    '-an', '-c:v', 'libvpx', '-b:v', bitrate, ...extraArgs, '-f', 'webm', outPath,
+  ];
+  const p = spawn(ff, args, { stdio: ['pipe', 'ignore', 'pipe'] });
+  let err = '';
+  p.stderr.on('data', d => { err += d; });
+  const done = new Promise((resolve, reject) => {
+    p.on('close', code => (code === 0 ? resolve() : reject(new Error(`ffmpeg exit ${code}: ${err.trim()}`))));
+  });
+  for (let f = 0; f < Math.round(fps * sec); f++) {
+    const buf = frame(f);
+    if (!p.stdin.write(buf)) await new Promise(r => p.stdin.once('drain', r));
+  }
+  p.stdin.end();
+  await done;
+  return outPath;
+}
+
+// Moving bright saturated liquid-like blobs over dark ground (3..4 distinct forms).
+function blobFrame(f, t, { darkGrain = false, barFrac = 0, logo = false, prng = null } = {}) {
+  const buf = Buffer.alloc(W * H * 3);
+  const cyMin = Math.round(barFrac * H), cyMax = H - cyMin;
+  const cx1 = 90 + 35 * Math.sin(t * 1.4), cy1 = 90 + 22 * Math.cos(t * 1.1);
+  const cx2 = 210 + 30 * Math.cos(t * 1.2), cy2 = 75 + 24 * Math.sin(t * 1.5);
+  const cx3 = 160 + 28 * Math.sin(t * 0.9 + 1.4), cy3 = 120 + 18 * Math.cos(t * 1.3);
+  for (let y = 0; y < H; y++) {
+    const inBar = barFrac > 0 && (y < cyMin || y >= cyMax);
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 3;
+      if (inBar) { buf[i] = 0; buf[i + 1] = 0; buf[i + 2] = 0; continue; }
+      const d1 = Math.exp(-(((x - cx1) ** 2 + (y - cy1) ** 2) / (2 * 22 ** 2)));
+      const d2 = Math.exp(-(((x - cx2) ** 2 + (y - cy2) ** 2) / (2 * 20 ** 2)));
+      const d3 = Math.exp(-(((x - cx3) ** 2 + (y - cy3) ** 2) / (2 * 18 ** 2)));
+      let g = 0;
+      if (darkGrain) {
+        const s = Math.sin(x * 0.37 + y * 0.29 + f * 1.7) * 43758.5453;
+        const n = (s - Math.floor(s)) * 12;
+        g = Math.round(4 + n + 8 * Math.max(0, Math.sin(x * 0.04 + t * 0.8)));
+      }
+      const r = Math.min(255, Math.round(g + 240 * d1 + 190 * d3));
+      const gr = Math.min(255, Math.round(g + 120 * d1 + 215 * d2 + 50 * d3));
+      const b = Math.min(255, Math.round(g + 35 * d1 + 235 * d2 + 220 * d3));
+      buf[i] = r; buf[i + 1] = gr; buf[i + 2] = b;
+    }
+  }
+  if (prng) {
+    // Optional deterministic dither for non-grain variants
+    void prng;
+  }
+  if (logo) {
+    for (let y = 10; y < 34; y++) {
+      for (let x = 10; x < 64; x++) {
+        const i = (y * W + x) * 3;
+        buf[i] = 245; buf[i + 1] = 245; buf[i + 2] = 245;
+      }
+    }
+    drawText(buf, 'LIVE', 13, 15, 2, [15, 15, 15]);
+  }
+  return buf;
+}
+
+function titleCardFrame() {
+  const buf = Buffer.alloc(W * H * 3);
+  drawText(buf, 'SHOW', 58, 46, 3, [245, 245, 245]);
+  drawText(buf, '1968', 58, 92, 3, [245, 245, 245]);
+  return buf;
+}
+
+// Non-periodic rich texture for reliable camera pan & optical-flow matching.
+function texAt(u, v) {
+  const a = 0.5 + 0.5 * Math.sin(u * 0.071 + Math.cos(v * 0.053) * 1.7);
+  const b = 0.5 + 0.5 * Math.cos(v * 0.089 - Math.sin(u * 0.041) * 1.5);
+  const c = 0.5 + 0.5 * Math.sin((u + v) * 0.13 + Math.sin((u - v) * 0.037) * 2.1);
+  const fin = 0.5 + 0.5 * Math.sin(u * 0.31 + v * 0.23) * Math.cos(u * 0.19 - v * 0.27);
+  const r = Math.min(255, Math.max(0, Math.round(35 + 165 * a + 45 * fin)));
+  const g = Math.min(255, Math.max(0, Math.round(25 + 170 * b + 40 * c)));
+  const bl = Math.min(255, Math.max(0, Math.round(40 + 160 * c + 40 * (1 - a))));
+  return [r, g, bl];
+}
+
+function panFrame(t, { camPctPerSec, dishOwnPctPerSec = 0 }) {
+  const buf = Buffer.alloc(W * H * 3);
+  const camShiftX = (camPctPerSec / 100) * W * t;
+  const ownShiftX = (dishOwnPctPerSec / 100) * W * t;
+  const cx = W / 2, cy = H / 2, r2 = 52 ** 2;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const inside = dishOwnPctPerSec !== 0 && ((x - cx) ** 2 + (y - cy) ** 2) < r2;
+      const sx = x - camShiftX - (inside ? ownShiftX : 0);
+      const [r, g, b] = texAt(sx, y);
+      const i = (y * W + x) * 3;
+      buf[i] = r; buf[i + 1] = g; buf[i + 2] = b;
+    }
+  }
+  return buf;
+}
+
+async function runSuite(runWatch, dir, clips) {
+  const out = [];
+  const rec = (id, name, ok, detail) => out.push({ id, name, ok: !!ok, detail });
+
+  // (a) letterbox: 12% bars top & bottom cropped within 1%; dark grainy ground NOT cropped
+  const rLb = await runWatch(clips.letterbox, { out: path.join(dir, 'out-lb'), rate: 4, quiet: true });
+  const rDg = await runWatch(clips.darkgrain, { out: path.join(dir, 'out-dg'), rate: 4, quiet: true });
+  const ac = rLb.footage?.autocrop;
+  rec('a', 'letterbox: 12% top/bottom bars cropped within 1%; dark grainy ground left uncropped',
+    ac && Math.abs(ac.y - 0.12) <= 0.01 && Math.abs(ac.h - 0.76) <= 0.01 && ac.x <= 0.01 && rDg.footage?.autocrop === null,
+    `lb=${ac ? `y=${ac.y.toFixed(3)},h=${ac.h.toFixed(3)}` : 'null'}, dg=${rDg.footage?.autocrop ? 'cropped' : 'null'}`);
+
+  // (b) overlay: still white logo in corner masked, matching clean plate within 1 step
+  const rPlain = await runWatch(clips.plain, { out: path.join(dir, 'out-plain'), rate: 4, quiet: true });
+  const rLogo = await runWatch(clips.logo, { out: path.join(dir, 'out-logo'), rate: 4, quiet: true });
+  const dCol = Math.abs((rLogo.design.colourfulness?.med ?? 0) - (rPlain.design.colourfulness?.med ?? 0));
+  const fL = rLogo.design.forms?.med ?? 0, fP = rPlain.design.forms?.med ?? 0;
+  const fRatio = fL && fP ? Math.max(fL / fP, fP / fL) : (fL === fP ? 1 : 99);
+  rec('b', 'overlay: still corner logo found and masked; colourfulness and forms match plain plate within one step',
+    (rLogo.footage?.overlays?.length ?? 0) >= 1 && dCol < 15 && fRatio < 1.5,
+    `overlays=${rLogo.footage?.overlays?.length ?? 0}, dCol=${dCol.toFixed(1)}, forms=${fL.toFixed(2)}/${fP.toFixed(2)}`);
+
+  // (c) title card: 2 s white-on-black text before moving plate excluded; reads match within one step
+  const rTitle = await runWatch(clips.title, { out: path.join(dir, 'out-title'), rate: 4, quiet: true });
+  const span = rTitle.footage?.titleSpans?.[0];
+  const dColT = Math.abs((rTitle.design.colourfulness?.med ?? 0) - (rPlain.design.colourfulness?.med ?? 0));
+  const dRmsT = Math.abs((rTitle.design.rms?.med ?? 0) - (rPlain.design.rms?.med ?? 0));
+  const dLumT = Math.abs((rTitle.design.lumMean?.med ?? 0) - (rPlain.design.lumMean?.med ?? 0));
+  rec('c', 'title card: 2 s text span excluded; design reads match plate alone within one step',
+    span && span.from <= 0.25 && span.to >= 1.75 && dColT < 15 && dRmsT < 0.05 && dLumT < 0.08,
+    `span=${span ? `${span.from.toFixed(2)}-${span.to.toFixed(2)}s` : 'none'}, dCol=${dColT.toFixed(1)}, dRms=${dRmsT.toFixed(3)}, dLum=${dLumT.toFixed(3)}`);
+
+  // (d) camera: panned still plate -> own < 0.1*cam & cameraShare > 0.8; counter-drifting dish within 20%
+  const rPan = await runWatch(clips.pan, { out: path.join(dir, 'out-pan'), rate: 4, quiet: true });
+  const rCpan = await runWatch(clips.cpan, { out: path.join(dir, 'out-cpan'), rate: 4, quiet: true });
+  const camSpd = rPan.design.physics?.camera?.med ?? 0;
+  const panOwn = rPan.design.physics?.own?.med ?? 99;
+  const panShare = rPan.design.physics?.cameraShare ?? 0;
+  const flH = rCpan.design.physics?.fluid?.horizontal ?? 0;
+  const cCamU = rCpan.design.physics?.camera?.u ?? 0;
+  rec('d', 'camera: panned plate reads own < 0.1*pan and cameraShare > 0.8; counter-drifting dish reads own drift within 20%',
+    camSpd > 4 && panOwn < 0.1 * camSpd && panShare > 0.8
+      && Math.abs(flH - 3.75) <= 0.2 * 3.75 && cCamU < -4,
+    `panOwn=${panOwn.toFixed(2)}, cam=${camSpd.toFixed(2)}, camShare=${panShare.toFixed(2)}, counterCamU=${cCamU.toFixed(2)}, fluidH=${flH.toFixed(2)} (exp 3.75)`);
+
+  // (e) compression: low bitrate flags detail unreliable and prints note; high bitrate stays reliable
+  const rHi = await runWatch(clips.hi, { out: path.join(dir, 'out-hi'), rate: 4, quiet: true });
+  const rLo = await runWatch(clips.lo, { out: path.join(dir, 'out-lo'), rate: 4, quiet: true });
+  const loSum = fs.readFileSync(path.join(rLo.out, 'summary.md'), 'utf8');
+  rec('e', 'compression: very low bitrate flags detail measures unreliable; high bitrate does not',
+    rHi.footage?.reliable?.detail === true && rHi.design.edgeWidth?.reliable !== false
+      && rLo.footage?.reliable?.detail === false && rLo.design.edgeWidth?.reliable === false
+      && rLo.design.physics?.spectrum?.reliable === false && loSum.includes('unreliable (compression)'),
+    `hi=${rHi.footage?.reliable?.detail} (bpp=${rHi.footage?.bpp?.toFixed(3)}), lo=${rLo.footage?.reliable?.detail} (blk=${rLo.footage?.blockiness?.toFixed(2)}, bpp=${rLo.footage?.bpp?.toFixed(3)})`);
+
+  return out;
+}
+
+const MUTANTS = [
+  { id: 'a', file: 'watchfootage.mjs', find: 'if (!top && !bottom && !left && !right) return null;', replace: 'return null;' },
+  { id: 'd', file: 'watchphysics.mjs', find: 'return { cu, cv, speed: Math.hypot(cu, cv), share, rmsFluid: Math.sqrt(rem / n) };', replace: 'return { cu: 0, cv: 0, speed: 0, share: 0, rmsFluid: Math.sqrt(tot / Math.max(1, n)) };' },
+  { id: 'e', file: 'watchfootage.mjs', find: 'if (blockiness >= 1.30) {\n    detailOk = false;', replace: 'if (false && blockiness >= 1.30) {\n    detailOk = false;' },
+];
+
+// For mutant (e), ensure all unreliable branches in analyseFootage are bypassed together
+// so low-bitrate/blocky footage isn't caught by the secondary branch either.
+const MUTANT_E_EXTRA = [
+  ['else if (bpp != null && bpp < 0.015', 'else if (false && bpp != null && bpp < 0.015'],
+  ['else if (bpp != null && bpp < 0.045', 'else if (false && bpp != null && bpp < 0.045'],
+];
+
+async function runMutant(m, clips, tmpRoot) {
+  const mDir = fs.mkdtempSync(path.join(tmpRoot, `mut-${m.id}-`));
+  try {
+    for (const f of fs.readdirSync(HERE)) {
+      if (/^watch.*\.mjs$/.test(f) && f !== 'watchcardtest.mjs') {
+        fs.copyFileSync(path.join(HERE, f), path.join(mDir, f));
+      }
+    }
+    const target = path.join(mDir, m.file);
+    let src = fs.readFileSync(target, 'utf8');
+    if (!src.includes(m.find)) return { ok: false, detail: `mutant target missing in ${m.file}` };
+    src = src.replace(m.find, m.replace);
+    if (m.id === 'e') {
+      for (const [f, r] of MUTANT_E_EXTRA) src = src.replace(f, r);
+    }
+    fs.writeFileSync(target, src);
+    const mod = await import(`${pathToFileURL(path.join(mDir, 'watch.mjs')).href}?v=${Date.now()}`);
+    const outDir = path.join(mDir, 'runs');
+    fs.mkdirSync(outDir, { recursive: true });
+    // Run only the clips needed for line m.id to keep mutant checks fast.
+    if (m.id === 'a') {
+      const rLb = await mod.watchVideo(clips.letterbox, { out: path.join(outDir, 'lb'), rate: 4, quiet: true });
+      const ac = rLb.footage?.autocrop;
+      const linePassed = !!(ac && Math.abs(ac.y - 0.12) <= 0.01);
+      return { ok: !linePassed, detail: linePassed ? 'autocrop STILL passed under mutant' : 'caught: autocrop=null under mutant' };
+    }
+    if (m.id === 'd') {
+      const rPan = await mod.watchVideo(clips.pan, { out: path.join(outDir, 'pan'), rate: 4, quiet: true });
+      const camSpd = rPan.design.physics?.camera?.med ?? 0;
+      const panShare = rPan.design.physics?.cameraShare ?? 0;
+      const linePassed = camSpd > 4 && panShare > 0.8;
+      return { ok: !linePassed, detail: linePassed ? 'camera STILL passed under mutant' : `caught: camShare=${panShare.toFixed(2)}, cam=${camSpd.toFixed(2)}` };
+    }
+    if (m.id === 'e') {
+      const rLo = await mod.watchVideo(clips.lo, { out: path.join(outDir, 'lo'), rate: 4, quiet: true });
+      const linePassed = rLo.footage?.reliable?.detail === false;
+      return { ok: !linePassed, detail: linePassed ? 'compression STILL passed under mutant' : `caught: reliable.detail=${rLo.footage?.reliable?.detail}` };
+    }
+    return { ok: false, detail: 'unknown mutant' };
+  } finally {
+    fs.rmSync(mDir, { recursive: true, force: true });
+  }
+}
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'watchcardtest-'));
+try {
+  const clips = {
+    letterbox: await encodeWebm(path.join(tmpDir, 'letterbox.webm'), { sec: 3.5, frame: f => blobFrame(f, f / FPS, { barFrac: 0.122 }) }),
+    darkgrain: await encodeWebm(path.join(tmpDir, 'darkgrain.webm'), { sec: 3.5, frame: f => blobFrame(f, f / FPS, { darkGrain: true }) }),
+    plain: await encodeWebm(path.join(tmpDir, 'plain.webm'), { sec: 3.5, frame: f => blobFrame(f, f / FPS) }),
+    logo: await encodeWebm(path.join(tmpDir, 'logo.webm'), { sec: 3.5, frame: f => blobFrame(f, f / FPS, { logo: true }) }),
+    title: await encodeWebm(path.join(tmpDir, 'title.webm'), {
+      sec: 5.5,
+      frame: f => (f < 2 * FPS ? titleCardFrame() : blobFrame(f, (f - 2 * FPS) / FPS)),
+    }),
+    pan: await encodeWebm(path.join(tmpDir, 'pan.webm'), { sec: 3.0, frame: f => panFrame(f / FPS, { camPctPerSec: 7.5 }) }),
+    cpan: await encodeWebm(path.join(tmpDir, 'cpan.webm'), { sec: 3.0, frame: f => panFrame(f / FPS, { camPctPerSec: -7.5, dishOwnPctPerSec: 3.75 }) }),
+    hi: await encodeWebm(path.join(tmpDir, 'hi.webm'), { sec: 3.0, bitrate: '2M', frame: f => panFrame(f / FPS, { camPctPerSec: 1.5, dishOwnPctPerSec: 2.5 }) }),
+    lo: await encodeWebm(path.join(tmpDir, 'lo.webm'), {
+      sec: 3.0, bitrate: '18k', extraArgs: ['-qmin', '52', '-qmax', '63'],
+      frame: f => panFrame(f / FPS, { camPctPerSec: 1.5, dishOwnPctPerSec: 2.5 }),
+    }),
+  };
+
+  const lines = await runSuite(watchVideo, tmpDir, clips);
+  for (const l of lines) check(`(${l.id}) ${l.name}`, l.ok, l.detail);
+
+  if (MUTANTS_ON) {
+    for (const m of MUTANTS) {
+      const r = await runMutant(m, clips, tmpDir);
+      check(`mutant (${m.id}) breaks check (${m.id})`, r.ok, r.detail);
+    }
+  }
+} finally {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+}
+
+const passed = results.filter(Boolean).length;
+console.log(`${passed}/${results.length} checks passed`);
+process.exit(passed === results.length ? 0 : 1);
