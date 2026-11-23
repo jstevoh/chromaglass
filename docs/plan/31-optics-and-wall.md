@@ -308,7 +308,16 @@ lens-shaped drop, no shadow beside it.*
   `sitefilms` (and its `--films-from`), `tvloops` (and `--from-raw`) and `tvfilms --from`.
   Left out on purpose: `render-app` and `clipApp` record only for their own checks, and
   `landingfilms` and `render.mjs` record nothing.
-- **31s-11. Open: the flower gate times out in a busy film queue.** Found 2026-11-23 in 48q:
+- **31s-11. Open, found 2026-11-23 filming PR #946: the gate calls a fixed dev server old.**
+  `pageHasFix` (`scripts/flowergate.mjs:75`) finds the plate's module through
+  `performance.getEntriesByType('resource')`, and the browser keeps only 250 resource entries by
+  default. Under vite's dev server the page loads every module as its own file, so the list stops
+  at about 244 scripts before `plateSlope.ts`, and the gate refuses a build that does carry the
+  fix (curl of both servers showed `fn cellDensity`). The built site bundles its modules, so it is
+  not affected. Fix: raise the buffer before the page loads (`performance.setResourceTimingBufferSize`
+  in an init script) or fetch the module by its path and look for the marker there. *Measure:* the
+  gate passes a vite server of main and still refuses one checked out before #933.
+- **31s-12. Open: the flower gate times out in a busy film queue.** Found 2026-11-23 in 48q:
   `film.mjs` asks `untilFlowerFree` before it takes the film lock, and `npm run flower` then
   queues on that lock itself, so with the queue over ten minutes long the gate's limit ran
   out and refused the film ("the flower check ran past 10 minutes"). A run inside
