@@ -19,9 +19,9 @@
  *   3. `soapProject`: MAC face velocity projection `uf`, `vf` and reduction of
  *      `uMax` to determine the CFL sub-step count `ceil(uMax * dt / (0.45 * dx))`.
  *   4. `soapTransport`: conservative minmod-limited flux-form advection over the
- *      CFL sub-steps (blocking inflow into ruptured cells when `evap > 0`)
- *      followed by uniform evaporation (`evap` nm/s) and exponential relaxation
- *      of ruptured cells (`< 30` nm) toward Newton black (`8` nm) over `0.5` s.
+ *      CFL sub-steps (blocking inflow into black cells), then the frame's Plateau
+ *      border (`border`, 32f), optional evaporation (`evap` nm/s), and black spots
+ *      on Vrij's clock handing their liquid to a rim (32g), all as the reference's.
  *
  * Constants are copied here under the same names as `src/lib/soapFilm.ts` rather
  * than imported from it, so the GPU solver's bundle never carries the CPU
@@ -34,7 +34,10 @@ const RHO_WATER = 1000;
 const DEFAULT_ZETA = 1.5;
 const BLACK_THRESHOLD_NM = 30;
 const NEWTON_BLACK_NM = 8;
-const BLACK_RELAX_TAU = 0.5;
+// The film's physical constants, as src/lib/soapFilm.ts's defaults.
+const SIGMA = 0.025;
+const MU = 1e-3;
+const HAMAKER = 3.7e-20;
 
 export interface SoapFilmGpuOptions {
   nx: number;
@@ -46,6 +49,11 @@ export interface SoapFilmStepOptions {
   g?: number;
   evap?: number;
   zeta?: number;
+  /** The bottom Plateau border's radius, metres; absent or 0, no border. */
+  border?: number;
+  sigma?: number;
+  mu?: number;
+  hamaker?: number;
 }
 
 export interface SoapFilmGpuReadback {
@@ -54,9 +62,33 @@ export interface SoapFilmGpuReadback {
   vf: Float32Array;
 }
 
+/**
+ * The solver's own buffers, for a caller that drives the film from outside
+ * (the plate, src/gpu/soapFilmPlate.ts, PLAN 32d): the thickness in nm, the
+ * outside push on the faces in m/s (the (nx + 1) * ny horizontal faces, then
+ * the nx * (ny + 1) vertical ones; zero unless written), the step's stats
+ * (stats[0] the mean thickness), and the rupture flags and Vrij clocks a
+ * fresh film resets.
+ */
+export interface SoapFilmGpuBuffers {
+  h: GPUBuffer;
+  /** The film's projected face velocities after a step, m/s (what drags the plate's air, gpu/soapAir.ts). */
+  uf: GPUBuffer;
+  vf: GPUBuffer;
+  ext: GPUBuffer;
+  stats: GPUBuffer;
+  ruptured: GPUBuffer;
+  age: GPUBuffer;
+}
+
 export interface SoapFilmGpu {
+  readonly nx: number;
+  readonly ny: number;
+  readonly buffers: SoapFilmGpuBuffers;
   write(h: ArrayLike<number>): void;
   step(dt: number, opts?: SoapFilmStepOptions): void;
+  /** The step, recorded into the caller's encoder (no submit of its own). Its arguments are written to the queue now, so one encode per submit. */
+  encode(enc: GPUCommandEncoder, dt: number, opts?: SoapFilmStepOptions): void;
   read(): Promise<SoapFilmGpuReadback>;
   destroy(): void;
 }
@@ -79,7 +111,7 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   const makeBuf = (label: string, bytes: number, usage = storageUsage) =>
     disposer.track(device.createBuffer({ label, size: Math.max(16, bytes), usage }));
 
-  const uniBuf = makeBuf('soap args', 64, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+  const uniBuf = makeBuf('soap args', 80, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
   const hBuf = makeBuf('soap h', n * 4);
   const ufBuf = makeBuf('soap uf', nUf * 4);
   const vfBuf = makeBuf('soap vf', nVf * 4);
@@ -89,6 +121,8 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   const statsBuf = makeBuf('soap stats', 32);
   const slopesBuf = makeBuf('soap slopes', n * 8);
   const fluxesBuf = makeBuf('soap fluxes', (nUf + nVf) * 4);
+  const ageBuf = makeBuf('soap age', n * 4);
+  const extBuf = makeBuf('soap ext', (nUf + nVf) * 4);
   const readBuf = makeBuf('soap readback', (n + nUf + nVf) * 4, GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ);
 
   const pipe = (k: SoapKernel): GPUComputePipeline => {
@@ -103,13 +137,13 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   const projectPipe = pipe('soapProject');
   const transportPipe = pipe('soapTransport');
 
-  const setupBg = bindGroup(device, setupPipe, [uniBuf, hBuf, ufBuf, vfBuf, pBuf, rhsBuf, rupturedBuf, statsBuf]);
+  const setupBg = bindGroup(device, setupPipe, [uniBuf, hBuf, ufBuf, vfBuf, pBuf, rhsBuf, rupturedBuf, statsBuf, extBuf]);
   const sorRedBg = bindGroup(device, sorRedPipe, [uniBuf, pBuf, rhsBuf, statsBuf]);
   const sorBlackBg = bindGroup(device, sorBlackPipe, [uniBuf, pBuf, rhsBuf, statsBuf]);
   const projectBg = bindGroup(device, projectPipe, [uniBuf, pBuf, ufBuf, vfBuf, statsBuf]);
-  const transportBg = bindGroup(device, transportPipe, [uniBuf, hBuf, ufBuf, vfBuf, rupturedBuf, statsBuf, slopesBuf, fluxesBuf]);
+  const transportBg = bindGroup(device, transportPipe, [uniBuf, hBuf, ufBuf, vfBuf, rupturedBuf, statsBuf, slopesBuf, fluxesBuf, ageBuf]);
 
-  const uniBytes = new ArrayBuffer(64);
+  const uniBytes = new ArrayBuffer(80);
   const uniU32 = new Uint32Array(uniBytes);
   const uniF32 = new Float32Array(uniBytes);
 
@@ -122,7 +156,10 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   let lastG = NaN;
   let destroyed = false;
 
-  return {
+  const film: SoapFilmGpu = {
+    nx,
+    ny,
+    buffers: { h: hBuf, uf: ufBuf, vf: vfBuf, ext: extBuf, stats: statsBuf, ruptured: rupturedBuf, age: ageBuf },
     write(h: ArrayLike<number>): void {
       if (destroyed) return;
       for (let i = 0; i < n; i++) {
@@ -135,10 +172,18 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       device.queue.writeBuffer(ufBuf, 0, zeroUf);
       device.queue.writeBuffer(vfBuf, 0, zeroVf);
       device.queue.writeBuffer(pBuf, 0, zeroCell);
+      device.queue.writeBuffer(ageBuf, 0, zeroCell);
       lastG = NaN;
     },
 
     step(dt: number, stepOpts: SoapFilmStepOptions = {}): void {
+      if (destroyed) return;
+      const enc = device.createCommandEncoder({ label: 'soapFilm step' });
+      film.encode(enc, dt, stepOpts);
+      device.queue.submit([enc.finish()]);
+    },
+
+    encode(enc: GPUCommandEncoder, dt: number, stepOpts: SoapFilmStepOptions = {}): void {
       if (destroyed) return;
       const g = stepOpts.g ?? 9.81;
       const evap = stepOpts.evap ?? 0;
@@ -147,7 +192,9 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       lastG = g;
 
       const scale = (RHO_WATER * g * 1e-9) / zeta;
-      const decay = dt > 0 ? Math.exp(-dt / BLACK_RELAX_TAU) : 1;
+      const sigma = stepOpts.sigma ?? SIGMA;
+      const mu = stepOpts.mu ?? MU;
+      const A = stepOpts.hamaker ?? HAMAKER;
       const sweeps = resetP ? 80 : 60;
 
       uniU32[0] = nx;
@@ -160,15 +207,20 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       uniF32[7] = evap;
       uniF32[8] = scale;
       uniF32[9] = omega;
-      uniF32[10] = decay;
+      uniF32[10] = 0;
       uniF32[11] = zeta;
       uniU32[12] = sweeps;
       uniU32[13] = sweeps;
       uniU32[14] = halfNx;
       uniU32[15] = 0;
+      uniF32[16] = stepOpts.border ?? 0;
+      uniF32[17] = (mu * RHO_WATER * Math.abs(g) * 1e-9) / (zeta * sigma);
+      uniF32[18] = (RHO_WATER * Math.abs(g)) / sigma;
+      // Vrij's 96 pi^2 sigma mu / A^2 for a thickness in nm: the SI value is near
+      // float32's top and h^5 in metres is under its smallest normal, so scale both.
+      uniF32[19] = ((96 * Math.PI * Math.PI * sigma * mu) / (A * A)) * 1e-45;
       device.queue.writeBuffer(uniBuf, 0, uniBytes);
 
-      const enc = device.createCommandEncoder({ label: 'soapFilm step' });
       const pass = enc.beginComputePass({ label: 'soapFilm' });
 
       pass.setPipeline(setupPipe);
@@ -193,7 +245,6 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       pass.dispatchWorkgroups(1);
 
       pass.end();
-      device.queue.submit([enc.finish()]);
     },
 
     async read(): Promise<SoapFilmGpuReadback> {
@@ -218,4 +269,5 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       disposer.dispose();
     },
   };
+  return film;
 }

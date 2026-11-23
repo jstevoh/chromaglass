@@ -14,6 +14,8 @@ import { type FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE, GRID_SIZE } from './constants';
 import { DICE } from './dice';
 import { fluidSink, type AreaSink } from '../lib/areaCords';
+import { areaCentre, type PlateArea } from '../lib/plateAreas';
+import { showNow } from '../lib/showClock';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 export const HAND_SETTLE = 0.25;
@@ -23,45 +25,6 @@ export const HAND_STILL_HOLD = 0.35;
 
 /** Frame widths a second above which a person is blowing rather than pressing. */
 export const HAND_MOVING = 0.06;
-
-/*
-  A moving Blow on the ferrofluid (PLAN.md §9n) pushes along the way the hand
-  last went, for this long after it last moved. Long enough to cover a
-  frame's later sim steps (the stroke is nothing on those) and a frame or two
-  at 20 fps where the pointer reported no move; short enough that a hand that
-  stops and holds is a puff, opening a hole, within a tenth of a second or so
-  of stopping, which reads as at once.
-*/
-export const BLOW_DIR_HOLD_MS = 150;
-
-/*
-  And the Blow is a straw only once the hand has been held for that long and
-  for this many frames in which the pointer reported no move, counting the
-  press itself as a move (PLAN.md §15c).
-
-  The straw used to be "not going": no move within BLOW_DIR_HOLD_MS. Two holes
-  in that, and the deploy after #230 fell into one: a Blow drawn across a pool
-  lost 54 of its 229 of dye (main's deploy, run 37177982848), the old eraser's
-  size of loss, though the wind had run 49 steps and carried 156.5. The
-  stroke had also run 5 straw steps, and a straw step blows a real bubble,
-  whose air takes the dye under it off the plate (airExclude) for as long as
-  the bubble sits there.
-  - A press has no move before it, so every step between the press and the
-    first move the pointer reports was a straw step: a drag began by blowing
-    a bubble in the middle of whatever it was drawn through. At 10 to 30
-    frames a second, as the Mac runner draws, that is a frame or two of steps
-    before the first move arrives (2, 3, 5 and 7 straw steps on its runs).
-  - On a slow frame rate a hand that never stops reports its moves a frame
-    apart, and 150 ms is a frame and a half at 10 fps: a drag on a struggling
-    machine was a straw every time a move came a frame late.
-  So the press starts the hold's clock as a move does, and the hold is both
-  the time (a hand on a fast machine still reads as held within a sixth of a
-  second) and a few frames with no move in them (a hand on a slow one that is
-  moving reports a move every frame, and is not held).
-*/
-export const BLOW_STRAW_FRAMES = 3;
-
-export type BlowDir = { x: number; y: number; at: number; still: number; moved: boolean };
 
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 export const DROP_EVERY = 10;
@@ -250,4 +213,82 @@ export function stirAlongMove(fluid: Pick<FluidSimulation, 'applySquish' | 'addV
   fluid.applySquish(x, y, 8, 0.005);
   // A touch passes no move (its handler never stirred): no stir, and no row marked for nothing.
   if (dx || dy) fluid.addVelocity(x, y, dx * 5, dy * 5);
+}
+
+/** Remote pad hands held on the glass (0–1), blocking the projector's air while held (PLAN 36e-2). */
+export type RemoteHoldMap = Map<string, { layer: number; x: number; y: number; at: number }>;
+
+export function recordRemoteHold(map: RemoteHoldMap, layer: number, id: number | undefined, x: number | undefined, y: number | undefined): void {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const holdId = `${layer}:${Number.isFinite(id) ? id : 0}`;
+  map.set(holdId, {
+    layer,
+    x: Math.max(0, Math.min(1, x as number)),
+    y: Math.max(0, Math.min(1, y as number)),
+    at: showNow(),
+  });
+}
+
+const BOIL_HOLD_POOL: { x: number; y: number }[][] = [];
+
+function writeBoilHold(
+  holds: { x: number; y: number }[],
+  pool: { x: number; y: number }[],
+  idx: number,
+  x: number,
+  y: number,
+): void {
+  let slot = pool[idx];
+  if (!slot) {
+    slot = { x, y };
+    pool[idx] = slot;
+  } else {
+    slot.x = x;
+    slot.y = y;
+  }
+  holds[idx] = slot;
+}
+
+export function syncBoilHolds(
+  fluids: (FluidSimulation | undefined)[],
+  activeLayer: number,
+  drainFrame: number,
+  hands: { hand: { x: number; y: number } }[],
+  remoteHolds: RemoteHoldMap,
+): void {
+  const holdNow = showNow();
+  for (let li = 0; li < fluids.length; li++) {
+    const fl = fluids[li];
+    if (!fl) continue;
+    let pool = BOIL_HOLD_POOL[li];
+    if (!pool) {
+      pool = [];
+      BOIL_HOLD_POOL[li] = pool;
+    }
+    const holds = fl.boilHolds;
+    let count = 0;
+    if (li === activeLayer && drainFrame === 0) {
+      for (const { hand } of hands) {
+        if (hand.x > 0 && hand.x < GRID_SIZE - 1 && hand.y > 0 && hand.y < GRID_SIZE - 1) {
+          writeBoilHold(holds, pool, count++, (hand.x + 0.5) / GRID_SIZE, (hand.y + 0.5) / GRID_SIZE);
+        }
+      }
+    }
+    for (const [hid, h] of remoteHolds) {
+      if (holdNow - h.at >= 250) { remoteHolds.delete(hid); continue; }
+      if (h.layer === li && drainFrame === 0) writeBoilHold(holds, pool, count++, h.x, h.y);
+    }
+    holds.length = count;
+  }
+}
+
+/** Where a kick lands on the dish (inside `sqArea` if given, else about the middle). */
+export function kickCenter(
+  sqArea: PlateArea | null,
+  sheet: boolean,
+  dice: { centred(): number },
+): { x: number; y: number } {
+  const sqAt = sqArea ? areaCentre(sqArea, GRID_SIZE) : { x: GRID_SIZE / 2, y: GRID_SIZE / 2 };
+  const sqSpread = sqArea ? sqArea.r * GRID_SIZE : (sheet ? GRID_SIZE / 2 : 30 * GRID_SCALE);
+  return { x: sqAt.x + dice.centred() * sqSpread, y: sqAt.y + dice.centred() * sqSpread };
 }

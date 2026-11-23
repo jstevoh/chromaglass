@@ -99,20 +99,30 @@ try {
   check('and keeps all the oil', Math.abs(tense.after.mass / tense.before.mass - 1) < 0.01,
     `${tense.before.mass.toFixed(1)} → ${tense.after.mass.toFixed(1)}`);
 
-  // ── 5: Marangoni flow ──
+  /*
+    ── 5: Marangoni flow ──
+
+    Measured inside the drop's own radius, 0.06. It was a tenth of the plate,
+    which only the old grid-rate spread reached: at this lab's 128² the soap
+    spread twelve times faster in m²/s than at the app's 384², so in 1.5 s it
+    pushed dye past 0.1 here and would not have at 384. With the spread in
+    metres and seconds (PLAN 38c) the burst empties the drop's footprint
+    (418 → 18) and piles the dye just outside it, inside 0.1 (1112 → 1112);
+    the front's real speed, which would clear far past 0.1, is 38c-1.
+  */
   const soapDrop = async (on) => {
     await page.evaluate(() => lab.create(128));
     await page.evaluate(() => { lab.dye(0.5, 0.5, 0.35, [1, 1, 1], 1); lab.flush(); lab.solver().addMix(0.5, 0.5, 0.06, { soap: 1 }); });
     await page.evaluate((s) => lab.step(90, { surfactantFlow: s, dt: 0.004 }), on);
     return page.evaluate(async () => {
       const d = await lab.field('dye'); const L = 192; let inner = 0, tot = 0;
-      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { const a = d[(i + j * L) * 4 + 3]; tot += a; if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) < 0.1) inner += a; }
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { const a = d[(i + j * L) * 4 + 3]; tot += a; if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) < 0.06) inner += a; }
       return { inner, tot };
     });
   };
   const still = await soapDrop(0), burst = await soapDrop(1);
   check('soap drives the dye away from where it lands', burst.inner < still.inner * 0.6,
-    `dye within a tenth of the drop ${still.inner.toFixed(0)} without the flow, ${burst.inner.toFixed(0)} with it`);
+    `dye within the drop's radius ${still.inner.toFixed(0)} without the flow, ${burst.inner.toFixed(0)} with it`);
   check('and carries it rather than making or losing any', Math.abs(burst.tot / still.tot - 1) < 0.01,
     `${still.tot.toFixed(0)} → ${burst.tot.toFixed(0)}`);
 

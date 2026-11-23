@@ -7,11 +7,38 @@ import { isClassFeature } from '../../lib/hitSource';
 import { AreaPicker } from '../phone/AreaPicker';
 import { BandStrip } from '../phone/BandStrip';
 import { groupOf } from '../../lib/settingsMap';
+import { ENVELOPE_TRIGGERS, formatLfoBars, LFO_BARS, LFO_SHAPES, LFO_TRIGGERS, nearestLfoBars } from '../../lib/modulators';
 import { Info } from '../Info';
 import { LIT } from '../ui';
-import { Slider } from './controls';
+import { Slider, PinChips } from './controls';
 import { PATCH_SOURCES, featuresFor, sceneTargets, TARGET_GROUPS } from './patchLists';
+import { HandControls, MusicHandsFold } from './HandControls';
+import { isMusicCord } from '../../lib/musicCords';
 import type { SectionCtx } from './props';
+
+const SHAPE_NAMES: Record<typeof LFO_SHAPES[number], string> = {
+  sine: 'Sine',
+  triangle: 'Triangle',
+  ramp: 'Ramp',
+  stepped: 'Stepped',
+  smooth: 'Smoothed random',
+};
+
+const RESTART_NAMES: Record<Exclude<typeof LFO_TRIGGERS[number], null>, string> = {
+  none: 'Free',
+  kick: 'Kick',
+  snare: 'Snare',
+  note: 'Note',
+  pad: 'Pad',
+};
+
+const ENV_ON_NAMES: Record<typeof ENVELOPE_TRIGGERS[number], string> = {
+  any: 'Any',
+  kick: 'Kick',
+  snare: 'Snare',
+  note: 'Note',
+  pad: 'Pad',
+};
 
 /*
   Feed: the patch bay, where a reading of the room, the film, the sound or a shape is
@@ -26,9 +53,12 @@ import type { SectionCtx } from './props';
 */
 export const PatchesSection = ({ c }: { c: SectionCtx }) => {
   const {
-    settings, onUpdate, readEar, focusSection, lookAreas, areaColours, keep, shown, goTo, listens,
+    settings, onUpdate, readEar, focusSection, lookAreas, areaColours, pins, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
+  // The music's cords folded until opened (HandControls.tsx MusicHandsFold says why).
+  const [handsOpen, setHandsOpen] = React.useState(false);
+  const musicRoles = (settings.sceneMappings ?? []).filter(isMusicCord).map(m => m.role!);
   return (
     <>
 
@@ -77,7 +107,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {(settings.sceneMappings ?? []).map((m, i) => (
+              <MusicHandsFold roles={musicRoles} open={handsOpen} onToggle={() => setHandsOpen(o => !o)} />
+              {(settings.sceneMappings ?? []).map((m, i) => !handsOpen && isMusicCord(m) ? null : (
                 <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
                   <div className="flex items-center gap-1">
                     {/*
@@ -92,7 +123,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       aria-label="Source"
                       onChange={(e) => {
                         const source = e.target.value as PatchSource;
-                        const options = featuresFor(source);
+                        const options = featuresFor(source, settings);
                         const keep = options.some(([v]) => v === m.feature);
                         const next = [...(settings.sceneMappings ?? [])];
                         const { band: _dropBand, ...rest } = m;
@@ -122,7 +153,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-feature-${i}`}
                     >
-                      {featuresFor(m.source ?? 'room').map(([value, label]) => (
+                      {featuresFor(m.source ?? 'room', settings).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
@@ -145,18 +176,28 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     >
                       {m.area !== undefined ? AREA_TARGETS.map(t => (
                         <option key={t.key} value={t.key} title={t.hint}>{t.label}</option>
-                      )) : TARGET_GROUPS.map(g => (
-                        <optgroup key={g.id} label={g.name}>
-                          {g.targets.map(t => (
-                            <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
+                      )) : <>
+                        {/* A hand on the whole plate (PLAN 38v-1): the music's own hands are these. */}
+                        <optgroup label="Hands on the plate">
+                          {AREA_TARGETS.map(t => (
+                            <option key={t.key} value={t.key} title={t.hint}>{t.plate}</option>
                           ))}
                         </optgroup>
-                      ))}
+                        {TARGET_GROUPS.map(g => (
+                          <optgroup key={g.id} label={g.name}>
+                            {g.targets.map(t => (
+                              <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </>}
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
                       aria-label="Remove mapping"
+                      // By the patch's index, for the phone's check: the music's folded cords make the nth on screen another patch.
+                      data-testid={`patch-remove-${i}`}
                     >
                       <X size={12} />
                     </button>
@@ -176,8 +217,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     <select
                       value={String(m.layer ?? 'all')}
                       aria-label="Plate"
-                      disabled={m.area !== undefined || !PER_LAYER.has(String(m.setting))}
-                      title={m.area !== undefined ? 'An area cord works on the plate the music plays'
+                      disabled={isAreaTarget(m.setting) || !PER_LAYER.has(String(m.setting))}
+                      title={isAreaTarget(m.setting) ? 'A hand works on the plate the music plays'
                         : PER_LAYER.has(String(m.setting))
                         ? 'Which plate this patch moves'
                         : `${sceneTargets.find(t => t.key === m.setting)?.label ?? 'This control'} is part of the finished picture, not one plate`}
@@ -225,7 +266,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                         band={m.band}
                         feature={m.feature}
                         gain={m.gain ?? 1}
-                        threshold={(m.area !== undefined
+                        threshold={(isAreaTarget(m.setting)
                           ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
                           : m.mode === 'gate')
                           ? (m.threshold ?? 0.3)
@@ -260,7 +301,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                           const next = [...(settings.sceneMappings ?? [])];
                           const { area: _drop, layer: _layer, ...rest } = m;
                           next[i] = area === undefined
-                            ? { ...rest, layer: m.layer ?? 'all', setting: isAreaTarget(m.setting) ? 'turbulenceScale' : m.setting }
+                            // Off its area a hand works the whole plate (38v-1), so it stays a hand.
+                            ? { ...rest, layer: m.layer ?? 'all' }
                             : { ...rest, area, setting: isAreaTarget(m.setting) ? m.setting : 'areaStir' };
                           onUpdate({ sceneMappings: next });
                         }}
@@ -274,9 +316,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     both whole-plate sound/band cords and area cords. Not on the
                     note (PLAN 25i): a name has no level to gate or gain.
                   */}
-                  {(m.source === 'sound' || m.source === 'bands' || m.area !== undefined) && !isClassFeature(m.feature) && (() => {
+                  {(m.source === 'sound' || m.source === 'bands' || isAreaTarget(m.setting)) && !isClassFeature(m.feature) && (() => {
                     const isSoundOrBands = m.source === 'sound' || m.source === 'bands';
-                    const isGated = m.area !== undefined
+                    const isGated = isAreaTarget(m.setting)
                       ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
                       : m.mode === 'gate';
                     return (
@@ -364,11 +406,293 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       </div>
                     );
                   })()}
+                  <HandControls m={m} i={i} settings={settings} onUpdate={onUpdate} />
                 </div>
               ))}
             </div>
           )}
         </div>
+        {/*
+          LFOs and envelopes (PLAN 30b): each LFO's bar rate (¼ to 16 bars),
+          waveform shape (sine, triangle, ramp, stepped, smoothed random) and
+          restart trigger (free, kick, snare, note, pad), and each envelope's
+          attack, decay and trigger source (any, kick, snare, note, pad).
+          Defaults match the fixed rates and shapes looks were built against.
+        */}
+        <div className="mt-6 mb-2 text-[13px] font-medium text-text" data-testid="patch-lfos">LFOs</div>
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="lfo-row-1">
+            <div className="flex items-center justify-between gap-1 mb-1.5">
+              <span className="text-[12px] font-medium text-text">LFO 1</span>
+              {pins && (
+                <div className="flex items-center gap-1.5">
+                  <PinChips settingKey="lfo1Bars" />
+                  <PinChips settingKey="lfo1Shape" />
+                  <PinChips settingKey="lfo1Restart" />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <select
+                value={String(nearestLfoBars(settings.lfo1Bars ?? 8))}
+                aria-label="LFO 1 Rate"
+                onChange={(e) => onUpdate({ lfo1Bars: parseFloat(e.target.value) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo1-bars"
+              >
+                {LFO_BARS.map((b) => (
+                  <option key={b} value={String(b)}>{formatLfoBars(b)}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_SHAPES.length - 1, Math.round(settings.lfo1Shape ?? 0))))}
+                aria-label="LFO 1 Shape"
+                onChange={(e) => onUpdate({ lfo1Shape: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo1-shape"
+              >
+                {LFO_SHAPES.map((s, idx) => (
+                  <option key={s} value={String(idx)}>{SHAPE_NAMES[s]}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_TRIGGERS.length - 1, Math.round(settings.lfo1Restart ?? 0))))}
+                aria-label="LFO 1 Restart"
+                onChange={(e) => onUpdate({ lfo1Restart: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo1-restart"
+              >
+                {LFO_TRIGGERS.map((r, idx) => (
+                  <option key={r} value={String(idx)}>{RESTART_NAMES[r]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="lfo-row-2">
+            <div className="flex items-center justify-between gap-1 mb-1.5">
+              <span className="text-[12px] font-medium text-text">LFO 2</span>
+              {pins && (
+                <div className="flex items-center gap-1.5">
+                  <PinChips settingKey="lfo2Bars" />
+                  <PinChips settingKey="lfo2Shape" />
+                  <PinChips settingKey="lfo2Restart" />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <select
+                value={String(nearestLfoBars(settings.lfo2Bars ?? 2))}
+                aria-label="LFO 2 Rate"
+                onChange={(e) => onUpdate({ lfo2Bars: parseFloat(e.target.value) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo2-bars"
+              >
+                {LFO_BARS.map((b) => (
+                  <option key={b} value={String(b)}>{formatLfoBars(b)}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_SHAPES.length - 1, Math.round(settings.lfo2Shape ?? 0))))}
+                aria-label="LFO 2 Shape"
+                onChange={(e) => onUpdate({ lfo2Shape: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo2-shape"
+              >
+                {LFO_SHAPES.map((s, idx) => (
+                  <option key={s} value={String(idx)}>{SHAPE_NAMES[s]}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_TRIGGERS.length - 1, Math.round(settings.lfo2Restart ?? 0))))}
+                aria-label="LFO 2 Restart"
+                onChange={(e) => onUpdate({ lfo2Restart: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo2-restart"
+              >
+                {LFO_TRIGGERS.map((r, idx) => (
+                  <option key={r} value={String(idx)}>{RESTART_NAMES[r]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="lfo-row-3">
+            <div className="flex items-center justify-between gap-1 mb-1.5">
+              <span className="text-[12px] font-medium text-text">LFO 3</span>
+              {pins && (
+                <div className="flex items-center gap-1.5">
+                  <PinChips settingKey="lfo3Bars" />
+                  <PinChips settingKey="lfo3Shape" />
+                  <PinChips settingKey="lfo3Restart" />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <select
+                value={String(nearestLfoBars(settings.lfo3Bars ?? 1))}
+                aria-label="LFO 3 Rate"
+                onChange={(e) => onUpdate({ lfo3Bars: parseFloat(e.target.value) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo3-bars"
+              >
+                {LFO_BARS.map((b) => (
+                  <option key={b} value={String(b)}>{formatLfoBars(b)}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_SHAPES.length - 1, Math.round(settings.lfo3Shape ?? 1))))}
+                aria-label="LFO 3 Shape"
+                onChange={(e) => onUpdate({ lfo3Shape: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo3-shape"
+              >
+                {LFO_SHAPES.map((s, idx) => (
+                  <option key={s} value={String(idx)}>{SHAPE_NAMES[s]}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_TRIGGERS.length - 1, Math.round(settings.lfo3Restart ?? 0))))}
+                aria-label="LFO 3 Restart"
+                onChange={(e) => onUpdate({ lfo3Restart: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo3-restart"
+              >
+                {LFO_TRIGGERS.map((r, idx) => (
+                  <option key={r} value={String(idx)}>{RESTART_NAMES[r]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="lfo-row-4">
+            <div className="flex items-center justify-between gap-1 mb-1.5">
+              <span className="text-[12px] font-medium text-text">LFO 4</span>
+              {pins && (
+                <div className="flex items-center gap-1.5">
+                  <PinChips settingKey="lfo4Bars" />
+                  <PinChips settingKey="lfo4Shape" />
+                  <PinChips settingKey="lfo4Restart" />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <select
+                value={String(nearestLfoBars(settings.lfo4Bars ?? 0.25))}
+                aria-label="LFO 4 Rate"
+                onChange={(e) => onUpdate({ lfo4Bars: parseFloat(e.target.value) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo4-bars"
+              >
+                {LFO_BARS.map((b) => (
+                  <option key={b} value={String(b)}>{formatLfoBars(b)}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_SHAPES.length - 1, Math.round(settings.lfo4Shape ?? 3))))}
+                aria-label="LFO 4 Shape"
+                onChange={(e) => onUpdate({ lfo4Shape: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo4-shape"
+              >
+                {LFO_SHAPES.map((s, idx) => (
+                  <option key={s} value={String(idx)}>{SHAPE_NAMES[s]}</option>
+                ))}
+              </select>
+              <select
+                value={String(Math.max(0, Math.min(LFO_TRIGGERS.length - 1, Math.round(settings.lfo4Restart ?? 0))))}
+                aria-label="LFO 4 Restart"
+                onChange={(e) => onUpdate({ lfo4Restart: parseInt(e.target.value, 10) })}
+                className="min-h-7 min-w-0 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-[12px] text-white/90 outline-none"
+                data-testid="lfo4-restart"
+              >
+                {LFO_TRIGGERS.map((r, idx) => (
+                  <option key={r} value={String(idx)}>{RESTART_NAMES[r]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 mb-2 text-[13px] font-medium text-text" data-testid="patch-envelopes">Envelopes</div>
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="env-row-1">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[12px] font-medium text-text">Envelope 1 Trigger</span>
+              <div className="flex items-center gap-2">
+                {pins && <PinChips settingKey="env1On" />}
+                <select
+                  value={String(Math.max(0, Math.min(ENVELOPE_TRIGGERS.length - 1, Math.round(settings.env1On ?? 0))))}
+                  aria-label="Envelope 1 Trigger"
+                  onChange={(e) => onUpdate({ env1On: parseInt(e.target.value, 10) })}
+                  className="min-h-7 bg-black/40 border border-white/10 rounded px-2 py-1 text-[12px] text-white/90 outline-none"
+                  data-testid="env1-on"
+                >
+                  {ENVELOPE_TRIGGERS.map((t, idx) => (
+                    <option key={t} value={String(idx)}>{ENV_ON_NAMES[t]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <Slider
+              label="Envelope 1 Attack"
+              value={settings.env1Attack ?? 0.012}
+              min={0.001}
+              max={1}
+              step={0.001}
+              onChange={(v: number) => onUpdate({ env1Attack: v })}
+              settingKey="env1Attack"
+            />
+            <Slider
+              label="Envelope 1 Decay"
+              value={settings.env1Decay ?? 0.28}
+              min={0.02}
+              max={4}
+              step={0.01}
+              onChange={(v: number) => onUpdate({ env1Decay: v })}
+              settingKey="env1Decay"
+            />
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="env-row-2">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[12px] font-medium text-text">Envelope 2 Trigger</span>
+              <div className="flex items-center gap-2">
+                {pins && <PinChips settingKey="env2On" />}
+                <select
+                  value={String(Math.max(0, Math.min(ENVELOPE_TRIGGERS.length - 1, Math.round(settings.env2On ?? 0))))}
+                  aria-label="Envelope 2 Trigger"
+                  onChange={(e) => onUpdate({ env2On: parseInt(e.target.value, 10) })}
+                  className="min-h-7 bg-black/40 border border-white/10 rounded px-2 py-1 text-[12px] text-white/90 outline-none"
+                  data-testid="env2-on"
+                >
+                  {ENVELOPE_TRIGGERS.map((t, idx) => (
+                    <option key={t} value={String(idx)}>{ENV_ON_NAMES[t]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <Slider
+              label="Envelope 2 Attack"
+              value={settings.env2Attack ?? 0.09}
+              min={0.001}
+              max={1}
+              step={0.001}
+              onChange={(v: number) => onUpdate({ env2Attack: v })}
+              settingKey="env2Attack"
+            />
+            <Slider
+              label="Envelope 2 Decay"
+              value={settings.env2Decay ?? 1.6}
+              min={0.02}
+              max={4}
+              step={0.01}
+              onChange={(v: number) => onUpdate({ env2Decay: v })}
+              settingKey="env2Decay"
+            />
+          </div>
+        </div>
+
         {/*
           The masters, one per source. Three of them sit beside the Drive of
           the source they scale (Room Impact under Room Drive, Film Impact

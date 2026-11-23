@@ -25,8 +25,10 @@
  *   2. a bigger magnet at the same gap is stronger at the glass, and reaches
  *      further (the deepened dipole's axis field was the same at every Size)
  *   3. at the tool's own size it raises spikes as far out, and as strongly,
- *      as the dipole did: the default keeps today's look; and every look's
- *      own magnet, held further off, still raises none
+ *      as the dipole did: the default keeps today's look; every look's own
+ *      magnet, held further off, still raises none; and the liquid's own
+ *      onset, the target the plate's lab-set one moves to (PLAN 38k-7), is
+ *      Cowley and Rosensweig's field for EFH1 under water
  *   4. the solver's own energy (magnetFieldEnergy) is the field-unit law on
  *      that field, so a big magnet's pull at the edge of its spikes is a real
  *      magnet's (main's deepened dipole at Size 0.9 pulled about a third of
@@ -35,6 +37,7 @@
  *      the integrals) stands on a bound that holds (the magnet's field there is
  *      under 1.25 times its dipole's) and never drops a point past the onset
  *   6. the TypeScript the solver ramps on (fieldOnAxis) is the shader's field
+ *   7. several magnets add as fields, not as energies (PLAN 38k)
  */
 import { openLab } from './lab.mjs';
 
@@ -55,6 +58,11 @@ const worstOf = (xs) => xs.reduce((w, x) => (Number.isFinite(x.err) && x.err <= 
 */
 const trig = new Map();
 function biotSavart(rho, z, a, t, nz = 400, nphi = 1440) {
+  const [bx, bz] = biotSavartVec(rho, z, a, t, nz, nphi);
+  return Math.hypot(bx, bz);
+}
+/** The same sum's components (B_ρ along +x from the axis, B_z), for adding two magnets (7). */
+function biotSavartVec(rho, z, a, t, nz = 400, nphi = 1440) {
   if (!trig.has(nphi)) trig.set(nphi, Array.from({ length: nphi }, (_, j) => [Math.cos((j + 0.5) * 2 * Math.PI / nphi), Math.sin((j + 0.5) * 2 * Math.PI / nphi)]));
   const cs = trig.get(nphi);
   let bx = 0, bz = 0;
@@ -70,7 +78,7 @@ function biotSavart(rho, z, a, t, nz = 400, nphi = 1440) {
       bz += dz * (dlx * ry - dly * rx) / r3;
     }
   }
-  return Math.hypot(bx, bz) / (4 * Math.PI);
+  return [bx / (4 * Math.PI), bz / (4 * Math.PI)];
 }
 /*
   And the same magnet as a point: moment m = M V at its centre, V = π a² t,
@@ -122,7 +130,7 @@ const { page, close } = await openLab();
 try {
   const ready = await page.evaluate(() => typeof lab.SPIKES_WGSL === 'string');
   if (!ready) throw new Error('the lab has no SPIKES_WGSL: scripts/lab-entry.ts must expose it');
-  const consts = await page.evaluate(() => ({ onset: lab.SPIKE_ONSET, full: lab.SPIKE_FULL, bRef: lab.SPIKE_B_REF, radius: lab.MAGNET_RADIUS }));
+  const consts = await page.evaluate(() => ({ onset: lab.SPIKE_ONSET, real: lab.SPIKE_ONSET_REAL, full: lab.SPIKE_FULL, bRef: lab.SPIKE_B_REF, radius: lab.MAGNET_RADIUS }));
   for (const [k, v] of Object.entries(consts)) if (!Number.isFinite(v) || v <= 0) throw new Error(`the lab's ${k} is ${v}`);
 
   /*
@@ -135,7 +143,7 @@ try {
   const run = (qs) => page.evaluate(async (qs) => {
     const device = (await lab.create(64), lab.solver().device);
     const code = `${lab.SPIKES_WGSL}
-struct Q { p: vec2f, radius: f32, pad: f32, m: vec4f };
+struct Q { p: vec2f, radius: f32, pad: f32, m: vec4f, m2: vec4f };
 @group(0) @binding(0) var<storage, read> qs: array<Q>;
 @group(0) @binding(1) var<storage, read_write> outs: array<vec4f>;
 var<private> R: f32;
@@ -146,28 +154,31 @@ fn magnetRadius() -> f32 { return R; }
   let q = qs[i];
   R = q.radius;
   let b = magnetShare(q.p, q.m);
-  outs[i] = vec4f(magnetDiscField(q.p, q.m, q.radius), b, spikeAmp(q.p, q.m), magnetFieldEnergy(b));
+  outs[2u * i] = vec4f(magnetDiscField(q.p, q.m, q.radius), b, spikeAmp(q.p, q.m), magnetFieldEnergy(b));
+  // The field as a vector (PLAN 38k): one magnet's length, and two magnets' sum.
+  // magnetsShare is the sum the solver's magnetsEnergy and the drop's pull call.
+  outs[2u * i + 1u] = vec4f(length(magnetVec(q.p, q.m)), magnetsShare(q.p, q.m, array<vec4f, 3>(q.m2, vec4f(0.0), vec4f(0.0))), magnetShare(q.p, q.m2), 0.0);
 }`;
     const module = device.createShaderModule({ code });
     const info = await module.getCompilationInfo();
     const errs = info.messages.filter((m) => m.type === 'error');
     if (errs.length) throw new Error(errs.map((m) => `${m.lineNum}: ${m.message}`).join('\n'));
     const pipe = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } });
-    const data = new Float32Array(qs.length * 8);
-    qs.forEach((q, i) => data.set([q.x, q.y, q.radius, 0, q.mx, q.my, q.h, q.w], i * 8));
+    const data = new Float32Array(qs.length * 12);
+    qs.forEach((q, i) => data.set([q.x, q.y, q.radius, 0, q.mx, q.my, q.h, q.w, ...(q.m2 ?? [0, 0, 0, 0])], i * 12));
     const inBuf = device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     device.queue.writeBuffer(inBuf, 0, data);
-    const outBuf = device.createBuffer({ size: qs.length * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-    const read = device.createBuffer({ size: qs.length * 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const outBuf = device.createBuffer({ size: qs.length * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+    const read = device.createBuffer({ size: qs.length * 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const bind = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: inBuf } }, { binding: 1, resource: { buffer: outBuf } }] });
     const enc = device.createCommandEncoder();
     const pass = enc.beginComputePass();
     pass.setPipeline(pipe); pass.setBindGroup(0, bind); pass.dispatchWorkgroups(Math.ceil(qs.length / 64)); pass.end();
-    enc.copyBufferToBuffer(outBuf, 0, read, 0, qs.length * 16);
+    enc.copyBufferToBuffer(outBuf, 0, read, 0, qs.length * 32);
     device.queue.submit([enc.finish()]);
     await read.mapAsync(GPUMapMode.READ);
     const out = Array.from(new Float32Array(read.getMappedRange().slice(0)));
-    return qs.map((_, i) => ({ field: out[i * 4], share: out[i * 4 + 1], amp: out[i * 4 + 2], energy: out[i * 4 + 3] }));
+    return qs.map((_, i) => ({ field: out[i * 8], share: out[i * 8 + 1], amp: out[i * 8 + 2], energy: out[i * 8 + 3], vecLen: out[i * 8 + 4], pair: out[i * 8 + 5], share2: out[i * 8 + 6] }));
   }, qs);
   // A point ρ off the axis of a magnet in the middle of the plate, along x.
   const at = (rho, h, a, w = W) => ({ x: 0.5 + rho, y: 0.5, radius: a, mx: 0.5, my: 0.5, h, w });
@@ -249,7 +260,43 @@ fn magnetRadius() -> f32 { return R; }
     const MAGNET_LOOKS = ['magnet-garden', 'ferro-paint'];
     check('every look\'s own magnet, held further off, still raises no spikes', MAGNET_LOOKS.every((id) => looks.some((l) => l.id === id)) && peaks.every((p) => p < consts.onset),
       looks.map((l, i) => `${l.id} ${peaks[i].toFixed(3)}`).join(', ') + ` at most, the onset ${consts.onset}`);
+
+    /*
+      The onset is the liquid's (PLAN 38k), worked out here on its own from
+      the sheet's numbers, typed here and not read from the solver: Ferrotec
+      EFH1 (μ0Ms 44 mT, χ 2.64, 1210 kg/m³) under water, the surface's
+      √(Δρ g σ) as Δρ g l_c with l_c the pitch's (0.04 of a 0.2 m plate over
+      2π), and an N52 rod (1.45 T). Cowley and Rosensweig: the layer stands
+      up at μ0 Mc² = 2 (1 + 1/μ̂) √(Δρ g σ), μ̂ = √(μ_chord μ_tangent). Solved
+      here for M (spikes.ts solves for the inner field H, by another route):
+      bisect M in (0, Ms), H = (Ms / 3χ) L⁻¹(M / Ms) by Newton, and the
+      applied field is μ0 (H + M), since B is continuous through a sheet.
+      Within 1%: the share is the shader's own scale (SPIKE_B_REF of Br).
+      It is held against SPIKE_ONSET_REAL, the target: the plate still runs
+      on the lab's 0.18 until the standing film has its pull (PLAN 9t-2,
+      then 38k-7), and the line prints how far that shortcut is from it.
+    */
+    {
+      const MU0 = 4e-7 * Math.PI, ms = 0.044 / MU0, chi = 2.64, br = 1.45;
+      const stress = (1210 - 1000) * 9.81 * (0.04 * 0.2 / (2 * Math.PI));
+      const Lf = (x) => (x < 1e-4 ? x / 3 : 1 / Math.tanh(x) - 1 / x);
+      const Ld = (x) => (x < 1e-4 ? 1 / 3 : 1 / (x * x) - 1 / Math.sinh(x) ** 2);
+      const Linv = (y) => { let x = 3 * y; for (let i = 0; i < 60; i++) x -= (Lf(x) - y) / Ld(x); return x; };
+      const innerH = (m) => Linv(m / ms) * ms / (3 * chi);
+      const need = (m) => {
+        const h = innerH(m), x = 3 * chi * h / ms;
+        const mu = Math.sqrt((1 + m / h) * (1 + 3 * chi * Ld(x)));
+        return MU0 * m * m - 2 * (1 + 1 / mu) * stress;
+      };
+      let lo = 1, hi = ms * 0.999;
+      for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (need(mid) < 0) lo = mid; else hi = mid; }
+      const b0 = MU0 * (innerH(hi) + hi);
+      const real = consts.real * consts.bRef * br;
+      check('the liquid\'s onset (the target) is Cowley and Rosensweig\'s field for EFH1 under water', Math.abs(real / b0 - 1) < 0.01,
+        `${(b0 * 1e3).toFixed(2)} mT worked out here (Mc ${(hi / 1e3).toFixed(2)} kA/m, the layer's inner field ${(innerH(hi) / 1e3).toFixed(2)} kA/m), spikes.ts's ${(real * 1e3).toFixed(2)} mT (a share of ${consts.real.toFixed(4)}); the plate's onset, the lab's ${consts.onset}, is ${(consts.onset * consts.bRef * br * 1e3).toFixed(1)} mT, ${(consts.onset / consts.real).toFixed(1)}× it until PLAN 38k-7`);
+    }
   }
+
 
   // ── 4. the solver's energy is the field-unit law, so a big magnet's pull at its edge is a real magnet's ──
   {
@@ -320,6 +367,46 @@ fn magnetRadius() -> f32 { return R; }
     const worst = worstOf(got.map((g, i) => ({ err: Math.abs(g.share / ts[i] - 1) })));
     check('the solver\'s ramp (fieldOnAxis) is the shader\'s field on the axis', worst.err < 1e-4,
       rows.map(([h, a], i) => `depth ${h.toFixed(3)} radius ${a}: ${ts[i].toFixed(4)} / ${got[i].share.toFixed(4)}`).join('; '));
+  }
+
+  // ── 7. several magnets add as fields, not as energies (PLAN 38k) ──
+  {
+    /*
+      Two like-poled magnets of the tool's size, held at the hand's depth a
+      little more than a magnet's width apart (a phone's two fingers), and
+      the field at points between them, beside them and off the line: the
+      shader's |ΣB| (magnetsShare, the one sum magnetsEnergy and the drop's
+      pull call, so going back to adding energies there turns this red)
+      against the two Biot–Savart fields added as vectors. And one magnet
+      alone, the vector's length against its |B| (magnetShare), so a single
+      magnet reads as it did. The energies' sum the solver used until 38k
+      reads √(b₁² + b₂²); where the two fields are parallel the real one is
+      b₁ + b₂ (well off to the side, the pair is one dipole twice as strong),
+      and the line asks that the old reading was plainly wrong somewhere
+      among the points (over 20%), so it measures what changed.
+    */
+    const a = consts.radius, h = HELD, sep = 0.12, w = W;
+    const m1 = [0.5 - sep / 2, 0.5], m2 = [0.5 + sep / 2, 0.5];
+    const pts = [[0.5, 0.5], [0.5, 0.53], [0.5 - sep / 2, 0.5], [0.5 + sep, 0.5], [0.5, 0.6], [0.35, 0.45], [0.5, 0.75], [0.2, 0.5]];
+    const got = await run(pts.map(([x, y]) => ({ x, y, radius: a, mx: m1[0], my: m1[1], h, w, m2: [m2[0], m2[1], h, w] })));
+    const zc = centreOf(h, a);
+    const scale = w / consts.bRef;
+    const truth = pts.map(([x, y]) => {
+      let bx = 0, by = 0, bz = 0;
+      for (const [mx, my] of [m1, m2]) {
+        const dx = x - mx, dy = y - my, r = Math.hypot(dx, dy);
+        const [br, b] = biotSavartVec(r, zc, a, THICK * a, 200, 720);
+        if (r > 1e-9) { bx += br * dx / r; by += br * dy / r; }
+        bz += b;
+      }
+      return { pair: Math.hypot(bx, by, bz) * scale };
+    });
+    const worst = worstOf(got.map((g, i) => ({ err: Math.abs(g.pair / truth[i].pair - 1) })));
+    const one = worstOf(got.map((g) => ({ err: Math.abs(g.vecLen / g.share - 1) })));
+    const olds = got.map((g, i) => ({ i, err: Math.abs(Math.hypot(g.share, g.share2) / truth[i].pair - 1) }));
+    const oldWorst = worstOf(olds), mid = got[0];
+    check('two magnets\' fields add as vectors, as the real ones do', worst.err < 0.02 && one.err < 1e-4 && oldWorst.err > 0.2,
+      `|ΣB| against Biot–Savart's sum at ${pts.length} points, worst ${(worst.err * 100).toFixed(2)}% off; one magnet's vector against its |B|, worst ${one.err.toExponential(1)}; between them ${mid.pair.toFixed(3)} against ${truth[0].pair.toFixed(3)}; the energies' sum was ${(oldWorst.err * 100).toFixed(0)}% off at (${pts[oldWorst.i].join(', ')}), ${(olds[0].err * 100).toFixed(0)}% between them`);
   }
 } finally {
   await close();

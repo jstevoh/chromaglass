@@ -134,7 +134,11 @@ export const ROOM_STEP = 1 / 20;
  * it, then lands on the nearest twentieth: a wobble inside that never
  * re-renders, a real pour or drain moves it a step at a time as before, and
  * the bottle still reaches full and empty. The cost is a level at most three
- * quarters of a step behind the reading rather than half of one.
+ * quarters of a step behind the reading rather than half of one. Since
+ * 2026-11-07 (PLAN 19aa-14) the bottle writes its level onto its own SVG with
+ * no render at all, since a drifting plate still crossed a step now and then
+ * and each crossing was a commit; the hysteresis stays, so the level does not
+ * flicker on a boundary.
  */
 export function shownRoom(shown: number, reading: number): number {
   const r = Math.max(0, Math.min(1, Number.isFinite(reading) ? reading : 1));

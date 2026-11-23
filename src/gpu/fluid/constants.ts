@@ -7,7 +7,7 @@
 
 import type { SolverCarry } from '../solverTypes';
 import { SOLVER_VEL_FORMAT } from '../wgsl/pack';
-import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, thicknessViscosity } from '../../lib/turntable';
+import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, OIL_NU, thicknessViscosity } from '../../lib/turntable';
 
 /*
   How many bubbles the air field has room for.
@@ -84,7 +84,9 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
+export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin', 'heatPack', 'heatUnpack'];
+/** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
+export const AIR_DISP_LEAST = 1e-5;
 /*
   The carries' substeps on a thin gap (carryPlan in wgsl/fluid.ts): what one
   substep may carry across a face, in cells, and the most substeps a step
@@ -138,8 +140,24 @@ export const PHASE_COMPRESS = 1;
   about a second, which is how an oil drop on a real dish behaves; the
   Korteweg force it replaced (−σ c ∇μ) had its own σ and no N², and a
   second-derivative field under it that did not scale either.
+
+  Between two glasses the tension moves the oil as Darcy moves it, h²/12μ
+  times σ∇κ, so it carries the gap's h² as every body force here does
+  (OIL_LIFT below): 4e-4 was set in the lab on the 6 mm gap, and on the 2 mm
+  one (PLAN 38r) a drop rounds nine times slower. Kept at 4e-4 the half
+  sheets in `npm run oillift` settled off the rim at 0.017 mm/s against a
+  lens that now rises nine times slower too (0.71 mm/s), over the frame's 2%
+  of it. PLAN 38e (σ in N/m from each bottle) replaces the 4e-4 itself.
+
+  Only between two glasses. The old open plate has no gap and no Darcy
+  drag for the h² to come from, so it keeps the 4e-4 it was set at: carried
+  there too, the strip of oil `npm run physics` lays on the old plate
+  rounded from an aspect of 5.58 to 4.87 in its 0.72 s against under 3.9
+  (the Mac's run on the first try of this, PLAN 38r part 2).
 */
 export const OIL_TENSION = 4e-4;
+/** OIL_TENSION on a thin gap: the gap's h² against the 6 mm it was set on (above). */
+export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The most the oil's surface tension may move the liquid in a step, in cells
   (see mixForce). A drop rounding up is a slow thing, a second or so for a
@@ -148,25 +166,258 @@ export const OIL_TENSION = 4e-4;
   when the force is at its largest and least real.
 */
 export const OIL_CELLS = 0.5;
-export const SOAP_PULL = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
+/*
+  The oil's own weight against the water, cold, and how much more than the
+  water it swells when warmed (PLAN 27f-9c, Oil Weight; mixForce and
+  sealSource lay both).
+
+  What was reported (the Mac film of Lava Lamp sealed, 2026-11-11): the
+  wax stayed in the plate but the plate was red wall to wall, with no
+  separate blobs and no clear liquid. The wax was dye, and dye is one liquid
+  with the water: it mixes. A real lamp's wax is an immiscible liquid (a
+  paraffin blend, a few per cent heavier than the liquid round it cold) that
+  holds itself in bodies by its surface tension, and it rises because it
+  swells with heat more than the liquid does, so it is lighter warm. The
+  engine's immiscible phase is the oil (Oil Tension's Cahn–Hilliard mix), and
+  until now its weight was fixed at "lighter than the water" (the mineral
+  oil of a light show's dish): 0.15 of a unit of dye, the number mixForce
+  carried since PLAN §18f.
+
+  OIL_RHO is the oil's density over the water's at full Oil Weight in the
+  dye's units (the units Dye Weight lays: a unit of dye is a heavy ink), so
+  the dial's −1..1 runs from 3 units lighter to 3 heavier, and
+  OIL_WEIGHT_DEFAULT, −0.05, is the 0.15 lightness every oil look had, so
+  they keep it. The scale is the heat's, not the mineral oil's: the lamp
+  warms the wax on the bottom glass to about 15 of the heat's units, and the
+  heat lifts a cell HEAT_LIFT/DYE_WEIGHT = half a unit of dye per unit of
+  heat (three halves in the oil), so a wax that is to sink once it has
+  cooled to a fifth of that and still lift off the lamp weighs one to two
+  units cold. Measured in the lab (128², Lava Lamp's settings): at 0.24
+  (the first scale's 0.8) the risen wax cooled to the bath's heat, about 1,
+  where its weight and its swelling all but cancelled, and it hung in the
+  upper half for good (the oil's centroid 0.28 → 0.58 of the plate's height
+  in 48 s and never back). The far ends are past any real oil, as the dials'
+  rule asks (PLAN 27h).
+
+  OIL_EXPAND is the oil's heat lift beyond the water's, per unit of oil: the
+  heat lifts a cell by HEAT_LIFT × T × (1 + OIL_EXPAND × c). Paraffin's
+  volumetric expansion is about 7.6e-4 per kelvin and water's 2.1e-4 at 20 °C
+  (4.6e-4 at 50 °C, CRC Handbook), so the oil swells two to three and a half
+  times what the water does: 2 is the low end, a warm lamp's. Every oil has
+  it, light or heavy, and it acts only where a heat and a gravity in the
+  plate meet (a standing plate with its lamp), which no oil look stood on
+  before this.
+*/
+export const OIL_RHO = 3;
+export const OIL_WEIGHT_DEFAULT = -0.05;
+export const OIL_EXPAND = 2;
+/*
+  No melt. A first cut gave a heavier oil a melt too (WAX_MELT, 2 of the
+  heat's units over ±0.5, the weight turned from heavy to as light across
+  it): paraffin grows 10 to 15% in volume on melting, which is what a real
+  lamp runs on. Measured on Lava Lamp's own step (`npm run lavawax`'s, against
+  a lab built without it), it changed nothing the plate does: the wax's centre of
+  mass at six seconds 0.24 of the height with it, 0.23 without, against 0.13
+  with no heat. The wax settles over the lamp where its warmth and swelling
+  balance its weight, and the melt's turn did not move that balance. So it
+  went (its two Sim slots are padding now, SIM_FLOATS); a lamp that cycles is PLAN 27f-9e, and a melt that does
+  something comes back with it, measured.
+*/
+/** The oil's density over the water's in dye units, from Oil Weight (−1..1; left out, the mineral oil's −0.15). */
+export function oilRhoOf(weight: number | undefined): number {
+  const w = Number.isFinite(weight) ? Math.max(-1, Math.min(1, weight as number)) : OIL_WEIGHT_DEFAULT;
+  return OIL_RHO * w;
+}
+/**
+ * The oil's lightness as a share of the mineral oil's, for the passes that
+ * carry a lightness of their own in real units (the oil's lift up a rocked
+ * plate, OIL_LIFT; the centrifuge, SPIN_OIL_LIGHT): 1 at the default, 0 for
+ * an oil as heavy as the water, below zero for one heavier (it then falls
+ * down the rocked plate and goes out to the rim of a turning dish).
+ */
+export function oilLightnessOf(weight: number | undefined): number {
+  return -oilRhoOf(weight) / (OIL_RHO * -OIL_WEIGHT_DEFAULT);
+}
 /**
  * The lamp heating rate: absorbed lamp irradiance turning into heat per second (PLAN §18f).
  * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
  */
 export const LAMP_HEATING = 0.24;
-/** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
+/**
+ * The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity.
+ * Only where the wax is dye: a wax that is a liquid of its own is warmed by the floor's glass (LAMP_GLASS below).
+ */
 export const LAMP_HEAT = 6;
-/** Vorticity confinement's push, as a fraction of the local spin, per step. */
+/*
+  The cool top of a lamp (PLAN 27f-9e): where the heat a standing plate's
+  lamp lays goes out again.
+
+  Reported (the 38f-1 lab, 192², 16 s): with the heat carried, Lava Lamp's
+  wax rose in plumes and gathered at the top, and stayed there. Nothing took
+  its heat but Heat Decay, a per-look fade on the look's clock (decayVel),
+  which on Lava Lamp's step (0.0013 of a unit against a sixtieth of a
+  second) is a time constant of about ten minutes: a risen body was still
+  light when the take ended.
+
+  In a thin gap every parcel of the liquid touches both glasses, a
+  millimetre either side, and that is where its heat goes: across the gap
+  by conduction, whose slowest mode in a slab of thickness h between two
+  walls held at one temperature dies as exp(−π²κt/h²). At the rest gap of
+  2 mm that is 2.9 s for water (κ = 1.4e-7 m²/s) and 5.8 s for a paraffin
+  wax (KAPPA_WAX below). A real lava lamp's blob, ten times wider than its
+  distance to any wall, keeps its heat for minutes and cools on the liquid
+  round it; a gap's blob cools on the glass, in seconds, which is the gap's
+  own physics and not a speed-up.
+
+  Where the glass is cold. A lava lamp's top is its cooler: the heat the
+  lamp puts in at the floor leaves through the cap and the upper glass,
+  while the lower glass stands in the lamp's own warm air, rising off the
+  base, and rides the warm liquid behind it (a 2 mm gap conducts about
+  k/(h/2) = 600 W/m²K to its glass against still air's 10 from it, so a
+  glass the air does not cool sits within a few percent of its liquid). So
+  the column holds a gradient, warm below and cool above, and that is what
+  turns a rising blob round: warmed on the floor, it keeps its heat through
+  the warm lower part and gives it up in the cool upper one. LAMP_COOL_FROM
+  is where the cool glass starts, as a share of the plate's height from the
+  floor, and it comes in over a sheet of glass's fin length,
+  √(k t / h_air) = √(1.0 W/mK × 3 mm / 10 W/m²K) ≈ 17 mm (GLASS_FIN, in the
+  plate's widths of 0.2 m), the distance over which a glass sheet carries
+  heat sideways before the air has taken it.
+
+  Measured in the lab (128², Lava Lamp's settings, 30 s; the oil's centre
+  of mass as a share of the height, the lay at 0.35):
+    no cooling (Heat Decay alone): up to 0.73 by 12 s and there at 30 s;
+    the cool glass from the lamp's own band (0.22 of the height) up: up to
+    0.46 at 6 s and down by 10 s, then the pool on the floor turned over
+    in itself and never let a blob go (its top always in the cold), 0.29
+    at 30 s;
+    from 0.35: 0.52 at 6 s, 0.28 at 16 s, 0.39 at 24 s, a shallow cycle;
+    from the half: 0.59 at 8 s, 0.31 at 18 s, 0.50 at 30 s, rising
+    again: the cycle, about 25 s round. So the half.
+
+  A shortcut, named (PLAN 27f-9g): the glass's temperature is laid by
+  height (riding the liquid below LAMP_COOL_FROM, the room's above) rather
+  than given a temperature of its own that the liquid warms and the air
+  cools (the lumped glass and air of lib/lampBoil.ts), so a lamp run for an
+  hour does not warm up as a real one does, and the cool line does not
+  move with how hot the lamp runs.
+*/
+export const KAPPA_WAX = 7e-8;       // m²/s: liquid paraffin, k ≈ 0.16 W/mK over ρc ≈ 780 kg/m³ × 2.9 kJ/kgK
+export const GLASS_FIN = 0.017 / DISH_METRES;
+export const LAMP_COOL_FROM = 0.5;
+/*
+  The warm floor of a lamp (PLAN 27f-9h): the glass over the bulb, in the
+  heat's units, and the other end of the gradient the cool top makes.
+
+  Reported: on the owner's machine the lamp's wax rose once and then hung
+  ("no second rise from the floor" in a 90 s film), and `npm run lavacycle`
+  went red when the wax was made paler. Measured in the lab (128², Lava
+  Lamp's settings, a sample every 2 s for 180 s, the oil's centre of mass as
+  a share of the height): the paler wax rose to 0.60 at 11 s and hovered at
+  0.49 to 0.50 from 22 s on; the wax the check was written on went round
+  once or twice and was hovering too by 60 to 80 s, past the 30 s the check
+  looked at. The maps showed why. The bulb was a kick of LAMP_HEAT a second
+  into the wax alone, in a band over the floor, with the water under it
+  left cold. The wax's neutral heat is about 1.3 of the heat's units, so a
+  body entering the band was light again within a quarter of a second, long
+  before it had sunk through it: the band was a thermostat with the wax
+  parked on its upper edge, one weightless slab, the water below it at 0.
+  No dial moved it (stronger gravity, a thinner liquid, slower cooling, no
+  cooling by the room at all), and it could not have: a body in a liquid
+  this thick has no inertia, its speed is its weight at that moment, and a
+  system of two such numbers (height, heat) that comes to rest somewhere
+  stays there. A lamp goes round on two things the kick did not have. The
+  liquid round the wax is warm below and cool above, so a body is lighter
+  against it the higher it gets, and it warms slowly, by conduction from the
+  floor, so it has sunk all the way down before it is light again.
+
+  So the bulb is what it is in a lamp: it heats the glass floor, and the
+  floor heats whatever lies on it, water and wax alike, by the same
+  conduction across the gap that the cool glass takes it out by (S.lampCool,
+  the wax at its own κ), toward the floor's temperature, over the same fin
+  length of glass (GLASS_FIN) up from the floor. LAMP_GLASS is that
+  temperature. Measured, the same lab:
+    4: up to 0.57, then a swing that dies to 0.34 to 0.40 by 180 s;
+    6: down to 0.15 at 8 s (wax laid cold sinks first), 0.60 at 22 s, 0.19
+    at 42 s, 0.64 at 56 s, 0.23 at 76 s, 0.60 at 90 s, 0.22 at 108 s, 0.62
+    at 122 s, and 0.24 to 0.62 still at 180 s: about 32 s round, in whole
+    fat bodies, the water at 2.7 on the floor, 1.0 a quarter of the way
+    up, 0.4 in the middle and 0 at the top;
+    8: 0.25 to 0.62, 26 s round, the wax torn into more and smaller bodies.
+  And the kick kept beside the warm floor (floors of 2, 3 and 4) hovered
+  every time: it is the kick that stops the lamp. The projector's own light
+  on the wax (LAMP_HEATING) was left on throughout; with it off and the
+  floor at 3 the wax never left the floor.
+
+  The same shortcut as the cool glass's (PLAN 27f-9g): the floor's
+  temperature is laid, not computed from a bulb's watts and the air's
+  cooling, so Gravity turns the whole lamp on or off and does not dim it.
+*/
+export const LAMP_GLASS = 6;
+/**
+ * How far a standing plate's glass draws a water cell's heat down in one
+ * step (S.lampCool, writeSim): the gap's slowest conduction mode, π²κ/h²,
+ * at the gap the cover holds (metres), times the step's real seconds. The
+ * heat a cell keeps is exp(−that), the wax's at its own κ (mixForce).
+ */
+export function lampCoolOf(gapMetres: number, seconds: number | undefined): number {
+  const h = Number.isFinite(gapMetres) ? Math.max(1e-5, gapMetres) : REST_GAP_METRES;
+  const s = Number.isFinite(seconds) ? Math.max(0, Math.min(0.1, seconds as number)) : 1 / 60;
+  return (Math.PI * Math.PI * KAPPA_WATER * s) / (h * h);
+}
+/*
+  Vorticity confinement's push, as a fraction of the local spin, per step.
+  The Swirl dial scales it up to 2 (PLAN 27h-2; fluid.ts holds the top). It
+  puts back the spin the grid smooths away, so it keeps an unforced plate
+  stirring at today's 1 as at 2; at 2 the stir levels off, feeding itself
+  no more than 1 does (`npm run widedials`, 128²: mean speed ×1.02 from step
+  300 to 600 at 2, ×1.11 at 1).
+
+  The other dials whose top fluid.ts holds (27h-2). Heat Spread runs to 2:
+  199 times water's κ (KAPPA_WATER), past nature for a show, through an
+  implicit Jacobi that is stable at any rate; on a fine grid at the top its
+  four passes under-converge, spreading the heat less than asked, never
+  wrongly. Dye Weight runs to 2, a dye 28% heavier than its liquid
+  (dyeDensityContrast, lib/turntable.ts). Pushes Dye runs to 1.2 in the same
+  passes: each of a cell's four neighbours takes at most the push's share of
+  it (k·max(f − f′, 0) + d·min(f, f′) ≤ k, as d < k), so a pass gives away at
+  most 4·DISPLACE_PUSH·s, 0.86 at 1.2, under the 1 where it would overshoot.
+  The step's parameters (sim/fluidSimulation.ts, at its size ceiling) bound
+  Pushes Dye only at 2; its top is held in fluid.ts.
+*/
 export const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 export const CH_SUBSTEPS = 4;
 /*
+  Where the oil's mixture stops being able to sit still (its spinodal), as a
+  share of oil from either pure liquid: the deep quench of mixMu's free
+  energy (wgsl/fluid/capillary.ts, PLAN 38f-2). The old quartic double well
+  put it at 0.21, so a smear of oil under a fifth full was stable for ever: a
+  rising wax plume's trailing edge, once the carry had spread it, stayed a
+  coloured haze. Wax and water mix to parts per million, so their spinodal
+  lies within a few per cent of the pure liquids; 0.05 is as near as the
+  explicit step allows (the wall's curvature, OIL_WELL / OIL_SPINODAL, sets
+  its limit: below).
+*/
+export const OIL_SPINODAL = 0.05;
+/*
+  The free energy's slope at the spinodal (its peak), set so the curvature
+  between the two spinodals is −1, the old quartic's at half full: the edge's
+  width is what it was. The wall's curvature is then OIL_WELL / OIL_SPINODAL =
+  9, and the explicit Cahn–Hilliard step on this stencil holds while
+  M·dt·(64 + 8 × 9) < 2, M·dt < 0.0147, over the 0.012 the mix stage runs.
+*/
+export const OIL_WELL = 0.5 - OIL_SPINODAL;
+/*
   Film Hold at 1, as a chemical potential: what the water in a film one
-  cell thick costs the oil, against the double well's own height (1/16)
-  and its steepest pull (0.19 at a fifth full). Set in the lab against
-  the packed splodascope plate (npm run filmhold): see there.
+  cell thick costs the oil, against the double well's own height and its
+  steepest pull. Set in the lab against the packed splodascope plate (npm
+  run filmhold) when the well was the quartic (1/16 high, 0.19 at a fifth
+  full); the deep well (OIL_WELL, PLAN 38f-2) is 0.11 high and pulls 0.45
+  at its spinodal, so the hold is now about 1.3 times that pull, not 3, and
+  filmhold still passes 6/6 on it (35 → 29 drops held, no oil made).
 */
 export const FILM_MU = 0.6;
 /*
@@ -390,21 +641,22 @@ export const MAX_SPEED = 0.002;
 
   The drag between two glasses is 12ν/h², which needs the gap in metres.
   The plate is a clock glass of about eight inches, 0.2 m, on an overhead
-  projector's stage, and the glasses are 6 mm apart in the middle at rest
-  (lib/turntable.ts DISH_GAP_METRES, the one number: PLAN 38r). The gap
-  field is in gap units, 0.03 at rest (REST_GAP), so the tightest the
-  squeeze allows (0.004) is 0.8 mm; a field value is a length only through
-  GAP_METRES, metres per unit, never through the plate's width (the two
-  are the same number only while the gap is 6 mm). The same
+  projector's stage, and the glasses are 2 mm apart in the middle at rest
+  (lib/turntable.ts DISH_GAP_METRES, PLAN 38r: it was 6 mm). The gap field
+  is in gap units, 0.03 at rest (REST_GAP), so the tightest the squeeze
+  allows (0.004) is 0.27 mm; a field value is a length only through
+  GAP_METRES, metres per unit, never through the plate's width. The same
   0.03 is the unit the mobility is written in, so M is about c on an open
   plate. The turntable's dish, because hsPrep reads the clear liquid's
   viscosity back out of 12ν/G² with that G (PLAN 18d) and the two must agree.
 */
 export const PLATE_METRES = DISH_METRES;
 export const REST_GAP = DISH_REST_GAP;
-/** The rest gap in metres, and metres per unit of the gap field. */
+/** The rest gap in metres (2 mm), and metres per unit of the gap field. */
 export const REST_GAP_METRES = DISH_GAP_METRES;
 export const GAP_METRES = DISH_GAP_FIELD_METRES;
+// The film a full press leaves, as a share of the rest gap (PLAN 38l): lib/sheet.ts owns it, since the rhythm sheet takes the same suction cell by cell.
+export { STEFAN_FILM } from '../../lib/sheet';
 /*
   Real molecular diffusion of food dye in water (PLAN 18h).
   Audit correction: the old Jacobi diffusion rate at default 0.0002 measured an
@@ -442,6 +694,20 @@ export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
   that much faster.
 */
 export const DRIP_WEIGHT = 0.5;
+/**
+  Rain Drip as the solver reads it: the look's dial times how far the plate is
+  tipped (Gravity, plateUpright, 0 flat to 1 on the wall). The in-plane share
+  of gravity is g sin θ, so a level plate has none and heavy dye there only
+  slumps (hsBody); it fell down a flat plate in every look that set it (PLAN
+  38u-12). A plate rocked by a hand has its own weight in the rock's term.
+*/
+export const dripOf = (p: { drip?: number; plateUpright?: number }): number => {
+  const d = Number.isFinite(p.drip) ? (p.drip as number) : 0;
+  const u = Number.isFinite(p.plateUpright) ? Math.max(0, Math.min(1, p.plateUpright as number)) : 0;
+  return d * u;
+};
+/** The thin gap's body-force weight of Rain Drip: DRIP_WEIGHT per unit of dripOf, nothing under 0.01. */
+export const dripWeightOf = (p: { drip?: number; plateUpright?: number }): number => (dripOf(p) > 0.01 ? DRIP_WEIGHT * dripOf(p) : 0);
 /*
   Updraft's shear, over the old push it is made from. The old push was only
   on the colour, and a pool pushed while the clear liquid round it is not
@@ -478,27 +744,42 @@ export const AIR_SHEAR = 0.5;
   dye over the mean falls on a plate stood straight up, in the flow's
   per-step speeds, read against the reference liquid as every body force
   is. Its size: dyed water in a light mineral oil (Δρ about 150 kg/m³) in
-  the plate's 6 mm middle, tipped fifteen degrees, would slide at about a
-  quarter of the plate a second; colour in the same liquid (Δρ of ten or
-  so) at a fiftieth. ROCK_FALL puts a pool at 0.73 in the flow's speeds at
-  twelve degrees (`npm run rides`), about 6% of the plate a second at the
-  default Speed, between the two, so a kick at full Plate Rock swings a pool
-  a few percent of the plate and the spring brings it back. With forty
+  the plate's 2 mm middle, tipped fifteen degrees, would slide at about 3%
+  of the plate a second (it was a quarter in the 6 mm gap the plate had
+  before PLAN 38r: Darcy goes as h²); colour in the same liquid (Δρ of ten
+  or so) at a fifteenth of that. ROCK_FALL puts a pool at 0.73 in the flow's
+  speeds at twelve degrees (`npm run rides`), about 6% of the plate a second
+  at the default Speed, so a kick at full Plate Rock swings a pool a few
+  percent of the plate and the spring brings it back: about twice what
+  dyed water would do in a real 2 mm sandwich, which is a dial past nature
+  (the owner, 10-30: settings may ramp past real, on the real law). Kept
+  where the looks were tuned rather than cut to the real speed, at which a
+  rocked plate barely moves. With forty
   pools rocked as the app rocks them the colour moved 0.43 against 0.028
   before, where a look's own stir moves it 0.79.
+
+  That was on the 6 mm gap. Its 12 is a weight through Darcy's h² as the
+  oil's lift is (OIL_LIFT, which carries REST_GAP_METRES²), so it carries the
+  gap's h² too: held at 12 on the 2 mm gap the colour's weight stood nine
+  times its old share against the oil's lift, a dye as heavy against the oil
+  as Δρ 400 kg/m³ (dyed water is 150), and Clock Glass's coloured lens rose at
+  21% of a plain one's (`npm run oillift`, bar 80%). On 2 mm a rocked pool
+  slides a ninth as far, as a real sandwich does; a look that wants the old
+  swing turns Plate Rock past real (PLAN 38r-3, 38r-8).
 */
-export const ROCK_FALL = 12;
+export const ROCK_FALL = 12 * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The oil rising up the same tipped plate (PLAN 27f-5, hsBody). Unlike the
   colour's weight this is not tuned: a light mineral oil is 12% lighter than
   the water (SPIN_OIL_LIGHT, the centrifuge's own), and between two glasses a
   column of it, tipped by θ, rises through the reference liquid at Darcy's
   Δρ g sinθ h₀² / 12μ_ref at the rest gap, which is how hsPrep reads a body
-  force: 6 mm, 22 cSt, so 0.16 m/s per unit of sinθ, a column's speed with
-  nothing round it to push aside. A round lens has the water to push round
+  force: 2 mm, 22 cSt, so 1.8 cm/s per unit of sinθ (it was 0.16 m/s in the
+  6 mm gap before PLAN 38r), a column's speed with nothing round it to push
+  aside. A round lens has the water to push round
   it (in a liquid of its own thickness it goes at half that, Hele-Shaw's
   inclusion), and on the default Plate Rock's leans of a few degrees it rises
-  a few millimetres a lean. This is that free speed in m/s per unit sinθ; the
+  a fraction of a millimetre a lean. This is that free speed in m/s per unit sinθ; the
   step turns it into the flow's per-step speed as the breath's is turned.
   `npm run oillift` measures the lens against the same formula worked out in
   SI there, and the frame against moving.
@@ -518,9 +799,40 @@ export const ROCK_FALL = 12;
 */
 export const LIFT_MOST = 256;
 export const LIFT_SWEEPS = 8;
-export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
+/*
+  Built behind the show with them: the sealed bottle's source and flow
+  (PLAN 27f-9, wgsl/fluid/seal.ts), which relax on hsLiftRelax with buffers
+  of their own. A standing plate lays its weight on the open rim until they
+  are in (sealReady), as it always did.
+*/
+export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
+export const LIFT_KERNELS = ['hsLiftSource', 'hsLiftRelax', 'hsLiftRelaxOil', 'sealSource', 'sealFlow'];
+/*
+  ln B, the oil's drag over the plate's clear liquid at viscosity nu (hsPrep's
+  oilBody, PLAN 27f-7): the oil lift's circulation relaxes with B on its faces
+  (hsLiftRelaxOil), so that what hsPrep's drag divides out it laid in first.
+*/
+export const oilBodyLn = (nu: number) => Math.log((1 - SPIN_OIL_LIGHT) * OIL_NU / nu);
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
+/*
+  A bottle's heavy liquid sliding down the same tipped plate (PLAN 15e-10,
+  driveLiquids in fluid/passes.ts). The law is the oil's lift with the sign
+  and the density its own: a column whose density is ρ(1 + w) in a plate of
+  the reference liquid, tipped by θ, feels w ρ g sinθ more than the liquid
+  round it, and between two glasses that weight drives it at Darcy's
+  w g sinθ h₀² / 12ν_ref at the rest gap, which is how hsPrep reads a body
+  force. This is that speed in m/s per unit of w and of sinθ: 2 mm, 22 cSt,
+  about 0.15 m/s, so a syrup (w 0.35) tipped twelve degrees would go at
+  1.1 cm/s with nothing round it to push aside, before its own viscosity
+  (the species field, 18d) and the water it has to push round it (half, for
+  a drop as thin as the water; 2/(1 + λ) of that for one λ times thicker)
+  take their share. Not tuned: the liquids' field carries w as each
+  bottle's `weight` (bottles.ts, about its density less one), and the step
+  turns this into the flow's per-step speed as the breath's and the lift's
+  are turned.
+*/
+export const LIQUID_FALL = 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).
@@ -532,8 +844,10 @@ export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_
   radius at 1.4 units in its middle (8 mm on the 0.2 m plate) holds
   1.4·πr²/2 = 1.41e-4 unit·m², and a drop from a dropper is 0.05 mL (twenty
   to the millilitre), so a unit is 5e-8/1.41e-4 = 0.36 mm of the liquid. The
-  dye's cap of six units is then 2.1 mm, a third of the plate's 6 mm middle,
-  and a look's pale wash of a few tenths a film a tenth of a millimetre deep,
+  dye's cap of six units is then 2.1 mm, a little more than the plate's 2 mm
+  middle (PLAN 38r; it was a third of the 6 mm gap before): a pool poured
+  that thick is a column from glass to glass, which slumps only as it thins
+  (wgsl/slump.ts, the exchange flow's (1 − η/b)³), and a look's pale wash of a few tenths a film a tenth of a millimetre deep,
   which (at the cube) barely moves: pools slump, washes and threads stay.
 */
 export const DYE_LAYER = 3.55e-4;
@@ -542,9 +856,10 @@ export const DYE_LAYER = 3.55e-4;
   18m-1a)"): a face moves at most SLUMP_FACE of the difference across it in
   a substep (¼ is the edge of stability on a square grid), in at most
   SLUMP_SUBSTEPS substeps a step. At 1024² with Heavy dye at 1 (g′ = 1.47 m/s²)
-  a cell at DYE_CAP (2.13 mm in a 6 mm gap) has an inertial bound of 4.57 a
-  frame at 60 Hz, which asks for ceil(4.57 / 0.24) = 20 substeps (15 at 768²;
-  6 in water at Dye Weight 0 on 768²; 2 on the default light-oil Thickness).
+  the worst cell (half the gap deep, 1 mm, where η³(1 − η/b)³ peaks; slumpPlan)
+  has an inertial bound of about 2.8 a frame at 60 Hz, which asks for
+  ceil(2.8 / 0.24) = 12 substeps. In the 6 mm gap before PLAN 38r a cell at
+  DYE_CAP (2.13 mm) asked for 20, which is why the cap is 20.
 */
 export const SLUMP_FACE = 0.24;
 export const SLUMP_SUBSTEPS = 20;
@@ -588,10 +903,14 @@ export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
   Darcy's speed for a force f between the glasses is f·h²/12μ, so the pull
   of Ferrotec's EFH1 (χ 2.64 by its sheet) under an N52 rod comes to
   GAIN_phys = (χ/2μ₀)(SPIKE_B_REF·Br)² h₀² / (12 ρ ν_ref L² MAGNET_E),
-  5.8e-5 seconds. This is 0.10 of it (0.22 at the χ of 1.2 some papers
-  give the same fluid).
+  6.4e-6 seconds at the 2 mm rest gap. This is 0.93 of it (2.1 at the χ
+  of 1.2 some papers give the same fluid).
 
-  Kept at a tenth of the real pull, and why. Nearer a magnet than 0.3 of
+  It was a tenth of the real pull while the gap was 6 mm (PLAN 38r): the
+  real pull goes as h₀², so the 2 mm sandwich's is a ninth of what the 6 mm
+  dish's was, and the gain the looks were tuned on is now the real one. What
+  follows is why it was held below the 6 mm pull, kept because it says what
+  the gain does and does not set. Nearer a magnet than 0.3 of
   the plate the pull asks for more than a step can carry at any gain the
   plate has had: the hand's magnet asks 7.8 plate widths a second at
   this gain, against the 0.375 that MAGNET_CELLS allows on 384², so
@@ -678,4 +997,4 @@ export const RG32 = 'rg32float';
 export const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-export const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50
+export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), the lamp's glass cooling at 54 (PLAN 27f-9e), 55 unused: a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks

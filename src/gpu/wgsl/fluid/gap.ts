@@ -8,6 +8,7 @@
  */
 
 import { HEAD, PACKED, PACKED_BILERP, W } from './shared';
+import { STEFAN_FILM } from '../../fluid/constants';
 import { DISH_GAP_RANGE, DISH_REST_GAP } from '../../../lib/turntable';
 
 /* The gap field's rest number and its floor and ceiling, in gap units (lib/turntable.ts, PLAN 38r): one source for every kernel here. */
@@ -74,7 +75,14 @@ export const GAP_KERNELS: Record<string, string> = {
     touched, because changing which glasses are on the desk is not a squeeze
     and should not pump the liquid.
 
-    A.a.x is the shape it was laid at, A.a.y the shape it is going to.
+    A.a.x is the shape it was laid at, A.a.y the shape it is going to; A.a.z
+    and A.a.w the cover's gap before and after (PLAN 38r-5).
+
+    The dome is added to the cover's height, not scaled by it: the glasses'
+    shape is a matter of metres (how far their curves part), and a glass
+    floating higher on more liquid parts from the other by the same shape
+    shifted up, not by a deeper one. At the default cover, 0.03, the two are
+    the same number.
   */
   gapReshape: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -84,8 +92,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
   let k = (r2 - 0.5) * 2.0;
-  let was = clamp(${GAP_REST} * (1.0 - A.a.x * k), ${GAP_FLOOR}, ${GAP_TOP});
-  let now = clamp(${GAP_REST} * (1.0 - A.a.y * k), ${GAP_FLOOR}, ${GAP_TOP});
+  let was = clamp(A.a.z - ${GAP_REST} * A.a.x * k, ${GAP_FLOOR}, ${GAP_TOP});
+  let now = clamp(A.a.w - ${GAP_REST} * A.a.y * k, ${GAP_FLOOR}, ${GAP_TOP});
   let s = textureLoad(src, vec2i(id.xy), 0);
   textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), ${GAP_FLOOR}, ${GAP_TOP}), s.g, s.b, s.a));
 }`,
@@ -104,7 +112,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // the squeeze film and no look sets it, and depth did not reach the flow
   // until depth became a mobility on the transport, so the shape has
   // never been visible.
-  let rest = clamp(${GAP_REST} * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), ${GAP_FLOOR}, ${GAP_TOP});
+  let rest = clamp(S.cover - ${GAP_REST} * S.plateCurve * (r2 - 0.5) * 2.0, ${GAP_FLOOR}, ${GAP_TOP});
   textureStore(dst, vec2i(id.xy), vec4f(rest, 0.0, 0.0, 0.0));
 }`,
 
@@ -120,7 +128,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
   // The dome the two glasses leave when nothing is pressing on them.
-  let rest = clamp(${GAP_REST} * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), ${GAP_FLOOR}, ${GAP_TOP});
+  let rest = clamp(S.cover - ${GAP_REST} * S.plateCurve * (r2 - 0.5) * 2.0, ${GAP_FLOOR}, ${GAP_TOP});
   var gap = s.r;
   var dhdt = 0.0;
   var pressed = false;
@@ -241,10 +249,52 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let room = (gap - ${GAP_FLOOR}) / max(S.dt, 0.0001);
     dhdt += max(s.b * S.gapMemory, -room);
   }
-  // The spring back toward the dome, and its motion counts.
-  let g3 = gap + (rest - gap) * S.gapSpring;
+  /*
+    The spring back toward the dome, and its motion counts.
+
+    On a thin gap, against the film's suction (PLAN 38l). The spring was the
+    same fraction of what is left whatever the gap, so a glass pressed nearly
+    flat came away as easily as one barely dented, and two wet glasses do
+    not part like that: to open, the gap has to draw the liquid back in
+    through itself, and that resistance goes as 1/h³, the press's own law
+    (Stefan, F = 3πμR⁴ḣ/2h³, above). Under the glass's restoring force
+    K(h₀ − h) the gap then opens at k(h₀ − h)(h/h_s)³: slow while the film
+    is thin, quick as it opens, the glass peeling and then letting go.
+
+    k is the look's spring (Press Lift, glassSpring, by the second) at the
+    film a full press leaves, h_s = STEFAN_FILM of the rest gap, not at
+    rest. Glass is stiff: a real clock glass let go is back as fast as the
+    film lets the liquid in, so the time a person sees is the thin film's,
+    and that is the time Press Lift has always set ("the ring a press
+    pushed out is a third of the way back in a second", npm run presslift).
+    Read at rest instead, the same dial left a full press stuck for minutes
+    ((0.2)³ of its rate). Shallower dents, a tap or a kick's, come back that
+    much quicker, which is what stiff glass on a thick film does.
+
+    Integrated over the step with the depth held, so the step takes
+    1 − (1 − k)^((h/h_s)³) of what is left and never overshoots. A film past
+    rest (the sheet's ring) closes the same way, faster as it is thicker, at
+    most at twice the rest gap. \`npm run stefan\` holds the law at two
+    depths. The old plate keeps its spring, which its looks were tuned on:
+    there the gap only shapes how long the film stays thin.
+
+    Where the rhythm sheet lays its change too: the sheet takes the same
+    law cell by cell on the dent it holds and on its own solve
+    (lib/sheet.ts step, on the one STEFAN_FILM), so the gap here stays
+    rest less the sheet's dent. Skipped here instead, with the sheet on one
+    plain share everywhere, a hand's press beside a kick lost 27% of its
+    memory (every cell carries a little of the sheet, a sum of sines); with
+    the suction here and the plain share there, the gap and the sheet's
+    dent parted by 7% of a dent (npm run sheet).
+  */
+  var spring = S.gapSpring;
+  if (A.a.y > 0.5) {
+    let x = clamp(gap / max(rest, 0.004), 0.0, 2.0) / ${STEFAN_FILM.toFixed(3)};
+    spring = 1.0 - pow(clamp(1.0 - S.gapSpring, 0.0, 1.0), x * x * x);
+  }
+  let g3 = gap + (rest - gap) * spring;
   dhdt += (g3 - gap) / max(S.dt, 0.0001);
-  let out = vec4f(g3, dhdt, dhdt - sheetRate, owed * (1.0 - S.gapSpring));
+  let out = vec4f(g3, dhdt, dhdt - sheetRate, owed * (1.0 - spring));
   textureStore(dst, vec2i(id.xy), select(vec4f(rest, 0.0, 0.0, 0.0), out, finite2(out.xy) && finite2(out.zw)));
 }`,
 

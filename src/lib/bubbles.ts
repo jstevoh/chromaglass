@@ -23,6 +23,7 @@
 import { stream, type Rng } from './rng';
 import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, OPEN_RIM, carrierViscosity, thicknessViscosity } from './turntable';
 import { plateSin } from './plateRock';
+import { liquidAtCell, type BubbleLiquid, type PouredLiquid, type SpeciesSnapshot } from './bubbleLiquid';
 
 export { DISH_METRES, DISH_REST_GAP };
 
@@ -172,8 +173,21 @@ const SPLIT_D = 0.5;
 /** Two rims nearer than this many cells are touching: the film between them is microns, a cell is a millimetre. */
 const CONTACT = 0.05;
 
+/** Eight directions round a pocket, for the ring its drift reads the liquid on (step). */
+const RING_COS = Array.from({ length: 8 }, (_, k) => Math.cos((k * Math.PI) / 4));
+const RING_SIN = Array.from({ length: 8 }, (_, k) => Math.sin((k * Math.PI) / 4));
+
 /** Solver velocity units → cells per second: one step moves v·dt·(N−2) cells at 60 steps/s. */
 const CELLS_PER_UNIT = 0.05 * 190 * 60;
+
+/**
+ * How many fingers the front of a bubble blown from a point between two
+ * plates breaks into: Paterson's fastest-growing mode, √((1 + 12 Ca R²/b²)/3),
+ * for the front's capillary number `Ca` and its radius over the gap
+ * (`blow` has the story). Under two the bubble stays round.
+ */
+export const strawFingers = (Ca: number, radiusOverGap: number): number =>
+  Math.sqrt((1 + 12 * Math.max(0, Ca) * radiusOverGap * radiusOverGap) / 3);
 
 export interface BubbleEvent {
   kind: 'pop' | 'merge' | 'split';
@@ -212,6 +226,8 @@ export class BubbleField {
   liquidOstwald = OIL_AIR.ostwald;
   /** The gap between the glasses, metres: the dish's rest gap. */
   gapMetres = DISH_GAP_METRES;
+  /** The gap at which current bubble radii were computed, so changing `gapMetres` conserves V = πr²b. */
+  private areaGap = DISH_GAP_METRES;
   /**
    * How many times the real rate air dissolves into the liquid. 1 is real,
    * and real is effectively never on a show's clock (see `step`); a dial
@@ -228,6 +244,49 @@ export class BubbleField {
   private readonly touchingNow = new Set<number>();
   /** The bubbles on the end of the straw this step (kept, not made each step). */
   private readonly heldNow = new Set<Bubble>();
+  private snap: SpeciesSnapshot | null = null;
+  private poured: PouredLiquid | null = null;
+  private readonly plateL: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+  private readonly sampleL: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+  private readonly hereA: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+  private readonly hereC: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+
+  /**
+   * Hand the field a downsampled species snapshot and the last-poured
+   * bottle's `{sigma, rho}` in SI (`null` drops it, PLAN 33f).
+   */
+  species(snap: SpeciesSnapshot | null, poured: PouredLiquid | null = null): void {
+    this.snap = snap;
+    this.poured = snap ? poured : null;
+  }
+
+  /**
+   * Sample the liquid around pocket `b` on the same eight-point ring
+   * (`b.r + 1.5`) that `step()` samples the flow velocity on, into `out`.
+   * When no snapshot is set or none of the ring taps hits poured liquid,
+   * `out` holds the plate's own `{mu, sigma, rho}` to the bit.
+   */
+  private ringAt(b: Bubble, out: BubbleLiquid): BubbleLiquid {
+    const pMu = this.liquidMu, pSigma = this.liquidSigma, pRho = this.liquidRho;
+    out.mu = pMu; out.sigma = pSigma; out.rho = pRho;
+    if (!this.snap || !this.poured) return out;
+    const plate = this.plateL, sample = this.sampleL;
+    plate.mu = pMu; plate.sigma = pSigma; plate.rho = pRho;
+    const ring = b.r + 1.5;
+    let mu = 0, sigma = 0, rho = 0, any = false;
+    for (let k = 0; k < 8; k++) {
+      liquidAtCell(plate, this.snap, b.x + ring * RING_COS[k], b.y + ring * RING_SIN[k], this.grid, this.poured, sample);
+      if (sample.mu !== pMu || sample.sigma !== pSigma || sample.rho !== pRho) any = true;
+      mu += sample.mu;
+      sigma += sample.sigma;
+      rho += sample.rho;
+    }
+    if (!any) return out;
+    out.mu = mu * 0.125;
+    out.sigma = sigma * 0.125;
+    out.rho = rho * 0.125;
+    return out;
+  }
 
   /**
    * `rng` decides every size, scatter and finger: the show's
@@ -262,6 +321,9 @@ export class BubbleField {
     this.strawBubble = null;
     this.contactDrain.clear();
     this.touchingNow.clear();
+    this.snap = null;
+    this.poured = null;
+    this.areaGap = Math.max(1e-6, this.gapMetres);
     this.nextId = 1;
   }
 
@@ -279,15 +341,31 @@ export class BubbleField {
   get anyBlown(): boolean { return this.bubbles.some((b) => b.straw); }
 
   /** The film a front moving at `cellsPerSecond` lays on the glass, as a fraction of the gap. */
-  private filmAt(cellsPerSecond: number): number {
-    const Ca = (this.liquidMu * Math.abs(cellsPerSecond) * (DISH_METRES / this.grid)) / this.liquidSigma;
+  private filmAt(cellsPerSecond: number, mu = this.liquidMu, sigma = this.liquidSigma): number {
+    const Ca = (mu * Math.abs(cellsPerSecond) * (DISH_METRES / this.grid)) / sigma;
     return FILM_COEF * Math.cbrt(Ca * Ca);
   }
 
-  /** A steady breath's volume, as r² a second (cells²): the straw fills a seventh of the plate across in 3.5 s. */
+  /**
+   * Keep every pocket's volume V = π r² b when the live gap `this.gapMetres`
+   * changes (A = V / b, PLAN 15g-19).
+   */
+  private syncGap(): void {
+    const gap = Math.max(1e-6, this.gapMetres);
+    if (gap === this.areaGap) return;
+    const scale = this.areaGap / gap;
+    const rScale = Math.sqrt(scale);
+    for (const b of this.bubbles) {
+      b.r *= rScale;
+      b.inject *= scale;
+    }
+    this.areaGap = gap;
+  }
+
+  /** A steady breath's volume, as r² a second (cells²) in the live gap: fills a seventh-of-the-plate disc at the rest gap in 3.5 s. */
   private get breath(): number {
-    const rMax = this.grid * 0.07;
-    return (rMax * rMax) / 3.5;
+    const rRef = this.grid * 0.07;
+    return ((rRef * rRef) / 3.5) * (DISH_GAP_METRES / Math.max(1e-6, this.gapMetres));
   }
 
   private make(x: number, y: number, r: number): Bubble {
@@ -330,6 +408,7 @@ export class BubbleField {
 
   /** Let `count` pockets of air in at (x, y), scattered within `spread` cells. Each inflates at a breath's rate. */
   spawn(x: number, y: number, r: number, count = 1, spread = 0): void {
+    this.syncGap();
     const N = this.grid;
     for (let i = 0; i < count; i++) {
       /*
@@ -373,12 +452,34 @@ export class BubbleField {
    * Air blown through a straw held still at (x, y): one bubble on the end of
    * it, growing while the blowing goes on.
    *
-   * Its area grows at a steady rate, as a steady breath delivers a steady
-   * volume, so it swells fast at first and slows as it gets big, up to about
-   * a seventh of the plate across. The faster it is growing, the more its rim
-   * breaks into fingers; small bubbles are shed off the rim as it goes, the
-   * ring of satellites round a blown bubble. Let go, it stays where it is and
-   * rounds off; blow again beside it and the plate fills with them.
+   * Its volume grows at a steady rate, so its area A = V / b in the live gap
+   * b grows at a steady rate without an artificial radius clip: it swells
+   * fast at first and slows as it gets big, and vents only if it reaches the
+   * open rim. Let go, it stays where it is; blow again beside it and there is
+   * a second.
+   *
+   * It is round, and it sheds nothing (PLAN.md 15g-12). It used to break
+   * into six to eighteen fingers while it grew and throw a ring of small
+   * bubbles off its rim, five a second, which the owner reported as
+   * "flower like things around the floating bubbles" (2026-11-13, Foam
+   * Cells; filmed on a Mac, a held Blow left a big bubble ringed by small
+   * ones with pale patches beside them). Neither was this plate's physics.
+   * The fingers are Saffman and Taylor's: air driven into a liquid between
+   * two plates breaks its front into the number of fingers Paterson found
+   * for a bubble blown from a point, n = √((1 + 12 Ca R²/b²)/3), with Ca =
+   * μU/σ the front's capillary number and b the gap (Paterson, J. Fluid
+   * Mech. 113, 1981). The count that was drawn put a gap of 0.095 mm into
+   * that, a twenty-first of the plate's 2 mm, chosen so six to eighteen
+   * lobes would show, and its own comment said so: at the real gap the
+   * count is under one. A bubble 3 mm across growing at 9 mm/s in the
+   * default oil (μ 0.017 Pa·s, σ 0.03 N/m) has Ca 0.005 and n = 0.6; at
+   * 13 mm and 2 mm/s, n = 0.7. Under two there is no finger to draw: mode
+   * one is the bubble moving over, not a lobe. So the count is Paterson's at
+   * the plate's own gap and this liquid's own viscosity, and the rim
+   * fingers only where that reaches two, which takes a liquid some sixty
+   * times as thick as the default or a breath as much faster. And the ring
+   * of small bubbles was drawn, not shed by anything: a front that does not
+   * finger pinches nothing off.
    *
    * `strength` is the breath's volume a second against a steady breath's
    * (lib/breath.ts, strawFlow: the Amount, which is the breath's speed). It
@@ -387,7 +488,8 @@ export class BubbleField {
    */
   blow(x: number, y: number, dt: number, strength = 1): void {
     const N = this.grid;
-    const rMax = N * 0.07;
+    this.syncGap();
+    const gap = this.areaGap;
     let b = this.strawBubble;
     if (b && (!this.bubbles.includes(b) || Math.hypot(b.x - x, b.y - y) > b.r + 3)) {
       // Gone, or the straw has moved off it: the next breath is a new bubble.
@@ -399,48 +501,27 @@ export class BubbleField {
       this.push(b, true);
       this.strawBubble = b;
     }
-    const rate = Math.max(0, strength || 0) * Math.PI * rMax * rMax / 3.5;   // cells² a second
+    const rRef = N * 0.07;
+    // Steady breath volume rate (at rest gap DISH_GAP_METRES, fills rRef in 3.5 s), divided by live gap b (PLAN 15g-19).
+    const rate = Math.max(0, strength || 0) * ((Math.PI * rRef * rRef) / 3.5) * (DISH_GAP_METRES / gap);   // cells² a second
     const r0 = b.r;
-    // Up to a seventh of the plate; one a merge made bigger keeps its air.
-    b.r = Math.max(b.r, Math.min(rMax, Math.sqrt(b.r * b.r + rate * dt / Math.PI)));
+    if (rate > 0 && dt > 0) b.r = Math.sqrt(b.r * b.r + (rate * dt) / Math.PI);
     const speed = (b.r - r0) / Math.max(dt, 1e-4);                       // cells a second
     // The film under it is the one its growing rim lays down.
     if (speed > 0) b.film = this.filmAt(speed);
-    // Fingers as long as the growth is fast, relaxing toward that.
-    const want = Math.min(1, speed / (N * 0.03)) * 0.55;
+    // Paterson's count at the plate's own gap (above): fingers only from two up, as long as the growth is fast.
+    const uMps = Math.max(0, speed) * (DISH_METRES / N);
+    const Ca = (this.liquidMu * uMps) / this.liquidSigma;
+    const rOverB = (b.r * (DISH_METRES / N)) / this.gapMetres;
+    const fingers = strawFingers(Ca, rOverB);
+    const want = fingers >= 2 ? Math.min(1, speed / (N * 0.03)) * 0.55 : 0;
     b.fing += (want - b.fing) * (1 - Math.exp(-dt / 0.25));
-    // Saffman-Taylor wavelength scaling: lambda ≈ pi * b_eff / sqrt(Ca) (PLAN 18i).
-    // An advancing air front in a Hele-Shaw cell destabilizes into fingers with
-    // wavelength lambda (Saffman & Taylor 1958, Paterson 1981). The number of lobes
-    // around the perimeter 2 * pi * R is m ≈ (2 * pi * R) / lambda ≈ (2 * R / b_eff) * sqrt(Ca).
-    // Physical speed U (m/s) = speed * (DISH_METRES / N).
-    // Capillary number Ca = μ * U / σ.
-    if (speed > 0.1) {
-      const uMps = speed * (DISH_METRES / N);
-      const Ca = Math.max(1e-4, (this.liquidMu * uMps) / this.liquidSigma);
-      // Effective meniscus neck gap b_eff ≈ 0.091 cells (0.095 mm) is a tuned shortcut:
-      // about 63x smaller than the real 6 mm plate gap (lib/turntable.ts DISH_GAP_METRES).
-      // If the physical 6 mm gap (b ≈ 5.76 cells) were used directly, m ≈ (2R/b)*sqrt(Ca) ~ 0.5 lobes,
-      // meaning a bubble on a 192 grid would never form more than 1 finger.
-      // b_eff is set in cells (moves with grid size) to produce 6-18 visible Saffman-Taylor
-      // lobes on the discrete grid. Lobe count scales as m ∝ R * sqrt(Ca) between the clamps.
-      const m = Math.round(22.0 * b.r * Math.sqrt(Ca));
-      b.lobes = Math.min(18, Math.max(6, m));
-    }
+    if (fingers >= 2) b.lobes = Math.min(18, Math.round(fingers));
     // Held at the straw.
     const k = Math.min(1, dt * 8);
     b.x += (x - b.x) * k; b.y += (y - b.y) * k;
     b.kx = 0; b.ky = 0;
     b.held = true;
-    // Satellites off the rim while it grows.
-    if (speed > 0.2 && this.bubbles.length < MAX_BUBBLES - 1 && this.rng.float() < dt * 5 * Math.min(1, strength)) {
-      const a = this.rng.angle();
-      const d = b.r * (1 + b.fing * 0.6) + 1.5 + this.rng.float() * 3;
-      const sat = this.make(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, Math.max(0.8, N * (0.003 + this.rng.float() * 0.004)));
-      sat.film = b.film;
-      sat.kx = Math.cos(a) * 8; sat.ky = Math.sin(a) * 8;
-      this.push(sat);
-    }
   }
 
   /**
@@ -478,15 +559,14 @@ export class BubbleField {
 
   /**
    * Advance by `dt` seconds. `velocity` samples the solver field in its own
-   * units; `tiltX/Y` is the plate's hold tilt (air climbs against it);
-   * `agitation` (0..1, from the treble) shakes them.
+   * units; `tiltX/Y` is the plate's hold tilt (air climbs against it).
    */
-  step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number, agitation = 0): void {
+  step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number): void {
+    this.syncGap();
     const N = this.grid;
     const bs = this.bubbles;
     const m = DISH_METRES / N;            // metres a cell
-    const gap = this.gapMetres;
-    const mu = this.liquidMu, sigma = this.liquidSigma;
+    const gap = this.areaGap;
     this.events.length = 0;
 
     /*
@@ -495,11 +575,8 @@ export class BubbleField {
       Δρ·g·sinθ·b²/(12μ) (PLAN 38n), in the liquid's own viscosity and the
       real gap. It was −tilt·900 cells a second for every liquid and size.
     */
-    const climb = (this.liquidRho * G * gap * gap) / (12 * mu) / m;
     const sinX = plateSin(tiltX, 0), sinY = plateSin(tiltY, 0);
     const rimR = OPEN_RIM * N, cx0 = N / 2, cy0 = N / 2;
-    // Air's diffusivity in this liquid, and how far a pocket's depleted shell reaches (the plate).
-    const D = D_AIR_WATER * (MU_WATER / mu);
     const breath = this.breath;
 
     // The bubbles on the end of the straw this step: held where it is, so
@@ -518,7 +595,30 @@ export class BubbleField {
         b.inject -= add;
       }
       if (b.held) { b.held = false; continue; }
-      const [vx, vy] = velocity(b.x, b.y);
+      const lq = this.ringAt(b, this.hereA);
+      const mu = lq.mu, sigma = lq.sigma;
+      const climb = (lq.rho * G * gap * gap) / (12 * mu) / m;
+      // Air's diffusivity in this liquid, and how far a pocket's depleted shell reaches (the plate).
+      const D = D_AIR_WATER * (MU_WATER / mu);
+      /*
+        The liquid's own speed where the pocket is, read on a ring just
+        outside its rim, not at its middle (PLAN 15g-8d). The thin solve
+        now gives the air no mobility, so the liquid goes round a pocket
+        and the solver's velocity inside one is nothing; at its middle it
+        would read a still pocket in any flow. Outside it the flow is the
+        far flow U plus the pocket's own disturbance, which round a disc in
+        Hele-Shaw flow is a dipole, cos 2θ/r² in each component: its mean on
+        any circle round the pocket is zero, so the ring's mean is U, the
+        speed Taylor and Saffman's 2U is twice. Eight points, a cell and a
+        half past the rim, so none lands in the rim's soft edge.
+      */
+      let vx = 0, vy = 0;
+      const ring = b.r + 1.5;
+      for (let k = 0; k < 8; k++) {
+        const [ux, uy] = velocity(b.x + ring * RING_COS[k], b.y + ring * RING_SIN[k]);
+        vx += ux * 0.125;
+        vy += uy * 0.125;
+      }
       /*
         Taylor and Saffman: a pocket of inviscid air spanning the gap runs at
         twice the depth-mean liquid speed, slowed by the drag of the film it
@@ -528,16 +628,21 @@ export class BubbleField {
       const vMag = Math.hypot(vx, vy) * CELLS_PER_UNIT;
       const Ca = (mu * vMag * m) / sigma;
       const speedRatio = 2 / (1 + FILM_DRAG * Math.cbrt(Ca * Ca));
-      // In the absence of audio agitation, millimeter air pancakes between plates
-      // have zero artificial Brownian wander (Pe >> 10^6, thermal drift < 10^-6 m/s).
-      // Treble acoustic agitation provides physical vibrational jitter scaling continuously
-      // in proportion to agitation (from 0 at 0 up to 2.0 at full agitation), with two
-      // independent random draws for x and y.
-      const wanderScale = agitation * 2.0;
-      const wx = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
-      const wy = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
-      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb + b.kx + wx;
-      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb + b.ky + wy;
+      /*
+        Nothing shakes a pocket (PLAN 38u-13). Until 2026-11-13 the treble
+        did: two random draws a step, up to 1.2 cells a second at full
+        treble, called "acoustic agitation". A pocket of air a few
+        millimetres across, pressed between two glasses, has no thermal
+        wander to speak of (Pe over 1e6), and the sound in a room moves the
+        liquid round it by nanometres. Measured before it went: a pocket in
+        still liquid at full treble jumped up to 0.02 cells a step (half a
+        pixel a frame in a 6x closeup, a shimmer) and ended 0.083 cells
+        from where it began after two seconds, the dice's way; 0 now. It
+        moves with the flow, up the tilt and off a press, and with nothing
+        else.
+      */
+      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb + b.kx;
+      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb + b.ky;
       b.x += dx * dt;
       b.y += dy * dt;
       b.kx *= Math.exp(-dt / 0.22);
@@ -552,7 +657,7 @@ export class BubbleField {
         was last laid on. The plate draws the pocket's colour from this rather
         than from a random number and a clock (PLAN 38n).
       */
-      const filmT = this.filmAt(speed);
+      const filmT = this.filmAt(speed, mu, sigma);
       b.film += (filmT - b.film) * (1 - Math.exp(-dt * speed / Math.max(1, 2 * b.r)));
 
       /*
@@ -574,7 +679,9 @@ export class BubbleField {
       // a second): the four samples of the strain are spent only on big ones.
       let eps = 0, half = 0, exy = 0;
       if (tau2 > 1e-3) {
-        const h = Math.max(1, b.r);
+        // Twice the radius out, where the pocket's own disturbance of a
+        // strain (R⁴/r³) is an eighth of what it is at the rim (PLAN 15g-8d).
+        const h = Math.max(1, 2 * b.r);
         const [ux1, uy1] = velocity(b.x + h, b.y), [ux0, uy0] = velocity(b.x - h, b.y);
         const [ux3, uy3] = velocity(b.x, b.y + h), [ux2, uy2] = velocity(b.x, b.y - h);
         const k2h = CELLS_PER_UNIT / (2 * h);
@@ -663,8 +770,10 @@ export class BubbleField {
         const key = Math.min(a.id, c.id) * (2 ** 26) + Math.max(a.id, c.id);
         this.touchingNow.add(key);
         const Re = (a.r * c.r) / (a.r + c.r);
+        const la = this.ringAt(a, this.hereA), lc = this.ringAt(c, this.hereC);
+        const vc = la.mu === lc.mu && la.sigma === lc.sigma ? la.mu / la.sigma : 0.5 * (la.mu / la.sigma + lc.mu / lc.sigma);
         // Stefan-Reynolds thin-film drainage: t_drain = DRAINAGE_FILM_FACTOR * (μ / σ) * Re_metres.
-        const tDrain = DRAINAGE_FILM_FACTOR * (mu / sigma) * Re * m;
+        const tDrain = DRAINAGE_FILM_FACTOR * vc * Re * m;
         const contact = (this.contactDrain.get(key) ?? 0) + dt;
         this.contactDrain.set(key, contact);
         if (contact < tDrain) continue;
@@ -714,10 +823,12 @@ export class BubbleField {
         const over = a.r + c.r - dist;
         if (over <= 0) continue;
         const Ra = Math.max(a.r, 0.3) * m, Rc = Math.max(c.r, 0.3) * m;
-        const k = (sigma * gap * (Ra + Rc)) / (Ra * Rc);
+        const la = this.ringAt(a, this.hereA), lc = this.ringAt(c, this.hereC);
+        const sigmaPair = la.sigma === lc.sigma ? la.sigma : 0.5 * (la.sigma + lc.sigma);
+        const k = (sigmaPair * gap * (Ra + Rc)) / (Ra * Rc);
         // A held bubble does not give: the other takes the whole of the move.
-        const ma = heldNow.has(a) ? 0 : gap / (6 * Math.PI * mu * Ra * Ra);
-        const mc = heldNow.has(c) ? 0 : gap / (6 * Math.PI * mu * Rc * Rc);
+        const ma = heldNow.has(a) ? 0 : gap / (6 * Math.PI * la.mu * Ra * Ra);
+        const mc = heldNow.has(c) ? 0 : gap / (6 * Math.PI * lc.mu * Rc * Rc);
         if (ma + mc <= 0) continue;
         const close = over * (1 - Math.exp(-dt * k * (ma + mc)));
         const pa = close * ma / (ma + mc), pc = close * mc / (ma + mc);

@@ -43,11 +43,11 @@
  * WebGPU (SWIRLCOST_PLATE=1 to try anyway).
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery } from './frame.mjs';
 
-const PORT = Number(process.env.SWIRLCOST_PORT ?? 4371);
+const PORT = port(4371, 'SWIRLCOST_PORT');
 const PLATE = process.platform === 'darwin' || !!process.env.SWIRLCOST_PLATE;
 const argOf = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);

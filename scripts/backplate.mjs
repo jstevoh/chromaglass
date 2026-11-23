@@ -272,12 +272,13 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
     evolveLiquid: /doseLiquid\(af, liquidsOf\(li\)/,
     seed: /fluidsRef\.current\.forEach\(\(fluid, li\) => \{[\s\S]{0,200}const styles = stylesOf\(li\);[\s\S]{0,300}harmonyColor\(harmonyOf\(li\)\)[\s\S]{0,400}doseLiquid\(fluid, liquidsOf\(li\)/,
     ambient: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.25/,
-    // The music's colour, by its own name rather than by its speed through
-    // the harmony: d8697cd turned that speed from 0.3 to 0.1 and added the
-    // heard pitch, and the plate the colour is read for is what this asks.
-    music: /const colFor = \(off: number\) => harmonyCycle\(harmonyOf\(activeLayerRef\.current\), /,
-    musicStyles: /const aStyles = stylesOf\(activeLayerRef\.current\);/,
-    musicLiquids: /doseLiquid\(activeFluid, liquidsOf\(activeLayerRef\.current\)/,
+    // The music's colour, styles and liquids: since PLAN 38v-1 its hands are
+    // cords, laid by the hands on the active plate, whose bottles are that
+    // plate's dyes (`plateDyes`), and whose sink (`musicSink`) pours in that
+    // plate's styles and doses its liquids.
+    music: /const plateDyes = harmonyOf\(activeLayerRef\.current\);/,
+    musicStyles: /const layer = activeLayerRef\.current;\s*let style = slug \? 'drop' : \(DICE\.music\.pick\(stylesOf\(layer\)\)/,
+    musicLiquids: /else doseLiquid\(af, liquidsOf\(layer\), x, y, strength\);/,
     themeMotion: /case 'motion': \{\s*const c = harmonyColor\(harmonyOf\(activeLayerRef\.current\)\);/,
     themeDefault: /default: \{\s*const c = harmonyColor\(harmonyOf\(activeLayerRef\.current\)\);\s*af\.autoInject\('drop'/,
     hand: /g\.color \? hexToRgb\(g\.color\) : harmonyColor\(harmonyOf\(layer\)\)/,
@@ -317,7 +318,7 @@ check('the layer pickers offer the back plate while it has a look (the desk, pho
   /const stageLayers = Math\.max\(1, settings\.layerCount \?\? 1, backLook \? 2 : 1\);/.test(app)
   && (app.match(/layers=\{stageLayers\}/g) ?? []).length === 2
   && /layers=\{stageLayers\}/.test(app.slice(app.indexOf('<Desk\n'), app.indexOf('\n        />', app.indexOf('<Desk\n')))) && /Math\.min\(stageLayers - 1, l \+ dir\)/.test(app)
-  && /if \(activeLayer >= stageLayers\)/.test(app) && !/settings\.layerCount - 1/.test(app));
+  && /setStageLayers\(stageLayers\)/.test(app) && /setActiveLayer\(l => \(l >= n \? Math\.max\(0, n - 1\) : l\)\)/.test(app) && !/settings\.layerCount - 1/.test(app));
 check('Follow the front keeps the back plate on the stage while it fades back, then lets it go',
   /setBackLook\(b => \(b && seconds > 0 \? \{ \.\.\.b, leaving: true \} : null\)\);/.test(app)
   && /setTimeout\(\(\) => \{ backLeavingTimer\.current = null; setBackLook\(null\); \}, seconds \* 1000\)/.test(app));

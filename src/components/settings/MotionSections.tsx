@@ -4,6 +4,7 @@ import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { LIT } from '../ui';
 import { StrobeRing } from '../ui/Playful';
+import { TipPad } from '../ui/TipPad';
 import { SPIN_AUTO_NAMES } from '../../lib/turntable';
 import { Slider, PinChips } from './controls';
 import { AUDIO_FEATURES } from './patchLists';
@@ -103,6 +104,11 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           <Waves size={12} /> Tilt & Rock
         </h3>
         {/* The dish tipped: held by a hand (Gravity, Tilt Direction), sloshed by the music (Slosh) and rocked on the beat (Plate Rock). PLAN 35c. */}
+        {/* And the hand itself, which moves the two faders under it and puts them back on letting go (PLAN 18a-13j). */}
+        <div className="col-span-full flex items-center gap-3">
+          <TipPad settings={settings} onSetting={onUpdate} size={84} testId="tilt-tip-pad" />
+          <p className="min-w-0 text-[12px] leading-snug text-muted">Drag the dot toward an edge: that edge goes down and the liquid runs to it. Let go and the dish lies back, and the liquid sloshes past the middle. A first grab turns Slosh up to half if it was off.</p>
+        </div>
         <Slider
           label="Gravity"
           value={settings.plateUpright ?? 0}
@@ -130,6 +136,25 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ slosh: v })}
           settingKey="slosh"
         />
+        {/* A hand's tip of the flat plate, two knobs' worth (lib/handTilt.ts, PLAN 18a-13m): the middle is level. */}
+        <Slider
+          label="Tilt Left/Right"
+          value={settings.plateTiltX ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ plateTiltX: v })}
+          settingKey="plateTiltX"
+        />
+        <Slider
+          label="Tilt Up/Down"
+          value={settings.plateTiltY ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ plateTiltY: v })}
+          settingKey="plateTiltY"
+        />
         <Slider
           label="Plate Rock"
           value={settings.plateRock ?? 0.45}
@@ -139,6 +164,35 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ plateRock: v })}
           settingKey="plateRock"
         />
+        {/*
+          The dish on a speaker (PLAN 48f, gpu/faraday.ts): Shaker is the
+          drive's frequency (nought, no speaker), Shake how hard it shakes in
+          g. The music reaches Shake through a cord from the bass, in Patches
+          beside this card (the phone, with no patch bay, has its depth as
+          Music Shake: lib/shakeCord.ts), as Music Stir is the stir's.
+          Past the water's threshold the shaking stands up in a lattice of
+          Faraday waves at half the drive's frequency.
+        */}
+        <Slider
+          label="Shaker Hz"
+          value={settings.faradayHz ?? 0}
+          min={0}
+          max={150}
+          step={1}
+          onChange={(v: number) => onUpdate({ faradayHz: v })}
+          settingKey="faradayHz"
+        />
+        {(settings.faradayHz ?? 0) > 0 && (
+          <Slider
+            label="Shake g"
+            value={settings.faraday ?? 0}
+            min={0}
+            max={2}
+            step={0.01}
+            onChange={(v: number) => onUpdate({ faraday: v })}
+            settingKey="faraday"
+          />
+        )}
       </section>
       )}
     </>
@@ -450,7 +504,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Swirl"
           value={settings.vorticityConfinement ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
           settingKey="vorticityConfinement"
@@ -459,7 +513,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Dye Weight"
           value={settings.solutalBuoyancy ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
           settingKey="solutalBuoyancy"
@@ -468,7 +522,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Heat Spread"
           value={settings.doubleDiffusion ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
           settingKey="doubleDiffusion"

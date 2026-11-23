@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
-import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
+import { ImagePlus, Palette, SlidersHorizontal, Video } from 'lucide-react';
+import { PicturePaletteButton } from '../PicturePaletteButton';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
-import { CartoonShelf } from '../CartoonShelf';
+import { VideoShelf } from '../VideoShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
@@ -22,6 +23,7 @@ import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
+import { TipPad } from '../ui/TipPad';
 import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
@@ -59,14 +61,13 @@ function setControl(p: DeskProps, key: keyof VisualizerSettings, n: number) {
 }
 
 /**
- * One control, drawn as the hardware it is ridden on.
+ * One control, as a knob or as a slider: which is the panel's, never the
+ * control's (`ControlGrid`, the Rides strip).
  *
- * A CC learned to a fader is a slider, full width, above the knobs; an
- * encoder, or nothing learned, is a knob. Re-learn a control and it redraws
- * in place. The value is the settings' own, so a fader, the mouse and the
- * phone are three ways to move one number.
+ * The value is the settings' own, so a fader, the mouse and the phone are
+ * three ways to move one number.
  */
-function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps; testId: string; asKnob: boolean }) {
+function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: DeskProps; testId: string; asKnob: boolean; dense?: boolean }) {
   const key = spec.key;
   const raw = p.settings[key];
   const v = typeof raw === 'number' ? raw : spec.min;
@@ -105,24 +106,35 @@ function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps
       onChange={n => setControl(p, key, n)}
       midiKey={`setting:${String(key)}`}
       testId={testId}
+      dense={dense}
     />
   );
 }
 
-/** Faders first, full width; then the knobs, four to a row. */
+/**
+ * A panel of knobs, four to a row: the Recipe and every section's knobs panel.
+ *
+ * One panel, one kind of control (PLAN 8d-3). This grid used to ask, control
+ * by control, what each was learned to on the MIDI controller and draw a
+ * fader's control as a full-width slider above the knob row, so the desk
+ * looked like the hardware. The owner reported that as a fault twice: on
+ * 2026-11-14 Iridescence, learned to a CC on a board with no profile, sat as
+ * a slider above the Recipe's knobs (8d-1 then made an unknown board's CCs
+ * knobs, which only narrowed it); on 2026-11-22 Bubbles and Saturation, which
+ * the APC mini mk2's factory map rides on two of its faders, were sliders in
+ * the Recipe beside Fluid Physics' and Squish Plate's knobs. Every way a
+ * learn could land made a different panel, and a panel that changes shape
+ * when someone moves a binding is one nobody can read across. So the kind is
+ * the panel's: Rides are faders, these are knobs, whatever each is learned
+ * to. `npm run panelkinds` renders every panel and fails one that draws both.
+ */
 function ControlGrid({ keys, p, prefix }: { keys: (keyof VisualizerSettings)[]; p: DeskProps; prefix: string }) {
   const specs = keys.map(k => RANGE.get(String(k))).filter((s): s is DeskSpec => !!s);
-  const faders = specs.filter(s => p.kindFor(s.key) === 'fader');
-  const knobs = specs.filter(s => p.kindFor(s.key) !== 'fader');
+  if (specs.length === 0) return null;
   return (
-    <>
-      {faders.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob={false} />)}
-      {knobs.length > 0 && (
-        <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-2 pt-1">
-          {knobs.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob />)}
-        </div>
-      )}
-    </>
+    <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-2 pt-1">
+      {specs.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob />)}
+    </div>
   );
 }
 
@@ -385,19 +397,6 @@ function RidesBody({ p }: { p: DeskProps }) {
   const side = where === 'left' ? 'left' : 'right';
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="rides">
-      <div className="flex h-9 shrink-0 items-center justify-end px-3">
-        <button
-          aria-pressed={picking}
-          onClick={() => setPicking(v => !v)}
-          className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
-            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
-          }`}
-          title="Choose which controls ride here"
-          data-testid="ride-pick"
-        >
-          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
-        </button>
-      </div>
       {picking ? (
         <PickList chosen={p.rideKeys} onChange={p.onRideKeys} testId="ride-picker" />
       ) : (
@@ -407,13 +406,20 @@ function RidesBody({ p }: { p: DeskProps }) {
               Nothing on the strip. <span className="text-text">Choose</span> picks what rides here.
             </p>
           )}
-          {/* Rides are faders in every case: a ride is a hand on a strip. */}
+          {/*
+            Rides are faders in every case: a ride is a hand on a strip. One
+            line each (`Slider dense`): the owner (2026-11-07) could not find
+            Macro Zoom, the seventh, because under the Bottles the column had
+            room for three of the old two-line rows, and chose denser faders
+            over moving it. `npm run layout` asks that all eight show whole on
+            the Perform tab at 1440×900.
+          */}
           {p.rideKeys.map(key => {
             const spec = RANGE.get(String(key));
             if (!spec) return null;          // a key saved by an older build
-            return <DeskControl key={String(key)} spec={spec} p={p} testId={`ride-${String(key)}`} asKnob={false} />;
+            return <DeskControl key={String(key)} spec={spec} p={p} testId={`ride-${String(key)}`} asKnob={false} dense />;
           })}
-          <div className="mt-2 border-t border-border pt-3">
+          <div className="mt-1.5 border-t border-border pt-1.5">
             <Toggle
               label="Random evolve"
               // The real switch. This used to write automateRate between 0 and
@@ -453,13 +459,25 @@ function RidesBody({ p }: { p: DeskProps }) {
         a level is a ride. `npm run layout` asks that it covers none of the plate.
       */}
       {/* The way into every setting is the status bar's, on every tab; a copy stood here until PLAN 35c-5. */}
-      {!mixerOut && (
-        <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
-          <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>
-        </div>
-      )}
-      <div className={`flex shrink-0 gap-2 p-3 ${mixerOut ? 'border-t border-border' : ''}`}>
-        <Button full height={40} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
+      {/*
+        Choose, Mixer and Drain share one row under the strip, so the faders
+        start at the panel's top and keep the column's height: Choose stood in
+        a row of its own above them until 2026-11-07.
+      */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border p-2.5">
+        <button
+          aria-pressed={picking}
+          onClick={() => setPicking(v => !v)}
+          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
+          }`}
+          title="Choose which controls ride here"
+          data-testid="ride-pick"
+        >
+          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
+        </button>
+        {!mixerOut && <Button full height={34} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
+        <Button full height={34} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
       </div>
       {mixerOpen && !mixerOut && createPortal(
         /*
@@ -487,8 +505,8 @@ function RidesBody({ p }: { p: DeskProps }) {
   The controls a look is built from, chosen by the owner (`DEFAULT_RECIPE`):
   the old bench's right-hand column, now a panel that leads Build's deck.
   Choose is the same picker the rides use, over the same list, so whatever
-  can ride there can sit here. Knobs or sliders by the controller, as every
-  panel's controls are.
+  can ride there can sit here. All knobs, whatever each is learned to on the
+  controller: one panel, one kind of control (`ControlGrid`, PLAN 8d-3).
 */
 function RecipeBody({ p }: { p: DeskProps }) {
   const [picking, setPicking] = useState(false);
@@ -545,16 +563,13 @@ function RecipeBody({ p }: { p: DeskProps }) {
       )}
       {/* Pinned rather than at the end of a list that scrolls. */}
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
-        <Button
-          full height={32}
-          pressed={!!p.settings.macroMode}
-          title="The closeup camera, in among the drops (M). Lit while it is on."
-          onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
-          midiKey="action:macro-toggle"
-          testId="macro-button"
-        >
-          Close-up
-        </Button>
+        {/*
+          A Close-up button sat here, beside Randomise: one press to 4x and
+          one back to the plate. The owner asked for it gone (2026-11-14):
+          the Macro Zoom is the one way in and out, so there is one control
+          for the closeup and it always reads what the plate is doing
+          (PLAN QA-32c).
+        */}
         {/* Randomise replaces every setting at once, so it asks first. */}
         <Button
           full height={32}
@@ -711,6 +726,15 @@ function DyesBody({ p }: { p: DeskProps }) {
         </>,
         portalBody,
       )}
+      {p.onPicturePalette && (
+        <PicturePaletteButton
+          onFile={p.onPicturePalette}
+          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-60"
+          testId="picture-palette"
+        >
+          <Palette size={13} className="mr-1.5 inline" /> Palette from a picture or video…
+        </PicturePaletteButton>
+      )}
       <div className="flex gap-1.5">
         <button
           onClick={p.onImageDye}
@@ -727,10 +751,12 @@ function DyesBody({ p }: { p: DeskProps }) {
           <Video size={13} className="mr-1.5 inline" /> Pour a video…
         </button>
       </div>
-      {p.cartoons && (
+      {/* The video loaded (PLAN 14ag), from Pour a video… here or Video file
+          in the Video panel: one row, Play and Pour, either or both. */}
+      {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Cartoons</span>
-          <CartoonShelf {...p.cartoons} />
+          <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
         </div>
       )}
     </div>
@@ -782,6 +808,26 @@ function ToolsBody({ p }: { p: DeskProps }) {
             </button>
           );
         })}
+        {/*
+          Tip the dish (PLAN 18a-13j, lib/tipPad.ts): the hand on the rim, beside
+          the hands on the liquid, in the two keycaps the last row leaves empty.
+          The owner never found a way to slosh the plate (2026-10-31): it was
+          three faders in a section no tab puts out. Here it is on every tab
+          that has the tools, with nothing to open and nothing to scroll to
+          (`npm run tippad`). It is not a tool: it needs no pointer on the
+          plate, so a pour and a tip can go together.
+        */}
+        <div
+          className="col-span-2 flex h-12 min-w-0 items-center gap-2 rounded-md border border-border bg-elevated px-1.5"
+          data-testid="tool-tip"
+          title="Tip the dish: drag the dot toward an edge and the liquid runs there; let go and it sloshes back. A first grab turns Slosh up to half if it was off."
+        >
+          <TipPad settings={p.settings} onSetting={p.onSetting} size={40} reach={72} testId="tip-pad" />
+          <span className="min-w-0 truncate text-[11px] font-medium leading-tight text-muted">
+            Tip
+            <span className="block font-mono text-[10px] font-normal text-faint" data-testid="tip-slosh">slosh {Math.round((p.settings.slosh ?? 0) * 100)}%</span>
+          </span>
+        </div>
       </div>
       {p.onToolAmount && (
         <div className="flex items-center gap-2">
@@ -1061,7 +1107,6 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;
-    case 'player': return p.screens.player;
   }
   const spec = PANEL_BY_ID.get(id);
   if (!spec) return null;

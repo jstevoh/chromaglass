@@ -8,9 +8,6 @@ called, and later where they go. The audit behind this (heuristics from Nielsen 
 visibility of system status and consistency, WCAG 1.4.11's 3:1 for a state's cue, every
 desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
 
-- ~~**35a** One look for on, every name unique (phase 1).~~ Shipped: the lit token, `Button
-  pressed`, the Film section's Source and demo loops, the renames, `npm run states` and the
-  3:1 bar in `npm run switches`. Story in `docs/plan-shipped.md` §35.
 - **35a-2** What phase 1 left, each because it moves a check's input or a layout:
   - Sliders standing in for switches: the phone's Press · thin gap and Two Projectors
     (`phone.mjs` drives the first as a range by keyboard), the remote's three (788, 822,
@@ -19,7 +16,8 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - Touch targets under 44 px: the Play handle, the remote's layer dots, tool chips, dye
     swatches and cue strip, LaptopLink's button, Settings' rail on a phone, `Toggle`'s
     36 px row and `PanelFrame`'s 24 px icons.
-  - The remote's two Blackouts share the test id `remote-blackout` (one per layout).
+  - ~~The remote's two Blackouts share the test id `remote-blackout` (one per layout).~~ One
+    Blackout since 35f (the bar under the thumb), so one test id.
   - The phone dock's Motion dot stands for two states (Evolve or Tilt) at once.
   - Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
     rows): legible, but a third way of saying off; make them `disabled` with the reason.
@@ -30,48 +28,44 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
-- ~~**35b** Regroup the panels into seven.~~ Shipped: Play, Pour, Feed, Motion, Chemistry, Look,
-  Stage, one vocabulary for the rail, the panel browser, the sections' `data-group`, the desk's own
-  panels and the phone's Settings strip (now with its headings drawn). Story in
-  `docs/plan-shipped.md` §35.
+- **35-owed** *Checks written first* (2026-11-07) for the four of these that are a build with an
+  answer the source can show, `npm run clearleft -- --owed=pace,spin,tray,dimmed` (logic): `pace`
+  (35d-2, the remote's Speed and Evolve Speed draw `PaceTrack`), `spin` (35a-2 and 35f-2, Auto Spin and
+  Spin Direction picked from their named answers in Settings and on the remote, keeping `settingKey`),
+  `tray` (35g-2, a `SlideMount` on the remote's looks, its cue strip and the Sequencer's stages) and
+  `dimmed` (35a-2, the phone's Show, Evolve and Spin rows `disabled`, no group at half opacity). All
+  four read owed on main. 35a-2's touch targets under 44 px are not among them: only a page measures
+  a target, so they want a line in `npm run phone` first (open).
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:
   - ~~Plates & LED holds the platform's spin, which is Motion's.~~ Moved to Plate Spin in 35c-2.
   - The pin picker (`PickList`) and the command palette still list by section, not by the seven
     groups; the same headings would find a setting faster there.
-- ~~**35c-1** Squish Plate in five.~~ Story in `docs/plan-shipped.md` §35c-1 (moved
-  2026-10-29, 19m).
-- ~~**35c-2** One home per setting, second half.~~ **Shipped**: Flash Limit's one switch, each Impact master under its source's Drive, Plate Spin, Squish Plate in Build's deck, the sequencer button, Takes as a pointer. Story in `docs/plan-shipped.md` §35c-2 (moved 2026-10-29, 19m-2).
-- **35c-3** One home for **MIDI on** and the **audio source**. *Shipped*: Settings' Controller section is MIDI's one home, the Sound sheet the source's. Story in `docs/plan-shipped.md` §35c-3 (moved 2026-10-29, 19m-2). Left from it:
-  - ~~The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
-    (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.~~
-    Settings' Input alone since 35c-5.
-  - 35b-2's pin picker and command palette still list by section, not by the seven groups.
-  - Each Drive/Impact pair (now side by side under its source) is still two knobs: whether
-    each becomes one Strength per input is undecided, and 14ad-2 waits on it (from 35c-2's
-    first statement, moved 2026-10-29, 19m-2).
-- ~~**35c-4** One control, one place on a tab; Send to wall is the Wall.~~ **Shipped** 2026-10-29:
-  the plate bar's Send to wall button gone (the header's Wall sends Preview's copy), and the Rides,
-  Recipe and section panels never draw one control twice on a tab. Story in `docs/plan-shipped.md`
-  §35c-4. Left from it:
-  - The Recipe's and Rides' Choose list does not say a control is drawn on another panel of the
-    tab, so picking Speed onto the Recipe beside the Rides answers with the line under the dials,
-    not in the list where the pick was made.
-- ~~**35c-5** One home each, the second sweep.~~ **Shipped** 2026-10-30: All settings… in the status
-  bar alone, Beat Prediction in Sound alone (the rides' Follow beat switch gone), the no-controller
-  route the header's MIDI light alone, the plates' music route in Plate Spin alone, the microphone in
-  Settings' Input alone (the Sound sheet says which and leads there). Then the three the sweep left, on the owner's "fix all this stuff": Change
-  in Sound… steps aside while Music & Drone is on the tab, the set's button says "Save set", and
-  `npm run shelf` reaches the shelf through Setup and runs in the browser shard. Story in
-  `docs/plan-shipped.md` §35c-5.
-- ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
-  Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
-- ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~
-  Story in `docs/plan-shipped.md` §35e (moved 2026-10-29, 19m).
-- ~~**35e-2** The lamp's grade tops out at 5100 K.~~ Story in `docs/plan-shipped.md` §35e-2
-  (moved 2026-10-29, 19m).
-- ~~**35e-4** Home Movie's lamp, and the warm end's brightness.~~ Story in
-  `docs/plan-shipped.md` §35e-4 (moved 2026-10-29, 19m).
+- ~~**35c-6** The Recipe a strip of its own, and the Rides shown whole.~~ **Shipped** 2026-11-07:
+  the Recipe adds six controls no ride has (8 of its own on Perform, was 2), and the Rides are one
+  line each so all eight, Macro Zoom among them, show under the Bottles at 1440×900 and 1512×860
+  (was 3 and 2). Story in `docs/plan-shipped.md` §35c-6. Left from it:
+  - **35c-6a** At 1280×800 the Rides show 7 of 8 (Evolve Speed under the fold), and the right
+    column still scrolls with its scrollbar hidden, so a strip longer than the column says nothing
+    about what is below. A fade at the cut, or the Bottles folding to one row when the column is short.
+    Check written first (2026-11-08): `npm run deskreach` lines `rides1280` (every ride whole at
+    1280×800; main shows 7 of 8, Automate Rate under the fold) and `ridemark` (a `data-more-mark`
+    at the column's cut while more is below, gone at the end), owed in `scripts/checks.json`.
+  - **35c-6b** On Perform at 1440 the deck's Macro panel (and Squish, Lens) start off the right of
+    the screen, and the deck's sideways scroll has no mark either: the closeup's own dials (aim,
+    camera, depth) are as hard to find as its zoom was.
+    Check written first (2026-11-08): `npm run deskreach` lines `deckmark` (the deck's mark at its
+    right edge, 1280 px past it on main at 1440) and `macro` (the Macro panel wholly on the screen at
+    1440×900, unscrolled; main draws it at x 1874), owed.
+- ~~**35c-7** One page for sound.~~ **Shipped** 2026-11-10 (the owner: "I don't understand why
+  there are two sound settings pages - can we put these all together and simplify things?"). The
+  Sound sheet (the desk's Music & Drone panel) is the top of Settings → Sound: the sources, the Mic's
+  input under the Mic, the shelf, the player and the drone, then what the sound does to the plate,
+  the beat and the songs. No sheet, no second panel, no "Change in Sound…". Story in
+  `docs/plan-shipped.md` §35c-7. Left from it:
+  - **35c-7a** The phone's Sound sheet has no System audio tile and no Input picker: on a phone
+    neither exists to pick (a tab picker, one microphone), but an iPad on a USB interface has
+    inputs. Judge on a tablet whether its Sound sheet wants the Input picker.
 - **35e-3** What the readings left, none changed because each moves a look or waits on another step:
   - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
     surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
@@ -94,10 +88,6 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     refilled) waits for the volume model (18c-2).
   - The legacy bench's bottle list in `App.tsx` (the `liquid-…` test ids) still draws round swatches.
   - The remote has no bottles or bulb (the owner's remote has Dye Budget and Lamp Warmth as sliders).
-- ~~**35f** Show hardware (batch C of the playful-controls choice, 2026-10-25; items 7 to
-  11).~~ Story in `docs/plan-shipped.md` §35f (moved 2026-10-29, 19m).
-- ~~**35g** Looks as slides in a tray (item 12 of the playful-controls choice,
-  2026-10-25).~~ Story in `docs/plan-shipped.md` §35g (moved 2026-10-29, 19m).
 - **35g-2** What the tray left:
   - **The drum has 10 slots, a real tray has 80.** At 28 px 80 slots is a grey ring, so one click turns the
     drawing 36 degrees, not 4.5. Named shortcut of the picture; nothing about any look.

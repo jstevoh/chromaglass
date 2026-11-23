@@ -199,6 +199,7 @@ export class LiveSession extends EventEmitter {
       error: d.error, status: d.status.slice(),
       kbps: c?.kbps ?? 0,
       secondsBehind: c?.secondsBehind ?? 0,
+      avSkewSeconds: c?.avSkewSeconds ?? null,
       bytesBehind: c?.bytesBehind ?? 0,
       measuredAt: c?.measuredAt ?? null,
       dropping: c?.dropping ?? false,

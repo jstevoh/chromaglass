@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself (continued)
 
-Part 2 of 3 of §19; it begins at 19l. The section starts in `19-checks-build-plan.md`.
+Part 2 of 4 of §19; it begins at 19l. The section starts in `19-checks-build-plan.md`.
 
 ## 19l. App frames readable in a cloud session
 
@@ -81,10 +81,6 @@ moved to `docs/plan-shipped.md` (its third pass). Story, and the plan as first w
   one file to the section a PR writes in, but two PRs in one section, or both in the running
   order, still conflict; `docs/judging.md` and `CHANGELOG.md` still do. *Measure:* conflicts
   recorded per merge of main.
-- ~~**19m-2. Read each section once for the shipped prose the markers did not catch**~~
-  **Shipped** (2026-10-29): about 1,700 lines of shipped stories in 30 section files moved,
-  open plan 757 → 631 KB; 28f and 28g folded. Story in `docs/plan-shipped.md` §19m-2
-  (moved 2026-10-29, 19m-2).
 - **19m-4. What the two passes left half-cut** (F, S, found in 19m-2). `15-tools-on-liquids.md`
   line 19 is a fragment the 15i stub left ("Maze, Ferro Paint) carry their own amount…");
   §16's three "Found while building it, not done" lists stand without the 16a, 16b and 16c
@@ -92,6 +88,16 @@ moved to `docs/plan-shipped.md` (its third pass). Story, and the plan as first w
   §27a-8 and §35c-2 twice (the third pass's copy and the fourth's), wanting one each.
 - **19m-3. The archive by section** (F, S): `docs/plan-shipped.md` is about 750 KB (after 19m-2) and a
   ledger in `scripts/sizes.json`; one file a section, like the plan's, would take it off.
+  Since 19m-5 (2026-11-21) what closes after that day is archived by section already, under
+  `docs/plan/archive/`; what is left of 19m-3 is the older stories in `docs/plan-shipped.md`.
+- **19m-6. What the first sweep could not see** (F, S, found in 19m-5). The sweep reads an
+  item's first line, so it leaves: items closed only in their prose ("Story in
+  `docs/plan-shipped.md`" with no mark beside the id); shipped items kept for an open
+  leftover with no id, which want the leftover written as an item of its own so the rest
+  can go; §10's numbered steps and other numbered lists; the order of work in `PLAN.md`,
+  whose waves still list struck ids beside open ones; and the running order's rows for
+  batches long shipped. Each wants one reading pass by hand, after the open PRs that write
+  in those lines have merged (a pass now would conflict with most of them).
 
 ## 19n. A shorter deploy
 
@@ -189,10 +195,6 @@ commit. *Size:* S.
   dish; the check now keeps its drag within 0.25 of the middle, where the old line went,
   so the rim needs a check of its own: a pool held against the rim by the magnet, its
   total read every second. Physics lane.
-- **19v-3. The magnet check's second press landed on the plate bar.** **Shipped**
-  (2026-10-17): Save's changed-look dot takes no width, so the bar at 1280 no longer wraps
-  when a look changes and the plate stays under the hand. `layout` and `magnet` each ask it
-  now. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
 - **19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
   **Shipped** (2026-10-25): Record's running timer on the desk (`RecordControls`) and on
   Play (`PhonePlay`) overlays its idle box and takes no extra width, so starting or stopping
@@ -247,11 +249,6 @@ required `Measure`; the … Story in `docs/plan-shipped.md` §19x (moved 2026-10
   a red check in the last month of `antigravity/` PRs before widening it, since every
   widening costs ordinary physics work a line in the body.
 
-- **19x-3. Measured quotes what it printed.** **Shipped** (2026-10-26): the `Check changes named` job fails an Antigravity PR whose `Measured:` quotes no printed line (`scripts/measured.mjs`, `npm run checkguard`). Story in `docs/plan-shipped.md` §19x-3 (moved 2026-10-29, 19m-2). Named limit: `npm run checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds that sentence in a string literal; the lookup cannot tell a script's fixtures from what it prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is the guard). Found along the way: `namedLines` does not read a
-  `Check changes:` that is itself a list item (`- **Check changes:**`, how Antigravity's
-  bodies write the whole block), so a named change under that form is not seen. It fails
-  safe (red, never green) but costs a round; read it the way `measuredGroups` does.
-
 ## 19y. Compaction and helper models set from the repo, not the host
 **Shipped** (2026-10-17): `.claude/settings.json` sets the window to 200000 in its `env` block and `CLAUDE_CODE_SUBAGENT_MODEL` to sonnet; the agents that judge name opus. Story in `docs/plan-shipped.md` §19y (moved 2026-10-29, 19m-2).
 
@@ -300,8 +297,6 @@ name, since `renders` on … Story in `docs/plan-shipped.md` §19aa (moved 2026-
   startup's "moving for good no later than the old way" 7 of 193 (19aa-7); the phone's
   two fingers holding Drop 4 of 172 (19h-2, a solver rebuilt by the governor in the
   window is the lead). Two deploys went red on one-off Mac flakes on 10-24.
-- **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** Story in
-  `docs/plan-shipped.md` §19aa-6 (moved 2026-10-29, 19m).
 - **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few (shipped 2026-10-25).** The stroke takes 3000 ms of waiting. Story in `docs/plan-shipped.md` §19aa-8 (moved 2026-10-29, 19m-2). The paused hunt
   for why the app pushes less per step than the lab (the breath's share, the `still`
   threshold, the Dropper's bottle) is not answered: the toolAmount is 1, so

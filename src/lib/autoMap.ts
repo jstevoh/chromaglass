@@ -98,9 +98,9 @@ export class SurfaceWatcher {
     this.order = 0;
   }
 
-  /** One message. Note-offs are ignored: a press and its release are one control. */
+  /** One message. Note-offs and program changes are ignored: auto-map watches physical controls. */
   observe(e: MidiEvent): void {
-    if (e.kind === 'noteoff') return;
+    if (e.kind === 'noteoff' || e.kind === 'program') return;
     const kind = e.kind === 'cc' ? 'cc' : 'note';
     const key = `${kind}:${e.channel}:${e.number}`;
     let s = this.seen.get(key);
@@ -215,7 +215,7 @@ export const RIDE_ORDER: (keyof VisualizerSettings)[] = [
  */
 export const ACTION_ORDER: MidiAction[] = [
   'go', 'blackout-toggle', 'tap-tempo', 'cue-next', 'cue-prev', 'revert',
-  'play-toggle', 'automate-toggle', 'macro-toggle', 'lucky',
+  'play-toggle', 'automate-toggle', 'lucky',
   'drain', 'clear', 'seed', 'overlays-toggle', 'record-toggle',
   'seq-play-pause', 'seq-next', 'seq-prev',
   'preset-next', 'preset-prev', 'tempo-clear', 'scene-toggle',

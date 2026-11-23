@@ -7,11 +7,14 @@ import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { PIN_RANGE } from '../../lib/deskPins';
+import { findPreset } from '../../presets';
+import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 
 /** Evolve's top, the registry's: the dial runs on past 1 to its extreme on every surface. */
 const EVOLVE_MAX = PIN_RANGE.get('automateRate')?.max ?? 1;
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
+import { shareClip } from '../../lib/shareClip';
 import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
 
 /**
@@ -93,7 +96,7 @@ export interface PhonePlayProps {
   onDye: (hex: string) => void;
   /** The app's hand: Play sets it from the tray and from the touch itself. */
   onTool: (t: PhoneTool) => void;
-  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom' | 'macroMode'>;
+  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
@@ -112,11 +115,8 @@ export interface PhonePlayProps {
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-/** The zoom the plate is drawn at, as LiquidVisualizer's macroZoomOf reads the look (a closeup look with no zoom of its own is at 4). */
-const zoomOf = (s: PhonePlayProps['settings']) => {
-  const z = s.macroZoom ?? 1;
-  return s.macroMode === true ? (z > 1.05 ? z : 4) : Math.max(1, z);
-};
+/** The zoom the plate is drawn at: the Macro Zoom alone, as LiquidVisualizer's macroZoomOf reads it (PLAN QA-32c). */
+const zoomOf = (s: PhonePlayProps['settings']) => Math.max(1, s.macroZoom ?? 1);
 
 /** A 36-tall glass pill in a 48 px target: lit while pressed, or solid red when what it holds is live (recording). */
 function Pill({ onPress, label, testId, children, pressed, live = false }: { onPress: () => void; label: string; testId: string; children: ReactNode; pressed?: boolean; live?: boolean }) {
@@ -263,23 +263,10 @@ export function PhonePlay(p: PhonePlayProps) {
   );
 
   const take = p.recording.take;
-  const shareClip = async () => {
+  const onClip = async () => {
     if (p.recording.on) { p.recording.onToggle(); return; }
     if (!take) { p.recording.onToggle(); return; }
-    /*
-      The phone's own share sheet where it has one (Messages, Instagram,
-      Photos), with the clip as a file; a download where it has not. Called
-      from the tap itself: a share sheet opened after an await of anything
-      else is refused for want of a user gesture.
-    */
-    const file = new File([take.blob], take.filename, { type: take.blob.type || 'video/mp4' });
-    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-    if (nav.share && nav.canShare?.({ files: [file] })) {
-      try { await nav.share({ files: [file], title: 'ChromaGlass' }); } catch { /* closed without sharing */ }
-      return;
-    }
-    const a = document.createElement('a');
-    a.href = take.url; a.download = take.filename; a.click();
+    await shareClip(take);
   };
   const clipLabel = p.recording.on ? `Stop · ${clock(p.recording.seconds)}` : take ? 'Share clip' : 'Record a clip';
 
@@ -464,7 +451,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 display={(s.globalSpeed ?? 0) < 0.1 ? (s.globalSpeed ?? 0).toFixed(3) : (s.globalSpeed ?? 0).toFixed(2)} resetTo={p.lookValueOf?.('globalSpeed')} onChange={v => p.onSetting({ globalSpeed: v })} testId="play-slider-speed" />
               <TouchSlider glass label="Turbulence" setting="turbulenceScale" min={0} max={1} value={s.turbulenceScale ?? 0}
                 display={pct(s.turbulenceScale ?? 0)} resetTo={p.lookValueOf?.('turbulenceScale')} onChange={v => p.onSetting({ turbulenceScale: v })} testId="play-slider-turbulence" />
-              <TouchSlider glass label="Swirl" setting="vorticityConfinement" min={0} max={1} value={s.vorticityConfinement ?? 0}
+              <TouchSlider glass label="Swirl" setting="vorticityConfinement" min={0} max={2} value={s.vorticityConfinement ?? 0}
                 display={pct(s.vorticityConfinement ?? 0)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
               <TouchSlider glass label="Soap" setting="surfactantFlow" min={0} max={1} value={s.surfactantFlow ?? 0}
                 display={pct(s.surfactantFlow ?? 0)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
@@ -484,7 +471,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 {p.looks.map(l => {
                   const on = l.id === p.activeLookId;
                   return (
-                    <button key={l.id} onClick={() => p.onLook(l.id)} aria-pressed={on} data-testid="play-look-tile"
+                    <button key={l.id} onClick={() => (isPackLocked(findPreset(l.id)?.pack) ? openAccountSheet() : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
                       className="flex w-[76px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
                       {/* Lit like every other chosen thing (PLAN 35a): the slide's own film cannot change colour, so its name takes the lit chip and the mount a lit ring (on a wrapper, since the mount's clipped corner would cut a ring drawn on it). A slide a flick, snapping one at a time (35g). */}
                       <span className={`flex w-full justify-center rounded-[4px] py-1 ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><SlideMount swatch={l.swatch} size={60} /></span>
@@ -516,7 +503,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 <button onClick={p.onClear} data-testid="play-clear"
                   className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Clear plate</button>
                 {p.recording.supported && (
-                  <button onClick={() => { void shareClip(); }} data-testid="play-share"
+                  <button onClick={() => { void onClip(); }} data-testid="play-share"
                     className="h-[52px] min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium tabular-nums text-on-primary">{clipLabel}</button>
                 )}
                 {p.onOpenAccount && (

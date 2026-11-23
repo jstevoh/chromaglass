@@ -20,7 +20,7 @@
  *      drops the remote socket or stops the phone from driving the show.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { clickAt } from './layoutProbe.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, mkdtempSync } from 'node:fs';
@@ -36,9 +36,9 @@ const check = (name, ok, detail = '') => {
 
 const FIREBASE_TOOLS = 'firebase-tools@15.33.0';
 const PROJECT = 'demo-chromaglass';
-const EMU_PORT = Number(process.env.ACCOUNTLINK_EMU_PORT ?? 9209);
+const EMU_PORT = port(9209, 'ACCOUNTLINK_EMU_PORT');
 const EMU = `http://127.0.0.1:${EMU_PORT}`;
-const PORT = Number(process.env.ACCOUNTLINK_PORT ?? 4297);
+const PORT = port(4297, 'ACCOUNTLINK_PORT');
 const KEY = '7391';
 const DIST = resolve(process.env.ACCOUNTLINK_DIST ?? 'dist-accountlink');
 const BOOT_MS = 90_000;

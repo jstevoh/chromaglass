@@ -51,6 +51,7 @@
  */
 import { spawn } from 'node:child_process';
 import { openLab } from './lab.mjs';
+import { port } from './ports.mjs';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -59,15 +60,16 @@ const check = (name, ok, detail = '') => {
 };
 
 const SIZE = 640;
-let server = null, port = 4620;
+const BASE = port(4620);
+let server = null, served = BASE;
 for (let t = 0; t < 6 && !server; t++) {
-  const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(4620 + t), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
+  const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(BASE + t), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
   let died = false;
   child.on('exit', () => { died = true; });
   await new Promise((r) => setTimeout(r, 2500));
-  if (!died) { server = child; port = 4620 + t; }
+  if (!died) { server = child; served = BASE + t; }
 }
-if (!server) { console.error('the preview did not start on ports 4620-4625 (a busy port, or no build: run `npm run build` first)'); process.exit(2); }
+if (!server) { console.error(`the preview did not start on ports ${BASE}-${BASE + 5} (a busy port, or no build: run \`npm run build\` first)`); process.exit(2); }
 const stopServer = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* already gone */ } };
 process.on('exit', stopServer);
 
@@ -75,7 +77,7 @@ const { page: lab, close } = await openLab();
 try {
   // ── The seed, as the app lays it ──────────────────────────────────
   const app = await lab.context().browser().newPage();
-  await app.goto(`http://localhost:${port}/?debug&look=roy`, { waitUntil: 'load' });
+  await app.goto(`http://localhost:${served}/?debug&look=roy`, { waitUntil: 'load' });
   await app.waitForFunction(() => window.chromaglassDebug?.().fluids?.[0]?.captureSeed, null, { timeout: 60000 });
   const seed = await app.evaluate(() => {
     const d = window.chromaglassDebug();

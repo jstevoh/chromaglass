@@ -842,6 +842,106 @@ const clusterStats = (fld, withColour) => {
     `mean radius ${pl.mean.toFixed(3)} -> ${mc.mean.toFixed(3)} cells (${(mc.mean / pl.mean).toFixed(2)}x, bar 1.4 to 1.8), beads ${pl.n} -> ${mc.n} (bar at least 60%)`);
 }
 
+/*
+  PLAN 18i-2, written before the build: the beads run on the gap, not on dials.
+
+  A pancake of one liquid between two glasses a gap b apart, in another, on a
+  plate tipped by θ, slides at U = Δρ g sinθ b² / (12 μ (1 + λ)) down the
+  slope, μ the liquid round it, λ the ratio of the drop's viscosity to it,
+  and Δρ the drop's density less the liquid's (the Hele-Shaw drop's
+  mobility, the same 1 + λ the field's 2U/(1 + λ) lag already carries). The
+  sign is the law's too: a drop heavier than what it sits in goes down the
+  slope, a lighter one (oil in water) goes up it, as the plate's own heavy
+  and light liquids do (liquidPhase.ts: heavy moves along +tilt). On main
+  the field slides every bead by tiltX·500 cells a second against the tilt,
+  whatever the gap, the liquids or which of them is the heavier, and merges
+  touching beads with a chance of 0.02 a step.
+
+  What the build adds, and the only API these lines assume: `setLiquid({
+  gapMetres, muOut, muIn, deltaRho, sigma })` on the field, in SI units
+  (metres, Pa·s, kg/m³ signed as ρ_drop − ρ_liquid, N/m), and the tilt that
+  `step` takes read as the sine of the plate's tilt on each axis, down the
+  slope being +x for a positive tiltX. The speed is signed along +x and held
+  to the signed law, so a bead that slides the right distance the wrong way
+  is a miss, not a pass (the old Math.abs let it through).
+
+  Three pairs of liquids. Two are oil beads in water with λ of 10 and 100,
+  at gaps a factor of two apart, which tell the gap's b² and the drop's
+  viscosity apart from a constant tuned to one of them; but with λ that large
+  μ(1 + λ) is nearly μ_in alone, so a build whose mobility were 1/μ_in (the
+  drop's viscosity, not the pair's) would pass both. The third is water
+  beads in oil, λ = 0.02: there μ(1 + λ) is nearly μ_out, and 1/μ_in is
+  fifty times too fast. It is also the heavier bead, so it goes down the
+  slope where the oil beads go up, and a sign fixed by the code instead of
+  by Δρ misses one side or the other.
+
+  The merge's chance a step has no line (why is written where it would be,
+  below the slide line).
+
+    npm run drops -- --owed=slide
+
+  is how main runs it until 18i-2 is built; the PR that builds it takes the
+  id out of --owed in scripts/checks.json and changes nothing here.
+*/
+{
+  const IDS = ['slide'];
+  const flag = process.argv.find((a) => a.startsWith('--owed='));
+  const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+  const unknown = [...owed].filter((id) => !IDS.includes(id));
+  if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+  const owedCheck = (id, name, ok, detail, mainState) => {
+    if (!owed.has(id)) return check(name, ok, detail);
+    if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+    if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+    console.log(` owed  ${name} — ${detail}`);
+  };
+  const G = 9.81, METRES_PER_CELL = 0.2 / N;
+  const built = typeof new BeadField(N).setLiquid === 'function';
+  const still = () => [0, 0];
+  const LIQUIDS = [
+    // Oil lighter than the water round it: Δρ = ρ_drop − ρ_liquid is negative, and the bead goes up the slope.
+    { name: 'light oil in water, 2 mm', gapMetres: 0.002, muOut: 1e-3, muIn: 0.01, deltaRho: -80, sigma: 0.03 },
+    { name: 'thick oil in water, 1 mm', gapMetres: 0.001, muOut: 1e-3, muIn: 0.1, deltaRho: -120, sigma: 0.03 },
+    // Water (1000 kg/m³, 1 mPa·s) beaded in a mineral oil of 880 kg/m³ and 50 mPa·s; the interface's tension about 0.04 N/m.
+    { name: 'water in oil, 1.5 mm', gapMetres: 0.0015, muOut: 0.05, muIn: 1e-3, deltaRho: 120, sigma: 0.04 },
+  ];
+  const sinT = 0.1;
+  const slides = LIQUIDS.map((L) => {
+    seed(1802);
+    const f = new BeadField(N);
+    f.drops = 1;
+    if (built) f.setLiquid(L);
+    f.populate(40, 1);
+    f.beads.splice(1);
+    const b = f.beads[0];
+    b.x = N * 0.3; b.y = N * 0.5;
+    const x0 = b.x, secs = 2, steps = 60 * secs;
+    for (let i = 0; i < steps; i++) f.step(1 / 60, still, sinT, 0);
+    // Signed along +x, which is down the slope for a positive tilt.
+    const got = (f.beads[0] ? f.beads[0].x - x0 : NaN) * METRES_PER_CELL / secs;
+    const want = L.deltaRho * G * sinT * L.gapMetres ** 2 / (12 * L.muOut * (1 + L.muIn / L.muOut));
+    return { L, got, want, ratio: got / want };
+  });
+  owedCheck('slide', 'a bead on a tipped plate slides at Hele-Shaw’s Δρ g sinθ b²/(12μ(1 + λ)), signed (heavy down the slope, light up it), within 15%, for three liquids and gaps, λ 10, 100 and 0.02',
+    slides.every((s) => s.ratio > 0.85 && s.ratio < 1.15),
+    slides.map((s) => `${s.L.name} (λ ${(s.L.muIn / s.L.muOut).toFixed(2)}): ${(s.got * 1e3).toFixed(3)} mm/s against ${(s.want * 1e3).toFixed(3)} (${s.ratio.toFixed(2)}x)`).join('; '),
+    !built);
+
+  /*
+    No rate line. The item also asks that a merge be Paterson's
+    1 − exp(−dt/τ), not the 0.02 a step of beads.ts, and a line for it was
+    written and measured on main (2026-11-21) in two setups, neither of which
+    can tell the two apart. On a crowded plate the gathering current packs,
+    1738 beads were lost in six seconds at 60 steps a second and 1834 at 30
+    (1.06x): the instant merge of a small drop inside a big one takes almost
+    all of them, and it has no chance in it. Pairs laid pressed on a still
+    plate part before the chance fires: 3 of 256 merged in half a second at
+    either rate. A line that is green on main is not owed, and one that reads
+    three events cannot fail honestly, so the chance a step is left to the
+    build's own reading of the item, and slide is the line 18i-2 is held to.
+  */
+}
+
 console.log(`     the mask for ${beads.length} drops took ${ms.toFixed(1)} ms to draw (the rings' canvas is not timed here)`);
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

@@ -13,7 +13,7 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 
 - `App.tsx` owns the settings and passes them in as props, like the desk.
 - What a finger does is read in `lib/playGesture.ts`; the touch handlers on the plate are in `LiquidVisualizer.tsx`; tilt is `hooks/useDeviceTilt`.
-- Imports `src/lib`, `src/types`, `../ui`, `hooks/useEscape`, `hooks/useDeskLayout`, `desk/TabStrip`, `settings/FeedbackPane` (the More sheet's Feedback, the same pane as Settings) and a few siblings (`MixerPanel`, `CartoonShelf`, `SongScore`, `PanelGuard`). Never `src/gpu`.
+- Imports `src/lib`, `src/types`, `../ui`, `hooks/useEscape`, `hooks/useDeskLayout`, `desk/TabStrip`, `settings/FeedbackPane` (the More sheet's Feedback, the same pane as Settings) and a few siblings (`MixerPanel`, `VideoShelf`, `SongScore`, `PanelGuard`). Never `src/gpu`.
 - `settings/PatchesSection.tsx` reuses `BandStrip` and `AreaPicker` on the laptop.
 - Every feature ships its phone version in the same PR.
 
@@ -22,8 +22,11 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 - `AreaPicker.tsx`: area picked on a plate thumbnail.
 - `BandStrip.tsx`: the band, dragged on a spectrum.
 - `PhonePlay.tsx`: Play.
-- `PhoneStage.tsx`: the stage.
+- `PhoneInkTitle.tsx`: `PhoneInkTitle`, the Title switch and its Sweep (PLAN 37x-10), on the More sheet and the remote's Controls.
+- `PhoneMoire.tsx`: `PhoneMoire`, the moiré pack's sheets on the Looks sheet (the desk's lists and try-it rule, PLAN 45a).
+- `PhoneStage.tsx`: the stage. Its microscope opens the Macro Zoom (`onZoom(zoom)`, the slider's value; it was the closeup's on/off until PLAN QA-32c).
+- `TvLink.tsx`: the `?tvlink` page: sign in, then type the code a TV shows, to link it to the account's Home or Pro (PLAN 12-tv-signin). `main.tsx` routes it before the show, like the remote; it loads no engine.
 
 ## Checks
 
-`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Cartoons: `cartoons`. Feedback: `feedbackpane`, `feedback-worker`. Areas and cords: `areacords`.
+`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Your own video (the dye sheet's row): `myvideo`. Feedback: `feedbackpane`, `feedback-worker`. Areas and cords: `areacords`. Linking a TV: `tvcode` (the Worker's routes and `lib/tvCode.ts`'s code format).

@@ -1,3 +1,5 @@
+import { BULB_FILL } from './lampField';
+import { MOIRE_WGSL } from './plateMoire';
 /**
  * What the plate does with the lamp's light where it once painted light of
  * its own (PLAN 38h): a plate lit from beneath shows transmitted light only,
@@ -21,7 +23,6 @@ export const TRANSMIT_WGSL = /* wgsl */ `
   ask for a surface steeper than the liquid makes. Flat dye is never lit or
   darkened by it, which the old law did by up to a quarter at a lamp's edge.
 */
-const RELIEF_GAIN: f32 = 3.0;
 fn reliefGain(n: vec3f) -> vec3f {
   if (U.glossiness < 0.005) { return n; }
   return normalize(vec3f(n.xy * (1.0 + RELIEF_GAIN * U.glossiness), n.z));
@@ -39,6 +40,120 @@ fn reliefGain(n: vec3f) -> vec3f {
 */
 fn gelFilter(uv: vec2f) -> vec3f {
   return mix(vec3f(1.0), clamp(gelColor(uv), vec3f(0.0), vec3f(1.0)), U.gelWheel);
+}
+
+/*
+  The shadowgraph: what a column of liquid does to the light when the
+  projector's lens is focused off it (PLAN 38h-3). Whatever bends the light,
+  dye, oil, a pour of glycerine, a film or a thicker gap, bends it by the
+  slope of the optical path through the column, OPL = n·h, and a plane Δz
+  past the plate sees the light gathered where that path is curved: the
+  transport 1 - Δz·∇²OPL, whose first order exp(-Δz ∇²OPL/n) stays positive
+  as light must. The derive pass writes the whole column's OPL (.w), so this
+  is one term for all of it. It was two: refractionOptics drew the dye's
+  from the derive pass's ∇²OPL, masked to the dye's own slope and only over
+  dye, so a pour that moved only the index drew nothing; and the oil block
+  drew the oil's from the oil alone, so where dye crossed an oil drop's edge
+  the oil's share was counted twice (a black and a bright arc there, in the
+  lab at Focus 0.8).
+
+  The wall sees the plate through the lens's defocus disc, so the Laplacian
+  is taken at the disc's scale, as the difference of two ring means (sixteen
+  taps and eight), 4 (mean over R - mean over R/3) / (R² - R²/9), with R the
+  derive pass's spacing widened as the disc grows with Δz, scaled to its
+  9-tap stencil (50 e² ∇²): the oil block's own law, now read off the whole
+  path. Read cell by cell, the oil's rings were stair-stepped (the owner:
+  "really pixelated at the edge ... super digital"); averaging the derive
+  pass's own ∇²OPL over the disc instead left a fresh pour's stair-stepped
+  rim speckled, since a Laplacian of steps is mostly cell-sized spikes, where
+  the path itself is only steps. Nothing at Focus's middle, where Δz is 0,
+  and so nothing on any look as it ships. The gain is the one both terms
+  had, Boundary Contrast's.
+*/
+fn defocusShadow(t: texture_2d<f32>, uv: vec2f) -> f32 {
+  let dz = (U.projectorFocus - 0.5) * 1.5;
+  if (abs(dz) <= 0.001) { return 1.0; }
+  let e = 3.0 / U.logicalGrid;
+  let R = e * (1.0 + 4.0 * abs(dz));
+  var outer = 0.0;
+  var inner = 0.0;
+  for (var k = 0; k < 16; k++) {
+    let d = vec2f(cos(f32(k) * 0.3926991), sin(f32(k) * 0.3926991));
+    outer += tex2(t, uv + d * R).w;
+    if (k % 2 == 1) { inner += tex2(t, uv + d * (R / 3.0)).w; }
+  }
+  let lap = (outer / 16.0 - inner / 8.0) * 4.0 / (R * R * (8.0 / 9.0)) * 50.0 * e * e;
+  return clamp(exp(-dz * (lap / N_WATER) * max(1.0, U.boundaryContrast * 2.0)), 0.2, 2.5);
+}
+
+/*
+  The closeup's shadowgraph (Macro Relief, PLAN 18e-7): the same law,
+  read off the same path, for a camera focused dz past the liquid. 38h-7
+  meant its depth to be this, but the derive pass's camera branch handed it
+  the colour step between two dyes, so up close every seam was shaded up to
+  half darker, scaled by Boundary Contrast, and a swell drew nothing. Now
+  the camera branch writes the dye's path in .w, its stand-in index at
+  gain 1 (refractionOptics note 6: a dye barely moves the index, and the
+  dial is the projector's), and its curvature is read at the lens's disc
+  as defocusShadow reads it, two ring means. Two dyes at one depth make no
+  path step, so no line; a swell of dye is a dome of path and gathers light
+  in its middle; a pool's edge or a step in the dye's depth is a soft
+  shadow-and-bright pair as wide as the disc. Returned as the curvature
+  over the path, which camShadow takes.
+
+  The dye's path, not the whole column's. The first build read the wall's
+  whole path, gap, oil and pours included, and the Mac's film of it (Classic
+  at 6x, Splodascope at 4x) drew a jagged ribbon clipped bright and rows of
+  scalloped shells round a bubble cluster, and a hard pale patch inside an
+  oil drop. Those fields are read texel by texel (viewProps, pouredDn: a
+  packed or 32-bit field cannot be filtered), so up close every step is a
+  cell-sized stair, and the gap bows hard round each bubble; their index
+  steps (oil 0.137, glycerine 0.14) are ten times the dye's stand-in, so
+  the stairs went straight to camShadow's clamp. An oil drop's and a
+  pour's rims are 18e-2's to draw, a bubble's wall its own lens; returning
+  them to the closeup waits on reading them smoothly (PLAN 18e-12).
+
+  Two readings were tried before this and taken back (18e-5's thread):
+  nothing (a flat closeup) and the derive pass's own nine-tap Laplacian of
+  the path, which read a bubble's hole in the dye as a cliff of path and
+  blew a cluster of bubbles up to flat white (17% of a frame on the Mac).
+  A bubble's wall is the traced bubble's to draw (closeupDepth.ts): its air
+  is not liquid, so a tap that lands in it reads the middle's path instead,
+  and near a hole the term fades out, as the slope holds the air (plateSlope.ts).
+
+  CAMERA_DISC is how fast the camera's disc grows with dz, in the derive
+  pass's spacings, against the projector's 4: a macro lens is stopped down
+  (f/8 to f/16, for its depth of field), so its cone, and with it its blur
+  past focus, is about half the projector's. At 4 the closeup's relief on
+  the stirred plate of npm run macroview read 0.020 to 0.026 of the frame,
+  on that check's bar of 0.02; at 2 it reads 0.027 to 0.032, and a seam
+  between two dyes still reads nothing (npm run camrelief).
+*/
+const CAMERA_DISC: f32 = 2.0;
+fn camAir(a: texture_2d<f32>, uv: vec2f) -> f32 { return smoothstep(0.02, 0.3, textureSampleLevel(a, samp, uv, 0.0).r); }
+fn camLap(t: texture_2d<f32>, air: texture_2d<f32>, uv: vec2f, dz: f32) -> f32 {
+  let c = tex2(t, uv).w;
+  if (c <= 0.0) { return 0.0; }
+  let e = 3.0 / U.logicalGrid;
+  let R = e * (1.0 + CAMERA_DISC * dz);
+  let airy = textureDimensions(air).x > 1u;
+  var near = 0.0;
+  if (airy) { near = camAir(air, uv); }
+  var outer = 0.0;
+  var inner = 0.0;
+  for (var k = 0; k < 16; k++) {
+    let d = vec2f(cos(f32(k) * 0.3926991), sin(f32(k) * 0.3926991));
+    var o = tex2(t, uv + d * R).w;
+    if (airy) { o = mix(o, c, camAir(air, uv + d * R)); }
+    outer += o;
+    if (k % 2 == 1) {
+      var i = tex2(t, uv + d * (R / 3.0)).w;
+      if (airy) { let a = camAir(air, uv + d * (R / 3.0)); i = mix(i, c, a); near = max(near, a); }
+      inner += i;
+    }
+  }
+  let lap = (outer / 16.0 - inner / 8.0) * 4.0 / (R * R * (8.0 / 9.0)) * 50.0 * e * e;
+  return lap / c * (1.0 - near);
 }
 
 /*
@@ -80,5 +195,163 @@ fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32, pxCell: f32) -> vec3f {
     }
   }
   return outc;
+}
+
+/*
+  The camera's bubble: its true centre and radius in plate uv (PLAN 38h-2,
+  38h-7), from p, the position field's filtered reading at fuv, and R, the
+  packed radius. Neither is good enough to draw a rim from up close. R is
+  packed in 16 steps on a log scale, each 1.28 times the last, so it is off
+  by up to 14%; and filtered p is the coverage-weighted mean of the four
+  texels round the point, so in the last texel it stops growing while the
+  coverage runs on in a square-cornered staircase: the owner saw the edge as
+  blocky, "low resolution" (2026-10-31). A first fix read the field again at
+  the estimated centre; with the radius still a step off, the rim stayed off
+  the hole the solver cut by as much.
+
+  But each texel the air covers holds its own position exactly: g and b are
+  a times a linear function of where the texel's centre is (wgsl/air.ts), so
+  divided by a they give (x - c) / R at a known x with no filtering at all.
+  So the texels themselves are read (textureGather), at the estimated centre
+  and three points half a radius out from it, and x = c + R q is fitted to
+  them by least squares: sixteen exact samples a radius apart fix the centre
+  and the radius to a fraction of a texel (the centre's four alone, on a
+  bubble a texel or two across). Each point is snapped to the corner its
+  four texels share, so the texels gathered are the ones assumed. A fit that
+  does not hold (too few covered texels, a radius more than a step from the
+  packed one, a neighbour's texels mixed in) falls back to the packed radius
+  and the centre the covered texels give for it.
+*/
+fn camBubble(fuv: vec2f, p: vec2f, R: f32) -> vec3f {
+  let n = vec2f(textureDimensions(air0));
+  var c0 = fuv - p * R;
+  var sn = 0.0;
+  var sq = vec2f(0.0);
+  var sx = vec2f(0.0);
+  var sqx = 0.0;
+  var sqq = 0.0;
+  var sc = vec3f(0.0);
+  for (var k = 0; k < 4; k++) {
+    // The centre first; the other three round the centre its texels give,
+    // which every pixel of the bubble agrees on, so they read the same texels.
+    if (k == 1 && sc.z > 0.0) { c0 = sc.xy / sc.z; }
+    let ang = f32(k) * 2.0943951;
+    let b = floor((c0 + vec2f(cos(ang), sin(ang)) * select(0.5 * R, 0.0, k == 0)) * n - 0.5);
+    let at = (b + 1.0) / n;
+    let ga = textureGather(0, air0, samp, at);
+    let gg = textureGather(1, air0, samp, at);
+    let gb = textureGather(2, air0, samp, at);
+    // textureGather's order: (0,1), (1,1), (1,0), (0,0) from the corner texel b.
+    let offs = array<vec2f, 4>(vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0), vec2f(0.0, 0.0));
+    for (var j = 0; j < 4; j++) {
+      let a = ga[j];
+      if (a > 0.1) {
+        let x = (b + offs[j] + 0.5) / n;
+        let q = (vec2f(gg[j], gb[j]) / a - vec2f(0.5)) * 2.0;
+        sn += 1.0; sq += q; sx += x; sqx += dot(q, x); sqq += dot(q, q);
+        sc += a * vec3f(x - R * q, 1.0);
+      }
+    }
+  }
+  let vq = sqq - dot(sq, sq) / max(sn, 1.0);
+  let Rf = (sqx - dot(sq, sx) / max(sn, 1.0)) / max(vq, 1e-6);
+  if (sn < 3.0 || vq < 0.05 || Rf < 0.8 * R || Rf > 1.25 * R) {
+    // Each covered texel's own word for the centre at the packed radius:
+    // the same texels give the same centre, so a bubble too small to fit
+    // still has one rim, not a piece of one per pixel.
+    return select(vec3f(c0, R), vec3f(sc.xy / max(sc.z, 1e-4), R), sc.z > 0.0);
+  }
+  return vec3f((sx - Rf * sq) / sn, Rf);
+}
+${MOIRE_WGSL}
+`;
+
+/**
+ * The light at an edge (PLAN 38h-2): what a slope does to light coming up
+ * through the glass, for the dye's rims, the camera's
+ * bubble and the closeup's relief. Built into the display shader's LIGHTING
+ * block, after the lamp's pupilPass (lampField.ts) and before the macro's
+ * relief and the VIEW block, which read it; so the indices and the
+ * aperture the drops' optics use (plate.ts, the drops' constants) are
+ * declared here, once, and that block reads them from here.
+ */
+export const EDGE_LIGHT_WGSL = /* wgsl */ `
+const DROP_NA: f32 = 0.25;
+const N_WATER: f32 = 1.333;
+const N_OIL: f32 = 1.47;
+const N_AIR: f32 = 1.0;
+/*
+  Every edge on the plate was lit from a lamp above it: the dye's rim
+  brightened on the side facing the lamp's position and darkened on the
+  other, a camera highlight sat on it, the camera's bubble wore a crescent
+  and two reflections of the lamp, a ring round each oil drop glowed, the
+  closeup's relief was Lambert and a Blinn glint, and the line between two
+  dyes added a quarter of white. The lamp is under the glass. What a slope
+  does to its light is bend it, by the step in index across the surface
+  times the slope, and what the lens then shows is the share of that light
+  still inside its aperture. That is the law the lamp lever already uses
+  (pupilPass, lampField.ts): the bulb's image, a disc BULB_FILL of the
+  aperture across, slid off the aperture's centre. A bend slides it the
+  same way, so an edge is that share against the flat plate's: 1 where the
+  liquid is level, falling to nothing as the bend carries the bulb's whole
+  image past the rim, and never above 1. Symmetric: the lamp sends its
+  light up along the axis, so no side of an edge faces it.
+
+  The camera's view (a photographed look, the closeup) is lit the same way
+  from beneath, by a light box rather than a condenser: its light reaches
+  each point from a cone much wider than the lens takes in, so a ray bent
+  a little is replaced by another from the box, and only a bend past the
+  difference loses light. CAMERA_FILL is that cone in the lens's aperture
+  radii, matched to the camera's line on a drop (the beads' block and the
+  satellite droplets: dark past 0.85 of a ball's radius, where oil in water
+  bends the light 1.6 aperture radii), so the camera's edges and its drops
+  agree: thin dark lines only where the surface is steep.
+*/
+const CAMERA_FILL: f32 = 2.6;
+/** How much steeper than the field Glossiness (the plate) and Macro Relief (the closeup) may make the surface: 1 to 1 + this times. */
+const RELIEF_GAIN: f32 = 3.0;
+fn edgePass(bend: f32, cam: f32) -> f32 {
+  let p = pupilPass(vec3f(bend, bend, 0.0), vec3f(${BULB_FILL.toFixed(6)}, CAMERA_FILL, CAMERA_FILL));
+  // p.z is the light box's share on a level plate (1/fill², the lens being smaller than its cone).
+  return mix(p.x, p.y / p.z, cam);
+}
+/*
+  What gives the closeup its depth (Relief / 3D, PLAN 38h-2): the camera
+  focused a little past the liquid. A curved surface is a lens; on a plane
+  past it the light it bends gathers under a dome and spreads under a
+  hollow, so a swell reads brighter in its middle and a trough darker, the
+  shadowgraph, exp(-dz grad^2 OPL / OPL), by the same law and from the same
+  path the projector's Focus uses in defocusShadow, read at the lens's disc
+  (camLap above; until 18e-7 it was fed the colour step between two dyes,
+  a line at every seam). No light is made: what the
+  middle of a swell gains its flanks lose. Macro Relief is how far past
+  the camera focuses, up to CAMERA_DEFOCUS at 1, the projector's own reach
+  at either end of Focus. It replaced a lamp lowered over the plate, which
+  lit one side of every swell; the macroview check asks this shading of
+  every look (smooth, 2% of the frame or more).
+*/
+const CAMERA_DEFOCUS: f32 = 0.75;
+fn camShadow(lapK: f32, relief: f32) -> f32 {
+  return clamp(exp(-relief * CAMERA_DEFOCUS * lapK), 0.2, 2.5);
+}
+/*
+  The bend at a dye surface of normal n, in aperture radii: the slope the
+  projector's optics take from the same field (refractionOptics reads the
+  gradient -n.xy/(0.9 n.z) and bends by 0.35 of it), so a rim the derived
+  path and the plain path draw is the same rim.
+*/
+fn dyeBend(n: vec3f) -> f32 { return 0.35 * length(n.xy) / (0.9 * max(n.z, 1e-3) * DROP_NA); }
+/* An air pocket's wall in water, of slope s: two refractions of 1 - n_water/n_air each. */
+fn airBend(s: f32) -> f32 { return 2.0 * N_WATER * (N_WATER / N_AIR - 1.0) * s / DROP_NA; }
+
+/*
+  The dye's rim on the paths that do not derive it (the camera's view, and
+  a projector without the derived field): its relief as the edge's share of
+  the light, weighted by Edge Relief as it always was, and by how much dye
+  there is to have a rim.
+*/
+fn meniscus(color: vec3f, n: vec3f, a: f32, isCamera: bool) -> vec3f {
+  let keep = edgePass(dyeBend(n), select(0.0, 1.0, isCamera));
+  return color * mix(1.0, keep, U.edgeRelief * smoothstep(0.02, 0.2, a));
 }
 `;

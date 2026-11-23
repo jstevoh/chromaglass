@@ -43,11 +43,11 @@
  * Software WebGPU cannot answer this (a step costs it seconds): in a cloud
  * session the run is refused rather than passed.
  */
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 
-const PORT = 4361;
+const PORT = port(4361);
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;

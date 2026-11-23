@@ -58,7 +58,11 @@
  * stream key never passes through here: the app's transport is given the
  * key's name and the main process looks it up (desktop/keys.js).
  */
-import { avcCodec, videoBitrate as bitrateFor } from './render';
+import { liveVideoBitrate, liveVideoConfig } from './liveRate';
+import { silenceChunk, SILENCE_CHANNELS, SILENCE_RATE, SILENCE_STEP_MS } from './liveSilence';
+import { fitChunk, fitMatches, makeAudioFit, switchedOffsetUs, SWITCH_FLOOR_US, SWITCH_SLACK_US, type AudioFit } from './liveAudioSwitch';
+import { listenLiveFrames, type LiveFrameKind } from './liveFrame';
+import { drawSongCaption, songCaptionNow } from './songCaption';
 
 export interface LivePacket { kind: 'video' | 'audio'; timestampMs: number; key?: boolean; data: Uint8Array; /** A video packet's encode (an output's id); audio goes to every destination. */ output?: string }
 export interface LiveAudioMeta { codec: 'aac' | 'opus'; sampleRate: number; channels: number; bitrate: number }
@@ -79,6 +83,8 @@ export interface LiveStartRequest { outputs: { id: string; meta: LiveMeta }[]; d
 export interface LiveDestinationHealth {
   name: string; output: string; phase: string; error: string | null; status: string[];
   kbps: number; secondsBehind: number; bytesBehind: number; measuredAt: 'server' | 'socket' | null; dropping: boolean;
+  /** The newest audio timestamp sent less the newest video one, in seconds (null until both): audio stamped or encoded seconds off its video (37x-4g). */
+  avSkewSeconds: number | null;
   videoFrames: number; videoDropped: number; dropRuns: number; audioPackets: number; bytesSent: number; joinSkipped: number;
   acks: number; pings: number; serverAcks: number; reconnects: number; retryInMs: number | null; seconds: number;
 }
@@ -117,6 +123,14 @@ export interface LiveOptions {
   audioCodec?: 'aac' | 'opus';
   /** The encoder hint; unset, `start` probes and chooses (see `probeVideoEncoder`). */
   acceleration?: LiveAcceleration;
+  /**
+   * Where the frames come from. Unset, `canvas` is read when each frame is
+   * due, which a 2D canvas allows (the lab's). Set, the frame task hands
+   * over that kind of picture as it draws it (lib/liveFrame.ts), and
+   * `canvas` gives only its first size: the app's plate is a presented
+   * WebGPU canvas, black when read on the stream's own clock (37x-4d-6).
+   */
+  frames?: LiveFrameKind;
 }
 
 export type LiveAcceleration = 'no-preference' | 'prefer-hardware' | 'prefer-software';
@@ -150,11 +164,16 @@ export interface LiveState {
   audioPackets: number;
   audioCodec: 'aac' | 'opus' | null;
   audioClock: 'track' | 'arrival' | null;
+  /** Sound sources changed on air (`setAudio`, 37x-4f-2), and whether the one now read was resampled to the encoder's rate. */
+  audioSwitches: number;
+  audioResampled: boolean;
   timing: { grabMs: number; firstOutMs: number | null; firstEncodeAt: number; outputs: number };
   /** The hint the video encoders were configured with, and what the probes read before it was chosen. */
   acceleration: LiveAcceleration | null;
   probes: LiveProbe[];
   encodeQueue: number;
+  /** Packets waiting in the audio encoder: it is fed every chunk and never skips, so a count that climbs is audio falling behind its video (37x-4g). */
+  audioQueue: number;
   outputs: LiveOutputState[];
   transport: LiveTransportState | null;
 }
@@ -203,8 +222,7 @@ export async function liveAudioCodec(sampleRate: number, channels: number, bitra
 export async function probeVideoEncoder(width: number, height: number, fps: number, acceleration: LiveAcceleration, frames = 24, source: 'canvas' | 'buffer' = 'canvas'): Promise<LiveProbe> {
   const out: LiveProbe = { acceleration, source, supported: false, outputs: 0, firstOutMs: null, msAFrame: null, makeMs: 0, error: null };
   if (!liveSupport()) { out.error = 'no WebCodecs'; return out; }
-  const codec = avcCodec(width, height, fps);
-  const cfg = { codec, width, height, framerate: fps, bitrate: bitrateFor(codec, width, height, fps), bitrateMode: 'constant', latencyMode: 'realtime', hardwareAcceleration: acceleration, avc: { format: 'avc' } } as VideoEncoderConfig;
+  const cfg = liveVideoConfig(width, height, fps, liveVideoBitrate(width, height, fps), acceleration);
   let enc: VideoEncoder | null = null;
   try {
     const s = await VideoEncoder.isConfigSupported(cfg);
@@ -322,6 +340,9 @@ export function liveCrop(cw: number, ch: number, w: number, h: number, fit: 'cov
   return { sx: (cw - sw) / 2, sy: (ch - sh) / 2, sw, sh, dx: 0, dy: 0, dw: w, dh: h };
 }
 
+/** How long `start` waits for the frame task's first picture before it starts the clock anyway (see `start`). */
+const FIRST_PICTURE_WAIT_MS = 500;
+
 export class LiveEncoder {
   readonly opts: LiveOptions;
   private outs: VideoOut[] = [];
@@ -336,6 +357,24 @@ export class LiveEncoder {
   private audioBaseMs = 0;
   private audioCodec: 'aac' | 'opus' | null = null;
   private audioDescribed = false;
+  /** Where the encoded audio ends, on the AudioData clock, and its rate and channels: what silence continues from (lib/liveSilence.ts). */
+  private audioEndUs = 0;
+  private audioRate = 0;
+  private audioChannels = 0;
+  private silenceTimer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * The source changed on air (`setAudio`, lib/liveAudioSwitch.ts): which
+   * track is read now, a count that retires the reader of the one before,
+   * and, for a track that came after Go, how its sound is fitted to the
+   * encoder and placed on the stream's clock (the offset is set by its
+   * first chunk). `pendingAudio` is a change asked for while starting.
+   */
+  private sourceTrack: string | null = null;
+  private audioGen = 0;
+  private switched: { fit: AudioFit | null; offsetUs: number; placed: boolean } | null = null;
+  private pendingAudio: MediaStream | null | undefined = undefined;
+  private audioSwitches = 0;
+  private audioResampled = false;
   private transportState: LiveTransportState | null = null;
   private audioPackets = 0;
   /** For the checks: the first output's ms spent making frames, ms from its first encode to its first packet out, packets out. */
@@ -345,6 +384,22 @@ export class LiveEncoder {
   private phase: LiveState['phase'] = 'idle';
   private error: string | null = null;
   private stopping = false;
+  /**
+   * With `frames`: the frame task copies the next picture only when a frame
+   * has gone out since the last. `start` waits for the first copy before the
+   * clock starts; a page whose plate never draws (the panel's check, on a
+   * machine with no WebGPU) starts after half a second with the stage black
+   * and still makes a stream, its first frame a keyframe, as it always has.
+   * Black then is the truth about the plate, not the bug: once a picture has
+   * come, the stage keeps it until the next copy, and a plate slower than
+   * the stream is repeated, never blacked out. The copy is the first plate
+   * frame after a stream frame went out, not the last before the next: at
+   * sixty and thirty that is up to one plate frame (17 ms) older than the
+   * stream frame's stamp, well inside what a viewer's player smooths over,
+   * for half the copies a copy on every frame would cost.
+   */
+  private want = true;
+  private unlisten: (() => void) | null = null;
 
   constructor(opts: LiveOptions) {
     this.opts = opts;
@@ -354,11 +409,13 @@ export class LiveEncoder {
     for (const [i, o] of specs.entries()) {
       if (ids.has(o.id)) throw new Error(`two outputs named "${o.id}"`);
       ids.add(o.id);
-      const codec = avcCodec(o.width, o.height, fps);
-      const videoBitrate = o.videoBitrate ?? (i === 0 ? opts.videoBitrate : undefined) ?? bitrateFor(codec, o.width, o.height, fps);
+      // The stream's own rate (liveRate.ts, 37x-4h), not the song film's: a stream is
+      // compressed again by every platform, and its first pass is all the
+      // detail the second has to work from.
+      const videoBitrate = o.videoBitrate ?? (i === 0 ? opts.videoBitrate : undefined) ?? liveVideoBitrate(o.width, o.height, fps);
       this.outs.push({
         spec: { id: o.id, width: o.width, height: o.height, fit: o.fit ?? 'cover', videoBitrate },
-        cfg: { codec, width: o.width, height: o.height, framerate: fps, bitrate: videoBitrate, bitrateMode: 'constant', latencyMode: 'realtime', avc: { format: 'avc' } } as VideoEncoderConfig,
+        cfg: liveVideoConfig(o.width, o.height, fps, videoBitrate),
         encoder: null, lastKeyBucket: -1, described: false, counts: { frames: 0, skipped: 0, keyframes: 0 }, stage: null, stageCtx: null,
       });
     }
@@ -375,10 +432,13 @@ export class LiveEncoder {
       audioPackets: this.audioPackets,
       audioCodec: this.audioCodec,
       audioClock: this.audioClock,
+      audioSwitches: this.audioSwitches,
+      audioResampled: this.audioResampled,
       timing: { ...this.timing },
       acceleration: this.acceleration,
       probes: this.probes,
       encodeQueue: first.encoder?.encodeQueueSize ?? 0,
+      audioQueue: this.audio?.encodeQueueSize ?? 0,
       outputs: this.outs.map((o) => ({ ...o.spec, ...o.counts, encodeQueue: o.encoder?.encodeQueueSize ?? 0 })),
       transport: this.transportState,
     };
@@ -401,6 +461,7 @@ export class LiveEncoder {
         const Processor = (globalThis as unknown as { MediaStreamTrackProcessor?: new (init: { track: MediaStreamTrack }) => { readable: ReadableStream<AudioData> } }).MediaStreamTrackProcessor;
         if (!Processor) throw new Error('this browser cannot read the audio track (no MediaStreamTrackProcessor)');
         this.reader = new Processor({ track }).readable.getReader();
+        this.sourceTrack = track.id;
         const r = await this.reader.read();
         if (r.done || !r.value) throw new Error('the audio track ended before the stream began');
         first = r.value;
@@ -410,7 +471,14 @@ export class LiveEncoder {
         if (!codec) throw new Error(`no audio encoder for ${channels} channels at ${first.sampleRate} Hz`);
         this.audioCodec = codec;
         audioMeta = { codec, sampleRate: first.sampleRate, channels, bitrate: audioBitrate };
+      } else {
+        // No sound source: the stream still carries an audio track, of silence, since YouTube shows nothing of a stream without one (lib/liveSilence.ts).
+        const codec = await liveAudioCodec(SILENCE_RATE, SILENCE_CHANNELS, audioBitrate, this.opts.audioCodec);
+        if (!codec) throw new Error(`no audio encoder for the silent track (${SILENCE_CHANNELS} channels at ${SILENCE_RATE} Hz)`);
+        this.audioCodec = codec;
+        audioMeta = { codec, sampleRate: SILENCE_RATE, channels: SILENCE_CHANNELS, bitrate: audioBitrate };
       }
+      if (audioMeta) { this.audioRate = audioMeta.sampleRate; this.audioChannels = audioMeta.channels; }
       // The hint is chosen on the first output's size (the largest, in the usual show) and used for all of them.
       const lead = this.outs[0].spec;
       if (this.opts.acceleration) this.acceleration = this.opts.acceleration;
@@ -426,6 +494,23 @@ export class LiveEncoder {
       this.transportState = started.state ?? null;
       if (!started.ok) throw new Error(started.error ?? 'the server refused the stream');
 
+      /*
+        The first picture before the clock starts. Started at once, the
+        first frame, a keyframe at t = 0, went out of a stage the frame task
+        had not drawn yet: black, and on CI's Mac the moving line of
+        `npm run liveshow -- --stack` decoded from that keyframe and found
+        no film in its first frame. At sixty a second the wait is a frame;
+        a page whose plate never draws (no WebGPU) gives up after half a
+        second and starts black, as before.
+      */
+      if (this.opts.frames) {
+        let first: () => void = () => {};
+        const came = new Promise<void>((res) => { first = res; });
+        this.unlisten = listenLiveFrames(this.opts.frames, (c) => { if (this.take(c)) first(); });
+        await Promise.race([came, new Promise<void>((res) => setTimeout(res, FIRST_PICTURE_WAIT_MS))]);
+      }
+      // Stopped while it waited: `stop` has torn down what there was.
+      if (this.phase !== 'starting') return;
       this.t0 = performance.now();
       for (const o of this.outs) {
         o.encoder = new VideoEncoder({
@@ -434,7 +519,7 @@ export class LiveEncoder {
         });
         o.encoder.configure(o.cfg);
       }
-      if (first && audioMeta) {
+      if (audioMeta) {
         this.audio = new AudioEncoder({
           output: (chunk, m) => this.onAudio(chunk, m),
           error: (e) => this.fail(e),
@@ -443,6 +528,15 @@ export class LiveEncoder {
       }
       this.phase = 'live';
       if (first) { this.takeAudio(first, firstReadAt); void this.pumpAudio(); }
+      else if (audioMeta) {
+        this.audioClock = 'track';
+        this.audioOriginUs = this.t0 * 1000;
+        this.audioBaseMs = 0;
+        this.audioEndUs = this.audioOriginUs;
+        this.startSilence();
+      }
+      // A source changed while the stream was connecting: read it from the start.
+      if (this.pendingAudio !== undefined) { const p = this.pendingAudio; this.pendingAudio = undefined; this.setAudio(p); }
       this.tick(0);
     } catch (e) {
       this.fail(e);
@@ -453,7 +547,7 @@ export class LiveEncoder {
   /** The frame timer: the next frame at t0 + n/fps, for every output; late ones skipped, never queued. */
   private tick(n: number): void {
     if (this.phase !== 'live') return;
-    const { fps, canvas, keySeconds = 2 } = this.opts;
+    const { fps, canvas, keySeconds = 2, frames } = this.opts;
     const frameMs = 1000 / fps;
     const now = performance.now() - this.t0;
     // n is the frame due now; if more than one is due, the ones between are skipped.
@@ -468,7 +562,7 @@ export class LiveEncoder {
       let frame: VideoFrame | null = null;
       try {
         const t = performance.now();
-        frame = new VideoFrame(this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
+        frame = new VideoFrame(frames ? this.stageOf(o) : this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
         if (i === 0 && o.counts.frames === 0) this.timing.firstEncodeAt = t;
         o.encoder.encode(frame, { keyFrame });
         if (i === 0) this.timing.grabMs += performance.now() - t;
@@ -481,25 +575,68 @@ export class LiveEncoder {
         frame?.close();
       }
     }
+    this.want = true;
     const next = this.t0 + (due + 1) * frameMs;
     this.timer = setTimeout(() => this.tick(due + 1), Math.max(0, next - performance.now()));
   }
 
+  /**
+   * The frame task's picture, copied onto every output's stage while it can
+   * still be read (lib/liveFrame.ts), once for each frame the clock has sent
+   * since: the plate draws at the display's rate and the stream takes 30.
+   * Copied even at the output's own size, unlike `staged`: the canvas
+   * itself is unreadable by the time the frame is due.
+   */
+  private take(canvas: HTMLCanvasElement | OffscreenCanvas): boolean {
+    if (!this.want || (this.phase !== 'live' && this.phase !== 'starting')) return false;
+    const t = performance.now();
+    for (const o of this.outs) this.stage(canvas, o);
+    this.timing.grabMs += performance.now() - t;
+    this.want = false;
+    return true;
+  }
+
   /** The canvas drawn at the output's size and shape (see `VideoOut.stage`); the canvas itself when it already is both. */
   private staged(canvas: HTMLCanvasElement, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
-    const { width, height, fit } = o.spec;
-    if (canvas.width === width && canvas.height === height) return canvas;
+    const { width, height } = o.spec;
+    // A song's caption up (lib/songCaption.ts) is drawn on the stage, so the canvas itself will not do while one shows.
+    if (canvas.width === width && canvas.height === height && !songCaptionNow()) return canvas;
+    return this.stage(canvas, o);
+  }
+
+  /** The output's staging canvas, made black at its size the first time. */
+  private stageOf(o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height } = o.spec;
     if (!o.stage) {
       o.stage = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
       o.stageCtx = o.stage.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+      if (o.stageCtx) { o.stageCtx.fillStyle = '#000'; o.stageCtx.fillRect(0, 0, width, height); }
     }
+    return o.stage;
+  }
+
+  private stage(canvas: HTMLCanvasElement | OffscreenCanvas, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height, fit } = o.spec;
+    const stage = this.stageOf(o);
     const ctx = o.stageCtx;
     if (!ctx) throw new Error('no 2D context to stage the stream\'s frames on');
     // Cropped, never stretched: a round dish drawn into another shape would be an oval (37x-4b stretched the window's canvas to 16:9).
     const c = liveCrop(canvas.width, canvas.height, width, height, fit);
     if (fit === 'contain') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); }
     ctx.drawImage(canvas, c.sx, c.sy, c.sw, c.sh, c.dx, c.dy, c.dw, c.dh);
-    return o.stage;
+    /*
+      The song's caption (PLAN 37x-10j), burned in here rather than read off
+      the screen: the screen's card is a canvas over the plate that the
+      frame task never draws, so the stream would carry the plate without
+      it. Drawn on each output at its own size and shape, so the portrait
+      encode's card sits in its own bottom-left corner, not cropped off the
+      landscape's; and after the plate, every time the plate is copied, so
+      it never stacks on itself. Per output and per frame this is four
+      fillText calls on a 2D canvas, under a millisecond.
+    */
+    const cap = songCaptionNow();
+    if (cap) drawSongCaption(ctx, width, height, cap.lines, cap.alpha);
+    return stage;
   }
 
   private onVideo(o: VideoOut, chunk: EncodedVideoChunk, m?: EncodedVideoChunkMetadata): void {
@@ -514,13 +651,101 @@ export class LiveEncoder {
     this.opts.transport.packet({ kind: 'video', output: o.spec.id, timestampMs: chunk.timestamp / 1000, key: chunk.type === 'key', data });
   }
 
-  private async pumpAudio(): Promise<void> {
-    while (this.reader && this.phase === 'live') {
+  /** Reads the current source until it ends, the stream stops, or `setAudio` moves on to another (a newer `gen`). */
+  private async pumpAudio(gen = this.audioGen): Promise<void> {
+    const reader = this.reader;
+    while (reader && this.phase === 'live' && gen === this.audioGen) {
       let r: ReadableStreamReadResult<AudioData>;
-      try { r = await this.reader.read(); } catch (e) { if (this.phase === 'live') this.fail(e); return; }
-      if (r.done) return;
+      try { r = await reader.read(); } catch (e) { if (this.phase === 'live' && gen === this.audioGen) this.fail(e); return; }
+      // Replaced while it waited: its reader was cancelled, and what it was handed is not the stream's.
+      if (gen !== this.audioGen) { r.value?.close(); return; }
+      // The source's track ended on air (switched off mid-set): silence carries the track on from its last sample.
+      if (r.done) { this.switched = null; if (this.phase === 'live') this.startSilence(); return; }
       if (this.phase !== 'live') { r.value.close(); return; }
-      this.takeAudio(r.value);
+      if (this.switched) this.takeSwitched(r.value); else this.takeAudio(r.value);
+    }
+  }
+
+  /**
+   * The show's sound source changed (PLAN.md 37x-4f-2; lib/liveAudioSwitch.ts
+   * says why it is read this way and not mixed in an AudioContext). The old
+   * track's reader is cancelled (its own track is left running: the show
+   * still hears it, and cancelling a processor's readable does not stop the
+   * track, checked in Chromium), silence carries the stream's track on from
+   * where it ends, and the new track, if there is one, is read from its next
+   * chunk, fitted to the encoder's rate and channels and placed on the
+   * stream's clock by `takeSwitched`. The same track again does nothing.
+   * Asked while starting, it waits for the stream to go live; asked when
+   * stopped or failed, nothing.
+   */
+  setAudio(stream: MediaStream | null): void {
+    if (this.phase === 'starting') { this.pendingAudio = stream; return; }
+    if (this.phase !== 'live' || !this.audio) return;
+    const track = stream?.getAudioTracks()[0] ?? null;
+    if ((track?.id ?? null) === this.sourceTrack && (!track || track.readyState === 'live')) return;
+    this.audioGen++;
+    const old = this.reader;
+    this.reader = null;
+    void old?.cancel().catch(() => { /* released */ });
+    this.sourceTrack = track?.id ?? null;
+    this.audioSwitches++;
+    this.audioResampled = false;
+    this.startSilence();
+    const Processor = (globalThis as unknown as { MediaStreamTrackProcessor?: new (init: { track: MediaStreamTrack }) => { readable: ReadableStream<AudioData> } }).MediaStreamTrackProcessor;
+    if (!track || track.readyState !== 'live' || !Processor) { this.switched = null; return; }
+    this.reader = new Processor({ track }).readable.getReader();
+    this.switched = { fit: null, offsetUs: 0, placed: false };
+    void this.pumpAudio(this.audioGen);
+  }
+
+  /** The stream's audio clock now, or at a `performance.now()` (the clock `audioEndUs` and the AudioData stamps are on). */
+  private streamUs(at = performance.now()): number {
+    return this.audioOriginUs + ((at - this.t0) - this.audioBaseMs) * 1000;
+  }
+
+  /**
+   * A chunk of a source that came after Go: placed on the stream's clock,
+   * met exactly where the track has got to on its first chunk (the silence
+   * before it cut back or padded on), then run on end to end and only cut
+   * or padded again if the source's clock wanders past SWITCH_SLACK_US.
+   */
+  private takeSwitched(ad: AudioData): void {
+    const sw = this.switched!;
+    try {
+      const readAt = performance.now();
+      if (!sw.fit || !fitMatches(sw.fit, ad)) {
+        sw.fit = makeAudioFit(ad.sampleRate, ad.numberOfChannels, this.audioRate, this.audioChannels);
+        if (ad.sampleRate !== this.audioRate) this.audioResampled = true;
+        if (!sw.placed) sw.offsetUs = switchedOffsetUs(ad.timestamp, ad.numberOfFrames, ad.sampleRate, readAt, this.streamUs(readAt));
+      }
+      const startUs = ad.timestamp + sw.offsetUs;
+      const lead = startUs - this.audioEndUs;
+      const slack = sw.placed ? SWITCH_SLACK_US : 0;
+      let skip = 0;
+      if (lead > slack) {
+        // A gap before this chunk (the first, or the source fell behind): silence up to where it starts, and the cubic starts afresh.
+        this.fillSilence(startUs);
+        sw.fit = makeAudioFit(ad.sampleRate, ad.numberOfChannels, this.audioRate, this.audioChannels);
+      } else if (lead < -slack) {
+        // Sound for time the track has already carried: cut it.
+        skip = Math.round((-lead * ad.sampleRate) / 1e6);
+        if (skip >= ad.numberOfFrames) return;
+      }
+      // From here the silence is only the floor under the source (`silenceTick`).
+      sw.placed = true;
+      const planes = fitChunk(sw.fit, ad, skip);
+      const m = planes[0]?.length ?? 0;
+      if (!m) return;
+      const data = new Float32Array(m * planes.length);
+      for (const [c, p] of planes.entries()) data.set(p, c * m);
+      const end = this.audioEndUs + (m / this.audioRate) * 1e6;
+      this.takeAudio(new AudioData({ format: 'f32-planar', sampleRate: this.audioRate, numberOfFrames: m, numberOfChannels: planes.length, timestamp: Math.round(this.audioEndUs), data }));
+      // Kept exact here: rounded stamps summed over an hour would drift.
+      this.audioEndUs = end;
+    } catch (e) {
+      this.fail(e);
+    } finally {
+      ad.close();
     }
   }
 
@@ -561,11 +786,45 @@ export class LiveEncoder {
         } else {
           this.audio.encode(ad);
         }
+        this.audioEndUs = ad.timestamp + (ad.numberOfFrames / ad.sampleRate) * 1e6;
       }
     } catch (e) {
       this.fail(e);
     } finally {
       ad.close();
+    }
+  }
+
+  /** Silence from where the audio ends, topped up every SILENCE_STEP_MS until the stream stops. */
+  private startSilence(): void {
+    if (this.silenceTimer || !this.audioRate) return;
+    if (!this.audioEndUs) this.audioEndUs = this.audioOriginUs + ((performance.now() - this.t0) - this.audioBaseMs) * 1000;
+    this.silenceTimer = setInterval(() => this.silenceTick(), SILENCE_STEP_MS);
+  }
+
+  /**
+   * The silence timer's top-up: up to now with no source; under a source
+   * that came after Go, only up to SWITCH_FLOOR_US behind now, a floor that
+   * a source delivering its chunks never meets (they keep the track within
+   * a chunk or two of now) and that keeps the track whole if the source
+   * stalls (its context suspended, its device unplugged without the track
+   * ending). When the source comes back, its chunks for time the floor
+   * carried are cut as any late sound is.
+   */
+  private silenceTick(): void {
+    const now = this.streamUs();
+    this.fillSilence(this.switched?.placed ? now - SWITCH_FLOOR_US : now);
+  }
+
+  /** Silence from where the track ends up to `toUs`: now, unless a switched source asks for the gap before its first chunk. */
+  private fillSilence(toUs = this.streamUs()): void {
+    if (this.phase !== 'live') return;
+    // Now is on the AudioData clock the audio is stamped in ('track': performance.now()'s; 'arrival': the track's own, offset by the base).
+    for (let c = silenceChunk(this.audioEndUs, toUs, this.audioRate, this.audioChannels); c; c = silenceChunk(this.audioEndUs, toUs, this.audioRate, this.audioChannels)) {
+      const end = c.timestamp + (c.numberOfFrames / c.sampleRate) * 1e6;
+      this.takeAudio(c);
+      // Set here as well as in takeAudio, so a chunk it declined cannot hold the loop.
+      this.audioEndUs = end;
     }
   }
 
@@ -606,6 +865,8 @@ export class LiveEncoder {
     if (this.stopping) return;
     this.stopping = true;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this.silenceTimer) { clearInterval(this.silenceTimer); this.silenceTimer = null; }
+    this.unlisten?.(); this.unlisten = null;
     for (const o of this.outs) { try { if (o.encoder && o.encoder.state === 'configured') await o.encoder.flush(); } catch { /* failed already */ } }
     try { if (this.audio && this.audio.state === 'configured') await this.audio.flush(); } catch { /* failed already */ }
     for (const o of this.outs) { try { o.encoder?.close(); } catch { /* closed */ } }
@@ -637,7 +898,7 @@ export interface LiveConsoleOptions {
   width?: number;
   height?: number;
   /** The portrait encode's size, made only when a destination is portrait: 720x1280 unless said (Instagram's and TikTok's). */
-  portrait?: { width?: number; height?: number; fit?: 'cover' | 'contain' };
+  portrait?: { width?: number; height?: number; fit?: 'cover' | 'contain'; videoBitrate?: number };
   fps?: number;
   videoBitrate?: number;
   audioBitrate?: number;
@@ -658,7 +919,7 @@ export function liveConsolePlan(o: LiveConsoleOptions): { outputs: LiveOutputSpe
   if (landscape) outputs.push({ id: 'landscape', width, height, videoBitrate: o.videoBitrate });
   if (portrait) {
     const pw = o.portrait?.width ?? 720, ph = o.portrait?.height ?? Math.round(pw * 16 / 9);
-    outputs.push({ id: 'portrait', width: pw, height: ph, fit: o.portrait?.fit ?? 'cover' });
+    outputs.push({ id: 'portrait', width: pw, height: ph, fit: o.portrait?.fit ?? 'cover', videoBitrate: o.portrait?.videoBitrate });
   }
   const destinations = asked.map((d) => ({ name: d.name ?? d.keyName, url: d.url, keyName: d.keyName, key: d.key, output: d.orientation === 'portrait' ? 'portrait' : 'landscape' }));
   return { outputs, destinations };

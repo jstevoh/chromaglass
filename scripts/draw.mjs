@@ -39,10 +39,10 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
-const PORT = Number(process.env.DRAW_PORT ?? 4197);
+const PORT = port(4197, 'DRAW_PORT');
 const KEY = '4321';
 const BASE = `http://localhost:${PORT}`;
 const HEADED = process.argv.includes('--head');

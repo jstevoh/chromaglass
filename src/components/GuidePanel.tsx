@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { LIT } from './ui';
+import { APP_VERSION } from '../lib/appVersion';
 import {
   X, BookOpen, Play, Layers, Droplets, Palette, Activity, Aperture,
   Zap, Microscope, Projector, Video, Sliders, GitMerge, History, Gauge,
@@ -90,10 +91,10 @@ const SECTIONS: Section[] = [
         </P>
         <H>The first two minutes</H>
         <Rows items={[
-          ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Classic Light Show</Em> preset — slow luminous blobs, the meditative 1960s look.</>],
+          ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Classic Light Show</Em> preset — round cells of oil in a coloured water, lit from below by the lamp: the 1960s clock-glass dish.</>],
           ['2. Give it sound', <>The quickest is <Em>Band</Em>: a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Mic</Em>, <Em>System</Em> and <Em>File</Em> are the real inputs.</>],
           ['3. Pick a preset palette', <>Click the name under the ChromaGlass title. The preset palettes come in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
-          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw (held still on layer 1 it blows a bubble that grows while you hold, its rim breaking into fingers), <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
+          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> is your breath: drag and it runs along the surface the way you dragged, a long plume ahead of your hand that keeps going that way while you hold; press without moving on layer 1 and it is a straw, one round bubble that grows while you hold, <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
         <H>Your first show, in order</H>
         <P>
@@ -199,8 +200,8 @@ const SECTIONS: Section[] = [
           the dilution: the app picks from it evenly, so the inert entries are how a preset
           says <Em>mostly nothing, once in a while something</Em>.{' '}
           <C>water, water, soap</C> is a plate broken open every third dose;{' '}
-          <C>soap, silicone</C> never stops reacting. Classic Light Show is the first,
-          Lacing Run is the second.
+          <C>soap, silicone</C> (Acid Trip's) never stops reacting. Classic Light Show
+          pours <C>oil, water, oil</C>, the two that will not mix.
         </P>
         <P>
           A show that runs itself adds liquid for hours and pours none of it out, so each
@@ -304,7 +305,7 @@ const SECTIONS: Section[] = [
           ['Bubbles', <>Air between the plates. A bubble is not drawn over the dye — it is a standing squeeze on its own footprint, so the dye pumps out to its rim and the field flows round it.</>],
           ['Plate Rock', <>A hand tipping the dish with the music: one way on the one, back on three, the axis turning a little each time. The heavier colour runs downhill through the clear liquid each way. It never jolts on the kick; that is Beat Squeeze and Kick Bloom.</>],
           ['Beat Squeeze', <>Each kick presses a thin sheet laid on the liquid where the kick lands. The dent is as wide as the sheet bends over the liquid while it is held: wide on a thin oil, a fingertip on syrup. Let go, the colour runs back in, fingering where Fingering is up. On a look that may move the frame (Frame Sway) it is the whole glass pressed instead.</>],
-          ['Slosh', <>Tip the plate one way and then back (Gravity and Tilt Direction, or the phone's tilt) and the liquid piles to the low side, runs back past the middle and mixes. Only your hand drives it, never the sound; thin liquid rings, thick liquid creeps.</>],
+          ['Slosh', <>Tip the plate one way and then back (the Tip pad beside the tools, Gravity and Tilt Direction, or the phone's tilt) and the liquid piles to the low side, runs back past the middle and mixes. Only your hand drives it, never the sound; thin liquid rings, thick liquid creeps.</>],
           ['Boundary Glow', <>A bright line where two distinct dyes meet — the oil-water interface, without a multi-fluid solve.</>],
           ['Saturation / Glossiness / Post Blur', <>The final grade. Glossiness steepens the liquid's surface as the lens sees it: zero is the real surface, and up from there its slopes bend more of the lamp out of the lens, so ripples and edges darken. Lit from beneath, nothing on the plate shines.</>],
         ]} />
@@ -346,7 +347,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Plate Pressure', <>A standing radial spread from the middle, as if the glass were slightly bowed.</>],
           ['Glass Smear', <>Slow wandering of the whole field, the way a plate on a warm projector drifts.</>],
-          ['Rain Drip', <>Occasional downward streaks.</>],
+          ['Rain Drip', <>Heavy colour runs downhill in streaks, as far as the plate is tipped (Gravity). Flat, nothing runs.</>],
           ['Fingering', <>Settings → Show. With it up, a press does not thin evenly: the film thins more along a ring of spokes and the outflow follows them, so the front breaks into radial fingers instead of a smooth ring. The physics is Saffman–Taylor — thin liquid shooting through thick.</>],
         ]} />
         <H>Heat and polarity</H>
@@ -385,7 +386,7 @@ const SECTIONS: Section[] = [
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
           ['Music Sync', <>The camera cuts on kicks. Its punch on the bass, push with the energy and tremor from the treble are the frame moving with the music, so they ride Frame Sway (Show), which is 0 unless you turn it up.</>],
           ['Paint Cells / Cell Size', <>Opt-in, off by default: synthesised cells at magnification, the rings a pour painting makes. No shipped look turns them on.</>],
-          ['Macro Lacing / Edge Detail / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Edge Detail is the fine boundary structure, and Relief the apparent thickness of the film, which is always on.</>],
+          ['Macro Lacing / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Relief is the apparent thickness of the film, which is always on.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],
         ]} />
         <Note>
@@ -469,7 +470,7 @@ const SECTIONS: Section[] = [
           ['MIDI', <>Plug the controller in and click the <Em>MIDI</Em> dot in the header, or open Settings → Inputs → Controller: if we recognise the port, its factory map is one button. Factory maps for APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad and Launch Control XL, or teach yours: choose what a control should do, then touch it. Soft takeover, endless encoders and LED feedback. The panel draws your controller to scale, which doubles as a printable cheat sheet. Maps save as <C>.chromaglass-midi.json</C>.</>],
           ['Game controller', <>Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons fire the one-shots.</>],
           ['Phone / iPad', <>A projectionist's pad: drag to blow, tap to drop, pick a dye, pick which plate you are working, tilt the device to rock the plate. On an iPad it is two columns — the pad on the left, the dials and sequencer on the right. A pen's pressure sets how much dye and its lean sets which way the air goes.</>],
-          ['OSC', <>Addresses like <C>/chromaglass/dye</C> for a lighting desk or a laptop running a show-control app.</>],
+          ['OSC', <>Addresses like <C>/chromaglass/preset galaxy</C> or <C>/chromaglass/setting/dimmer 0.5</C> for Resolume, TouchDesigner, a lighting desk or a laptop running a show-control app, on UDP port 9000 (Pro; the Mac app's Show → OSC input turns it on). Every address, with a starter Resolume map and a TouchDesigner script: <C>docs/osc.md</C> on ChromaGlass's GitHub.</>],
         ]} />
         <H>The show over time</H>
         <Rows items={[
@@ -494,7 +495,7 @@ const SECTIONS: Section[] = [
         <H>The keyboard</H>
         <Rows items={[
           ['B', <>Blackout — fades the plate down and back. The panic button, and the one to leave your hand near.</>],
-          ['+ / −', <>Macro zoom, 1× to 16×. <C>+</C> with the closeup off turns it on gently at 2×; <C>−</C> never turns it off.</>],
+          ['+ / −', <>Macro zoom, 1× to 16×, the closeup's one control. <C>+</C> from the plate comes in gently; <C>−</C> down to 1× is the whole plate again.</>],
           ['[ / ]', <>Less or more of the tool in hand: the dye a drop lays, the pressure of a press, the wind, the drag, the magnet's pull. Each tool keeps its own <Em>Amount</Em>; 1× is the usual.</>],
           ['Alt-drag', <>In the closeup, pans the camera; <C>Alt</C>-click fixes it on the spot under the pointer. <Em>Hold</Em>, <Em>Follow</Em> and <Em>Auto</Em> on the zoom chip say who moves it.</>],
           ['?', <>This manual.</>],
@@ -506,8 +507,9 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Second display</Em> opens a window on a projector that mirrors this canvas pixel
           for pixel — one render, at the projector's own resolution, with the laptop
-          keeping the controls. <Em>Network display</Em> gives an address any browser on the
-          same Wi-Fi can open. <Em>Chromecast</Em> uses Chrome's own picker.
+          keeping the controls. <Em>Network display</Em> gives an https address any browser on
+          the same Wi-Fi can open; its browser warns once that the connection is not private
+          (Advanced, then Proceed), since the GPU runs only on a secure page. <Em>Chromecast</Em> uses Chrome's own picker.
         </P>
       </>
     ),
@@ -833,7 +835,8 @@ export function GuidePanel({ focus = null, onClose }: GuidePanelProps) {
             <h2 className="text-lg font-bold tracking-tighter flex items-center gap-2">
               <BookOpen size={17} /> About ChromaGlass
             </h2>
-            <p className="text-[10px] uppercase tracking-[0.25em] opacity-30 mt-0.5">The manual</p>
+            {/* Which build this is, by the release's name (lib/appVersion.ts): the one place a performer reads it on the web and the phone, as the Mac app's About box is on the Mac. */}
+            <p className="text-[10px] uppercase tracking-[0.25em] opacity-30 mt-0.5">The manual · <span data-testid="guide-version">{APP_VERSION}</span></p>
           </div>
           <button
             onClick={onClose}

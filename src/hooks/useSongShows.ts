@@ -3,7 +3,7 @@ import type { SongMap, TrackIdentity } from '../lib/musicTypes';
 import { songRefFromTrack, songLabel } from '../lib/songRef';
 import { songDuration } from '../lib/songScore';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
-import { dueActions, describeWhat, describeWhen, sectionsAt, showFor, type FiredState, type SongAction, type SongClock, type SongShow } from '../lib/songShows';
+import { SONG_SHOW_TICK_MS, songShowTime, dueActions, describeWhat, describeWhen, sectionsAt, showFor, type FiredState, type SongAction, type SongClock, type SongShow } from '../lib/songShows';
 
 /**
  * Runs a song's show while the song plays (see lib/songShows.ts).
@@ -53,6 +53,8 @@ interface Args {
   follow: boolean;
   track: TrackIdentity | null;
   positionSec: number;
+  /** The song's position read at the call (useMusicIntelligence's `positionNow`); `positionSec` when absent. */
+  positionNow?: () => number;
   songMap: SongMap | null;
   isActive: boolean;
   /** Kicks since the plate started. */
@@ -127,8 +129,27 @@ export function useSongShows(a: Args): SongShowRuntime {
     if (run && !run.manual && run.trackIsrc !== (a.track?.isrc ?? null)) stop();
   }, [a.track?.isrc, stop]);
 
-  // The clock: ten times a second is finer than any action needs.
+  /*
+    The clock: every frame. It was ten times a second ("finer than any action
+    needs"), reading a position set twice a second, so a section's action
+    fired up to 0.6 s after the section began. That was fine for a zoom
+    gliding over three seconds and not for a pour on the drop (PLAN 44f),
+    which is a hit: it has to land on the frame the drop starts. A tick is a
+    find, a filter and the scheduler over one song's actions, well under a
+    tenth of a millisecond.
+
+    And only while a show runs. At ten a second an idle timer cost nothing
+    worth counting; at sixty, on every page whether or not any song has a
+    show, it is sixty tasks a second on the main thread that the frame loop,
+    the ear and the recorder share, for nothing. The Mac's checks that time
+    the page (the live stream's clicks, the ear behind the wall) went red on
+    the first run with the idle one, on a starved runner; that may not have
+    been this timer, but there is no reason to keep it, so the effect waits
+    for a show to begin and the timer goes when the show stops.
+  */
+  const running = status.showId !== null;
   useEffect(() => {
+    if (!running) return;
     const timer = showInterval(() => {
       const run = runRef.current;
       const x = argsRef.current;
@@ -138,7 +159,7 @@ export function useSongShows(a: Args): SongShowRuntime {
       if (!found) { stop(); return; }
       const current = skipRef.current.size ? { ...found, actions: found.actions.filter((act) => !skipRef.current.has(act.what.do)) } : found;
       run.show = current;
-      const t = run.manual ? (showNow() - run.startedAt) / 1000 : Math.max(0, x.positionSec);
+      const t = songShowTime(run, showNow(), x.positionSec, x.positionNow);
       const duration = songDuration(durationRef.current, x.track?.durationSec, current.song.durationSec, x.songMap?.durationSec);
       const clock: SongClock = {
         t, duration,
@@ -153,9 +174,9 @@ export function useSongShows(a: Args): SongShowRuntime {
       if (run.manual && duration !== null && t > duration + 2) { stop(); return; }
       setStatus((s) => (s.showId === current.id && Math.floor(s.t) === Math.floor(t) && s.last === run.last ? s
         : { showId: current.id, song: songLabel(current.song), t, manual: run.manual, last: run.last }));
-    }, 100, 'song-show');
+    }, SONG_SHOW_TICK_MS, 'song-show');
     return () => clearShowInterval(timer);
-  }, [stop]);
+  }, [stop, running]);
 
   return { status, start, stop, keepLook };
 }

@@ -16,7 +16,7 @@ import { lookOf } from '../lib/lookFade';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
 import {
   ShowSequence, ShowStage, SequencerStatus,
-  builtInSequences, loadUserSequences, SEQUENCES_KEY, saveUserSequences, lerpSettings,
+  builtInSequences, loadUserSequences, SEQUENCES_KEY, saveUserSequences, lerpSettings, stageAtOffset, stageCloseup,
 } from '../lib/sequencer';
 import { useCloudSyncReload } from '../lib/cloudSyncApp';
 import {
@@ -175,7 +175,8 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     // the stage's own settings over it. A stage with no look is a set of
     // changes to the one already playing, and glides only those.
     const target: Partial<VisualizerSettings> = { ...(preset ? lookOf(preset.settings) : {}), ...(stage.settings ?? {}) };
-    if (stage.macro !== undefined) target.macroMode = stage.macro;
+    // Closeup on or off glides the zoom, the closeup's one control (PLAN QA-32c).
+    if (stage.macro !== undefined) stageCloseup(target, stage.macro);
     const current = a.getSettings();
     const from: Partial<VisualizerSettings> = {};
     for (const key of Object.keys(target) as (keyof VisualizerSettings)[]) (from as Record<string, unknown>)[key] = current[key];
@@ -268,15 +269,7 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     setSelectedId(sequenceId);
     if (runRef.current && runRef.current.sequenceId !== seq.id) releasePacing();
     holdPacing(seq);
-    const total = seq.stages.reduce((t, st) => t + Math.max(1, st.seconds), 0);
-    let off = Math.max(0, offsetSec);
-    if (seq.loop && total > 0) off = off % total;
-    let index = 0;
-    for (; index < seq.stages.length - 1; index++) {
-      const len = Math.max(1, seq.stages[index].seconds);
-      if (off < len) break;
-      off -= len;
-    }
+    const { index, into: off } = stageAtOffset(seq.stages, offsetSec, seq.loop);
     enterStage(seq, index);
     const run = runRef.current;
     if (run) {

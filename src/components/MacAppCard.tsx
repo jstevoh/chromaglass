@@ -53,6 +53,25 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
       {row.kind === 'in-app' && (
         <>
           <p className="mt-1 text-[13px] text-text" data-cg-mac-update={state?.status ?? 'off'} aria-live="polite">{row.line}</p>
+          {/*
+            Install Updates Automatically (13-update-auto), the menu's tick
+            too: on, a new version downloads by itself and installs when the
+            app quits; off, it is only announced, and installs when the
+            performer presses Install. Hidden in an app one release older,
+            whose preload has no switch to call.
+          */}
+          {updates?.setAuto && state?.signed && state.status !== 'off' && (
+            <label className="mt-2 flex min-h-10 pointer-coarse:min-h-12 cursor-pointer items-center justify-between gap-3 text-[13px] text-text-2">
+              <span>Install updates automatically</span>
+              <input
+                type="checkbox"
+                data-cg-mac-update-auto=""
+                className="h-4 w-4 accent-accent"
+                checked={state.auto !== false}
+                onChange={(e) => { updates.setAuto?.(e.currentTarget.checked).then(setState).catch(() => {}); }}
+              />
+            </label>
+          )}
           {row.button && (
             <button
               type="button"

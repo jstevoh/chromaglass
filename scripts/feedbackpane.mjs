@@ -26,10 +26,10 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { coveredControls } from './layoutProbe.mjs';
 
-const PORT = Number(process.env.FEEDBACK_PORT ?? 4187);
+const PORT = port(4187, 'FEEDBACK_PORT');
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`;
 
 const results = [];

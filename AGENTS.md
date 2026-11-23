@@ -2,7 +2,8 @@
 
 `CLAUDE.md` holds this repo's rules for every agent, whatever tool runs it. Read it
 first. It says how work is done, what to read in the plan (`PLAN.md`, the index, and one section under `docs/plan/`)
-and how PRs ship.
+and how PRs ship. Per-area rules live in `.agents/rules/` (generated from `.claude/rules/`
+by `npm run rules`): read the one for the files you touch.
 
 If you are not Claude Code, read `docs/handoff.md` next. It covers how to claim work
 alongside Claude Code sessions, the handoff block every PR body carries, and what to do
@@ -31,3 +32,30 @@ Never deploy by hand: deploys come only from `main` through CI.
 
 Never commit keys or secrets: they go in repo or Worker secrets, by name only. If one is
 already committed, say so on the PR and stop.
+
+## Small PRs, and say which commit
+
+Details in `docs/handoff.md` ("Who takes what", "Small and short-lived", "Ready, review,
+merge"):
+
+- One plan item per PR, under about 400 changed lines, opened, green and reviewed within
+  a day. Merge `main` in once, as the last push before review, not on every new commit
+  to `main`.
+- The PR body's handoff block starts `Plan item: <id>`, and its `Review owed:` line starts
+  `before-merge` or `none`. Since 2026-11-15 only sign-in, keys, payments, licences, the
+  Workers and security changes owe a review (`before-merge`, with the `review-owed` label
+  when you open the PR); everything else is `none` and merges as soon as it is green.
+- Build what has a number to hit: UI with its phone version, presets, settings, GPU and
+  shader tuning, and physics only from a Claude brief whose check is red on `main`. Never
+  write, loosen or move a check yourself, and leave sign-in, keys, payments, Workers, the
+  deploy and CI to Claude Code.
+- After a second `CHANGES` on the same PR, label it `handoff` and stop: Claude Code
+  finishes it on your branch.
+- Your summary comment at the end of each run starts `Pushed #<n> <item> head <sha>`.
+- Never post a `READY` line or add `ready-for-review` yourself: when `Checks` goes green
+  on the head, `ready.yml` adds the label and comments `READY #<n> <item> head <sha>`.
+  A review answers `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>` and a numbered
+  list.
+- A PR that owes a review before merge is merged by the Claude reviewer on its `PASS`,
+  pinned to the head it passed; do not merge it yourself. One that owes none you merge
+  with `gh pr merge <n> --squash --match-head-commit <the green head>`.

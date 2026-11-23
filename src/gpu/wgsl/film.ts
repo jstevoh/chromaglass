@@ -58,13 +58,16 @@
  *   a young hole into a slit. That treats the film as having the water's
  *   viscosity; a viscous film (20c) replaces it.
  */
+/** The precursor film the glass keeps wet, as a share of the gap: where a torn film's holes sit (F_HP below), read by its dye (filmDye.ts). */
+export const FILM_PRECURSOR = 0.06;
+
 export function filmKernels(HEAD: string, W: string): Record<string, string> {
   const COMMON = /* wgsl */ `
 // The prototype's numbers, in the film grid's cells and the film's own time
 // (FILM_RATE in src/gpu/fluid.ts turns seconds into it).
 const F_SIGMA: f32 = 100.0;     // the film's surface tension
 const F_K: f32 = 2000.0;        // the disjoining strength: with F_SIGMA, the spinodal spacing (7 cells at h 0.4, 16 at 0.75)
-const F_HP: f32 = 0.06;         // the precursor film the glass keeps wet
+const F_HP: f32 = ${FILM_PRECURSOR};         // the precursor film the glass keeps wet
 const F_FLOOR: f32 = 0.048;     // 0.8 h_p: the floor and the mobility's clip
 const F_WALL: f32 = 150.0;      // the top glass, past F_WALL_AT
 const F_WALL_AT: f32 = 0.9;

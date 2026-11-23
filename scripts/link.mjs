@@ -9,7 +9,7 @@
  * floor; what is held here is much tighter, because a kick a beat late is no
  * use and one twenty milliseconds late is already visible on a wall.
  *
- * Five parts, from the bytes up to real sockets:
+ * Six parts, from the bytes up to real sockets:
  *
  *   1. The bytes. An Alive and a ping written out by hand from the protocol's
  *      layout (header, type, ttl, group, id; then key, size, value entries, all
@@ -31,6 +31,8 @@
  *   5. Real sockets: the show server's `startLink()` and a stand-in Live on
  *      this machine's loopback, which is how Live and the Mac app meet with the
  *      Wi-Fi off.
+ *   6. The same, with the show's interfaces coming up after Link is on: the
+ *      next rescan finds the session (13.5-link-rescan).
  *
  * What none of it can say is that Live itself agrees: the stand-in is written
  * from the same reading of the protocol as the peer. That is the owner's test
@@ -278,6 +280,37 @@ function makeLive({ clock, ghostOffset, send, address, port, bpm }) {
   check('Link on with nobody in the session is not a tempo', t.read(20000)?.source !== 'link' && t.linkStatus.on && t.linkStatus.available);
 }
 
+// ── 3b. Live's play and stop (13.5-link-transport) ────────────────────
+//
+// The tempo source hands back the session's transport as an edge, and only
+// between two readings in a session: a show that joins a stopped Live is
+// not told "stop", and a session that ends is not a stop either. The page
+// (useRemote) pauses a running Sequence on a stop and resumes only one that
+// Link paused, when Play/Stop is on; that wiring is grepped for below.
+
+{
+  const t = new TempoSource();
+  const msg = (playing, on = true, peers = 1) => ({ on, peers, bpm: 120, beat: on ? 3 : null, playing });
+  const edges = [
+    t.linkReading(0, msg(false)),     // joined a stopped Live: nothing
+    t.linkReading(50, msg(false)),
+    t.linkReading(100, msg(true)),    // Live plays
+    t.linkReading(150, msg(true)),
+    t.linkReading(200, msg(false)),   // Live stops
+    t.linkReading(250, msg(false, false, 0)),   // Link off: no edge, forgotten
+    t.linkReading(300, msg(true)),    // back in a playing session: nothing yet
+    t.linkReading(350, msg(false)),
+  ];
+  check('Live\'s play and stop arrive as one edge each, and joining or leaving a session is neither', edges.join(',') === ',,start,,stop,,,stop', edges.map((e) => e ?? '·').join(' '));
+  const { readFileSync } = await import('node:fs');
+  const remote = readFileSync(new URL('../src/app/useRemote.ts', import.meta.url), 'utf8');
+  check('the page pauses a running Sequence on a stop, and resumes only one Link paused and nobody touched since, when asked to',
+    /const edge = t\.linkReading\(performance\.now\(\), message\);/.test(remote) && /if \(edge && t\.linkTransport\) \{/.test(remote)
+    && /if \(edge === 'stop' && seq\.status\.running\) \{ linkPausedRef\.current = true; linkPausedIdRef\.current = seq\.status\.sequenceId; seq\.pause\(\); \}/.test(remote)
+    && /if \(linkPausedRef\.current && \(seq\.status\.running \|\| seq\.status\.sequenceId !== linkPausedIdRef\.current\)\) linkPausedRef\.current = false;/.test(remote)
+    && /else if \(edge === 'start' && linkPausedRef\.current\) \{ linkPausedRef\.current = false; seq\.play\(\); \}/.test(remote));
+}
+
 // ── 4. The beat clock, a frame at a time ──────────────────────────────
 
 {
@@ -329,6 +362,64 @@ function makeLive({ clock, ghostOffset, send, address, port, bpm }) {
   const apart = r.beat === null ? Infinity : Math.abs(r.beat - liveBeat) * 60e3 / 123;
   check('over real sockets, the show server joins a session on this machine', r.peers >= 1, `peers ${r.peers}`);
   check('and reads its tempo and its beat within 2 ms', Math.abs(r.bpm - 123) < 0.001 && apart < 2, `${r.bpm.toFixed(3)} bpm, ${Number.isFinite(apart) ? apart.toFixed(3) : '—'} ms apart`);
+  clearInterval(timer);
+  link.stop();
+  await new Promise((done) => setTimeout(done, 100));
+  sock.close();
+}
+
+// ── 6. An interface that comes up after Link is on ────────────────────
+//
+// PLAN.md 13.5-link-rescan. The interfaces were read once, when Link was
+// switched on, so a Mac that joined the Wi-Fi afterwards stayed on loopback
+// alone until Link was switched off and on. Here the show's list of
+// interfaces starts empty, as a Mac's is with the Wi-Fi off and loopback
+// counted out, and the stand-in Live is already announcing on loopback.
+// Nothing must be found; then loopback "comes up", and the next rescan must
+// find the session with no switching.
+
+{
+  const clock = () => Number(process.hrtime.bigint() / 1000n);
+  const sock = createSocket({ type: 'udp4', reuseAddr: true });
+  await new Promise((done) => sock.bind(0, '127.0.0.1', done));
+  sock.setMulticastInterface('127.0.0.1');
+  sock.setMulticastLoopback(true);
+  const live = makeLive({
+    clock, ghostOffset: -clock() + 7e6, bpm: 97,
+    send: (buf, port, address) => sock.send(buf, port, address),
+    address: '127.0.0.1', port: sock.address().port,
+  });
+  sock.on('message', (buf, rinfo) => live.receive(buf, rinfo));
+  let up = [];
+  const link = startLink({ listInterfaces: () => up, rescanMs: 250, onError: (err) => console.log(`  (link: ${err.message})`) });
+  const timer = setInterval(() => live.alive(), 250);
+  await new Promise((done) => setTimeout(done, 1500));
+  const before = link.reading().peers;
+  up = [{ address: '127.0.0.1', netmask: '255.0.0.0', internal: true }];
+  const cameAt = Date.now();
+  let r = link.reading();
+  while (Date.now() - cameAt < 5000 && !(r.peers > 0 && r.beat !== null)) {
+    await new Promise((done) => setTimeout(done, 100));
+    r = link.reading();
+  }
+  const took = Date.now() - cameAt;
+  check('with no interface up, Link finds nobody', before === 0, `peers ${before}`);
+  check('an interface that comes up later is found on the next rescan, with no switching off and on', r.peers >= 1 && Math.abs(r.bpm - 97) < 0.001,
+    `peers ${r.peers}, ${r.bpm.toFixed(3)} bpm, ${took} ms after it came up`);
+  // And one that goes away mid-session (a Mac leaving the Wi-Fi), its
+  // socket closed by the rescan while Alives and pings are going out, then
+  // back: the server carries on and reads the session again.
+  let threw = null;
+  const onThrow = (err) => { threw = err; };
+  process.on('uncaughtException', onThrow);
+  up = [];
+  await new Promise((done) => setTimeout(done, 800));
+  up = [{ address: '127.0.0.1', netmask: '255.0.0.0', internal: true }];
+  await new Promise((done) => setTimeout(done, 1500));
+  process.off('uncaughtException', onThrow);
+  const again = link.reading();
+  check('an interface that goes away and comes back closes and reopens with nothing thrown, and the session is still read', !threw && again.peers >= 1 && Math.abs(again.bpm - 97) < 0.001,
+    threw ? `threw ${threw.code ?? threw.message}` : `peers ${again.peers}, ${again.bpm.toFixed(3)} bpm`);
   clearInterval(timer);
   link.stop();
   await new Promise((done) => setTimeout(done, 100));

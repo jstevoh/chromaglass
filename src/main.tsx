@@ -4,7 +4,7 @@ import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
 import { SHOW_PATH, isLandingAddress } from './lib/showPath';
-import { macAppLicensed } from './lib/macApp';
+import { macAppLicensed, handoffFromUrl } from './lib/macApp';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
 import { installTitleTips } from './lib/titleTips';
@@ -26,7 +26,10 @@ import {
 installCrashLog();
 
 const params = new URLSearchParams(window.location.search);
-const show = !params.has('remote') && !params.has('cast');
+// A TV at home (PLAN 12-tv): `/tv` on the laptop's show server plays the
+// show's picture as video, with no visualizer and no GPU of its own.
+const tv = /^\/tv\/?$/.test(window.location.pathname);
+const show = !params.has('remote') && !params.has('cast') && !params.has('tvlink') && !tv;
 // The intro `index.html` painted, listened to from here on: a key or a press
 // on it takes it away, and the plate's first frame does (lib/intro.ts).
 installIntro(show);
@@ -35,11 +38,17 @@ installIntro(show);
 // remote and the cast page are for a phone or a wall and keep what they have.
 if (show) installTitleTips(document);
 // The phone loads only the control surface — no visualizer, no solver.
-const Root = params.has('remote')
+const Root = tv
+  ? lazy(() => import('./components/TvDisplay'))
+  : params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))
   : params.has('cast')
     ? lazy(() => import('./components/CastDisplay'))
-    : lazy(() => import('./App'));
+    // The page a TV sends the player to, to link it to their account by a code
+    // (PLAN.md 12-tv-signin). Its own sign-in, no engine.
+    : params.has('tvlink')
+      ? lazy(() => import('./components/phone/TvLink'))
+      : lazy(() => import('./App'));
 
 const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))
@@ -178,15 +187,16 @@ async function startOver(): Promise<boolean> {
  * server also hands the display key only to localhost, so even in a browser
  * told to treat the address as secure that page could not link phones. The
  * way out is the same page at localhost on the same port, said in plain words.
- * A network display at a Wi-Fi address meets the same wall and has no such way
- * out yet (PLAN 14m-https). Null on a secure page, where the failure is something else.
+ * A network display at a Wi-Fi address meets the same wall; its way out is the
+ * https address the show server now prints for it (PLAN 14m-https). Null on a
+ * secure page, where the failure is something else.
  */
 function insecureAddress(): { local: string; cast: boolean } | null {
   if (typeof window === 'undefined' || window.isSecureContext) return null;
   const { hostname, port, search } = window.location;
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') return null;
   // A network display (`?cast=true`) is another machine: its localhost is not
-  // the laptop, so it is told only why, not sent somewhere that is not the show.
+  // the laptop, so it is sent to the https address instead, not to its own localhost.
   return { local: `http://localhost${port ? `:${port}` : ''}/`, cast: new URLSearchParams(search).has('cast') };
 }
 
@@ -229,7 +239,7 @@ class Boot extends Component<{ children: any }, { failed: any; recovering: boole
               <p className="max-w-md text-[13px] leading-relaxed text-white/80" data-testid="boot-insecure">
                 This page was opened at a Wi-Fi address, and browsers run the GPU only on a secure page (https, or the computer's own localhost).{' '}
                 {insecureAddress()!.cast ? (
-                  'A network display cannot start from this address.'
+                  'A network display opens the https address the show server prints instead, and accepts its warning once.'
                 ) : (
                   <>On the laptop running the show, open <a className="font-mono underline" href={insecureAddress()!.local}>{insecureAddress()!.local}</a> instead.</>
                 )}
@@ -260,8 +270,21 @@ function Loading() {
   useEffect(() => { const t = setTimeout(() => setSlow(true), 8000); return () => clearTimeout(t); }, []);
   // The intro sits over this rectangle, so the way out would be under it.
   useEffect(() => { if (slow) introOut('slow'); }, [slow]);
+  /*
+    The mark under it too (the owner, 2026-11-14: "add the logo to the
+    loading screen"): once the intro has gone for a slow download this is
+    what a phone shows, and it was a black rectangle with a line of grey.
+    The intro's own pictures, already in the browser's cache from the first
+    paint, so it costs no download.
+  */
   return (
-    <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
+    <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center" data-testid="app-loading">
+      <div className="relative h-24 w-24" aria-hidden="true">
+        <img src="/intro-burst.svg" alt="" className="absolute inset-0 h-full w-full" />
+        <img src="/intro-hub.svg" alt="" className="absolute" style={{ left: '31.43%', top: '31.43%', width: '37.14%', height: '37.14%' }} />
+      </div>
+      <img src="/intro-name.svg" alt="ChromaGlass" className="h-7 w-auto" />
+      {!slow && <p className="font-mono text-[12px] text-white/60">Loading</p>}
       {slow && (
         <>
           <p className="text-[13px] text-white/50">Still loading. A stale cached copy can do this.</p>
@@ -286,8 +309,12 @@ const orSignIn = () => (hasValidLicenseSync() || isSignedInCached() ? 'app' : 's
  * shell verified at launch is read here, synchronously.
  */
 function PaidGate() {
+  // The browser tab the app's window sent a sign-in to always meets the gate,
+  // which asks for that sign-in (PLAN.md 23.17f). Once one hand-off had left a
+  // key in this browser's storage, the next tab opened a whole second show here
+  // instead, and the window waited for a sign-in nobody was asked for.
   const [phase, setPhase] = useState<'app' | 'verifying-license' | 'gate'>(() =>
-    macAppLicensed() ? 'app' : hasStoredLicenseCandidateSync() ? 'verifying-license' : 'gate');
+    handoffFromUrl() ? 'gate' : macAppLicensed() ? 'app' : hasStoredLicenseCandidateSync() ? 'verifying-license' : 'gate');
   // A key in this browser's storage is checked against its signature before
   // anything is drawn, so a licensed start shows the loading screen for that
   // moment and never the gate (`npm run tiers` 7).

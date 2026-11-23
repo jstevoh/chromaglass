@@ -120,77 +120,24 @@ once the login works (23.14).*
 
 - **23.1** *(owner)*: the merchant account, the Home price ($29–39) and Pro's ($199),
   and the checkout page.
-- **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`,
-  or `?tierGates=1` for checks) that shows each paid feature above as an "In the ChromaGlass
-  app" tile with a link (`src/lib/tierGates.ts`, `SettingsPanel.tsx`, `DeskPanels.tsx`), off
-  in a licensed app and in … Story in `docs/plan-shipped.md` §23.2 (moved 2026-10-29, 19m).
-- **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes
-  an Ed25519-signed `X-ChromaGlass-Key` licence key as well as an allowed origin, and the
-  site's manual tag stays. Story in `docs/plan-shipped.md` §23.3 (moved 2026-10-29, 19m).
-- **23.4** (**shipped**, this PR): the key in the Mac app and show server
-  (`server/license-key.js`, `server/server-license.js`, `server/remote-server.js`,
-  `src/lib/licenseKey.ts`, `desktop/`) Story in `docs/plan-shipped.md` §23.4 (moved
-  2026-10-29, 19m).
-- **23.5** (**shipped**, this PR): the site's Record capped to a 15-second clip (`FREE_RECORD_MAX_SECONDS = 15`)
-  and Render to 720p (`FREE_RENDER_MAX_HEIGHT = 720`), each with a small ChromaGlass corner mark (`useRecorder.ts`, `useSongRender.ts`) the Mixer cannot hide; the app's untouched. *Measure:*
-  `npm run tiers` (11/11): verifies the 15 s cap, 720p cap, and corner mark pixels on recorded frames.
-- **23.6** (**shipped**, this PR): the site's logo layer shows the ChromaGlass
-  mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
-  logo is the app's. *Measure:* `npm run tiers` (11/11).
-- **23.8** (**shipped**, this PR, `desktop/`): Home's listening features. Story in
-  `docs/plan-shipped.md` §23.8 (moved 2026-10-29, 19m).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
-- **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
-  with Google, Apple and the emailed link; authorised domains configured; web config wired into
-  `deploy.yml` via GitHub Actions repository secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`).
-  *(Open console step for the owner: in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client `793087423172-fi7d5oq5tisv3is84vvf8e6dtorighql.apps.googleusercontent.com`, add `https://chromaglass.art/__/auth/handler`, `https://www.chromaglass.art/__/auth/handler`, and `https://chromaglass.web.app/__/auth/handler` under Authorised redirect URIs, then update `VITE_FIREBASE_AUTH_DOMAIN` to `chromaglass.art` so `signInWithRedirect` stays same-domain on iPhone Safari.)*
-- **23.13** (**shipped**, #390 and extended in #394): `public/privacy.html` and `public/terms.html` completed and
-  approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
-  2026-10-24: both pages name who runs ChromaGlass, the owner's California LLC (the terms
-  had named the product itself as the contracting party, which is not a person in law).
 - **23.13-mail** (open, the owner): `support@chromaglass.art`, the contact both pages and
   the terms give, has no mailbox: on 2026-10-24 the domain's DNS (GoDaddy) had no MX
   record, so mail to it bounces. Set up a mail service for the domain and add its MX and
   SPF records; until then the pages promise an address nobody reads.
-- **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the hosted
-  site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro` with Google,
-  Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`: the email,
-  sign out with confirmation … Story in `docs/plan-shipped.md` §23.10 (moved 2026-10-29,
-  19m).
-- **23.10c** (**shipped**, this PR): a way back in, and a profile sheet that reads (the
-  owner, 2026-10-24: signed out while using the app, "there is no way to re-sign in"; "the
-  profile page is garbage"). Story in `docs/plan-shipped.md` §23.10c (moved 2026-10-29,
-  19m).
-- **23.10b** (**shipped**, #430's work, folded into 23.10c's PR): the Profile & Store sheet
-  fits the screen (the owner, 2026-10-22: "a little janky"). Story in `docs/plan-shipped.md`
-  §23.10b (moved 2026-10-29, 19m).
-- **23.11** (**shipped**, this PR): the Mac app with no key asks for the
-  same sign-in once (`LicenseGate.tsx`, `src/main.tsx`), online, then runs as the site does;
-  with a verified Ed25519 key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
-  and signed in, and with none and signed out.
 - **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`); `npm run license-worker`. Story in `docs/plan-shipped.md` §23.12 (moved 2026-10-29, 19m-2).
   **23.12-url** (**shipped**): `deploy.yml` now passes `VITE_FIREBASE_LICENSES_URL` to the build, so a signed-in site pulls its key from the account. Story in `docs/plan-shipped.md` §23.12-url (moved 2026-10-29, 19m-2).
   *Open:* `VITE_FIREBASE_SHOWS_URL`
   is read by `accountShows.ts` and is also not in the build; it falls back to `/account-shows` on the
   same origin, which the hosted site does not serve, so decide with 23.14 where that endpoint lives.
-  **23.12-jwks** (**shipped**, this PR): the Worker fetches Google's published keys for Firebase tokens, and the app asks for the account's key at start and after a sign-in. Story in `docs/plan-shipped.md` §23.12-jwks (moved 2026-10-29, 19m-2).
-  *Owed:* `wrangler deploy` of the licence
-  Worker from the owner's Mac (its config is not in the repo), then confirm `owner-pro-1` is filed
-  under the owner's sign-in email and was signed after the key rotation (the sheet now says so in
-  words when the account holds a key the app cannot verify).
   **23.12-reissue** (open): a key the account holds that was signed by the retired key pair is
   refused by every browser; the Worker could re-sign such records on `GET /keys` with the current
   key (it is the source of truth for what was sold), with a check that a forged token never enters
   KV that way.
   **23.12-orders** (**shipped**, this PR; the security audit of 2026-10-28, findings 5, 6 and 15): the Worker filed a key for whatever Lemon Squeezy sent. Now a Lemon Squeezy order files a key only for a product on `LS_HOME_PRODUCT_IDS`, `LS_PRO_PRODUCT_IDS` or `LS_UPGRADE_PRODUCT_IDS` (the three test-mode ids and the three live ones, 1479217 Home, 1479218 Upgrade, 1479219 Pro, are built in); a product's name no longer decides, and an unknown product used to be a Home key. An order whose status is not `paid` (pending, failed) files nothing. An Upgrade needs an unrevoked Home key under the same email, or it files no Pro key (it used to, at $164 against Pro's $199). `order_refunded` revokes only when the order's status is `refunded`: Lemon Squeezy sends the event for a partial refund too (`partial_refund`), which used to take the whole licence. The paid `order_created` of an order already refunded, delivered again, is held too (a refund leaves `refunded:<order>`; the review of #560). A refused order answers 200 (the store would only retry), is logged, and is kept in KV as `held:<key id>` for the owner. `POST /activate` and `/deactivate` take 60 asks an hour per address (counted before the key is read) and 20 per key, then 429 with `Retry-After` (`ACTIVATE_PER_ADDRESS`, `ACTIVATE_PER_KEY` settings); the counters are KV, so the limit is a brake on a script, not an exact meter. *Measured:* `npm run license-worker` 13a–13d and 14a–14c, 7 of the 44 failing on the Worker before (37/44 with the 34a-4b Worker); the existing 9-lines' fixtures now carry `status: "paid"`, as Lemon Squeezy's do, and the live-id line lists a Home id. *Owed:* the first real order is read in KV (`held:` empty, its key filed): an order for an id on no list is held, not filed; whether Lemon Squeezy sends anything when a pending order is later paid is not known from here, so read `held:` in KV after go-live and re-send a held order from the store's webhook log if it was paid (open). **23.12-seats** (open): the profile sheet lists the Macs holding a key's seats and lets a signed-in owner release one (a Worker route verified with the Firebase token, as `/keys` is), so a dead Mac's seat does not need a hand edit of KV (23.17g's open note); finding 15's second half.
-  **23.12-ids** (**shipped**, this PR): the built-in test-mode Home id was 1450530, but the store's test Home is 1450525 (its dashboard, and its own `order_created` of 2026-10-24, `first_order_item.product_id`), so since 23.12-orders every paid test Home order was held as an unknown product. Now 1450525; the live ids were read from the dashboard the same day (1479217 Home, 1479218 Upgrade, 1479219 Pro) and already matched. `npm run license-worker`, whose orders now carry the store's id: the old Worker 48/50 (9b, 9c held the order), the new 50/50.
   **23.12-secret** (**done**, the owner, 2026-10-30 12:59 PT): on 2026-10-30 the Worker's `WEBHOOK_SECRET` was changed and Lemon Squeezy's test-mode webhook was not: a simulated `order_refunded` from its dashboard was answered 401 three times (`wrangler tail --format json`). The live-mode webhook is a separate one in the store and was not testable (no live orders, and Simulate is test-only). One new secret goes into the Worker and into both webhooks; then a simulated event in test mode must answer 200. Done: one new secret in the Worker and both webhooks; the same simulated `order_refunded` was answered 200 at 1:02 PM PT, the Worker logging that the paid order was left alone. The live webhook holds the same secret but can only be proven by a live order.
   **23.12-rotate** (this PR; the same audit, finding 1): the keys a test-mode order minted verify offline for ever, so the guard in 34a-4b stops new ones only. The plan was to rotate the signing pair before the store sells; the owner chose not to (2026-10-29), because the live KV held three licences, all under his own address (his Pro and two test orders), every key the Worker mints is filed in KV so nobody else holds one, and a rotation would have cost his key, a Mac release and a window of "could not verify". Instead `node scripts/licenserotate.mjs revoke` takes the two test keys out of his list, marks them revoked (so `/activate` refuses them and a Mac asks the account at each online start) and clears their seats, after a backup it reads back; `restore` puts a backup back. The first live `revoke-plan` (2026-10-30) stopped on a 404 for a seat record the key never had: the strict reader that makes a backup trustworthy treats a missing record as an error, so `revokeIds` lists `machines:<id>` first and reads it only if it is there (check 15i reads through a KV that throws on a missing record, as wrangler does). The rotation itself (`generate | plan | apply`, header: the order and the rollback) stays built and tested for the day the private key may have leaked, or before a launch with real keys in KV: it re-signs the keys to keep (`--keep-email`, `--keep-id`) and deletes the rest, and the public half goes into `DEFAULT_PUBLIC_JWK` in `server/license-key.js` and `src/lib/licenseKey.ts`, the song-ID Worker, and with a release the Mac app. A pair made 2026-10-29 sits unused on the owner's Mac. *Measured:* `npm run license-worker` 15a–15i against an in-memory KV (a refused plan changes nothing, an unreadable record stops it, the backup restores, the old token and a test buyer's fail against a new public key, the revoked token is refused). *Open:* rotate if the old private key (a Worker secret) is ever thought to have left it.
-  **23.14-verify** (**shipped**, #467): `server/account-shows.js` now verifies the account token's signature against Google's keys (`server/firebase-token.js`); `npm run accountlink` 1b. Story in `docs/plan-shipped.md` §23.14-verify (moved 2026-10-29, 19m-2).
-- **23.14** (**shipped**, this PR): linking devices by account (`server/account-shows.js`,
-  `src/lib/accountShows.ts`). Story in `docs/plan-shipped.md` §23.14 (moved 2026-10-29,
-  19m).
 - **23.18** (**shipped**, this PR): cloud sync for Pro (`server/cloud-sync.js`, `src/lib/cloudSync.ts`): a Pro account carries its looks, sets, liquids, MIDI map and settings across every signed-in browser and Mac app; `npm run cloudsync`. Story in `docs/plan-shipped.md` §23.18 (moved 2026-10-29, 19m-2).
   **23.18-deploy** (*owner*): `/sync` exists once the licence Worker is deployed by hand from
   the Mac (`npx wrangler deploy`, as for #460); until then a Pro sheet says sync stopped on an
@@ -220,7 +167,6 @@ once the login works (23.14).*
   the next one in the cloud, before the Mac job.
   **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
   (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
-- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (`APPLE_SIGN_IN` in `SignInScreen.tsx`; `npm run signin` line 4). Story in `docs/plan-shipped.md` §23.10d (moved 2026-10-29, 19m-2).
 - **23.10e** (**shipped**, this PR): email and password accounts beside Google and the emailed link (`SignInForm`, `AccountSignInMethods.tsx`; `npm run signin` 17–21), live since the 2026-10-25 deploy. Story in `docs/plan-shipped.md` §23.10e (moved 2026-10-29, 19m-2).
   *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
   Account, Set a password, sign out, sign in with the password, same licence;
@@ -235,12 +181,6 @@ once the login works (23.14).*
   password-strength setting) is not turned on; the form asks for 8 characters, Firebase's own
   floor is 6. **23.10e-4** (open): the iPhone app's sign-in (23.15) needs the same form and the
   keychain's autofill hints.
-  **23.10e-5** (open, from #475's review): `pendingProviderCredential` (Google's credential kept
-  when Firebase refuses a Google sign-in because the email has a password) is attached on the
-  next password sign-in for *any* email. Firebase refuses to link it to another account today
-  (`email-already-in-use`, swallowed), so it is safe by the platform and not by this code; store
-  the error's `customData.email` with the credential and link only when it matches the password
-  sign-in's email.
   **23.10e-6** (open, from #475's review): `signInWithGoogleAddPassword` sets the signed-in flag
   before checking the Google email is the typed one, so choosing the wrong Google account leaves
   the person signed in as it with no plate; check first, or sign out on a mismatch. The same

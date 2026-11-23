@@ -298,6 +298,15 @@
 .ride-slider.is-touch { height: 32px; }
 .ride-slider.is-touch::-webkit-slider-runnable-track { height: 12px; border-radius: 6px; }
 .ride-slider.is-touch::-webkit-slider-thumb { height: 32px; width: 32px; margin-top: -10px; }
+/*
+  The Rides' one-line rows (`Slider dense`, 2026-11-07): 24 px rows, so the
+  input is 24 px too and a row's hit area stops at its neighbour's, with an
+  18 px handle on a 6 px track, still wider than the 12 px value text beside it.
+*/
+.ride-slider.is-dense { height: 24px; }
+.ride-slider.is-dense::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; }
+.ride-slider.is-dense::-webkit-slider-thumb { height: 18px; width: 18px; margin-top: -6px; }
+.ride-slider.is-dense::-moz-range-thumb { height: 18px; width: 18px; }
 .ride-slider:focus-visible::-webkit-slider-thumb {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;

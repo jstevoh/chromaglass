@@ -8,7 +8,32 @@
  * the one table every pass is asked for by name.
  */
 
+import { OPEN_RIM } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
+
+/*
+  The open rim for the mix's own evolution (PLAN 18g-7): which side of it a
+  cell is on, on a thin gap. The rim is open to flow: what the liquid
+  carries over it goes, as the colour does (18g). But the oil's
+  Cahn–Hilliard relaxation is not a flow, it is the oil's own diffusion down
+  its chemical potential, and it read its neighbours past the rim as if the
+  rim were not there: a body against the rim relaxed its edge into the
+  cells past it, and they, with no body of their own, took it. In the lab a
+  lens of radius 0.06 laid against the rim at a hundredth of the looks'
+  tension (\`npm run oillift\`, held by a 6° tilt) lost 6% of its oil over
+  54 s, almost all of it while spread along the rim; with the plate level
+  it lost 1.4%. The dye's diffusion has had the zero-flux condition at the
+  rim since 18g (dyeDisperse): mixMu and mixUpdate take the same, a
+  neighbour across the rim read as the cell itself, so neither ∇c nor ∇μ
+  has a face there and nothing crosses by relaxation. ∇c·n = 0 is
+  Cahn–Hilliard's own natural condition at a wall, and it sets the edge
+  meeting the rim square, the 90° that 18g-8 says the rim has no better
+  number for yet.
+*/
+export const RIM_SIDE = /* wgsl */ `
+fn rimSide(p: vec2i, n: f32) -> bool {
+  return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
+}`;
 
 export const OIL_KERNELS: Record<string, string> = {
   /*
@@ -126,6 +151,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let c = clamp(textureLoad(mixT, p, 0).r, 0.0, 1.0);
   let o = textureLoad(oil, p, 0) * textureLoad(mulT, p, 0).r + max(textureLoad(addT, p, 0), vec4f(0.0)) * c;
+  textureStore(dst, p, select(vec4f(0.0), max(o, vec4f(0.0)), finite4(o)));
+}`,
+
+  /*
+    Oil Bodies: a look's lay, which says which colour is the oil's (PLAN
+    47z-1; inputs.ts foldDye says why). The oil's share takes the lay's oil
+    colour, never more than the frame's dye in that cell nor less than none,
+    and keeps the multiplier as the dye does; the rest of the frame's dye is
+    the water's, by being left out of the share.
+  */
+  bodyLay: `${HEAD}
+@group(0) @binding(2) var oil: texture_2d<f32>;
+@group(0) @binding(3) var addT: texture_2d<f32>;
+@group(0) @binding(4) var mulT: texture_2d<f32>;
+@group(0) @binding(5) var layT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let add = max(textureLoad(addT, p, 0), vec4f(0.0));
+  let o = textureLoad(oil, p, 0) * textureLoad(mulT, p, 0).r + clamp(textureLoad(layT, p, 0), vec4f(0.0), add);
   textureStore(dst, p, select(vec4f(0.0), max(o, vec4f(0.0)), finite4(o)));
 }`,
 
@@ -305,14 +351,19 @@ fn bad(p: vec2i, n: i32) -> vec2f {
   return vec2f(max(c - 1.0, 0.0) + min(c, 0.0), 1.0);
 }
 fn pair(a: f32, b: vec2f) -> f32 { return select(0.0, 0.24 * (a - b.x), b.y > 0.5); }
+${RIM_SIDE}
+// Not across the open rim (RIM_SIDE): the share is the oil's own packing, not a flow.
+fn pairN(a: f32, p: vec2i, e: vec2i, n: i32) -> f32 {
+  return select(pair(a, bad(p + e, n)), 0.0, rimSide(p, f32(n)) != rimSide(p + e, f32(n)));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
   let m = textureLoad(src, p, 0);
   let e = max(m.r - 1.0, 0.0) + min(m.r, 0.0);
-  let out = pair(e, bad(p + vec2i(1, 0), n)) + pair(e, bad(p - vec2i(1, 0), n))
-          + pair(e, bad(p + vec2i(0, 1), n)) + pair(e, bad(p - vec2i(0, 1), n));
+  let out = pairN(e, p, vec2i(1, 0), n) + pairN(e, p, vec2i(-1, 0), n)
+          + pairN(e, p, vec2i(0, 1), n) + pairN(e, p, vec2i(0, -1), n);
   let outVal = vec4f(m.r - out, m.gba);
   textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
 }`,
@@ -334,25 +385,43 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     front and nothing is made or lost. The milk-and-soap burst, and the
     fronts a drop of detergent sends across a plate.
 
-    A.a.x = k (face speed per unit of Γ across it, in cells a step);
-    A.a.y = 1 when what is moved is the mix itself (the soap's own spread).
+    What drives it is the surface's coverage θ = min(soap, 1), not the
+    soap: a surface holds one monolayer, and the soap over that is in the
+    water as micelles with the tension at its floor (src/gpu/fluid/soap.ts,
+    PLAN 38c). So a pool of strong soap pulls only at its edge, and a plate
+    soaped all over pulls nowhere. The soap itself is moved as the monolayer
+    the surface carries (θ upwind), never the micelles under it, so a strong
+    pool feeds its front at the rate the surface draws it off.
+
+    A.a.x = k (face speed per unit of θ across it, in cells a substep);
+    A.a.y = 1 when what is moved is the mix itself (the soap's own spread);
+    A.a.z = the face speed's cap, cells a substep; A.a.w = the self-spread's
+    cap, cells² a substep (both from metres and seconds, soapPlan);
+    A.b.x = the open rim's radius on a thin gap (0 for a closed plate): no
+    face across it carries, since the trough beyond holds the same soapy
+    overflow and there is no clean surface there to pull toward.
   */
   marangoniFlux: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
-fn gm(p: vec2i, n: i32) -> f32 { return textureLoad(mix, clamp(p, vec2i(0), vec2i(n - 1)), 0).g; }
+fn gm(p: vec2i, n: i32) -> f32 { return min(textureLoad(mix, clamp(p, vec2i(0), vec2i(n - 1)), 0).g, 1.0); }
+fn rimmed(q: vec2i) -> bool { return A.b.x > 0.0 && length((vec2f(q) + 0.5) / S.n - vec2f(0.5)) >= A.b.x; }
 fn face(a: vec2i, e: vec2i, n: i32) -> vec4f {
   let b = a + e;
   if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec4f(0.0); }
+  if (rimmed(a) || rimmed(b)) { return vec4f(0.0); }
   let dg = gm(b, n) - gm(a, n);
-  let c = clamp(-A.a.x * dg, -0.24, 0.24);
+  let c = clamp(-A.a.x * dg, -A.a.z, A.a.z);
   var f = c * select(textureLoad(src, b, 0), textureLoad(src, a, 0), c >= 0.0);
-  // The soap's own spread is a diffusion (flux kΓ∇Γ) and, explicit, it is
+  // The soap's own spread is a diffusion (flux kθ∇θ) and, explicit, it is
   // stable only below a quarter of the difference a face (a checkerboard
   // grows past it). At full k it ran near two: the soap flipped between
   // neighbouring cells every step and carried the dye into a lattice of dots.
-  if (A.a.y > 0.5) { f.g = clamp(f.g, -0.12 * abs(dg), 0.12 * abs(dg)); }
+  if (A.a.y > 0.5) {
+    let up = select(gm(b, n), gm(a, n), c >= 0.0);
+    f.g = clamp(c * up, -A.a.w * abs(dg), A.a.w * abs(dg));
+  }
   return f;
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -369,28 +438,43 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     One step of the mix's own evolution.
 
       oil         ∂c/∂t = M ∇²μ         (Cahn–Hilliard: conserves the oil)
-      surfactant  diffuses (A.a.y) and breaks down (A.a.z, a factor a step)
+      surfactant  ∂Γ/∂t = D ∇²Γ − k Γ    (molecular A.a.y; A.b.x = exp(−k·s), 1 at 0, PLAN 38c/38c-3)
       acidity     diffuses (A.a.w); acid and base neutralise by cancelling
 
     A.a.x = M × dt in cell units, kept under the explicit limit (1/64 for
-    this stencil) by the host.
+    this stencil) by the host. A.a.z = the open rim's radius on a thin gap
+    (0 closed): soap carried past it has gone over into the trough with
+    the liquid, as the dye has (decayDye).
+
+    At Soap Breakdown = 0 (A.b.x = 1) the soap is kept and is not capped at
+    a monolayer: what is
+    over one is in the water as micelles (src/gpu/fluid/soap.ts). It once
+    faded to a tenth every ten seconds and was clamped at 1, so the plate
+    forgot it and a second drop on the first was lost. The 64 is only a
+    guard against a runaway, sixty-four monolayers a cell (mixSplat's too).
   */
   mixUpdate: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 fn mm4(p: vec2i, n: f32) -> vec4f { return textureLoad(src, clampP(p, n), 0); }
+${RIM_SIDE}
+// A neighbour across the open rim reads as this cell: no flux through that face (RIM_SIDE).
+fn mmN(p: vec2i, e: vec2i, n: f32, m: vec4f) -> vec4f {
+  return select(mm4(p + e, n), m, rimSide(p, n) != rimSide(clampP(p + e, n), n));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   let m = mm4(p, n);
-  let lap = mm4(p + vec2i(1, 0), n) + mm4(p - vec2i(1, 0), n) + mm4(p + vec2i(0, 1), n) + mm4(p - vec2i(0, 1), n) - 4.0 * m;
+  let lap = mmN(p, vec2i(1, 0), n, m) + mmN(p, vec2i(-1, 0), n, m) + mmN(p, vec2i(0, 1), n, m) + mmN(p, vec2i(0, -1), n, m) - 4.0 * m;
   // Not clamped to 0..1: Cahn–Hilliard overshoots a little either side of an
   // interface and its own double well brings it back, where a clamp would
   // make or destroy oil every step (measured: the oil swung ±30%). The wide
   // band is only a guard against a runaway.
   let c = clamp(m.r + A.a.x * lap.a, -0.25, 1.25);
-  let s = clamp((m.g + A.a.y * lap.g) * A.a.z, 0.0, 1.0);
+  let rim = A.a.z > 0.0 && length(uvOf(id) - vec2f(0.5)) >= A.a.z;
+  let s = select(clamp((m.g + A.a.y * lap.g) * A.b.x, 0.0, 64.0), 0.0, rim);
   let a = clamp(m.b + A.a.w * lap.b, -1.0, 1.0);
   let outVal = vec4f(c, s, a, m.a);
   textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
