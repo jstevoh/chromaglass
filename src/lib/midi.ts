@@ -1307,6 +1307,14 @@ const KNOB_CCS: Record<FactoryMapId, (s: MidiSource) => boolean> = {
  * takes a row of its own at the top of the panel. A fader is drawn as a slider
  * only where a profile knows it is one. The Rides strip is unaffected: it
  * draws every control as a fader whatever it is learned to.
+ *
+ * And then the desk stopped drawing by it (PLAN 8d-3, the owner, 2026-11-22):
+ * the APC mini mk2's factory map rides Bubbles and Saturation on faders, so
+ * the Recipe drew those two as sliders among its knobs, the same fault from
+ * another door. A panel's kind of control is now the panel's (`ControlGrid`
+ * in `desk/DeskPanels.tsx`, `npm run panelkinds`). This still says which of
+ * a profiled board's CCs are faders, for the controller's picture and learn
+ * (8d-2), and nothing on the desk asks it.
  */
 export function controlKindOf(map: MidiMap | null | undefined, key: keyof VisualizerSettings, inputName?: string | null): 'fader' | 'encoder' | null {
   const b = map?.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);

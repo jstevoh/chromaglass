@@ -32,7 +32,7 @@ cost, then Low.
 | 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | `heatVisc` shipped; lift open behind 36e-7, 36e-8 |
 | 11 | 38v-2 | Comet's pull flickers with the beat, and is absent on the open plate (RS-3) | here | S | Medium | new |
 | 12 | ~~29a-11~~ | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | shipped |
-| 13 | 9ae | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | new |
+| 13 | ~~9ae~~ | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | shipped |
 | 14 | 9t-11 | The domes' film has no upper wall; two magnets start nothing (RS-24) | `09-ferrofluid.md` | S | Medium | new |
 | 15 | ~~18e-9~~ | A thin film's optical path steps the wrong way (RS-26) | `18-physics-2.md` | S | Medium | shipped |
 | 16 | 32d-6 | Soap film on the plate takes out 8× the light Airy allows (RS-29) | `32-soap-film.md` | S | Medium | shipped #928 |
@@ -242,16 +242,48 @@ is in the project's files).
   against the check's half (0.44 at 0.25). A held press on the floor has no squeeze, so it
   should push nothing; Classic is back at 0.25 until both are found, and the fix runs
   heldpress at 0.4 flat as well.
-- **38w-20. Warm cells still read soft in the app with Crisp Edges on** (M; High). Filmed in
-  the app on Metal (seed 1, 512² grid, 1280x800 canvas, after 12 s): the cyan cells' rims are
-  one crisp pixel, but the red and orange cells' rims are a soft three or four pixels, and
-  turning Crisp Edges off leaves them unchanged. Edge Relief adds a broad dark band just inside
-  them (it reads the solver's band at `rim0`, unmoved), but Edge Relief at 0 still leaves the
-  rim soft, so the relief is not the cause. Not measured yet, two guesses: those cells' oil band
-  is wider than 3.5 cells, which `crispInterface`'s `real` gate leaves alone on purpose as real
-  diffusion; or their dye has leaked out into the water (about 7% of it in the lab), so the
-  colour's edge is not the oil's. First read the band half-width (`eps / h.x`) and the dye
-  outside the oil at those rims in the app, then fix the cause in the solver (why warm cells
-  spread wider than cyan) and not in the plate. Once the rim is sharp, draw the meniscus as a
-  narrow line at the crisp rim (the chain rule through the warp), not as the band-wide halo.
+- **38w-25. Classic's meniscus from the oil, not the dye** (M; High, after 18e-2). A real cell's
+  rim is the light its curved oil surface bends: a thin dark and bright line at the oil's edge,
+  set by the oil's index step (about 1.47 against 1.33), not by the dye. Build 18e-2 (deflection
+  by the gradient of the optical path, the oil's thickness in it), then give Classic a narrow
+  rim at the crisp edge from it and turn the classicdish no-halo line into "a rim, and no halo".
+  Untraced on the way: at Edge Relief 0 the water 2–8 px outside a rim is already about 5%
+  darker than open water (94.9% and 94.6% on Metal), with no slope shading drawn. Find what
+  darkens it (dye crowded at the rim by the flow, or the plate's own blur) before the rim goes in.
+- **38w-26. `readField` and `fluids[0].n` report the CPU mirror, not the GPU grid** (S; Medium).
+  In the app on Metal the solver runs at 512² or 768², but `chromaglassDebug().fluids[0].n`
+  and `readField` answer 192², the CPU mirror's. A check or probe reading them thinks the plate
+  is coarser than it is (this thread lost an hour to it). Report the GPU grid, or name the field
+  `cpuN`, and say in `src/lib/checkHooks.ts` which grid each hook reads.
+- **38w-27. Classic's oil edge holds under stretch** (L; High, the owner's round five). Filmed
+  2026-11-22 with a hand on the dish (Beat Squeeze 0.6, Plate Rock 1.6): cells merge and are
+  pushed, but their edges blur into soft blobs and the colour washes out, where the 1969
+  footage (Liquid Loops) stretches pressed oil into sharp threads and bead strings. A real
+  interface is molecularly thin and its tension pulls a stretched thread into beads
+  (Rayleigh–Plateau); the Cahn–Hilliard band is a few cells wide and the strain smears it
+  faster than the chemical potential restores it. Measure the band's width against the strain
+  rate first, then sharpen the interface (mobility and ε matched to the grid, or a sharp-
+  interface reconstruction) so a press makes threads that pinch into beads.
+  *Part shipped 2026-11-22 (PR #946):* superbee limits the oil's flux in the carry
+  (mixAdvect). Measured on the live app under the hand (Beat Squeeze 0.6, Plate Rock 1.6):
+  the interface share of oil cells fell from 0.24–0.28 to 0.11–0.14 (a still plate: 0.07),
+  the oil level inside bodies rose from 0.78–0.82 to 0.88–0.90, and body cells from about
+  2,360 to about 5,070. Eight Cahn–Hilliard substeps gained a little more but were left out
+  (less of the oil's colour kept, and a half-built 15g-8e mix line in `npm run bubbleair`).
+  Still open: threads that pinch into beads (Rayleigh–Plateau) want a sharper interface.
+- **38w-28. Classic's water moves at the 1969 speed** (M; High, after 38w-27). The round-five
+  motion read (`npm run watch`): flow median 0.7 %/s against Liquid Loops' 6.9, turnover 10.7 s
+  against 1.8, curl ±0.01 against ±0.13, and 80% of the motion is the whole picture sliding
+  (17% in the reference). Liquids only interact where the water shears; ours barely does, so
+  cells never stretch or meet. The period hand drives it: a pressed second glass (radial
+  squeeze-out) and a deep rock. Give Classic that hand once 38w-27 keeps the edges.
+- **38w-29. The oil's colour rides the oil's own flux** (M; High, the owner's round five: "the
+  colors seem to get washed out"). A shortcut named in PR #946: the dye and the oil's dye are
+  carried on their own (minmod) and the Cahn–Hilliard step moves the oil fraction `c` but not
+  what is dissolved in it, so a sharper edge leaves the oil's colour behind the oil, and
+  `bodyPartition` hands that stray colour to the water. Measured on Classic under a hand: the
+  oil's dye falls 10,070 to 9,250 in 41 s (8% washes to the water); putting superbee on the
+  colour made it four times worse (9,200 to 5,300). In the real dish a dye dissolved in oil
+  moves with the oil, so the fix is to carry the oil's dye as its concentration times the
+  oil's own flux, in the carry and in the Cahn–Hilliard flux alike, so no colour is stranded.
 

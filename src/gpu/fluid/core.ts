@@ -232,9 +232,9 @@ export class FluidCore {
   /** What the step's hsPrep reads as the velocity after the body forces: hsMid, or hsPrev when no body force ran. */
   protected hsMidNow: GPUTexture | null = null;
   protected hsMob: GPUBuffer | null = null;
-  protected hsOilMean: GPUBuffer | null = null;
   protected hsLiftSrc: GPUBuffer | null = null;
   protected hsLiftPsi: GPUBuffer | null = null;
+  protected hsLiftB: GPUBuffer | null = null;
   /** The sealed bottle's (PLAN 27f-9): the weight's right-hand side and its Ψ, on the lift's grid. */
   protected hsSealSrc: GPUBuffer | null = null;
   protected hsSealPsi: GPUBuffer | null = null;

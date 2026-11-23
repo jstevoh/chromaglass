@@ -247,20 +247,113 @@ lens-shaped drop, no shadow beside it.*
   radius R focuses at R/(n-1) within 10%; a flat plate lights the wall evenly (1%); light is
   kept (total on the wall within 1% of total in); no feature is drawn twice (one peak per drop
   in the wall's autocorrelation).
-- **31s-3. The other sparse stencils.** Still reading the plate at a stride: the bubble glow's
-  airNear (a 9-tap max at 4.5 cells, plate.ts), the camera's camLap (an 8-tap max,
-  plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c) and blurAlpha (3x3). Each can draw
+- **31s-3. The other sparse stencils.** Still reading the plate at a stride: the camera's
+  camLap (an 8-tap max, plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c), the
+  lamp's lampBendAt and defocusShadow's reads of the derived layer, and blurAlpha (3x3). (The
+  bubble glow's airNear, a 9-tap max at 4.5 cells, went with 31s-8.) Each that reads the dye
+  itself at one texel a tap, where the dye has four texels a cell, can comb a thin rim the way
+  31s-8 found, and should take the cell's mean the way `cellDensity` does. Each can draw
   ghost copies of anything narrower than its stride the way the slope did. Replace each with the
-  traced light of 31s-2 where it is optics, or a dense stencil where it is a field read.
+  traced light of 31s-2 where it is optics, or a dense stencil where it is a field read. `npm run flower`
+  measures only the slope and its ∇², so none of these is covered by it yet (31s-10).
 - **31s-4. Retune the looks on the traced light.** Once 31s-2 draws the plate, every preset's
   brightness, contrast and rim weight moves. Retune on films from the Mac, judged by the owner
   against the reference library (watch skill).
-- **31s-5. An audit of how fields are sampled, and a check that a drop is drawn once.** The four
-  realism passes (§18, §38) asked of each effect whether it is a law or a stand-in; none asked how
-  a field is read. A sparse stencil is a correct operator on anything wider than its stride and
-  draws ghost copies of anything narrower, which is how the flower passed every audit. Pass: list
-  every shader read of a solver field at a stride over one cell, or a max/min over sparse taps,
-  with what it can ghost. Check (lab): seed single small drops (one to three cells) and moving
-  ones, render the wall, and assert one peak per drop in the picture's autocorrelation (no copies
-  at the stencil's offsets); it must fail on the old three-cell Sobel. 38w-7 (small cells as
-  rounded squares) may be the same square stencil: re-film it after 15g-15.
+- **31s-6. Open, found on main's deploy of 2026-11-22 (ebfa3324): `npm run holeline` was
+  calibrated on the stride-3 stencil 15g-15 replaced.** The dense slope (#933, `plateSlope.ts`,
+  sigma 1.5 cells) reads a hole's rim about 1.6 to 2 cells wider than the Sobel did, so
+  holeline's precondition throws before any line is judged: "the hole of 5.0 cells has its rim
+  at 6.7 cells" against `RIM_SLACK` 1.5 (bisected to ea277f3d; 61cab2c4 passes). Past it, on
+  the dense stencil, every feature line holds ("no line round a hole" at most 0 levels) and two
+  controls miss: "the control finds the glow" (3.7, wanting more than 6) and "the smallest hole
+  is partly flattened" (5.28 against 0.9 times 5.47). A narrower stencil (sigma 1.0) breaks the
+  controls further, so it is the check's yardstick that moved, not the picture. Fix: read the
+  rim the way the dense stencil spreads it (its reach, `SLOPE_REACH2`, rather than a fixed
+  slack), and set the glow control's size row from the dense slope's own response, or from
+  31s-2's traced light once it draws the plate. Never a looser bar without the owner's word;
+  until then holeline stays red on main's checks (the site deploys without them, 19ak-21).
+- **31s-7. Open: two films and the Mac app still draw the flower.** Four films are re-recorded on
+  main with the dense slope and replace the privated ones (shipped 2026-11-22: Effervescence,
+  The Distant Sun, Undertow, Machina, each with its card loop; a close look at Galaxy's bubbles
+  in the new film shows one ring each, no lobes). Hymn to the Dawn and Permafrost were filmed
+  before #933, so their channel films and card loops still carry it: re-record both with
+  `npm run sitefilms` and swap them the same way. The Mac app's last release (1.3.1652) was
+  built before #933 and draws the flower until the next release. A preview server left running
+  from an old checkout shows it too; judge only from main or the live site.
+- **31s-9. Open: ∇² ripples on a gentle tilt.** Found by `npm run flower`: dye on a linear tilt
+  (no rim, no air) should read zero Laplacian, but the derive pass reads a smooth ripple of
+  period three cells (about ±0.07 in its units) all across the tilt, far past the slope's
+  reach, under both builds alike (the point-read control as a square wave of the same period).
+  Suspects: how calcOpl turns dye into optical path, a channel of the dye the path does not
+  share, the half-float derived layer, or perTap/oplAt. Measure first: ∇² of a pure tilt with
+  no air, by channel and by derived format. The flower check uses a piled rim, not a tilt,
+  until this is found.
+- **31s-10. Open: the flower check sees one size and one layer.** `npm run flower` measures the
+  derived layer at gridSize 768 only; the app also runs 512 (2.7 texels a cell, where a one-cell
+  box is not a whole number of texels) and 1024. Nor does it measure the drawn picture, so a
+  stencil downstream of the slope (31s-3) could draw the flower with this check green. Measure
+  each size with a box of its own cell, and the drawn frame of a ring with the comb.
+  The gate itself (31s-8) covers every harness that records the plate for anyone to see:
+  `recorder.mjs` (every take, asking the open page for the fixed code), `film`, `showreel`,
+  `sitefilms` (and its `--films-from`), `tvloops` (and `--from-raw`) and `tvfilms --from`.
+  Left out on purpose: `render-app` and `clipApp` record only for their own checks, and
+  `landingfilms` and `render.mjs` record nothing.
+- **31s-11. Open, found 2026-11-23 filming PR #946: the gate calls a fixed dev server old.**
+  `pageHasFix` (`scripts/flowergate.mjs:75`) finds the plate's module through
+  `performance.getEntriesByType('resource')`, and the browser keeps only 250 resource entries by
+  default. Under vite's dev server the page loads every module as its own file, so the list stops
+  at about 244 scripts before `plateSlope.ts`, and the gate refuses a build that does carry the
+  fix (curl of both servers showed `fn cellDensity`). The built site bundles its modules, so it is
+  not affected. Fix: raise the buffer before the page loads (`performance.setResourceTimingBufferSize`
+  in an init script) or fetch the module by its path and look for the marker there. *Measure:* the
+  gate passes a vite server of main and still refuses one checked out before #933.
+- **31s-12. Open: the flower gate times out in a busy film queue.** Found 2026-11-23 in 48q:
+  `film.mjs` asks `untilFlowerFree` before it takes the film lock, and `npm run flower` then
+  queues on that lock itself, so with the queue over ten minutes long the gate's limit ran
+  out and refused the film ("the flower check ran past 10 minutes"). A run inside
+  `maclock.mjs run` does not hit it, since the check inherits the held lock. Take the lock
+  first, or let the gate's limit start when the check gets the GPU. The same run found the
+  gate checking the main checkout's source from a worktree whose node_modules links there
+  (refused for a missing `flower.mjs`); #944 fixed that by checking the working directory's
+  checkout first, the one whose `dist` is filmed.
+- **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
+  passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
+  a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
+  a phenomenon that nobody built, or a field that is read wrongly. That is how the flower got through
+  every pass. It came from a sparse stencil, which is a correct operator on anything wider than its
+  stride and draws ghost copies of anything narrower. It also got through because no pass followed
+  the light out of the dish, so none asked what a small drop's curved surface does to it. This audit
+  turns the question round. Walk the real rig in order (lamp, condenser, glass, liquid layers, glass,
+  projection lens, wall, eye). For each stage, list what physically happens there from optics and
+  fluid texts, never from our code. Then mark each item as built (with the file), faked (with what
+  stands in for it) or missing. Six areas, each with its own list:
+  1. **Depth.** The layers have thickness: film height, meniscus, a drop's cap, oil over water, and
+     what lies at the bottom against what lies at the top. Is any of it a field, or does the dye
+     stand in for it? (31s-1 builds the height.)
+  2. **Light all the way through.** Refraction at each interface, total internal reflection, focus
+     and caustics, Beer-Lambert absorption by depth, scattering in milky dyes, Fresnel loss and
+     dispersion. Does energy add up from the lamp to the wall? (31s-2 builds the trace.)
+  3. **Lens and wall.** Depth of field across a dish that is not flat, the lamp's size against how
+     sharp an edge can be, vignetting, keystone, the wall's texture and bounce, and how bright the
+     wall is against how the eye adapts.
+  4. **Sampling.** Every shader read of a solver field at a stride over one cell, every max or min
+     over sparse taps, every place a field is drawn at another resolution, with what each can ghost
+     or alias. (31s-3 holds the known ones.)
+  5. **Dish edges.** The meniscus against the rim, wetting and contact angle, the rim's shadow and
+     its refraction, and how drops behave next to the wall of the dish.
+  6. **Time.** How fast each thing happens in a real dish (diffusion, Marangoni spreading, settling,
+     evaporation, heat from the lamp) against the solver's steps, and what the frame rate smears.
+  Checks. (a) Lab: seed single small drops (one to three cells) and moving ones, render the wall,
+  and assert one peak per drop in the picture's autocorrelation, with no copies at the stencil's
+  offsets. It must fail on the old three-cell Sobel. (b) The optical numbers of our films against
+  the real-show references kept for `npm run watch` (jls-liquid-loops-1969, bar-the-dip-2016):
+  edge width, how sharp and how high the brightest caustic peaks are, and the dark rims round drops.
+  Any number outside the references' range becomes an item in its area. The two halves check each other
+  (the owner, 2026-11-22): a number of ours outside the references' range is a symptom, and every
+  symptom must point at a rig item that explains it. A symptom nothing explains means the rig walk
+  missed a phenomenon. An item marked built whose number is still out of range is really faked. The
+  watch tool gains a ghost measure (secondary autocorrelation peaks round small forms), which would
+  have caught the flower from the films alone. Each missing or faked item
+  the audit finds becomes a plan item in the section it belongs to. Antigravity runs it after 31s-1
+  lands. 38w-7 (small cells drawn as rounded squares) may be the same square stencil, so re-film it
+  after 15g-15.

@@ -151,15 +151,23 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     weigh all the colour, oil's included, over the app's mean, and a plate stood up (Plate Upright,
     Rain Drip) lifts no oil: the same circulation with gravity's in-plane share in place of the
     rock's tilt.
-  - **27f-7, open (a shortcut named). The lift's circulation is the even gap's.** Ψ is solved with
-    the plate's mobility taken as even, then the gap's own solve takes what is left where the gap is
-    not (a press, a domed plate), with its open rim: exact on an even gap, and under a press a little
-    of the lift can reach the rim. The full answer is the lift's own solve with the gap's mobility
-    and a closed rim, a second multigrid; or one solve with the rim's held pressure set per liquid
-    (18g-6 holds the surface tension's this way, as a gradient taken off the force near the rim). And the oil in the mix has the water's viscosity in the gap: a light
-    mineral oil is fifty times thicker (OIL_NU), which would slow a lens to about 1/25 of this in
-    water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
-    when the mix's oil gets its viscosity.
+  - **27f-7, partly shipped (Classic round five, 2026-11-22). The oil has its own viscosity in
+    the gap, and the lift's circulation sees it.** hsPrep now gives the mix's oil its own body,
+    B = (0.88·OIL_NU/ν)^c (`oilBodyLn`), so a lens of light mineral oil is about twice as stiff as
+    the water round it at the default gap and moves at a Hele-Shaw inclusion's speed in a round
+    cell, (1−ε)/(λ(1−ε)+1+ε) of Darcy's with λ ≈ 2 and ε its area share (`npm run oillift`,
+    0.52 mm/s against 0.52). The tipped dish's closed
+    circulation is solved with that uneven mobility, −∇·(B∇Ψ) = ∂φ/∂a, and the dyed water's own
+    weight goes through the same circulation (φ = water dye + κ·oil): handing it to the open-rim
+    solve under an uneven mobility leaked a mean flow, 4.5% of Clock Glass's frame a second,
+    now 0.2%. Still open, two shortcuts:
+    - **27f-7a, open (a shortcut named).** The circulation's B is the oil's alone: a press or a
+      domed plate (the gap's own h³) is still left to the gap's open-rim solve, so under a press
+      a little of the lift reaches the rim. The full answer folds h³ into B.
+    - **27f-7b, open (a shortcut named).** Past LIFT_MOST (256) the circulation's grid is coarser
+      than the solver's, so the dyed water's finest swirls are weighed as a block average: a
+      sub-block stripe of colour feels no lift. The full answer is the circulation on the
+      solver's own grid (a multigrid, like the pressure's).
   - **27f-9. A standing plate is a sealed bottle (shipped 2026-11-11; story in
     docs/plan-shipped.md §27f-9).** Lava Lamp's wax poured out over the open rim; on a standing
     plate the weight is now the closed cell's circulation (`wgsl/fluid/seal.ts`). `npm run sealed`.

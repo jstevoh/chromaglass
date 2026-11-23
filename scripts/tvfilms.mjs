@@ -65,6 +65,9 @@ if (flag('--probe')) {
 } else {
   const from = value('--from');
   if (!from) { console.error('tvfilms: --from <dir> (where sitefilms put the films) or --probe'); process.exit(2); }
+  // Nothing goes up to where the TVs fetch it while the source draws the flower (PLAN 31s-8, scripts/flowergate.mjs).
+  const { untilFlowerFree } = await import('./flowergate.mjs');
+  await untilFlowerFree();
   const out = path.resolve('scratch/tvfilms');
   fs.mkdirSync(out, { recursive: true });
   const ready = [];

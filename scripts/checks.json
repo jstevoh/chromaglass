@@ -74,6 +74,16 @@
       ]
     },
     {
+      "name": "The rules stay in sync",
+      "shard": "logic",
+      "run": "npm run rules -- --check",
+      "why": [
+        "Antigravity's per-area rules under .agents/rules/ are generated from",
+        ".claude/rules/ by scripts/syncrules.mjs, so the two agents' rule files",
+        "never drift and each generated file stays under Antigravity's 24,000-byte cap."
+      ]
+    },
+    {
       "name": "What a change reaches",
       "shard": "logic",
       "run": "npm run reach",
@@ -115,6 +125,18 @@
       ]
     },
     {
+      "name": "The lively looks at a real show's pace",
+      "shard": "logic",
+      "run": "npm run pace",
+      "why": [
+        "PLAN 48q: the lively looks turned over several times slower than a real",
+        "show. Each carries its harder rock, rhythm sheet and pours whole after",
+        "every pass, never quieter than before, inside the dials, runs a liquid",
+        "thinner than light oil and no thinner than water (Thickness), and the moire",
+        "pack keeps its own pace. The film's turnover and colour are `-- --film` on the Mac."
+      ]
+    },
+    {
       "name": "The kick's bloom",
       "shard": "logic",
       "run": "npm run kickbloom",
@@ -132,6 +154,17 @@
       "run": "npm run desk",
       "why": [
         "That a look change never cuts the plate to black in front of a room."
+      ]
+    },
+    {
+      "name": "One panel, one kind of control",
+      "shard": "logic",
+      "run": "npm run panelkinds",
+      "why": [
+        "Every desk panel and the Wall panel rendered in node: none draws both knobs and",
+        "sliders, Rides and the Mixer draw sliders, the Recipe and section panels knobs,",
+        "whatever a control is learned to on a controller (PLAN 8d-3, the owner,",
+        "2026-11-22: the Recipe's Bubbles and Saturation were sliders among knobs again)."
       ]
     },
     {
@@ -336,6 +369,19 @@
       ]
     },
     {
+      "name": "One film at a time on the owner's Mac",
+      "shard": "logic",
+      "run": "npm run maclock -- --selftest",
+      "why": [
+        "The Mac film lock and FIFO queue (scripts/maclock.mjs, PLAN.md 19ak-23):",
+        "exclusive execution, FIFO ordering across queued waiters, dead-pid and",
+        "over-timeout stale recovery, manual one-line locks honoured and aged,",
+        "timeout cleanup, CG_FILM_LOCK_HELD nesting, stale-rename race protection,",
+        "--max-wait exit 75 with no leftover ticket, deploy-mark priority, and",
+        "scripts/macbusy.sh refusing a live film.lock."
+      ]
+    },
+    {
       "name": "Two runners on one Mac never share a harness port",
       "shard": "logic",
       "run": "npm run ports",
@@ -430,6 +476,26 @@
         "and a pour, a spreading dye body and a dimming lamp each turned down by",
         "its own step (47w-2, scripts/watchcuts.mjs). In the sound shard for its",
         "ffmpeg. About two minutes."
+      ]
+    },
+    {
+      "name": "Watching in words",
+      "shard": "sound",
+      "run": "npm run watchwords",
+      "quarantine": [
+        { "line": "drift → drift2 (the same look, another phase): no steady change past a step", "plan": "47x-11", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
+      "why": [
+        "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
+        "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
+        "from an after one (PLAN.md 47x). Held to clips made to sit at known poles:",
+        "a steady drift reads sustained, analogous and all-over; a picture that",
+        "sits and jumps reads sudden and strong; a centred disc on black reads",
+        "centred and dark-ground, hard-edged at one pixel and soft at fourteen.",
+        "The before/after read must rank the edge first when only the edge",
+        "changed, and find nothing steady changed between two takes of the same",
+        "look. Written before the words were built, so it holds them to pictures",
+        "and not to the code's own thresholds. In the sound shard for its ffmpeg."
       ]
     },
     {
@@ -1734,6 +1800,18 @@
       ]
     },
     {
+      "name": "A colour's edge stays sharp on the thin gap",
+      "shard": "lab2",
+      "run": "npm run dyeedge",
+      "why": [
+        "The thin gap's dye flux keeps an edge as sharp as the grid can hold (PLAN.md 1l,",
+        "scripts/dyeedge.mjs): three flat discs on Galaxy's gap turned two hundred steps",
+        "by a solid swirl keep their colour, overshoot nowhere, and leave under 0.62",
+        "part-full cells per full cell (minmod left 0.713, the MC limiter 0.541, an exact",
+        "carry about 0.29). Lab at 128², so SwiftShader runs it in under a minute."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
@@ -1795,7 +1873,7 @@
         "and that the dial is live out of focus so nothing moving is the shader's",
         "answer. It also",
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
-        "with airNear's mask taken off finds the glow again), and a pool's edge",
+        "with the slope's air hold taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
         "so it sits here beside lampzero rather than in the Mac queue.",
         "In a Measure part of its own, `lab4`, since main's deploys 667 and 670",
@@ -2801,6 +2879,15 @@
       ]
     },
     {
+      "name": "The flower",
+      "shard": "plate",
+      "run": "npm run flower",
+      "why": [
+        "No ghost copies of a thin rim one cell apart round a drop or a bubble (PLAN 31s-8): the slope reads each tap as its cell's mean, so a rim thinner than a cell is not copied at every tap offset.",
+        "The point-read control (each tap read at one texel again, what drew the flower) must read the comb, or the measure sees nothing."
+      ]
+    },
+    {
       "name": "The straw bubble",
       "shard": "plate",
       "run": "npm run straw",
@@ -3171,6 +3258,10 @@
       "name": "The ferrofluid's spikes",
       "shard": "plate",
       "run": "npm run spikes",
+      "quarantine": [
+        { "line": "held close under a pool, the magnet parts it into domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "the plate lights a point on the domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "The magnet held close stands the ferrofluid up: the pool parts into",
         "lit domes and its outline stops being a blob's; a look's own far",
@@ -3245,7 +3336,7 @@
     {
       "name": "The ferrofluid drop at rest on the thin gap",
       "shard": "open",
-      "run": "npm run ferrorest -- --owed=9ae",
+      "run": "npm run ferrorest",
       "why": [
         "The closeup's ferrofluid drop at rest on the thin gap (PLAN 29c):",
         "degenerate mobility in phaseCHVolume holds its half-full core and",
@@ -3834,6 +3925,13 @@
       "name": "A flicked plate's liquid trails the glass",
       "shard": "fifth",
       "run": "node scripts/flick.mjs",
+      "quarantine": [
+        { "line": "a flick on water: the liquid trails the glass by its drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "and the picture turns with the liquid, not the glass", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "the solver is handed the dish", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "two drag times later the picture has lost the drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "a dish the turntable turns drags the same water the same way", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md",
         "22h): the look's own turning goes through the liquid's drag time like",
@@ -3999,6 +4097,10 @@
       "name": "A drop lands only where it is dropped",
       "shard": "show",
       "run": "node scripts/mirror.mjs",
+      "quarantine": [
+        { "line": "Classic, calm, layer 1: and nowhere else", "plan": "19ak-22", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "Classic, calm, layer 1 turned a quarter: and nowhere else", "plan": "19ak-22", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "A drop lands where it is dropped: on the Design desk, on either layer,",
         "the cell under the hand changes and its mirror image across the middle",

@@ -241,16 +241,6 @@ Open, from building 9i:
   stand inside the radius where |B_z| passes the onset and none in the ring past the rim where
   |B| is still high. (38v, from RS-20.)
 
-- **9ae. The ferrofluid rounds at the step rate, not in seconds** (S; Medium). The
-  Cahn–Hilliard mobility in `fluid.ts:1393-1401` is 0.006 + 0.012·phaseSharp a substep,
-  `CH_SUBSTEPS` 4 (`constants.ts:392`), with no `magnetSeconds` and no grid size in it: when
-  the governor drops to 30 steps a second (`governor.ts:112`) a ferro body rounds half as fast
-  in a second, and at 384² it rounds slower than at 256². The display's rate does not matter;
-  the step's does. A drop between plates relaxes on τ = 12μR³/(b²σ). Scale the mobility by the
-  step's seconds and Δx² so the rounding time is that τ. Check: a stretched ferro body's
-  aspect ratio after 2 s within 5% at 60 against 30 steps a second and at 256² against 384².
-  38e points here. (38v, from RS-23.)
-
 - **9af. The magnet's strength and walk ride the music outside the cords** (S; Medium).
   `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.55 +
   0.35·energy + 0.45·env)) and speeds its walk on the music whatever the patch says (no
@@ -259,3 +249,14 @@ Open, from building 9i:
   default cord on `magnetStrength` and `magnetWalk`, so Impact and the patch govern it and the
   desk shows it. Check: with `sceneMappings` empty, `lastMagnetRef` is the same under loud
   music and silence. 9j points here. (38v, from RS-44.)
+
+- **9e-1. The magnet's domes come up short on some Mac runs** (S; Medium). `npm run spikes`
+  on main's deploy of 2026-11-22 (f825ee6b, WebGPU plate shard): "held close under a pool,
+  the magnet parts it into domes" read 21 domes in 7 pieces (the bar wants 8 pieces), and "the
+  plate lights a point on the domes" 7 of the 21 lit (it wants 8, and half). Deploys 869 and
+  872 read 28 domes and 16 pieces; 871 (2026-11-21, before #932's Cahn–Hilliard pacing) read
+  21 and 6, so it predates #932 but now repeats. Find whether the pool parts later on a busy
+  runner (the check's settle counted in frames or in seconds), or whether the Rosensweig
+  wavelength the solver resolves sits near the grid's pitch so a pool either breaks into
+  pieces or stays joined by thin necks. Don't lower the bar: those two lines are quarantined on
+  PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes them out.

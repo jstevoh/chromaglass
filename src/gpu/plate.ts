@@ -528,7 +528,7 @@ export class WebGPUPlate {
         });
         pass.setPipeline(derive);
         const viewTex = fields[i]?.view ?? this.blankU;
-        pass.setBindGroup(0, groupOf(this.device, derive, [this.uniformBuffer, this.sampler, this.layers[i].dye, viewTex, fields[i]?.species ?? this.blankSpecies]));
+        pass.setBindGroup(0, groupOf(this.device, derive, [this.uniformBuffer, this.sampler, this.layers[i].dye, viewTex, fields[i]?.species ?? this.blankSpecies, fields[i]?.air ?? this.blank]));
         pass.draw(6);
         pass.end();
       }

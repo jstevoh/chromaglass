@@ -4,6 +4,7 @@ Start with the [full guide](guide.md): every feature, control and setup, and how
 
 **Working on ChromaGlass**
 - [handoff.md](handoff.md): how work is claimed and handed between tools, and the block every PR body carries
+- [../CLAUDE.md](../CLAUDE.md), [../.claude/rules/](../.claude/rules/): core rules loaded every session, and canonical per-area rules (`npm run rules` syncs `.agents/rules/` from `.claude/rules/`, held in sync by `npm run rules -- --check`)
 - [architecture.md](architecture.md): which domain owns what, how the code is split so a session loads one domain at a time, and the splits still to do
 - [checks-map.md](checks-map.md), [ci.md](ci.md): which checks to run for which files, and how CI and the deploy gate work
 - [judging.md](judging.md): what only the owner can judge, on a real GPU
