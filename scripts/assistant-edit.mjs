@@ -257,9 +257,17 @@ function editPageLines(page, say, guard, undoDepth) {
 
   // Sequences: a built-in refused, a copy chosen and edited, a new one chosen before a render.
   r.built = Q('edit-stage', { index: 0, fields: { name: 'x' } });
-  const copy = Q('copy', { sequence: 'Slow build', name: 'My build' });
-  const twin = Q('new', { name: 'Twin' });
-  const fresh = Q('new', { name: 'Fresh' });
+  // One millisecond in fact, not by luck: the clock held still across the three, so ids
+  // made from the time alone would collide here every run (the 'ids collide' mutant lived
+  // once a slower copy let the three fall in different milliseconds).
+  const clock = Date.now, at = clock();
+  Date.now = () => at;
+  let copy, twin, fresh;
+  try {
+    copy = Q('copy', { sequence: 'Slow build', name: 'My build' });
+    twin = Q('new', { name: 'Twin' });
+    fresh = Q('new', { name: 'Fresh' });
+  } finally { Date.now = clock; }
   Q('add-stage', { fields: { name: 'Second' } });
   Q('loop', { on: false });
   render();
