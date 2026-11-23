@@ -320,6 +320,15 @@ lens-shaped drop, no shadow beside it.*
   `sitefilms` (and its `--films-from`), `tvloops` (and `--from-raw`) and `tvfilms --from`.
   Left out on purpose: `render-app` and `clipApp` record only for their own checks, and
   `landingfilms` and `render.mjs` record nothing.
+- **31s-11. Open, found 2026-11-23 filming PR #946: the gate calls a fixed dev server old.**
+  `pageHasFix` (`scripts/flowergate.mjs:75`) finds the plate's module through
+  `performance.getEntriesByType('resource')`, and the browser keeps only 250 resource entries by
+  default. Under vite's dev server the page loads every module as its own file, so the list stops
+  at about 244 scripts before `plateSlope.ts`, and the gate refuses a build that does carry the
+  fix (curl of both servers showed `fn cellDensity`). The built site bundles its modules, so it is
+  not affected. Fix: raise the buffer before the page loads (`performance.setResourceTimingBufferSize`
+  in an init script) or fetch the module by its path and look for the marker there. *Measure:* the
+  gate passes a vite server of main and still refuses one checked out before #933.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
