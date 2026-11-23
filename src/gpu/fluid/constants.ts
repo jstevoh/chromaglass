@@ -388,8 +388,27 @@ export function lampCoolOf(gapMetres: number, seconds: number | undefined): numb
   Pushes Dye only at 2; its top is held in fluid.ts.
 */
 export const CONFINE = 0.35;
-/** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
+/** Cahn–Hilliard substeps a step for the ferrofluid's phase (see the 'ferro' stage). */
 export const CH_SUBSTEPS = 4;
+/*
+  Cahn–Hilliard substeps a step for the oil and water (the 'mix' stage), twice
+  the ferrofluid's (PLAN 38w-27).
+
+  The oil's interface is meant to be molecularly thin, and the flow's
+  strain under a hand (Beat Squeeze, Plate Rock) widens the carried band
+  every step; Cahn–Hilliard is what pulls it back into its tanh, and at the
+  mobility the explicit step allows (M·dt 0.012 against a limit of 0.0147
+  with the deep well, mixUpdate) four substeps restored it slower than the
+  strain spread it. Measured in the app (Classic, Beat Squeeze 0.6, Plate
+  Rock 1.6, 40 s, with the oil's superbee carry): the plate's share in an
+  interface 0.11–0.14 at four, 0.09–0.12 at eight, the bodies' oil level
+  0.88–0.90 at four and 0.91–0.92 at eight (a still plate: 0.07, 0.95).
+  More substeps of the same stable step, not a larger step: that is what
+  keeps it real Cahn–Hilliard rather than a sharpening filter. Each is two
+  passes over the mix at the solver's grid. The ferrofluid's phase, shared
+  with CH_SUBSTEPS before, keeps four.
+*/
+export const OIL_CH_SUBSTEPS = 8;
 /*
   Where the oil's mixture stops being able to sit still (its spinodal), as a
   share of oil from either pure liquid: the deep quench of mixMu's free
