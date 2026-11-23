@@ -28,7 +28,7 @@
  * of the plate the hands lay on, so two hands overlapping share the cells
  * at their mean velocity and the solver takes the ratio.
  */
-import { DISH_GAP_FIELD_UV, DISH_REST_GAP } from './turntable';
+import { DISH_GAP_METRES, DISH_METRES } from './turntable';
 
 /*
   How hard a hand holds the liquid it touches (hsPrep, wgsl/thinGap.ts): the
@@ -56,8 +56,9 @@ export const HAND_GRIP = 40;
  * which keep it whole (`npm run fingerflow`, lab), so the edge is the
  * physics' alone.
  */
-export function handEdge(L: number): number {
-  return (2 * DISH_GAP_FIELD_UV * DISH_REST_GAP * L) / Math.sqrt(12);
+export function handEdge(L: number, gapMetres?: number): number {
+  const h = Number.isFinite(gapMetres) ? gapMetres! : DISH_GAP_METRES;
+  return (2 * (h / DISH_METRES) * L) / Math.sqrt(12);
 }
 
 /**

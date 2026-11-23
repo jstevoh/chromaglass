@@ -375,6 +375,15 @@ try {
     });
     check(`${sc.name}: the plate hears no music while it is judged`, !music.band && music.kicks === 0 && music.heard === 0,
       `${music.band ? 'the band was started' : 'no band started'}, ${music.kicks} kicks reached the plate and the ear heard ${music.heard}, over the ${REPS} drops`);
+    /*
+      This line's name is built from the scenario's, so a quarantine of it in
+      scripts/checks.json cannot be found in this file by its own words. The two
+      held on main's deploy of 2026-11-22 (PLAN 19ak-22, until 2026-12-06), named
+      here whole so the manifest's self-test finds them. A rename of either
+      scenario changes this note and those entries in the same commit, or the
+      quarantine holds nothing: "Classic, calm, layer 1: and nowhere else" and
+      "Classic, calm, layer 1 turned a quarter: and nowhere else".
+    */
     check(`${sc.name}: and nowhere else`, !!worst && worst.over < 1,
       worst ? `most beyond the drop's reach ${worst.v.toFixed(1)} past its drift (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} under the drop; each drop ${worst.reps}, drift ${worst.dreps}, past it ${worst.preps}` : 'no cell was judged');
     await page.close();

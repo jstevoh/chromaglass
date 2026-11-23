@@ -8,6 +8,44 @@ import { OscOutRow } from '../ui/OscOutRow';
 import { linkLine, tempoSourceName } from '../../lib/tempo';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
+import type { AudioData } from '../../hooks/useAudioAnalyzer';
+import { musicRouteOf, withMusicRoute, ROUTE_ROLES } from '../../lib/musicCords';
+import type { AudioFeature } from '../../types';
+
+type MusicRoute = keyof typeof ROUTE_ROLES;
+/** What each coarse route's cords are, for its label. */
+const ROUTE_NAMES: Record<MusicRoute, string> = { velocity: 'the press', density: 'the pulse', color: 'the bottle' };
+import { useEarView, type EarView } from '../../hooks/useEarView';
+
+/*
+  The room calibration's readout, a component of its own so it alone renders
+  as the room is heard (hooks/useEarView.ts, PLAN.md 46f). The calibration is
+  a new object on every reading, so whoever reads it renders ten times a
+  second: it was a prop from App(), which rendered the whole shell for it.
+*/
+const roomOf = (a: AudioData | null) => a?.calibration ?? null;
+function RoomReadout({ view }: { view: EarView }) {
+  const calibration = useEarView(view, roomOf);
+  if (!calibration) return <span className="text-[12px] opacity-40">Waiting for audio</span>;
+  return (
+    <>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[12px] opacity-60">
+          {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
+        </span>
+        <span className="text-[12px] font-mono opacity-50">
+          {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
+        </span>
+      </div>
+      <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
+          style={{ width: `${Math.round(calibration.progress * 100)}%` }}
+        />
+      </div>
+    </>
+  );
+}
 
 /*
   Feed: Sound, the section that was the longest on its own (the device, the room's
@@ -22,7 +60,7 @@ import type { SectionCtx } from './props';
 */
 export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
   const {
-    settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate,
+    settings, onUpdate, songDetection, onSongDetection, earView, onRecalibrate,
     audioInputs, audioInputId, onAudioInput, tempo, onTap, readTempo, onTempoClear,
     onTempoBpm, onLink, oscOut, onOscOut, onLinkTransport, midiClocked, timecode, focusSection, midi, soundSources, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
@@ -299,26 +337,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         </div>
         {settings.autoCalibrate !== false && (
           <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
-            {calibration ? (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[12px] opacity-60">
-                    {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
-                  </span>
-                  <span className="text-[12px] font-mono opacity-50">
-                    {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
-                  </span>
-                </div>
-                <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
-                    style={{ width: `${Math.round(calibration.progress * 100)}%` }}
-                  />
-                </div>
-              </>
-            ) : (
-              <span className="text-[12px] opacity-40">Waiting for audio</span>
-            )}
+            {earView ? <RoomReadout view={earView} /> : <span className="text-[12px] opacity-40">Waiting for audio</span>}
             <button
               onClick={() => onRecalibrate?.()}
               className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[13px] font-medium opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
@@ -330,11 +349,15 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         {/* What each band of the sound moves: Sound Mappings, as was. */}
         <span className="mb-2 mt-4 block text-[11px] font-medium uppercase tracking-wide text-white/40">What the sound moves</span>
         {/*
-          The selects below are the fixed wiring — which audio band drives
-          velocity, density and colour — and they stay, because they are what
-          the solver reads directly. The other way in is a patch, which can
-          take *any* audio feature to *any* setting; Sound Impact, the master
-          over those, sits with the patch bay under Patches.
+          The selects below are the coarse wiring: which reading the look's
+          music cords take (PLAN 38v-1, lib/musicCords.ts). Velocity is what
+          the Press cord reads, density the pulse's pour and heat, colour the
+          Bottle cord that picks which dye pours. They were read by the
+          frame loop's own hands until those became cords; now each select
+          rewires its cords, which are on the patch bay with every other, and
+          "none" leaves them plugged in reading nothing. Sound Impact, the
+          master over every sound cord, sits with the patch bay under Patches;
+          Sound Drive, above, is the master over these.
 
           Rotation was a fourth select here, the same `audioMappings.rotation`
           as Plate Spin's "Driven by": two drawings of one route, the one here
@@ -343,14 +366,16 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         */}
         {['velocity', 'density', 'color'].map((param) => (
           <div key={param} className="flex flex-col gap-2 mb-4">
-            <span className="text-[13px] font-medium text-text">{param}</span>
+            <span className="text-[13px] font-medium text-text">{param} <span className="text-white/40 font-normal">({ROUTE_NAMES[param as MusicRoute]})</span></span>
             <select
-              value={settings.audioMappings[param as keyof typeof settings.audioMappings]}
+              value={musicRouteOf(settings.sceneMappings, param as MusicRoute)}
+              data-testid={`sound-route-${param}`}
               onChange={(e) => onUpdate({
                 audioMappings: {
                   ...settings.audioMappings,
                   [param]: e.target.value
-                }
+                },
+                sceneMappings: withMusicRoute(settings, param as MusicRoute, e.target.value as AudioFeature, null),
               })}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:border-white/30 transition-all"
             >
