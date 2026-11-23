@@ -1,3 +1,4 @@
+import { withMusicRoute } from './musicCords.ts';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { MOIRE_LOOKS } from '../presetsMoire';
 import { DROPPER_COLORS } from '../constants';
@@ -119,7 +120,7 @@ export function luckyLook(
   const audioFeatures: ('none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity')[] = ['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'];
   const randomFeature = () => audioFeatures[Math.floor(rand() * audioFeatures.length)];
 
-  return {
+  const look: VisualizerSettings = {
     /*
       Everything this roll does not have an opinion about, kept.
 
@@ -298,6 +299,9 @@ export function luckyLook(
     exposure: rand() < 0.25 ? rand() * 0.8 : 0,
     filmMix: current.filmMix,
     filmKey: current.filmKey,
+    filmZoom: current.filmZoom,
+    filmX: current.filmX,
+    filmY: current.filmY,
     glossiness: rand() < 0.8 ? 0 : rand() * 0.4,
     postBlurRadius: rand() * 0.7,
     // One roll in four goes closeup — a magnified chase is its own happy
@@ -316,9 +320,17 @@ export function luckyLook(
     macroCellScale: 0.25 + rand() * 0.7,
     macroLacing: 0,
     macroDepth: 0.25 + rand() * 0.6,
-    macroEdgeDetail: 0.3 + rand() * 0.7,
     macroRelief: 0.4 + rand() * 0.6,
     simResolution: current.simResolution,
     ...sheetsRoll(rand, moirePack),
   };
+  /*
+    The roll's wiring, on the music's cords (PLAN 38v-1): the routes it rolls
+    are what the look's pulse, press and bottle cords read, as they were what
+    the music's old hands read. Without this a roll kept the last look's
+    cords and its rolled routes moved nothing.
+  */
+  let maps = look.sceneMappings;
+  for (const r of ['density', 'velocity', 'color'] as const) maps = withMusicRoute({ ...look, sceneMappings: maps }, r, look.audioMappings[r], null);
+  return { ...look, sceneMappings: maps };
 }

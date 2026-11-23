@@ -7,13 +7,6 @@ Part 4 of 4 of §19; it begins at 19al. The section starts in `19-checks-build-p
 First built 2026-10-24 as #450 (plan id 19ae then, since given to the phone check),
 closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
 
-- **19al-1. Shipped:** a green head says so on the PR, and every hop names its commit
-  (`ready.yml`; docs/plan-shipped.md, 19al).
-- **19al-2. Shipped:** a `PASS` merges without waiting for Antigravity: the reviewer
-  merges on its own `PASS`, pinned to the head it passed (the owner, 2026-10-24;
-  docs/plan-shipped.md, 19al).
-- **19al-3. Shipped:** "Who takes what" by what the job needs, the owner's 2026-11-01
-  split; two `CHANGES` hand a PR to Claude Code (docs/plan-shipped.md, 19al).
 - **19al-4. Open: the watcher no longer relays "ready".** With `READY` on the PR, the
   reviewing thread can subscribe to each Antigravity PR and wake on the comment itself;
   the Mac watcher keeps only what needs the Mac (full `qa`, driving Antigravity). A
@@ -22,9 +15,6 @@ closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
   and merge timestamps on each Antigravity PR: green → review, review → fix, fix →
   merge. The daily scorecard reads open → merge today; split, it would show which hop to
   fix next.
-- **19al-6. Shipped:** the first live labels. `ready.yml` labelled five Antigravity PRs
-  on their own green heads on 2026-11-09 between 05:35Z and 09:16Z, each with its
-  `READY #N <item> head <sha>` line (docs/plan-shipped.md, 19al).
 - **19al-7. Open: nothing merges a ready PR by itself.** Found 2026-11-10: those five
   sat labelled and green for a day, unmerged. Three causes, all in the hop after the
   label. (1) `ready.yml` only labels and comments, by design: the merge was the
@@ -46,16 +36,12 @@ closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
   payments, sign-in or Worker paths; anything else keeps `ready-for-review` for a
   Claude session. Check: a stubbed-`gh` harness over the five PRs of 2026-11-09 (four
   merge, P7-cpu stays) in `scripts/checks.json`.
-
 ## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
 
 The owner's rule since 2026-11-01, made mechanical on 2026-11-09 (card 14 adopted
 13:12Z): on 11-08 the fifth shard was red on deploys 699 and 701 and 16 of 34 merges
 landed on a red main.
 
-- **19am-1. Shipped:** `hold.yml` posts `Main not held red` on every open PR, red while
-  the same job is red at its newest two results on main's deploys, green on a PR labelled
-  `fixes-main` (`scripts/mainhold.mjs`, `npm run mainhold`; docs/plan-shipped.md, 19am).
 - **19am-2. Open: the ruleset on main requires `Main not held red`.** Until it does, the
   status refuses nothing by itself; the ship skill and docs/handoff.md's merge step read
   it. Add the context to ruleset 24848041's required checks (a cloud session's proxy
@@ -75,7 +61,6 @@ landed on a red main.
   and the early stop on saved runs, but not the HTTP reading itself (paging, the re-run
   attempt lookup, the GraphQL read of each PR's status). A recorded set of responses
   played through a stub `fetch` would cover it.
-
 ## 19an. Conflict markers reached main and nothing stopped them (2026-11-11)
 
 A squash merge on 2026-11-10 (25i-10) landed `<<<<<<< HEAD` / `=======` / `>>>>>>>` blocks
