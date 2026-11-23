@@ -145,6 +145,17 @@
       ]
     },
     {
+      "name": "One panel, one kind of control",
+      "shard": "logic",
+      "run": "npm run panelkinds",
+      "why": [
+        "Every desk panel and the Wall panel rendered in node: none draws both knobs and",
+        "sliders, Rides and the Mixer draw sliders, the Recipe and section panels knobs,",
+        "whatever a control is learned to on a controller (PLAN 8d-3, the owner,",
+        "2026-11-22: the Recipe's Bubbles and Saturation were sliders among knobs again)."
+      ]
+    },
+    {
       "name": "The desk's layouts",
       "shard": "logic",
       "run": "npm run desklayout",
@@ -346,6 +357,19 @@
       ]
     },
     {
+      "name": "One film at a time on the owner's Mac",
+      "shard": "logic",
+      "run": "npm run maclock -- --selftest",
+      "why": [
+        "The Mac film lock and FIFO queue (scripts/maclock.mjs, PLAN.md 19ak-23):",
+        "exclusive execution, FIFO ordering across queued waiters, dead-pid and",
+        "over-timeout stale recovery, manual one-line locks honoured and aged,",
+        "timeout cleanup, CG_FILM_LOCK_HELD nesting, stale-rename race protection,",
+        "--max-wait exit 75 with no leftover ticket, deploy-mark priority, and",
+        "scripts/macbusy.sh refusing a live film.lock."
+      ]
+    },
+    {
       "name": "Two runners on one Mac never share a harness port",
       "shard": "logic",
       "run": "npm run ports",
@@ -440,6 +464,26 @@
         "and a pour, a spreading dye body and a dimming lamp each turned down by",
         "its own step (47w-2, scripts/watchcuts.mjs). In the sound shard for its",
         "ffmpeg. About two minutes."
+      ]
+    },
+    {
+      "name": "Watching in words",
+      "shard": "sound",
+      "run": "npm run watchwords",
+      "quarantine": [
+        { "line": "drift → drift2 (the same look, another phase): no steady change past a step", "plan": "47x-11", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
+      "why": [
+        "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
+        "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
+        "from an after one (PLAN.md 47x). Held to clips made to sit at known poles:",
+        "a steady drift reads sustained, analogous and all-over; a picture that",
+        "sits and jumps reads sudden and strong; a centred disc on black reads",
+        "centred and dark-ground, hard-edged at one pixel and soft at fourteen.",
+        "The before/after read must rank the edge first when only the edge",
+        "changed, and find nothing steady changed between two takes of the same",
+        "look. Written before the words were built, so it holds them to pictures",
+        "and not to the code's own thresholds. In the sound shard for its ffmpeg."
       ]
     },
     {
@@ -1792,7 +1836,7 @@
         "and that the dial is live out of focus so nothing moving is the shader's",
         "answer. It also",
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
-        "with airNear's mask taken off finds the glow again), and a pool's edge",
+        "with the slope's air hold taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
         "so it sits here beside lampzero rather than in the Mac queue.",
         "In a Measure part of its own, `lab4`, since main's deploys 667 and 670",
@@ -2798,6 +2842,15 @@
       ]
     },
     {
+      "name": "The flower",
+      "shard": "plate",
+      "run": "npm run flower",
+      "why": [
+        "No ghost copies of a thin rim one cell apart round a drop or a bubble (PLAN 31s-8): the slope reads each tap as its cell's mean, so a rim thinner than a cell is not copied at every tap offset.",
+        "The point-read control (each tap read at one texel again, what drew the flower) must read the comb, or the measure sees nothing."
+      ]
+    },
+    {
       "name": "The straw bubble",
       "shard": "plate",
       "run": "npm run straw",
@@ -3178,6 +3231,10 @@
       "name": "The ferrofluid's spikes",
       "shard": "plate",
       "run": "npm run spikes",
+      "quarantine": [
+        { "line": "held close under a pool, the magnet parts it into domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "the plate lights a point on the domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "The magnet held close stands the ferrofluid up: the pool parts into",
         "lit domes and its outline stops being a blob's; a look's own far",
@@ -3845,7 +3902,8 @@
         { "line": "a flick on water: the liquid trails the glass by its drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
         { "line": "and the picture turns with the liquid, not the glass", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
         { "line": "the solver is handed the dish", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
-        { "line": "two drag times later the picture has lost the drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" }
+        { "line": "two drag times later the picture has lost the drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "a dish the turntable turns drags the same water the same way", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" }
       ],
       "why": [
         "A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md",

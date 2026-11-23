@@ -118,7 +118,7 @@ export const FADE_OUT_S = 1.2;
 
 export const SITE_FILMS: readonly SiteFilm[] = [
   {
-    id: 'effervescence', look: 'splodascope', lookName: 'Splodascope', kind: 'Ambient electronica, 2023', seed: 1, loopAt: 120, youtube: 'mIkBqddPS_c',
+    id: 'effervescence', look: 'splodascope', lookName: 'Splodascope', kind: 'Ambient electronica, 2023', seed: 1, loopAt: 120, youtube: 'Dl3gUrC7kQo',
     music: {
       title: 'Effervescence', artist: 'Scott Buckley', year: 2023, page: 'https://www.scottbuckley.com.au/library/effervescence/',
       file: 'https://www.scottbuckley.com.au/library/wp-content/uploads/2023/07/Effervescence.mp3',
@@ -134,7 +134,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'distant-sun', look: 'galaxy', lookName: 'Galaxy', kind: 'Space ambient, 2019', seed: 1, loopAt: 90, youtube: '-us9tmNVuWA',
+    id: 'distant-sun', look: 'galaxy', lookName: 'Galaxy', kind: 'Space ambient, 2019', seed: 1, loopAt: 90, youtube: '8645KzNomd4',
     music: {
       title: 'The Distant Sun', artist: 'Scott Buckley', year: 2019, page: 'https://www.scottbuckley.com.au/library/the-distant-sun/',
       file: 'https://www.scottbuckley.com.au/library/wp-content/uploads/2019/07/sb_monomyth_1_thedistantsun.mp3',
@@ -150,7 +150,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'undertow', look: 'neon-coral-reef', lookName: 'Neon Coral Reef', kind: 'Drifting ambient, 2019', seed: 1, loopAt: 100, youtube: 'L20txtagBLw',
+    id: 'undertow', look: 'neon-coral-reef', lookName: 'Neon Coral Reef', kind: 'Drifting ambient, 2019', seed: 1, loopAt: 100, youtube: 'vEjOw8dyjiA',
     music: {
       title: 'Undertow', artist: 'Scott Buckley', year: 2019, page: 'https://www.scottbuckley.com.au/library/undertow/',
       file: 'https://www.scottbuckley.com.au/library/wp-content/uploads/2019/12/sb_undertow.mp3',
@@ -158,7 +158,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'machina', look: 'velvet-underground', lookName: 'Velvet Underground', kind: 'Dark ambient electronica, 2019', seed: 1, loopAt: 120, youtube: 'iAfSG01qJVo',
+    id: 'machina', look: 'velvet-underground', lookName: 'Velvet Underground', kind: 'Dark ambient electronica, 2019', seed: 1, loopAt: 120, youtube: 'l-Ze5GmZJMQ',
     music: {
       title: 'Machina', artist: 'Scott Buckley', year: 2019, page: 'https://www.scottbuckley.com.au/library/machina/',
       file: 'https://www.scottbuckley.com.au/library/wp-content/uploads/2019/12/sb_machina.mp3',

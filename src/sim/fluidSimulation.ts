@@ -50,7 +50,7 @@ import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
 import { layPress } from './pressLay';
-import { SolverSeeds, takeBack, addShare, scaleSince } from './solverLay';
+import { SolverSeeds, takeBack, addShare, scaleSince, OwedLay, dishMean } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
@@ -134,6 +134,9 @@ export class FluidSimulation {
   /** Everything `addDensity` has been given, summed, so a frame's hand can be told from the music's. */
   private laidMass = 0;
   private readonly seeds = new SolverSeeds();
+  /** The four dye arrays as they are now (a resize makes new ones). */
+  private readonly dye = () => [this.density, this.densityR, this.densityG, this.densityB];
+  private readonly owed = new OwedLay(this.dye);
   private handMarkMass = 0;
   /**
    * Dye a hand has laid on a seeded plate, as a mean over the dish, that the
@@ -618,6 +621,7 @@ export class FluidSimulation {
     this.gpu = gpu;
     gpu.clear();
     this.carried = !!this.carry && !!gpu.takeOver?.(this.carry);
+    this.owed.take(!this.carried, (l, n) => this.layLook(l, n));
     // Its readings count from nothing again, and whatever was pending went with the last solver.
     this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
@@ -1260,6 +1264,7 @@ export class FluidSimulation {
   injectImage(imgData: ImageData) { pourPictureCpu(this, imgData, this.size); }
 
   clearAll() {
+    this.owed.clear();
     this.liquid.clear();
     this.speciesPoll.clear();
     this.gpu?.clear();
@@ -1342,7 +1347,7 @@ export class FluidSimulation {
    * seeding is random) and the change flashed through several pictures.
    */
   captureSeed(lay: () => void): Float32Array[] {
-    const arrays = [this.density, this.densityR, this.densityG, this.densityB];
+    const arrays = this.dye();
     const before = arrays.map(a => a.slice()), onSolver = this.seeds.capture(lay), delta = takeBack(arrays, before);
     this.seeds.keep(delta, onSolver);
     this.dirty = true;
@@ -1353,7 +1358,7 @@ export class FluidSimulation {
   addSeedShare(seed: Float32Array[], k: number): void {
     if (!(k > 0)) return;
     this.seeds.share(seed, this.gpu, k);
-    addShare([this.density, this.densityR, this.densityG, this.densityB], seed, k);
+    addShare(this.dye(), seed, k);
     this.dirty = true;
   }
 
@@ -1364,14 +1369,18 @@ export class FluidSimulation {
    */
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
     const k = c01(w);
-    const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
+    const before = this.dye().map(a => a.slice());
     const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
-    scaleSince([this.density, this.densityR, this.densityG, this.densityB], before, k);
+    scaleSince(this.dye(), before, k);
     this.dirty = true;
     return harmony;
   }
 
   seedPreset(look: string, noise2D: (x: number, y: number) => number): number[] {
+    return this.owed.lay(!this.gpu && this.seeds.plain(), look, noise2D, () => this.layLook(look, noise2D));
+  }
+
+  private layLook(look: string, noise2D: (x: number, y: number) => number): number[] {
     const presetId = plateLook(look);
     const S = this.size;
     const cx = S / 2, cy = S / 2;
@@ -1380,17 +1389,7 @@ export class FluidSimulation {
     const harmony = PRESET_CONTRACTS[look] || pickHarmony();
     const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
 
-    const dishSum = () => {
-      let s = 0;
-      for (let j = 0; j < S; j++) {
-        const v = (j + 0.5) / S - 0.5;
-        for (let i = 0; i < S; i++) {
-          const u = (i + 0.5) / S - 0.5;
-          if (u * u + v * v < OPEN_RIM * OPEN_RIM) s += Math.min(6.0, this.density[i + j * S]);
-        }
-      }
-      return s / Math.max(1, this.dishArea);
-    };
+    const dishSum = () => dishMean(this.density, S, this.dishArea);
     const beforeMean = dishSum();
 
     const areas = plateAreas(presetId);
@@ -3578,7 +3577,7 @@ export class FluidSimulation {
     // before the thickness itself is: the gate must not shift under the pass.
     this.shpA.set(this.density);
     const ga = this.shpA;
-    for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
+    for (const ch of this.dye()) {
       this.shp.set(ch);
       const o = this.shp;
       for (let y = 1; y < N - 1; y++) {

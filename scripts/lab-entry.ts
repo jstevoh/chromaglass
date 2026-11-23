@@ -864,8 +864,8 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    // Asked for the air field and there is none: airNear would read a blank
-    // and be 0, which a check of the flat dye beside a hole would take for the
+    // Asked for the air field and there is none: the slope would read a blank
+    // and hold nothing, which a check of the flat dye beside a hole would take for the
     // mask not being there. Say so instead.
     if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
     const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, faraday: l.solver.fields.faraday, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };

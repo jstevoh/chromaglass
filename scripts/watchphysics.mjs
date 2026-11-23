@@ -130,6 +130,9 @@ function search(a, b, px, py, bs, cx, cy, r) {
   return { dx: bx, dy: by, s: best, x, y };
 }
 
+/** How much worse a seeded match may be than the unseeded one and still win (see flowField). */
+const SEED_SLACK = 1.25;
+
 /**
  * The displacement field from half-size image A to B: a vector per 8×8 block
  * (16 pixels at 320), in half-size pixels, or null where the block has too
@@ -140,8 +143,35 @@ function search(a, b, px, py, bs, cx, cy, r) {
  * coarse blocks are bigger than the fine one on purpose: a block of 2 pixels
  * at an eighth matches noise (the first version did, and read a slid texture
  * at 0.4 of its true whole-field share).
+ *
+ * With `seed` (the field from A to an earlier sample) and `ratio` (this
+ * lag over the seed's), a block whose seed vector matched cleanly is also
+ * searched about that vector times the ratio, ±(1 + ceil(ratio)). The words
+ * check's drifting stripes found why (47x-10): a 64-pixel sine moving a pixel
+ * a frame moves 15 half-size pixels in the second, almost half its period of
+ * 32, so over the second the true shift and the one the other way (17 back)
+ * match the stripes about equally, and which one the coarse search took came
+ * down to the codec's noise. On one ffmpeg both takes of the same look took
+ * the alias and read the drift backwards, 7.1 and 6.9 % a second the wrong
+ * way; on Ubuntu's they split, two steps apart; the truth is 9.4 forwards.
+ *
+ * So physicsSummary follows the motion through time rather than guessing it
+ * between two far-apart frames: the one-sample field first (1.5 pixels, a
+ * twentieth of the period, which cannot alias), then lags of about 2.5 times
+ * the last (1, 3, 8, 10 samples), each seeded from the one before. Any
+ * repeating texture moving near half its period in a second (ripples,
+ * stripes, a lattice of cells) aliased the same way. The chain is short
+ * steps on purpose: a first version scaled the one-sample vector straight up
+ * to the second, and under the self-test's grain a one-sample vector is
+ * mostly noise, so ten times it landed nowhere (the carried share fell from
+ * 0.94 to 0.80); one seeded from it at three samples is already good to a
+ * pixel. The unseeded search still runs, and the seeded match wins unless it
+ * is worse than the unseeded one by more than SEED_SLACK: an alias matches
+ * about as well as the truth (that is what makes it an alias), so the seed
+ * decides between them, and a seed thrown off by grain lands far from any
+ * match and loses to the search.
  */
-export function flowField(A, B) {
+export function flowField(A, B, seed = null, ratio = 1) {
   const qa = halve(A), qb = halve(B), ea = halve(qa), eb = halve(qb);
   const BS = 8, nx = Math.floor(A.w / BS), ny = Math.floor(A.h / BS), out = [];
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
@@ -161,14 +191,19 @@ export function flowField(A, B) {
     if (sd < 3) { out.push(null); continue; }
     const e = search(ea, eb, cx / 4, cy / 4, 6, 0, 0, 6);
     const q = search(qa, qb, cx / 2, cy / 2, 8, Number.isFinite(e.s) ? 2 * e.dx : 0, Number.isFinite(e.s) ? 2 * e.dy : 0, 2);
-    const h = search(A, B, cx, cy, BS, Number.isFinite(q.s) ? 2 * q.dx : 0, Number.isFinite(q.s) ? 2 * q.dy : 0, 2);
+    let h = search(A, B, cx, cy, BS, Number.isFinite(q.s) ? 2 * q.dx : 0, Number.isFinite(q.s) ? 2 * q.dy : 0, 2);
+    let edge = Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6;
+    const sv = seed ? seed.v[j * nx + i] : null;
+    if (sv && !sv.edge && sv.resid <= 0.6) {
+      const t = search(A, B, cx, cy, BS, Math.round(sv.dx * ratio), Math.round(sv.dy * ratio), 1 + Math.ceil(ratio));
+      if (Number.isFinite(t.s) && !(t.s > SEED_SLACK * h.s)) { h = t; edge = false; }
+    }
     if (!Number.isFinite(h.s)) { out.push(null); continue; }
     const par = (l, c, r) => (Number.isFinite(l) && Number.isFinite(r) && l + r - 2 * c > 0 ? Math.max(-0.5, Math.min(0.5, (l - r) / (2 * (l + r - 2 * c)))) : 0);
     const fx = par(zsad(A, B, h.x, h.y, BS, h.dx - 1, h.dy), h.s, zsad(A, B, h.x, h.y, BS, h.dx + 1, h.dy));
     const fy = par(zsad(A, B, h.x, h.y, BS, h.dx, h.dy - 1), h.s, zsad(A, B, h.x, h.y, BS, h.dx, h.dy + 1));
     // Match quality: the residual a pixel against the block's own contrast.
     const resid = h.s / (BS * BS) / sd;
-    const edge = Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6;
     out.push({ x: cx, y: cy, dx: h.dx + fx, dy: h.dy + fy, resid, edge });
   }
   return { nx, ny, v: out };
@@ -384,8 +419,12 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
   for (let k = 0; k + 1 < n; k += stride) {
     const L = useLong ? (k + long < n && shotOf[k + long] === shotOf[k] ? long : 0) : shotOf[k + 1] === shotOf[k] ? 1 : 0;
     if (!L) continue;
-    const fl = flowField(F[k], F[k + L]);
+    // Followed through time (47x-10, see flowField): the one-sample field,
+    // then each lag seeded from the one before, about 2.5 times shorter.
     const fs = L > 1 ? flowField(F[k], F[k + 1]) : null;
+    let fl = fs, at = 1;
+    while (at < L) { const next = Math.min(L, Math.round(at * 2.5)); fl = flowField(F[k], F[k + next], fl, next / at); at = next; }
+    if (!fl) fl = flowField(F[k], F[k + L]);
     const vs = [];
     fl.v.forEach((f, i) => {
       let g = f, lag = L;
