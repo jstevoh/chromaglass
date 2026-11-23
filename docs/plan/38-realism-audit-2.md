@@ -255,4 +255,19 @@ is in the project's files).
   and `readField` answer 192², the CPU mirror's. A check or probe reading them thinks the plate
   is coarser than it is (this thread lost an hour to it). Report the GPU grid, or name the field
   `cpuN`, and say in `src/lib/checkHooks.ts` which grid each hook reads.
+- **38w-27. Classic's oil edge holds under stretch** (L; High, the owner's round five). Filmed
+  2026-11-22 with a hand on the dish (Beat Squeeze 0.6, Plate Rock 1.6): cells merge and are
+  pushed, but their edges blur into soft blobs and the colour washes out, where the 1969
+  footage (Liquid Loops) stretches pressed oil into sharp threads and bead strings. A real
+  interface is molecularly thin and its tension pulls a stretched thread into beads
+  (Rayleigh–Plateau); the Cahn–Hilliard band is a few cells wide and the strain smears it
+  faster than the chemical potential restores it. Measure the band's width against the strain
+  rate first, then sharpen the interface (mobility and ε matched to the grid, or a sharp-
+  interface reconstruction) so a press makes threads that pinch into beads.
+- **38w-28. Classic's water moves at the 1969 speed** (M; High, after 38w-27). The round-five
+  motion read (`npm run watch`): flow median 0.7 %/s against Liquid Loops' 6.9, turnover 10.7 s
+  against 1.8, curl ±0.01 against ±0.13, and 80% of the motion is the whole picture sliding
+  (17% in the reference). Liquids only interact where the water shears; ours barely does, so
+  cells never stretch or meet. The period hand drives it: a pressed second glass (radial
+  squeeze-out) and a deep rock. Give Classic that hand once 38w-27 keeps the edges.
 

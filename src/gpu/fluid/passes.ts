@@ -1037,10 +1037,12 @@ export class FluidPasses extends FluidFields {
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+    /* The oil bodies' viscosity (hsPrep's oilBody, PLAN 27f-7). */
+    const oilMix = this.mixLive && this.mix ? this.mix.read : this.blank('rgba');
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}:${oilMix.label}`,
       this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, this.airPush, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev, oilMix]);
     this.vel.swap();
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
