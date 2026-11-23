@@ -547,7 +547,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 38 | Realism audit: what still imitates, after §18 (asked 2026-10-30) | [`38-realism-audit.md`](docs/plan/38-realism-audit.md) | 38a–38u-16 | 61 |
 |  | (continued) | [`38-realism-audit-2.md`](docs/plan/38-realism-audit-2.md) | 38v–38w | 20 |
 | 39 | Feedback from inside the app (asked 2026-10-30) | [`39-feedback.md`](docs/plan/39-feedback.md) |  | 2 |
-| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) | 25 |
+| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) |  | 25 |
 | 41 | Specs for the thin items, part 2: sound and beat, many plates, the fluids (written 2026-11-01) | [`41-specs-sound-plates-fluids.md`](docs/plan/41-specs-sound-plates-fluids.md) |  | 28 |
 | 42 | What Liquid Light Lab's tutorials and gear showed (asked 2026-11-07) | [`42-liquid-light-lab.md`](docs/plan/42-liquid-light-lab.md) |  | 13 |
 | 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 12 |
