@@ -275,7 +275,7 @@ export class RhythmSheet {
   readonly gapMetres: number;
   /** The sheet's bending stiffness (N·m) and the film's rest depth (m). */
   readonly D: number;
-  readonly h0: number;
+  h0: number;
   /** The film's mobility h₀³/12μ (m³/Pa·s), from `setLiquid`. */
   private M = 0;
   /** The liquid's weight a metre of depth, ρg (Pa/m): what holds a floating sheet up where it is pushed down (Archimedes). */

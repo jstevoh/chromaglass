@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12 and later show a splash of their own at launch: the app's
+      icon on a plain colour. The colour is the start screen's blue, so the
+      splash, the logo screen and the start screen read as one.
+    -->
+    <style name="Tv" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@drawable/launch</item>
+        <item name="android:windowSplashScreenBackground">@color/screen</item>
+    </style>
+</resources>

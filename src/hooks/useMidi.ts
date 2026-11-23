@@ -60,7 +60,7 @@ export interface MidiFeedback {
   presetColor: (presetId: string) => { r: number; g: number; b: number } | null;
   /** Palette colour (0..1 RGB) by index, for the dye pads. */
   paletteColor: (index: number) => { r: number; g: number; b: number } | null;
-  toggles: { play: boolean; automate: boolean; macro: boolean; overlays: boolean; sequencer: boolean; blackout: boolean; record: boolean; performance?: boolean };
+  toggles: { play: boolean; automate: boolean; overlays: boolean; sequencer: boolean; blackout: boolean; record: boolean; performance?: boolean };
 }
 
 export interface MidiDevice { id: string; name: string; }
@@ -731,7 +731,6 @@ function toggleState(a: MidiAction, t: MidiFeedback['toggles']): boolean | null 
   switch (a) {
     case 'play-toggle': return t.play;
     case 'automate-toggle': return t.automate;
-    case 'macro-toggle': return t.macro;
     case 'overlays-toggle': return !t.overlays;
     case 'seq-play-pause': return t.sequencer;
     case 'blackout-toggle': return t.blackout;

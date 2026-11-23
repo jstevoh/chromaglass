@@ -123,7 +123,7 @@ export interface LiquidVisualizerHandle {
   plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
   /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
-  /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
+  /** A film by address, from the app's own origin (the video loaded by its address, PLAN 14ag): it streams, where a file is read whole first. */
   loadFilmUrl: (url: string) => Promise<void>;
   /**
    * A camera's picture as the film (lib/cameras.ts): `deviceId` from the

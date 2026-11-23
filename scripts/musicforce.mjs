@@ -94,25 +94,24 @@ const { BassPress, bassPressDepth, BASS_PRESS, BASS_STEP, stirOf, stirCordDepth,
 }
 
 /*
-  The frame loop's part, which the lab cannot run: read from the source. The
-  burst runs only off a thin gap, the hand is handed where the burst was,
-  and every plate is handed its hand on every running step from outside the
-  music's block (so a plate the music left, or music that stopped, lets up).
-  The depth is the velocity route's through `bassPressFor` (squish.ts: the
-  route over its ceiling, Sound Drive and the passage, PLAN 28e).
+  The frame loop's part, which the lab cannot run: read from the source.
+  Since PLAN 38v-1 the hand on the glass is a Press cord (lib/musicCords.ts)
+  played by the hands (lib/areaCords.ts): the loop sets the press from what
+  the hands laid (`hands.pressAt`) and hands every plate its press on every
+  running step after them, so a plate the music left, or music that stopped,
+  lets up. The burst went with the music's block. And the classic look's
+  press cord at the bass's ceiling and Sound Drive's 1x asks the depth the
+  old hand did at its deepest.
 */
 {
   const src = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
-  const block = src.indexOf('// ── Audio input to fluid'), each = src.indexOf('fluidsRef.current.forEach((pl, li) => {', block);
-  const hand = src.indexOf('pl.pressBass(', each), set = src.indexOf('bassPressAt = {', block);
-  const between = src.slice(set, each);
-  // The music's block opened after `let bassPressAt` must have closed before the forEach: its braces balance.
-  const opened = src.indexOf('if (currentAudioData && currentSettings.audioMappings) {', block);
-  const inner = src.slice(opened, each);
-  const depth = [...inner].reduce((d, ch) => d + (ch === '{' ? 1 : ch === '}' ? -1 : 0), 0);
-  check("the frame loop: the burst only off a thin gap, the hand set where the burst was and handed to every plate after the music's block",
-    src.includes('if (vel01 > 0.25 && !activeFluid.thinGap) {') && set > block && between.includes('bassPressFor(velRaw,') && each > set && hand > each && hand - each < 400 && depth === 0,
-    `braces between the music's block and the hand: ${depth} open`);
+  const decl = src.indexOf('let bassPressAt: { x: number; y: number; r: number; depth: number } | null = null;');
+  const set = src.indexOf('bassPressAt = hands.pressAt;', decl);
+  const each = src.indexOf('fluidsRef.current.forEach((pl, li) => {', set);
+  const hand = src.indexOf('pl.pressBass(', each);
+  check("the frame loop: the press set from the hands' Press cords and handed to every plate after them; no burst",
+    decl > 0 && set > decl && each > set && hand > each && hand - each < 400 && !src.includes('if (vel01 > 0.25 && !activeFluid.thinGap) {'),
+    `declared ${decl}, set ${set}, handed ${hand}`);
 }
 
 // ── 3 and 4. The plate, in the lab ───────────────────────────────────

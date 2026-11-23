@@ -11,7 +11,8 @@ import { liveRates, type LiveEncodeRate } from '../lib/liveRate';
 
 /**
  * The Live Show panel (PLAN.md 37x-4d): the Mac app streaming the show to
- * every platform the owner has added, at once, Pro only.
+ * every platform the owner has added, at once, on a Home or Pro licence
+ * (Pro only until 2026-11-15, PLAN.md 23.21).
  *
  * The owner, 2026-10-29: "open my mac app (pro version only) and configure
  * the live show... stream it on all of the popular streaming platforms".
@@ -125,7 +126,7 @@ export function LiveShowPanel() {
     return <p className="text-[13px] text-text-2" data-testid="live-show-absent">The Live Show streams from the Mac app.</p>;
   }
   if (!liveAllowed()) {
-    return <p className="text-[13px] text-text-2" data-testid="live-show-pro">The Live Show is part of Pro: stream the show to YouTube, Twitch, Facebook and the rest at once.</p>;
+    return <p className="text-[13px] text-text-2" data-testid="live-show-pro">The Live Show comes with Home and Pro: stream the show to YouTube, Twitch, Facebook and the rest at once.</p>;
   }
 
   return (
