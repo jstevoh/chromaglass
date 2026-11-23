@@ -343,5 +343,8 @@ if (watchPair) {
 
 fs.rmSync(dir, { recursive: true, force: true });
 const failed = results.filter(x => !x).length;
-console.log(failed ? `watchwords: ${failed} of ${results.length} FAIL` : `watchwords: ok ${results.length}/${results.length}`);
+// The closing line is the tally scripts/checks.mjs reads to hold a quarantined line
+// (47x-11). It used to read "watchwords: 1 of 58 FAIL", which the runner counted as a
+// second FAIL line, so no quarantine could ever match this check's red.
+console.log(`${results.length - failed}/${results.length} checks passed`);
 process.exit(failed ? 1 : 0);

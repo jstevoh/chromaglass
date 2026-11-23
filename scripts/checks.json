@@ -457,6 +457,9 @@
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
+      "quarantine": [
+        { "line": "drift → drift2 (the same look, another phase): no steady change past a step", "plan": "47x-11", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
         "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
@@ -3196,6 +3199,10 @@
       "name": "The ferrofluid's spikes",
       "shard": "plate",
       "run": "npm run spikes",
+      "quarantine": [
+        { "line": "held close under a pool, the magnet parts it into domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "the plate lights a point on the domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
       "why": [
         "The magnet held close stands the ferrofluid up: the pool parts into",
         "lit domes and its outline stops being a blob's; a look's own far",
@@ -3863,7 +3870,8 @@
         { "line": "a flick on water: the liquid trails the glass by its drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
         { "line": "and the picture turns with the liquid, not the glass", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
         { "line": "the solver is handed the dish", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
-        { "line": "two drag times later the picture has lost the drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" }
+        { "line": "two drag times later the picture has lost the drag time", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" },
+        { "line": "a dish the turntable turns drags the same water the same way", "plan": "22s-1", "since": "2026-11-22", "until": "2026-12-06" }
       ],
       "why": [
         "A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md",

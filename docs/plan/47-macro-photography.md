@@ -428,6 +428,15 @@ an unsteady measure says "may vary from take to take", and every word names its 
   one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
   two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
   one sample then lags of 3, 8 and 10, each seeded from the last.
+- **47x-11** two takes of one look still read as changed on Ubuntu. On main's deploy of
+  2026-11-22 (f825ee6b, Measure sound, after 47x-10 shipped) "drift → drift2 (the same look,
+  another phase): no steady change past a step" failed with show/turnover and show/own flow
+  speed each 1.3 steps apart between the two takes. #936 merged without that shard running,
+  so this is its first Ubuntu read. Find which of the two measures the phase moves (the
+  turnover's window against the stripes' period, as 47x-10 found for the flow), fix the read,
+  not the bar. Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the
+  check now closes on the "n/m checks passed" tally a quarantine counts against, where its old
+  "watchwords: 1 of 58 FAIL" line read as a second FAIL and no quarantine could match.
 - **47x-10** An artistic report card (`scripts/watchcard.mjs`): `reportCard(read, { cal, ratings })`
   scores seven canons (Unity, Complexity, Intensity, Arc, Surprise, Music fit, Restraint)
   from 0 to 10 by calibrating each measure against real liquid shows in `REAL_SHOW_CARDS`
