@@ -407,7 +407,11 @@ export function detectOverlays(frames, lums, isTitle, W, H) {
     return out;
   };
 
-  const dilated = dilate(filled, 4);
+  // Bridge nearby still pixels (up to 2 px inside still regions + 1 px edge fringe)
+  // without expanding the reported overlay box deep into moving background pixels.
+  const bridged = dilate(filled, 2);
+  for (let p = 0; p < N; p++) bridged[p] = bridged[p] && still[p] ? 1 : 0;
+  const dilated = dilate(bridged, 1);
   const seen = new Uint8Array(N);
   const stack = new Int32Array(N);
   const kept = new Uint8Array(N);
@@ -418,6 +422,7 @@ export function detectOverlays(frames, lums, isTitle, W, H) {
     let top = 0; stack[top++] = s0; seen[s0] = 1;
     let seedsInComp = 0;
     let x0 = W, y0 = H, x1 = 0, y1 = 0;
+    let bx0 = W, by0 = H, bx1 = -1, by1 = -1;
     const pts = [];
     while (top) {
       const p = stack[--top];
@@ -426,6 +431,10 @@ export function detectOverlays(frames, lums, isTitle, W, H) {
       const x = p % W, y = (p - x) / W;
       if (x < x0) x0 = x; if (x > x1) x1 = x;
       if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (filled[p]) {
+        if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
+        if (y < by0) by0 = y; if (y > by1) by1 = y;
+      }
       if (x > 0 && dilated[p - 1] && !seen[p - 1]) { seen[p - 1] = 1; stack[top++] = p - 1; }
       if (x + 1 < W && dilated[p + 1] && !seen[p + 1]) { seen[p + 1] = 1; stack[top++] = p + 1; }
       if (y > 0 && dilated[p - W] && !seen[p - W]) { seen[p - W] = 1; stack[top++] = p - W; }
@@ -433,11 +442,12 @@ export function detectOverlays(frames, lums, isTitle, W, H) {
     }
     if (seedsInComp < 12) continue;
     for (const p of pts) kept[p] = 1;
+    if (bx1 < bx0) { bx0 = x0; by0 = y0; bx1 = x1; by1 = y1; }
     boxes.push({
-      x: x0 / W,
-      y: y0 / H,
-      w: (x1 - x0 + 1) / W,
-      h: (y1 - y0 + 1) / H,
+      x: bx0 / W,
+      y: by0 / H,
+      w: (bx1 - bx0 + 1) / W,
+      h: (by1 - by0 + 1) / H,
     });
   }
 
@@ -608,17 +618,17 @@ export function analyseFootage({ frames, W, H, rate, from, file, pr, span, crop,
   // Flag detail unreliable when clear blocking is visible OR bitrate is starved
   // alongside blocky/soft high frequencies. Sparse/dark sharp plates compress
   // to low bpp with zero blocking and high spectral cutoff and stay reliable.
+  const severeBlocking = blockiness >= 1.30;
+  const starvedLow = bpp != null && bpp < 0.015 && (blockiness >= 1.10 || (cutoff != null && cutoff < 0.50));
+  const starvedMid = bpp != null && bpp < 0.045 && (blockiness >= 1.12 || (cutoff != null && cutoff < 0.42));
+  const compressedSoft = severeBlocking || starvedLow || starvedMid;
   let detailOk = true;
   let detailReason = null;
-  if (blockiness >= 1.30) {
+  if (compressedSoft) {
     detailOk = false;
-    detailReason = `blockiness ${blockiness.toFixed(2)} on 8 px grid`;
-  } else if (bpp != null && bpp < 0.015 && (blockiness >= 1.10 || (cutoff != null && cutoff < 0.50))) {
-    detailOk = false;
-    detailReason = `low bitrate (${bpp.toFixed(3)} bpp) with ${blockiness >= 1.10 ? `blockiness ${blockiness.toFixed(2)}` : `soft cutoff ${cutoff.toFixed(2)}`}`;
-  } else if (bpp != null && bpp < 0.045 && (blockiness >= 1.12 || (cutoff != null && cutoff < 0.42))) {
-    detailOk = false;
-    detailReason = `low bitrate (${bpp.toFixed(3)} bpp) with ${blockiness >= 1.12 ? `blockiness ${blockiness.toFixed(2)}` : `soft cutoff ${cutoff.toFixed(2)}`}`;
+    detailReason = severeBlocking
+      ? `blockiness ${blockiness.toFixed(2)} on 8 px grid`
+      : `low bitrate (${bpp.toFixed(3)} bpp) with ${blockiness >= 1.10 ? `blockiness ${blockiness.toFixed(2)}` : `soft cutoff ${cutoff.toFixed(2)}`}`;
   }
 
   return {
