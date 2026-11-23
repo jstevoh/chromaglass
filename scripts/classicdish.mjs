@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Classic Light Show lays a 1960s dish: oil cells in a coloured water.
+ * Lava Pop lays a 1960s dish: oil cells in a coloured water.
  *
  *   npm run classicdish      (any adapter that computes: scripts/lab.mjs)
  *
