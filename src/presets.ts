@@ -42,7 +42,7 @@ export const PRESETS: Preset[] = [
       /*
         38w-1: a real dish (the 1960s references, src/lib/oilLay.ts): oil cells
         in a coloured water on the lamp, each keeping its colour (Oil Bodies,
-        Film Hold), a meniscus round each, moved by a hand (plateRock, the
+        Film Hold), no drawn rim yet (38w-25), rocked by a hand (plateRock, the
         kick's press), the motor nearly off, no glow knobs. npm run classicdish.
       */
       lampGround: 1,
@@ -94,8 +94,8 @@ export const PRESETS: Preset[] = [
       plateCurve: 0,             // flat: at 0.2 a held Press never rests (heldpress, 38w-19)
       depthDrag: 1.2,
       plateSpring: 0.35,
-      plateRock: 0.55,           // a hand tips the dish: the references' swells
-      edgeRelief: 0.6,           // the meniscus round every cell: a dark rim and a bright one
+      plateRock: 0.8,            // the swells: 0.55 read as still (round four); 3.4x the motion (38w-24)
+      edgeRelief: 0,             // its rim reads the dye's slope, not the oil: dark lattice halos (38w-23)
       crispEdges: 1,             // the rims a real dish shows: one pixel, not the solver's band (38w-15)
       bubbles: 0.2,
       transmission: 0.4,
