@@ -356,8 +356,10 @@ try {
     `${laid.pour.total.toFixed(0)} against ${laid.dropper.total.toFixed(0)}`);
   // At the pour's own scale: its stream is about 0.03 of the plate across.
   const spreadOf = (l) => l.spread / Math.max(1e-6, l.near + l.spread);
-  check('and spreads it out from where it lands', pourTimed && spreadOf(laid.pour) > spreadOf(laid.dropper),
-    `${(100 * spreadOf(laid.pour)).toFixed(0)}% of it from 0.02 to 0.07, against Drop's ${(100 * spreadOf(laid.dropper)).toFixed(0)}%${timedSaid()}`);
+  // Pour's "spreads it out from where it lands" stood here until PLAN.md
+  // 19ak-21: the tools are held for wall time, so the share it compared
+  // moved with the runner's frame rate (19ak-13), and it only ever flaked.
+  console.log(`     Pour spread ${(100 * spreadOf(laid.pour)).toFixed(0)}% from 0.02 to 0.07, Drop's ${(100 * spreadOf(laid.dropper)).toFixed(0)}% (printed, not judged)${timedSaid()}`);
   check('Spray lays a wider mist than Drop', pourTimed && laid.spray.total > 5 && laid.spray.ring / laid.spray.total > laid.dropper.ring / Math.max(1e-6, laid.dropper.total),
     `${(100 * laid.spray.ring / Math.max(1e-6, laid.spray.total)).toFixed(0)}% beyond 0.07`);
   check('Splat flings dye round the hand', pourTimed && laid.splatter.total > 5 && laid.splatter.disc + laid.splatter.ring > 0.7 * laid.splatter.total,
@@ -930,7 +932,11 @@ try {
           says: `${r.wa.total.toFixed(0)} → ${r.wb.total.toFixed(0)}, against ${sgn(r.before.total)} before and ${sgn(after)} after with the plate left alone as long; ${r.straw} straw step(s) in the stroke` };
       };
       const kf = kept(fwd), kb = kept(back);
-      check('and keeps it rather than erasing it', kf.ok && kb.ok, `${kf.says}; the other way ${kb.says}`);
+      // "and keeps it rather than erasing it" was judged here until PLAN.md
+      // 19ak-21: the stroke is wall time, so its pool moved with the runner
+      // (272 plate steps on the owner's Mac, 83 to 144 on GitHub's, 19aj-1),
+      // and it only ever flaked. Printed, not judged.
+      console.log(`     Blow kept: ${kf.says}; the other way ${kb.says} (printed, not judged)`);
     } finally {
       // Caught, so a page already dead says why it died, not that this failed.
       await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true)).catch((e) => console.log(`     [seeding not put back] ${e.message}`));

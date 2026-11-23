@@ -56,6 +56,7 @@ import { engineQuery } from './frame.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { watchVideo, WatchError, findFfmpeg } from './watch.mjs';
 import { AUTOPLAY, withBand, untilRunning } from './recorder.mjs';
+import { untilFlowerFree } from './flowergate.mjs';
 
 const PORT = port(4353, 'SHOWREEL_PORT');
 const OUT = path.resolve(process.env.SHOWREEL_OUT ?? 'showreel');
@@ -120,6 +121,8 @@ const reel = { song: { file: path.basename(SONG), from: FROM, seconds: SECONDS }
 const save = () => fs.writeFileSync(path.join(OUT, 'showreel.json'), JSON.stringify(reel, null, 1));
 console.log(`  ${looks.length} looks${SET ? `, with ${JSON.stringify(SET)} laid over each` : ''}${SHARD ? ` (shard ${SHARD.join('/')})` : ''}, rendered at ${W}x${H} ${FPS} fps on seed ${SEED} to ${SECONDS} s of ${path.basename(SONG)} from ${FROM} s, into ${OUT}\n`);
 
+// Before the app opens: no film of a build that draws the flower (PLAN 31s-8, scripts/flowergate.mjs).
+await untilFlowerFree({ dist: 'dist' });
 const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
 try {
   for (const look of looks) {

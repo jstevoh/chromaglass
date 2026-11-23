@@ -164,6 +164,35 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ plateRock: v })}
           settingKey="plateRock"
         />
+        {/*
+          The dish on a speaker (PLAN 48f, gpu/faraday.ts): Shaker is the
+          drive's frequency (nought, no speaker), Shake how hard it shakes in
+          g. The music reaches Shake through a cord from the bass, in Patches
+          beside this card (the phone, with no patch bay, has its depth as
+          Music Shake: lib/shakeCord.ts), as Music Stir is the stir's.
+          Past the water's threshold the shaking stands up in a lattice of
+          Faraday waves at half the drive's frequency.
+        */}
+        <Slider
+          label="Shaker Hz"
+          value={settings.faradayHz ?? 0}
+          min={0}
+          max={150}
+          step={1}
+          onChange={(v: number) => onUpdate({ faradayHz: v })}
+          settingKey="faradayHz"
+        />
+        {(settings.faradayHz ?? 0) > 0 && (
+          <Slider
+            label="Shake g"
+            value={settings.faraday ?? 0}
+            min={0}
+            max={2}
+            step={0.01}
+            onChange={(v: number) => onUpdate({ faraday: v })}
+            settingKey="faraday"
+          />
+        )}
       </section>
       )}
     </>

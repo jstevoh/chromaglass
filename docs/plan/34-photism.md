@@ -27,7 +27,6 @@ dropped picture or 3D model driven by the music as its own look does not.
 because our free site asks for a login and needs its own reason to (saves your looks);
 a grid of generic stock thumbnails: ours are the plate itself.
 
-- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped.md` §34a (moved 2026-10-29, 19m-2).
 - **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
   video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
   the app's own frames, because a cloud session cannot film the app and the lab's plate barely
@@ -75,8 +74,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
 - **34a-6. The looks as films, each to its own kind of music, and on the channel.** *The row
   shipped (2026-11-08): six 1920s records, each played whole by a look, under the gallery; story
   in `docs/plan-shipped.md` §34a-6.*
-  - **34a-6a. The channel's ids.** *Shipped (2026-11-08): all six on the channel, Public, ids
-    in `siteFilms.ts`; story in `docs/plan-shipped.md` §34a-6.*
   - **34a-6c. Open: the channel's content claims.** Five of the six carry a claim from the
     channel's matching of a label's remaster: Rachmaninoff and Tears are blocked in some
     countries (Tears in Russia), Bessie, Caruso and the Wolverines only lose earnings. Every one
@@ -85,8 +82,22 @@ a grid of generic stock thumbnails: ours are the plate itself.
     all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
     about 30 days). Until one is won, a visitor in a blocked country who opens
     that card gets YouTube's own notice in the player, not the film.
-  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills; more records
-    as each year's recordings enter the public domain (1926's on 1 January 2027).
+  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills.
+  - **34a-6d. The films to modern ambient music.** *(The owner, 2026-11-21: "we need to move
+    all of the demo videos off of the old recordings. The quality is just too low.")*
+    **Shipped (2026-11-22):** the webpage's six loops, the TV samples (release `tv-films-1`)
+    and four of their channel copies on Scott Buckley's CC BY 4.0 library, each on the look its
+    record had. `public/landing/films/SOURCES.md` has each page, licence line and checksum.
+    The 1920s films stay on the channel and 34a-6c's disputes stand.
+  - **34a-6f. Open: the last three channel films.** Hymn to the Dawn and Permafrost are
+    rendered (`/Volumes/Media/ChromaGlass/renders/ambient-2026-11/`) but YouTube's daily upload
+    limit refused them, so their cards loop and do not open; and the long film of Chris
+    Zabriskie's *Cylinders* (CC BY 4.0, a look a piece, `npm run sitefilms -- --album
+    cylinders`) has 7 of 9 pieces. Upload them, then put the ids in `siteFilms.ts`
+    (`SITE_FILMS`, `CHANNEL_ALBUMS`) and `Sample.FILMS`.
+  - **34a-6e. Open: a TV build with the new films.** The Android TV app names its sample films
+    in `Sample.java`; a TV on build 24 or older keeps playing the 1920s films (they stay in the
+    `tv-films-1` release) until the next build reaches Play.
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
   synth people, producers and artists, who need the technical capabilities before they pay.)*
   `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
@@ -102,8 +113,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
   MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
   sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
   Found along the way:
-  - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
-    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
   - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
     a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
     packets are ignored; the menu could instead show the item disabled with an upgrade line, read
@@ -125,15 +134,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
     the set beside the page as a download.
-  - **34a-7f. The rig's wires, checked without the rig.** **Shipped** (`npm run rig`, `scripts/rig.mjs`):
-    the real show server with a Pro key; every OSC address on `/pro`, sent as Resolume, TouchDesigner
-    and Max send it, arrives as the message the page acts on; the page's `lights` leaves as an
-    ArtDmx universe at the set rate; a desk's universe arrives as settings; and in the built app an
-    OSC setting, a desk fader, a MIDI fader (past soft takeover) and a DAW's 120 BPM clock move the
-    page, and an OSC setting lights the controller's ring. All 33 lines green: no
-    claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
-    need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
-    programs themselves are `docs/judging.md` §93, one sitting with free versions.
   - **34a-7g. Resolume sends its own OSC addresses.** **Page half shipped** (`/pro`'s "OSC in" card and
     `docs/guide.md` § OSC, "From Resolume"). Resolume's manual allows what was needed: its OSC output
     mirrors its own address space (`/composition/layers/1/video/opacity`), and a custom output address per
@@ -150,12 +150,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
     another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
     Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
-- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
-  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
-  - **34a-8a. The films themselves on the page.** *Shipped with 34a-6 (PR #679, carried from #729): the row
-    "Six records from the 1920s" sits under the looks, and each card opens its film from the
-    channel on the page itself.*
-
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
