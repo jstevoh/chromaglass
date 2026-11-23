@@ -264,10 +264,25 @@ is in the project's files).
   faster than the chemical potential restores it. Measure the band's width against the strain
   rate first, then sharpen the interface (mobility and ε matched to the grid, or a sharp-
   interface reconstruction) so a press makes threads that pinch into beads.
+  *Part shipped 2026-11-22 (PR #946):* superbee limits the oil's flux in the carry and the
+  oil's Cahn–Hilliard runs eight substeps a frame (`OIL_CH_SUBSTEPS`). Measured with
+  probes of the live app under the hand (Beat Squeeze 0.6, Plate Rock 1.6): the interface share of oil cells fell from
+  0.24–0.28 to 0.09–0.12 (the still plate's 0.07), the oil level inside bodies rose from
+  0.78–0.82 to 0.91–0.93, and body cells from about 2,360 to about 6,450. Still open: threads
+  that pinch into beads (Rayleigh–Plateau) want a sharper interface than a few cells.
 - **38w-28. Classic's water moves at the 1969 speed** (M; High, after 38w-27). The round-five
   motion read (`npm run watch`): flow median 0.7 %/s against Liquid Loops' 6.9, turnover 10.7 s
   against 1.8, curl ±0.01 against ±0.13, and 80% of the motion is the whole picture sliding
   (17% in the reference). Liquids only interact where the water shears; ours barely does, so
   cells never stretch or meet. The period hand drives it: a pressed second glass (radial
   squeeze-out) and a deep rock. Give Classic that hand once 38w-27 keeps the edges.
+- **38w-29. The oil's colour rides the oil's own flux** (M; High, the owner's round five: "the
+  colors seem to get washed out"). A shortcut named in PR #946: the dye and the oil's dye are
+  carried on their own (minmod) and the Cahn–Hilliard step moves the oil fraction `c` but not
+  what is dissolved in it, so a sharper edge leaves the oil's colour behind the oil, and
+  `bodyPartition` hands that stray colour to the water. Measured on Classic under a hand: the
+  oil's dye falls 10,070 to 9,250 in 41 s (8% washes to the water); putting superbee on the
+  colour made it four times worse (9,200 to 5,300). In the real dish a dye dissolved in oil
+  moves with the oil, so the fix is to carry the oil's dye as its concentration times the
+  oil's own flux, in the carry and in the Cahn–Hilliard flux alike, so no colour is stranded.
 
