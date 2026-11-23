@@ -3237,7 +3237,8 @@ export class FluidSimulation {
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: c01(settings.oilTension),
       oilBodies: c01(settings.oilBodies),
-      // The oil's weight against the water (PLAN 27f-9c): −0.05, the mineral oil's lightness, where a look leaves it out.
+      // Oil weight (27f-9c; −0.05 left out), thickness (38w-31).
+      oilThickness: settings.oilThickness,
       oilWeight: Math.max(-1, Math.min(1, Number.isFinite(settings.oilWeight) ? settings.oilWeight : -0.05)),
       filmHold: c01(settings.filmHold),
       surfactantFlow: c01(settings.surfactantFlow),
