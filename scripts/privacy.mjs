@@ -59,6 +59,8 @@ const LINK_ONLY = {
   'securetoken.google.com': "the issuer a Firebase ID token must name (server/license-worker.js compares the token's `iss` to it); a string, never fetched",
   'archive.org': 'the music library credits each track with a link to its page',
   'creativecommons.org': "each track's licence, as a link",
+  'www.scottbuckley.com.au': "the webpage's films credit each piece with a link to its composer's page (src/lib/siteFilms.ts); the files there are fetched only by `npm run sitefilms` on a Mac, never by the site",
+  'chriszabriskie.bandcamp.com': "the channel album's page, as the credit's link (src/lib/siteFilms.ts); never fetched by the site",
   'github.com': 'links to the source, and the name LRCLIB asks clients to send',
   'www.w3.org': 'the SVG namespace string; nothing is fetched from it',
   'www.youtube.com': "the landing page links to the channel (PLAN 34a-8), opened in a new tab by the visitor's click; nothing is fetched or embedded from it",
@@ -99,6 +101,7 @@ const TEMPLATE_HOSTS = {
   'info.hosts[0]': 'own network: the show server\'s LAN address, for the phone',
   'raw': 'own network: the laptop address the person types into the phone',
   'host': 'own network: the show server printing its LAN address at start',
+  'lanHost': 'own network: the show server\'s LAN address in the Cast menu, for a network display (14m-https)',
 };
 /** What every visitor reaches whatever the code says: the hosts of the site itself and its fonts. */
 const ALWAYS = ['fonts.gstatic.com', 'Firebase Hosting', 'Cloudflare'];

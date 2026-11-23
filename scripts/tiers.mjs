@@ -546,7 +546,7 @@ try {
     const freeMoireNote = await moireNote();
     check(
       '8. free tier shows "In the ChromaGlass app" tiles (23.2) and locks the logo layer to the ChromaGlass mark (23.6)',
-      freeTiles.length === 7 && freeLogoLocked === 1 && freeMarkFileCount === 0,
+      freeTiles.length === 8 && freeLogoLocked === 1 && freeMarkFileCount === 0,
       `tiles=${freeTiles.length}, freeLogoLocked=${freeLogoLocked}, markFile=${freeMarkFileCount}`,
     );
 

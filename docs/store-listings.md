@@ -153,7 +153,7 @@ PLAN 12-tv-2b. A separate Play app (`app.chromaglass.tv`, `androidtv/`) with
 its own listing, because a TV app and a phone app are different packages. It
 draws nothing itself: it finds the Mac running the show on the same Wi-Fi and
 plays the plate the Mac sends it (12-tv-1, 12-tv-2). With no Mac it plays a
-sample film (the press clips), which is what Play's TV review, done on a real
+sample film (the channel's films, from YouTube, or from the site when YouTube will not play; 12-tv-2f, 12-tv-2h), which is what Play's TV review, done on a real
 TV with no Mac, will see. Its listing names no price and no tier either; it
 says plainly that it needs the Mac app, since a TV owner without one would get
 nothing from it but the sample.
@@ -210,7 +210,7 @@ identifier or analytics. No ads, no advertising ID, no sign-in.
 App access (Play Console → App content → App access), for the reviewer:
 
 ```text
-ChromaGlass TV plays a show that runs in the ChromaGlass app on a Mac on the same Wi-Fi network; the TV draws nothing itself. Without a Mac, choose "Watch a sample film" on the first screen: it plays two 20-second films of the same liquid light show the Mac sends (press Back to return). With a Mac: open ChromaGlass on the Mac and start the show; the TV finds it within a few seconds and shows four digits; press Allow on the Mac and the show plays on the TV. No account or sign-in is needed on the TV.
+ChromaGlass TV plays a show that runs in the ChromaGlass app on a Mac on the same Wi-Fi network; the TV draws nothing itself. Without a Mac, choose "Watch a sample film" on the first screen: it plays the channel's song films of the same liquid light show the Mac sends, from YouTube, or the same films from chromaglass.art if YouTube cannot play (press Back to return). With a Mac: open ChromaGlass on the Mac and start the show; the TV finds it within a few seconds and shows four digits; press Allow on the Mac and the show plays on the TV. No account or sign-in is needed on the TV.
 ```
 
 ## App Store: the Apple TV app

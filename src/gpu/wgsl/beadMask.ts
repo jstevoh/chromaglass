@@ -31,14 +31,8 @@
 
 import { BEAD_TILE } from '../../lib/beadPack';
 
-const COMMON = /* wgsl */ `
-struct Args {
-  S: u32,
-  tiles: u32,
-  wide: u32,
-  amount: f32,
-}
-
+/** One bead as lib/beadPack.ts writes it; the plate reads the same list (beadShape.ts, PLAN 38h-17). */
+export const BEAD_STRUCT_WGSL = /* wgsl */ `
 // lib/beadPack.ts writes these, BEAD_FLOATS (24) floats each.
 struct Bead {
   p: vec4f,     // centre x, y and radius in mask pixels, fade-in
@@ -50,6 +44,17 @@ struct Bead {
   inn: vec4f,   // the passenger's centre, radius and rim width
   icol: vec4f,  // the passenger's colour
 }
+`;
+
+const COMMON = /* wgsl */ `
+struct Args {
+  S: u32,
+  tiles: u32,
+  wide: u32,
+  amount: f32,
+}
+
+${BEAD_STRUCT_WGSL}
 
 const TILE: u32 = ${BEAD_TILE}u;
 

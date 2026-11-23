@@ -39,7 +39,6 @@ export interface GpuStepParams {
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
-  spin: number;         // vorticity strength (0 = off)
   immiscibility: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
   /*
@@ -199,6 +198,8 @@ export interface GpuStepParams {
   soapFilm?: number;
   /** The film's drain rate, its seconds per show second (default 1; PLAN 32i's time dial). */
   soapFilmRate?: number;
+  /** The frame's tilt from flat, degrees (default 90, hanging; PLAN 32h): gravity along the film is g sin of it. */
+  soapFilmTilt?: number;
   /** The tank's side view (PLAN 47n, gpu/tankPlate.ts): Tank (0 off, else its glow), Feed cm/s, Dye Weight % heavier than water, Nozzle 0..1 across, Drain 0..1, Glow Hue degrees. The front plate's only. */
   tank?: number;
   tankFeed?: number;
@@ -206,6 +207,9 @@ export interface GpuStepParams {
   tankNozzle?: number;
   tankDrain?: number;
   tankHue?: number;
+  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), and Shake, its peak acceleration in g. The front plate's only. */
+  faradayHz?: number;
+  faraday?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
@@ -321,6 +325,15 @@ export interface PlateSolver {
   /** Lay the oil cell for cell, replacing the mix (Foam Cells' pressed drops, PLAN 47z-5): `oil` is asked at each cell's middle in plate units, with the mix's size. */
   layOil?(oil: (x: number, y: number, n: number) => number): void;
   /**
+   * A look's dye laid at the solver's own grid (PLAN 38w-8): `dye` N²×4 in the
+   * CPU's delta format (absorbance × amount per channel, then the amount),
+   * `oil` the oil's own colour of it in the same format, or null. Held until
+   * the next lay; false when the arrays are not N² (the caller then lays on
+   * the CPU's grid). `layShare(k)` adds k of it to the plate.
+   */
+  layDye?(dye: Float32Array, oil: Float32Array | null): boolean;
+  layShare?(k: number): void;
+  /**
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
    * over the rim, and, for a liquid that mixes with the clear one (`sp`),
@@ -331,6 +344,8 @@ export interface PlateSolver {
   /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
   readonly coverUnits?: number;
   pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
+  /** Whether a pour's volume can be laid now without compiling on the frame that asks: its kernel is built behind the show (fluid.ts), and until it is, a drop is laid as a stamp (sim/dropSplash.ts). */
+  pourReady?(): boolean;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
   /**

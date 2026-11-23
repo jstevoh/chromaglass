@@ -119,10 +119,12 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
 const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle']);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
+  // Where the video sits on the plate (PLAN 14ag): a hand frames it, nothing wanders it.
+  'filmZoom', 'filmX', 'filmY',
   // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
   'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
-  'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
+  'macroRelief', 'macroSync', 'macroChase',
   // How far the music moves the frame (lib/plateRock.ts): a wander would
   // start the frame sliding under the viewer by itself, the very thing the
   // owner turned off (2026-10-11).
@@ -131,6 +133,9 @@ const NOT_THE_LOOK = new Set([
   // tilt, like the direction above, and a dial that would set the plate
   // slopping by itself in a look that was still.
   'slosh',
+  // The Tilt knobs (lib/handTilt.ts): a wander would tip a still plate and
+  // drain its heavy colour to one edge with nobody touching it.
+  'plateTiltX', 'plateTiltY',
   // Film Hold (PLAN 28k): a merge cannot be undone, so a wander down would
   // tear a look's crowd of drops into a few blobs for good, and up adds
   // nothing to a look without one. The look's own number, held.
@@ -186,7 +191,7 @@ const NOT_THE_LOOK = new Set([
     it (a granulation glide drawn the length of its reach in 6 s) and 4.20
     without (PLAN 10-8d-3).
   */
-  'soapFilm', 'soapFilmRate', 'soapFilmAngle',
+  'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
   /*
     The glitter, the lens and the side lamp (PLAN 47e, 47d, 47b-side) are the
     photographer's: what is in the dish, the stop the lens is set to, and a
@@ -202,6 +207,19 @@ const NOT_THE_LOOK = new Set([
     dials it reached for before (they were not in it, being new).
   */
   'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
+  /*
+    The dish on a speaker (PLAN 48f): whether there is a shaker and how
+    hard it shakes are the performer's and the music's (through its cord),
+    never a wander of Evolve's.
+  */
+  'faradayHz', 'faraday',
+  /*
+    Polarised light (PLAN 31p-1): the sheets are put into the beam and the
+    analyser turned by a hand at the projector. Wandering in, the sheets
+    would black the plate out under nobody's hand (crossed, a still plate
+    is dark); left out, the pool and Evolve's pace are as they were.
+  */
+  'polariser', 'analyserAngle', 'quarterWave', 'birefringence',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),
