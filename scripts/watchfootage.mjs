@@ -145,10 +145,39 @@ export function detectAutocrop(frames, W, H) {
   if (left < minW) left = 0;
   if (right < minW) right = 0;
 
+  // A letterbox or pillarbox appears as an opposite pair (top+bottom or
+  // left+right); a single-sided black margin (e.g. a widening dark side) stays.
+  if (!top || !bottom) { top = 0; bottom = 0; }
+  if (!left || !right) { left = 0; right = 0; }
+
   if (!top && !bottom && !left && !right) return null;
   const cw = (W - left - right) / W;
   const ch = (H - top - bottom) / H;
   if (cw < MIN_REMAINING || ch < MIN_REMAINING) return null;
+
+  // When all four sides look bordered, skip centered dark-ground discs whose
+  // bounding-box corners remain black and still across the shot.
+  if (top && bottom && left && right) {
+    const iw = W - left - right, ih = H - top - bottom;
+    const cs = Math.max(2, Math.floor(Math.min(iw, ih) * 0.12));
+    const corners = [
+      [left, top], [W - right - cs, top],
+      [left, H - bottom - cs], [W - right - cs, H - bottom - cs],
+    ];
+    let darkCorners = 0;
+    for (const [cx, cy] of corners) {
+      let maxMean = 0;
+      for (let k = 0; k < n; k++) {
+        const L = lums[k];
+        let s = 0;
+        for (let y = cy; y < cy + cs; y++) for (let x = cx; x < cx + cs; x++) s += L[y * W + x];
+        const m = s / (cs * cs);
+        if (m > maxMean) maxMean = m;
+      }
+      if (maxMean < BAR_LUMA_MAX) darkCorners++;
+    }
+    if (darkCorners >= 3) return null;
+  }
 
   return {
     x: left / W,
@@ -208,7 +237,21 @@ export function detectTitleSpans(lums, W, H, rate, t0 = 0) {
         if (g > 0.12) sharp++;
       }
     }
-    if (flat / intN >= TITLE_FLAT_FRAC_MIN && sharp / intN >= TITLE_EDGE_MIN && sharp / intN <= TITLE_EDGE_MAX) {
+    // Text/captions cross each scanline many times (letters), unlike a single solid shape.
+    const rowStep = H >= 60 ? 2 : 1;
+    let textRows = 0;
+    for (let y = 1; y < H - 1; y += rowStep) {
+      let crossings = 0, lastX = -10;
+      const off = y * W;
+      for (let x = 2; x < W - 2; x++) {
+        if (Math.abs(L[off + x + 1] - L[off + x - 1]) > 0.12 && x - lastX >= 2) {
+          crossings++;
+          lastX = x;
+        }
+      }
+      if (crossings >= 6) textRows++;
+    }
+    if (flat / intN >= TITLE_FLAT_FRAC_MIN && sharp / intN >= TITLE_EDGE_MIN && sharp / intN <= TITLE_EDGE_MAX && textRows >= Math.max(3, Math.floor((H / rowStep) * 0.03))) {
       looksLikeTitle[k] = true;
     }
   }
@@ -299,24 +342,22 @@ export function detectOverlays(frames, lums, isTitle, W, H) {
   // If almost nothing moves, the whole shot is still — not an overlay over moving footage.
   if (movingPixels / N < 0.08) return { mask: null, boxes: [] };
 
-  // A pixel is a seed if it is still AND either has a sharp edge between two
-  // still pixels (so a moving shape beside a still black background never fires)
-  // or is bright/coloured and still beside an edge in the temporal mean frame.
+  // A pixel is a seed if it is still AND has a sharp edge between two
+  // still pixels (so a moving shape beside a still black/flat region never fires).
   const seed = new Uint8Array(N);
   for (let y = 1; y < H - 1; y++) {
     for (let x = 1; x < W - 1; x++) {
       const p = y * W + x;
       if (!still[p]) continue;
       const i = p * 3;
-      const lumP = 0.2126 * meanRgb[i] + 0.7152 * meanRgb[i + 1] + 0.0722 * meanRgb[i + 2];
-      let stillGrad = 0, meanGrad = 0;
+      let stillGrad = 0;
       for (const q of [p - 1, p + 1, p - W, p + W]) {
+        if (!still[q]) continue;
         const qi = q * 3;
         const mg = Math.max(Math.abs(meanRgb[i] - meanRgb[qi]), Math.abs(meanRgb[i + 1] - meanRgb[qi + 1]), Math.abs(meanRgb[i + 2] - meanRgb[qi + 2]));
-        if (mg > meanGrad) meanGrad = mg;
-        if (still[q] && mg > stillGrad) stillGrad = mg;
+        if (mg > stillGrad) stillGrad = mg;
       }
-      if (stillGrad > OVERLAY_EDGE_MIN || (lumP > 0.15 && meanGrad > 0.06)) seed[p] = 1;
+      if (stillGrad > OVERLAY_EDGE_MIN) seed[p] = 1;
     }
   }
 
@@ -565,19 +606,19 @@ export function analyseFootage({ frames, W, H, rate, from, file, pr, span, crop,
   const bpp = probeBitrate(file, pr, span, ff);
 
   // Flag detail unreliable when clear blocking is visible OR bitrate is starved
-  // alongside blocky/soft high frequencies. High-bitrate soft focus (e.g. an
-  // out-of-focus plate at >= 0.05 bpp with no blocking) stays reliable.
+  // alongside blocky/soft high frequencies. Sparse/dark sharp plates compress
+  // to low bpp with zero blocking and high spectral cutoff and stay reliable.
   let detailOk = true;
   let detailReason = null;
   if (blockiness >= 1.30) {
     detailOk = false;
     detailReason = `blockiness ${blockiness.toFixed(2)} on 8 px grid`;
-  } else if (bpp != null && bpp < 0.015) {
-    detailOk = false;
-    detailReason = `low bitrate (${bpp.toFixed(3)} bpp)`;
-  } else if (bpp != null && bpp < 0.045 && (blockiness >= 1.10 || (cutoff != null && cutoff < 0.45))) {
+  } else if (bpp != null && bpp < 0.015 && (blockiness >= 1.10 || (cutoff != null && cutoff < 0.50))) {
     detailOk = false;
     detailReason = `low bitrate (${bpp.toFixed(3)} bpp) with ${blockiness >= 1.10 ? `blockiness ${blockiness.toFixed(2)}` : `soft cutoff ${cutoff.toFixed(2)}`}`;
+  } else if (bpp != null && bpp < 0.045 && (blockiness >= 1.12 || (cutoff != null && cutoff < 0.42))) {
+    detailOk = false;
+    detailReason = `low bitrate (${bpp.toFixed(3)} bpp) with ${blockiness >= 1.12 ? `blockiness ${blockiness.toFixed(2)}` : `soft cutoff ${cutoff.toFixed(2)}`}`;
   }
 
   return {
