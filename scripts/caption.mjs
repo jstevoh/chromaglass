@@ -46,6 +46,8 @@ import { chromium } from 'playwright';
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync } from 'node:fs';
+import { basename } from 'node:path';
+import { acquireFilmLock } from './maclock.mjs';
 
 const fails = [];
 const check = (id, what, ok, detail) => {
@@ -62,6 +64,7 @@ const server = createServer((req, res) => {
   res.end('<!doctype html><meta charset="utf-8"><body style="margin:0;background:#000"><script src="/caption.js"></script>');
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
+await acquireFilmLock({ label: `caption.mjs (${basename(process.cwd())})` });
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage();

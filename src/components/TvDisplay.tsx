@@ -4,6 +4,7 @@ import { useWakeLock } from '../hooks/useWakeLock';
 import { showKeyFromUrl, type RemoteMessage, type TvSignal } from '../lib/remoteProtocol';
 import { forgetTvKey, keepTvKey, keptTvKey } from '../lib/tvKey';
 import type { TvLook } from '../lib/tvLooks';
+import { TV_FILMS, tvFilmUrl } from '../lib/tvFilms';
 import TvRemote from './TvRemote';
 
 /**
@@ -20,11 +21,19 @@ import TvRemote from './TvRemote';
  * peer connection does.
  *
  * When there is no show (the laptop's page is closed, or reloading), the TV
- * is never a blank screen: it plays the films the site ships of the plate,
- * one after another, and goes live by itself when the show comes back (the
- * relay says `tv-show`). The films are the press clips today; the long
- * rendered films, and playing them with the laptop switched off altogether,
- * are 12-tv's sign-in item (the TV then talks to the site, not the laptop).
+ * is never a blank screen: it plays the channel's films of the plate, the
+ * six 1920s records whole (lib/tvFilms.ts, PLAN 12-tv-2f), one after another,
+ * from the site's address for them, and goes live by itself when the show
+ * comes back (the relay says `tv-show`). They were the press clips, served by
+ * the laptop, until the owner asked for better and longer ones (2026-11-14);
+ * the films now come from the internet, so a TV with no internet skips each
+ * and, when all have failed, shows the brand's logo on black rather than a
+ * film that never starts. Playing them with the laptop switched off
+ * altogether is 12-tv's sign-in item (the TV then talks to the site).
+ *
+ * The logo (the same file as the Android TV app's loading screen,
+ * public/brand/chromaglass-logo-512.png) heads the four digits of pairing
+ * and the line at the bottom, and stands in for the films when none plays.
  *
  * What it says, in a line at the bottom that fades after a few seconds: that
  * it is live, that the show is off, or why it was turned away (a wrong key,
@@ -40,8 +49,8 @@ import TvRemote from './TvRemote';
  * the key the relay then hands over is kept (lib/tvKey.ts) for next time.
  */
 
-/** The films played while there is no show: the plate's own, shipped with the site. */
-export const TV_FILMS = ['/press/clips/neon-coral-reef.mp4', '/press/clips/ferro-paint.mp4'];
+/** The brand's mark, as the TV app's loading screen shows it. */
+export const TV_LOGO = '/brand/chromaglass-logo-512.png';
 /**
  * How long the TV waits for a connection once the show says it is here, before
  * it starts over: an offer lost, or ICE that found no road. Ten seconds is
@@ -88,6 +97,8 @@ export default function TvDisplay() {
   const [state, setState] = useState<TvState>('looking');
   const [says, setSays] = useState(true);
   const [film, setFilm] = useState(0);
+  /** Films that failed one after another; at TV_FILMS.length there is no internet, and the logo stands in. */
+  const [filmFailed, setFilmFailed] = useState(0);
   const [code, setCode] = useState<string | null>(null);
   const [looks, setLooks] = useState<{ presets: TvLook[]; active: string | null }>({ presets: [], active: null });
   // A URL's key wins; else the one kept from pairing; else this TV pairs.
@@ -266,21 +277,26 @@ export default function TvDisplay() {
         autoPlay
         playsInline
       />
-      {films && (
+      {films && filmFailed >= TV_FILMS.length && (
+        <img src={TV_LOGO} alt="ChromaGlass" data-testid="tv-logo" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[28vh] h-[28vh]" />
+      )}
+      {films && filmFailed < TV_FILMS.length && (
         <video
           key={film}
           data-testid="tv-film"
           className="absolute inset-0 h-full w-full object-contain"
-          src={TV_FILMS[film % TV_FILMS.length]}
+          src={tvFilmUrl(TV_FILMS[film % TV_FILMS.length])}
           muted
           autoPlay
           playsInline
+          onPlaying={() => setFilmFailed(0)}
           onEnded={() => setFilm((f) => f + 1)}
-          onError={() => setFilm((f) => f + 1)}
+          onError={() => { setFilmFailed((n) => n + 1); setFilm((f) => f + 1); }}
         />
       )}
       {state === 'pairing' && code && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-white text-center px-[6vw]" data-testid="tv-pair">
+          <img src={TV_LOGO} alt="" className="w-[14vh] h-[14vh] mb-[3vh]" />
           <div className="opacity-80" style={{ fontSize: 'clamp(16px, 2.4vw, 40px)' }}>To show ChromaGlass on this TV, allow it on the computer running the show</div>
           <div className="font-mono font-semibold tracking-[0.3em] my-[4vh]" style={{ fontSize: 'clamp(56px, 14vw, 240px)' }} data-testid="tv-pair-code">{code}</div>
           <div className="opacity-60" style={{ fontSize: 'clamp(13px, 1.6vw, 26px)' }}>It shows there as “A TV wants to join” with these four digits: press Allow.</div>
@@ -302,8 +318,9 @@ export default function TvDisplay() {
           background: 'linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0))',
         }}
       >
-        <span className="font-semibold tracking-wide">ChromaGlass</span>
-        <span className="opacity-70"> · {SAYS[state]}</span>
+        <img src={TV_LOGO} alt="" className="inline-block align-middle mr-[0.5em] w-[1.6em] h-[1.6em]" />
+        <span className="font-semibold tracking-wide align-middle">ChromaGlass</span>
+        <span className="opacity-70 align-middle"> · {SAYS[state]}</span>
       </div>
     </div>
   );

@@ -14,13 +14,13 @@ comments, which moved with it.
 | `useAmbientMode` | Ambient TV mode's switch |
 | `useSoundState` | what the show listens to, as state |
 | `useSongLine` | the song's shape, the bar and the heard tempo, for the status lines |
-| `usePour` | an image or a film poured into the dish |
+| `usePour` | an image or a film poured into the dish, and the one video loaded (`LoadedVideo`, `loaded`, `pourLoaded`, PLAN 14ag) |
 | `useSoundSource` | changing what the show hears; the music player; the drone |
 | `useBench` | the engine's status, Calibrate and the grid sweep (`?bench`) |
 | `useToast` | the one-line notice |
-| `useFilm` | the film that drives the plate: a file, a cartoon, a camera, a window |
+| `useFilm` | the film that drives the plate: a file, a camera, a window; and `video`, the row that plays and pours the video loaded (`VideoShelfProps`, PLAN 14ag) |
 | `useSceneSource` | the room camera as a sensor |
-| `usePaletteLock` | the palette held across looks |
+| `usePaletteLock` | the palette held across looks; since PLAN 43d also `paletteFromFile` (a picture or video file's colours as the palette, "From picture", the lock `PICTURE_LOCK`), `palettes` (the list the desk and the phone draw, the picture's last) and `pictureDyes` (sent to a projector with the lock) |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
 | `useSetListState` | the set list, the armed look, the Go's fade; publishes them to `setNow.ts` for the assistant, and its fade and cancel |
 | `usePhoneLayout` | phone, desks or the narrow overlay; Perform or Design |
@@ -33,7 +33,7 @@ comments, which moved with it.
 | `useLucky` | Lucky, and its one ask in Perform |
 | `useSongChangeFades` | a new song, a new look |
 | `useCastFeed` | the cast window, mirror and network display kept in step; the mark |
-| `useRecording` | the one Record button |
+| `useRecording` | the one Record button; in a portrait clip it also lays the wall's canvas out 9:16 for the clip (`wallRef`, `stageRef`, `phone`) and returns `phoneRecording` for the phone's More sheet |
 | `useGlides` | a setting walked to a value over seconds |
 | `useRowFades` | a mixer row's take button |
 | `useRemote` | the phone remote's link, both ways; and the TVs at home, `tv` (a `TvAtHome`: watching, asking to pair, paired, and Allow, No, Forget; PLAN 12-tv, 12-tv-2, `lib/tvFeed.ts`) |

@@ -58,6 +58,18 @@
  * below it, and over the glass it tints the picture below it and not the
  * sources laid on top. A saved order from before them keeps its picture: the
  * two go in under the front plate, where they always were.
+ *
+ * **The video** (PLAN 14ag-3) is the fourth that can be the lamp. The owner
+ * chose it as the way a video and the liquid meet (2026-11-14): the video as
+ * the lamp under the dish, the way a show sets its dish on a light panel or a
+ * tablet. Under the glass the film is a picture in the lamp house: the lamp
+ * passes through it, the liquid's surface bends where each point of it is
+ * seen from, and the dye takes its share out of its light, Beer–Lambert, as
+ * it does of any lamp's (wgsl/plateLamp.ts). Above the glass it is the film it
+ * always was. A saved order is read as it was: a film missing from one goes
+ * back above the glass, as before (`HOUSE`, the three the fill-in steps put
+ * under the glass), so only an order that names the film under the front
+ * plate puts it there.
  */
 
 import type { MixBlend, VisualizerSettings } from '../types';
@@ -76,8 +88,11 @@ export const MIX_MOVERS: readonly MixMover[] = ['led', 'back', 'film', 'mark', '
  * in the lamp house; a plate, a film and a card cannot shine through glass
  * from beneath it.
  */
-export const MIX_LAMP: readonly MixMover[] = ['led', 'gel', 'lumia'];
+export const MIX_LAMP: readonly MixMover[] = ['led', 'gel', 'lumia', 'film'];
 const isLamp = (m: MixSource): boolean => (MIX_LAMP as readonly string[]).includes(m);
+/** The lamp house's own three: the ones an order that leaves them out puts under the glass. */
+const HOUSE: readonly MixMover[] = ['led', 'gel', 'lumia'];
+const isHouse = (m: MixSource): boolean => (HOUSE as readonly string[]).includes(m);
 
 /** Bottom to top, as the shader drew them before there was a choice. */
 export const DEFAULT_MIX_ORDER = 'led gel lumia front back film mark';
@@ -96,7 +111,7 @@ export const MIX_SOURCE_INFO: Record<MixSource, MixSourceInfo> = {
   led:   { id: 'led',   name: 'LED Ring',    level: 'ledLevel',   hint: 'The spinning LED platform. At the bottom it is the lamp under the glass; higher up it is a beam of its own.' },
   front: { id: 'front', name: 'Front Plate', level: 'frontLevel', hint: 'The lead plate, lit from beneath. Everything else stacks on it.' },
   back:  { id: 'back',  name: 'Back Plate',  level: 'backLevel',  hint: 'The second plate, when the look has two.' },
-  film:  { id: 'film',  name: 'Film',        level: 'filmMix',    hint: 'A loaded reel, a window or the camera.' },
+  film:  { id: 'film',  name: 'Film',        level: 'filmMix',    hint: 'A loaded video, a window or the camera. Under the glass it is the lamp, seen through the dye; above it, laid over the plate.' },
   mark:  { id: 'mark',  name: 'Logo',        level: 'markMix',    hint: 'The logo or title card.' },
   gel:   { id: 'gel',   name: 'Gel Wheel',   level: 'gelWheel',   hint: 'A turning four-colour gel. In the lamp it colours the lamp; above the glass it colours everything under it.' },
   lumia: { id: 'lumia', name: 'Lumia',       level: 'lumia',      hint: 'Slow folded sheets of light. In the lamp they light the glass; above it they are a beam of their own.' },
@@ -208,7 +223,7 @@ export const OWN_BLEND: Record<MixMover, string> = {
   gel: 'a filter: it colours what is under it',
   lumia: 'added to the lamp under the glass, a screened beam over it',
   back: 'the Blend Mode under Multi-Layer Mixer (on paper, lit as a photograph)',
-  film: 'through the dye it lands on, keyed on its dark by Film Key, which Own and Key read',
+  film: 'through the dye it lands on, keyed on its dark by Film Key, which Own and Key read; under the glass, the lamp shining through it',
   mark: 'drawn over, by the logo\'s own transparency',
 };
 
@@ -237,8 +252,11 @@ export const gradeLabel = (g: MixGrade): string => GRADE_LABEL[g];
  * 1. The front plate. Where the order puts it, if everything under it can be
  *    the lamp; otherwise (or when it is missing) just above the run of lamp
  *    sources the order starts with. So "the LED ring first" still reads as
- *    the ring being the lamp, and a plate or a film found under the glass is
- *    read as the front plate at the bottom.
+ *    the ring being the lamp, and a plate or the logo found under the glass is
+ *    read as the front plate at the bottom. The film under it stays (it can
+ *    be the lamp, PLAN 14ag-3), but the run, with no front plate named, is of
+ *    the lamp house's three only, so an old order that left the front plate
+ *    out and began with the film still reads with the film over the glass.
  * 2. A missing lamp source goes just under the front plate, in the default's
  *    order. This is the step that keeps an order saved before the gel and the
  *    lumia were rows the same picture: the shader always drew them after the
@@ -267,17 +285,43 @@ export function mixStack(raw: unknown): MixSource[] {
   } else {
     const rest = seen.filter(m => m !== 'front');
     let run = 0;
-    while (run < rest.length && isLamp(rest[run])) run++;
+    while (run < rest.length && isHouse(rest[run])) run++;
     stack = [...rest.slice(0, run), 'front', ...rest.slice(run)];
   }
   const def = DEFAULT_MIX_ORDER.split(' ') as MixSource[];
   for (const m of def) {
     if (stack.includes(m)) continue;
     const front = stack.indexOf('front');
-    if (isLamp(m)) stack.splice(front, 0, m);
+    if (isHouse(m)) stack.splice(front, 0, m);
     else stack.splice(Math.max(front + 1, Math.min(def.indexOf(m), stack.length)), 0, m);
   }
   return stack;
+}
+
+/** Whether the film is under the front plate: the video as the lamp (PLAN 14ag-3). */
+export const filmInLamp = (raw: unknown): boolean => {
+  const st = mixStack(raw);
+  return st.indexOf('film') < st.indexOf('front');
+};
+
+/**
+ * The film put in the lamp (`on`) or taken out of it, everything else where
+ * it was: for the one switch on the video's row (VideoShelf), which should not
+ * need the mixer's arrows. In, it goes just under the glass, the top of the
+ * lamp, so a ring or a gel already there lights it from beneath rather than
+ * covering it. Out, it goes back where the default order has it, just over
+ * the back plate (which is always above the glass, wherever it was moved).
+ */
+export function filmAsLamp(raw: unknown, on: boolean): string {
+  const stack = mixStack(raw);
+  if (filmInLamp(raw) === on) return mixOrderString(stack);
+  const rest = stack.filter(m => m !== 'film');
+  if (on) {
+    const f = rest.indexOf('front');
+    return mixOrderString([...rest.slice(0, f), 'film', ...rest.slice(f)]);
+  }
+  const at = rest.indexOf('back') + 1;
+  return mixOrderString([...rest.slice(0, at), 'film', ...rest.slice(at)]);
 }
 
 /** The six that move, bottom to top. */

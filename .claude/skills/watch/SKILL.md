@@ -18,10 +18,12 @@ npm run watch -- <file or URL> --out <scratchpad>/<name>
 npm run watch -- clip.webm --out … --from 30 --to 90 --frames 36 --at 41.5,62
 npm run watch -- room.mkv --out … --crop 0.52,0.10,0.22,0.40   # only the projection
 npm run watch -- our-take.webm --out … --vs <scratchpad>/<reference>   # ours against it
+npm run watch -- --before A --after B --out <scratchpad>/<name>       # what changed between two films
 npm run watch -- film.mkv --out … --keep <name> --note "why"   # into the reference library
 npm run watch -- our-take.webm --out … --vs <name>   # against a kept reference, no fetch
 npm run watch -- --refs         # the library, with each reference's numbers
 npm run watch -- --selftest     # synthetic clips, frames and flows with known answers
+npm run watchwords              # vocabulary and before/after diff contract check
 ```
 
 ## The routine for a link the owner sends
@@ -40,8 +42,20 @@ npm run watch -- --selftest     # synthetic clips, frames and flows with known a
    sheet and run again with `--crop x,y,w,h` (fractions), or the design read
    measures the room. A circular projection inside a square crop reads some
    symmetry from the mask; say so.
-3. **Read** the timeline, the sheets, then the summary's Design, Physics and
-   Techniques sections. Take `--at` stills of what matters.
+3. **Read** the timeline, the sheets, then the summary's **Overall** section (the whole
+   film's arc and feel in one paragraph: whether it builds, settles, swells or holds, its
+   Laban character, where its strongest moment and longest rest fall, how the light and
+   colour drift, whether it goes with the music, and the look in a line), then its
+   **In words** section
+   (every word with the number that chose it, its source in `docs/watch-words.md`,
+   and `(may vary from take to take)` on unsteady measures), followed by the Design,
+   Physics and Techniques sections. Take `--at` stills of what matters.
+   With `--vs`, a **Reference in words** section appears beside it.
+   For a before/after pair, run `--before A --after B --out <dir>` to write
+   `diff.md` (changes ranked in just-noticeable steps and what held, a **Near an
+   edge** note for words that differ while their measure moved under a step, a **How
+   it felt** section with both Overall paragraphs and how the arc changed, plus both
+   "In words" reads), `diff-timeline.png` and `pairs.png`.
 4. **Scan the pages.** Open the links the Techniques section lists
    (WebFetch), the maker's site and gear lists, for what they say they used.
    Where nothing says, the "Guessed from the footage" lines are a start: check
@@ -68,6 +82,7 @@ It prints a summary (also `summary.md`) and writes:
 | `stats.tsv` | Per sample: brightness, near-black fraction, blown fraction, saturation, motion, loudness. |
 | `palette.png` | The clip's six main colours, each as wide as its share. |
 | `design.json` | The design and physics reads, for a later `--vs`. |
+| `diff.md`, `diff-timeline.png`, `pairs.png` | Written by `--before A --after B`: `# What changed` (ranked steps, what held, near an edge, how it felt, both "In words" reads), stacked timelines, and matched-time frame pairs beside `before/` and `after/`. |
 
 The summary also names the dominant hues, the motion median and 90th
 percentile, and **motion vs loudness**: the correlation, and the lag at which
@@ -112,8 +127,10 @@ shows) and `lll-melt-your-face-1` (Liquid Light Lab's own look: a dish
 camera through a video mirror and colouriser, so not a real-show row).
 
 A crop is decoded 320 pixels wide. A thin strip (a screen filmed from the
-crowd) leaves too few rows for the flow read's blocks, and the physics
-section prints dashes: crop a squarer piece of the screen (47v-6).
+crowd) leaves too few rows for the flow read's blocks. Under 64 rows (a
+crop less than a fifth as tall as it is wide) the physics section says "the
+flow read needs a taller crop" and reads only lifetime and spectrum: crop a
+squarer piece of the screen (47v-6).
 
 ## The design, physics and techniques sections
 
@@ -140,7 +157,8 @@ Definitions, with why each measure and what its bands mean, are at the top of
   carried, turnover, lifetime and spectrum the read prints the range real
   performances read (`REAL_SHOWS` in `scripts/watchphysics.mjs`, 47v-3), and
   says when a clip is under or over every one. Real shows read carried only
-  0.13 to 0.19 (film grain, the lamp, superimposition), so a low carried
+  0.13 to 0.23 (the lamp, superimposed loops, the camera; the grain is taken
+  out of the change first, from the pair's own noise, 47v-5), so a low carried
   share is a finding only under that.
 - **Techniques:** technique words found in the page (rig, oils, dyes,
   surfactants, heat, magnets, optics, camera speed, digital tools), its
