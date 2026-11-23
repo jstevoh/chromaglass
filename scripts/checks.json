@@ -457,7 +457,6 @@
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
-      "quarantine": [{ "line": "drift → drift2 (the same look, another phase)", "plan": "47x-11", "since": "2026-11-22", "until": "2026-12-06" }],
       "why": [
         "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
         "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
