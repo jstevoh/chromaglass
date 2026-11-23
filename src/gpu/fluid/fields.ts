@@ -346,11 +346,11 @@ export class FluidFields extends FluidCore {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
       this.hsMob = buf('thin gap mobility', this.N);
-      // The oil's lift (PLAN 27f-5, hsBody): the water's colour's mean, and the circulation's Ψ and its right-hand side.
-      this.hsOilMean = buf('thin gap oil mean', 1);
+      // The tipped dish's closed circulation (PLAN 27f-5, hsBody): its Ψ, its right-hand side and the oil's drag.
       this.liftN = liftGrid(this.N);
       this.hsLiftSrc = this.disposer.track(this.device.createBuffer({ label: 'oil lift source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsLiftPsi = this.disposer.track(this.device.createBuffer({ label: 'oil lift psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      this.hsLiftB = this.disposer.track(this.device.createBuffer({ label: 'oil lift drag', size: this.liftN * this.liftN * 4, usage: GPUBufferUsage.STORAGE }));
       // The sealed bottle's (PLAN 27f-9, wgsl/fluid/seal.ts): the same grid, a weight of its own.
       this.hsSealSrc = this.disposer.track(this.device.createBuffer({ label: 'seal source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));

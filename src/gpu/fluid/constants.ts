@@ -7,7 +7,7 @@
 
 import type { SolverCarry } from '../solverTypes';
 import { SOLVER_VEL_FORMAT } from '../wgsl/pack';
-import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, thicknessViscosity } from '../../lib/turntable';
+import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, OIL_NU, thicknessViscosity } from '../../lib/turntable';
 
 /*
   How many bubbles the air field has room for.
@@ -806,7 +806,13 @@ export const LIFT_SWEEPS = 8;
   are in (sealReady), as it always did.
 */
 export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
-export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax', 'sealSource', 'sealFlow'];
+export const LIFT_KERNELS = ['hsLiftSource', 'hsLiftRelax', 'hsLiftRelaxOil', 'sealSource', 'sealFlow'];
+/*
+  ln B, the oil's drag over the plate's clear liquid at viscosity nu (hsPrep's
+  oilBody, PLAN 27f-7): the oil lift's circulation relaxes with B on its faces
+  (hsLiftRelaxOil), so that what hsPrep's drag divides out it laid in first.
+*/
+export const oilBodyLn = (nu: number) => Math.log((1 - SPIN_OIL_LIGHT) * OIL_NU / nu);
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*

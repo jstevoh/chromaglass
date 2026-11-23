@@ -125,6 +125,18 @@
       ]
     },
     {
+      "name": "The lively looks at a real show's pace",
+      "shard": "logic",
+      "run": "npm run pace",
+      "why": [
+        "PLAN 48q: the lively looks turned over several times slower than a real",
+        "show. Each carries its harder rock, rhythm sheet and pours whole after",
+        "every pass, never quieter than before, inside the dials, runs a liquid",
+        "thinner than light oil and no thinner than water (Thickness), and the moire",
+        "pack keeps its own pace. The film's turnover and colour are `-- --film` on the Mac."
+      ]
+    },
+    {
       "name": "The kick's bloom",
       "shard": "logic",
       "run": "npm run kickbloom",
@@ -1772,6 +1784,18 @@
         "lab does not draw, by its shader's mix held at 1 and its width growing). --owed:",
         "each line is excused only in main's state; the PR that builds it takes its id",
         "out. About a minute on SwiftShader (cloud, 2026-11-07), in lab4 beside holeline."
+      ]
+    },
+    {
+      "name": "A colour's edge stays sharp on the thin gap",
+      "shard": "lab2",
+      "run": "npm run dyeedge",
+      "why": [
+        "The thin gap's dye flux keeps an edge as sharp as the grid can hold (PLAN.md 1l,",
+        "scripts/dyeedge.mjs): three flat discs on Galaxy's gap turned two hundred steps",
+        "by a solid swirl keep their colour, overshoot nowhere, and leave under 0.62",
+        "part-full cells per full cell (minmod left 0.713, the MC limiter 0.541, an exact",
+        "carry about 0.29). Lab at 128², so SwiftShader runs it in under a minute."
       ]
     },
     {

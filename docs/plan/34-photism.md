@@ -95,7 +95,8 @@ a grid of generic stock thumbnails: ours are the plate itself.
     #943 put up; Permafrost is up (`EaETAQuSdS0`). A long film read back as one base64 string
     passed V8's string limit, so `chromaglassRender({ raw: true })` now leaves the bytes on
     `window.chromaglassRenderBytes` and `sitefilms.mjs` reads them in 8 MB slices; and the
-    flower gate checked the main checkout instead of the tree it ran in (31s-11).
+    flower gate checked the main checkout instead of the tree it ran in (fixed the same way by
+    #944; the shared bundle cache behind it is 31s-13).
   - **34a-6g. Open: Hymn to the Dawn.** Its new film drains to an empty plate by about 160 s
     (mean brightness 51 falling to 28, against 90 to 144 for the 2026-11-21 film), so it is not
     uploaded and its card keeps the old loop. It waits on 34a-6i.
