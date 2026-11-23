@@ -89,12 +89,26 @@ a grid of generic stock thumbnails: ours are the plate itself.
     and four of their channel copies on Scott Buckley's CC BY 4.0 library, each on the look its
     record had. `public/landing/films/SOURCES.md` has each page, licence line and checksum.
     The 1920s films stay on the channel and 34a-6c's disputes stand.
-  - **34a-6f. Open: the last three channel films.** Hymn to the Dawn and Permafrost are
-    rendered (`/Volumes/Media/ChromaGlass/renders/ambient-2026-11/`) but YouTube's daily upload
-    limit refused them, so their cards loop and do not open; and the long film of Chris
-    Zabriskie's *Cylinders* (CC BY 4.0, a look a piece, `npm run sitefilms -- --album
-    cylinders`) has 7 of 9 pieces. Upload them, then put the ids in `siteFilms.ts`
-    (`SITE_FILMS`, `CHANNEL_ALBUMS`) and `Sample.FILMS`.
+  - **34a-6f. The last three channel films, and the four re-filmed after the flower.**
+    *(Shipped in part, 2026-11-23.)* Effervescence, The Distant Sun, Undertow and Machina
+    were filmed again from a build with 31s-8..10's flower fix (#949) and replace the copies
+    #943 put up; Permafrost is up (`EaETAQuSdS0`). A long film read back as one base64 string
+    passed V8's string limit, so `chromaglassRender({ raw: true })` now leaves the bytes on
+    `window.chromaglassRenderBytes` and `sitefilms.mjs` reads them in 8 MB slices; and the
+    flower gate checked the main checkout instead of the tree it ran in (31s-11).
+  - **34a-6g. Open: Hymn to the Dawn.** Its new film drains to an empty plate by about 160 s
+    (mean brightness 51 falling to 28, against 90 to 144 for the 2026-11-21 film), so it is not
+    uploaded and its card keeps the old loop. It waits on 34a-6i.
+  - **34a-6h. Open: the Cylinders long film.** Chris Zabriskie's *Cylinders* (CC BY 4.0, a look
+    a piece, `npm run sitefilms -- --album cylinders`): render all nine pieces from main now
+    that a long film reads back (Cylinder 7 failed on the string limit), check every piece's
+    frames (the flower and 34a-6i's drain), join, upload, and set `CHANNEL_ALBUMS`' id.
+  - **34a-6i. Open: Solar Flare drains to an empty plate in a song film.** Filmed at about
+    `a3a42823` (2026-11-21) the look held; at `62568d42` it empties by 160 s. Bisect that range
+    with `npm run sitefilms -- --only hymn-to-the-dawn`, compare brightness every 20 s.
+  - **34a-6j. Open: the film check passes an empty plate.** `sitefilms.mjs`' "the plate never
+    goes dark" test compares brightness to black, so a drained plate on a lit backdrop passes.
+    It wants a dye-coverage gate measured against the look's own backdrop.
   - **34a-6e. Open: a TV build with the new films.** The Android TV app names its sample films
     in `Sample.java`; a TV on build 24 or older keeps playing the 1920s films (they stay in the
     `tv-films-1` release) until the next build reaches Play.

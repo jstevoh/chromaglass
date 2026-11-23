@@ -89,6 +89,7 @@ final class Sample {
         new Film("8645KzNomd4", "Galaxy", "The Distant Sun", "Scott Buckley", 2019),
         new Film("vEjOw8dyjiA", "Neon Coral Reef", "Undertow", "Scott Buckley", 2019),
         new Film("l-Ze5GmZJMQ", "Velvet Underground", "Machina", "Scott Buckley", 2019),
+        new Film("EaETAQuSdS0", "Aurora Borealis", "Permafrost", "Scott Buckley", 2022),
     };
 
     /**

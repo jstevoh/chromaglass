@@ -142,7 +142,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'permafrost', look: 'aurora-borealis', lookName: 'Aurora Borealis', kind: 'Neoclassical ambient, 2022', seed: 1, loopAt: 150, youtube: null,
+    id: 'permafrost', look: 'aurora-borealis', lookName: 'Aurora Borealis', kind: 'Neoclassical ambient, 2022', seed: 1, loopAt: 150, youtube: 'EaETAQuSdS0',
     music: {
       title: 'Permafrost', artist: 'Scott Buckley', year: 2022, page: 'https://www.scottbuckley.com.au/library/permafrost/',
       file: 'https://www.scottbuckley.com.au/library/wp-content/uploads/2022/08/Permafrost.mp3',
