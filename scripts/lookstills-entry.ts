@@ -20,27 +20,25 @@ import {
   macroAmountOf,
 } from '../src/sim/constants';
 import { FluidSimulation } from '../src/sim/fluidSimulation';
-import { doseLiquid, pourLiquid } from '../src/sim/tools';
+import { areaSink, doseLiquid, pourLiquid } from '../src/sim/tools';
 import { DICE } from '../src/sim/dice';
 import { phasePour } from '../src/lib/phasePour';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape } from '../src/presetPlate';
-import { areaCentre, areaDye, areaFamily, areaForBand, pickArea, plateAreas, pointInArea, type PlateArea } from '../src/lib/plateAreas';
+import { areaDye, areaFamily, pickArea, plateAreas, pointInArea } from '../src/lib/plateAreas';
 import { makeRng, restartStreams, setShowSeed } from '../src/lib/rng';
 import { stageClocks, turnClocks } from '../src/lib/stageClocks';
 import { MacroCamera } from '../src/lib/macroCamera';
 import { CELL_TRAVEL } from '../src/lib/detailFlow';
 import { BeadField, beadPopulation } from '../src/lib/beads';
 import { TURING_PRODUCT, turingInk } from '../src/lib/chemistry';
-import { lookTarget as dyeLookTarget, pourRoomOf, sparseDark as isSparseDark } from '../src/lib/dyeTarget';
-import { PALETTE_RGB, getAudioValue, harmonyColor, harmonyCycle, type AudioFeatureKey } from '../src/constants';
-import { AreaHands, fluidSink, musicDyeIn } from '../src/lib/areaCords';
+import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../src/lib/dyeTarget';
+import { PALETTE_RGB, harmonyColor, harmonyCycle } from '../src/constants';
+import { AreaHands, musicDyeIn, plateArea, type AreaSink, type LayOptions, type MasterGains, type PressAt } from '../src/lib/areaCords';
+import { setMasters } from '../src/lib/musicCords';
 import { cordReading, PatchBay, type PatchContext } from '../src/lib/sceneMap';
 import { HitSource } from '../src/lib/hitSource';
 import { SOURCE_NAMES, type AudioReading, type OnsetState, type SourceName } from '../src/lib/audioFeatures';
 import { BAND_STEP_S } from '../src/lib/simulatedMusic';
-import { levels01, musicHands } from '../src/lib/soundLevels';
-import { bassBoostGain, bassPressFor, bassRouteValue } from '../src/lib/squish';
-import { throwKickBloom } from '../src/lib/kickBloom';
 import { BubbleField, MAX_BUBBLES } from '../src/lib/bubbles';
 import { stepPlateBubbles } from '../src/sim/speciesPoll';
 import { makeHandTilt, stepHandTilt, tipPlate } from '../src/lib/handTilt';
@@ -301,12 +299,32 @@ const lookStillsApi = {
         }
       }
 
-      const areaCycle = (a: PlateArea, t: number) =>
-        harmonyCycle(areaFamily(a).map((_, k) => areaDye(a, contractDyes, 0, k)), t);
       const patchBay = new PatchBay(settings, 1);
       const hitSource = new HitSource();
       const areaHands = new AreaHands();
-      const areaSink = fluidSink(fluid, GRID_SCALE, (f, lid, x, y, s) => pourLiquid(f, lid, x, y, s));
+      const wholePlate = plateArea(harmony.length);
+      const cordMasters: MasterGains = {};
+      const layOpts: LayOptions = { pace: 1, dice: () => DICE.music.float(), plate: wholePlate };
+      const baseSink = areaSink(fluid);
+      const sink: AreaSink = {
+        ...baseSink,
+        drop: (x, y, amount, c, slug) => {
+          if (fluid.seedMean === 0 && (stepSettings.phaseAmount ?? 0) > 0.002) return;
+          let style = slug ? 'drop' : (DICE.music.pick(styles) ?? 'drop');
+          if (
+            !slug &&
+            (style === 'spray' || style === 'splatter') &&
+            isSparseDark(stepSettings.lampGround, dyeLookTarget(fluid.seedMean, stepSettings.dyeBudget ?? 0.85, fluid.seedBudget))
+          ) {
+            style = 'drop';
+          }
+          fluid.autoInject(style, Math.round(x), Math.round(y), amount, c.r, c.g, c.b, Math.min(1, amount / 5));
+        },
+        dose: (x, y, strength, area) => {
+          if (area) pourLiquid(fluid, area.liquid, x, y, strength);
+          else doseLiquid(fluid, liquids, x, y, strength);
+        },
+      };
       const bandState = makeBandState();
       const bubbles = new BubbleField(GRID_SIZE);
       const rock = restingHand();
@@ -327,7 +345,6 @@ const lookStillsApi = {
       let turingClock = 0;
       let turingDrift = 0;
       let lastSoapAt = 0;
-      let areaKicks = 0;
       let stepSettings = settings;
       let picSettings = settings;
       let bubbleDebug = { count: 0, strength: 0 };
@@ -349,6 +366,7 @@ const lookStillsApi = {
         simTime += dt;
         const { audio, kick } = synthAudio(bandState, simTime);
         hitSource.update(audio.features ?? null, simTime);
+        setMasters(cordMasters, settings, audio);
         const ctx: PatchContext = {
           room: null,
           film: null,
@@ -360,10 +378,13 @@ const lookStillsApi = {
           filmImpact: 0,
           soundImpact: settings.soundImpact ?? 1,
           shapeImpact: 0,
+          masters: cordMasters,
+          bassBoost: settings.bassBoost,
         };
         patchBay.fold(settings, ctx, 1, simTime * 1000);
         picSettings = patchBay.global;
         stepSettings = patchBay.layer(0);
+        setMasters(cordMasters, picSettings, audio);
 
         // Ambient seeding (matches LiquidVisualizer.tsx ambientSeedRef = true default).
         {
@@ -391,150 +412,40 @@ const lookStillsApi = {
           solver.addMix?.(0.15 + DICE.music.float() * 0.7, 0.15 + DICE.music.float() * 0.7, 0.03 + 0.04 * DICE.music.float(), { soap: 1 });
         }
 
-        // Music hands (matches LiquidVisualizer loop): beat blooms, pressure/bursts, streams, sparks.
-        const impact = stepSettings.audioImpact ?? 0.45;
-        if (impact > 0.01 && stepSettings.audioMappings) {
-          const densityMod = getAudioValue(audio, stepSettings.audioMappings.density as AudioFeatureKey);
-          const colorMod = getAudioValue(audio, stepSettings.audioMappings.color as AudioFeatureKey);
-          const velRoute = stepSettings.audioMappings.velocity as AudioFeatureKey;
-          const boostGain = bassBoostGain(stepSettings.bassBoost);
-          const bassGain = velRoute === 'bass' ? boostGain : 1;
-          const velRaw = velRoute === 'bass' ? bassRouteValue(audio.bass, boostGain) : getAudioValue(audio, velRoute);
-          const vel01 = velRoute === 'energy' ? velRaw : Math.min(1, velRaw * (100 / 70));
-          const pitchAngle = ((audio.features?.pitchClass ?? 0) / 12) * Math.PI * 2;
-          const timbreColour = stepSettings.audioMappings.color === 'timbre';
-          const colFor = (off: number) =>
-            harmonyCycle(
-              harmony,
-              timbreColour ? colorMod * (harmony.length - 1) + off * 0.25 : simTime * 0.1 + pitchAngle + colorMod * Math.PI + off,
-            );
-          const { bass: bass01, treble: treble01, energy: energy01, mid: mid01 } = levels01(audio);
-          const impactMul = impact / 0.45;
-          const autoAmp = musicHands(impact, audio.passage);
-          const centerX = Math.floor(GRID_SIZE / 2);
-          const centerY = Math.floor(GRID_SIZE / 2);
-          const aStyle = () => DICE.music.pick(styles) ?? 'drop';
-          if (areas && kick) areaKicks++;
-          const bassArea = areas ? areaForBand(areas, 'bass', areaKicks) : null;
-          const bassAt = bassArea ? areaCentre(bassArea, GRID_SIZE) : null;
-          const bassX = bassAt ? Math.floor(bassAt.x) : centerX;
-          const bassY = bassAt ? Math.floor(bassAt.y) : centerY;
-          const turn = Math.floor(simTime / 8);
-          const areaTime = simTime * 0.3 + colorMod * Math.PI;
-          const clearPhase = fluid.seedMean === 0 && (stepSettings.phaseAmount ?? 0) > 0.002;
-          const target = dyeLookTarget(fluid.seedMean, stepSettings.dyeBudget ?? 0.85, fluid.seedBudget);
-          const pourRoom = clearPhase ? 0 : pourRoomOf(fluid.meanDensity / Math.max(0.06, target));
-          const pourDt = Math.min(1, Math.max(0.04, fluid.dt / 0.05)) * pourRoom;
-          const sparseDark = isSparseDark(stepSettings.lampGround, target);
-          const contStyle = () => {
-            const st = aStyle();
-            return sparseDark && (st === 'spray' || st === 'splatter') ? 'drop' : st;
-          };
-          if (densityMod > 0.005) {
-            const pc = bassArea ? areaCycle(bassArea, areaTime) : colFor(0);
-            if (pourDt > 0.001) {
-              fluid.autoInject(contStyle(), bassX, bassY, densityMod * 0.025 * autoAmp * pourDt, pc.r, pc.g, pc.b, densityMod, false, musicDyeIn(bassArea));
-            }
-            fluid.addTemp(bassX, bassY, densityMod * 0.018 * autoAmp);
-          }
-          fluid.pressBass(
-            bassX,
-            bassY,
-            Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
-            bassPressFor(velRaw, velRoute === 'energy', impact, audio.passage, bassGain),
-          );
-          if (vel01 > 0.25 && !fluid.thinGap) {
-            const burstR = Math.round(Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * Math.max(0.4, impactMul)));
-            const bassStr = (vel01 - 0.25) * autoAmp * bassGain;
-            for (let bj = -burstR; bj <= burstR; bj += 3) {
-              for (let bi = -burstR; bi <= burstR; bi += 3) {
-                const dist = Math.hypot(bi, bj);
-                if (dist < 2 || dist > burstR) continue;
-                const bx = bassX + bi;
-                const by = bassY + bj;
-                if (bx > 0 && bx < GRID_SIZE - 1 && by > 0 && by < GRID_SIZE - 1) {
-                  const f = bassStr * 0.65 * (1 - dist / burstR);
-                  fluid.addVelocity(bx, by, (bi / dist) * f, (bj / dist) * f);
-                }
-              }
-            }
-          }
-          const bloomGain = Math.max(0, Math.min(4, stepSettings.kickBloom ?? 1));
-          if (kick && bloomGain > 0) {
-            const ringCol = bassArea ? areaCycle(bassArea, areaTime + 1.0) : colFor(2.0);
-            const ringR = bassArea ? bassArea.r * GRID_SIZE * (0.35 + bass01 * 0.5) : (10 + bass01 * 14) * GRID_SCALE;
-            throwKickBloom(fluid, DICE.music, GRID_SIZE, bassX, bassY, ringR, ringCol, bass01 * boostGain, autoAmp * pourDt * bloomGain * musicDyeIn(bassArea), bloomGain);
-            const da = DICE.music.angle();
-            const doseDist = ringR * (0.95 + 0.15 * DICE.music.float());
-            if (bassArea) {
-              pourLiquid(fluid, bassArea.liquid, bassX + Math.cos(da) * doseDist, bassY + Math.sin(da) * doseDist, bass01 * Math.min(1, bloomGain));
-            } else {
-              doseLiquid(fluid, liquids, centerX + Math.cos(da) * doseDist, centerY + Math.sin(da) * doseDist, bass01 * Math.min(1, bloomGain));
-            }
-          }
-          if (mid01 > 0.2) {
-            const midArea = areas ? areaForBand(areas, 'mid', turn) : null;
-            const midAt = midArea ? areaCentre(midArea, GRID_SIZE) : { x: centerX, y: centerY };
-            const midCol = midArea ? areaCycle(midArea, areaTime + 0.65) : colFor(1.3);
-            const orbitR = midArea ? midArea.r * GRID_SIZE * 0.8 : GRID_SIZE * 0.3;
-            const mx = Math.floor(midAt.x + (noise2D(simTime * 0.25, 12.3) * 0.7 + Math.cos(simTime * 0.45) * 0.3) * orbitR);
-            const my = Math.floor(midAt.y + (noise2D(47.1, simTime * 0.25) * 0.7 + Math.sin(simTime * 0.55) * 0.3) * orbitR);
-            if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
-              if (pourDt > 0.001) {
-                fluid.autoInject(contStyle(), mx, my, mid01 * 0.06 * autoAmp * pourDt, midCol.r, midCol.g, midCol.b, mid01, false, musicDyeIn(midArea));
-              }
-              fluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
-            }
-          }
-          if (treble01 > 0.2) {
-            const trebleArea = areas ? areaForBand(areas, 'treble', turn + 1) : null;
-            const sparkCol = trebleArea ? areaCycle(trebleArea, areaTime + 1.55) : colFor(3.1);
-            const sparks = Math.floor(treble01 * 2 * autoAmp);
-            for (let s = 0; s < sparks; s++) {
-              const sp = trebleArea ? pointInArea(trebleArea, GRID_SIZE, DICE.music) : null;
-              const sx = sp ? Math.floor(sp.x) : DICE.music.int(GRID_SIZE - 20) + 10;
-              const sy = sp ? Math.floor(sp.y) : DICE.music.int(GRID_SIZE - 20) + 10;
-              fluid.addTemp(sx, sy, treble01 * 0.6 * autoAmp);
-              for (let ddy = -1; ddy <= 1; ddy++) {
-                for (let ddx = -1; ddx <= 1; ddx++) {
-                  const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
-                  if (sparseDark) {
-                    if (pourDt > 0.001) {
-                      fluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w * musicDyeIn(trebleArea), sparkCol.r, sparkCol.g, sparkCol.b);
-                    }
-                  } else {
-                    fluid.addDensity(
-                      sx + ddx,
-                      sy + ddy,
-                      treble01 * 1.1 * w * musicDyeIn(trebleArea),
-                      sparkCol.r * 0.5 + 0.5,
-                      sparkCol.g * 0.5 + 0.5,
-                      sparkCol.b * 0.5 + 0.5,
-                    );
-                  }
-                }
-              }
-            }
-          }
-          if (energy01 > 0.15) {
-            const swellArea = areas ? areaForBand(areas, 'mid', turn + 2) : null;
-            const swellAt = swellArea ? areaCentre(swellArea, GRID_SIZE) : { x: centerX, y: centerY };
-            const swellR = swellArea ? swellArea.r * GRID_SIZE * 0.6 : GRID_SIZE * 0.28;
-            const swellCol = swellArea ? areaCycle(swellArea, areaTime + 1.1) : colFor(2.6);
-            const ex = Math.floor(swellAt.x + (noise2D(simTime * 0.18, 71.9) * 0.7 + Math.cos(simTime * 0.32) * 0.3) * swellR);
-            const ey = Math.floor(swellAt.y + (noise2D(88.4, simTime * 0.18) * 0.7 + Math.sin(simTime * 0.27) * 0.3) * swellR);
-            if (pourDt > 0.001) {
-              fluid.autoInject(contStyle(), ex, ey, energy01 * 0.06 * autoAmp * pourDt, swellCol.r, swellCol.g, swellCol.b, energy01, false, musicDyeIn(swellArea));
-            }
-          }
-        }
-
-        // Area cords (Velvet Underground paddles, soap well heater, syrup bottles, etc.)
-        const acts = areaHands.step(stepSettings.sceneMappings, areas, (m, band) => cordReading(ctx, m, simTime * 1000, band), dt);
+        // Music and area hands (matches LiquidVisualizer.tsx): every music hand
+        // is a cord on the look (lib/musicCords.ts), stepped and laid together
+        // with area cords through AreaHands and musicSink.
+        let bassPressAt: PressAt | null = null;
+        const acts = areaHands.step(
+          picSettings.sceneMappings,
+          areas,
+          (m, band) => cordReading(ctx, m, simTime * 1000, band),
+          dt,
+          wholePlate,
+          cordMasters,
+        );
         if (acts.length > 0) {
           const fill = fluid.meanDensity / Math.max(0.06, dyeLookTarget(fluid.seedMean, stepSettings.dyeBudget ?? 0.85, fluid.seedBudget));
-          areaHands.lay(areaSink, GRID_SIZE, dt, (a, bottle) => PALETTE_RGB[areaDye(a, contractDyes, 0, bottle)], fill);
+          layOpts.pace = Math.min(1, Math.max(0.04, fluid.dt / 0.05));
+          areaHands.lay(
+            sink,
+            GRID_SIZE,
+            dt,
+            (a, bottle) =>
+              a === wholePlate
+                ? PALETTE_RGB[harmony[bottle % harmony.length] ?? 0]
+                : PALETTE_RGB[areaDye(a, contractDyes, 0, bottle)],
+            fill,
+            layOpts,
+          );
+          bassPressAt = areaHands.pressAt;
         }
+        fluid.pressBass(
+          bassPressAt ? bassPressAt.x : 0,
+          bassPressAt ? bassPressAt.y : 0,
+          bassPressAt ? bassPressAt.r : 1,
+          bassPressAt ? bassPressAt.depth : 0,
+        );
 
         // Evolve automation drops/air (matches LiquidVisualizer automation loop).
         const rate = Math.max(0, Math.min(3, stepSettings.automateRate ?? 0.12));
