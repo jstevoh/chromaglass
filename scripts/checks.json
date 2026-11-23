@@ -357,6 +357,19 @@
       ]
     },
     {
+      "name": "One film at a time on the owner's Mac",
+      "shard": "logic",
+      "run": "npm run maclock -- --selftest",
+      "why": [
+        "The Mac film lock and FIFO queue (scripts/maclock.mjs, PLAN.md 19ak-23):",
+        "exclusive execution, FIFO ordering across queued waiters, dead-pid and",
+        "over-timeout stale recovery, manual one-line locks honoured and aged,",
+        "timeout cleanup, CG_FILM_LOCK_HELD nesting, stale-rename race protection,",
+        "--max-wait exit 75 with no leftover ticket, deploy-mark priority, and",
+        "scripts/macbusy.sh refusing a live film.lock."
+      ]
+    },
+    {
       "name": "Two runners on one Mac never share a harness port",
       "shard": "logic",
       "run": "npm run ports",
