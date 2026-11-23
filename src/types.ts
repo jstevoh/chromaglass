@@ -814,6 +814,8 @@ export interface VisualizerSettings {
   lampGround?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  /** The oil/water interface drawn as the step it really is, not the solver's few-cell band (PLAN 38w-15): 0 off, 1 sharp. */
+  crispEdges?: number;
   /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -997,6 +999,7 @@ export interface VisualizerSettings {
   soapFilm: number;           // the frame's draining soap film over the plate, its reflection 0 (off) to 1 (PLAN 32d)
   soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
   soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
+  soapFilmTilt: number;       // the frame's tilt from flat, degrees: 90 hangs it (gravity along the film is g sin of it, 32h)
   glow: number;               // the water's bioluminescence, 0 (off) to 2: blue light where a stroke shears it past a threshold, tiring as it is spent (PLAN 48c)
   glowShear: number;          // the shear rate, per second, the organisms fire at: lower and a gentle stir lights, higher and only a hard stroke does (48c)
   glowRecharge: number;       // seconds the organisms take to refill their light once they have flashed (48c)
@@ -1015,6 +1018,8 @@ export interface VisualizerSettings {
   tankNozzle: number;         // where the nozzle sits across the tank, 0..1 (a held finger carries it too) (47n)
   tankDrain: number;          // the share of the fed water drained through the floor, 0..1; the rest raises the level and the dye pools (47n)
   tankHue: number;            // the dye's glow, degrees of hue (47n)
+  faradayHz: number;          // Shaker: the dish on a speaker, its drive's frequency in Hz; 0 is no shaker (PLAN 48f)
+  faraday: number;            // Shake: the dish's peak acceleration, g; past the liquid's threshold it stands up in Faraday waves (48f)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -1252,6 +1257,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
+  crispEdges: 0,            // off: the oil's edge drawn as the solver's band, as every look had it
   projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,
@@ -1288,6 +1294,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   soapFilm: 0,              // no film in the frame: every look but Soap Film
   soapFilmRate: 1,
   soapFilmAngle: 0,
+  soapFilmTilt: 90,
   glow: 0,                  // the water is dark: every look but the ones that glow
   glowShear: 30,
   glowRecharge: 8,
@@ -1306,6 +1313,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   tankNozzle: 0.5,
   tankDrain: 1,
   tankHue: 205,
+  faradayHz: 0,             // no shaker under the dish: every look until a performer turns it on
+  faraday: 0,
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,

@@ -30,13 +30,16 @@ import { PH_WGSL } from '../../lib/phIndicator';
 import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
+import { INTERFACE_WGSL } from './plateInterface';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { VIEW_OPTICS } from './platePolar';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
 import { BEAD_SHAPE_WGSL } from './beadShape';
 import { FILM_DYE_WGSL } from './filmDye';
 import { FILM_FRAME_WGSL } from './plateFilm';
+import { LAMP_MIX_WGSL } from './plateLamp';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
+import { SLOPE_WGSL } from './plateSlope';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -385,7 +388,6 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
 
 fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
-  dyeUnit = vec3f(1.0);
   let raw = textureBicubic(t, fuv);
   var rawAlpha = raw.a;
   if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
@@ -402,7 +404,6 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
     exp(-decodeDensity(raw.g) * norm),
     exp(-decodeDensity(raw.b) * norm),
   );
-  dyeUnit = unit;
   let lt = lightThrough(unit, absTotalDensity);
 
   let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
@@ -432,21 +433,7 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
   return vec4f(ltBody, alpha);
 }
 
-fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
-  let ts = 3.0 / U.logicalGrid;
-  let d00 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, -ts)).a);
-  let d10 = decodeDensity(textureBicubic(t, fuv + vec2f(0.0, -ts)).a);
-  let d20 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, -ts)).a);
-  let d01 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, 0.0)).a);
-  let d21 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, 0.0)).a);
-  let d02 = decodeDensity(textureBicubic(t, fuv + vec2f(-ts, ts)).a);
-  let d12 = decodeDensity(textureBicubic(t, fuv + vec2f(0.0, ts)).a);
-  let d22 = decodeDensity(textureBicubic(t, fuv + vec2f(ts, ts)).a);
-  let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
-  let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
-  return vec2f(gradX, gradY);
-}
-
+${SLOPE_WGSL}
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
 /*
@@ -475,65 +462,15 @@ fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
   the liquid does not make. npm run holeline asks that the dial moves nothing
   in focus.
 
-  boundaryDiff stays for one reader, the closeup's relief. The derive pass's
-  camera branch hands the colour step to the closeup in .z, and the
-  closeup's shadowgraph (camShadow, 38h-7) reads it as the optical path's
-  curvature, which it is not: up close a seam between two dyes is still
-  shaded darker, and that is all the depth Macro Relief draws where there
-  are no cells. Two replacements were tried. Nothing in .z left the closeup
-  flat (npm run macroview's relief 0 on every look). The path's own nine-tap
-  Laplacian blew up to 17% of a closeup frame to flat white on the Mac round
-  a cluster of bubbles (air's index step is a spike at that scale, and
-  camShadow may brighten 2.5 times) and drew a doublet 119 levels darker and
-  99 brighter at a step in the dye's depth. So the closeup is main's, to the
-  byte, until PLAN 18e-7 reads the path at the lens's scale.
-
-  The step is asked where the dye's colour changes, not its depth (33a,
-  2026-10-19: a bubble's hole in one dye read as two colours and wore a "+"
-  of the four taps). The colour per unit of dye ("unit" in decodeFluid) is
-  the same wherever one dye lies and differs where two meet.
+  The closeup's relief reads the optical path too (camLap, plateTransmit.ts,
+  PLAN 18e-7), not this colour step: up close it had shaded every seam
+  between two dyes darker, with the dial.
 */
-const HUE_LO: f32 = 0.03;
-const HUE_HI: f32 = 0.12;
-/*
-  The hue is the "unit" decodeFluid already works out from the very sample
-  it lights, so it is left here by that decode (as dyeThrough is) and read
-  after each of the four taps, rather than sampled again. Sampling it again
-  was the first version of this gate: four more bicubic reads (five filtered
-  taps each, so twenty more) on every pixel of the plate, while a laptop
-  window in the Mac runner's sound-render check drew 9.9 frames a second
-  (2026-10-20; not shown to be the cause, but the reads bought nothing).
-  Read this way the line costs what it did before the gate, five bicubic
-  reads, and draws the same picture (npm run holeline, to the percent).
-  Clear water, where decodeFluid returns before any hue, leaves 1, which is
-  clear water's hue.
-*/
-var<private> dyeUnit: vec3f = vec3f(1.0);
-fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
-  let cC = decodeFluid(t, fuv, 0.0, false);
-  if (cC.a < 0.03) { return 0.0; }
-  let e = (3.0 / U.logicalGrid) * 0.55;
-  let cR = decodeFluid(t, fuv + vec2f(e, 0.0), 0.0, false);
-  let uR = dyeUnit;
-  let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
-  let uL = dyeUnit;
-  let cT = decodeFluid(t, fuv + vec2f(0.0, e), 0.0, false);
-  let uT = dyeUnit;
-  let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
-  let uB = dyeUnit;
-  let maskX = min(cR.a, cL.a);
-  let maskY = min(cT.a, cB.a);
-  let hueX = smoothstep(HUE_LO, HUE_HI, length(uR - uL));
-  let hueY = smoothstep(HUE_LO, HUE_HI, length(uT - uB));
-  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX) * hueX;
-  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY) * hueY;
-  return diffX + diffY;
-}
 `;
 
 /** One lamp for every material, and what a dye edge does with it. */
 const LIGHTING = /* wgsl */ `
-fn sobelNormal(t: texture_2d<f32>, fuv: vec2f) -> vec3f { return gradNormal(sobelGrad(t, fuv)); }
+fn sobelNormal(t: texture_2d<f32>, air: texture_2d<f32>, fuv: vec2f) -> vec3f { return gradNormal(sobelGrad(t, air, fuv)); }
 
 // Where the lamp is, seen from the plate: only the photograph's softbox
 // reads it now (the photo style is dye on paper, lit from the front). On the
@@ -1267,6 +1204,8 @@ export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
   deriveLayout, src/gpu/plate.ts). 1×1 and empty when nothing is poured.
 */
 @group(0) @binding(4) var speciesSrc: texture_2d<f32>;
+// The bubbles' air, 1x1 blank with none, read as missing dye (plateSlope.ts).
+@group(0) @binding(5) var airSrc: texture_2d<f32>;
 
 // The plate's clear liquid: water, n 1.333 at 589 nm and room temperature.
 const N_CLEAR: f32 = 1.333;
@@ -1313,8 +1252,7 @@ fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
   let deltaFilm = v.z * 0.087;
   let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
   let gap = v.y;
-  let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
-  let h = hScale * (1.0 - 0.5 * v.z);
+  let h = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
   return n * h;
 }
 
@@ -1327,64 +1265,63 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
-  // The camera's views keep their own slope. In .z the closeup alone still
-  // carries the two-dye colour step, for its relief (the comment over
-  // boundaryDiff says why, and PLAN 18e-7); a photographed look carries none.
+  // The camera's views keep their own slope. The closeup's .w is the dye's
+  // path alone, its stand-in index at gain 1 (the dial moves nothing up
+  // close), for camLap (PLAN 18e-7; plateTransmit.ts says why).
   if (isCamera) {
-    var diff = 0.0;
-    if (closeup && U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
-    return vec4f(sobelGrad(src, in.uv), diff, 0.0);
+    var path = 0.0;
+    if (closeup) { path = calcOpl(decodeDensity(tex2(src, in.uv).a), vec3f(0.0, 0.03, 0.0), 0.0, 1.0); }
+    return vec4f(sobelGrad(src, airSrc, in.uv), 0.0, path);
   }
 
-  let ts = 3.0 / U.logicalGrid;
+  let cell = 1.0 / U.logicalGrid;
   let dyeGain = max(1.0, U.boundaryContrast * 3.0);
 
-  let d00 = decodeDensity(tex2(src, in.uv + vec2f(-ts, -ts)).a);
-  let d10 = decodeDensity(tex2(src, in.uv + vec2f( 0.0, -ts)).a);
-  let d20 = decodeDensity(tex2(src, in.uv + vec2f( ts, -ts)).a);
-  let d01 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  0.0)).a);
-  let dC  = decodeDensity(tex2(src, in.uv).a);
-  let d21 = decodeDensity(tex2(src, in.uv + vec2f( ts,  0.0)).a);
-  let d02 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  ts)).a);
-  let d12 = decodeDensity(tex2(src, in.uv + vec2f( 0.0,  ts)).a);
-  let d22 = decodeDensity(tex2(src, in.uv + vec2f( ts,  ts)).a);
-
-  let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
-  let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
-  let g = vec2f(gradX, gradY);
-
+  // Every density here is the mean of its whole cell, the bubbles' air held
+  // at the middle's own (cellDensity, PLAN 31s-8: one read per cell at 768
+  // saw one texel in four and drew the flower again).
+  let hasAir = textureDimensions(airSrc).x > 1u;
+  let dC = cellDensity(src, airSrc, in.uv, 0.0, false);
   let vC = viewProps(in.uv);
   let oC = calcOpl(dC, vC, pouredDn(in.uv), dyeGain);
-
-  var o00: f32; var o10: f32; var o20: f32;
-  var o01: f32; var o21: f32;
-  var o02: f32; var o12: f32; var o22: f32;
 
   // Each tap's own view and poured index wherever either can differ from
   // the middle's: oil, a film, or any liquid poured (the species is 1×1
   // with none, so a plate with nothing poured pays for none of these reads).
   let poured = textureDimensions(speciesSrc).x > 1u;
-  if (vC.x > 0.001 || vC.z > 0.001 || poured) {
-    o00 = oplAt(d00, in.uv + vec2f(-ts, -ts), dyeGain);
-    o10 = oplAt(d10, in.uv + vec2f( 0.0, -ts), dyeGain);
-    o20 = oplAt(d20, in.uv + vec2f( ts, -ts), dyeGain);
-    o01 = oplAt(d01, in.uv + vec2f(-ts,  0.0), dyeGain);
-    o21 = oplAt(d21, in.uv + vec2f( ts,  0.0), dyeGain);
-    o02 = oplAt(d02, in.uv + vec2f(-ts,  ts), dyeGain);
-    o12 = oplAt(d12, in.uv + vec2f( 0.0,  ts), dyeGain);
-    o22 = oplAt(d22, in.uv + vec2f( ts,  ts), dyeGain);
-  } else {
-    o00 = calcOpl(d00, vC, 0.0, dyeGain);
-    o10 = calcOpl(d10, vC, 0.0, dyeGain);
-    o20 = calcOpl(d20, vC, 0.0, dyeGain);
-    o01 = calcOpl(d01, vC, 0.0, dyeGain);
-    o21 = calcOpl(d21, vC, 0.0, dyeGain);
-    o02 = calcOpl(d02, vC, 0.0, dyeGain);
-    o12 = calcOpl(d12, vC, 0.0, dyeGain);
-    o22 = calcOpl(d22, vC, 0.0, dyeGain);
-  }
+  let perTap = vC.x > 0.001 || vC.z > 0.001 || poured;
 
-  let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
+  // The slope and the optical path's curvature from the same taps, at one
+  // cell apart with Gaussian weights, each the mean of its cell (sobelGrad
+  // says why: taps that see only part of the plate copy every narrow drop
+  // to where they stand, eight times round it). The
+  // curvature is scaled to the old nine-tap stencil's answer on a bowl,
+  // o = a·r²: that stencil read 1800a, so this reads 1800a too, and flat
+  // ground and straight ramps still read zero.
+  var gs = vec2f(0.0);
+  var m2 = 0.0;
+  var ls = 0.0;
+  var r2s = 0.0;
+  for (var j = -3; j <= 3; j++) {
+    for (var i = -3; i <= 3; i++) {
+      let r2 = i * i + j * j;
+      if (r2 == 0 || r2 > SLOPE_REACH2) { continue; }
+      let w = slopeWeight(r2);
+      let k = vec2f(f32(i), f32(j));
+      let uv = in.uv + k * cell;
+      let d = cellDensity(src, airSrc, uv, dC, hasAir);
+      var o: f32;
+      if (perTap) { o = oplAt(d, uv, dyeGain); } else { o = calcOpl(d, vC, 0.0, dyeGain); }
+      gs += k * (w * d);
+      m2 += f32(i * i) * w;
+      ls += w * (o - oC);
+      r2s += w * f32(r2);
+    }
+  }
+  // Inside a bubble's air there is no dye column to slope or curve.
+  let dyeHere = 1.0 - airAt(airSrc, in.uv);
+  let g = gs * (3.0 / m2) * dyeHere;
+  let lap = ls * (1800.0 / r2s) * dyeHere;
 
   return vec4f(g, lap, oC);
 }
@@ -1575,6 +1512,7 @@ fn viewAt(uv: vec2f) -> View {
   for (var k = 0; k < 9; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
   return View(o[0] * ${PHASE_VIEW_TOP}.0, o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7], o[8]);
 }
+${INTERFACE_WGSL}
 
 /*
   A drop of oil sitting on the plate is a lens, and what it shows depends on
@@ -1745,36 +1683,6 @@ ${BUBBLE_SHAPE_WGSL}
 ${FILM_DYE_WGSL}
 ${DROP_LENS_WGSL}
 ${VIEW_OPTICS}
-
-/*
-  How near this pixel is to the air of a bubble, 0 beyond the reach of the
-  dye's relief and 1 inside it (33b). A hole in the dye is the bubble's own
-  edge, and the bubble pass draws that edge as the meniscus it is; the dye
-  beside it is flat. The relief below reads a ramp in the density though, and
-  the ramp the air cuts is steep (the air field's rim is about a texel and a
-  half) so it was lit as if it were a pool's edge into clear liquid: a pale
-  ring on the lamp's side and a dark one opposite, a few cells wide, round
-  every hole. This is the reach of that ramp, the Sobel taps (3 cells) and
-  the bicubic spread under each (about 2), looked for in air: the biggest
-  coverage anywhere a tap of the relief could have read, taken at 4.5 cells
-  and at the pixel. The 1x1 blank a layer without bubbles carries gives 0
-  without a sample.
-*/
-fn airNear(fuv: vec2f) -> f32 {
-  if (textureDimensions(air0).x <= 1u) { return 0.0; }
-  let r = 4.5 / U.logicalGrid;
-  var m = textureSampleLevel(air0, samp, fuv, 0.0).r;
-  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(r, 0.0), 0.0).r);
-  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(r, 0.0), 0.0).r);
-  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(0.0, r), 0.0).r);
-  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(0.0, r), 0.0).r);
-  let d = r * 0.7071;
-  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(d, d), 0.0).r);
-  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(-d, d), 0.0).r);
-  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(d, -d), 0.0).r);
-  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(d, d), 0.0).r);
-  return smoothstep(0.02, 0.3, m);
-}
 `;
 
 /*
@@ -1995,37 +1903,11 @@ fn lumiaLight(uv: vec2f) -> vec3f {
 }
 
 ${FILM_FRAME_WGSL}
+${LAMP_MIX_WGSL}
 
 /** Light laid over light: screened, so it adds and cannot clip past white. */
 fn screenOver(c: vec3f, light: vec3f) -> vec3f {
   return 1.0 - (1.0 - c) * (1.0 - clamp(light, vec3f(0.0), vec3f(1.0)));
-}
-
-/**
- * The rows under the front plate, bottom up: the lamp the glass is lit by.
- * The LED ring replaces what is under it by its level, as the platform always
- * did; the gel filters what is under it (gelFilter: it makes no light, so
- * over a dark lamp it shows nothing, PLAN 38h); the lumia adds its light.
- */
-fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
-  var c = bg;
-  for (var p = 0; p < 7; p++) {
-    let fp = f32(p);
-    if (fp >= U.mixPos2.z) { break; }
-    if (U.ledPlatform != 0 && U.mixPos.x == fp) {
-      let m = mixBlendOf(U.mixBlend.x);
-      if (m == 0) { c = mixLevelled(c, ledLight(uv), U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
-    }
-    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) {
-      let m = mixBlendOf(U.mixBlend.y);
-      if (m == 0) { c *= gelFilter(uv); } else { c = blendRow(c, gelColor(uv), U.gelWheel, m); }
-    }
-    if (U.lumia > 0.001 && U.mixPos2.y == fp) {
-      let m = mixBlendOf(U.mixBlend.z);
-      if (m == 0) { c += lumiaLight(uv) * U.lumia; } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
-    }
-  }
-  return c;
 }
 
 /**
@@ -2294,9 +2176,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // stack has under the front plate, bottom up. Anything of the three that is
   // higher is laid over the glass (mixSourcesAt), and the glass is lit without it.
   bgColor = mixLamp(bgColor, uv);
-  // And the lamp ground (lampBg): the same rows over the lamp at full. The
-  // hot-spot (lampField.ts) never lifts a point above it, so nothing divides it.
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2329,6 +2208,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
+  // A screen pixel in plate units, for the ferrofluid's and oil's edges
+  // (crispInterface), outside any branch: a derivative reads across the
+  // quad. Not fwidth: √2 px on a turn. Relief reads rim0 unmoved.
+  let px0 = max(length(dpdx(fuv0)), length(dpdy(fuv0)));
+  let rim0 = fuv0;
+  fuv0 = crispInterface(fuv0, px0);
   let fuvBase = fuv0;
 
   var flow0 = vec2f(0.0);
@@ -2337,12 +2222,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
   // The front plate's own physics, once, where it sits on the plate.
   let view = viewAt(fuvBase);
-  // One screen pixel in plate units, for the ferrofluid's edge. Taken here,
-  // before any branch a pixel can take on its own, because WGSL reads a
-  // derivative across the whole quad or not at all. The length of a step
-  // across the screen, not fwidth: fwidth adds the two axes, which on a
-  // turning plate is up to √2 pixels and softened the edge as it spun.
-  let phasePx = max(length(dpdx(fuvBase)), length(dpdy(fuvBase)));
+  let phasePx = px0;
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   /*
     The clear film (§20b, 18b-6): the water's dye has the gap less the film,
@@ -2451,12 +2331,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   let sharp0 = dof < 0.55;
   var near0 = vec4f(0.0);
-  if (sharp0 && U.derivedOn > 0.5) { near0 = bicubicSigned(derived0, fuv0); }
+  if (sharp0 && U.derivedOn > 0.5) { near0 = bicubicSigned(derived0, rim0); }
   var normal0 = vec3f(0.0, 0.0, 1.0);
   if (sharp0) {
-    if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
-    // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
-    normal0 = normalize(mix(normal0, vec3f(0.0, 0.0, 1.0), airNear(fuv0)));
+    // A hole the air cut is the bubble's edge, not the dye's (33b): the slope
+    // reads the air as missing dye (plateSlope.ts, 31s-8).
+    if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, air0, rim0); }
   }
   normal0 = reliefGain(normal0);
   if (darkBlend) { fluid0.a *= 0.6; film0 *= 0.6; }
@@ -2508,13 +2388,22 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    let detail0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof, near0.z / max(1.0, near0.w));
+    var camK0 = 0.0;
+    if (sharp0 && U.derivedOn > 0.5 && U.macroRelief > 0.005) { camK0 = camLap(derived0, air0, fuv0, U.macroRelief * CAMERA_DEFOCUS); }
+    let detail0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof, camK0);
     // The film follows what the closeup does to the opacity, as it did when
     // it read fluid0.a here; only the grain is kept out of it.
     film0 = mix(film0, detail0.a * film0 / max(fluid0.a, 1e-4), macroAmt);
     fluid0 = mix(fluid0, detail0, macroAmt);
   }
 
+  // The lamp ground (lampBg): the same rows over the lamp at full, here once
+  // the surface is known, since a video in the lamp is seen through it
+  // (lampBend, plateLamp.ts). The hot-spot (lampField.ts) never lifts a point above it.
+  // One line each, as scripts/lampcontrol.mjs finds them (a video in the lamp
+  // always has a lamp ground, plateUniforms.ts, so its bend needs no test of it).
+  if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5 && U.dishSpread <= 0.001) { lampBend = lampBendAt(fuv0, c0, s0); }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
   /*
     No substrate grain and no contact shadow (PLAN 38u-2). Until 2026-11-13
     the closeup laid a paper's fibre over the ground (value noise at 230
@@ -2926,7 +2815,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  // Thin Film (1i), the water's glow (48c), the soap film (32d): plateThinFilm.ts.
+  // Thin Film (1i), the soap film (32d), a shaken dish (48f), the water's glow (48c): plateThinFilm.ts.
   if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
     outColor = thinFilmOver(outColor, film0, bare0, layer0, fuv0, blurFluid, useBlur, dof);
   }
@@ -2988,11 +2877,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (sharp1 && U.derivedOn > 0.5) { near1 = bicubicSigned(derived1, fuv1); }
     var normal1 = vec3f(0.0, 0.0, 1.0);
     if (sharp1) {
-      if (U.derivedOn > 0.5) { normal1 = gradNormal(near1.xy); } else { normal1 = sobelNormal(layer1, fuv1); }
-      // No airNear here: the bubbles' air is cut in the lead layer's dye only
-      // (the app hands the back layer no air), and airNear reads the front
-      // plate's air in this layer's own coordinates, which differ under a
-      // layer zoom or drift, so it would flatten relief where no bubble is.
+      // The back layer's own air (air1): the app cuts bubbles in the lead
+      // layer's dye only and hands this one the 1x1 blank, so nothing is
+      // held here, and the front plate's air, in coordinates a layer zoom or
+      // drift moves, is never read against this layer's dye.
+      if (U.derivedOn > 0.5) { normal1 = gradNormal(near1.xy); } else { normal1 = sobelNormal(layer1, air1, fuv1); }
     }
     normal1 = reliefGain(normal1);
     if (darkBlend) { fluid1.a *= 0.6; }
@@ -3025,7 +2914,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
     if (closeup) {
       let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
-      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof, near1.z / max(1.0, near1.w)), macroAmt);
+      var camK1 = 0.0;
+      if (sharp1 && U.derivedOn > 0.5 && U.macroRelief > 0.005) { camK1 = camLap(derived1, air1, fuv1, U.macroRelief * CAMERA_DEFOCUS); }
+      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof, camK1), macroAmt);
     }
 
     // The mixer's grade and level for the back plate, on its own picture.

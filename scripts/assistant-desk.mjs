@@ -233,5 +233,5 @@ export const DESK_MUTANTS = [
   { rule: 'desk-undo', file: 'assistant.js', find: "send({ type: 'assistant-desk', do: 'tab-restore' });", replace: '' },
   { rule: 'desk-panel', file: 'assistantDesk.js', find: "if (verb === 'dock' && !DESK_SLOTS.includes(message.slot)) return", replace: 'if (false) return' },
   { rule: 'desk-pin', file: 'assistantDesk.js', find: "for (const k of ['activity', 'ambient']) if", replace: "for (const k of ['activity']) if" },
-  { rule: 'phone-desk', file: 'remote-server.js', find: ", 'assistant-desk']);", replace: ']);' },
+  { rule: 'phone-desk', file: 'remote-server.js', find: ", 'assistant-desk', ", replace: ', ' },
 ];

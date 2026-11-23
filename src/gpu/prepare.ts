@@ -59,6 +59,7 @@ import { WebGPUFrameProbe } from './probe';
 import { WebGPUAir } from './air';
 import { WebGPUSlosh } from './slosh';
 import { SoapFilmPlate } from './soapFilmPlate';
+import { FaradayPlate } from './faraday';
 import { GlowPlate } from './glow';
 import { WebGPUParticles } from './particles';
 import { WebGPUCamera } from './camera';
@@ -504,6 +505,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUAir.prepare(device),
     ...WebGPUSlosh.prepare(device, open),
     ...SoapFilmPlate.prepare(device, open),
+    ...FaradayPlate.prepare(device, open),
     ...GlowPlate.prepare(device, open),
     ...WebGPUParticles.prepare(device, open),
     ...WebGPUCamera.prepare(device, format, open),

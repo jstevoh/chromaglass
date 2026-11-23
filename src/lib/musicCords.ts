@@ -39,7 +39,7 @@
  * to; a look saved before is given them once as it is read (lib/userPresets.ts).
  */
 import { DEFAULT_SETTINGS, type AudioFeature, type CordMaster, type MusicRole, type SceneMapping, type VisualizerSettings } from '../types';
-import { areasForBand, type PlateArea } from './plateAreas.ts';
+import { areasForBand, PRESET_AREAS, type PlateArea } from './plateAreas.ts';
 import { musicHands } from './soundLevels.ts';
 import type { MasterGains } from './areaCords.ts';
 
@@ -162,9 +162,11 @@ export const isMusicCord = (m: SceneMapping | null | undefined): boolean => !!m 
 
 /**
  * Give every look its music's cords (presets.ts, after the looks and the
- * pack's are written, beside layStirCords). `areasFor` is a look's areas by id.
+ * pack's are written, beside layStirCords). `areasFor` is a look's areas by
+ * id, the built-in looks' own (plateAreas.ts PRESET_AREAS) unless given:
+ * presets.ts sits at its size line, so the lookup is made here.
  */
-export function layMusicCords(looks: readonly { id: string; settings: Partial<VisualizerSettings> }[], areasFor: (id: string) => readonly PlateArea[] | null): void {
+export function layMusicCords(looks: readonly { id: string; settings: Partial<VisualizerSettings> }[], areasFor: (id: string) => readonly PlateArea[] | null = id => PRESET_AREAS[id] ?? null): void {
   for (const p of looks) {
     const add = musicCordsFor(p.settings, areasFor(p.id));
     if (add.length) p.settings.sceneMappings = [...(p.settings.sceneMappings ?? []), ...add];

@@ -11,6 +11,7 @@ import type { SloshDrive } from '../../lib/slosh';
 import { WebGPUSlosh } from '../slosh';
 import type { SoapFilmPlate } from '../soapFilmPlate';
 import type { TankPlate } from '../tankPlate';
+import type { FaradayPlate } from '../faraday';
 import type { GlowPlate } from '../glow';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
@@ -108,6 +109,8 @@ export class FluidCore {
   protected soapPlate: SoapFilmPlate | null = null;
   /** The tank's side view (PLAN 47n), made while Tank is up. */
   protected tankPlate: TankPlate | null = null;
+  /** The shaken dish's standing waves (PLAN 48f), made while Shaker is up. */
+  protected faradayPlate: FaradayPlate | null = null;
   /** The water's glow (PLAN 48c, gpu/glow.ts), made while Glow is up. */
   protected glowPlate: GlowPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
@@ -229,9 +232,9 @@ export class FluidCore {
   /** What the step's hsPrep reads as the velocity after the body forces: hsMid, or hsPrev when no body force ran. */
   protected hsMidNow: GPUTexture | null = null;
   protected hsMob: GPUBuffer | null = null;
-  protected hsOilMean: GPUBuffer | null = null;
   protected hsLiftSrc: GPUBuffer | null = null;
   protected hsLiftPsi: GPUBuffer | null = null;
+  protected hsLiftB: GPUBuffer | null = null;
   /** The sealed bottle's (PLAN 27f-9): the weight's right-hand side and its Ψ, on the lift's grid. */
   protected hsSealSrc: GPUBuffer | null = null;
   protected hsSealPsi: GPUBuffer | null = null;
@@ -715,6 +718,8 @@ export class FluidCore {
     this.resetFilm();
     // And the tank's water clear again (PLAN 47n): the performer's wipe is the tank emptied and refilled.
     this.tankPlate?.reset();
+    // And the shaken dish's water still again (PLAN 48f).
+    this.faradayPlate?.reset();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
     // The sim buffer only needs its grid sizes for a fill, and the cover's gap

@@ -25,7 +25,8 @@ import { WHOLE_DISPLAY, displayNeeds, leanCovers, leanDisplayWgsl } from './disp
 import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
 import { FerroDrop } from './ferroDrop';
 import { groupOf, viewOf } from './groupCache';
-import { DROP_KERNELS } from './wgsl/ferroDrop';
+import { DROP_KERNELS, GAP_LC } from './wgsl/ferroDrop';
+import { DISH_REST_GAP } from '../lib/turntable';
 import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
 import { BEAD_FLOATS } from '../lib/beadPack';
@@ -33,6 +34,7 @@ import { soapFilmLut } from '../lib/soapFilm';
 import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
 import { drawTank } from './tankDraw';
 import type { TankPlateField } from './tankPlate';
+import type { FaradayField } from './faraday';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -312,7 +314,7 @@ export class WebGPUPlate {
       this.layers[i] = {
         size,
         dye: tex('packed dye', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
-        vel: tex('packed velocity', PACKED_VEL_FORMAT, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
+        vel: tex('packed velocity', PACKED_VEL_FORMAT, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
         // COPY_SRC so npm run derive can read where the slopes were found.
         derived: tex('derived', 'rgba16float', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
       };
@@ -398,7 +400,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -431,10 +433,10 @@ export class WebGPUPlate {
     if (lensOn) this.pack.set('finishInMain', 0);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
     if (lensOn) this.pack.set('finishInMain', finish);
-    // The pack's one number is the grid, which changes with a rung and not
+    // The pack's grid and l_c per gap unit, which change with a rung and not
     // with a frame: written when it does, not sixty times a second (14ab-5).
     if (grid !== this.packGrid) {
-      this.device.queue.writeBuffer(this.packArgs, 0, new Float32Array([grid, 0, 0, 0]));
+      this.device.queue.writeBuffer(this.packArgs, 0, new Float32Array([grid, GAP_LC / DISH_REST_GAP, 0, 0]));
       this.packGrid = grid;
     }
 
@@ -450,7 +452,7 @@ export class WebGPUPlate {
     const leadView = fields[0].view;
     const dropWanted = !!leadView && leadView.width === grid
       && FerroDrop.wanted(this.pack.get('macroOn')[0], this.pack.get('macroRelief')[0], this.pack.get('phaseAmount')[0]);
-    const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets')) : null;
+    const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres) : null;
     if (!dropWanted) this.drop.cool();
     if (height) {
       const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
@@ -458,6 +460,7 @@ export class WebGPUPlate {
         packPass.setPipeline(pipe);
         packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
         packPass.dispatchWorkgroups(groups, groups);
+        this.drop.notePackedVel(this.layers[0].vel);
       }
     }
     for (let i = 0; i < fields.length; i++) {
@@ -499,7 +502,7 @@ export class WebGPUPlate {
         });
         pass.setPipeline(derive);
         const viewTex = fields[i]?.view ?? this.blankU;
-        pass.setBindGroup(0, groupOf(this.device, derive, [this.uniformBuffer, this.sampler, this.layers[i].dye, viewTex, fields[i]?.species ?? this.blankSpecies]));
+        pass.setBindGroup(0, groupOf(this.device, derive, [this.uniformBuffer, this.sampler, this.layers[i].dye, viewTex, fields[i]?.species ?? this.blankSpecies, fields[i]?.air ?? this.blank]));
         pass.draw(6);
         pass.end();
       }
@@ -556,7 +559,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -591,7 +594,7 @@ export class WebGPUPlate {
     uniforms: GPUBuffer,
     /** What `uniforms` was written from: which of the display's effects this draw turns on. */
     bytes: ArrayBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -639,6 +642,8 @@ export class WebGPUPlate {
       fields[0].airGeo?.discs ?? this.blankList, fields[0].airGeo?.rims ?? this.blankList,
       // The rings' list the beads' mask was drawn from, read at the screen's resolution (38h-17).
       rings?.args ?? this.blankBeadArgs, rings?.beads ?? this.blankBeads, rings?.tiles ?? this.blankList,
+      // The shaken dish's standing waves (48f), the front plate's alone.
+      fields[0].faraday?.h ?? this.blankStore,
       // The water's glow (48c), the lead plate's alone; a 4-float stand-in while it is off.
       fields[0].glow?.light ?? this.blankStore,
     ]));

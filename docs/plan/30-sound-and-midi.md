@@ -50,10 +50,6 @@ the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
 analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
 
 ## ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
-
-Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Story in
-`docs/plan-shipped.md` §30a (moved 2026-10-29, 19m).
-
 - **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
   on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the
   projector mirrors `#liquid-canvas` directly, so it shows the laptop's fold (including
@@ -92,9 +88,6 @@ Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Story in
   the quarter is, and the line stays red about half the time until it is found.
 
 ## ~~30b. The LFOs and envelopes are fixed~~ (shipped 2026-11-08)
-
-Shipped (`npm run soundowed`, id `lfo` taken out of `--owed` in `scripts/checks.json`; `npm run shapes` 15/15). Story in `docs/plan-shipped.md` §30b.
-
 - **30b-loop. A recorded song's onsets driving `Modulators.trigger`.** In `soundowed.mjs` the drum loop is written out; the ear's kick and snare onsets call `trigger('kick')` and `trigger('snare')` in `Modulators.step`, and a check line feeding a recorded song's analysed onsets through the ear to `trigger` remains open here.
 
 **Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the
@@ -107,11 +100,45 @@ ChromaGlass itself as an AUv3 inside AUM: the plate needs WebGPU and more memory
 audio extension gets (inferred), the same reason as §13's "not doing a plugin inside
 the host"; 13.7-ipad is the part of it that fits.
 
+## 48f. Faraday waves: the music's shake stands up as a pattern (shipped 2026-11-21)
+
+Idea 48f of the visuals the music moves, picked by the owner 2026-11-21 ("anything that can be impacted by the music
+itself. Like the standing-wave patterns"), written here beside the cords because it is
+one: the music reaches it only through Music Shake, a cord from the bass onto Shake. The
+story is in `docs/plan-shipped.md` under 48f. Open:
+
+- **48f-2. The saturation's coefficients, derived** (M). The cubic that stops the
+  pattern growing (wgsl/faraday.ts) is the curvature's own for ripples and u³ for
+  gravity waves, weighted by the capillary share, scaled so a wave settles at a real
+  pattern's steepness (S0 = 0.6). Replace the scale with Zhang and Viñals' (1997)
+  coefficients for the layer, so which pattern stands (stripes, squares, hexagons,
+  quasi-patterns at two frequencies) is the liquid's too. `npm run faraday` prints the
+  peaks round the ring today (6, 3 and 9 at 20, 50, 100 Hz: a disordered lattice after a
+  few seconds, not yet the squares experiments show for ripples); hold them once derived.
+- **48f-3. The dish's wall** (M). The grid is periodic over the plate's square; a real
+  dish's rim pins the pattern and launches its own meniscus waves at the drive's own
+  frequency. Lay the rim (lib/rimMask) as a wall in the step.
+- **48f-4. The drive follows the music's pitch** (S–M). Shaker is a dial; the music only
+  moves Shake. A cord from the bass line's pitch onto Shaker would put the big cells
+  under low notes and the fine ones under high, which the patch bay has no source for
+  yet (a pitch reading as a cord source).
+- **48f-5. Two frequencies** (M). A real speaker playing music shakes at many at once;
+  two drive frequencies make quasi-crystal patterns (Edwards and Fauve 1993). The step
+  takes one.
+- **48f-6. The strobe's phase** (S). The light is drawn as a camera locked to the wave at
+  its crest (wgsl/plateFaraday.ts), so it holds still; a dial that detunes that lock
+  slowly would let the crests and troughs trade places over seconds, as a detuned strobe
+  shows them, without ever flickering.
+- **48f-7. A look that opens shaken** (S). No look sits on the shaker yet, so every look
+  opens as it did; a look built for it (Shaker on, Music Shake set) would show the
+  feature without a hand on the desk. Needs the owner's judging first (docs/judging.md
+  §140).
+
 ## ~~48c. Bioluminescent trails: the water glows where it is sheared~~ (shipped 2026-11-21)
 
 Shipped behind Glow, Glow Shear and Glow Recharge (`npm run glow` 15/15 on the lab's software
 WebGPU). Story in `docs/plan-shipped.md` §48c; written here beside the cords because the music
-plays it through them. Not yet seen on the Mac (`docs/judging.md` §140). Three shortcuts are
+plays it through them. Not yet seen on the Mac (`docs/judging.md` §144). Three shortcuts are
 named in the code and each is an item:
 
 - **48c-1. The plankton are spread evenly.** Every cell of the plate's water holds the same
@@ -131,11 +158,11 @@ named in the code and each is an item:
   the water passes through the dye on its way to the lens and is absorbed by it as the
   lamp's is (18b): attenuate it by the dye's absorbance over the path, Beer–Lambert, with
   the blue's own extinction per dye.
-- **48c-4. The display's fragment stage is at its storage-buffer limit.** The glow's light is
-  the display's seventh read-only storage buffer in its fragment stage; with 48f's surface
-  (binding 25) it is the eighth of the eight every device gives without asking
-  (`gpu/device.ts` asks for no more). The next field the plate draws must pack into a buffer
-  already bound (the glow's light and the Faraday surface fit one array) or be a texture.
+- **48c-4. The display's fragment stage is at its storage-buffer limit.** The glow's light
+  (binding 26) is the display's eighth read-only storage buffer in its fragment stage, after
+  48f's surface (binding 25): the eight every device gives without asking (`gpu/device.ts`
+  asks for no more). The next field the plate draws must pack into a buffer already bound
+  (the glow's light and the Faraday surface fit one array) or be a texture.
 - **48c-5. A look made for the glow.** Every look ships with Glow at 0. A look of dark water,
   sparse dye and a cord that stirs on the kick (the music lights a wake on each hit and the
   quiet lets the water recharge) would show it on Go; the owner picks it from Mac films.

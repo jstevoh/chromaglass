@@ -19,7 +19,6 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
-import { closeupIn, closeupToggle } from '../../lib/macroLanding';
 import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
@@ -62,13 +61,11 @@ function setControl(p: DeskProps, key: keyof VisualizerSettings, n: number) {
 }
 
 /**
- * One control, drawn as the hardware it is ridden on.
+ * One control, as a knob or as a slider: which is the panel's, never the
+ * control's (`ControlGrid`, the Rides strip).
  *
- * A CC learned to a known controller's fader is a slider, full width, above
- * the knobs; a knob, an encoder, a CC on a board with no profile (8d-1), or
- * nothing learned, is a knob. Re-learn a control and it redraws
- * in place. The value is the settings' own, so a fader, the mouse and the
- * phone are three ways to move one number.
+ * The value is the settings' own, so a fader, the mouse and the phone are
+ * three ways to move one number.
  */
 function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: DeskProps; testId: string; asKnob: boolean; dense?: boolean }) {
   const key = spec.key;
@@ -114,20 +111,30 @@ function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: De
   );
 }
 
-/** Faders first, full width; then the knobs, four to a row. */
+/**
+ * A panel of knobs, four to a row: the Recipe and every section's knobs panel.
+ *
+ * One panel, one kind of control (PLAN 8d-3). This grid used to ask, control
+ * by control, what each was learned to on the MIDI controller and draw a
+ * fader's control as a full-width slider above the knob row, so the desk
+ * looked like the hardware. The owner reported that as a fault twice: on
+ * 2026-11-14 Iridescence, learned to a CC on a board with no profile, sat as
+ * a slider above the Recipe's knobs (8d-1 then made an unknown board's CCs
+ * knobs, which only narrowed it); on 2026-11-22 Bubbles and Saturation, which
+ * the APC mini mk2's factory map rides on two of its faders, were sliders in
+ * the Recipe beside Fluid Physics' and Squish Plate's knobs. Every way a
+ * learn could land made a different panel, and a panel that changes shape
+ * when someone moves a binding is one nobody can read across. So the kind is
+ * the panel's: Rides are faders, these are knobs, whatever each is learned
+ * to. `npm run panelkinds` renders every panel and fails one that draws both.
+ */
 function ControlGrid({ keys, p, prefix }: { keys: (keyof VisualizerSettings)[]; p: DeskProps; prefix: string }) {
   const specs = keys.map(k => RANGE.get(String(k))).filter((s): s is DeskSpec => !!s);
-  const faders = specs.filter(s => p.kindFor(s.key) === 'fader');
-  const knobs = specs.filter(s => p.kindFor(s.key) !== 'fader');
+  if (specs.length === 0) return null;
   return (
-    <>
-      {faders.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob={false} />)}
-      {knobs.length > 0 && (
-        <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-2 pt-1">
-          {knobs.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob />)}
-        </div>
-      )}
-    </>
+    <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-2 pt-1">
+      {specs.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob />)}
+    </div>
   );
 }
 
@@ -498,8 +505,8 @@ function RidesBody({ p }: { p: DeskProps }) {
   The controls a look is built from, chosen by the owner (`DEFAULT_RECIPE`):
   the old bench's right-hand column, now a panel that leads Build's deck.
   Choose is the same picker the rides use, over the same list, so whatever
-  can ride there can sit here. Knobs or sliders by the controller, as every
-  panel's controls are.
+  can ride there can sit here. All knobs, whatever each is learned to on the
+  controller: one panel, one kind of control (`ControlGrid`, PLAN 8d-3).
 */
 function RecipeBody({ p }: { p: DeskProps }) {
   const [picking, setPicking] = useState(false);
@@ -556,16 +563,13 @@ function RecipeBody({ p }: { p: DeskProps }) {
       )}
       {/* Pinned rather than at the end of a list that scrolls. */}
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
-        <Button
-          full height={32}
-          pressed={closeupIn(p.settings)}
-          title="The closeup camera, in among the drops (M). Lit while it is on."
-          onClick={() => p.onSetting(closeupToggle(p.settings))}
-          midiKey="action:macro-toggle"
-          testId="macro-button"
-        >
-          Close-up
-        </Button>
+        {/*
+          A Close-up button sat here, beside Randomise: one press to 4x and
+          one back to the plate. The owner asked for it gone (2026-11-14):
+          the Macro Zoom is the one way in and out, so there is one control
+          for the closeup and it always reads what the plate is doing
+          (PLAN QA-32c).
+        */}
         {/* Randomise replaces every setting at once, so it asks first. */}
         <Button
           full height={32}
@@ -752,7 +756,7 @@ function DyesBody({ p }: { p: DeskProps }) {
       {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
           <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
-          <VideoShelf {...p.video} prefix="dyes-" />
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
         </div>
       )}
     </div>

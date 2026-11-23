@@ -191,7 +191,7 @@ const NOT_THE_LOOK = new Set([
     it (a granulation glide drawn the length of its reach in 6 s) and 4.20
     without (PLAN 10-8d-3).
   */
-  'soapFilm', 'soapFilmRate', 'soapFilmAngle',
+  'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
   /* The water's glow (PLAN 48c) is a light the look turns on, not a tint to drift. */
   'glow', 'glowShear', 'glowRecharge',
   /*
@@ -209,6 +209,12 @@ const NOT_THE_LOOK = new Set([
     dials it reached for before (they were not in it, being new).
   */
   'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
+  /*
+    The dish on a speaker (PLAN 48f): whether there is a shaker and how
+    hard it shakes are the performer's and the music's (through its cord),
+    never a wander of Evolve's.
+  */
+  'faradayHz', 'faraday',
   /*
     Polarised light (PLAN 31p-1): the sheets are put into the beam and the
     analyser turned by a hand at the projector. Wandering in, the sheets

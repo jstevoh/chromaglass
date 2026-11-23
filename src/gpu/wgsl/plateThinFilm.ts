@@ -12,6 +12,7 @@
  */
 import { SOAP_LUT_STEP_NM } from '../../lib/soapFilm';
 import { SOAP_FRAME_LO, SOAP_FRAME_SPAN } from '../soapFrame';
+import { FARADAY_PLATE_WGSL } from './plateFaraday';
 import { GLOW_PLATE_WGSL } from './plateGlow';
 
 export const THIN_FILM_WGSL = /* wgsl */ `
@@ -170,7 +171,8 @@ fn thinFilmOver(c: vec3f, film0: f32, bare0: f32, t: texture_2d<f32>, fuv: vec2f
 @group(0) @binding(19) var<storage, read> soapLut: array<vec4f>;
 
 const SOAP_LUT_STEP: f32 = ${SOAP_LUT_STEP_NM}.0;
-const SOAP_GAIN: f32 = 4.0;
+// Physical Airy reflectance in linear light (PLAN 32d-6): R <= ~7.8% and T = 1 - R.
+const SOAP_GAIN: f32 = 1.0;
 const SOAP_FRAME_LO: f32 = ${SOAP_FRAME_LO};
 const SOAP_FRAME_SPAN: f32 = ${SOAP_FRAME_SPAN};
 
@@ -197,6 +199,11 @@ fn soapThickness(fuv: vec2f, n: i32) -> f32 {
   return h;
 }
 
+fn soapDecode(c: vec3f) -> vec3f {
+  let v = max(c, vec3f(0.0));
+  return select(pow((v + 0.055) / 1.055, vec3f(2.4)), v / 12.92, v <= vec3f(0.04045));
+}
+
 fn soapEncode(c: vec3f) -> vec3f {
   let v = clamp(c, vec3f(0.0), vec3f(1.0));
   return select(1.055 * pow(v, vec3f(1.0 / 2.4)) - 0.055, 12.92 * v, v <= vec3f(0.0031308));
@@ -212,16 +219,24 @@ fn soapFilmOver(c: vec3f, fuv: vec2f) -> vec3f {
   let d = max(0.0, soapThickness(vec2f(f.x, 1.0 - f.y), n)) * U.soapCosT;
   let pos = min(d / SOAP_LUT_STEP, f32(count - 1u));
   let k = u32(pos);
-  let lin = mix(soapLut[k].rgb, soapLut[min(k + 1u, count - 1u)].rgb, pos - f32(k)) * SOAP_GAIN;
-  let film = soapEncode(lin);
-  let reflected = min(1.0, dot(film, vec3f(0.2126, 0.7152, 0.0722)));
-  return mix(c, c * (1.0 - reflected) + film, U.soapFilm);
+  let w = clamp(U.soapFilm, 0.0, 1.0);
+  let lin = mix(soapLut[k].rgb, soapLut[min(k + 1u, count - 1u)].rgb, pos - f32(k)) * SOAP_GAIN * w;
+  let r = clamp(lin, vec3f(0.0), vec3f(1.0));
+  return soapEncode(soapDecode(c) * (vec3f(1.0) - r) + lin);
 }
+
+/*
+  What lies over the plate's liquid, in the order light meets it: a shaken
+  dish's standing waves bend the lamp's light (PLAN 48f, plateFaraday.ts),
+  the water's own glow is added in linear light (48c, plateGlow.ts), then
+  the frame's soap film reflects over all of it (32d). Here and not in
+  plate.ts, which is at its size ceiling.
+*/
+${FARADAY_PLATE_WGSL}
 ${GLOW_PLATE_WGSL}
-// What lies over the plate's colour once it is drawn: the water's own light
-// (48c, plateGlow.ts), then the frame's soap film in front of it all (32d).
 fn coversOver(c: vec3f, fuv: vec2f) -> vec3f {
   var o = c;
+  if (U.faraday > 0.5) { o = faradayOver(o, fuv); }
   if (U.glow > 0.001) { o = glowOver(o, fuv); }
   if (U.soapFilm > 0.001) { o = soapFilmOver(o, fuv); }
   return o;

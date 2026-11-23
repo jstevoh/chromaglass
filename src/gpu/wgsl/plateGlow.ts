@@ -27,8 +27,8 @@
 const BLUE = [0.0, 0.32, 1.0];
 
 export const GLOW_PLATE_WGSL = /* wgsl */ `
-/* The glow's light, n × n over the plate's uv (gpu/glow.ts); a 4-float stand-in while the water is not glowing. The display's seventh storage buffer in its fragment stage, of the eight every device gives without asking (gpu/device.ts asks for no more). */
-@group(0) @binding(25) var<storage, read> glowLight: array<f32>;
+/* The glow's light, n × n over the plate's uv (gpu/glow.ts); a 4-float stand-in while the water is not glowing. The display's eighth storage buffer in its fragment stage (after 48f's surface at 25), the last of the eight every device gives without asking (gpu/device.ts asks for no more). */
+@group(0) @binding(26) var<storage, read> glowLight: array<f32>;
 
 const GLOW_BLUE: vec3f = vec3f(${BLUE.join(', ')});
 

@@ -470,6 +470,25 @@ export class AreaHands {
   }
 
   /** How many times a cord's gate has opened (for the check). */
+  /**
+   * Forget every hand's state and the hands' clock, as a fresh AreaHands:
+   * the gates' envelopes, where each paddle is round its circle, the bottle a
+   * pour took up and the walk the plate's bottle is on (`t`).
+   *
+   * A render calls it as it lays its plate (LiquidVisualizer resetPlateClocks).
+   * Since 38v-1 every look carries the music's hands, so these gates are
+   * open on every look the live show plays; left as the show had them, two
+   * renders of the same seed began with the gates in two places and drew
+   * different frames from the first (`npm run render-app` on the Mac: 239 of
+   * 240 frames differed, against 0 on main).
+   */
+  forget(): void {
+    this.state.clear();
+    this.acts.length = 0;
+    this.t = 0;
+    this.pressAt = null;
+  }
+
   fires(m: SceneMapping): number { return this.state.get(keyOf(m))?.gate.fires ?? 0; }
 
   /**
