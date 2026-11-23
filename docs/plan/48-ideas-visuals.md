@@ -193,15 +193,15 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   lively, measured by `npm run watch`'s turnover and lifetime against the reference
   library, never by speeding the clock (38u-6 is the clock's own item).
 
-  **First part shipped** (#944, `npm run pace`): five lively looks (Oil and Water, Home
-  Movie, Red Cabbage, Splodascope, Crowd Plate) run in a thin water-and-glycerine (4–8 cSt,
-  Thickness 0.2–0.3) instead of light oil (22 cSt), with a firmer Plate Rock, Beat Squeeze
-  and pours (`src/presetsPace.ts`). In the thin gap a body force moves the liquid at
-  h²Δρg sinθ/12μ and a push coasts for h²/12ν, so the thinner liquid is the real lever: the
-  harder hand alone at light oil gave a 1.07x median. Filmed on the Mac, turnover went
-  5.8→2.3, 9.6→5.8, 5.6→3.5, 3.9→2.7 and 4.0→3.8 s (median 1.58x), each keeping 90% of its
-  colourfulness and half its dark. Still slower than a real show's 1.5–2.4 s; the rest is
-  below.
+  **First part shipped** (#944, `npm run pace`): four lively looks (Oil and Water, Home
+  Movie, Red Cabbage, Crowd Plate) run in a thin water-and-glycerine (4–8 cSt, Thickness
+  0.2–0.3) instead of light oil (22 cSt), with a firmer Plate Rock, Beat Squeeze and pours
+  (`src/presetsPace.ts`). In the thin gap a body force moves the liquid at h²Δρg sinθ/12μ
+  and a push coasts for h²/12ν, so the thinner liquid is the real lever: the harder hand
+  alone at light oil gave a 1.07x median. Filmed on the Mac after the flower fix (#949),
+  one clean run of 60 s takes, turnover went 5.8→2.8, 8.6→4.1, 5.7→3.4 and 4.3→3.5 s
+  (median 1.87x), each keeping 90% of its colourfulness and half its dark. Still slower
+  than a real show's 1.5–2.4 s; the rest is below.
 
 - **48q-1. The viscosity mode is dead on the thin gap** (S; found 2026-11-22 in 48q). With
   the thin gap on (every look), the plate's viscosity comes from Thickness alone
@@ -227,6 +227,14 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   5.6, 11 and 16 cSt its colourfulness fell from 33 to 3, 16 and 24 while it turned over
   little faster (4.55 s, then 4.0 at 16 cSt). Its pace should come from `cometSpeed` and
   the pours that feed it, held to the same film's colour bar.
+- **48q-5. Splodascope's pace** (S; found 2026-11-23 in 48q). Paced like the others (rock
+  0.65, squeeze 0.4, pours 0.16, Thickness 0.3) it turned over 1.30x as fast on the film
+  before the plate's slope fix (#949), but after it, two takes a setting on the same code,
+  its old settings turned over in 3.74 s at colourfulness 134 and the paced ones in 4.36 s
+  at 83 (4.50 s and 89 at Thickness 0.4): slower and muddier, its crowd of oil drops (Film
+  Hold) broken up by the harder hand. So it stays as it was. Its pace may come from the
+  drops' own motion (more drops, a gentler tilt that lets them slide) rather than a harder
+  push. Check: `npm run pace -- --film` with it back in `PACE`, the same bars.
 
 - **48r. Timbre and harmony as cord sources** (S–M; asked 2026-11-21 with the owner's pick:
   "what music aspects can we send through cords? ... like melody, timbre?"). A cord today

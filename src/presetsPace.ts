@@ -76,7 +76,15 @@ import type { VisualizerSettings } from './types';
   16 cSt). Its pace is the stream's own, PLAN 48q-4. Aurora, Jellyfish and Solar Flare are not here: filmed for
   48q, they already turn over inside the real shows' range (1.1, 2.5 and
   2.4 s on the main this went out from). Classic is not here either: it is
-  being rebuilt on its own (PR #923). The numbers each look was filmed at,
+  being rebuilt on its own (PR #923). Splodascope is not here: on the film
+  before the plate's slope fix (#949) it turned over 1.30 times as fast at
+  0.65 rock, 0.4 squeeze, 0.16 pours and Thickness 0.3, but filmed again
+  after that fix, two takes a setting on the same code, its old settings
+  turned over in 3.74 s at colourfulness 134 and the paced ones in 4.36 s at
+  83 (4.50 s and 89 at Thickness 0.4): slower and muddier both ways, its
+  crowd of oil drops broken up by the harder hand. Its pace is PLAN 48q-5.
+  Home Movie sits at 0.3, not the 0.275 it was first set to, because at
+  0.275 it kept only 12% near black against 26% before. The numbers each look was filmed at,
   before and after, are in the PR that set them and in PLAN 48q, and
   `npm run pace` holds the table to them.
 
@@ -96,10 +104,9 @@ export type Pace = Pick<VisualizerSettings, PaceKey>;
 
 export const PACE: Readonly<Record<string, Pace>> = {
   'crowd-plate':   { plateRock: 0.6,  beatSqueeze: 0.5,  automateRate: 0.18, gapThickness: 0.2 },
-  splodascope:     { plateRock: 0.65, beatSqueeze: 0.4,  automateRate: 0.16, gapThickness: 0.3 },
   'red-cabbage':   { plateRock: 0.7,  beatSqueeze: 0.4,  automateRate: 0.24, gapThickness: 0.25 },
   'oil-and-water': { plateRock: 0.7,  beatSqueeze: 0.45, automateRate: 0.14, gapThickness: 0.3 },
-  'home-movie':    { plateRock: 0.8,  beatSqueeze: 0.5,  automateRate: 0.3, gapThickness: 0.275 },
+  'home-movie':    { plateRock: 0.8,  beatSqueeze: 0.5,  automateRate: 0.3,  gapThickness: 0.3 },
 };
 
 export function layPaceLooks(looks: Preset[]): void {
