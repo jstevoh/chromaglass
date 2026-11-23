@@ -126,9 +126,6 @@ nothing. A loop that needs less of a crossfade (a periodic stir locked to the ba
     as first written: on a Release kit render the cover can also be poured in as the first
     dye (`injectImage`) so a loop opens on it, as Apple's motion art asks. *Measure:* the
     film's first frame is closer to the cover than a plate from the default look's.
-  - **43d-6. The playing plate takes the picture's colours.** **Shipped 2026-11-21**
-    (`npm run pictureplate`): a palette chosen by hand recolours the plate in eight seconds,
-    and a look laid under a lock is laid in its dyes. Story in `docs/plan-shipped.md` §43d-6.
   - **43d-7. A recolour by a real rinse.** *(M.)* 43d-6's eight seconds reuse Go's handover,
     which thins the dye already laid to 2% by a rate no liquid has: a shortcut. On a real
     plate the old colour leaves only by being carried off or out-poured: clear medium flowed

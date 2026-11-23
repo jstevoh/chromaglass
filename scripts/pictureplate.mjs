@@ -18,8 +18,8 @@
  * engine's harmony) was green on a plate that never changed colour.
  *
  * This asks the plate itself. A cover of four blocks is made in the page in
- * teals and greens, hues Classic has none of (its six are Sunshine Yellow,
- * Amber, Hot Pink, Magenta, Ultramarine and Blue Cheer), so a pixel's hue
+ * teals and greens, hues Classic has none of (its five are Magenta,
+ * Sunshine Orange, Amber, Sunshine Yellow and Icy Blue), so a pixel's hue
  * says which palette it came from. Each lit, coloured pixel of the plate read
  * back is classed by the direction of its chroma (its colour less its grey):
  * nearer a picture dye's direction or nearer a look dye's. Then, on the
@@ -85,8 +85,8 @@ const CASES = [
   { name: 'laptop', screen: LAPTOP },
   { name: 'phone', screen: PHONE },
 ];
-// Classic's harmony (src/presets): the look's six dyes in PALETTE_RGB.
-const LOOK_DYES = [0, 17, 2, 20, 18, 8];
+// Classic's harmony (src/presetPlate.ts): the look's five dyes in PALETTE_RGB.
+const LOOK_DYES = [20, 1, 17, 0, 7];
 const PICTURE_SLOTS = [24, 25, 26, 27];
 // Teal, green, emerald and turquoise: none of them near a Classic dye's hue.
 const COVER = ['#00a096', '#1eb43c', '#00c878', '#00b4b4'];

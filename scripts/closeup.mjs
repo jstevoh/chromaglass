@@ -80,13 +80,15 @@ try {
       const before = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.meanDensity ?? -1);
       if (before < 0.3) throw new Error(`${look} never filled — ${before.toFixed(2)} on the glass, nothing to zoom into`);
       dye = before;
-      await page.evaluate(() => window.chromaglassAction?.('macro-toggle'));
-      // The action sets React state; the settings the hook hands back are last
+      // In by the Macro Zoom, the closeup's one control (the Close-up press
+      // this used was taken out, PLAN QA-32c): the patch its slider writes.
+      await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 4, macroMode: true }));
+      // The patch sets React state; the settings the hook hands back are last
       // frame's until it lands. Read too early and the check says the closeup
       // never came on when it came on perfectly well.
       await page.waitForTimeout(600);
       const on = await page.evaluate(() => window.chromaglassDebug().settings.macroZoom);
-      if (!(on > 1.05)) throw new Error(`macro-toggle did not turn the closeup on — zoom ${on}`);
+      if (!(on > 1.05)) throw new Error(`the Macro Zoom did not turn the closeup on — zoom ${on}`);
       const seen = [];
       for (let s = 0; s < 14; s++) {
         await page.waitForTimeout(1000);

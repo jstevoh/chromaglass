@@ -46,7 +46,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let soap = l0.r;
   let body = l0.g;
   let repel = l0.b;
-  let heavy = l0.a;
+  let heavy = l0.a - l1.g;   // a heavy liquid's w, less a light one's lightness (addLiquidDrop)
   let polar = l1.r;
   
   if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
@@ -59,7 +59,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let dt = S.dt;
   let s = S.n;
   
-  if (soap > 0.0) {
+  /*
+    On a thin gap (A.a.y) only the drags stay here, acting on the flow the
+    liquid already had: the soap's pull and the polar keeping-apart have no
+    place between two glasses (no free surface for a Marangoni stress, and
+    the oil's own tension is the mix's), and the heavy liquid's weight is a
+    drive the thin solve reads after it keeps the flow (liquidDrive, PLAN
+    15e-10).
+  */
+  let open = A.a.y == 0.0;
+  if (soap > 0.0 && open) {
     let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
     let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
     fx -= gx * A.a.x * dt * s;
@@ -72,12 +81,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     fy -= v.y * k;
   }
   
-  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
+  if (heavy != 0.0 && open && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
     fx += S.rock.x * heavy * A.a.w * dt * s;
     fy += S.rock.y * heavy * A.a.w * dt * s;
   }
   
-  if (polar != 0.0) {
+  if (polar != 0.0 && open) {
     let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
     let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
     let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
@@ -107,6 +116,43 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   fy = clamp(fy, -maxf, maxf);
   
   textureStore(dst, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
+}`,
+
+  /*
+    A heavy liquid's weight down a rocked thin gap (PLAN 15e-10,
+    driveLiquids). The liquids' fields carry w, the column's density over
+    the water's less one (a heavy liquid's in liquids0.a, a light one's
+    lightness in liquids1.g: addLiquidDrop says why), and a plate tipped by θ puts w ρ g sinθ on that
+    column more than on the liquid round it. Laid after the thin gap keeps
+    its flow ('thin gap keep') and before it keeps the body forces, it is
+    read as every body force is there: the speed it drives the reference
+    liquid to at the rest gap, which the solve then turns into the flow
+    a weight between two glasses makes. The drop goes as its own viscosity
+    lets it (the species field, in hsPrep's drag), the water goes round it
+    (the pressure), and on balance nothing else moves.
+
+    Where the mix holds oil this step's lift already weighs it (hsBody,
+    OIL_LIFT): the same oil, laid by the same pour into both fields, would
+    otherwise rise twice. So the weight here is the column's less the oil's
+    share. `mixT` is the mix while the look has Oil Tension on, else 1×1
+    and empty.
+
+    A.a.xy is the drive per unit of w: LIQUID_FALL at the cover's gap,
+    times Plate Rock's tilt and gain, in the flow's per-step speeds.
+  */
+  liquidDrive: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var liquids1: texture_2d<f32>;
+@group(0) @binding(5) var mixT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let oil = clamp(textureLoad(mixT, min(p, vec2i(textureDimensions(mixT)) - 1), 0).r, 0.0, 1.0);
+  let w = (textureLoad(liquids0, p, 0).a - textureLoad(liquids1, p, 0).g) * (1.0 - oil);
+  textureStore(dst, p, safeVel(vec4f(v.xy + A.a.xy * w, v.z, v.w)));
 }`,
 
   // Everything the CPU applies after the projection.
@@ -438,13 +484,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 // Oil: its share of a cell, from the mix where a look has one (1×1 blank otherwise).
 fn oilAt(uv: vec2f) -> f32 { return clamp(bilerpN(mixT, uv, f32(textureDimensions(mixT).x)).r, 0.0, 1.0); }
 /*
-  Δρ/ρ here. The dye as the current reads it (saturated about the plate's mean,
-  so a plate with more dye everywhere is not heavier everywhere), times the
-  dye's contrast (A.b.z); the oil lighter (A.b.w); the ferrofluid heavier, a
-  fixed property of the liquid (lib/turntable.ts).
+  Δρ/ρ here. Linear in the dye's density gap above the plate's mean (Boussinesq,
+  PLAN 22r / 18m-3: the mean is constant across the plate so its gradient is
+  zero, and taking it off keeps weightAt centred near zero), times the dye's
+  contrast (A.b.z); the oil lighter (A.b.w); the ferrofluid heavier, a fixed
+  property of the liquid (lib/turntable.ts).
 */
 fn weightAt(uv: vec2f) -> f32 {
-  let d = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
+  let d = bilerpN(dye, uv, S.n).a - S.meanD;
   let f = clamp(bilerpN(ph, uv, f32(textureDimensions(ph).x)).r, 0.0, 1.0);
   return A.b.z * d - A.b.w * oilAt(uv) + 0.25 * f;
 }

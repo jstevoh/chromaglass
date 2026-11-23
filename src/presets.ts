@@ -1,7 +1,7 @@
-import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
-import { layMoireLooks } from './presetsMoire';
+import { VisualizerSettings } from './types';
+import { layLooks } from './presetsLay';
 import { FOAM_CELLS } from './presetsFoam';
-import { layStirCords } from './lib/stir';
+export { NEW_LOOK } from './lib/musicCords';
 
 export interface Preset {
   id: string;
@@ -37,65 +37,82 @@ export const PRESETS: Preset[] = [
   {
     id: 'classic',
     name: 'Classic Light Show',
-    description: 'Slow, luminous blobs of yellow, pink and blue drift and merge: the 1960s overhead projector at its most meditative.',
+    description: 'Round cells of orange, amber and yellow oil in a magenta water, lit from below by the projector\'s lamp, rocked and pressed by a hand on the beat: the 1960s clock-glass dish.',
     settings: {
-      globalSpeed: 0.00924,
-      surge: 0.5,        // unhurried, dreamlike pace
-      layerCount: 2,
-      blendMode: 'screen',       // additive glow — colors brighten where they overlap
-      gooeyEffect: 0.78,         // organic, rounded blob edges that hold clean dark space between them
-      rotationSpeed: 0.07,       // the dish's motor; was 0.008 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
+      /*
+        38w-1: a real dish (the 1960s references, src/lib/oilLay.ts): oil cells
+        in a coloured water on the lamp, each keeping its colour (Oil Bodies,
+        Film Hold), no drawn rim yet (38w-25), rocked by a hand (plateRock, the
+        kick's press), the motor nearly off, no glow knobs. npm run classicdish.
+      */
+      lampGround: 1,
+      oilTension: 0.9,
+      oilBodies: 1,
+      filmHold: 0.8,             // a hard press still merges a few, as in the references
+      globalSpeed: 0.0115,
+      surge: 0.35,
+      layerCount: 1,
+      blendMode: 'screen',       // unused under the lamp (plate.ts takes the lamp's light through the dye)
+      gooeyEffect: 0,            // its blur merged cells the oil keeps apart
+      rotationSpeed: 0,          // no motor: still between hand moves (38w-1)
+      /*
+        No stirring (PLAN 38w-1): Turbulence is a curl of noise over the whole
+        plate, not a hand. Filmed at 0.5 the cells tore into smears within a
+        second; at 0 they stay round, and no music stir cord is laid.
+      */
+      turbulenceScale: 0,
+      centerGravity: 0.05,
       ledPlatform: false,
-      diffusionRate: 0,          // measured: the bleed cost more edge than it bought
-      buoyancy: 0.4,             // moderate rise — not too static, not too chaotic
-      advection: 0.35,           // smooth transport, no turbulence
-      damping: 0.988,            // very slow energy loss — movements persist gracefully
-      heatDecay: 0.992,          // warmth lingers, keeps gentle convection going
-      automateRate: 0.08,        // regular auto-injection keeps the frame alive
-      platePressure: 0.25,       // subtle radial spread from center
-      glassSmear: 0.3,           // soft smearing, no harsh edges
-      rainDrip: 0.15,            // a trace of streaks, once the plate is tipped (38u-12)
-      viscosity: 'thick',        // heavy, syrupy movement
-      polarity: 0.85,            // colors stay distinct but can gently intermingle
-      evaporationRate: 0.012,    // keeps black between the blobs across the show
-      airVelocity: 0.04,         // near-still air — no turbulence
-      vibrationFrequency: 0.08,  // minimal vibration — serene
-      audioImpact: 0.55,         // audible music visibly drives the fluid
-      turbulenceScale: 0.5,      // lively multi-scale ripple
-      turbulenceDetail: 3,
-      blobSurfaceTension: 0.55,  // colours hold apart cleanly
-      boundaryContrast: 0.5,     // bright line where dyes meet
-      saturationBoost: 1.5,
-      glossiness: 0.0,           // flat backlit dye — the projector look
-      postBlurRadius: 0.15,
+      diffusionRate: 0,
+      buoyancy: 0.1,
+      advection: 0.45,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.06,
+      platePressure: 0.25,      // 0.4 leaves a held Press pushing (38w-19)
+      glassSmear: 0,
+      rainDrip: 0,
+      viscosity: 'thick',
+      polarity: 0.85,
+      evaporationRate: 0.002,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.05,
+      /*
+        The music's hands off, as Lava Lamp's (27f-9h): at 0.5 they flooded the
+        water red and dissolved the cells in 25 s. The band reaches the dish
+        through a hand instead (sceneMappings below, Plate Rock).
+      */
+      audioImpact: 0,
+      blobSurfaceTension: 0.45,
+      boundaryContrast: 0.3,
+      saturationBoost: 1.0,
+      glossiness: 0.2,
+      postBlurRadius: 0,
       secondLamp: 0.0,
-      hueJourney: 2,
-      /*
-        28d (the showreel, 2026-10-11) & 28i-2: the default look scored 4 of 10.
-        On a minute of a real song at 0.85 it was a full-frame gradient with no
-        bodies at all, and at 0.45 across two layers the film still dropped to
-        0% near black at the 5th percentile. At 0.18 the regulator holds the
-        blobs apart with dark screen between them throughout the show.
-      */
-      dyeBudget: 0.18,
-      bubbles: 0.05,
-      /*
-        The overhead projector's dish answers in the liquid (PLAN 28i-3b): a
-        kick breaks the oil-and-water film with a soap pull (surfactantFlow),
-        the snare curls the oil rims, and a held mid chord rounds the blobs'
-        surface tension.
-      */
+      hueJourney: 0,
+      dyeBudget: 0.8,            // the whole dish is dye; 0.18 kept black glass (28i-2)
+      plateCurve: 0,             // flat: at 0.2 a held Press never rests (heldpress, 38w-19)
+      depthDrag: 1.2,
+      plateSpring: 0.35,
+      plateRock: 0.8,            // the swells: 0.55 read as still (round four); 3.4x the motion (38w-24)
+      edgeRelief: 0,             // its rim reads the dye's slope, not the oil: dark lattice halos (38w-23)
+      crispEdges: 1,             // the rims a real dish shows: one pixel, not the solver's band (38w-15)
+      bubbles: 0.2,
+      transmission: 0.4,
+      dishVignette: 0,           // full screen, no Petri rim (the owner, 2026-11-21)
+      granulation: 0,            // dissolved dye does not granulate; the grain read as pixelation on the wall
+      lampHotspot: 0.2,          // an even lamp across the full frame, as the references light it
+      // A hand on the music: the kick presses the glass, the snare shears, a mid chord rounds.
       sceneMappings: [
-        { source: 'hits', feature: 'kickHit', setting: 'surfactantFlow', depth: 0.25 },
-        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
-        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.2 },
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.15 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.15 },
       ],
       audioMappings: {
-        velocity: 'bass',        // low frequencies push the fluid gently
-        density: 'volume',       // louder = more color, but mapped gently
-        color: 'treble',         // high frequencies shift hue — sparkle
-        rotation: 'none',        // no audio-driven rotation — keep it calm
+        velocity: 'bass',
+        density: 'bass',
+        color: 'none',           // a real dish keeps its dyes
+        rotation: 'none',
       },
     }
   },
@@ -187,6 +204,10 @@ export const PRESETS: Preset[] = [
       dyeBudget: 0.24,
       glossiness: 0.0,
       postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
+      // Hubble-sharp: dye threads on particles, no meniscus rim (PLAN 1n)
+      particles: 0.5,
+      particleMix: 0.6,
+      edgeRelief: 0,
       ledMode: 'single',
       ledColor: '#03041a',
       ledSpeed: 0.0,
@@ -1423,14 +1444,14 @@ export const PRESETS: Preset[] = [
   {
     id: 'soap-film',
     name: 'Soap Film',
-    description: 'A real soap film in its frame: it drains through the colours of its own thickness, silver to gold, blue and magenta, swirls with the music, goes black from the top, and is drawn again.',
+    description: 'A real soap film in a frame held nearly flat: it drains through the colours of its thickness, silver to gold, blue and magenta, marbles with the music, goes black from the top, and is drawn again.',
     settings: {
       surfactantFlow: 0.6,
-      // The frame's own film (PLAN 32d) over a dark ground: its colour is its
-      // thickness, seen in reflection. The plate under it is a faint dye
-      // whose flow, stirred by the soap and the music, is the air that
-      // swirls the film. No dish motor: the frame does not turn.
+      // The frame's film (PLAN 32d) on a dark ground, its colour its thickness
+      // in reflection; the faint dye's flow drives its air. Held 12° from
+      // flat (32h): hung, its big swirls (32k) sort into bands. No motor.
       soapFilm: 1,
+      soapFilmTilt: 12,
       globalSpeed: 0.0168,
       surge: 0.5,
       layerCount: 1,
@@ -2364,10 +2385,8 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-// The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
-// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5). In that order.
-layMoireLooks(PRESETS);
-layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
+// The moiré pack, the music's stir and its hands, over every look (presetsLay.ts).
+layLooks(PRESETS);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).

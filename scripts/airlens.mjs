@@ -127,7 +127,7 @@ try {
       // shows through the band and the band measures 25% where it is drawn dark.
       const on = await lab.render(S, { ...QUIET, iridescence: IRID, ...set }, { ...view, bubbles: 1 });
       // The off picture is handed the air field too (airField), because the
-      // plate lays the air over the dye's relief (33b, airNear): flat dye
+      // plate lays the air over the dye's relief (33b, plateSlope.ts holds it): flat dye
       // beside a bubble's hole. Without it the difference between the two is
       // the bubble's drawing plus that relief going flat, and the box found
       // below is lopsided by the dye's own light (the middle read 7 px off).

@@ -30,9 +30,6 @@ export type SetItemAction = 'link-song' | 'unlink-song' | 'capture' | 'up' | 'do
 /** What the set's own menu can do. */
 export type SetAction = 'import' | 'export' | 'import-show' | 'export-show' | 'clear' | 'song-shows' | 'save' | 'open' | 'delete' | 'rename' | 'new';
 
-/** How a control is learned: to a fader (drawn as a slider) or an encoder (a knob). */
-export type ControlKind = 'fader' | 'encoder';
-
 /**
  * Everything the one desk is given.
  *
@@ -157,8 +154,6 @@ export interface DeskProps {
   automated: boolean;
   onAutomate: (on: boolean) => void;
   ccFor: (key: keyof VisualizerSettings) => number | null;
-  /** Whether a control's CC is a fader or an encoder: a fader draws as a slider. */
-  kindFor: (key: keyof VisualizerSettings) => ControlKind | null;
   /** The look's own value of a setting, where a double-click on its knob or slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
   /**

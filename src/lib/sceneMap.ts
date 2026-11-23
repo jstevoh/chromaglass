@@ -30,7 +30,8 @@ import { ROOM_STALE_MS } from './roomStir.ts';
 import { getSceneValue, type SceneReading } from './sceneSense.ts';
 import { getAudioValue, type AudioFeatureKey } from '../constants.ts';
 import { BandRange, SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures.ts';
-import { CordGate } from './areaCords.ts';
+import { CordGate, gated, isHandCord, masterGain, type MasterGains } from './areaCords.ts';
+import { bassBoostGain, bassRouteValue } from './squish.ts';
 import type { ModulatorFeature, Modulators } from './modulators';
 import { isClassFeature, type HitSource } from './hitSource.ts';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
@@ -190,6 +191,15 @@ export interface PatchContext {
   filmImpact: number;
   soundImpact: number;
   shapeImpact: number;
+  /**
+   * What each dial a cord can ride as a master is worth this frame (PLAN
+   * 38v-1, lib/areaCords.ts `CORD_MASTERS`): Sound Drive over the music's
+   * hands, Kick Bloom over the kick's pour. A cord names the ones it rides
+   * (`masters`); absent here, every master is 1.
+   */
+  masters?: MasterGains;
+  /** Bass Boost, laid as a gain on a cord reading the bass rather than in its reading (PLAN 27g); absent, the reading as the analyser has it. */
+  bassBoost?: number;
 }
 
 const sourceOf = (m: SceneMapping): PatchSource => m.source ?? 'room';
@@ -224,15 +234,44 @@ function liveValue(
   now: number,
   bandRange?: BandRange | null,
 ): { value: number; impact: number } | null {
+  const got = sourceReading(ctx, m, now, bandRange);
+  /*
+    The dials the cord rides as masters (38v-1), on its source's own master.
+    Not on a gated hand's: the hands gate the reading times its impact
+    (lib/areaCords.ts AreaHands.step), so a master turned down there would
+    lift the gate's threshold over the kicks instead of making each bloom
+    smaller; the hands put a gated cord's masters on what passes the gate.
+    The fold here gates the bare value and puts the impact on after, so it
+    can take them in the impact.
+  */
+  if (got && m.masters && m.masters.length > 0 && !(gated(m) && isHandCord(m))) got.impact *= masterGain(m, ctx.masters);
+  return got;
+}
+
+function sourceReading(
+  ctx: PatchContext,
+  m: SceneMapping,
+  now: number,
+  bandRange?: BandRange | null,
+): { value: number; impact: number } | null {
   const source = sourceOf(m);
   const feature = m.feature;
   if (source === 'sound') {
     if (ctx.soundImpact <= 0 || !ctx.sound) return null;
-    let value = getAudioValue(ctx.sound, feature as AudioFeatureKey);
+    /*
+      Bass Boost as a gain (PLAN 27g, 38v-1): the analyser's bass carries the
+      slider as a multiplier, which pins a cord reading it at its ceiling at
+      2x and up (the press held flat, the kicks moving nothing: `npm run
+      bassboost`). The music's hands took it back off the bass and laid it on
+      the force when they were the frame loop's own; now they are cords, every
+      cord on the bass does, given the slider (absent, the reading as it was).
+    */
+    const boosted = feature === 'bass' && ctx.bassBoost !== undefined;
+    let value = boosted ? bassRouteValue(ctx.sound.bass, ctx.bassBoost) : getAudioValue(ctx.sound, feature as AudioFeatureKey);
     if (m.gain !== undefined && Number.isFinite(m.gain)) {
       value = Math.min(1, Math.max(0, value * m.gain));
     }
-    return { value, impact: ctx.soundImpact };
+    return { value, impact: ctx.soundImpact * (boosted ? bassBoostGain(ctx.bassBoost) : 1) };
   }
   // The sound by name (or a dragged `[loHz, hiHz]` band, PLAN 30a): read raw
   // from the analyser's reading of this frame, no smoothing, because a mapping

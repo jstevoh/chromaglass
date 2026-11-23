@@ -42,8 +42,9 @@
 
 import type { FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE } from './constants';
-import { dropImpact, dropTrickle, queueDrop, stepDrops, DROP_TRICKLE, DROP_AMOUNT, DROP_DISC } from '../lib/dropImpact';
-import { pourShare, speciesOf } from '../lib/liquidProps';
+import { dropImpact, dropSlotFree, dropTrickle, queueDrop, stepDrops, DROP_TRICKLE, DROP_AMOUNT, DROP_DISC } from '../lib/dropImpact';
+import { DISH_GAP_METRES } from '../lib/turntable';
+import { pourShare, speciesOf, type Species } from '../lib/liquidProps';
 import type { LiquidDeposit } from '../lib/liquidPhase';
 
 /** A drop's dye over its disc, (1 − d/R)², at the cell (x, y), `amount` at its middle. */
@@ -103,31 +104,72 @@ export function layDrop(sim: FluidSimulation, x: number, y: number, amount: numb
   // Until the pour's kernel is built (behind the show), a drop is the stamp:
   // asking for it sooner compiles it on that frame, in the opening (pourReady).
   const pours = volume && amount > 0 && pouring(sim);
-  let queued = false;
-  if (!pours) {
-    stamp(sim, x, y, dropR, amount * dye / (spread * spread), r, g, b);
-  } else if (amount < DROP_TRICKLE && !what) {
+  if (pours && amount < DROP_TRICKLE && !what) {
     // The music's trickle: its dye as it always laid, its volume held at the
     // dropper's tip until a drop's worth falls (Tate's law, dropTrickle).
     stamp(sim, x, y, dropR, amount * dye / (spread * spread), r, g, b);
     const fall = dropTrickle(sim.drops, amount);
     if (fall > 0) queueDrop(sim.drops, sim.size, x, y, fall, 0, r, g, b);
+    if (e > 0.02) sim.applySquish(x, y, (dropR / k) * (1.6 + 1.8 * h), 0.0012 * e, sim.dropFingering, !sim.thinGap, sim.thinGap ? 'press' : 'splash');
+    return false;
+  }
+  /*
+    With every slot busy the drop is let go, not stamped. The slots fill
+    only when drops keep coming and the plate takes no steps: Freeze the
+    liquid, while the automation and the music still drop. A stamp there
+    reached the frozen plate through the readback's flush and the colour
+    kept arriving on a plate meant to stand still: `npm run moving` (Mac,
+    soap-film) found its four-second freeze ending 1.2 to 1.9 s early,
+    from when the sixteen slots had filled. Sixteen drops within one
+    drop's five steps is not a show running.
+  */
+  if (pours && !dropSlotFree(sim.drops)) return false;
+
+  const S = sim.size;
+  const inside = (px: number, py: number) => px >= 2 && px < S - 2 && py >= 2 && py < S - 2;
+  const gap = Number.isFinite(sim.gpu?.coverMetres) && sim.gpu!.coverMetres! > 0
+    ? sim.gpu!.coverMetres!
+    : DISH_GAP_METRES;
+  const imp = e > 0.02 ? dropImpact(amount, h, gap, what) : null;
+
+  // When Cossali's K exceeds threshold, some of the drop's rim pinches off into
+  // satellites. Plan them first so their total share is subtracted from the
+  // central drop rather than invented on top of it (PLAN 18c-13).
+  const sats: Satellite[] = [];
+  let satShare = 0;
+  if (imp?.splashes) {
+    const n = Math.round(imp.fingers * (0.2 + sim.rng.float() * 0.25));
+    const targetShare = Math.min(0.25, 0.25 * Math.max(0, 1 - imp.Kc / imp.K));
+    let totalWeight = 0;
+    for (let q = 0; q < n; q++) {
+      const a = sim.rng.angle();
+      const dist = dropR * (1.4 + (1 + 5 * h) * sim.rng.float());
+      const px = Math.round(x + Math.cos(a) * dist), py = Math.round(y + Math.sin(a) * dist);
+      if (!inside(px, py)) continue;
+      const sr = Math.max(1, Math.round((0.8 + sim.rng.float() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
+      const weight = sr * sr;
+      sats.push({ px, py, sr, a, weight });
+      totalWeight += weight;
+    }
+    if (totalWeight > 0 && targetShare > 0) {
+      satShare = targetShare;
+      for (const s of sats) s.weight /= totalWeight;
+    } else {
+      sats.length = 0;
+    }
+  }
+
+  const coreShare = 1 - satShare;
+  const mass = stampMass(Math.round(3 * k), amount * dye);
+  const sp = what ? speciesOf(what) : null;
+  let queued = false;
+  if (!pours) {
+    stamp(sim, x, y, dropR, amount * coreShare * dye / (spread * spread), r, g, b);
   } else {
     // The same dye the stamp laid, brought in with the drop's volume.
-    const mass = stampMass(Math.round(3 * k), amount * dye);
-    /*
-      With every slot busy the drop is let go, not stamped. The slots fill
-      only when drops keep coming and the plate takes no steps: Freeze the
-      liquid, while the automation and the music still drop. A stamp there
-      reached the frozen plate through the readback's flush and the colour
-      kept arriving on a plate meant to stand still: `npm run moving` (Mac,
-      soap-film) found its four-second freeze ending 1.2 to 1.9 s early,
-      from when the sixteen slots had filled. Sixteen drops within one
-      drop's five steps is not a show running.
-    */
-    queued = queueDrop(sim.drops, sim.size, x, y, amount, mass, r, g, b, sim.dtSeconds, what ? speciesOf(what) : null, what ?? null);
+    queued = queueDrop(sim.drops, S, x, y, amount * coreShare, mass * coreShare, r, g, b, sim.dtSeconds, sp, what ?? null);
   }
-  if (e > 0.02) splash(sim, x, y, dropR, h, e, amount, amount * dye, r, g, b);
+  if (e > 0.02) splash(sim, x, y, dropR, h, e, amount, mass, r, g, b, pours, sats, satShare, sp, what, inside);
   return queued;
 }
 
@@ -171,41 +213,58 @@ export function layStream(sim: FluidSimulation, x: number, y: number, R: number,
   return laid;
 }
 
+interface Satellite { px: number; py: number; sr: number; a: number; weight: number }
+
 /*
   A drop landing from a height. It presses the film: on a thin gap the
   crater is the glass's bowl (squishDisc's thin `press`), and the flow that
   closing it makes carries the colour, with no drawn multiplies or pushes;
   on the old plate the `splash` stroke as it was. And past Cossali's
-  threshold it throws satellites, droplets of its own dye flung clear of the
-  impact, as many as the crown has fingers (Bhola and Chandra), further out
-  the higher it fell.
+  threshold it throws satellites, droplets of the drop's own liquid and dye
+  flung clear of the impact (already split out of the central drop above).
 */
-function splash(sim: FluidSimulation, x: number, y: number, dropR: number, h: number, e: number, amount: number, dyeAmount: number, r: number, g: number, b: number): void {
+function splash(
+  sim: FluidSimulation,
+  x: number, y: number, dropR: number, h: number, e: number,
+  amount: number, mass: number, r: number, g: number, b: number,
+  pours: boolean, sats: Satellite[], satShare: number, sp: Species | null, what: LiquidDeposit | undefined,
+  inside: (px: number, py: number) => boolean,
+): void {
   const S = sim.size;
   const k = GRID_SCALE;
-  const inside = (px: number, py: number) => px >= 2 && px < S - 2 && py >= 2 && py < S - 2;
   sim.applySquish(x, y, (dropR / k) * (1.6 + 1.8 * h), 0.0012 * e, sim.dropFingering, !sim.thinGap, sim.thinGap ? 'press' : 'splash');
 
-  const imp = dropImpact(amount, h);
-  if (!imp.splashes) return;
-  // A few of the crown's fingers pinch off (Rayleigh–Plateau), not all of
-  // them: a third, give or take, as the satellites always numbered.
-  const n = Math.round(imp.fingers * (0.2 + sim.rng.float() * 0.25));
-  for (let q = 0; q < n; q++) {
-    const a = sim.rng.angle();
-    const dist = dropR * (1.4 + (1 + 5 * h) * sim.rng.float());
-    const px = Math.round(x + Math.cos(a) * dist), py = Math.round(y + Math.sin(a) * dist);
-    if (!inside(px, py)) continue;
-    const sr = Math.max(1, Math.round((0.8 + sim.rng.float() * 1.2) * k * Math.min(1, 0.6 + 0.3 * e)));
-    for (let dy = -sr; dy <= sr; dy++) {
-      for (let dx = -sr; dx <= sr; dx++) {
-        const dd = Math.sqrt(dx * dx + dy * dy);
-        if (dd > sr || !inside(px + dx, py + dy)) continue;
-        sim.addDensity(px + dx, py + dy, dyeAmount * 0.22 * (1 - dd / sr), r, g, b);
+  if (sats.length === 0 || !(satShare > 0)) return;
+  const kick = (0.25 + 0.5 * h) * Math.min(1, e);
+  for (const s of sats) {
+    const frac = satShare * s.weight;
+    const satDye = mass * frac;
+    if (satDye > 0) {
+      let wSum = 0;
+      for (let dy = -s.sr; dy <= s.sr; dy++) {
+        for (let dx = -s.sr; dx <= s.sr; dx++) {
+          const dd = Math.sqrt(dx * dx + dy * dy);
+          if (dd < s.sr && inside(s.px + dx, s.py + dy)) wSum += 1 - dd / s.sr;
+        }
+      }
+      if (wSum > 0) {
+        for (let dy = -s.sr; dy <= s.sr; dy++) {
+          for (let dx = -s.sr; dx <= s.sr; dx++) {
+            const dd = Math.sqrt(dx * dx + dy * dy);
+            if (dd < s.sr && inside(s.px + dx, s.py + dy)) {
+              sim.addDensity(s.px + dx, s.py + dy, satDye * (1 - dd / s.sr) / wSum, r, g, b);
+            }
+          }
+        }
       }
     }
-    const kick = (0.25 + 0.5 * h) * Math.min(1, e);
-    sim.addVelocity(px, py, Math.cos(a) * kick, Math.sin(a) * kick);
+    if (pours) {
+      const satW = (amount * frac / DROP_AMOUNT) * DROP_DISC * DROP_DISC;
+      const satR = Math.max(s.sr / S, Math.sqrt(satW));
+      const satTake = satW / (satR * satR);
+      sim.gpu!.pour!((s.px + 0.5) / S, (s.py + 0.5) / S, satR, satTake, sp, true, what);
+    }
+    sim.addVelocity(s.px, s.py, Math.cos(s.a) * kick, Math.sin(s.a) * kick);
   }
 }
 
