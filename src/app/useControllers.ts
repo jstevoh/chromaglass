@@ -20,7 +20,6 @@ import type { TempoSource } from '../lib/tempo';
 import type { TimecodeReader } from '../lib/timecode';
 import type { ScreenLike } from '../hooks/useCastSession';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
-import { closeupIn } from '../lib/macroLanding';
 
 /**
  * The controllers: MIDI (`hooks/useMidi.ts`), the gamepad and the projector
@@ -88,7 +87,7 @@ export function useControllers({
         return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
       },
       paletteColor: (i) => PALETTE_RGB[i] ?? null,
-      toggles: { play: isActive, automate: isAutomated, macro: closeupIn(settings), overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording, performance: !!musicIntel.performance.live },
+      toggles: { play: isActive, automate: isAutomated, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording, performance: !!musicIntel.performance.live },
     },
     allPresetIds,
     // The tempo, if the desk is sending it. Straight into the tempo source:

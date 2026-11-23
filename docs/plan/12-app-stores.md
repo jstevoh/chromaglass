@@ -198,17 +198,12 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- **12-ctl-1: the songs on the phone (shipped; story in `docs/plan-shipped.md` §12-ctl-1).**
-  A Songs screen one tap from Draw and from Controls: the laptop's set list (tap to arm an item
-  for the next Go) and its song shows (Run, Stop, Follow songs), sent as `RemoteState.setList`
-  and `RemoteState.songs`; `npm run controller` lines `setlist`, `songs`, `display`.
 - **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
   which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
   Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is
   refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
   camera (it opens the show server's own remote in the browser) and the app. *Measure:*
   `controller` line `scan`.
-- ~~**12-ctl-3**~~ *(shipped 2026-11-11)*: the Android app, a Capacitor project beside `ios/`; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
   when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,
@@ -281,15 +276,6 @@ fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs
 App Store Connect record from 12-ship. Size: M, after route 2's first PR, and
 after 12-tv-hls (below).
 
-**12-tv-1: the stream and the `/tv` page (shipped, PR 1 of route 2; story in
-`docs/plan-shipped.md` §12-tv-1).** The show's page sends the wall's canvas to a
-TV on the network as WebRTC video, signalled through the show server's relay
-(`src/lib/tvFeed.ts`, `server/remote-server.js`'s `tv` role); `/tv?key=…` plays it
-with no GPU (`src/components/TvDisplay.tsx`), films while the show is off; Home or
-Pro on the laptop, three TVs at most; `npm run tv`.
-
-What route 2 still needs, found while building 12-tv-1:
-
 - **12-tv-2: the Android TV app, the Bonjour advert and pairing by four digits
   (shipped 2026-11-12, merged with 12-tv-2b after #768 sat green unmerged; story in
   `docs/plan-shipped.md` §12-tv-2).** `androidtv/`
@@ -322,13 +308,6 @@ What route 2 still needs, found while building 12-tv-1:
   its unit tests (every clip carries its credit). Owed by the owner: the upload key
   (one command), then the Play Console steps (create the app, the forms, the TV
   form factor, the first upload by hand).
-- **12-tv-remote: the TV's remote picks the look (shipped 2026-11-12; story in
-  `docs/plan-shipped.md` §12-tv-remote).** Asked 2026-11-12, the TV staying a
-  receiver: right and left play the next and previous preset on the Mac, OK a
-  random one, up, down or Menu the list. The relay lets a TV pick only a preset
-  the laptop listed, one every 0.4 s (`server/tv-remote.js`); the page reads the
-  D-pad (`src/components/TvRemote.tsx`), the app passes on Menu and Back; the
-  phone version is a tap bar. `npm run tvremote`; on a real TV `docs/judging.md` §126.
 - **12-tv-remote-2: more than presets from the remote (S, if asked).** The remote
   picks presets only. The owner's own looks and the set list's songs are the next
   things a sofa might want (the set list's Go is `cue-set-item` on the phone), and
@@ -338,8 +317,6 @@ What route 2 still needs, found while building 12-tv-1:
   could send each bundle to the internal track itself with the Play Developer API
   (a Google Cloud service account the owner adds in Play Console → Users and
   permissions, its JSON as a secret). Shared with 12-ctl-ship's upload job.
-- ~~**12-tv-2h: the films through YouTube first, the splash, and the website's QR code.**~~
-  (shipped 2026-11-15; story in `docs/plan-shipped.md` §12-tv-2h.)
 - **12-promo-1: the website in every app (S, built 2026-11-15).** The owner,
   2026-11-14: "put sufficient advertisements into all of the apps period tv, phone,
   whatever", pointing at the website "to try more free chromaglass.art visuals", and
@@ -368,8 +345,6 @@ What route 2 still needs, found while building 12-tv-1:
   sample film (12-tv-2b) on the TV too: the YouTube films play (12-tv-2h), or the
   site's do when YouTube will not, Back returns to the list, and a Mac starting
   its show replaces it.
-- ~~**12-tv-2f: the samples are the channel's films; the logo on the loading screen.**~~
-  (shipped 2026-11-14; story in `docs/plan-shipped.md` §12-tv-2f.)
 - **12-tv-2g: the films on storage made for streaming (S, if needed).** 12-tv-2f
   serves the six films from a release of the repository behind the site's
   `/films/` redirect: free, but a release is for downloads, not for streaming to
@@ -517,10 +492,6 @@ runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
   against the Mac app's own show and the live Worker, then on an Apple TV (judging),
   and sign it with the owner's team for TestFlight once the App Store Connect record
   exists (12-ship).
-
-**~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
-`/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
-§12-tv-signin.** Open from it:
 
 - **12-tv-signin-1, the TVs read it.** The Apple TV app (12-tv-apple) and the
   Google TV shell (route 2) call `/tv/code` and `/tv/poll`, show the code and a QR

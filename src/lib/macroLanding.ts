@@ -3,8 +3,9 @@
  *
  * What was reported (the owner, 2026-10-29, again 2026-11-14): "this closeup
  * button doesn't seem to do anything besides make the canvas black/empty".
- * The Close-up button, the M key, the zoom and the phone's pinch all bring the
- * closeup in on the camera's mode, and the default mode is Hold, aimed at the
+ * The zoom (the Macro Zoom slider, + and −, the wheel, the phone's pinch and
+ * zoom; the Close-up button that also did, until the owner asked for it gone
+ * on 2026-11-14, PLAN QA-32c) brings the closeup in on the camera's mode, and the default mode is Hold, aimed at the
  * middle of the plate. Hold sat on its aim and nowhere else, so on a plate
  * whose middle was bare (a look that pours in pools, a middle a finger had
  * swept, a plate between pours) the frame was four times the size of nothing:
@@ -26,7 +27,6 @@
  * summed-area table is kept between calls so those frames make no new arrays.
  */
 import type { MacroField } from './macroCamera';
-import type { VisualizerSettings } from '../types';
 
 /**
  * A held frame is bare glass when the dye in it is under this share of the
@@ -58,11 +58,23 @@ export const LAND_FULL_ZOOM = 2;
  * whenever its pool later flowed out of the frame, a cut in the middle of a
  * held shot minutes on (the review of this port measured it: Hold at 1.5x on
  * the middle for ten seconds, then across the plate in one frame). Long enough
- * for the zoom's own ease in, which is most of a second.
+ * for the zoom's own ease in, which is most of a second. Counted from the
+ * zoom's last rise, so a slow hand on the slider is not cut off half way in.
  */
 export const LAND_SECONDS = 1.5;
-/** The zoom the Close-up press goes to (`MACRO_PRESET_ZOOM`, checked the same way). */
-export const CLOSEUP_PRESS_ZOOM = 4;
+/**
+ * How long a zoom past LAND_FULL_ZOOM must stop coming in before the landing
+ * stands, in seconds of liquid on the plate. With the Close-up button gone
+ * (PLAN QA-32c) the zoom is the only way in, and + comes in by steps of 1.2x
+ * (1.2, 1.44, 1.73, 2.07, 2.49, 2.99, 3.58, 4.3). The landing used to stand on
+ * the first frame at 2x or more, so at 2.07x a pool a sixth of the plate from
+ * the aim still showed at the frame's edge, the aim was not bare, and it
+ * stood: two presses on, the 2.99x frame was bare glass and stayed so to 4.3x
+ * (the Mac's `npm run closeupland` caught it, the frame 0.000 lit and the aim
+ * on 0.5, 0.5). Each rise of the zoom asks again; a zoom that has held still
+ * this long, a hand's pause between presses and more, has its answer.
+ */
+export const LAND_HOLD = 0.5;
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -198,18 +210,19 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
  * A closeup's landing: whether it still has to check that its aim shows any
  * liquid (`pending`, set as it comes in), and where it landed instead when it
  * did not (grid cells, NaN while it sits on its aim); how long it has asked
- * (`age`, seconds), and whether the place it settled on has been handed back
- * as the aim (`told`). Owned by the camera.
+ * since the zoom last came in further (`age`, seconds) and the zoom it asked
+ * at (`zoom`), and whether the place it settled on has been handed back as
+ * the aim (`told`). Owned by the camera.
  */
-export interface Landing { pending: boolean; x: number; y: number; age: number; told: boolean; out: { x: number; y: number } }
+export interface Landing { pending: boolean; x: number; y: number; age: number; zoom: number; told: boolean; out: { x: number; y: number } }
 
 export function newLanding(): Landing {
-  return { pending: true, x: NaN, y: NaN, age: 0, told: false, out: { x: 0, y: 0 } };
+  return { pending: true, x: NaN, y: NaN, age: 0, zoom: NaN, told: false, out: { x: 0, y: 0 } };
 }
 
 /** Coming in again (`pending` true), or a hand on the camera (false): either way, back on the aim. */
 export function clearLanding(l: Landing, pending: boolean): void {
-  l.pending = pending; l.x = NaN; l.y = NaN; l.age = 0; l.told = false;
+  l.pending = pending; l.x = NaN; l.y = NaN; l.age = 0; l.zoom = NaN; l.told = false;
 }
 
 /**
@@ -246,7 +259,9 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
   const plate = plateMean(field, margin);
   // An empty plate waits on the aim, still pending, for the first pour.
   if (!(plate > EMPTY_PLATE)) return false;
-  l.age += step;
+  // A zoom still coming in (the slider's ramp, + after +) is asked afresh.
+  if (!(frame.zoom <= l.zoom + 1e-3)) l.age = 0; else l.age += step;
+  l.zoom = frame.zoom;
   const { size } = field;
   const hx = clamp(frame.spanX / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
   const hy = clamp(frame.spanY / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
@@ -255,9 +270,10 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
     slider comes in from 1x a notch at a time, and at 1.01x the frame is nearly
     the whole plate and holds the plate's average: asked only then, it was
     never asked again, and the pinch went on into the bare middle (a ramp from
-    1.01x to 4x over a second ended on 0.5, 0.5). Fully in, the answer stands.
+    1.01x to 4x over a second ended on 0.5, 0.5). Fully in and held there
+    (LAND_HOLD), or parked short of it (LAND_SECONDS), the answer stands.
   */
-  if (frame.zoom >= LAND_FULL_ZOOM || l.age >= LAND_SECONDS) l.pending = false;
+  if (l.age >= (frame.zoom >= LAND_FULL_ZOOM ? LAND_HOLD : LAND_SECONDS)) l.pending = false;
   const had = Number.isFinite(l.x);
   const atX = Number.isFinite(followX) ? followX : had ? l.x : ax;
   const atY = Number.isFinite(followY) ? followY : had ? l.y : ay;
@@ -272,23 +288,4 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
   landing(field, ax, ay, hx, hy, margin, l.out);
   l.x = l.out.x; l.y = l.out.y;
   return !had;
-}
-
-/** Whether the closeup is in: the same reading as `macroZoomOf(s) > 1.05` (src/sim/constants.ts). */
-export function closeupIn(s: { macroMode?: boolean; macroZoom?: number }): boolean {
-  return s.macroMode === true || (s.macroZoom ?? 1) > 1.05;
-}
-
-/**
- * The one press in and out of the closeup: the desk's Close-up button, the M
- * key, a pad, the phone's Zoom. In by the zoom, as the slider and the pinch go
- * in, with the flag riding along; out to the plate with both. The desk button
- * used to flip the flag alone, so the plate went to 4x while the Macro Zoom
- * knob beside it still read 1.00x (the owner's screenshot, 2026-10-29), and a
- * look carrying a zoom with the flag off was in the closeup with the button
- * unlit; the M key read the zoom alone, so a look that set the flag was in
- * with M pressing it further in.
- */
-export function closeupToggle(s: { macroMode?: boolean; macroZoom?: number }): Pick<VisualizerSettings, 'macroMode' | 'macroZoom'> {
-  return closeupIn(s) ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: CLOSEUP_PRESS_ZOOM };
 }

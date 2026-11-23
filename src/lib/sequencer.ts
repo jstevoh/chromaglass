@@ -63,6 +63,26 @@ export interface ShowSequence {
 }
 
 let idCounter = 0;
+/**
+ * The zoom a stage's Closeup on is given when neither the stage nor its look
+ * sets one: the same 4x as MACRO_PRESET_ZOOM in src/sim/constants.ts, written
+ * here because src/lib does not import src/sim (`npm run closeupland` checks
+ * the two agree).
+ */
+export const STAGE_CLOSEUP_ZOOM = 4;
+
+/**
+ * A stage's Closeup on or off, as the zoom (PLAN QA-32c): the Macro Zoom is
+ * all the frame reads, so the flag alone would do nothing. On keeps a zoom
+ * the stage or its look already asks for past 1.05, or takes
+ * STAGE_CLOSEUP_ZOOM; off is the plate. Writes into `target`, the stage's glide.
+ */
+export function stageCloseup(target: Partial<VisualizerSettings>, macro: boolean): void {
+  target.macroMode = macro;
+  if (!macro) target.macroZoom = 1;
+  else if (!((target.macroZoom ?? 1) > 1.05)) target.macroZoom = STAGE_CLOSEUP_ZOOM;
+}
+
 export const stageId = (): string => `st-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
 /**
@@ -108,6 +128,7 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['soapFilm', 0.05],
   ['soapFilmRate', 0.25],
   ['soapFilmAngle', 1],
+  ['soapFilmTilt', 1],
   ['glitter', 0.05],
   ['lensStop', 0.5],
   ['sideLight', 0.05],
@@ -123,6 +144,8 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['tankNozzle', 0.01],
   ['tankDrain', 0.05],
   ['tankHue', 1],
+  ['faradayHz', 1],
+  ['faraday', 0.01],
   ['lumia', 0.05],
   ['chemistry', 0.05],
   ['gelWheel', 0.05],
@@ -348,7 +371,8 @@ export function stageAtOffset(stages: readonly Pick<ShowStage, 'seconds'>[], off
 export function duplicateSequence(seq: ShowSequence, name?: string): ShowSequence {
   return {
     ...seq,
-    id: `seq-${Date.now().toString(36)}`,
+    // The counter too: two copies made in one millisecond (the assistant's, PLAN 44k-16a) shared an id, and the second replaced the first.
+    id: `seq-${Date.now().toString(36)}-${(idCounter++).toString(36)}`,
     name: name ?? `${seq.name} copy`,
     builtIn: false,
     stages: seq.stages.map(st => ({ ...st, id: stageId(), settings: st.settings ? { ...st.settings } : undefined })),

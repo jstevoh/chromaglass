@@ -9,7 +9,8 @@ import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/
 /*
  * The channel the looks are filmed for (PLAN 34a-8). The owner asked, on
  * 2026-11-08, for the homepage to point at it: six films went public that day,
- * each a look played to a 1920s record, and a visitor deciding whether to press
+ * each a look played to a 1920s record (modern ambient music since 2026-11-21,
+ * PLAN 34a-6d), and a visitor deciding whether to press
  * Play free learns more from a minute of the plate moving to music than from
  * any still on this page. The handle, not a channel id, so the link reads as
  * what it is if someone copies it. It sits in the header, beside Sign in, so a
@@ -263,7 +264,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           className="mt-6 inline-flex min-h-[44px] items-center gap-2.5 text-[15px] text-text-2 underline-offset-4 transition-colors hover:text-text hover:underline"
         >
           <YouTubeMark className="h-[17px] w-[24px] shrink-0" />
-          Watch the looks move to 1920s records on our YouTube channel
+          Watch the looks move to music on our YouTube channel
         </a>
       </section>
 
@@ -276,12 +277,12 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <MusicClip covered={covered} />
       </section>
 
-      {/* Films: six records from before 1926, each played whole by a look (LandingFilms.tsx, PLAN.md 34a-6). */}
+      {/* Films: six pieces of modern ambient music, each played whole by a look (LandingFilms.tsx, PLAN.md 34a-6, 34a-6d). */}
       <section id="films" className="mx-auto w-full max-w-[1120px] px-4 pb-16 sm:px-8 sm:pb-24">
-        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Six records from the 1920s</h2>
+        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Six pieces of ambient music</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
-          The app listening to six old 78s and playing each from the first note to the last, with nothing added afterwards.
-          The records are in the public domain in the US.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
+          The app listening to six pieces by the composer Scott Buckley and playing each from the first note to the last, with nothing added afterwards.
+          The music is his, under CC BY 4.0.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
         </p>
         <SiteFilms />
       </section>

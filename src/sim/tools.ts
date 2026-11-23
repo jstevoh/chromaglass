@@ -14,6 +14,7 @@ import { type FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE, GRID_SIZE } from './constants';
 import { DICE } from './dice';
 import { fluidSink, type AreaSink } from '../lib/areaCords';
+import { areaCentre, type PlateArea } from '../lib/plateAreas';
 import { showNow } from '../lib/showClock';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
@@ -279,4 +280,15 @@ export function syncBoilHolds(
     }
     holds.length = count;
   }
+}
+
+/** Where a kick lands on the dish (inside `sqArea` if given, else about the middle). */
+export function kickCenter(
+  sqArea: PlateArea | null,
+  sheet: boolean,
+  dice: { centred(): number },
+): { x: number; y: number } {
+  const sqAt = sqArea ? areaCentre(sqArea, GRID_SIZE) : { x: GRID_SIZE / 2, y: GRID_SIZE / 2 };
+  const sqSpread = sqArea ? sqArea.r * GRID_SIZE : (sheet ? GRID_SIZE / 2 : 30 * GRID_SCALE);
+  return { x: sqAt.x + dice.centred() * sqSpread, y: sqAt.y + dice.centred() * sqSpread };
 }
