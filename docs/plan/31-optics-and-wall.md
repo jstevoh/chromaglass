@@ -279,6 +279,14 @@ lens-shaped drop, no shadow beside it.*
   slack), and set the glow control's size row from the dense slope's own response, or from
   31s-2's traced light once it draws the plate. Never a looser bar without the owner's word;
   until then holeline stays red on main's checks (the site deploys without them, 19ak-21).
+- **31s-7. Open: two films and the Mac app still draw the flower.** Four films are re-recorded on
+  main with the dense slope and replace the privated ones (shipped 2026-11-22: Effervescence,
+  The Distant Sun, Undertow, Machina, each with its card loop; a close look at Galaxy's bubbles
+  in the new film shows one ring each, no lobes). Hymn to the Dawn and Permafrost were filmed
+  before #933, so their channel films and card loops still carry it: re-record both with
+  `npm run sitefilms` and swap them the same way. The Mac app's last release (1.3.1652) was
+  built before #933 and draws the flower until the next release. A preview server left running
+  from an old checkout shows it too; judge only from main or the live site.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
