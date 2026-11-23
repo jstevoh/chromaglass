@@ -25,7 +25,8 @@ import { WHOLE_DISPLAY, displayNeeds, leanCovers, leanDisplayWgsl } from './disp
 import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
 import { FerroDrop } from './ferroDrop';
 import { groupOf, viewOf } from './groupCache';
-import { DROP_KERNELS } from './wgsl/ferroDrop';
+import { DROP_KERNELS, GAP_LC } from './wgsl/ferroDrop';
+import { DISH_REST_GAP } from '../lib/turntable';
 import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
 import { BEAD_FLOATS } from '../lib/beadPack';
@@ -313,7 +314,7 @@ export class WebGPUPlate {
       this.layers[i] = {
         size,
         dye: tex('packed dye', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
-        vel: tex('packed velocity', PACKED_VEL_FORMAT, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
+        vel: tex('packed velocity', PACKED_VEL_FORMAT, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
         // COPY_SRC so npm run derive can read where the slopes were found.
         derived: tex('derived', 'rgba16float', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
       };
@@ -432,10 +433,10 @@ export class WebGPUPlate {
     if (lensOn) this.pack.set('finishInMain', 0);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
     if (lensOn) this.pack.set('finishInMain', finish);
-    // The pack's one number is the grid, which changes with a rung and not
+    // The pack's grid and l_c per gap unit, which change with a rung and not
     // with a frame: written when it does, not sixty times a second (14ab-5).
     if (grid !== this.packGrid) {
-      this.device.queue.writeBuffer(this.packArgs, 0, new Float32Array([grid, 0, 0, 0]));
+      this.device.queue.writeBuffer(this.packArgs, 0, new Float32Array([grid, GAP_LC / DISH_REST_GAP, 0, 0]));
       this.packGrid = grid;
     }
 
@@ -459,6 +460,7 @@ export class WebGPUPlate {
         packPass.setPipeline(pipe);
         packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
         packPass.dispatchWorkgroups(groups, groups);
+        this.drop.notePackedVel(this.layers[0].vel);
       }
     }
     for (let i = 0; i < fields.length; i++) {

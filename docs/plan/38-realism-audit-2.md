@@ -26,16 +26,16 @@ cost, then Low.
 | 4 | 18c-14 | The ambient seed pours dye and heat into every look (RS-38) | `18-physics-2.md` | S–M | High | new |
 | 5 | 18c-3b | The mouse's dye stamp and the themes' kicks lay no volume (RS-39) | `18-physics-2.md` | M | High | updates |
 | 6 | ~~38v-1~~ | Sound Drive's built-in hands become cords on real actuators (RS-43) | here | L | High | shipped |
-| 7 | 18c-13 | Every drop splashes as water, and its satellites add dye (RS-13) | `18-physics-2.md` | S | Medium–High | new |
+| 7 | ~~18c-13~~ | ~~Every drop splashes as water, and its satellites add dye (RS-13)~~ | `18-physics-2.md` | S | Medium–High | **shipped** (`npm run dropwindow`; 18c-13b left) |
 | 8 | 9ad | The domes rise on \|B\|, not on its normal part (RS-20) | `09-ferrofluid.md` | S–M | Medium–High | new |
 | 9 | ~~18i-2~~ | Beads slide, merge and appear on fixed numbers (RS-11) | `18-physics-2.md` | M | Medium–High | shipped |
-| 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | new |
+| 10 | 36e-6 | The lamp's buoyancy rides past the speed cap; heat diffused twice (RS-2) | `36-analog-operators.md` | S | Medium | `heatVisc` shipped; lift open behind 36e-7, 36e-8 |
 | 11 | 38v-2 | Comet's pull flickers with the beat, and is absent on the open plate (RS-3) | here | S | Medium | new |
-| 12 | 29a-11 | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | new |
-| 13 | 9ae | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | new |
+| 12 | ~~29a-11~~ | The closeup drop is clipped to a fixed gap and loses volume (RS-21) | `29-ferro-drop.md` | S | Medium | shipped |
+| 13 | ~~9ae~~ | Ferrofluid rounds at the step rate, not in seconds (RS-23) | `09-ferrofluid.md` | S | Medium | shipped |
 | 14 | 9t-11 | The domes' film has no upper wall; two magnets start nothing (RS-24) | `09-ferrofluid.md` | S | Medium | new |
-| 15 | 18e-9 | A thin film's optical path steps the wrong way (RS-26) | `18-physics-2.md` | S | Medium | new |
-| 16 | 32d-6 | Soap film on the plate takes out 8× the light Airy allows (RS-29) | `32-soap-film.md` | S | Medium | new |
+| 15 | ~~18e-9~~ | A thin film's optical path steps the wrong way (RS-26) | `18-physics-2.md` | S | Medium | shipped |
+| 16 | 32d-6 | Soap film on the plate takes out 8× the light Airy allows (RS-29) | `32-soap-film.md` | S | Medium | shipped #928 |
 | 17 | 38r-17 | The milk scatters through 6 mm, not the cover's gap (RS-30, RS-28) | `38-realism-audit.md` | S | Medium | updates |
 | 18 | 15g-18 | A press twists the liquid it squeezes (RS-36) | `15-tools-on-liquids.md` | S | Medium | new |
 | 19 | 15g-2 | A still breath carries the ferrofluid out (RS-40; plan text corrected) | `15-tools-on-liquids.md` | S | Medium | updates |
@@ -53,7 +53,7 @@ cost, then Low.
 | 31 | 38v-7 | Thin film and bead cores brighten a backlit plate (RS-33) | here | S | Low–Medium | new |
 | 32 | 18d-13 | A dye has no partition coefficient between liquids (RS-14; plan text corrected) | `18-physics-2.md` | M | Low–Medium | new |
 | 33 | 1b | Liesegang steps by frames and grid cells (RS-4) | `01-sharp-liquid.md` | S | Low | updates |
-| 34 | 22g, 22r | The spin's viscosity misses the glycerine; tanh on the weight (RS-5) | `22-spin.md` | S | Low | updates, new |
+| 34 | 22g, 22r | The spin's viscosity misses the glycerine; tanh on the weight (RS-5) | `22-spin.md` | S | Low | updates, 22r spin half shipped |
 | 35 | 18m-3 | The slump reads one global viscosity (RS-6) | `18-physics-3.md` | S | Low | updates |
 | 36 | 1k | Retire the sharpen pass still behind Sharpness and CC15 (RS-9; plan text corrected) | `01-sharp-liquid.md` | S | Low | new |
 | 37 | 18f-4, 38s | Vogel's law for warm glycerine; the cover's density is water's (RS-10) | `18-physics-2.md`, `38-realism-audit.md` | S | Low | updates |

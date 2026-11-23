@@ -98,6 +98,23 @@ nothing (the build step fails first).
   GitHub's after 15 minutes (`Watchdog`); by hand, **Re-run all jobs**, never failed jobs.
   Setup, pausing it for a show, and what a job there can reach: `docs/mac-runner.md`
   (PLAN.md 19ah).
+- **One film at a time on the owner's Mac (the film queue)** (`scripts/maclock.mjs`, PLAN.md
+  19ak-23): `launchChromium` (`scripts/chromium.mjs`), `npm run desktop`, and the standalone
+  browser scripts (`caption.mjs`, `codecblip.mjs`, `detail.mjs`, `webgpu-smoke.mjs`) all
+  acquire `~/cg-scratch/film.lock` in a FIFO queue (`~/cg-scratch/film.queue/`) before
+  launching Chromium or Electron, after waiting on any deploy mark (`macdeploy.mjs`), and
+  release on exit. For an ad-hoc Playwright script outside the repo, wrap it with
+  `npm run maclock -- run -- <cmd>` (or copy `scripts/maclock.mjs` alone to
+  `~/cg-scratch/bin`); check who holds or waits for the Mac with `npm run maclock -- status`
+  (`--json` for scripts). Stale recovery: a lock whose `pid:` has exited is freed at once,
+  and any lock older than its `timeout:` plus 60 s (or mtime for a hand-written one-line lock)
+  is freed and logged to `~/cg-scratch/film-lock.log`, using an atomic rename-and-compare so
+  two waiters never delete a fresh third-party lock. Inside CI (`GITHUB_ACTIONS`) and off
+  macOS it is a no-op unless `CG_FILM_LOCK` is set; `scripts/macbusy.sh` still checks
+  `node scripts/maclock.mjs status --json` so a shard refuses the Mac and moves to GitHub's
+  Macs while a live film holds it. Variables: `CG_FILM_LOCK` (override lock path),
+  `CG_FILM_LOCK_TIMEOUT_SEC` (default `5400`), `CG_FILM_LOCK_HELD` (set to the holder pid
+  so nested child launches do not self-deadlock).
 - `ready.yml` labels an Antigravity PR (or one labelled `review-owed`)
   `ready-for-review` and comments `READY #<n> <item> head <sha>` when `Checks` goes
   green on its current head, and takes the label off on the next push or a red run

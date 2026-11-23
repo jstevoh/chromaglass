@@ -108,10 +108,6 @@ Open from Desk v2, each its own thread (the UI lane):
     window is painted from the wall's canvas and never the copy's, and which settings
     each engine was handed; a picture of the window against a look changed in Preview
     would be the last word (`docs/judging.md` §49 for the owner's eye meanwhile).
-- ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
-  XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
-  - **8d-2** (S) Profiles for more boards, or a per-control "knob / slider" choice in
-    MIDI learn, so a real fader on an unprofiled board can draw as one again.
 - ~~**8e** Load-in's Wall panel: the test pattern and Identify, and Output's Gain and Gamma
   as knobs~~ (shipped; checks `npm run wallpattern`, `npm run map`, `npm run layout`).
   - **8e-1** (S) The wall test from the phone. The remote has no Load-in at all (no

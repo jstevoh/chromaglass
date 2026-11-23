@@ -48,3 +48,21 @@ receiver once rather than in every cast state (the lesson of S0's logo, in
 `docs/stability-plan.md`). The phone's Looks sheet, where rows are smallest, gains most.
 *Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
 row; the cast state's size is unchanged.
+- ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
+  XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
+- ~~**8d-2** (S) Profiles for more boards, or a per-control "knob / slider" choice in
+  MIDI learn, so a real fader on an unprofiled board can draw as one again.~~ (dropped
+  by 8d-3: no panel draws a control by what it is learned to any more.)
+- ~~**8d-3** One panel, one kind of control~~ (shipped; check `npm run panelkinds`). The
+  owner, 2026-11-22, with a screenshot: the Recipe drew Bubbles and Saturation as
+  sliders beside its own and Fluid Physics' knobs, "once again" after Iridescence on
+  2026-11-14 (8d-1). The cause was 8d itself: the APC mini mk2's factory map rides those
+  two on faders, and the Recipe drew a fader's control as a slider. Now the kind is the
+  panel's: Rides, the Mixer and the Wall panel sliders (Gain and Gamma, 8e's two knobs
+  among the Wall's slider rows, are rows now), the Recipe and every section's knobs
+  panel knobs, the phone sliders. `DeskProps.kindFor` is gone. `panelkinds` renders
+  every desk panel and the Wall in node, counts knobs and range inputs, and fails a panel
+  that draws both kinds, the other kind, or fewer controls than it holds, and any desk
+  or app file that names `controlKindOf` or `kindFor`. On main's code it fails 8 of 21
+  lines (with the old lookup told half the controls are faders, the Recipe drew 133
+  knobs + 133 sliders); here 21 of 21 pass.

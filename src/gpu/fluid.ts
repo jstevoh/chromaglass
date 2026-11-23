@@ -50,8 +50,10 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, OIL_CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, oilBodyLn, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, OIL_CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
+import { phaseCHPlan, phaseCapillaryPull } from './fluid/phase';
+import { heatViscPlan } from './fluid/heat';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
 
@@ -67,8 +69,11 @@ export class WebGPUFluid extends FluidCover {
    * mid-measurement is held off too.
    */
   static swirlHeldOff = false;
-  /** The step's soap numbers (soapPlan), kept so a frame makes none. */
+  /** The step's soap and heat diffusion numbers (`soapPlan`, `heatViscPlan`), kept so a frame makes none. */
   private readonly soapNums = new Float64Array(6);
+  /** The step's ferrofluid Cahn-Hilliard numbers (phaseCHPlan), kept so a frame makes none. */
+  private readonly phaseNums = new Float64Array(2);
+  private readonly heatNums = new Float64Array(2);
 
   /**
    * The kernels a step runs, on any look a show can open on, built before
@@ -165,7 +170,7 @@ export class WebGPUFluid extends FluidCover {
       */
       // Except on a look that stands the plate up, whose dye's weight runs
       // the mix force from its first step (Opening.gravity).
-      ['mixSmooth', [R32], open.gravity],
+      ['mixSmooth', [R32], open.gravity || (open.phase && open.thinGap)],
       // The oil's pressure along the open rim, which mixForce reads (PLAN 18g-6): with it, as it runs with it.
       ['rimLaplace', [R32], open.gravity],
       /*
@@ -177,6 +182,14 @@ export class WebGPUFluid extends FluidCover {
       ['speciesSplat', [RGBA32], false],
       // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
       ['inkSpecies', [RGBA32], false],
+      /*
+        The layered seed's oil share (38w-15, `layShare` in fluid/inputs.ts),
+        added without an entry here, so the first look that laid oil built it
+        on a frame: main's deploy of 2026-11-22 read "1 in the ledger (0 in
+        the opening), fluid/seedShare:rgba32float" in `npm run startup`. No
+        look's opening asks for it, so it is built behind the show.
+      */
+      ['seedShare', [RGBA32], false],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       ['liquidForces', [VEL], false],
@@ -237,6 +250,7 @@ export class WebGPUFluid extends FluidCover {
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
       ['phaseVelocity', [VEL], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
+      ['phaseCapillary', [VEL], open.phase && open.thinGap],
       ['phaseMomentum', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
       // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
@@ -638,32 +652,10 @@ export class WebGPUFluid extends FluidCover {
 
     // 3. Viscous diffusion of momentum (xy) and heat (z)
     const n2 = (N - 2) * (N - 2);
-    /*
-      Heat diffuses through water with thermal diffusivity kappa ≈ 1.4e-7 m²/s,
-      about 350 times faster than a dye or salt does (Lewis number Le ≈ 350).
-      Heat previously shared the dye's diffusionRate, leaving the 12 presets
-      with diffusionRate at 0 with no heat spreading at all. Now heat has its
-      own physical diffusivity term. doubleDiffusion raises the heat's alone
-      to simulate double-diffusive convection (salt fingers).
-
-      Precision: in rgba16float (FP16), heat's per-step change at real κ is below
-      half-float precision (~0.0009 cells²/step, truncating to 0.0% on SwiftShader).
-      The step's duration in physical seconds is `seconds` (from magnetSeconds).
-      We accumulate `heatSeconds` until the accumulated heat diffusion coefficient
-      reaches ≥ 0.02, where half-float changes survive quantization without loss,
-      or whenever doubleDiffusion is elevated.
-    */
     const doubleDiff = Math.max(0, Math.min(2, p.doubleDiffusion ?? 0));
-    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
-    this.heatSeconds += seconds;
-    const heatRate = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff) * n2;
-    const heatA = this.heatSeconds * heatRate;
-    let heatVisc = 0;
-    if (heatA >= 0.02 || doubleDiff > 0) {
-      heatVisc = heatA;
-      this.heatSeconds = 0;
-    }
-    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, heatVisc, 0];
+    const hp = heatViscPlan(this.boilLive, n2, doubleDiff, p.magnetSeconds, this.heatSeconds, this.heatNums);
+    this.heatSeconds = hp[0];
+    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, hp[1], 0];
     stage('viscosity', (pass) => {
       this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
     }, visc.some((v) => v > 0));
@@ -760,6 +752,14 @@ export class WebGPUFluid extends FluidCover {
     else if (this.oilDye) this.oilDyeStale = true;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
     const pull = oil * (thin ? OIL_TENSION_GAP * this.coverH2 : OIL_TENSION) * perSecond * N * N, cells = OIL_CELLS / Math.max(disp * N, 1e-9);
+    const phaseCapOn = thin && this.phaseLive && (p.magnetSeconds ?? 1 / 60) > 0;
+    stage('phase capillary', (pass) => {
+      const smooth = this.scratch();
+      this.run(pass, 'mixSmooth', smooth, [this.phase.read], none);
+      this.run(pass, 'phaseCapillary', this.vel.write, [this.vel.read, smooth, this.ensureStand()],
+        this.arg('phase cap', [phaseCapillaryPull(this.coverH2, perSecond, N), cells, 0, 0]));
+      this.vel.swap();
+    }, phaseCapOn);
     stage('mix force', (pass) => {
       /*
         Gravity in the plate: how far it stands up, toward the bottom of the
@@ -865,7 +865,7 @@ export class WebGPUFluid extends FluidCover {
       });
     }
     if (thin) {
-      const body = magnetOn || mazeFlow || mixOn || thinBody;
+      const body = magnetOn || mazeFlow || mixOn || thinBody || phaseCapOn;
       const prev = this.ensureThinGap();
       this.hsMidNow = body ? this.hsMid! : prev;
       stage('thin gap mid', (pass) => {
@@ -1387,11 +1387,11 @@ export class WebGPUFluid extends FluidCover {
           psi.swap();
         }
       }
-      // Phase Edge is how fast it separates: its mobility, M dt, from 0.006
-      // to 0.018 (under the explicit limit, about 0.028).
+      // Paced in real seconds and grid spacing (phaseCHPlan, PLAN 9ae).
+      const ch = phaseCHPlan(p.phaseSharp ?? 0.35, p.magnetSeconds, N, this.phaseNums);
       const args = this.arg('phase ch', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength,
-        0.006 + 0.012 * Math.max(0, Math.min(1, p.phaseSharp ?? 0.35)), field > 0.001 ? mazeK.alpha * (0.5 + 0.5 * field) : 0, MAZE_UNIFORM * maze / Math.max(field, 1e-6), p.time ?? 0]);
-      for (let k = 0; k < CH_SUBSTEPS; k++) {
+        ch[1], field > 0.001 ? mazeK.alpha * (0.5 + 0.5 * field) : 0, MAZE_UNIFORM * maze / Math.max(field, 1e-6), p.time ?? 0]);
+      for (let k = 0; k < ch[0]; k++) {
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
         // Carried as a volume, Cahn–Hilliard moves volume too (phaseCHVolume, and why).
         if (volume) this.run(pass, 'phaseCHVolume', this.phase.write, [this.phase.read, mu, this.squeeze.read, stand], args);

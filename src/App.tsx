@@ -18,7 +18,7 @@ import { Info } from './components/Info';
 import { CastNetworkItems, TvAsks } from './components/CastNetworkItems';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
-import type { Cue, ControlKind } from './components/desk/deskProps';
+import type { Cue } from './components/desk/deskProps';
 import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
 import { travelOfKey, valueOfKey } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
@@ -58,7 +58,6 @@ import { useFilmSense } from './hooks/useFilmSense';
 import { type SimulatedMusic } from './lib/simulatedMusic';
 import { useWakeLock } from './hooks/useWakeLock';
 import type { MidiAction, MidiMap } from './lib/midi';
-import { controlKindOf } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
@@ -1455,16 +1454,6 @@ export default function App() {
     return b && b.source.kind === 'cc' ? b.source.number : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  /*
-    And what it is learned to: a knob draws as a knob, a fader as a slider
-    (the design's rule, so the desk looks like the controller). A binding
-    only says absolute or relative, so the controller's profile names which
-    of its CCs turn (`controlKindOf`, PLAN.md 8d).
-  */
-  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null =>
-    controlKindOf(midiRef.current?.map, key, midiRef.current?.activeInputName),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  []);
 
   // The stage look's place in each list, for the slide tray's click (PLAN 35g):
   // the desk's is among all the presets, the phone's among its grouped list.
@@ -3671,7 +3660,6 @@ export default function App() {
           automated={isAutomated}
           onAutomate={setIsAutomated}
           ccFor={ccFor}
-          kindFor={kindFor}
           lookValueOf={lookValueOf}
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}

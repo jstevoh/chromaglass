@@ -125,16 +125,27 @@ export function dropSchedule(amount: number, N: number, dt = 1 / 60): { radius: 
   return { radius, share, steps, window };
 }
 
-/** The impact's numbers for a drop of `amount` falling `dropHeight` (the setting) onto a film `gap` deep. */
-export function dropImpact(amount: number, dropHeight: number, gap = DISH_GAP_METRES) {
+/** What of a falling liquid governs its impact: density (g/cm³ or weight), viscosity (mPa·s), surface tension (mN/m). */
+export type DropLiquid = Pick<LiquidDeposit, 'viscosity' | 'density' | 'tension' | 'weight'>;
+
+/**
+ * The impact's numbers for a drop of `amount` falling `dropHeight` (the setting)
+ * onto a film `gap` deep, using the falling liquid's own ρ, μ and σ (water when absent).
+ */
+export function dropImpact(amount: number, dropHeight: number, gap = DISH_GAP_METRES, what?: DropLiquid | null) {
   const D = Math.max(1e-4, dropDiameter(amount));
   const H = Math.max(0, dropHeight) * DROP_HEIGHT_METRES;
   const v = Math.sqrt(2 * G * H);
-  const We = RHO * v * v * D / SIGMA;
-  const Re = RHO * v * D / MU;
-  const Oh = MU / Math.sqrt(RHO * SIGMA * D);
+  const rho = what?.density && what.density > 0 ? what.density * 1000
+    : what?.weight ? Math.max(100, (1 + what.weight) * 1000) : RHO;
+  const sigma = what?.tension && what.tension > 0 ? what.tension * 1e-3 : SIGMA;
+  const mu = what?.viscosity && what.viscosity > 0 ? what.viscosity * 1e-3 : MU;
+  const h = Number.isFinite(gap) && gap > 0 ? gap : DISH_GAP_METRES;
+  const We = rho * v * v * D / sigma;
+  const Re = rho * v * D / mu;
+  const Oh = mu / Math.sqrt(rho * sigma * D);
   const K = We * Math.pow(Oh, -0.4);
-  const Kc = 2100 + 5880 * Math.pow(gap / D, 1.44);
+  const Kc = 2100 + 5880 * Math.pow(h / D, 1.44);
   return {
     D, v, We, Re, Oh, K, Kc,
     /** Throws a crown and satellites (Cossali 1997). */
@@ -190,6 +201,12 @@ export function dropTrickle(dq: DropQueue, amount: number): number {
   const fall = dq.trickle;
   dq.trickle = 0;
   return fall;
+}
+
+/** Whether at least one drop slot is free in the queue. */
+export function dropSlotFree(dq: DropQueue): boolean {
+  for (let k = 0; k < DROP_SLOTS; k++) if (!(dq.q[k * F + 4] > 0)) return true;
+  return false;
 }
 
 /** Whether a drop is still on its way in. */
