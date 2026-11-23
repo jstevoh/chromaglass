@@ -428,6 +428,21 @@ an unsteady measure says "may vary from take to take", and every word names its 
   one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
   two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
   one sample then lags of 3, 8 and 10, each seeded from the last.
+- **47x-10** An artistic report card (`scripts/watchcard.mjs`): `reportCard(read, { cal, ratings })`
+  scores seven canons (Unity, Complexity, Intensity, Arc, Surprise, Music fit, Restraint)
+  from 0 to 10 by calibrating each measure against real liquid shows in `REAL_SHOW_CARDS`
+  using the existing just-noticeable steps, prints `## Report card` in `summary.md` and side
+  by side under `--vs`, and computes Spearman's rho against a library `ratings.json`.
+- ~~**47x-11**~~ Reading YouTube footage honestly (**shipped**, this PR: `scripts/watchfootage.mjs`): crops black-and-still
+  letterbox/pillarbox bars (`--crop` wins, `--no-autocrop` disables), masks burnt-in sharp
+  still overlays out of every read, excludes title-card spans, estimates global camera
+  translation from block flow (`cameraShare`, keeping `wholeShare`), and flags detail
+  measures unreliable under compression softness.
+- **47x-12** From a gap to the settings that close it (`scripts/watchsettings.mjs`): `MEASURE_SETTINGS`
+  maps every comparable measure to `DEFAULT_SETTINGS` keys (`src/types.ts`) with real physics
+  before post grades, and `gapSettings(gaps)` writes `## Settings to try` under `--vs` (with
+  current values when `--settings` or a take's settings block is given).
+- **47x-13** refit the card's bands from the owner's ratings once there are enough.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
