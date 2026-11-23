@@ -305,7 +305,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
           */}
           {video?.name && (
             <div className="mt-1 rounded-lg border border-white/10 px-3 py-2" data-testid="film-video-row">
-              <VideoShelf {...video} />
+              <VideoShelf {...video} mixOrder={settings.mixOrder} onMixOrder={o => onUpdate({ mixOrder: o })} />
             </div>
           )}
 

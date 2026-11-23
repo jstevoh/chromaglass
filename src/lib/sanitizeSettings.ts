@@ -13,7 +13,8 @@ import {
 } from '../types.ts';
 import { PIN_RANGE, onStep } from './deskPins.ts';
 import { SETTING_TRAVEL } from './sceneMap.ts';
-import { isAreaTarget } from './areaCords.ts';
+import { isAreaTarget, CORD_MASTERS, HAND_VOLUME_MAX } from './areaCords.ts';
+import { MUSIC_ROLES, type CordMaster } from '../types';
 import { VALID_MOIRE_SHEETS } from './moire.ts';
 
 const VALID_VISCOSITY = new Set<string>(VISCOSITY_MODES);
@@ -147,8 +148,12 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
           a setting, or an act with no area, is neither, and is dropped
           rather than read as the other.
         */
+        /*
+          Or, with no area, one of the hand's acts on the whole plate (PLAN
+          38v-1): the music's own hands are those.
+        */
         (m.area === undefined
-          ? Object.prototype.hasOwnProperty.call(SETTING_TRAVEL, m.setting)
+          ? Object.prototype.hasOwnProperty.call(SETTING_TRAVEL, m.setting) || isAreaTarget(m.setting)
           : Number.isInteger(m.area) && m.area >= 0 && m.area < 8 && isAreaTarget(m.setting)) &&
         typeof m.depth === 'number' && Number.isFinite(m.depth) &&
         (m.layer === undefined || m.layer === 'all' || (typeof m.layer === 'number' && Number.isFinite(m.layer))) &&
@@ -157,7 +162,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
           typeof m.band[0] === 'number' && typeof m.band[1] === 'number' &&
           Number.isFinite(m.band[0]) && Number.isFinite(m.band[1]) &&
           m.band[0] > 0 && m.band[1] > m.band[0])) &&
-        [m.gain, m.threshold, m.attack, m.release].every(v => v === undefined || (typeof v === 'number' && Number.isFinite(v)))
+        [m.gain, m.threshold, m.attack, m.release, m.size, m.volume, m.drops, m.wander, m.bottle].every(v => v === undefined || (typeof v === 'number' && Number.isFinite(v)))
       ).map(m => {
         const out = { ...m, depth: Math.max(-100, Math.min(100, m.depth)) };
         if (m.gain !== undefined) out.gain = Math.max(0, Math.min(10, m.gain));
@@ -170,6 +175,17 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
         if (m.threshold !== undefined) out.threshold = Math.max(0, Math.min(1, m.threshold));
         if (m.attack !== undefined) out.attack = Math.max(0, Math.min(10, m.attack));
         if (m.release !== undefined) out.release = Math.max(0, Math.min(10, m.release));
+        // How a hand acts (38v-1), each in its range; masters and a role only from their own lists.
+        if (m.size !== undefined) out.size = Math.max(0.02, Math.min(1, m.size));
+        if (m.volume !== undefined) out.volume = Math.max(0, Math.min(HAND_VOLUME_MAX, m.volume));
+        if (m.drops !== undefined) out.drops = Math.max(1, Math.min(16, Math.round(m.drops)));
+        if (m.wander !== undefined) out.wander = Math.max(0, Math.min(1, m.wander));
+        if (m.bottle !== undefined) out.bottle = Math.max(-8, Math.min(8, Math.round(m.bottle)));
+        if (m.masters !== undefined) {
+          const ms = Array.isArray(m.masters) ? (m.masters as unknown[]).filter((k): k is CordMaster => CORD_MASTERS.some(c => c.key === k)) : [];
+          if (ms.length) out.masters = [...new Set(ms)]; else delete out.masters;
+        }
+        if (m.role !== undefined && !(MUSIC_ROLES as readonly string[]).includes(String(m.role))) delete out.role;
         return out;
       }).slice(0, 32);
       out.sceneMappings = validMappings;

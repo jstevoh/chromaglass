@@ -11,6 +11,7 @@
  * uniforms) that the shader reads for the rim and the interior.
  */
 import { makeRng, showSeed, stream, type Rng } from './rng';
+import { DISH_GAP_METRES, DISH_METRES, OPEN_RIM } from './turntable';
 
 export interface Bead {
   x: number;   // logical grid cells
@@ -147,8 +148,29 @@ export function innerLife(seed: number): number { return 15 + 20 * seed; }
 
 /** How long a drop takes to take on a new look's colour: a look fade's order. */
 const RECOLOUR_S = 1.5;
+/** Relaxation time (s) for overlapping drops pushing apart (~0.25 per 1/60 s step). */
+const REPEL_TAU_S = 0.058;
+/** Relaxation time (s) for nearby drops drawing together (1/1.5 s). */
+const ATTRACT_TAU_S = 1 / 1.5;
+const G = 9.81;
 /** Droplets per bead the population asks for, at full drops (see `populateTiny`). */
 const TINY_SHARE = 0.8;
+
+/**
+ * Liquid and gap parameters for `BeadField.setLiquid` (PLAN 18i-2), in SI units.
+ */
+export interface BeadLiquid {
+  /** Live gap between the glasses, metres. */
+  gapMetres: number;
+  /** Dynamic viscosity of the surrounding carrier liquid, Pa·s. */
+  muOut: number;
+  /** Dynamic viscosity of the drop liquid, Pa·s. */
+  muIn: number;
+  /** Signed density difference ρ_drop − ρ_liquid, kg/m³. */
+  deltaRho: number;
+  /** Interfacial tension between the two liquids, N/m. */
+  sigma: number;
+}
 
 /**
  * Which palette entry a drop takes. From the bead's own seed rather than a
@@ -201,12 +223,38 @@ export class BeadField {
 
   /**
    * Viscosity ratio lambda = mu_drop / mu_carrier (PLAN 18i).
-   * In a thin gap, an oil pancake drop lags the depth-mean flow: U_drop = 2U / (1 + lambda).
-   * The 0.8 flow speed was originally tuned by eye for show aesthetics, and
-   * lambda = 1.5 was solved back from 2U / (1 + lambda) = 0.8 as a tuned shortcut.
-   * This is a property on BeadField; per-bottle dynamic coupling awaits 18d-3 Cahn-Hilliard pinch-off.
+   * In a thin gap, a viscous drop lags the depth-mean flow: U_drop = 2U / (1 + lambda).
+   * Starts at 1.5 (the tuned ring lag) until `setLiquid` supplies the live liquids.
    */
   viscosityRatio = 1.5;
+  private gapMetres = DISH_GAP_METRES;
+  private muOut = 0.001;
+  private muIn = 0.0015;
+  private deltaRho = -80;
+  private sigma = 0.03;
+  private liquidSet = false;
+
+  /**
+   * Set the live gap and the two liquids' properties in SI units (PLAN 18i-2).
+   * Updates `viscosityRatio = muIn / muOut` for both the flow lag 2U / (1 + lambda)
+   * and the Hele-Shaw tilt slide Δρ g sinθ b² / (12 μ_out (1 + lambda)).
+   */
+  setLiquid(liquid: BeadLiquid): void {
+    if (Number.isFinite(liquid.gapMetres) && liquid.gapMetres > 0) this.gapMetres = liquid.gapMetres;
+    if (Number.isFinite(liquid.muOut) && liquid.muOut > 0) this.muOut = liquid.muOut;
+    if (Number.isFinite(liquid.muIn) && liquid.muIn >= 0) this.muIn = liquid.muIn;
+    if (Number.isFinite(liquid.deltaRho)) this.deltaRho = liquid.deltaRho;
+    if (Number.isFinite(liquid.sigma) && liquid.sigma > 0) this.sigma = liquid.sigma;
+    this.viscosityRatio = this.muIn / this.muOut;
+    this.liquidSet = true;
+  }
+
+  /** Paterson's Hele-Shaw shape/coalescence relaxation time 2 μ R³ / (b² σ). */
+  private patersonTau(rCells: number): number {
+    const R = Math.max(0.1, rCells) * (DISH_METRES / this.grid);
+    const mu = Math.max(this.muOut, this.muIn);
+    return Math.max(1e-6, (2 * mu * R * R * R) / (this.gapMetres * this.gapMetres * this.sigma));
+  }
   /** The drop mask's pixels and its scratch, kept between frames (see `rasterDrops`). */
   private dropPixels: Uint8ClampedArray | null = null;
   private dropOwn: Float32Array | null = null;
@@ -421,7 +469,19 @@ export class BeadField {
     const N = this.grid;
     const bs = this.beads;
     if (bs.length === 0) return;
+    const m = DISH_METRES / N;
     const dropSpeed = 2 / (1 + this.viscosityRatio);
+    /*
+      Signed Hele-Shaw pancake buoyancy/gravity slide (PLAN 18i-2):
+      U_slide = Δρ g sinθ b² / (12 μ_out (1 + λ)), where Δρ = ρ_drop − ρ_liquid
+      and `tiltX`/`tiltY` are sinθ along +x/+y (down the slope for positive tilt).
+      A drop heavier than the surrounding liquid slides down the slope (+), a
+      lighter one (oil in water) rises up it (−).
+    */
+    const slide = (this.deltaRho * G * this.gapMetres * this.gapMetres) / (12 * this.muOut * (1 + this.viscosityRatio)) / m;
+    const sx = Number.isFinite(tiltX) ? tiltX : 0;
+    const sy = Number.isFinite(tiltY) ? tiltY : 0;
+    const dropsMode = this.drops > 0 || this.liquidSet;
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
       /*
@@ -439,18 +499,18 @@ export class BeadField {
         reason (PLAN 18i, `npm run bubblephysics`). So a drop on still paint
         stays exactly where it is, as the bubbles do.
       */
-      b.x += (vx * CELLS_PER_UNIT * dropSpeed - tiltX * 500) * dt;
-      b.y += (vy * CELLS_PER_UNIT * dropSpeed - tiltY * 500) * dt;
+      b.x += (vx * CELLS_PER_UNIT * dropSpeed + sx * slide) * dt;
+      b.y += (vy * CELLS_PER_UNIT * dropSpeed + sy * slide) * dt;
       b.age += dt;
       if (b.inner && (b.inner.age += dt) >= innerLife(b.inner.seed)) delete b.inner;
       if (b.sx !== undefined) {
-        const f = Math.exp(-dt / mergeRelax(b.r, N));
+        const f = Math.exp(-dt / (this.liquidSet ? this.patersonTau(b.r) : mergeRelax(b.r, N)));
         b.sx *= f; b.sy = (b.sy ?? 0) * f;
         if (Math.hypot(b.sx, b.sy) < 0.005) { delete b.sx; delete b.sy; }
       }
     }
     if (this.drops > 0 && this.palette.length) {
-      const k = Math.min(1, dt / RECOLOUR_S);
+      const k = 1 - Math.exp(-dt / RECOLOUR_S);
       const ease = (c: [number, number, number], seed: number) => {
         const t = this.slotColour(seed)!;
         c[0] += (t[0] - c[0]) * k; c[1] += (t[1] - c[1]) * k; c[2] += (t[2] - c[2]) * k;
@@ -576,7 +636,10 @@ export class BeadField {
           // droplet, and a droplet that took one in carried it as a passenger
           // (eighteen did on the drops check's crowd).
           const takes = !!smaller.tiny === !!larger.tiny;
-          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && this.rng.float() < 0.02) || (smaller.tiny && d < touch * 0.6))) {
+          const mergeProb = dropsMode
+            ? 1 - Math.exp(-dt / (this.liquidSet ? this.patersonTau(Math.hypot(b.r, o.r)) : mergeRelax(Math.hypot(b.r, o.r), N)))
+            : 0.02;
+          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && this.rng.float() < mergeProb) || (smaller.tiny && d < touch * 0.6))) {
             // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             const bigR = big.r;
@@ -636,7 +699,9 @@ export class BeadField {
           }
           // Apart when overlapping, firmly; together when near, gently. Each
           // pair is visited from both ends, so each move is half of it.
-          const move = d < want ? (want - d) * 0.25 : -Math.min(d - want, touch * 0.3) * Math.min(1, dt * 1.5) * 0.5;
+          const repelK = dropsMode ? 1 - Math.exp(-dt / REPEL_TAU_S) : 0.25;
+          const attractK = dropsMode ? 1 - Math.exp(-dt / ATTRACT_TAU_S) : Math.min(1, dt * 1.5);
+          const move = d < want ? (want - d) * repelK : -Math.min(d - want, touch * 0.3) * attractK * 0.5;
           b.x -= dx / d * move; b.y -= dy / d * move;
           o.x += dx / d * move; o.y += dy / d * move;
         }
@@ -672,7 +737,15 @@ export class BeadField {
         }
       }
     }
-    for (const b of bs) { b.x = Math.max(2, Math.min(N - 3, b.x)); b.y = Math.max(2, Math.min(N - 3, b.y)); }
+    if (dropsMode) {
+      // Beads reaching the open circular rim leave the dish rather than piling at a square clamp.
+      const cx0 = N / 2, cy0 = N / 2, rimR = OPEN_RIM * N;
+      for (let i = bs.length - 1; i >= 0; i--) {
+        if (Math.hypot(bs[i].x - cx0, bs[i].y - cy0) >= rimR) bs.splice(i, 1);
+      }
+    } else {
+      for (const b of bs) { b.x = Math.max(2, Math.min(N - 3, b.x)); b.y = Math.max(2, Math.min(N - 3, b.y)); }
+    }
     this.dirty = true;
   }
 

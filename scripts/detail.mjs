@@ -45,8 +45,11 @@ for (const resolve of [() => 'playwright', () => pathToFileURL(createRequire(pro
 }
 if (!chromium) { console.error('scripts/detail.mjs needs Playwright to decode images. Run it from a directory where `playwright` resolves (the Mac has it in ~/cg-scratch), or `npm i -D playwright` first.'); process.exit(2); }
 import fs from 'node:fs';
+import { basename } from 'node:path';
+import { acquireFilmLock } from './maclock.mjs';
 const files = process.argv.slice(2);
 if (files.length === 0) { console.error('usage: node scripts/detail.mjs <image> [image ...]'); process.exit(2); }
+await acquireFilmLock({ label: `detail.mjs (${basename(process.cwd())})` });
 // Playwright's own headless shell is often not downloaded on a machine that
 // only uses the installed browser, so fall back to whatever Chrome is there.
 const CHROME = [
