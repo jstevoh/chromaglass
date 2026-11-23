@@ -258,11 +258,15 @@ lens-shaped drop, no shadow beside it.*
   radius R focuses at R/(n-1) within 10%; a flat plate lights the wall evenly (1%); light is
   kept (total on the wall within 1% of total in); no feature is drawn twice (one peak per drop
   in the wall's autocorrelation).
-- **31s-3. The other sparse stencils.** Still reading the plate at a stride: the bubble glow's
-  airNear (a 9-tap max at 4.5 cells, plate.ts), the camera's camLap (an 8-tap max,
-  plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c) and blurAlpha (3x3). Each can draw
+- **31s-3. The other sparse stencils.** Still reading the plate at a stride: the camera's
+  camLap (an 8-tap max, plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c), the
+  lamp's lampBendAt and defocusShadow's reads of the derived layer, and blurAlpha (3x3). (The
+  bubble glow's airNear, a 9-tap max at 4.5 cells, went with 31s-8.) Each that reads the dye
+  itself at one texel a tap, where the dye has four texels a cell, can comb a thin rim the way
+  31s-8 found, and should take the cell's mean the way `cellDensity` does. Each can draw
   ghost copies of anything narrower than its stride the way the slope did. Replace each with the
-  traced light of 31s-2 where it is optics, or a dense stencil where it is a field read.
+  traced light of 31s-2 where it is optics, or a dense stencil where it is a field read. `npm run flower`
+  measures only the slope and its ∇², so none of these is covered by it yet (31s-10).
 - **31s-4. Retune the looks on the traced light.** Once 31s-2 draws the plate, every preset's
   brightness, contrast and rim weight moves. Retune on films from the Mac, judged by the owner
   against the reference library (watch skill).
@@ -287,6 +291,35 @@ lens-shaped drop, no shadow beside it.*
   `npm run sitefilms` and swap them the same way. The Mac app's last release (1.3.1652) was
   built before #933 and draws the flower until the next release. A preview server left running
   from an old checkout shows it too; judge only from main or the live site.
+- ~~**31s-8. The flower's second life: four texels a cell.**~~ **Shipped** (`npm run flower`).
+  #933's dense stencil still drew the flower at headed 2x Chrome on Galaxy at tier=local: its
+  taps sit a cell apart (logicalGrid 192) but the dye is 768², four texels a cell, and each tap
+  read one texel, so a rim thinner than a cell was copied at every tap offset. Each tap now reads
+  its cell's mean (`cellDensity`, 3x3 bilinear sub-taps), the air is read as missing dye held to
+  the middle's density (`heldAt`, `AIR_HELD`) and the slope and ∇² are weighed by the dye under
+  the pixel, so `airNear`'s flattening is gone. `npm run flower` reads the comb (what a one-cell
+  box leaves of the slope and ∇² near a rim) on a ring, a disc and a bubble: build 0.04 to 0.08
+  against a point-read control of 0.33 to 0.35 (bars 0.10 and 0.3). Every harness that films the
+  plate (recorder, film, showreel, sitefilms) runs it first and refuses to record a build that
+  fails; `FILM_ALLOW_FLOWER=1` films anyway for a private take, flagged in the log.
+- **31s-9. Open: ∇² ripples on a gentle tilt.** Found by `npm run flower`: dye on a linear tilt
+  (no rim, no air) should read zero Laplacian, but the derive pass reads a smooth ripple of
+  period three cells (about ±0.07 in its units) all across the tilt, far past the slope's
+  reach, under both builds alike (the point-read control as a square wave of the same period).
+  Suspects: how calcOpl turns dye into optical path, a channel of the dye the path does not
+  share, the half-float derived layer, or perTap/oplAt. Measure first: ∇² of a pure tilt with
+  no air, by channel and by derived format. The flower check uses a piled rim, not a tilt,
+  until this is found.
+- **31s-10. Open: the flower check sees one size and one layer.** `npm run flower` measures the
+  derived layer at gridSize 768 only; the app also runs 512 (2.7 texels a cell, where a one-cell
+  box is not a whole number of texels) and 1024. Nor does it measure the drawn picture, so a
+  stencil downstream of the slope (31s-3) could draw the flower with this check green. Measure
+  each size with a box of its own cell, and the drawn frame of a ring with the comb.
+  The gate itself (31s-8) covers every harness that records the plate for anyone to see:
+  `recorder.mjs` (every take, asking the open page for the fixed code), `film`, `showreel`,
+  `sitefilms` (and its `--films-from`), `tvloops` (and `--from-raw`) and `tvfilms --from`.
+  Left out on purpose: `render-app` and `clipApp` record only for their own checks, and
+  `landingfilms` and `render.mjs` record nothing.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
