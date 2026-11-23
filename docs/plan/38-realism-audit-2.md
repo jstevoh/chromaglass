@@ -264,12 +264,13 @@ is in the project's files).
   faster than the chemical potential restores it. Measure the band's width against the strain
   rate first, then sharpen the interface (mobility and ε matched to the grid, or a sharp-
   interface reconstruction) so a press makes threads that pinch into beads.
-  *Part shipped 2026-11-22 (PR #946):* superbee limits the oil's flux in the carry and the
-  oil's Cahn–Hilliard runs eight substeps a frame (`OIL_CH_SUBSTEPS`). Measured with
-  probes of the live app under the hand (Beat Squeeze 0.6, Plate Rock 1.6): the interface share of oil cells fell from
-  0.24–0.28 to 0.09–0.12 (the still plate's 0.07), the oil level inside bodies rose from
-  0.78–0.82 to 0.91–0.93, and body cells from about 2,360 to about 6,450. Still open: threads
-  that pinch into beads (Rayleigh–Plateau) want a sharper interface than a few cells.
+  *Part shipped 2026-11-22 (PR #946):* superbee limits the oil's flux in the carry
+  (mixAdvect). Measured on the live app under the hand (Beat Squeeze 0.6, Plate Rock 1.6):
+  the interface share of oil cells fell from 0.24–0.28 to 0.11–0.14 (a still plate: 0.07),
+  the oil level inside bodies rose from 0.78–0.82 to 0.88–0.90, and body cells from about
+  2,360 to about 5,070. Eight Cahn–Hilliard substeps gained a little more but were left out
+  (less of the oil's colour kept, and a half-built 15g-8e mix line in `npm run bubbleair`).
+  Still open: threads that pinch into beads (Rayleigh–Plateau) want a sharper interface.
 - **38w-28. Classic's water moves at the 1969 speed** (M; High, after 38w-27). The round-five
   motion read (`npm run watch`): flow median 0.7 %/s against Liquid Loops' 6.9, turnover 10.7 s
   against 1.8, curl ±0.01 against ±0.13, and 80% of the motion is the whole picture sliding

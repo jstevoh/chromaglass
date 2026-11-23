@@ -222,10 +222,15 @@ fn mm(a: vec3f, b: vec3f) -> vec3f {
   which CH puts back into its tanh. The soap and the acid are smooth
   concentrations that really do spread, so they keep minmod.
 
-  Measured, same run: superbee here alone, interface 0.11–0.14, bodies at
-  0.88–0.90, 5070 body cells; with the mix's Cahn–Hilliard in eight
-  substeps (OIL_CH_SUBSTEPS) as well, 0.09–0.12, 0.91–0.92, 6450. Superbee in
-  the glass's drift shift too (driftShift) gained nothing and was left out.
+  Measured, same run: superbee here, interface 0.11–0.14, bodies at
+  0.88–0.90, 5070 body cells. Eight Cahn–Hilliard substeps a step as well
+  gained a little more (0.09–0.12, 0.91–0.92, 6450) and were left out: they
+  kept less of the oil's colour after 42 s (9250 against 10,400 at four),
+  and they emptied the oil from under a bubble put down in it (0.149 left
+  to 0.013, npm run bubbleair), the half of an owed item (15g-8e, the
+  mix's carry taking the air) that the check reads as built and short.
+  Superbee in the glass's drift shift too (driftShift) gained nothing and
+  was left out.
   The oil's colour (oilDye, bodyAdvect) stays on minmod, and that was
   measured, not assumed. Carrying it with superbee too, so its edge would
   match the oil's, lost the oil's colour to the water four times as fast
