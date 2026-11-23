@@ -225,7 +225,6 @@ liquid that lights where its flow stretches it ("Let's do it!").*
   analyser at a half. *Measure:* with the sheets in and crossed, a still plate's glints are
   dimmed by the analyser and not by the polariser.
 
-
 ## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
 
 *The owner, 2026-11-22, on the flower (eight grey discs round every moving drop, 15g-15):
@@ -291,17 +290,6 @@ lens-shaped drop, no shadow beside it.*
   `npm run sitefilms` and swap them the same way. The Mac app's last release (1.3.1652) was
   built before #933 and draws the flower until the next release. A preview server left running
   from an old checkout shows it too; judge only from main or the live site.
-- ~~**31s-8. The flower's second life: four texels a cell.**~~ **Shipped** (`npm run flower`).
-  #933's dense stencil still drew the flower at headed 2x Chrome on Galaxy at tier=local: its
-  taps sit a cell apart (logicalGrid 192) but the dye is 768², four texels a cell, and each tap
-  read one texel, so a rim thinner than a cell was copied at every tap offset. Each tap now reads
-  its cell's mean (`cellDensity`, 3x3 bilinear sub-taps), the air is read as missing dye held to
-  the middle's density (`heldAt`, `AIR_HELD`) and the slope and ∇² are weighed by the dye under
-  the pixel, so `airNear`'s flattening is gone. `npm run flower` reads the comb (what a one-cell
-  box leaves of the slope and ∇² near a rim) on a ring, a disc and a bubble: build 0.04 to 0.08
-  against a point-read control of 0.33 to 0.35 (bars 0.10 and 0.3). Every harness that films the
-  plate (recorder, film, showreel, sitefilms) runs it first and refuses to record a build that
-  fails; `FILM_ALLOW_FLOWER=1` films anyway for a private take, flagged in the log.
 - **31s-9. Open: ∇² ripples on a gentle tilt.** Found by `npm run flower`: dye on a linear tilt
   (no rim, no air) should read zero Laplacian, but the derive pass reads a smooth ripple of
   period three cells (about ±0.07 in its units) all across the tilt, far past the slope's
@@ -329,6 +317,15 @@ lens-shaped drop, no shadow beside it.*
   not affected. Fix: raise the buffer before the page loads (`performance.setResourceTimingBufferSize`
   in an init script) or fetch the module by its path and look for the marker there. *Measure:* the
   gate passes a vite server of main and still refuses one checked out before #933.
+- **31s-12. Open: the flower gate times out in a busy film queue.** Found 2026-11-23 in 48q:
+  `film.mjs` asks `untilFlowerFree` before it takes the film lock, and `npm run flower` then
+  queues on that lock itself, so with the queue over ten minutes long the gate's limit ran
+  out and refused the film ("the flower check ran past 10 minutes"). A run inside
+  `maclock.mjs run` does not hit it, since the check inherits the held lock. Take the lock
+  first, or let the gate's limit start when the check gets the GPU. The same run found the
+  gate checking the main checkout's source from a worktree whose node_modules links there
+  (refused for a missing `flower.mjs`); #944 fixed that by checking the working directory's
+  checkout first, the one whose `dist` is filmed.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see

@@ -125,6 +125,18 @@
       ]
     },
     {
+      "name": "The lively looks at a real show's pace",
+      "shard": "logic",
+      "run": "npm run pace",
+      "why": [
+        "PLAN 48q: the lively looks turned over several times slower than a real",
+        "show. Each carries its harder rock, rhythm sheet and pours whole after",
+        "every pass, never quieter than before, inside the dials, runs a liquid",
+        "thinner than light oil and no thinner than water (Thickness), and the moire",
+        "pack keeps its own pace. The film's turnover and colour are `-- --film` on the Mac."
+      ]
+    },
+    {
       "name": "The kick's bloom",
       "shard": "logic",
       "run": "npm run kickbloom",
