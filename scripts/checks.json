@@ -3564,7 +3564,7 @@
       ]
     },
     {
-      "name": "Lava Pop lays a 1960s dish",
+      "name": "Classic Light Show lays a 1960s dish",
       "shard": "open",
       "run": "npm run classicdish",
       "why": [
