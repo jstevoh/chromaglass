@@ -8,13 +8,12 @@ the component.
 
 ## Start here
 
-- `fluidSimulation.ts` (194 KB, grep it): `FluidSimulation`, one layer: its seeding
-  (`seedPreset`; `addOilDensity` lays a colour as the oil's own, PLAN 47z-1), pours and doses, and the hand-off to the GPU solver (`attachGpu`,
-  `dropGpu`, `syncFromGpu`). `wait.pending` (`mixWait.ts`) says whether a look's oil waits for that solver,
-  which the show asks before it builds its pipelines (`gpu/opening.ts`).
+- `fluidSimulation.ts` (184 KB, grep it): `FluidSimulation`, one layer: its seeding
+  (`seedPreset`; `addOilDensity` lays a colour as the oil's own, PLAN 47z-1), pours and doses, spin drag (`spinDrag(settings)` returning `{ nu, gap, tau }` for this layer's viscosity and `gpu.coverMetres`, PLAN 38v-4), and the hand-off to the GPU solver (`attachGpu`,
+  `dropGpu`, `syncFromGpu`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
-- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom, Turing's rates, the currents.
+- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom (`macroZoomOf`, the Macro Zoom alone since PLAN QA-32c: `macroMode` no longer floors it at 4x; `MACRO_PRESET_ZOOM`, what a flag-only saved look or stage is given), Turing's rates, the currents.
 
 ## Contracts
 
@@ -33,16 +32,18 @@ the component.
 
 ## Files
 
+- `beadStep.ts`: `stepPlateBeads` (oil bead stepping and live gap/liquid wiring, moved out of `LiquidVisualizer.tsx`, PLAN 18i-2, 19ai-10).
 - `constants.ts`: the grid, the macro zoom, Turing's drift, the currents' gains.
 - `dice.ts`: `DICE` (seeded randomness), the palette window.
+- `dropSplash.ts`: `layDrop` (a colour drop: on a thin gap its volume and dye queued through lib/dropImpact.ts, else the stamp; its crater, and satellites only past Cossali's K using the falling liquid's own ρ, σ, μ and live `coverMetres` gap, splitting drop dye and volume across central drop and satellites; a last `what` carries the bottle's liquid into every pour, PLAN 18c-13), `dropBottle` (a hand's drop from a bottle: `layDrop` with its liquid, and the bottle's deposit told the volume came already), `layStream` (a stream held on the plate: one held share a step with its colour laid at the strength of a column of the same drop, `dropColumnDye`; the stamp when nothing pours) and `stepPlateDrops` (the drops on their way in, a step at a time), PLAN 18c-2, 18c-3, 18c-10, 18c-13; moved out of `fluidSimulation.ts` with its old `splash()`. `FluidSimulation.autoInject` takes a last `volume` (false for a fresh plate's lay and a bottle whose own pour brought it) and the sim holds `drops`.
 - `fluidSimulation.ts`: `FluidSimulation`.
 - `frameTypes.ts`: the frame's shapes.
-- `mixWait.ts`: `mixWait()` (a look's oil laid before its solver is built: kept, played onto the solver when it attaches, put back if that solver goes before it has spoken, dropped on a clear or when a carry holds it; PLAN 27f-9m, `npm run oillaid`).
 - `noteVoicesStep.ts`: `handleNoteVoiceEvent`, `queueMelodyDrops`, `stepMelodyAndVoices` (MIDI note voices and Melody Walk stepped into the plate, PLAN 24.3).
 - `speciesPoll.ts`: `SpeciesPoller` (`speciesShare` and `speciesSnapshot` polled once a second on a thin gap) and `stepPlateBubbles` (handing the snapshot to `BubbleField` on a thin gap and stepping the bubbles).
+- `solverLay.ts`: `layClassicOnSolver` (Classic's dye and oil cells laid at the solver's own grid through `FluidInputs.layDye`, not on the CPU's 192² and carried up bilinearly, which blurred every rim; PLAN 38w-8) and `SolverSeeds` (which captured seeds hold such a lay, so `addSeedShare` sends each share to the solver too through `layShare`, and the dish mean the solver's lay added, which `seedPreset`'s CPU sum cannot see), `SolverSeeds.plain()` (no capture or scaling running), `OwedLay` (a look that lays its oil only on the solver, laid before one is attached, `SOLVER_OIL_LOOKS`: its CPU dye is taken back and the look laid again at the first attach that carries no plate, so the opening Classic has its oil; PLAN 38w-21) and `dishMean` (seedPreset's measure of what a look laid).
 - `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
-  `resolveSimResolution`, `engineLabel`.
-- `tools.ts`: the hands' settle and hold, Blow's straw, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`).
+  `resolveSimResolution`, `engineLabel`, `pressSheetKick` (sheet kick with live cover gap).
+- `tools.ts`: the hands' settle and hold, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`), `kickCenter`.
 
 ## Checks
 

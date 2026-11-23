@@ -26,7 +26,16 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
-import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
+import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
+
+/**
+ * `?lean=0` opens on the whole display, as before `displayLean.ts`: the
+ * other way for `npm run openingtime -- --variants ",lean=0"` to time
+ * against, on one build and interleaved.
+ */
+const LEAN_OFF = (() => { try { return new URLSearchParams(window.location.search).get('lean') === '0'; } catch { return false; } })();
+import { COVER_FULL_ML, coverNew } from '../lib/cover';
+import { DISH_GAP_FIELD_METRES, carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -134,40 +143,16 @@ export interface Opening {
    */
   soap: boolean;
   /**
-   * The look's own oil, laid with the look and waiting for the solver (Clock
-   * Glass, Splodascope, Lava Lamp).
-   *
-   * Not a setting: it is what is on the plate. The mix's kernels run only
-   * once something has been poured into the mix (`mixLive`), and on every
-   * other opening nothing has, so they were built behind the show. Until
-   * PLAN 27f-9m these three looks' oil was laid before the solver existed
-   * and let go, so their openings never ran the mix either, and the lists
-   * were right about a show that was wrong. With the oil kept for the solver
-   * (`sim/mixWait.ts`) it is laid on the solver's first step, and
-   * `npm run startup` on Metal read each of the three asking on the frame for
-   * the mix's carry, relax, potential and update, the oil's force, and the
-   * bodies' and the lift's kernels: eight to fifteen pipelines the opening
-   * had not waited for. The simulation says whether oil is waiting
-   * (`FluidSimulation.wait.pending`), and the four below follow from it and
-   * the settings that the step itself reads.
+   * Faraday waves (PLAN 48f, gpu/faraday.ts): the shaken dish's four
+   * kernels, from the first step when the look opens with its shaker on
+   * (Shaker above nought Hz); every other look builds them behind the show.
    */
-  oil: boolean;
-  /** That oil's surface tension: the smoothed shape, the rim's pressure and the force (Oil Tension on, over oil that is there). */
-  oilPull: boolean;
-  /** Oil Bodies: each body's colour kept to it (partition, unspread, land), which runs only over oil that pulls. */
-  oilBodies: boolean;
+  faraday: boolean;
   /**
-   * Film Hold's push between two drops. It runs inside the mix force's
-   * stage, which is on over oil that pulls or under a standing plate's
-   * weight, and then only with Oil Tension on.
+   * The display's effects this look can reach (`displayLean.ts`): the
+   * opening compiles a display with only these, and the whole one behind it.
    */
-  filmHold: boolean;
-  /**
-   * The oil's lift up a rocked plate (PLAN 27f-5): a thin gap, a Plate Rock
-   * above zero (the hand's sway is never still, so the rock is not either)
-   * and oil that pulls. Lava Lamp stands with its rock at 0 and never asks.
-   */
-  oilLift: boolean;
+  display: number;
 }
 
 /**
@@ -191,7 +176,9 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   const viscosity = s.viscosity ?? DEFAULT_SETTINGS.viscosity;
   const bed = (viscosity === 'thin' ? 0.8 : 1.7) * (1 + (s.platePressure ?? DEFAULT_SETTINGS.platePressure ?? 0) * 0.8);
   const dragRate = (0.04 + (s.spinDrag ?? DEFAULT_SETTINGS.spinDrag ?? 0.25) * 1.2) * bed;
-  const tau = dragSeconds(carrierViscosity(viscosity));
+  const ml = Number.isFinite(s.liquidMl) ? s.liquidMl! : COVER_FULL_ML;
+  const coverUnits = coverNew(ml).h / DISH_GAP_FIELD_METRES;
+  const tau = dragSeconds(carrierViscosity(viscosity), coverUnits);
   let dish = 0, liquid = 0;
   for (let k = 0; k < 180; k++) {
     dish = dishFollow(dish, motor, dragRate, 1 / 60);
@@ -201,25 +188,8 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   return false;
 }
 
-/**
- * `oilWaiting`: whether the look now up laid oil that waits for this solver
- * (`Opening.oil`). The one thing here that is the plate's and not a setting's,
- * so the caller asks the simulation and hands it in.
- *
- * When it is asked matters. The opening look is laid in the same pass of
- * effects that starts the stage, before the device has answered, so by the
- * time the show builds its pipelines the oil is waiting and this says so. A
- * device lost mid-show is another matter: its replacement builds first and
- * the look is laid again after, so nothing waits yet, this says no, and the
- * oil's kernels are compiled on the frame as they were before PLAN 27f-9m. A
- * hitch on a plate that has just gone dark and come back, and never a wrong
- * picture: every kernel is still built, only later.
- */
-export function openingOf(s: Partial<VisualizerSettings>, oilWaiting = false): Opening {
+export function openingOf(s: Partial<VisualizerSettings>): Opening {
   const on = (v: number | undefined) => (v ?? 0) > 0;
-  const thin = (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5;
-  const gravity = on(s.plateUpright) || on(s.solutalBuoyancy);
-  const oilPull = oilWaiting && on(s.oilTension);
   return {
     vorticity: on(s.vorticityConfinement),
     mix: on(s.surfactantFlow),
@@ -236,14 +206,13 @@ export function openingOf(s: Partial<VisualizerSettings>, oilWaiting = false): O
     chemistry: on(s.chemistry),
     gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
     slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
-      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
+      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway))
+        // The Tilt knobs tip it too, either way (lib/handTilt.ts).
+        || (on(s.slosh) && (on(s.plateUpright) || on(Math.abs(s.plateTiltX ?? 0)) || on(Math.abs(s.plateTiltY ?? 0))))),
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
-    oil: oilWaiting,
-    oilPull,
-    oilBodies: oilPull && on(s.oilBodies),
-    filmHold: on(s.filmHold) && on(s.oilTension) && (oilWaiting || gravity),
-    oilLift: oilPull && thin && on(s.plateRock ?? DEFAULT_SETTINGS.plateRock),
+    faraday: (s.faradayHz ?? 0) > 0,
+    display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
   };
 }

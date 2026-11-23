@@ -32,6 +32,8 @@ import { useProjectorNow, askProjector } from './projectorNow';
 import { useDeskNow, askDesk } from './deskNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet, armSetItem } from './setNow';
+import { askEdit } from './editNow';
+import { songLabel } from '../lib/songRef';
 import { useSongsNow, askSongs } from './songShowNow';
 import { livePresetId } from '../presets';
 import { assistantLook } from '../lib/assistantLook';
@@ -194,10 +196,11 @@ export function useRemote({
     const items = setNow.list.items.map((item, i) => {
       const seq = item.kind === 'sequence' ? sequencer.sequences.find(q => q.id === item.ref) : undefined;
       const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
-      return { n: i + 1, name: item.name ?? look?.name ?? seq?.name ?? item.ref, kind: item.kind, look: look?.id ?? null, fade: item.fade ?? null, missing: item.kind === 'sequence' ? !seq : !look };
+      return { n: i + 1, name: item.name ?? look?.name ?? seq?.name ?? item.ref, kind: item.kind, look: look?.id ?? null, fade: item.fade ?? null, missing: item.kind === 'sequence' ? !seq : !look, song: item.song ? songLabel(item.song) : null };
     });
     const armed = setNow.armedItem ? setNow.list.items.findIndex(i => i.id === setNow.armedItem) : -1;
-    return { name: setNow.list.name, items, armed: armed >= 0 ? armed + 1 : null, fadeSeconds: setNow.fadeSeconds };
+    // The kept sets by name, for set_list_edit's open (PLAN 44k-16a).
+    return { name: setNow.list.name, items, armed: armed >= 0 ? armed + 1 : null, fadeSeconds: setNow.fadeSeconds, saved: setNow.saved.map(x => ({ name: x.name, items: x.items.length })) };
   }, [setNow, sequencer.sequences, allPresets]);
   /*
     The same set and shows as the phone controller lists them (PLAN 12-ctl-1):
@@ -230,7 +233,7 @@ export function useRemote({
       stageName: sequencer.status.stageName,
       progress: Math.round(sequencer.status.progress * 100) / 100,
       stages: sequencer.status.stages.map(st => ({ name: st.name, seconds: st.seconds })),
-      sequences: sequencer.sequences.map(q => ({ id: q.id, name: q.name, stages: q.stages.length })),
+      sequences: sequencer.sequences.map(q => ({ id: q.id, name: q.name, stages: q.stages.length, builtIn: !!q.builtIn, loop: q.loop, song: q.song ? songLabel(q.song) : null })),
       selectedId: sequencer.selectedId,
     },
     presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
@@ -441,6 +444,10 @@ export function useRemote({
         }
         case 'assistant-songs':
           answer(message.answer, askSongs(message));
+          break;
+        // The set list and the sequences built (PLAN 44k-16a, app/editNow.ts), answered with what a read or a file out found.
+        case 'assistant-edit':
+          answer(message.answer, askEdit(message));
           break;
         /*
           The phone controller's Songs screen (PLAN 12-ctl-1), through the same

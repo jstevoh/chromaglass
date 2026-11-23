@@ -17,6 +17,7 @@ import {
 import { getEffectiveTier } from '../../lib/tierGates';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import type { DeskProps } from './deskProps';
+import { LiveFor } from './LiveFor';
 
 /**
  * The desk (Desk v2, the owner's design of 2026-10-10).
@@ -442,7 +443,7 @@ export function Desk(p: DeskProps) {
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: live ? 'var(--color-live)' : 'var(--color-accent)' }} />
             <span className="truncate text-[16px] font-medium" data-testid="plate-name">{plateName}</span>
             <span className="hidden shrink-0 whitespace-nowrap font-mono text-[12px] text-dim 2xl:inline">
-              {live ? `live · ${p.liveFor}` : p.dots.wall ? 'preview · ⌘⏎ sends to wall' : 'preview · not on wall'}
+              {live ? <>live · <LiveFor since={p.liveSince} /></> : p.dots.wall ? 'preview · ⌘⏎ sends to wall' : 'preview · not on wall'}
             </span>
           </span>
           <RecordControls

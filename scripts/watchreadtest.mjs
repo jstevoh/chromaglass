@@ -78,9 +78,13 @@ export function readSelftest(check) {
     const x0 = Math.max(0, Math.min(TS - 2, Math.floor(x))), y0 = Math.max(0, Math.min(TS - 2, Math.floor(y))), fx = x - x0, fy = y - y0;
     return tex[y0 * TS + x0] * (1 - fx) * (1 - fy) + tex[y0 * TS + x0 + 1] * fx * (1 - fy) + tex[(y0 + 1) * TS + x0] * (1 - fx) * fy + tex[(y0 + 1) * TS + x0 + 1] * fx * fy;
   };
-  const seq = (n, map, gain = () => 1) => {
+  // `grain`: grey levels of noise added to each pixel of each sample, uniform
+  // and fresh every sample (a camcorder's or film's grain moves nothing).
+  let gs = 99; const grn = () => (gs = (gs * 48271) % 2147483647) / 2147483647 - 0.5;
+  const seq = (n, map, gain = () => 1, grain = 0, H = DH, sample = at) => {
     const acc = physicsAcc();
-    for (let k = 0; k < n; k++) physicsFrame(frame((x, y) => { const [u, v] = map(x, y, k); return grey(Math.max(0, Math.min(255, Math.round(20 + gain(k, x, y) * at(u, v))))); }), DW, DH, acc, k);
+    const fr = fn => { const img = Buffer.alloc(DW * H * 3); for (let y = 0; y < H; y++) for (let x = 0; x < DW; x++) img.set(fn(x, y), (y * DW + x) * 3); return img; };
+    for (let k = 0; k < n; k++) physicsFrame(fr((x, y) => { const [u, v] = map(x, y, k); return grey(Math.max(0, Math.min(255, Math.round(20 + gain(k, x, y) * sample(u, v) + grain * 2 * grn())))); }), DW, H, acc, k);
     return acc;
   };
   const RATE = 10, NS = 24, noCut = new Array(NS).fill(false);
@@ -123,6 +127,56 @@ export function readSelftest(check) {
   check('physics: a still texture whose light pulses in place reads near-zero speed and little carried',
     faded.own.med < 0.4 && faded.whole.med < 0.4 && faded.carried.med < 0.25,
     `own ${f2(faded.own.med)}, whole ${f2(faded.whole.med)}, carried ${f2(faded.carried.med)}`);
+  // Grain (47v-5). The same slid texture, dimmed to a fifth of its contrast
+  // (a dark plate, a camcorder in poor light), with noise of ±6 grey levels
+  // fresh on every pixel of every sample: nothing about the flow changed, but
+  // real footage reads like this (film grain, a camcorder's noise in the
+  // dark). Before the noise floor was taken out the grain counted as change
+  // the flow did not carry and this read 0.79; clean it reads 0.97. The same
+  // still texture with grain only has no change to carry at all, so it must
+  // not read as a plate that changes in place (before, it read 14 changing
+  // pairs).
+  const slide = (x, y, k) => [x + 80 - 0.8 * k, y + 150];
+  const dim = () => 0.15;
+  const dimClean = physicsSummary(seq(NS, slide, dim), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const grainy = physicsSummary(seq(NS, slide, dim, 6), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const grainStill = physicsSummary(seq(NS, (x, y) => [x + 80, y + 150], dim, 6), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const grainPulse = physicsSummary(seq(NS, (x, y) => [x + 80, y + 150], k => 0.15 * (0.55 + 0.45 * Math.sin(k * 0.9)), 6), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  check('physics: a dim slid texture under grain reads its carried share (over 0.9, as clean), with a noise floor near the grain\'s 2',
+    grainy.carried.med > 0.9 && dimClean.carried.med > 0.9 && Math.abs(grainy.whole.med - 2.5) < 0.4 && grainy.noiseFloor > 1.2 && grainy.noiseFloor < 3 && dimClean.noiseFloor < grainy.noiseFloor / 2,
+    `carried ${f2(grainy.carried.med)} (clean ${f2(dimClean.carried.med)}), whole ${f2(grainy.whole.med)}, floor ${f2(grainy.noiseFloor)} (clean ${f2(dimClean.noiseFloor)})`);
+  // Detail is not grain. 300 sharp specks (about 3 pixels across) on a dark
+  // ground, slid, with no grain at all: the second-difference estimate reads
+  // their edges as noise (a floor near 0.9 on its own), and the quietest
+  // blocks, the flat ground, are what cap it back to nothing.
+  const sp = new Float32Array(TS * TS);
+  let sq = 5; const rn2 = () => (sq = (sq * 16807) % 2147483647) / 2147483647;
+  for (let b = 0; b < 300; b++) {
+    const bx = rn2() * TS, by = rn2() * TS, r = 1.5 + rn2(), a = 120 + rn2() * 120;
+    for (let y = Math.max(0, Math.floor(by - 3 * r)); y < Math.min(TS, by + 3 * r); y++)
+      for (let x = Math.max(0, Math.floor(bx - 3 * r)); x < Math.min(TS, bx + 3 * r); x++) sp[y * TS + x] += a * Math.exp(-((x - bx) ** 2 + (y - by) ** 2) / (2 * r * r));
+  }
+  const specks = (x, y) => { const x0 = Math.max(0, Math.min(TS - 2, Math.floor(x))), y0 = Math.max(0, Math.min(TS - 2, Math.floor(y))), fx = x - x0, fy = y - y0; return sp[y0 * TS + x0] * (1 - fx) * (1 - fy) + sp[y0 * TS + x0 + 1] * fx * (1 - fy) + sp[(y0 + 1) * TS + x0] * (1 - fx) * fy + sp[(y0 + 1) * TS + x0 + 1] * fx * fy; };
+  const speck = physicsSummary(seq(NS, slide, () => 1, 0, DH, specks), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  check('physics: sharp specks with no grain read a noise floor under 0.3 and still read carried over 0.9',
+    speck.noiseFloor < 0.3 && speck.carried.med > 0.9 && speck.carried.n >= 10, `floor ${f2(speck.noiseFloor)}, carried ${f2(speck.carried.med)} over ${speck.carried.n} pairs`);
+  check('physics: grain alone is not change (no changing pairs to read carried on), and light pulsing in place under grain still reads in place',
+    grainStill.carried.n === 0 && grainPulse.carried.n >= 10 && Number.isFinite(grainPulse.carried.med) && grainPulse.carried.med < 0.25,
+    `still: ${grainStill.carried.n} changing pairs, floor ${f2(grainStill.noiseFloor)}; pulsing: carried ${f2(grainPulse.carried.med)} over ${grainPulse.carried.n} pairs`);
+  // A strip too short to hold two rows of flow blocks (47v-6): the Brooklyn
+  // Bowl film cropped to 0.05,0.33,0.9,0.13 decoded to 320×26 and the read
+  // printed dashes with no reason. Under 64 rows it says so, in place of the
+  // flow lines (kept: lifetime and spectrum); at 64 and over it reads as before.
+  const thin = physicsSummary(seq(NS, slide, () => 1, 0, 26), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const edge62 = physicsSummary(seq(NS, slide, () => 1, 0, 62), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const edge64 = physicsSummary(seq(NS, slide, () => 1, 0, 64), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const thinText = physicsLines(thin).join('\n'), fullText = physicsLines(slid).join('\n');
+  check('physics: a 26-row crop says the flow read needs a taller crop, not dashes; 62 rows says it, 64 and the full frame do not',
+    thin.tooShort && edge62.tooShort && !edge64.tooShort && !slid.tooShort && thin.rows === 26 && edge64.rows === 64
+      && /needs a taller crop[^\n]*26 rows/.test(thinText) && !/–/.test(thinText.replace(/\*\*lifetime[^\n]*|\*\*spectrum[^\n]*/g, ''))
+      && /\*\*lifetime\*\*/.test(thinText) && /\*\*spectrum\*\*/.test(thinText) && !/taller crop/.test(fullText) && /\*\*carried\*\*/.test(fullText) && !/\*\*carried\*\*/.test(thinText),
+    `26 rows: ${thinText.split('\n').find(l => /taller crop/.test(l))?.slice(0, 80) ?? 'no warning'}; tooShort at 26 ${thin.tooShort}, 62 ${edge62.tooShort}, 64 ${edge64.tooShort}, 180 ${slid.tooShort}`);
+
   // Spectra: a field built with power per band k^-1 against k^-4.
   // Built 256 square (periodic, from an inverse FFT) and read through a 128
   // square cut from inside it at an odd offset, so the window sees hard,
