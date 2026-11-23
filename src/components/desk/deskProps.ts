@@ -1,4 +1,4 @@
-import type { CartoonShelfProps } from '../CartoonShelf';
+import type { VideoShelfProps } from '../VideoShelf';
 import type { ReactNode, Ref } from 'react';
 import type { MixTakes } from '../../lib/mixFade';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -29,9 +29,6 @@ export interface Cue {
 export type SetItemAction = 'link-song' | 'unlink-song' | 'capture' | 'up' | 'down' | 'remove';
 /** What the set's own menu can do. */
 export type SetAction = 'import' | 'export' | 'import-show' | 'export-show' | 'clear' | 'song-shows' | 'save' | 'open' | 'delete' | 'rename' | 'new';
-
-/** How a control is learned: to a fader (drawn as a slider) or an encoder (a knob). */
-export type ControlKind = 'fader' | 'encoder';
 
 /**
  * Everything the one desk is given.
@@ -157,8 +154,6 @@ export interface DeskProps {
   automated: boolean;
   onAutomate: (on: boolean) => void;
   ccFor: (key: keyof VisualizerSettings) => number | null;
-  /** Whether a control's CC is a fader or an encoder: a fader draws as a slider. */
-  kindFor: (key: keyof VisualizerSettings) => ControlKind | null;
   /** The look's own value of a setting, where a double-click on its knob or slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
   /**
@@ -191,10 +186,12 @@ export interface DeskProps {
   palettes: { name: string; colours: string[] }[];
   paletteLock: number | null;
   onPalette: (i: number | null) => void;
+  /** A picture or video file's colours as the palette, "From picture" in the list (usePaletteLock, PLAN 43d). */
+  onPicturePalette?: (file: File) => Promise<string | null>;
   onImageDye: () => void;
   onVideoDye: () => void;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   tool: string;
   onTool: (t: string) => void;
   amountOf?: (tool: string) => number;

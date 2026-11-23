@@ -88,6 +88,7 @@
  */
 import { _electron as electron } from 'playwright';
 import { untilMacDeployDone } from './macdeploy.mjs';
+import { acquireFilmLock } from './maclock.mjs';
 import { spawn as launchProcess, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -95,7 +96,7 @@ import { createRequire } from 'node:module';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signLicenseKey } from '../server/license-key.js';
 import { systemAudioLine } from './desktop-audio.mjs';
@@ -262,6 +263,7 @@ delete env.SHOW_KEY;   // the app's own key, the one it keeps, is what is checke
 // The app draws the plate on the Mac's GPU as a harness's browser does: a
 // deploy's shard holding the owner's Mac goes first (PLAN.md 19ah-9a).
 await untilMacDeployDone('npm run desktop');
+await acquireFilmLock({ label: `desktop.mjs (${basename(REPO)})` });
 const electronApp = await electron.launch({
   executablePath: app.executablePath,
   args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])],

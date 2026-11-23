@@ -197,6 +197,57 @@ fn mx(p: vec2i, n: i32) -> vec3f { return textureLoad(src, clamp(p, vec2i(0), ve
 fn mm(a: vec3f, b: vec3f) -> vec3f {
   return select(vec3f(0.0), select(max(a, b), min(a, b), a > vec3f(0.0)), a * b > vec3f(0.0));
 }
+/*
+  The oil's own share (.r) is carried with superbee's slope, the soap and the
+  acid with minmod's (Classic round five, PLAN 38w-27).
+
+  What was seen: under Beat Squeeze and Plate Rock the colours washed out
+  over a take. Measured in the app (Classic, beatSqueeze 0.6, plateRock 1.6,
+  40 s): the share of the plate in an interface (0.1 < c < 0.9) went from
+  0.07 on a still plate to 0.24–0.28 under the drive, the oil's level inside
+  its bodies fell from 0.95 to 0.80, and the cells that read as a body
+  (c > 0.9) from about 6900 to 2360. The bodies were turning into a wide
+  smear of half oil, and half oil is drawn half bright.
+
+  Why: minmod is the most diffusive of the TVD limiters, and a carried edge
+  under a flow that crosses it at a slant loses about a cell of sharpness
+  in tens of steps. The oil and the water do not mix: their interface is
+  molecularly thin, and the only thing that ought to widen it is nothing at
+  all (the interdiffusion of an oil in water is far below a cell in a show's
+  length). The width minmod gives it is numerical error, and Cahn–Hilliard
+  (mixMu, mixUpdate) restores the tanh profile only as fast as its mobility
+  allows. Superbee is still TVD (no new extremum, no negative oil) and is
+  the compressive one: a step stays a step. Its known fault, squaring off a
+  smooth profile, does not arise for c, which is meant to be a step and
+  which CH puts back into its tanh. The soap and the acid are smooth
+  concentrations that really do spread, so they keep minmod.
+
+  Measured, same run: superbee here, interface 0.11–0.14, bodies at
+  0.88–0.90, 5070 body cells. Eight Cahn–Hilliard substeps a step as well
+  gained a little more (0.09–0.12, 0.91–0.92, 6450) and were left out: they
+  kept less of the oil's colour after 42 s (9250 against 10,400 at four),
+  and they emptied the oil from under a bubble put down in it (0.149 left
+  to 0.013, npm run bubbleair), the half of an owed item (15g-8e, the
+  mix's carry taking the air) that the check reads as built and short.
+  Superbee in the glass's drift shift too (driftShift) gained nothing and
+  was left out.
+  The oil's colour (oilDye, bodyAdvect) stays on minmod, and that was
+  measured, not assumed. Carrying it with superbee too, so its edge would
+  match the oil's, lost the oil's colour to the water four times as fast
+  (the oil's own colour from 9200 to 5300 in 43 s, against 10,070 to 9250
+  with minmod), and so did carrying the whole dye with superbee as well
+  (10,530 to 6560). The colour does not follow Cahn–Hilliard's flux, which
+  moves the oil and not what is dissolved in it, so a sharper colour edge
+  is left further from where CH puts the oil's, and bodyPartition hands
+  what it finds astray to the water. The colour riding the oil's own fluxes
+  (its concentration times the oil's flux, through the carry and CH alike)
+  is the real fix, and PLAN 38w-29 holds it.
+*/
+fn sb(a: f32, b: f32) -> f32 {
+  if (a * b <= 0.0) { return 0.0; }
+  return sign(a) * max(min(2.0 * abs(a), abs(b)), min(abs(a), 2.0 * abs(b)));
+}
+fn lim(a: vec3f, b: vec3f) -> vec3f { return vec3f(sb(a.x, b.x), mm(a, b).yz); }
 // The lip (above): the face a → a + e crosses the rim outward, with the flow's
 // sign c, and the dish's cell behind it is not above the trough's pressure
 // or is not the body's (under half oil: the interface's foot, 18g-12).
@@ -219,10 +270,10 @@ fn flux(a: vec2i, e: vec2i, n: i32) -> vec3f {
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
   var f: vec3f;
   if (c >= 0.0) {
-    let s = mm(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));
+    let s = lim(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));
     f = c * (mx(a, n) + 0.5 * (1.0 - c) * s);
   } else {
-    let s = mm(mx(b, n) - mx(a, n), mx(b + e, n) - mx(b, n));
+    let s = lim(mx(b, n) - mx(a, n), mx(b + e, n) - mx(b, n));
     f = c * (mx(b, n) - 0.5 * (1.0 + c) * s);
   }
   return vec3f(select(f.r, 0.0, lipHolds(a, e, c, n)), f.g, f.b);
@@ -262,7 +313,31 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     whatever the flow does, and these are Rhie–Chow faces, which see the
     grid-scale part the projection cannot.
 
-    A copy of mixAdvect over four channels, into the dye's own format.
+    A copy of mixAdvect over four channels, into the dye's own format, but
+    with a different slope limiter (PLAN 1l, asked 2026-11-22: Galaxy looked
+    like a blurry lens, not a sharp Hubble picture). mixAdvect's minmod takes
+    the smaller of the two one-sided slopes, and wherever they differ much,
+    which is at every edge of colour, it gives back first-order upwind, whose
+    error is a diffusion of about ½|u|Δx(1 − c). At a look's speeds on a 192²
+    grid that is near 1e-7 m²/s, about three hundred times what dye in water
+    spreads by itself (D_MOLECULAR, 4e-10 m²/s, a Péclet number of some
+    25 000 for a centimetre swirl): every edge the flow carried came out a
+    ramp several cells wide, however fine the grid. This one uses the
+    monotonized central limiter (van Leer's MC): the centred slope, held to
+    twice either one-sided slope. It is still total-variation diminishing, so
+    it makes no new peaks or dips and the flux makes and loses nothing, but
+    it keeps second order in smooth colour and gives an edge twice the slope
+    before it falls back. Measured with `npm run dyeedge` (three flat discs on
+    Galaxy's thin gap, 128², two hundred steps of a solid swirl): part-full
+    cells per full cell 0.713 with minmod, 0.541 with MC, 0.457 with
+    superbee, against about 0.29 for a disc carried exactly and resampled.
+    Superbee would be sharper still, but it is compressive: it steepens a
+    smooth ramp into a step, so a soft wash of colour would square off into
+    terraces, which is a look the liquid does not have. mixAdvect and the
+    phase field keep minmod for now (PLAN 1m): what they carry is an
+    interface profile that mixRelax and the phase field's own step hold to a
+    set width, so a sharper limiter there would fight that relaxation rather
+    than keep a real edge; whether it would help them is measured apart.
   */
   bodyAdvect: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -272,7 +347,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${PACKED}
 fn mx(p: vec2i, n: i32) -> vec4f { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0); }
 fn mm(a: vec4f, b: vec4f) -> vec4f {
-  return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));
+  let l = min(min(2.0 * abs(a), 2.0 * abs(b)), 0.5 * abs(a + b));
+  return select(vec4f(0.0), sign(a) * l, a * b > vec4f(0.0));
 }
 fn flux(a: vec2i, e: vec2i, n: i32) -> vec4f {
   let b = a + e;

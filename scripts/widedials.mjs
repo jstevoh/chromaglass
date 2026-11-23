@@ -48,7 +48,7 @@ const check = (name, ok, detail = '') => {
 
 // ── 1. The source ─────────────────────────────────────────────────────────
 const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-const files = ['src/sim/fluidSimulation.ts', 'src/gpu/fluid.ts', 'src/gpu/fluid/passes.ts', 'src/lib/turntable.ts'];
+const files = ['src/sim/fluidSimulation.ts', 'src/sim/dropSplash.ts', 'src/gpu/fluid.ts', 'src/gpu/fluid/passes.ts', 'src/lib/turntable.ts'];
 const text = Object.fromEntries(files.map((f) => [f, src(f)]));
 
 /*
@@ -66,7 +66,8 @@ const DIALS = [
   { key: 'solutalBuoyancy', top: 2, names: ['settings.solutalBuoyancy', 'p.solutalBuoyancy', 'dyeWeight'], clamps: { fluidSimulation: 1, fluid: 1, turntable: 1 } },
   { key: 'doubleDiffusion', top: 2, names: ['settings.doubleDiffusion', 'p.doubleDiffusion'], clamps: { fluidSimulation: 1, fluid: 1 } },
   { key: 'phaseDisplace', top: 1.2, names: ['settings.phaseDisplace', 'p.phaseDisplace'], clamps: { fluidSimulation: 1, fluid: 1 } },
-  { key: 'dropHeight', top: 2, names: ['this.dropHeight'], clamps: { fluidSimulation: 1 } },
+  // The drop moved to sim/dropSplash.ts with its clamp (PLAN 18c-2), the same Math.min(2, …) of the plate's dropHeight.
+  { key: 'dropHeight', top: 2, names: ['this.dropHeight', 'sim.dropHeight'], clamps: { dropSplash: 1 } },
   { key: 'backgroundLoop', top: 1.4, names: ['settings.backgroundLoop'], clamps: { fluidSimulation: 2 } },
 ];
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

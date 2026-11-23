@@ -27,7 +27,6 @@ dropped picture or 3D model driven by the music as its own look does not.
 because our free site asks for a login and needs its own reason to (saves your looks);
 a grid of generic stock thumbnails: ours are the plate itself.
 
-- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped.md` §34a (moved 2026-10-29, 19m-2).
 - **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
   video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
   the app's own frames, because a cloud session cannot film the app and the lab's plate barely
@@ -72,6 +71,33 @@ a grid of generic stock thumbnails: ours are the plate itself.
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
+- **34a-6. The looks as films, each to its own kind of music, and on the channel.** *The row
+  shipped (2026-11-08): six 1920s records, each played whole by a look, under the gallery; story
+  in `docs/plan-shipped.md` §34a-6.*
+  - **34a-6c. Open: the channel's content claims.** Five of the six carry a claim from the
+    channel's matching of a label's remaster: Rachmaninoff and Tears are blocked in some
+    countries (Tears in Russia), Bessie, Caruso and the Wolverines only lose earnings. Every one
+    is a Great 78 transfer of the original disc, published in the US before 1926, so each is
+    disputed as public domain with the credit lines and `public/landing/films/SOURCES.md`;
+    all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
+    about 30 days). Until one is won, a visitor in a blocked country who opens
+    that card gets YouTube's own notice in the player, not the film.
+  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills.
+  - **34a-6d. The films to modern ambient music.** *(The owner, 2026-11-21: "we need to move
+    all of the demo videos off of the old recordings. The quality is just too low.")*
+    **Shipped (2026-11-22):** the webpage's six loops, the TV samples (release `tv-films-1`)
+    and four of their channel copies on Scott Buckley's CC BY 4.0 library, each on the look its
+    record had. `public/landing/films/SOURCES.md` has each page, licence line and checksum.
+    The 1920s films stay on the channel and 34a-6c's disputes stand.
+  - **34a-6f. Open: the last three channel films.** Hymn to the Dawn and Permafrost are
+    rendered (`/Volumes/Media/ChromaGlass/renders/ambient-2026-11/`) but YouTube's daily upload
+    limit refused them, so their cards loop and do not open; and the long film of Chris
+    Zabriskie's *Cylinders* (CC BY 4.0, a look a piece, `npm run sitefilms -- --album
+    cylinders`) has 7 of 9 pieces. Upload them, then put the ids in `siteFilms.ts`
+    (`SITE_FILMS`, `CHANNEL_ALBUMS`) and `Sample.FILMS`.
+  - **34a-6e. Open: a TV build with the new films.** The Android TV app names its sample films
+    in `Sample.java`; a TV on build 24 or older keeps playing the 1920s films (they stay in the
+    `tv-films-1` release) until the next build reaches Play.
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
   synth people, producers and artists, who need the technical capabilities before they pay.)*
   `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
@@ -87,8 +113,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
   MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
   sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
   Found along the way:
-  - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
-    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
   - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
     a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
     packets are ignored; the menu could instead show the item disabled with an upgrade line, read
@@ -103,21 +127,13 @@ a grid of generic stock thumbnails: ours are the plate itself.
     variables when the show server starts, which a Finder launch never sets, though
     `desktop/README.md` says it works "with no terminal". A Show menu item or a Settings → Wall
     card for host, universe, fixtures, order and the in-map, kept in the app's settings.
-  - **34a-7d. Network displays cannot start over the Wi-Fi.** A `?cast` page at an `http://`
-    address gets no WebGPU (14m-https, #443), so "more screens on other computers" is not sold yet.
+  - **34a-7d. Network displays cannot start over the Wi-Fi.** The show server now serves them over
+    https (14m-https, shipped); "more screens on other computers" can be sold once the owner has seen
+    a TV or a second computer take it (judging §136).
   - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
     the set beside the page as a download.
-  - **34a-7f. The rig's wires, checked without the rig.** **Shipped** (`npm run rig`, `scripts/rig.mjs`):
-    the real show server with a Pro key; every OSC address on `/pro`, sent as Resolume, TouchDesigner
-    and Max send it, arrives as the message the page acts on; the page's `lights` leaves as an
-    ArtDmx universe at the set rate; a desk's universe arrives as settings; and in the built app an
-    OSC setting, a desk fader, a MIDI fader (past soft takeover) and a DAW's 120 BPM clock move the
-    page, and an OSC setting lights the controller's ring. All 33 lines green: no
-    claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
-    need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
-    programs themselves are `docs/judging.md` §93, one sitting with free versions.
   - **34a-7g. Resolume sends its own OSC addresses.** **Page half shipped** (`/pro`'s "OSC in" card and
     `docs/guide.md` § OSC, "From Resolume"). Resolume's manual allows what was needed: its OSC output
     mirrors its own address space (`/composition/layers/1/video/opacity`), and a custom output address per
@@ -134,12 +150,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
     another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
     Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
-- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
-  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
-  - **34a-8a. The films themselves on the page.** The link sends a visitor away to watch; the six
-    public films (PR #729's ids in `siteFilms`) could play on the page itself, a card per look, once
-    #679's cards are on main. Until then the channel link is the only way to see a look move.
-
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
@@ -211,6 +221,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
   are what a producer and a VJ pay for, and Photism has both. No change in scope, but
   13.7 is the one a music-maker audience (Home's buyers) asks for first: when the signed
   Mac app (13.1-sign) is out, take 13.7 before 13.3.
+
+- **34j. The second look: the clips, watched (2026-11-15).** The owner sent a Photism Instagram ad;
+  this time its nineteen scene clips (photism.app/clips/, 4 to 16 s, silent) were watched with
+  `npm run watch`. Notes and a poster mosaic: the project's shared `references/photism-2026-11-15/`.
+  It is shader art, not fluid: fractals, raymarched tunnels, lasers, particles on a swirl, a chrome
+  bust, and one reaction-diffusion maze (Morphogen). Its hero (Anemone) pumps the whole frame's
+  brightness on the beat (luminance 0.06 to 0.28 at 2.0 s and 6.0 s), the whole-frame reaction our
+  rule forbids. Morphogen is the one picture to aim at: a crisp lit labyrinth, edges 0.71% of the
+  width, stripes about 1.2% apart, about 213 forms a frame; kept as the reference
+  `photism-morphogen` for Ferro Labyrinth's fingers (38d, the fingers thread's PR #838), where the
+  maze must come from the magnetic instability, not a reaction-diffusion formula. New on its page
+  since 10-22: cover art builds a scene's palette (ours is being built from any image or video,
+  17 and 43), and 1,000+ users became 3,000+. The owner's calls: Home to $29 with the Live Show
+  and the DAW bridge (23.21); the page's refund line and phone-to-computer email are not taken.
 
 **Order.** 34a first (it needs no engine work and the site is the demo), then ~~34f~~ (shipped) and 34g
 (small), then 34b and 34c; 34d, 34e and 34h are for when the planned VJ and DAW steps
