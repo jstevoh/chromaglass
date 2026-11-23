@@ -36,7 +36,6 @@ export interface Preset {
 export const PRESETS: Preset[] = [
   {
     id: 'classic',
-    // Named Lava Pop since 2026-11-23; the id stays 'classic' so saved shows and links work.
     name: 'Lava Pop',
     description: 'Round cells of orange, amber and yellow oil in a magenta water, lit from below by the projector\'s lamp, rocked and pressed by a hand on the beat: the 1960s clock-glass dish.',
     settings: {
