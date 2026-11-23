@@ -29,7 +29,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `fluid/`: the solver's class chain, six files.
 - `glint.ts`: `PlateGlint`, the plate's lens pass (PLAN 47e, 47d-1, 47b-1): the glitter's flakes stepped on the dye's flow and splatted through the lens, and the side lamp, run after the display only while Glitter or Side Light is up (`WebGPUPlate.glint`; `npm run glint`).
 - `groupCache.ts`: `groupOf`, `viewOf`: bind groups and views made once.
-- `opening.ts`: pipelines the opening look needs; `display`, the display's effects it can reach (`?lean=0` opens whole).
+- `opening.ts`: pipelines the opening look needs (`Opening`, from `openingOf`; `bodies` is Oil Bodies on a thin gap, PLAN 14v-18); `display`, the display's effects it can reach (`?lean=0` opens whole).
 - `output.ts`: projector pass: mirror, keystone, blanking, grade.
 - `padGrab.ts`: the remote's Draw picture.
 - `particles.ts`: dye carried by particles.

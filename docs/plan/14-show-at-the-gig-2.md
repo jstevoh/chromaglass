@@ -249,6 +249,16 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   device opens, which is the whole opening again; it should be the intro's mark and its
   loading line. `LiquidVisualizer.tsx` is over its size ceiling, so the caption moves to a
   small component first.
+- **14v-18. Shipped (2026-11-23): the oil looks wait for their oil's kernels again.** Main's
+  deploys 921 to 926 read `npm run startup` red on the open shard: seventeen pipelines built
+  on a frame (the mix's carry, the bodies' partition, land and lay, the oil's lift, Film
+  Hold) and a 4.4 to 9.5 s stop in Classic's opening, because 38w-21's owed lay hands each
+  oil look's seed to the solver at its first attach and those kernels had been left behind
+  the show. `Opening.bodies` (Oil Bodies on a thin gap) waits for them. Oil & Water waits
+  for them unused (it pours its oil later), about a second of its opening.
+  - **14v-18a. Open:** `carryArea` was built on a frame in the same run, after the governor
+    moved the grid inside the 9.5 s stop. Expected to go with the stop; if the open shard
+    still names it, it needs its own rule (no look asks for it in forty steps).
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do

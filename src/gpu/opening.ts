@@ -42,6 +42,21 @@ export interface Opening {
   vorticity: boolean;
   /** The mix and its surface tension (soap-film, milk-marble). */
   mix: boolean;
+  /**
+   * Oil Bodies on a thin gap (Classic, Clock Glass, Splodascope, Lava Lamp,
+   * Oil & Water): the oil carried as the mix, each liquid keeping its own
+   * colour, its lift and its surface tension, from the first step where the
+   * look lays its oil. Added after main's deploys of 2026-11-22 and 23: once
+   * 38w-21 handed a look's lay to the solver at its first attach (OwedLay,
+   * sim/solverLay.ts), the four looks that lay oil in their seed asked for
+   * the mix's and the bodies' kernels in their first steps, and `npm run
+   * startup` read seventeen of them built on a frame and a 9.5 s stop in
+   * Classic's opening. They had been built behind the show because Oil &
+   * Water, which pours its oil later, asked for none of them; it now waits
+   * for them too, about a second of its opening, since the solver is never
+   * told which look laid oil and a missed one costs a stop on the frame.
+   */
+  bodies: boolean;
   /** The reaction (chemical-clock). */
   reaction: boolean;
   /** The gel (agate). */
@@ -193,6 +208,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
   return {
     vorticity: on(s.vorticityConfinement),
     mix: on(s.surfactantFlow),
+    bodies: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.oilBodies),
     reaction: on(s.bzReaction),
     gel: on(s.liesegang),
     phase: on(s.phaseAmount),

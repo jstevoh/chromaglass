@@ -150,29 +150,33 @@ export class WebGPUFluid extends FluidCover {
       // The mix (soap-film), always full float, and its surface tension on
       // the dye as well as on itself.
       ['marangoniFlux', [dye, RGBA32], open.mix],
-      ['mixSplat', [RGBA32], open.mix],
+      ['mixSplat', [RGBA32], open.mix || open.bodies],
       // The mix's carry on the old plate; on a thin gap it is carried in
       // substeps (mixAdvectSub, below), so a look opening on one never asks.
       ['mixAdvect', [RGBA32], open.mix && !open.thinGap],
-      ['mixRelax', [RGBA32], open.mix],
-      ['mixMu', [RGBA32], open.mix],
-      ['mixUpdate', [RGBA32], open.mix],
+      ['mixRelax', [RGBA32], open.mix || open.bodies],
+      ['mixMu', [RGBA32], open.mix || open.bodies],
+      ['mixUpdate', [RGBA32], open.mix || open.bodies],
       /*
         Oil Bodies, and the oil's smoothed shape that its reach and the
-        oil's surface tension (mixForce) both read: built behind the show,
-        like mixForce. They were first waited for whenever a look with Oil
-        Bodies opened the show, and `npm run startup` on Metal failed it:
-        Oil & Water, opened on its own, asked for none of the six in its
-        first forty steps, because nothing runs them until oil has been
-        poured, and the opening's rule is to wait only for what a look's
-        first steps use. Behind the show they are ready some fifteen
-        seconds after it opens, as mixForce always has been.
+        oil's surface tension (mixForce) both read. They were first waited
+        for whenever a look with Oil Bodies opened the show, and `npm run
+        startup` on Metal failed it: Oil & Water, opened on its own, asked
+        for none of the six in its first forty steps, because nothing runs
+        them until oil has been poured. So they went behind the show. Then
+        38w-21 handed each look's lay to the solver at its first attach, and
+        the four looks that lay oil in their seed (Classic, Clock Glass,
+        Splodascope, Lava Lamp) asked for them all in their first steps: main's
+        deploys of 2026-11-22 and 23 read seventeen built on a frame and a
+        9.5 s stop in Classic's opening. They wait again with Oil Bodies
+        (Opening.bodies); Oil & Water waits for them unused, about a second,
+        which `npm run startup` allows since other looks ask for each.
       */
       // Except on a look that stands the plate up, whose dye's weight runs
       // the mix force from its first step (Opening.gravity).
-      ['mixSmooth', [R32], open.gravity || (open.phase && open.thinGap)],
+      ['mixSmooth', [R32], open.gravity || open.bodies || (open.phase && open.thinGap)],
       // The oil's pressure along the open rim, which mixForce reads (PLAN 18g-6): with it, as it runs with it.
-      ['rimLaplace', [R32], open.gravity],
+      ['rimLaplace', [R32], open.gravity || open.bodies],
       /*
         The poured liquids' species (PLAN 18d): its pour and fade, and its
         carry in substeps, below. Built behind the show: nothing runs them
@@ -186,10 +190,11 @@ export class WebGPUFluid extends FluidCover {
         The layered seed's oil share (38w-15, `layShare` in fluid/inputs.ts),
         added without an entry here, so the first look that laid oil built it
         on a frame: main's deploy of 2026-11-22 read "1 in the ledger (0 in
-        the opening), fluid/seedShare:rgba32float" in `npm run startup`. No
-        look's opening asks for it, so it is built behind the show.
+        the opening), fluid/seedShare:rgba32float" in `npm run startup`.
+        Classic asks for it in its first steps since 38w-21 lays its seed at
+        the first attach, so it waits with Oil Bodies (Opening.bodies).
       */
-      ['seedShare', [RGBA32], false],
+      ['seedShare', [RGBA32], open.bodies],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       ['liquidForces', [VEL], false],
@@ -202,10 +207,10 @@ export class WebGPUFluid extends FluidCover {
       */
       ['bodyAdvect', [dye], open.maze && !open.thinGap],
       ['bodyAdvectThin', [dye], open.maze && open.thinGap],
-      ['bodyPartition', [dye], false],
-      ['bodyUnspread', [dye], false],
-      ['bodyLand', [dye], false],
-      ['bodyLay', [dye], false],
+      ['bodyPartition', [dye], open.bodies],
+      ['bodyUnspread', [dye], open.bodies],
+      ['bodyLand', [dye], open.bodies],
+      ['bodyLay', [dye], open.bodies],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -260,11 +265,11 @@ export class WebGPUFluid extends FluidCover {
       // drain. None was seen in a look's first steps, the mix's and the
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
-      ['mixForce', [VEL], open.gravity],
-      // Film Hold's push: built behind the show, as the oil's other kernels
-      // are (no look opens with it in its first steps' set; startup fails one
-      // waited for and never run).
-      ['mixFilm', [VEL], false],
+      ['mixForce', [VEL], open.gravity || open.bodies],
+      // Film Hold's push: with Oil Bodies, as the oil's other kernels (Classic
+      // and Splodascope run it in their first steps once their oil is laid).
+      // Off every other look's opening: startup fails one waited for and never run.
+      ['mixFilm', [VEL], open.bodies],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
@@ -294,14 +299,20 @@ export class WebGPUFluid extends FluidCover {
     */
     if (open.thinGap) {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
-      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
+      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix || open.bodies);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
       // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
-      // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
-      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
+      /*
+        The oil's lift up a rocked plate and its closed circulation (PLAN
+        27f-5, 38w): waited for with Oil Bodies, as the bodies' are
+        (Opening.bodies), since Classic's first steps run the source and the
+        oil's relax once its lay reaches the solver; behind the show otherwise.
+      */
+      const liftWithBodies = ['hsLiftSource', 'hsLiftRelaxOil'];
+      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.bodies && liftWithBodies.includes(name));
       // The sealed bottle's (PLAN 27f-9): waited for where the look opens stood up, whose first step is sealed (opening.ts).
       for (const name of SEAL_KERNEL_NAMES) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.sealed);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
