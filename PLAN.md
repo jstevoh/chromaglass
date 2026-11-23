@@ -535,7 +535,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28l | 21 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 15 |
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 10 |
-| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 17 |
+| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s); ~~31s-8~~ the flower's second life (each tap its cell's mean, films refuse a flower build) shipped (`npm run flower`), 31s-9 and 31s-10 open | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 17 |
 | 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 15 |
 | 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33c, 33d, 33f-2..4 open | 12 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 19 |
