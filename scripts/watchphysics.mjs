@@ -130,6 +130,9 @@ function search(a, b, px, py, bs, cx, cy, r) {
   return { dx: bx, dy: by, s: best, x, y };
 }
 
+/** How much worse a seeded match may be than the unseeded one and still win (see flowField). */
+const SEED_SLACK = 1.25;
+
 /**
  * The displacement field from half-size image A to B: a vector per 8×8 block
  * (16 pixels at 320), in half-size pixels, or null where the block has too
@@ -140,8 +143,35 @@ function search(a, b, px, py, bs, cx, cy, r) {
  * coarse blocks are bigger than the fine one on purpose: a block of 2 pixels
  * at an eighth matches noise (the first version did, and read a slid texture
  * at 0.4 of its true whole-field share).
+ *
+ * With `seed` (the field from A to an earlier sample) and `ratio` (this
+ * lag over the seed's), a block whose seed vector matched cleanly is also
+ * searched about that vector times the ratio, ±(1 + ceil(ratio)). The words
+ * check's drifting stripes found why (47x-10): a 64-pixel sine moving a pixel
+ * a frame moves 15 half-size pixels in the second, almost half its period of
+ * 32, so over the second the true shift and the one the other way (17 back)
+ * match the stripes about equally, and which one the coarse search took came
+ * down to the codec's noise. On one ffmpeg both takes of the same look took
+ * the alias and read the drift backwards, 7.1 and 6.9 % a second the wrong
+ * way; on Ubuntu's they split, two steps apart; the truth is 9.4 forwards.
+ *
+ * So physicsSummary follows the motion through time rather than guessing it
+ * between two far-apart frames: the one-sample field first (1.5 pixels, a
+ * twentieth of the period, which cannot alias), then lags of about 2.5 times
+ * the last (1, 3, 8, 10 samples), each seeded from the one before. Any
+ * repeating texture moving near half its period in a second (ripples,
+ * stripes, a lattice of cells) aliased the same way. The chain is short
+ * steps on purpose: a first version scaled the one-sample vector straight up
+ * to the second, and under the self-test's grain a one-sample vector is
+ * mostly noise, so ten times it landed nowhere (the carried share fell from
+ * 0.94 to 0.80); one seeded from it at three samples is already good to a
+ * pixel. The unseeded search still runs, and the seeded match wins unless it
+ * is worse than the unseeded one by more than SEED_SLACK: an alias matches
+ * about as well as the truth (that is what makes it an alias), so the seed
+ * decides between them, and a seed thrown off by grain lands far from any
+ * match and loses to the search.
  */
-export function flowField(A, B) {
+export function flowField(A, B, seed = null, ratio = 1) {
   const qa = halve(A), qb = halve(B), ea = halve(qa), eb = halve(qb);
   const BS = 8, nx = Math.floor(A.w / BS), ny = Math.floor(A.h / BS), out = [];
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
@@ -161,14 +191,19 @@ export function flowField(A, B) {
     if (sd < 3) { out.push(null); continue; }
     const e = search(ea, eb, cx / 4, cy / 4, 6, 0, 0, 6);
     const q = search(qa, qb, cx / 2, cy / 2, 8, Number.isFinite(e.s) ? 2 * e.dx : 0, Number.isFinite(e.s) ? 2 * e.dy : 0, 2);
-    const h = search(A, B, cx, cy, BS, Number.isFinite(q.s) ? 2 * q.dx : 0, Number.isFinite(q.s) ? 2 * q.dy : 0, 2);
+    let h = search(A, B, cx, cy, BS, Number.isFinite(q.s) ? 2 * q.dx : 0, Number.isFinite(q.s) ? 2 * q.dy : 0, 2);
+    let edge = Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6;
+    const sv = seed ? seed.v[j * nx + i] : null;
+    if (sv && !sv.edge && sv.resid <= 0.6) {
+      const t = search(A, B, cx, cy, BS, Math.round(sv.dx * ratio), Math.round(sv.dy * ratio), 1 + Math.ceil(ratio));
+      if (Number.isFinite(t.s) && !(t.s > SEED_SLACK * h.s)) { h = t; edge = false; }
+    }
     if (!Number.isFinite(h.s)) { out.push(null); continue; }
     const par = (l, c, r) => (Number.isFinite(l) && Number.isFinite(r) && l + r - 2 * c > 0 ? Math.max(-0.5, Math.min(0.5, (l - r) / (2 * (l + r - 2 * c)))) : 0);
     const fx = par(zsad(A, B, h.x, h.y, BS, h.dx - 1, h.dy), h.s, zsad(A, B, h.x, h.y, BS, h.dx + 1, h.dy));
     const fy = par(zsad(A, B, h.x, h.y, BS, h.dx, h.dy - 1), h.s, zsad(A, B, h.x, h.y, BS, h.dx, h.dy + 1));
     // Match quality: the residual a pixel against the block's own contrast.
     const resid = h.s / (BS * BS) / sd;
-    const edge = Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6;
     out.push({ x: cx, y: cy, dx: h.dx + fx, dy: h.dy + fy, resid, edge });
   }
   return { nx, ny, v: out };
@@ -201,7 +236,66 @@ function carried(A, B, field) {
       n++;
     }
   }
-  return n ? { raw: raw / n, res: res / n } : null;
+  if (!n) return null;
+  return { raw: raw / n, res: res / n, floor: Math.min(noiseSigma(A, B) * 1.128, quietestBlock(A, B, field)) };
+}
+
+/**
+ * The pixel noise of a pair, as the standard deviation of one sample's
+ * pixels (47v-5): Immerkaer's estimate, the response to the mask
+ * [1 −2 1; −2 4 −2; 1 −2 1], which has no response to a ramp or a smooth
+ * blob (a plane's second differences cancel) and answers to white noise
+ * alone: its mean absolute value × √(π/2) / 6 is the noise sd. Detail as
+ * fine as the grain adds to it, so it is an upper bound, and the quietest
+ * blocks below keep it honest. 1.128 σ is the mean absolute difference of
+ * two independent samples of that noise, which is what the grain adds to
+ * the change between a pair.
+ */
+function noiseSigma(A, B) {
+  let t = 0, c = 0;
+  for (const I of [A, B]) {
+    const w = I.w, d = I.d;
+    for (let y = 1; y < I.h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const q = y * w + x;
+      t += Math.abs(4 * d[q] - 2 * (d[q - 1] + d[q + 1] + d[q - w] + d[q + w]) + d[q - w - 1] + d[q - w + 1] + d[q + w - 1] + d[q + w + 1]);
+      c++;
+    }
+  }
+  return c ? (t / c) * Math.sqrt(Math.PI / 2) / 6 : 0;
+}
+
+/**
+ * The change of the quietest tenth of the picture's blocks. Whatever moves
+ * adds to a block's change, so the quietest are where grain is most of what
+ * changed. On a plate textured everywhere and all moving this is the motion,
+ * not the grain, which is why it only caps the estimate above and never
+ * stands for it.
+ */
+function quietestBlock(A, B, field) {
+  const BS = 8, W = A.w, bm = [];
+  for (let j = 1; j < field.ny - 1; j++) for (let i = 1; i < field.nx - 1; i++) {
+    let t = 0;
+    for (let yy = 0; yy < BS; yy++) for (let xx = 0; xx < BS; xx++) { const q = (j * BS + yy) * W + i * BS + xx; t += Math.abs(B.d[q] - A.d[q]); }
+    bm.push(t / (BS * BS));
+  }
+  bm.sort((a, b) => a - b);
+  return bm.length ? bm[Math.floor(0.1 * (bm.length - 1))] : 0;
+}
+
+/**
+ * One pair's carried share with the grain taken out of both sides. Grain
+ * adds to the change with and without the flow's correction alike, so a
+ * plate the flow carries perfectly still read most of its change as
+ * uncarried. The mean absolute change of motion c plus noise is about
+ * √(c² + floor²) (all noise when c is nothing, all motion when it is large),
+ * so each side is taken as √(x² − floor²). Null where less than 1.5 grey
+ * levels of change are left (the bar the raw change was held to before this,
+ * now on what the grain has not already explained).
+ */
+export function carriedShare(c) {
+  if (!c) return null;
+  const fl = (c.floor ?? 0) ** 2, raw = Math.sqrt(Math.max(0, c.raw ** 2 - fl)), res = Math.sqrt(Math.max(0, c.res ** 2 - fl));
+  return raw > 1.5 ? Math.max(0, Math.min(1, 1 - res / raw)) : null;
 }
 
 /** Least-squares affine fit v = v0 + M (p − c) to the vectors, in units per second. */
@@ -291,6 +385,9 @@ export function spectrumSlope(px, W, H, { hann = true } = {}) {
   return sxy / sxx;
 }
 
+/** Fewest rows of a 320-wide sample the flow read is trusted on (PLAN 47v-6). */
+export const MIN_ROWS = 64;
+
 /** A running physics read: half-size luminance of every sample, and the spectra. */
 export function physicsAcc() { return { frames: [], spectra: [] }; }
 
@@ -322,8 +419,12 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
   for (let k = 0; k + 1 < n; k += stride) {
     const L = useLong ? (k + long < n && shotOf[k + long] === shotOf[k] ? long : 0) : shotOf[k + 1] === shotOf[k] ? 1 : 0;
     if (!L) continue;
-    const fl = flowField(F[k], F[k + L]);
+    // Followed through time (47x-10, see flowField): the one-sample field,
+    // then each lag seeded from the one before, about 2.5 times shorter.
     const fs = L > 1 ? flowField(F[k], F[k + 1]) : null;
+    let fl = fs, at = 1;
+    while (at < L) { const next = Math.min(L, Math.round(at * 2.5)); fl = flowField(F[k], F[k + next], fl, next / at); at = next; }
+    if (!fl) fl = flowField(F[k], F[k + L]);
     const vs = [];
     fl.v.forEach((f, i) => {
       let g = f, lag = L;
@@ -363,8 +464,9 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
   const div = pairs.map(p => p.af?.div).filter(x => x != null);
   const vert = pairs.map(p => p.af?.v).filter(x => x != null);
   const horiz = pairs.map(p => p.af?.u).filter(x => x != null);
-  // Carried: only where the picture changed by more than the codec's noise.
-  const carr = pairs.map(p => (p.c1 && p.c1.raw > 1.5 ? Math.max(0, Math.min(1, 1 - p.c1.res / p.c1.raw)) : null)).filter(x => x != null);
+  // Carried: only where the picture changed by more than its own grain (carriedShare).
+  const carr = pairs.map(p => carriedShare(p.c1)).filter(x => x != null);
+  const noiseFloor = quant(pairs.map(p => p.c1?.floor), 0.5);
 
   // Lifetime: the correlation of a sample with one τ later, inside a shot,
   // averaged over anchors, until it falls under a half.
@@ -393,7 +495,14 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
   const longestShot = (() => { let best = 0, run = 1; for (let k = 1; k < n; k++) { if (shotOf[k] === shotOf[k - 1]) run++; else run = 1; best = Math.max(best, run); } return Math.max(best, n ? 1 : 0) / rate; })();
 
   const ownMed = quant(own, 0.5);
+  // The decoded sample's height (the frames are pooled to half size). The
+  // flow is read in 8-pixel blocks at half size, the outer ring left out, so
+  // a strip under MIN_ROWS rows has one row of blocks or none and every
+  // flow measure comes out as dashes (47v-6).
+  const rows = F.length ? F[0].h * 2 : null;
   return {
+    rows, tooShort: rows != null && rows < MIN_ROWS,
+    noiseFloor,
     pairs: pairs.length,
     matched: quant(pairs.map(p => p.matched), 0.5),
     speed: { med: quant(speeds, 0.5), p90: quant(speeds, 0.9) },
@@ -431,18 +540,22 @@ const f = (x, d = 1) => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(d)
  * highest of them, and physicsLines prints it beside each measure, with
  * "under" or "over" when a clip falls outside every real show.
  *
- * What they say, 2026-11-12: real shows read carried 0.13 to 0.19, low by
+ * What they say, 2026-11-12: real shows read carried 0.13 to 0.23, low by
  * the synthetic bands' words, with p90s near 0.4: on real footage this
  * measure tells a transported plate from a crossfading one only well under
- * 0.1 or well over 0.4. Lifetime spans 0.9 s (an edited film of the loops,
+ * 0.1 or well over 0.4. (0.13 to 0.19 before the grain was taken out of the
+ * change, 47v-5: the film's read rose from 0.187 to 0.229 and the bar's stayed
+ * at 0.125 to 0.127, so grain was a small part of why they read low; the rest
+ * is the lamp, the superimposed loops and the camera, which no noise floor
+ * removes.) Lifetime spans 0.9 s (an edited film of the loops,
  * superimposed) to 5 s (one projector, one take, at a bar). Every one sits
  * in the spectrum's cascade band, −2.7 to −2.8.
  */
 export const REAL_SHOWS = [
   { name: 'jls-liquid-loops-1969', what: 'the Joshua Light Show, Liquid Loops 1969: 35 mm film of the loops, edited, with dissolves and superimpositions; 10 min',
-    own: 8.02, carried: 0.187, turnover: 1.51, lifetime: 0.91, spectrum: -2.69, wholeShare: 0.16 },
+    own: 8.02, carried: 0.229, turnover: 1.51, lifetime: 0.91, spectrum: -2.69, wholeShare: 0.16 },
   { name: 'bar-the-dip-2016', what: 'a liquid light show on the wall behind a band at a bar (The Dip, Redding, 2016-08-08), one camera from the floor, cropped to the wall; 10 min of the set',
-    own: 1.96, carried: 0.125, turnover: 2.43, lifetime: 4.98, spectrum: -2.79, wholeShare: 0.14 },
+    own: 1.96, carried: 0.127, turnover: 2.43, lifetime: 4.98, spectrum: -2.79, wholeShare: 0.14 },
 ];
 
 /** The lowest and highest real show for a measure (a key of REAL_SHOWS' rows). */
@@ -479,6 +592,19 @@ export function physicsLines(p) {
   const vert = p.vertical;
   const drift = vert == null || Math.abs(vert) < 0.3 ? 'no steady drift up or down' : vert > 0 ? `drifting down (${f(vert, 1)}% of the width a second): falling, pouring or a plate tilted down` : `drifting up (${f(-vert, 1)}% a second): rising, as warm wax or bubbles`;
   const turnover = p.turnover;
+  const lifeLine = `- **lifetime**: ${p.lifetime != null ? `a picture stays like itself for about ${f(p.lifetime, 1)} s (correlation with itself falls to a half)${realNote('lifetime', p.lifetime)}` : `longer than the clip shows (longest shot ${f(p.longestShot, 0)} s)`}`;
+  const specLine = `- **spectrum**: slope ${f(sl, 2)} (${f(p.spectrum.p10, 2)} to ${f(p.spectrum.p90, 2)})${realNote('spectrum', sl, 2)} of power per wavenumber band: ${spec}`;
+  // A strip too short to hold two rows of flow blocks reads nothing of the
+  // flow: say so, in place of lines of dashes that look like a read that
+  // found nothing moving. Lifetime and spectrum do not need the blocks.
+  if (p.tooShort) return [
+    '## Physics',
+    '',
+    `**The flow read needs a taller crop.** The decoded sample is ${p.rows} rows high (320 wide), under the ${MIN_ROWS} the flow's 8-pixel blocks need, so speed, whole-field motion, rotation, spreading, carried, turnover and drift are not read (they would only be dashes). Use a crop at least a fifth as tall as it is wide (\`--crop x,y,w,h\`), such as the projection itself, not a strip of it.`,
+    '',
+    lifeLine,
+    specLine,
+  ];
   return [
     '## Physics',
     '',
@@ -488,10 +614,10 @@ export function physicsLines(p) {
     `- **whole-field motion** (camera, or the dish slid, turned or zoomed): median ${f(p.whole.med, 1)}, and it explains ${f((p.wholeShare ?? 0) * 100, 0)}% of the motion`,
     `- **rotation**: curl median ${f(curl, 3)}/s (${f(p.curl.p10, 3)} to ${f(p.curl.p90, 3)}): ${turn}`,
     `- **spreading**: divergence median ${f(dv, 3)}/s (${f(p.div.p10, 3)} to ${f(p.div.p90, 3)}): ${spread}`,
-    `- **carried**: ${f(car, 2)} (${f(p.carried.p10, 2)} to ${f(p.carried.p90, 2)}, over ${p.carried.n} changing pairs)${realNote('carried', car, 2)} of the change from one sample to the next is the flow moving material: ${carriedWord}`,
+    `- **carried**: ${f(car, 2)} (${f(p.carried.p10, 2)} to ${f(p.carried.p90, 2)}, over ${p.carried.n} changing pairs)${realNote('carried', car, 2)} of the change from one sample to the next (the grain, about ${f(p.noiseFloor, 1)} grey levels of it, taken out) is the flow moving material: ${carriedWord}`,
     `- **turnover**: ${turnover != null ? `${f(turnover, 1)} s for the flow to carry a form across its own size${realNote('turnover', turnover)}` : '–'}${turnover != null ? `, ${band(turnover, [[0.5, 'churning'], [2, 'lively'], [6, 'unhurried'], [Infinity, 'stately, viscous']])}` : ''}`,
-    `- **lifetime**: ${p.lifetime != null ? `a picture stays like itself for about ${f(p.lifetime, 1)} s (correlation with itself falls to a half)${realNote('lifetime', p.lifetime)}` : `longer than the clip shows (longest shot ${f(p.longestShot, 0)} s)`}`,
-    `- **spectrum**: slope ${f(sl, 2)} (${f(p.spectrum.p10, 2)} to ${f(p.spectrum.p90, 2)})${realNote('spectrum', sl, 2)} of power per wavenumber band: ${spec}`,
+    lifeLine,
+    specLine,
     `- **drift**: ${drift}`,
   ];
 }
@@ -567,7 +693,7 @@ export function guessTechniques(d, p, cutsPerMin = 0) {
   if (p?.wholeShare > 0.5 && period != null && period < 90) say(3, 'the glass or dish is turned (or the camera rotates)', `whole-field motion explains ${(p.wholeShare * 100).toFixed(0)}% of the motion, one turn in ${period.toFixed(0)} s`);
   else if (p?.wholeShare > 0.5 && p?.whole?.med > 2) say(2.5, 'the camera pans or the plate is slid: the picture moves as one', `whole-field share ${(p.wholeShare * 100).toFixed(0)}%, ${p.whole.med.toFixed(1)}% of the width a second`);
   if (div != null && div > 0.03) say(2, 'pours or presses: material spreading out from where it is added', `divergence ${div.toFixed(3)}/s`);
-  // Real shows read carried 0.13 to 0.19 (REAL_SHOWS): noise, the lamp and
+  // Real shows read carried 0.13 to 0.23 (REAL_SHOWS): noise, the lamp and
   // superimposition pull it down. So only a clip under every real show is
   // guessed to change in place rather than flow; the old bar, 0.3, called
   // both real films digital.

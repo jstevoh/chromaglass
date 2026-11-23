@@ -6,7 +6,8 @@
  * and the show's sound; desktop/liveSession.js writes it to every
  * destination) and drove it only from the console. The owner asked for "a
  * Live Show panel in the Mac app, Pro only" to stream to every popular
- * platform at once; this file is what that panel stands on:
+ * platform at once (moved to Home on 2026-11-15, PLAN.md 23.21: streamers
+ * are Home's buyers); this file is what that panel stands on:
  *
  *  - one controller, so the panel, the console and the remote's Stop all
  *    act on the same stream. Two (the console's and the panel's, each with
@@ -294,7 +295,7 @@ export const liveAllowed = () => deps?.allowed() ?? false;
 export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Promise<LiveState> {
   const native = nativeLive();
   if (!native || !deps) throw new Error('the live show streams from the Mac app');
-  if (!deps.allowed()) throw new Error('the live show is a Pro feature');
+  if (!deps.allowed()) throw new Error('the live show needs a Home or Pro licence');
   if (current && onAir(show(current.state()))) throw new Error('already live: stop() first');
   const canvas = deps.canvas();
   if (!canvas) throw new Error('no plate to stream');
@@ -451,7 +452,7 @@ export async function stopLive(): Promise<LiveState | null> {
  * orientation }] })` for several (37x-4c), `stop()`, `state()` (with each
  * destination's health under `transport.destinations`), `probe({ width,
  * height, fps })`, `keys.set(name, key)`, `keys.list()`, `keys.remove(name)`.
- * `allowed` is the Pro gate, asked at each start. Outside the app (no
+ * `allowed` is the Home gate (Home or Pro), asked at each start. Outside the app (no
  * RTMPS client to hand the packets to) it does nothing.
  */
 export function installLiveConsole(d: Deps): void {
