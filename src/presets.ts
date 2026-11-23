@@ -204,6 +204,10 @@ export const PRESETS: Preset[] = [
       dyeBudget: 0.24,
       glossiness: 0.0,
       postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
+      // Hubble-sharp: dye threads on particles, no meniscus rim (PLAN 1n)
+      particles: 0.5,
+      particleMix: 0.6,
+      edgeRelief: 0,
       ledMode: 'single',
       ledColor: '#03041a',
       ledSpeed: 0.0,
