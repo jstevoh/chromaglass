@@ -39,8 +39,49 @@ Mac app, and not named on any page a visitor or customer reads.
   `~/.chromaglass/youtube/`, `CHROMAGLASS_YOUTUBE_DIR`, beside the Google client file
   the owner saves there). Tools: `channel`, `list_videos`, `upload_video` (resumable
   8 MiB chunks; resumes a dropped connection, an expired key, and a closed app from
-  `uploads.json`), `upload_status`, `update_video` (only the fields named change),
-  `set_thumbnail`, `list_playlists`, `create_playlist`, `add_to_playlist`. No delete.
+  `uploads.json`; emits MCP `notifications/progress` when `progressToken` is sent;
+  queues the job with `notBefore` on `uploadLimitExceeded` or `quotaExceeded` instead of
+  failing), `queue_upload` (saves a job in state `queued` with optional `key` and
+  `replaces` without uploading yet), `replace_video` (reads an old video's snippet,
+  status and playlists via manifest playlist memory or paged `playlists`/`playlistItems`
+  search, then queues a private replacement upload via `queue_upload` carrying the old
+  metadata, playlists/positions, `replaces` and manifest `key`; never deletes or edits
+  the old video), `upload_status` (lists queued jobs with `not_before` in Pacific time),
+  `update_video` (only the fields named change), `release_plan` (schedules live private
+  videos via `publishAt` — 50 quota units each — and queued jobs at a Pacific clock time,
+  with `dry_run` and DST-safe slot spacing; only run when the owner asked for that
+  release), `set_thumbnail`, `list_playlists`, `create_playlist`, `add_to_playlist`,
+  `manifest` (reads `~/.chromaglass/youtube/manifest.json` and optionally syncs all
+  upload pages including `views` and `likes` from `videos.list` `statistics`, keeping
+  local fields), `mark_video` (sets local manifest fields on one video or a list of
+  `video_ids`). No delete. Command-line modes: `login`, `whoami`, `logout`, `drain`
+  (uploads queued jobs whose `notBefore` has passed, one at a time, using
+  `busyElsewhere` so two drains never push the same job, and posts a macOS notification
+  via `osascript` after each finished or failed job unless
+  `CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL=1` or `CHROMAGLASS_YOUTUBE_NO_NOTIFY=1`),
+  `install-agent` / `uninstall-agent` (writes/removes the hourly LaunchAgent plist for
+  `drain`), `manifest [--sync] [--md <file>]` (prints or writes the manifest as Markdown).
+
+  ### Upload sidecar card (`<file without extension>.youtube.json`)
+
+  `upload_video`, `queue_upload` and `replace_video` check for a JSON sidecar strictly
+  beside the video file (`<file without extension>.youtube.json`, never elsewhere). Any
+  field omitted by the tool call is read from the card; the call wins. Unknown fields are
+  refused, naming them. Allowed fields:
+
+  ```json
+  {
+    "title": "Slow Dawn",
+    "description": "Recorded 2026-11-20. Music by Scott Buckley (CC BY 4.0).",
+    "tags": ["liquid light", "ambient"],
+    "playlist": "PL1234567890",
+    "thumbnail": "slow-dawn.jpg",
+    "key": "slow-dawn",
+    "replaces": "oldVideoId123",
+    "publish_at": "2026-12-01T18:00:00Z",
+    "privacy": "private"
+  }
+  ```
 
 ## Contracts
 
