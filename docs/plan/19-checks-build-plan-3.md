@@ -633,3 +633,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   drop, as the drift column does) or whether a drop's reach grew. Never a looser bar.
   Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes
   the entries out.
+- **19ak-23. Open: one film at a time on the owner's Mac, in a real queue (`scripts/maclock.mjs`).**
+  Several agent sessions driving Chrome or the ChromaGlass app at once overloaded the owner's Mac
+  (16 GB MacBook Air), replacing the manual `~/cg-scratch/film.lock` rule with an atomic lock,
+  a FIFO queue (`~/cg-scratch/film.queue/`), stale-lock recovery with rename-race guard,
+  deploy-shard priority (`macdeploy.mjs`), nesting via `CG_FILM_LOCK_HELD`, wiring into
+  `chromium.mjs`, `desktop.mjs` and the standalone browser launchers, and `macbusy.sh` shard
+  refusal when a live film holds the lock.
