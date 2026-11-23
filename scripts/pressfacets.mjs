@@ -23,7 +23,7 @@
  * blur takes most of it away. "creases" is rms(lap − blur(lap)) over
  * rms(blur(lap)) inside the bowl.
  *
- * It runs at gpu=high (512², PRESS_GPU to change it), where the upsample
+ * It pins the grid at 512² (PRESS_RES to change it), where the upsample
  * is by 8/3 and the creases fall unevenly: measured on main, creases 0.70
  * to 0.73 there against 0.04 to 0.10 at gpu=mid (384², an even 2×, where
  * the relaxation between press and read has mostly rounded them). A row
@@ -96,12 +96,21 @@ try {
   await installFrameReader(page);
   await page.goto(`http://localhost:${PORT}/?debug&gpu=${process.env.PRESS_GPU || "high"}&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
-  await page.evaluate(() => {
+  // The solver's grid is pinned, not left to the governor. 'auto' steps the
+  // grid down when the GPU is busy: on a quiet Mac gpu=high opened at 512²,
+  // and with the owner's own app open beside the run it opened at 384²,
+  // where main's creases mostly relax away in the read's 30 ms and the
+  // check could no longer tell main from the fix. A pin is what the
+  // settings offer for this (Perform's grid control), so the read is at
+  // the grid it names whatever else the machine is doing.
+  const res = +(process.env.PRESS_RES || 512);
+  await page.evaluate((res) => {
     const d = window.chromaglassDebug();
+    d.settings.simResolution = res;
     d.settings.automateRate = 0;
     d.settings.globalSpeed = 0.004;
     d.settings.fingering = 0;
-  });
+  }, res);
   await page.waitForTimeout(3000);
 
   const thin = await page.evaluate(() => window.chromaglassDebug().fluids[0].thinGap);
@@ -114,8 +123,8 @@ try {
   // cannot see the facets.
   {
     const f = await page.evaluate(async () => (await window.chromaglassDebug().readSqueeze())?.n ?? 0);
-    const want = process.env.PRESS_GPU ? 0 : 512;
-    check('the solver runs at 512² (gpu=high), where facets read', !want || f === want, `n ${f}`);
+    const want = res;
+    check(`the solver runs at the pinned ${res}², where facets read`, f === want, `n ${f}`);
   }
   const read = () => page.evaluate(async () => {
     const f = await window.chromaglassDebug().readSqueeze();
