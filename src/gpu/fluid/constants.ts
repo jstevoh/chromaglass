@@ -7,7 +7,7 @@
 
 import type { SolverCarry } from '../solverTypes';
 import { SOLVER_VEL_FORMAT } from '../wgsl/pack';
-import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, thicknessViscosity } from '../../lib/turntable';
+import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, OIL_NU, thicknessViscosity } from '../../lib/turntable';
 
 /*
   How many bubbles the air field has room for.
@@ -245,7 +245,10 @@ export function oilLightnessOf(weight: number | undefined): number {
  * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
  */
 export const LAMP_HEATING = 0.24;
-/** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
+/**
+ * The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity.
+ * Only where the wax is dye: a wax that is a liquid of its own is warmed by the floor's glass (LAMP_GLASS below).
+ */
 export const LAMP_HEAT = 6;
 /*
   The cool top of a lamp (PLAN 27f-9e): where the heat a standing plate's
@@ -304,6 +307,55 @@ export const LAMP_HEAT = 6;
 export const KAPPA_WAX = 7e-8;       // m²/s: liquid paraffin, k ≈ 0.16 W/mK over ρc ≈ 780 kg/m³ × 2.9 kJ/kgK
 export const GLASS_FIN = 0.017 / DISH_METRES;
 export const LAMP_COOL_FROM = 0.5;
+/*
+  The warm floor of a lamp (PLAN 27f-9h): the glass over the bulb, in the
+  heat's units, and the other end of the gradient the cool top makes.
+
+  Reported: on the owner's machine the lamp's wax rose once and then hung
+  ("no second rise from the floor" in a 90 s film), and `npm run lavacycle`
+  went red when the wax was made paler. Measured in the lab (128², Lava
+  Lamp's settings, a sample every 2 s for 180 s, the oil's centre of mass as
+  a share of the height): the paler wax rose to 0.60 at 11 s and hovered at
+  0.49 to 0.50 from 22 s on; the wax the check was written on went round
+  once or twice and was hovering too by 60 to 80 s, past the 30 s the check
+  looked at. The maps showed why. The bulb was a kick of LAMP_HEAT a second
+  into the wax alone, in a band over the floor, with the water under it
+  left cold. The wax's neutral heat is about 1.3 of the heat's units, so a
+  body entering the band was light again within a quarter of a second, long
+  before it had sunk through it: the band was a thermostat with the wax
+  parked on its upper edge, one weightless slab, the water below it at 0.
+  No dial moved it (stronger gravity, a thinner liquid, slower cooling, no
+  cooling by the room at all), and it could not have: a body in a liquid
+  this thick has no inertia, its speed is its weight at that moment, and a
+  system of two such numbers (height, heat) that comes to rest somewhere
+  stays there. A lamp goes round on two things the kick did not have. The
+  liquid round the wax is warm below and cool above, so a body is lighter
+  against it the higher it gets, and it warms slowly, by conduction from the
+  floor, so it has sunk all the way down before it is light again.
+
+  So the bulb is what it is in a lamp: it heats the glass floor, and the
+  floor heats whatever lies on it, water and wax alike, by the same
+  conduction across the gap that the cool glass takes it out by (S.lampCool,
+  the wax at its own κ), toward the floor's temperature, over the same fin
+  length of glass (GLASS_FIN) up from the floor. LAMP_GLASS is that
+  temperature. Measured, the same lab:
+    4: up to 0.57, then a swing that dies to 0.34 to 0.40 by 180 s;
+    6: down to 0.15 at 8 s (wax laid cold sinks first), 0.60 at 22 s, 0.19
+    at 42 s, 0.64 at 56 s, 0.23 at 76 s, 0.60 at 90 s, 0.22 at 108 s, 0.62
+    at 122 s, and 0.24 to 0.62 still at 180 s: about 32 s round, in whole
+    fat bodies, the water at 2.7 on the floor, 1.0 a quarter of the way
+    up, 0.4 in the middle and 0 at the top;
+    8: 0.25 to 0.62, 26 s round, the wax torn into more and smaller bodies.
+  And the kick kept beside the warm floor (floors of 2, 3 and 4) hovered
+  every time: it is the kick that stops the lamp. The projector's own light
+  on the wax (LAMP_HEATING) was left on throughout; with it off and the
+  floor at 3 the wax never left the floor.
+
+  The same shortcut as the cool glass's (PLAN 27f-9g): the floor's
+  temperature is laid, not computed from a bulb's watts and the air's
+  cooling, so Gravity turns the whole lamp on or off and does not dim it.
+*/
+export const LAMP_GLASS = 6;
 /**
  * How far a standing plate's glass draws a water cell's heat down in one
  * step (S.lampCool, writeSim): the gap's slowest conduction mode, π²κ/h²,
@@ -642,6 +694,20 @@ export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
   that much faster.
 */
 export const DRIP_WEIGHT = 0.5;
+/**
+  Rain Drip as the solver reads it: the look's dial times how far the plate is
+  tipped (Gravity, plateUpright, 0 flat to 1 on the wall). The in-plane share
+  of gravity is g sin θ, so a level plate has none and heavy dye there only
+  slumps (hsBody); it fell down a flat plate in every look that set it (PLAN
+  38u-12). A plate rocked by a hand has its own weight in the rock's term.
+*/
+export const dripOf = (p: { drip?: number; plateUpright?: number }): number => {
+  const d = Number.isFinite(p.drip) ? (p.drip as number) : 0;
+  const u = Number.isFinite(p.plateUpright) ? Math.max(0, Math.min(1, p.plateUpright as number)) : 0;
+  return d * u;
+};
+/** The thin gap's body-force weight of Rain Drip: DRIP_WEIGHT per unit of dripOf, nothing under 0.01. */
+export const dripWeightOf = (p: { drip?: number; plateUpright?: number }): number => (dripOf(p) > 0.01 ? DRIP_WEIGHT * dripOf(p) : 0);
 /*
   Updraft's shear, over the old push it is made from. The old push was only
   on the colour, and a pool pushed while the clear liquid round it is not
@@ -740,9 +806,33 @@ export const LIFT_SWEEPS = 8;
   are in (sealReady), as it always did.
 */
 export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
-export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax', 'sealSource', 'sealFlow'];
+export const LIFT_KERNELS = ['hsLiftSource', 'hsLiftRelax', 'hsLiftRelaxOil', 'sealSource', 'sealFlow'];
+/*
+  ln B, the oil's drag over the plate's clear liquid at viscosity nu (hsPrep's
+  oilBody, PLAN 27f-7): the oil lift's circulation relaxes with B on its faces
+  (hsLiftRelaxOil), so that what hsPrep's drag divides out it laid in first.
+*/
+export const oilBodyLn = (nu: number) => Math.log((1 - SPIN_OIL_LIGHT) * OIL_NU / nu);
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
+/*
+  A bottle's heavy liquid sliding down the same tipped plate (PLAN 15e-10,
+  driveLiquids in fluid/passes.ts). The law is the oil's lift with the sign
+  and the density its own: a column whose density is ρ(1 + w) in a plate of
+  the reference liquid, tipped by θ, feels w ρ g sinθ more than the liquid
+  round it, and between two glasses that weight drives it at Darcy's
+  w g sinθ h₀² / 12ν_ref at the rest gap, which is how hsPrep reads a body
+  force. This is that speed in m/s per unit of w and of sinθ: 2 mm, 22 cSt,
+  about 0.15 m/s, so a syrup (w 0.35) tipped twelve degrees would go at
+  1.1 cm/s with nothing round it to push aside, before its own viscosity
+  (the species field, 18d) and the water it has to push round it (half, for
+  a drop as thin as the water; 2/(1 + λ) of that for one λ times thicker)
+  take their share. Not tuned: the liquids' field carries w as each
+  bottle's `weight` (bottles.ts, about its density less one), and the step
+  turns this into the flow's per-step speed as the breath's and the lift's
+  are turned.
+*/
+export const LIQUID_FALL = 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).

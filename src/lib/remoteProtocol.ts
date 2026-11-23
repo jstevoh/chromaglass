@@ -222,7 +222,7 @@ export interface RemoteState {
    * Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts):
    * what drives the plate as the film, what pours into the dish, the room
    * camera on or off and which camera, the mark up or not, the cameras by the
-   * pickers' names, and the cartoon shelf.
+   * pickers' names, and the video loaded (PLAN 14ag).
    */
   media?: MediaNow;
   /** OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts): OSC out's switch and target, MIDI on or off, its ports by name, clock and the map. */
@@ -280,17 +280,18 @@ export interface MidiNow {
 export interface OutputsNow { oscOut: OscOutNow | null; midi: MidiNow | null }
 
 export interface MediaNow {
-  /** The film: its source, the file's or the cartoon's name, the cartoon's id, the camera's name, and whether that camera was unplugged mid-show. */
-  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; cartoon: string | null; camera: string | null; cameraLost: boolean };
+  /** The film: its source, the file's name, the camera's name, and whether that camera was unplugged mid-show. */
+  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; camera: string | null; cameraLost: boolean };
   /** The film pouring into the dish (a picture, once laid, is dye and not a pour). */
-  pour: { playing: boolean; name: string | null; cartoon: string | null };
+  pour: { playing: boolean; name: string | null };
+  /** The video loaded, by its name: the one the Video panel's row plays and pours, and film/pour_file's `loaded` take (PLAN 14ag). */
+  video: string | null;
   /** The room camera (the motion camera): on, the camera's name (null: the browser's own pick), and whether last session left it on. */
   room: { on: boolean; camera: string | null; resume: boolean };
   /** The mark (the logo card) is up. */
   mark: boolean;
   /** The cameras by the pickers' names. */
   cameras: string[];
-  cartoons: { id: string; title: string; seconds: number }[];
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -301,14 +302,27 @@ export type TvSignal =
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string }
+  | {
+      type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string;
+      /** A TV with no key asking to pair by four digits (PLAN 12-tv-2, server/tv-pairing.js). */
+      pair?: boolean;
+    }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
    * minutes, `retryMs` from now. A locked phone waits that long rather than
    * knocking again, since every knock while locked is refused unread.
    */
-  | { type: 'denied'; reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop'; retryMs?: number }
+  | {
+      type: 'denied'; retryMs?: number;
+      /**
+       * A TV pairing (PLAN 12-tv-2) hears four more: the laptop said No
+       * (`refused`), nobody answered in two minutes or it asked again
+       * (`expired`), four TVs already ask (`busy`), or its own key is one this
+       * show does not hold, forgotten or another Mac's (`unpaired`).
+       */
+      reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop' | 'refused' | 'expired' | 'busy' | 'unpaired';
+    }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
@@ -358,6 +372,27 @@ export type RemoteMessage =
    * signal alone. TV → relay carries the signal alone; the relay adds `from`.
    */
   | { type: 'tv-signal'; to?: string; from?: string; signal: TvSignal }
+  /**
+   * Pairing a TV by four digits (PLAN 12-tv-2, server/tv-pairing.js). Relay →
+   * the TV asking: the digits to show. Relay → display: who is asking, and
+   * how many TVs hold a key, on every change and on hello. Display → relay:
+   * Allow, No, or forget every paired TV; the relay takes them from the
+   * laptop's own page only. Relay → the TV allowed: its own key, to keep.
+   */
+  | { type: 'tv-code'; code: string }
+  | { type: 'tv-pairing'; asks: { id: string; code: string }[]; paired: number }
+  | { type: 'tv-allow'; id: string }
+  | { type: 'tv-refuse'; id: string }
+  | { type: 'tv-forget' }
+  | { type: 'tv-key'; key: string }
+  /**
+   * The TV's remote picks the look (PLAN 12-tv-remote, server/tv-remote.js).
+   * Relay → TV: the laptop's presets in its order, and the live one, when
+   * either changes and when the TV joins. TV → relay: play this one, which
+   * the relay hands the display as `preset` if the laptop listed it.
+   */
+  | { type: 'tv-looks'; presets: { id: string; name: string }[]; active: string | null }
+  | { type: 'tv-pick'; presetId: string }
   /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
   | { type: 'beat' }
   /**
@@ -451,7 +486,7 @@ export type RemoteMessage =
   /** Recording's options and a Take replayed, stopped or deleted, from the owner's assistant (PLAN 44k-11), relayed only from the guard, with `answer`. */
   | { type: 'assistant-record'; do: string; makes?: string; quality?: string; fps?: number; format?: string; sound?: boolean; take?: number; id?: string; answer?: number }
   /** Film, pours, the room camera and the mark from the owner's assistant (PLAN 44k-13), relayed only from the guard, with `answer`; a file as the show server's own address for it (`url`, server/assistantMedia.js). */
-  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; cartoon?: string; camera?: string; on?: boolean; answer?: number }
+  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; camera?: string; on?: boolean; answer?: number }
   /** OSC out and MIDI from the owner's assistant (PLAN 44k-14), relayed only from the guard, with `answer`; OSC in and Syphon are the relay's own. */
   | { type: 'assistant-outputs'; do: string; on?: boolean; target?: string; input?: string; output?: string; answer?: number }
   /** The projector and the wall from the owner's assistant (PLAN 44k-15), relayed only from the guard, with `answer`; the geometry already judged there (server/assistantProjector.js). */
@@ -462,11 +497,12 @@ export type RemoteMessage =
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
   /**
-   * Words poured onto the plate as dye, which the flow then carries off
-   * (PLAN 37x-10c, `lib/pourText.ts`): a song's name and credit at the top
-   * of each track in a live set. From the phone remote's text box, or
-   * through the relay's guard; the display reads it with `parsePourText`
-   * whoever sent it. `colour` is `#rrggbb` or `contrast` (the default).
+   * A song's name and credit as rows (PLAN 37x-10c, `lib/pourText.ts`), at
+   * the top of each track in a live set, through the relay's guard (the
+   * assistant's `pour_text`) or from a phone one build older. Poured onto
+   * the plate as ink until the owner shelved that (37x-10m); the display now
+   * shows it as the corner caption (`rowsCaption`), reading it with
+   * `parsePourText` whoever sent it. `colour` is kept on the wire, unread.
    */
   | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
   /**
@@ -587,6 +623,13 @@ export interface RelayInfo {
    * It is a fresh 32-hex-digit key each launch, never shown or put in a URL.
    */
   displayKey: string | null;
+  /**
+   * The port the show server also serves https on, for network displays (PLAN
+   * 14m-https): a browser runs WebGPU only on a secure page, so a display
+   * opened at the http Wi-Fi address cannot start. Null when the server has no
+   * certificate (no openssl, or HTTPS_PORT=0).
+   */
+  httpsPort: number | null;
 }
 
 /**
@@ -611,13 +654,14 @@ export async function relayInfo(): Promise<RelayInfo | null> {
   try {
     const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
-    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null; displayKey?: string | null };
+    const body = (await res.json()) as { chromaglass?: unknown; port?: number; httpsPort?: number | null; hosts?: string[]; key?: string | null; displayKey?: string | null };
     if (body?.chromaglass !== 'relay') return null;
     return {
       port: body.port ?? (Number(window.location.port) || 3000),
       hosts: Array.isArray(body.hosts) ? body.hosts : [],
       key: body.key ?? null,
       displayKey: body.displayKey ?? null,
+      httpsPort: typeof body.httpsPort === 'number' && body.httpsPort > 0 ? body.httpsPort : null,
     };
   } catch {
     return null;

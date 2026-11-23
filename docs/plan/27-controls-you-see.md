@@ -60,20 +60,14 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       - **27a-8-2.** The camera aims from a readback of the density a frame or two old
         (`readbackAsync`), so Follow sits that far behind a fast drop. Measure the lag on
         the Mac and, if it shows, lead by the readback's age.
+      - **27a-8-3.** The plate's uniforms carry `pitchClass` and `brightness`
+        (`plateUniforms.ts:447-457`) that no shader reads. Drop them. Check: `npm run wgsl`
+        and the layout test pass, and the plate is identical at Frame Sway 0. (S; Low; 38v,
+        from RS-48.)
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick's discs span the dish (`KICK_RADII`, `kickDepth`); `npm run lift`. Story in `docs/plan-shipped.md` §27b (moved 2026-10-29, 19m-2).
   - **27b-1, open.** Let go, the ring comes back 87% of the way at the default and 79%
     at full; a squeeze film with nothing fingering should come all the way. The rest is
     the colour's first-order carry (18a-8).
-  - **27b-2. The ferrofluid is given back too (shipped, #305).** The ferrofluid takes the colour's own substep plan (`phasePlan`); `npm run rides`. Story in `docs/plan-shipped.md` §27b-2 (moved 2026-10-29, 19m-2).
-  - **27b-3. Breathing beat squeeze and organic liquid injection (shipped).** Squeeze shaped quadratically with a cosine release, automated doses as droplet clusters; `npm run lift`, `squeeze`, `downbeat`. Story in `docs/plan-shipped.md` §27b-3 (moved 2026-10-29, 19m-2).
-- **27c. Turbulence reaches (shipped, #305).** The dial was the stir's speed, so
-  full was a look's 0.3 tripled, and with the band playing the music multiplied it and
-  then held it to the larger of the dial and 1.2: full was 1.4 times half way. Now the
-  dial runs as t(1 + 3t³) (`lib/stir.ts`; a look's 0.3 within 8% of before, full four
-  times) and the music multiplies it by at most two: full is 5.8 times half way. The
-  eddies still change on the clock, not on the stir's own speed (an eddy of size l
-  stirred at U turns over in l/U): **27c-1, open**, wants a third dimension in the
-  noise (3D simplex with the turnover as z), not a slide of the 2D one.
 - **27d. The rest of the sweep (open, its own PR).** From the run above and a read of
   the code (handoff `meaningful-controls.md` in the project's files):
   - Dead on a thin gap (every look since #248): Depth Drag (18a's open item), Vibration
@@ -130,21 +124,6 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   but Bass Drop since a direct commit on 10-08 (`beatSqueeze` 0.03–0.10 before it, already about a
   tenth of the default's press after 27b-3), so what was seen was the *kick's dye burst* (a ring of
   6–12 droplets pushed outward on every kick, gated only by Audio Impact) and Plate Rock's tilt shove.
-  - **27f-1. Kick Bloom (shipped, awaiting a Mac read).** `kickBloom` is the kick's dye burst's own dial and the burst is lobes, not a ring; `npm run panel`, the picture judging.md §60. Story in `docs/plan-shipped.md` §27f-1 (moved 2026-10-29, 19m-2).
-  - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped.md §27f-2).**
-    A hand's minimum-jerk reach to the other side of a turning axis on the strong beats, never a
-    shove on each kick; `npm run rides` holds it (judging.md §61).
-  - **27f-3. Beat Squeeze presses a sheet, locally (shipped 2026-10-22; the owner picked the
-    local sheet on the thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
-    lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
-    (elastohydrodynamic bending length; with the liquid's weight since 27f-4); Bass Drop keeps the
-    glass. `npm run rides` holds it.
-  - **27f-4. The sheet solved, not stamped (shipped 2026-10-24; story in docs/plan-shipped.md
-    §27f-4).** The kick is a fingertip on a sheet floating on the liquid, solved each step on its
-    own grid, exactly per Fourier mode (lib/sheet.ts): its bending, the liquid's weight under it
-    (which 27f-3's reach left out, and which is the larger at a dent's size) and the dish's open
-    rim. Laid on the gap through its own channel, past rest where its ring lifts. `npm run sheet`
-    holds it (judging.md §68).
   - **27f-8, open (shortcuts named in 27f-4).** (a) The sheet's mobility is the rest depth's,
     h₀³/12μ, where the film under a deep dent drains as h³: at full Beat Squeeze the dent's middle
     is half the gap, an eighth of the mobility. The full equation is nonlinear (a semi-implicit
@@ -168,26 +147,27 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     (δ ≈ 1.4 mm on the oil): a couple of swings on the oil, many in water, where the lubrication
     sheet has it gone within a frame. The inertial sheet (a damped wave per mode, still exact per
     step) is the fix; judging.md §68 asks whether the missing swing shows.
-  - **27f-5. The rock lifts the oil, not the frame (shipped 2026-10-24; story in
-    docs/plan-shipped.md §27f-5).** On a tipped thin gap oil rises uphill through the water at
-    Hele-Shaw's speed (`OIL_LIFT`, in SI), laid as the closed dish's circulation so an even sheet
-    feels nothing, the frame stays still and the rim holds a lens; the water's colour alone weighs.
-    `npm run oillift` holds it.
-    - On the frame-moving looks the dish's own tilt (`rockAccel`, SLOSH_LEAN × Frame Sway) and the
-      gap's (CUR_ROCK) are two different sizes of the same tilt; say which is the plate's.
   - **27f-6, open. A standing plate lifts the oil too.** Rain Drip's weight and Comet's pull still
     weigh all the colour, oil's included, over the app's mean, and a plate stood up (Plate Upright,
     Rain Drip) lifts no oil: the same circulation with gravity's in-plane share in place of the
     rock's tilt.
-  - **27f-7, open (a shortcut named). The lift's circulation is the even gap's.** Ψ is solved with
-    the plate's mobility taken as even, then the gap's own solve takes what is left where the gap is
-    not (a press, a domed plate), with its open rim: exact on an even gap, and under a press a little
-    of the lift can reach the rim. The full answer is the lift's own solve with the gap's mobility
-    and a closed rim, a second multigrid; or one solve with the rim's held pressure set per liquid
-    (18g-6 holds the surface tension's this way, as a gradient taken off the force near the rim). And the oil in the mix has the water's viscosity in the gap: a light
-    mineral oil is fifty times thicker (OIL_NU), which would slow a lens to about 1/25 of this in
-    water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
-    when the mix's oil gets its viscosity.
+  - **27f-7, partly shipped (Classic round five, 2026-11-22). The oil has its own viscosity in
+    the gap, and the lift's circulation sees it.** hsPrep now gives the mix's oil its own body,
+    B = (0.88·OIL_NU/ν)^c (`oilBodyLn`), so a lens of light mineral oil is about twice as stiff as
+    the water round it at the default gap and moves at a Hele-Shaw inclusion's speed in a round
+    cell, (1−ε)/(λ(1−ε)+1+ε) of Darcy's with λ ≈ 2 and ε its area share (`npm run oillift`,
+    0.52 mm/s against 0.52). The tipped dish's closed
+    circulation is solved with that uneven mobility, −∇·(B∇Ψ) = ∂φ/∂a, and the dyed water's own
+    weight goes through the same circulation (φ = water dye + κ·oil): handing it to the open-rim
+    solve under an uneven mobility leaked a mean flow, 4.5% of Clock Glass's frame a second,
+    now 0.2%. Still open, two shortcuts:
+    - **27f-7a, open (a shortcut named).** The circulation's B is the oil's alone: a press or a
+      domed plate (the gap's own h³) is still left to the gap's open-rim solve, so under a press
+      a little of the lift reaches the rim. The full answer folds h³ into B.
+    - **27f-7b, open (a shortcut named).** Past LIFT_MOST (256) the circulation's grid is coarser
+      than the solver's, so the dyed water's finest swirls are weighed as a block average: a
+      sub-block stripe of colour feels no lift. The full answer is the circulation on the
+      solver's own grid (a multigrid, like the pressure's).
   - **27f-9. A standing plate is a sealed bottle (shipped 2026-11-11; story in
     docs/plan-shipped.md §27f-9).** Lava Lamp's wax poured out over the open rim; on a standing
     plate the weight is now the closed cell's circulation (`wgsl/fluid/seal.ts`). `npm run sealed`.
@@ -200,11 +180,6 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       20 s where the wax lies on the bottom rim. A press on a standing plate is still an open
       edge for the glass. The full answer is a closed rim for the weight's part of the gap's
       own solve.
-    - **27f-9c. Lava Lamp's wax is a liquid of its own (shipped 2026-11-11; story in
-      docs/plan-shipped.md §27f-9c).** The wax is the oil, heavy cold (Oil Weight, a new
-      setting) and swelling lighter warm (OIL_EXPAND), its colour kept in it (Oil Bodies);
-      the lamp warms it as a body off the rim; the look no longer stirs itself.
-      `npm run lavawax`.
     - **27f-9d, open. A melt that does something.** A first cut gave a heavy oil a melt
       (heavy below 2 of the heat's units, as light above), which is what a real lamp runs on
       (paraffin grows 10–15% in volume as it melts). On the look's own step it changed
@@ -213,19 +188,44 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       warmed through the melt; it went. The cycle (27f-9e) shipped without it, on the gap's
       cooling; a melt comes back as a property of the poured liquid (§38e's bottles) rather than of any heavy oil, with a line in
       `npm run lavawax` that fails without it.
-    - **27f-9e. The wax goes round (shipped 2026-11-12; story in docs/plan-shipped.md
-      §27f-9e).** The heat crosses the gap to the cool upper glass at the gap's conduction
-      rate, π²κ/h² in real seconds (2.9 s water, 5.8 s wax), so a risen body cools, sinks
-      and is warmed again: about 16 s round on the look's clock at 192². `npm run lavacycle`.
-    - **27f-9g, open (a shortcut named, with 27f-9e).** The glass's temperature is laid by
-      height (riding the liquid below half the plate, the room's above, LAMP_COOL_FROM)
-      rather than a field of its own that the liquid warms and the air cools (the lumped
-      glass and air of `lib/lampBoil.ts`): a lamp run for an hour does not warm up as a
-      real one does, the cool line does not move with Heat or the lamp's brightness, and the
-      floor's warm glass warms only the wax (mixForce's source), not the water beside it.
-      Wanted: the glass as a temperature per cell (stationary, so not carried), warmed by
-      the liquid through the gap and cooled by the air at h ≈ 10 W/m²K, with the lamp
-      heating the floor's glass; then the cycle's period should follow the lamp.
+    - **27f-9g, open (shortcuts named, with 27f-9e and 27f-9h).** The glass's temperature is
+      laid by height (the floor's at LAMP_GLASS, fading up over a fin length; the room's above
+      half the plate, LAMP_COOL_FROM) rather than a field of its own that the lamp heats, the
+      liquid warms and the air cools (the lumped glass and air of `lib/lampBoil.ts`): a lamp
+      run for an hour does not warm up as a real one does, the cool line and the floor's
+      temperature do not move with Heat or the lamp's brightness, and Gravity turns the floor
+      on (any tilt) rather than dimming it. The rate both ends work at is the thin gap's
+      (π²κ/h², 2.9 s in water), standing in for a fat bottle's far slower conduction, which
+      is why the lamp goes round in 32 s where a real one takes minutes. And a wax that is dye
+      with a weight (no oil phase) is still warmed by the old kick into the wax alone
+      (LAMP_HEAT), which hovers for the same reason 27f-9h found. Wanted: the glass as a
+      temperature per cell (stationary, so not carried), heated by the lamp at the floor,
+      warmed by the liquid through the gap and cooled by the air at h ≈ 10 W/m²K, for dye
+      and oil alike; then the cycle's period should follow the lamp.
+    - **27f-9i, open. The wax's capillary length is a quarter of a real lamp's.** At the Dye
+      Weight 0.5 a standing plate runs (27f-9j) the wax's ℓc is about 3.5 mm against a real
+      lamp's 1.5 cm. The full answer is σ per liquid in N/m (§38e's bottles) with the wax's own
+      low interfacial tension against its liquid, and a weight the dial can take below 0.5.
+    - **27f-9j, open. Dye Weight is dead below 0.5 on a standing plate.** The solver floors it
+      there when Plate Upright is on (`fluid.ts`, "Dye weighs something whether or not a look
+      says how much"), so the dial reads 0.2 and the plate runs 0.5: Lava Lamp at 0.2, 0.35 and
+      0.5 was one run to the last digit (lab, 128², 30 s), and 27f-9h's "0.7 → 0.2" was 0.7 →
+      0.5. Wanted: the floor only where a look sets no weight at all, or the dial showing what
+      runs; `npm run lavacycle` held while it moves.
+    - **27f-9k, open. The colour is counted in the wax's weight, and the projector's light
+      heats the wax wherever it floats.** Two things found under the stall. Dye Weight weighs
+      the wax's own dye, so lightening the colour (LAVA_DYE 2.6 → 0.55) lightened the wax and
+      moved its balance; a liquid's weight should be its own (Oil Weight) and its colour a
+      tracer. And the absorbed light of the projector (LAMP_HEATING, derived for a 1 mm layer,
+      §38's audit) warms dyed wax at any height on a standing lamp: with all conduction off
+      the wax rose on that alone to 0.86 of the height and stayed. A real lamp's bulb is
+      under the bottle; the light through the glass is not what lifts its wax. Wanted: the
+      look's light as heat only where the look asks for it, and measured against the floor's.
+    - **27f-9l, open. `gapThickness` is the Thickness (viscosity) dial, not the gap.** The
+      setting's key reads as the glass gap, which is the cover's own (Plate Pressure squeezes it; the
+      solver's `REST_GAP`); a lab script that passes
+      it as the gap is wrong by the name alone (it cost an hour here). Rename the key with a
+      migration, or say so where `VisualizerSettings` declares it.
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
@@ -254,6 +254,22 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       at 6 s, 192²: haze 1,474 cells, colour in the bodies 72%, 83% clear (`lavawax` 4/4).
       What is left of 27f-9f is the Mac's minute: whether the plumes still strip colour
       over a long take, which the film after this PR shows.
+      *The Mac's minute, filmed (27f-9h, 2026-11-12, two takes of 150 s, no hands, no
+      sound):* yes, in the app, and not in the lab. The film: fat dark caps on stalks to
+      about 20 s, red streaks and folded sheets by 30 s, and from about 1:40 one marbled
+      orange-red column up the middle with a pale orange wash round it; the wax never
+      gathers back into separate round bodies. The lab over the same 150 s (128², the
+      look's own settings, `scratch/stall/probe.mjs`): the share of the colour inside the
+      wax (oil above a half) is 97% laid, then 81% to 92% at every 15 s sample, the wax's
+      cells 1,095 laid and 837 to 909 after, the fringe (a tenth to a half oil) 138 laid
+      and 164 to 334 after. So the lab's wax keeps its colour and its area for the whole
+      take and the app's picture does not. What differs between the two is not yet known,
+      and is the next thing to measure before anything is changed: the app's grid and step
+      on this Mac's tier against the lab's 128² at a sixtieth; what the plate draws (the
+      dye, at the dye's own grid) against what the probe reads (the oil); and whether the
+      sheets are 27f-9i's short capillary length seen at the app's finer grid. A check for
+      it would read the app's own fields after two minutes (the share of the dye inside
+      the wax, and the count of separate bodies), which the lab's `lavawax` does not.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).
@@ -268,12 +284,6 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   project's shared files (`dials/survey-2026-10-31.md`). The rule it leaves: the bottom step is
   barely there, the top is past nature with the law still at the core, the default and every
   look's value stay where they are, and Evolve never takes a dial to its far end on its own.
-  - **27h-1, shipped (#626).** Twenty-five dials let further where their consumer allowed it;
-    story in `docs/plan-shipped.md` §27h-1.
-  - **27h-2, shipped (this PR).** The dials whose top the solver held a second time: Swirl,
-    Dye Weight and Heat Spread to 2, Pushes Dye to 1.2, Drop Height to 2, Background Loop to
-    1.4, Glass Smear to 3 with no gate, Momentum's lasting current to 0.999. Story in
-    `docs/plan-shipped.md` §27h-2; `npm run widedials`.
   - **27h-2b, open. Buoyancy's top is the lasting current's cap.** The dial already runs to 2
     and nothing clamps it, but the current it drives is held to ¾ of a cell a step
     (`maxCurrent`, a CFL limit, not a choice), so past where a warm plate reaches the cap more
@@ -292,7 +302,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27h-3, open. Dials whose top is held in the plate shader** (after 38h, which rewrites
     `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
     the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate
-    Boundary Glow near 0.45), Gate Edge (clamp the mix, let the width grow).
+    Boundary Glow near 0.45; since 18e-5 it draws nothing in focus, so its line waits on **18e-6**), Gate Edge (clamp the mix, let the width grow).
     *Check written first* (2026-11-07): `npm run shaderdials -- --owed=droplets,cells,gloss,glow,gate`
     (lab4), each dial to its new top (2, 1.4, 2, 2, 2) in `PIN_RANGE`, its uniform not clamped to the
     old top, no look moved, and in the lab the last quarter of the range changing the picture by a

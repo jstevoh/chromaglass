@@ -94,7 +94,7 @@
  *      through it and so the gap ratio of flux, printed; the check asks the
  *      thin gap's to be under half of that as well.
  *   5. Liquid is conserved where the gap changes. On a domed plate (the rim
- *      tighter than the middle) stirred by turbulence and spin and a lasting
+ *      tighter than the middle) stirred by turbulence and a lasting
  *      current, the flux's divergence ∇·(hu) over the flux, averaged over the
  *      dish, at its worst over twelve samples 50 steps apart: under 0.005 and
  *      under a fifth of the old solver's, for water and for glycerine. A
@@ -270,7 +270,7 @@ try {
     out.dent = dent;
 
     // 5. Liquid is conserved where the gap changes.
-    const stir = { turbScale: 1, turbDetail: 3, spin: 0.03, plateCurve: 0.8, gapSpring: 0.02, currentGrav: 0.02, maxCurrent: 0.05 };
+    const stir = { turbScale: 1, turbDetail: 3, plateCurve: 0.8, gapSpring: 0.02, currentGrav: 0.02, maxCurrent: 0.05 };
     const cons = {};
     for (const [name, over] of [['old', stir], ['water', { ...stir, thinGap: 1, gapThickness: 0 }], ['glycerine', { ...stir, thinGap: 1, gapThickness: 1 }]]) {
       await lab.create(N, N);

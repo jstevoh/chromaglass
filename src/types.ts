@@ -219,12 +219,30 @@ export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'notes'
  * old shape is a special case of the new one rather than a thing to convert.
  */
 /**
- * What a hand does to one place on the plate (PLAN 25h, lib/areaCords.ts):
- * warms it, stirs it with a paddle, pours into it, or picks which of its
- * bottles pours. Only a cord aimed at an area can take one, and a cord aimed
- * at an area can take nothing else.
+ * What a hand does to the liquid (PLAN 25h, 38v-1, lib/areaCords.ts): warms
+ * it, stirs it with a paddle, pours into it, picks which bottle pours, or
+ * presses the glass down on it. A cord aimed at an area does it there; a cord
+ * with no area does it to the whole plate, whose bottles are the look's dyes.
+ * A cord aimed at an area can take nothing else.
  */
-export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue';
+export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue' | 'areaPress';
+
+/**
+ * A dial a cord can ride as a master (PLAN 38v-1, lib/areaCords.ts
+ * `CORD_MASTERS`): the cord's reading is scaled by it, so one knob turns a
+ * whole family of cords up or down. Sound Drive is the master of the music's
+ * hands, Kick Bloom of the kick's pour.
+ */
+export type CordMaster = 'audioImpact' | 'kickBloom';
+
+/**
+ * Which of the music's hands a cord stands for (PLAN 38v-1, lib/musicCords.ts),
+ * so the coarse wiring on the desk and the phone's sliders can find and turn
+ * it. Absent on every other cord.
+ */
+/** The music's hands, by what each did (lib/musicCords.ts); the list is what a file may name. */
+export const MUSIC_ROLES = ['pulse', 'heat', 'press', 'bloom', 'stream', 'swell', 'bottle'] as const;
+export type MusicRole = typeof MUSIC_ROLES[number];
 
 /**
  * How a sound or band cord shapes its reading before it moves a setting or an
@@ -290,6 +308,30 @@ export interface SceneMapping {
   threshold?: number;
   attack?: number;
   release?: number;
+  /*
+    How a hand acts (PLAN 38v-1, lib/areaCords.ts). Read only on a cord aimed
+    at a hand (`AreaTarget`); absent, each is what the hand did before it had
+    one, so a cord saved before reads as it did.
+  */
+  /** The hand's reach, as a share of its area's radius (the plate's half-width with no area): absent, the whole area. 0.02..1. */
+  size?: number;
+  /**
+   * A pour that brings liquid from a dropper rather than washing dye over the
+   * reach. Following, the dropper pours `volume` drops' worth a second at full;
+   * gated, each hit lays a slug of `volume` drops' worth (lib/dropImpact.ts
+   * `DROP_AMOUNT` each) and a dose of the bottle's own liquid.
+   */
+  volume?: number;
+  /** How many drops a gated slug is split into, scattered over the reach (1..16). */
+  drops?: number;
+  /** How far the hand roams its area or the plate as it acts, 0 (its middle) to 1 (out to the reach). */
+  wander?: number;
+  /** Which bottle along the hand reaches for, after the one picked or in turn (a whole number). */
+  bottle?: number;
+  /** The dials this cord rides as masters (`CordMaster`), each scaling its reading. */
+  masters?: CordMaster[];
+  /** Which of the music's hands this cord is (`MusicRole`), for the desk's wiring and the phone. */
+  role?: MusicRole;
 }
 
 export interface VisualizerSettings {
@@ -330,17 +372,6 @@ export interface VisualizerSettings {
   inkTitleSize: number;
   inkTitleY: number;
   inkTitleSweep: number;
-  /**
-    How a song's title goes up (PLAN 37x-10j, app/songTitle.ts): true, the
-    default, is the corner caption of a 1980s music channel (artist, the
-    song in quotes, album, label; lib/songCaption.ts), on the screen and
-    burned into the live stream; false pours it as ink, as 37x-10 did. It
-    chooses for the ear's titles (`inkTitle`) and a song show's Pour the title.
-    The default is the caption on the owner's word (2026-11-10, "simple ui
-    overlay"), not today's ink: a saved show with titles on now captions
-    them. Titles themselves stay off by default, so no plate changes.
-  */
-  titleCaption: boolean;
   /*
     The logo melted at the start of a film or a stream (PLAN 37x-11,
     lib/logoMelt.ts): when the Live Show goes on air or the Record button
@@ -591,6 +622,19 @@ export interface VisualizerSettings {
    * Optional so a look saved before it reads as 0.
    */
   slosh?: number;
+  /**
+   * A hand tipping the flat plate on the projector, left and right (PLAN
+   * 18a-13m): −1 to 1, 0 level. Up dips the right edge and the colour runs
+   * right. Two knobs on a controller are what it is for. Not Gravity: the
+   * plate stays flat on the lamp, and on a thin gap heavy dye slides down the
+   * tip and light oil rises (lib/handTilt.ts says why it is that tilt, eased,
+   * with a level middle). Added to the remote phone's tilt. A hand's alone:
+   * never the sound's or Evolve's. Optional so a look saved before it reads
+   * as level.
+   */
+  plateTiltX?: number;
+  /** The same, top and bottom: up dips the top edge and the colour runs up the screen. */
+  plateTiltY?: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -755,7 +799,7 @@ export interface VisualizerSettings {
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
   blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
-  boundaryContrast: number;   // bright edge-line strength where two dye colors meet
+  boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and now only shades that step in the closeup (18e-7)
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
   colourBody?: number;
@@ -770,6 +814,8 @@ export interface VisualizerSettings {
   lampGround?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  /** The oil/water interface drawn as the step it really is, not the solver's few-cell band (PLAN 38w-15): 0 off, 1 sharp. */
+  crispEdges?: number;
   /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -814,6 +860,9 @@ export interface VisualizerSettings {
   filmKey: number;            // luminance below which the film is transparent (a black key)
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
   filmImpact: number;         // master depth over every mapping, read from the film instead of the room
+  filmZoom: number;           // the film's frame on the plate: 1 fills it (cover-fit), above crops in, below shows it smaller with black round it
+  filmX: number;              // the film's frame slid across, in plate widths (0 centred)
+  filmY: number;              // the film's frame slid up, in plate heights (0 centred)
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -947,6 +996,27 @@ export interface VisualizerSettings {
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
+  soapFilm: number;           // the frame's draining soap film over the plate, its reflection 0 (off) to 1 (PLAN 32d)
+  soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
+  soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
+  soapFilmTilt: number;       // the frame's tilt from flat, degrees: 90 hangs it (gravity along the film is g sin of it, 32h)
+  glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
+  lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
+  sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
+  sideLightHue: number;       // the side lamp's colour as a hue, degrees (30 amber, 0 red, 320 magenta)
+  sideLightAngle: number;     // where round the dish the side lamp stands, degrees from the right, counter-clockwise
+  polariser: number;          // polarising sheets under the plate and at the projector's head, 0 (out) to 1 (in): the stretched liquid shows Michel-Levy colours (PLAN 31p-1)
+  analyserAngle: number;      // the analyser's turn against the polariser, degrees: 90 crossed (dark field), 0 parallel (white field, complementary colours)
+  quarterWave: number;        // quarter-wave plates with the sheets, 0 (plane: dark pinwheel arms where the stretch lines up with a sheet) to 1 (circular: colour bands only)
+  birefringence: number;      // how strongly the liquid's stretch retards the light, 0 to 1 (400 nm per unit of the solver's strain rate at 1)
+  tank: number;               // a tank of water seen through its side instead of the dish: 0 off, else the dye's glow (PLAN 47n)
+  tankFeed: number;           // the nozzle's speed, cm/s: how fast dye is fed in at the surface (47n)
+  tankWeight: number;         // how much heavier the dye is than water, %: what gravity pulls it down with (47n)
+  tankNozzle: number;         // where the nozzle sits across the tank, 0..1 (a held finger carries it too) (47n)
+  tankDrain: number;          // the share of the fed water drained through the floor, 0..1; the rest raises the level and the dye pools (47n)
+  tankHue: number;            // the dye's glow, degrees of hue (47n)
+  faradayHz: number;          // Shaker: the dish on a speaker, its drive's frequency in Hz; 0 is no shaker (PLAN 48f)
+  faraday: number;            // Shake: the dish's peak acceleration, g; past the liquid's threshold it stands up in Faraday waves (48f)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -970,8 +1040,7 @@ export interface VisualizerSettings {
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
-  macroDepth: number;         // dome shading, contact shadow and shallow depth of field
-  macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
+  macroDepth: number;         // the closeup camera's depth of field (it was also a drawn dome shading, contact shadow and paper grain until PLAN 38u-2)
   macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
@@ -1027,7 +1096,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleSize: 0.5,
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
-  titleCaption: true,
   logoMelt: false,
   beatPrediction: 0.7,
   beatLead: 80,
@@ -1098,6 +1166,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
+  plateTiltX: 0,            // level: the hand's tip of the flat plate (lib/handTilt.ts)
+  plateTiltY: 0,
   slosh: 0,                 // the plate as it was: a tilt changes the level and the liquid does not slop (lib/slosh.ts)
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
@@ -1177,13 +1247,14 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
   blobSurfaceTension: 0.3,  // colours hold apart loosely
-  boundaryContrast: 0.45,   // bright interface line between dye colors
+  boundaryContrast: 0.45,   // the optical path's contrast; no line between two dyes (18e-5)
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
   benDay: 0,
   lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
+  crispEdges: 0,            // off: the oil's edge drawn as the solver's band, as every look had it
   projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,
@@ -1217,6 +1288,27 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   microDroplets: 0,
   thinFilm: 0,
   filmPhysics: 0,           // the rainbow: the film every look was made with
+  soapFilm: 0,              // no film in the frame: every look but Soap Film
+  soapFilmRate: 1,
+  soapFilmAngle: 0,
+  soapFilmTilt: 90,
+  glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
+  lensStop: 4,
+  sideLight: 0,
+  sideLightHue: 30,
+  sideLightAngle: 160,
+  polariser: 0,             // no sheets in the beam: every look as it was, to the bit (the shader's branch)
+  analyserAngle: 90,        // crossed, the classic: dark until the liquid moves
+  quarterWave: 1,           // circular: the bands with no black lines through them (the owner dislikes thick black outlines)
+  birefringence: 0.3,       // a Turbulence-0.35 stir in broad first- and second-order bands on the Mac (lib/polar.ts)
+  tank: 0,                  // the dish from above: every look but the tank's
+  tankFeed: 1.5,
+  tankWeight: 0.5,
+  tankNozzle: 0.5,
+  tankDrain: 1,
+  tankHue: 205,
+  faradayHz: 0,             // no shaker under the dish: every look until a performer turns it on
+  faraday: 0,
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,
@@ -1243,6 +1335,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // this existed shows the same picture and moves the same way.
   filmDrive: 0,
   filmImpact: 0,
+  // The frame as it always landed: cover-fit, centred (PLAN 14ag).
+  filmZoom: 1,
+  filmX: 0,
+  filmY: 0,
   lampWarmth: 0,
   transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,
@@ -1298,7 +1394,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroCellScale: 0.5,
   macroLacing: 0,
   macroDepth: 0.5,
-  macroEdgeDetail: 0.6,
   macroRelief: 0.7,
   sceneDrive: 0,            // the room does nothing to the plate until it is asked to
   sceneHands: 0,

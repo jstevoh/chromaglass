@@ -108,7 +108,10 @@ export async function verifyFirebaseToken(token, env = {}, now = Date.now()) {
   if (!uid || uid.length > 128) return null;
   // `emailVerified`: Firebase signs anyone up with any address and a password,
   // so an address is the account's only when the token says it was proved.
-  const who = { uid, aud: project, email: typeof payload.email === 'string' ? payload.email : null, emailVerified: payload.email_verified === true };
+  // `authTime`: when the person last signed in (seconds), which a refreshed
+  // token keeps; the relay Worker (tunnel-worker.js) takes only a sign-in made
+  // for it, not a token that has been travelling for an hour.
+  const who = { uid, aud: project, email: typeof payload.email === 'string' ? payload.email : null, emailVerified: payload.email_verified === true, authTime: typeof payload.auth_time === 'number' ? payload.auth_time : null };
 
   if (header.alg === 'none') return env.FIREBASE_AUTH_EMULATOR ? who : null;
   if (header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid) return null;

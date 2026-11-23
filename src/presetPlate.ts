@@ -56,7 +56,7 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 }
 
 export const PRESET_CONTRACTS: Record<string, number[]> = {
-  'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
+  'classic':            [20, 1, 17, 0, 7],   // a magenta water; orange, amber and yellow oil, and an icy-blue accent (38w-1: the references are nine tenths warm)
   'comet':              [17, 21, 20, 18, 16, 7],  // amber head, coral, magenta, ultramarine, teal and icy tail (28i-7: one pink hue on black)
   'galaxy':             [7, 17, 18, 21, 20, 8],  // an ice-blue arm and a gold one (the seed's two arms are the first two), ultramarine, coral, magenta; 28i-7: blue-violet wisps read as Jellyfish Bloom
   'cyberpunk':          [2, 20, 10, 18, 7],       // hot pink, magenta, purple, ultramarine, ice: one neon arc (28i-7: lime and orange summed it to grey-teal)
@@ -87,7 +87,8 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9, 21, 16], // purple water; red, amber, cobalt, coral and teal oil (the seed lays the first as the water; 28i-7: a second family)
-  'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 28i-7: under cobalt every drop read green)
+  'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 47z-1: cobalt filmed on the Mac 2026-11-13 read darker, colourfulness 62 against 131, the frame 0.40 near black: vivid colour wants a bright ground)
+  'foam-cells':         [12, 7, 17, 23],           // rust water (sienna) in the films; pale icy blue, amber and lavender cells (47z-5)
   // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
   // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
   // under a yellow film laid an olive-black blot in the lab.
@@ -148,6 +149,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
   'splodascope':        ['drop'],                 // a drop at a time into the crowd, as an eyedropper does
+  'foam-cells':         ['drop'],                 // a drop into the foam presses its neighbours aside
   'saffron-lace':       ['drop'],                 // an eyedropper's drops: each one a hole in the film, or more film
 };
 
@@ -170,9 +172,10 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
  */
 export const PRESET_LIQUIDS: Record<string, string[]> = {
   // ── The originals ────────────────────────────────────────────────
-  // Oil and water with a drop of soap in it now and then: the thing that is
-  // being imitated, done the way it was actually done.
-  'classic':            ['water', 'water', 'soap'],
+  // Oil and water, the thing being imitated done the way it was done: fresh
+  // oil cells and now and then a drop of the water (38w-1). The old soap is
+  // gone: soap lowers the tension the water films between cells rest on.
+  'classic':            ['oil', 'water', 'oil'],
   'comet':              ['syrup', 'glycerine'],
   // Points of light that must not feather at the edge, and are white anyway.
   'galaxy':             ['water', 'milk'],
@@ -244,6 +247,8 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'clock-glass':        ['oil', 'water', 'oil', 'syrup'],
   // More oil into the crowd, and now and then the soapy water that holds the films.
   'splodascope':        ['oil', 'oil', 'water'],
+  // More oil presses a new cell in among the others; the water wets the films.
+  'foam-cells':         ['oil', 'water'],
   // Oil poured onto a clear film joins it (it thickens where it lands, and tears again);
   // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
   // is the lavender wash's body, which holds its place under the film.

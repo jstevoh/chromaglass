@@ -58,7 +58,7 @@ const WHEN_KINDS: [ActionWhen['at'], string][] = [
 const WHAT_KINDS: [ActionWhat['do'], string][] = [
   ['title', 'Pour the title'], ['burst', 'Burst'], ['zoom', 'Zoom'], ['kaleidoscope', 'Kaleidoscope'], ['dyes', 'Next dyes'],
   ['look', 'Switch look'], ['drain', 'Drain'], ['clear', 'Clear'], ['seed', 'Lay the look again'],
-  ['blackout', 'Fade to black'], ['lights-up', 'Lights up'], ['signoff', 'Pour the name'],
+  ['blackout', 'Fade to black'], ['lights-up', 'Lights up'], ['signoff', 'Show the name'],
 ];
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;

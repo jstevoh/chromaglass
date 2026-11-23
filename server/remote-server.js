@@ -18,10 +18,12 @@
  */
 
 import { createServer } from 'node:http';
-import { chmodSync, createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createServer as createTlsServer } from 'node:https';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { extname, join, normalize, resolve } from 'node:path';
-import { networkInterfaces } from 'node:os';
+import { hostname, networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
@@ -36,6 +38,9 @@ import { createAssistantGuard, readAssistantMode } from './assistant.js';
 import { serveMusicFile } from './assistantMusic.js';
 import { updatesCall } from './assistantUpdates.js';
 import { OSC_IN_BINDS, RELAY_OUTPUTS, oscInMode, outputsCall } from './assistantOutputs.js';
+import { createTvPairing, TV_KEY } from './tv-pairing.js';
+import { createTvRemote } from './tv-remote.js';
+import { advertise, instanceLabel } from './bonjour.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -142,8 +147,8 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.map': 'application/json; charset=utf-8',
-  // The films a TV plays while the show is off (PLAN 12-tv) and the cartoons
-  // the Film source pours: a TV's WebView is stricter about a video sent as
+  // The films a TV plays while the show is off (PLAN 12-tv), and a video
+  // served to the assistant's film or pour: a TV's WebView is stricter about a video sent as
   // octet-stream than a desktop browser, which sniffs it.
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
@@ -206,7 +211,8 @@ void licenseManager.initFromEnv().then(refreshTier);
 setInterval(refreshTier, 2000).unref?.();
 
 // ── Static files, with SPA fallback ────────────────────────────────────
-const server = createServer((req, res) => {
+// One handler for both the http and the https server (PLAN 14m-https, below).
+const handle = (req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (url.pathname === ACCOUNT_SHOWS_PATH) {
     void handleAccountShows(req, res, url);
@@ -234,7 +240,7 @@ const server = createServer((req, res) => {
     // The keys go to the laptop alone: anyone on the Wi-Fi can ask this, and
     // a key it gave them would be the key to the show.
     const laptop = isLaptop(req);
-    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH, port: PORT, hosts: lanAddresses(), key: laptop ? SHOW_KEY : null, displayKey: laptop ? DISPLAY_KEY : null }));
+    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH, port: PORT, httpsPort: tlsServer ? HTTPS_PORT : null, hosts: lanAddresses(), key: laptop ? SHOW_KEY : null, displayKey: laptop ? DISPLAY_KEY : null }));
     return;
   }
   // normalize() collapses any ../ before it can escape dist
@@ -256,7 +262,65 @@ const server = createServer((req, res) => {
     'Cache-Control': 'no-cache',
   });
   createReadStream(filePath).pipe(res);
-});
+};
+const server = createServer(handle);
+
+/*
+  ── https on the Wi-Fi, for network displays (PLAN 14m-https) ──────────
+
+  What was found (2026-10-24, measured in Chromium): a network display could
+  not start at all. Browsers give WebGPU only to a secure page, which is https
+  or the machine's own localhost, and the address this server printed for a
+  projector's browser or a second computer was http on the Wi-Fi, so the page
+  stopped at its first shader module ("GPUTextureUsage is not defined"). The
+  phone's remote needs no GPU and was never affected.
+
+  So the same files and the same relay are served over https too, on
+  HTTPS_PORT (PORT + 443 by default: 3443 beside 3000), with a certificate made
+  on the first launch and kept in server/.tls (ignored by git). It is
+  self-signed, so each display's browser warns once ("Your connection is not
+  private"; Advanced, then Proceed), and from then on the page is a secure
+  context with the GPU: Chromium treats a page whose certificate warning was
+  accepted as secure, which is what the check asks of it. Why not the other
+  ways: a certificate the browsers trust outright needs a public name and a
+  certificate authority, which a room's Wi-Fi does not have; a home-made
+  authority installed on every display is the same warning made into a setup
+  step per device; the tunnel's https works but leaves the room and needs the
+  internet; and a WebGL copy of the plate for displays would be a second
+  renderer to keep in step. The warning once per display is the least of them.
+
+  The certificate is made with the system's openssl (on every Mac, and on any
+  Linux); where there is none, or HTTPS_PORT=0, the server runs as before,
+  http only, and says so. It names localhost, this machine's .local name and
+  the addresses it has now; a display on an address added later still opens
+  it, since the warning it accepts is the same one.
+*/
+const HTTPS_PORT = Number(process.env.HTTPS_PORT ?? PORT + 443);
+const TLS_DIR = process.env.TLS_DIR ?? join(HERE, '.tls');
+const tlsFiles = () => {
+  const key = join(TLS_DIR, 'key.pem');
+  const cert = join(TLS_DIR, 'cert.pem');
+  if (!existsSync(key) || !existsSync(cert)) {
+    mkdirSync(TLS_DIR, { recursive: true });
+    const names = ['DNS:localhost', `DNS:${hostname()}`, `DNS:${hostname().replace(/\.local$/, '')}.local`, 'IP:127.0.0.1', ...lanAddresses().map((a) => `IP:${a}`)];
+    execFileSync('openssl', [
+      'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes',
+      '-keyout', key, '-out', cert, '-days', '825', '-subj', '/CN=ChromaGlass show',
+      '-addext', `subjectAltName=${[...new Set(names)].join(',')}`,
+    ], { stdio: 'ignore' });
+    try { chmodSync(key, 0o600); } catch { /* the key still works; it is only less private */ }
+  }
+  return { key: readFileSync(key), cert: readFileSync(cert) };
+};
+let tlsServer = null;
+let tlsWhyNot = '';
+if (HTTPS_PORT > 0) {
+  try {
+    tlsServer = createTlsServer(tlsFiles(), handle);
+  } catch (e) {
+    tlsWhyNot = /ENOENT/.test(String(e?.code ?? e)) ? 'no openssl on this machine to make a certificate' : String(e?.message ?? e).split('\n')[0];
+  }
+}
 
 // ── Control relay ──────────────────────────────────────────────────────
 // Displays and controllers each broadcast to the other side. There is no
@@ -333,7 +397,22 @@ const named = (req) => {
   const n = (unnamedBy.get(req.address) ?? 1) - 1;
   if (n > 0) unnamedBy.set(req.address, n); else unnamedBy.delete(req.address);
 };
-const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: MAX_FRAME, verifyClient });
+/*
+  One relay for both servers: a socket that came in over https (a network
+  display) and one over http (the laptop, a phone) are clients of the same
+  WebSocketServer, so every count and broadcast below sees them all. With
+  `noServer` the socket server no longer refuses another path itself, so the
+  upgrade does that here, as it did (400).
+*/
+const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, verifyClient });
+const upgrade = (req, socket, head) => {
+  let path = '';
+  try { path = new URL(req.url ?? '/', 'http://localhost').pathname; } catch { /* refused below */ }
+  if (path !== WS_PATH) { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); return; }
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+};
+server.on('upgrade', upgrade);
+tlsServer?.on('upgrade', upgrade);
 const roles = new WeakMap();
 
 /**
@@ -405,7 +484,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show', 'tv-code', 'tv-key', 'tv-pairing', 'tv-looks']);
 
 // ── TVs at home (PLAN 12-tv) ───────────────────────────────────────────
 // A TV plays the display's plate as a WebRTC video (src/lib/tvFeed.ts); the
@@ -426,6 +505,35 @@ const pairTv = (tv, except) => {
   sendTo(tv, { type: 'tv-show', here: display !== null });
   if (display) sendTo(display, { type: 'tv-join', id: tvIds.get(tv) });
 };
+/** A TV in: by the show key, its own key, or the laptop's Allow. */
+const admitTv = (tv) => {
+  roles.set(tv, 'tv');
+  tvIds.set(tv, `tv${++tvSeq}`);
+  pairTv(tv);
+  // The presets its remote picks from (PLAN 12-tv-remote, `tv-remote.js`):
+  // the last list the laptop sent, or ask the laptop for its state.
+  const looks = tvRemote.looks();
+  if (looks) sendTo(tv, looks);
+  else broadcastTo('display', JSON.stringify({ type: 'request-state' }));
+};
+/** The TV remote's rules (PLAN 12-tv-remote): which presets a TV may pick, and how often. */
+const tvRemote = createTvRemote();
+
+// Pairing by four digits (PLAN 12-tv-2, `tv-pairing.js` says why): a TV with
+// no key waits as `pairing`, hears nothing and relays nothing, while the
+// laptop's page shows its digits with Allow and No.
+const pairing = createTvPairing({ file: process.env.CHROMAGLASS_TV_FILE ?? join(HERE, '.tvs.json') });
+/** The sockets let in by a TV key, closed when the laptop forgets the paired TVs. */
+const pairedTvs = new WeakSet();
+const pairingMessage = () => ({ type: 'tv-pairing', asks: pairing.list(), paired: pairing.paired() });
+const tellPairing = () => { for (const d of clientsOf('display')) sendTo(d, pairingMessage()); };
+const refuseTv = (socket, reason) => { sendTo(socket, { type: 'denied', reason }); try { socket.close(); } catch { /* gone */ } };
+const pairingWatch = setInterval(() => {
+  const old = pairing.expire();
+  for (const s of old) refuseTv(s, 'expired');
+  if (old.length) tellPairing();
+}, 5000);
+pairingWatch.unref?.();
 
 // ── The assistant (PLAN 44b) ───────────────────────────────────────────
 // The owner's own AI assistant, joined from this Mac (`mcp/chromaglass-mcp.js`).
@@ -456,6 +564,17 @@ const serverOutputs = {
   setOscIn: (mode) => setOsc(mode === 'off' ? 0 : OSC_ON_PORT, OSC_IN_BINDS[mode]),
 };
 const assistantMode = () => assistantNow;
+/*
+  OSC in opened to the whole network by the assistant closes again when the
+  switch goes off (the owner's choice, 2026-11-13). The security review found
+  that Full mode's osc_in network, asked by an assistant a page or a title had
+  talked round, bound unauthenticated OSC on 0.0.0.0 and kept it in show.json,
+  so anyone on the venue's Wi-Fi could drive the show long after the assistant
+  was switched off. This is the mode it was in before the assistant opened it,
+  or null when the assistant has not (or the owner had it open already); the
+  Mac app does not keep the assistant's network choice in show.json either.
+*/
+let assistantOpenedOsc = null;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
 // last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
@@ -475,6 +594,16 @@ const assistantWatch = setInterval(() => {
   guard.stop();
   // Cut, not a closing handshake a stalled socket could sit in for half a minute.
   if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.terminate();
+  if (mode === 'off' && assistantOpenedOsc !== null) {
+    const back = assistantOpenedOsc;
+    assistantOpenedOsc = null;
+    const outs = appOutputs ?? serverOutputs;
+    // The owner picked it in the Show menu since (the Mac app keeps that choice): theirs, left open.
+    if (!(appOutputs && outs.state()?.oscIn?.kept)) {
+      console.log(`  assistant switch off: OSC in back to ${back}`);
+      void Promise.resolve(outs.setOscIn(back)).catch(() => {});
+    }
+  }
 }, 1000);
 assistantWatch.unref?.();
 
@@ -520,7 +649,34 @@ wss.on('connection', (socket, req) => {
         socket.close();
         return;
       }
-      if (!keyIs(message.key, role === 'display' ? DISPLAY_KEY : SHOW_KEY)) {
+      // A TV asking to pair has no key to be wrong: it waits for the
+      // laptop's Allow, and asking is never a guess.
+      if (role === 'tv' && message.pair === true && !message.key) {
+        clearTimeout(deadline);
+        const ask = pairing.ask(socket, address);
+        if (ask.replaced) refuseTv(ask.replaced, 'expired');
+        if (ask.busy) {
+          console.log('  tv refused: too many TVs asking to pair');
+          refuseTv(socket, 'busy');
+          if (ask.replaced) tellPairing();
+          return;
+        }
+        roles.set(socket, 'pairing');
+        console.log(`  a TV asks to pair: ${ask.code}`);
+        sendTo(socket, { type: 'tv-code', code: ask.code });
+        tellPairing();
+        return;
+      }
+      // A TV's own key is 128 random bits, never a guess at the show's
+      // eight digits: one this show does not hold (forgotten, or another
+      // Mac's) is told so, and the TV asks to pair again.
+      const tvKey = role === 'tv' && typeof message.key === 'string' && TV_KEY.test(message.key);
+      if (tvKey && !pairing.isTvKey(message.key)) {
+        console.log('  tv refused: a TV key this show does not hold');
+        refuseTv(socket, 'unpaired');
+        return;
+      }
+      if (!tvKey && !keyIs(message.key, role === 'display' ? DISPLAY_KEY : SHOW_KEY)) {
         // A display with no key is not a guess: it is the laptop's own page
         // opened at an address the relay does not give the display key to
         // (its Wi-Fi address, say), which the page no longer even sends
@@ -552,8 +708,8 @@ wss.on('connection', (socket, req) => {
         broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
       }
       if (role === 'tv') {
-        tvIds.set(socket, `tv${++tvSeq}`);
-        pairTv(socket);
+        if (tvKey) pairedTvs.add(socket);
+        admitTv(socket);
       }
       if (role === 'assistant') {
         socket.send(JSON.stringify({ type: 'assistant-mode', mode: assistantMode() }));
@@ -568,6 +724,8 @@ wss.on('connection', (socket, req) => {
           socket.send(linkMessage());
           // And OSC out's state, which offers its switch the same way.
           socket.send(oscOutMessage());
+          // And the TVs asking to pair, and how many are paired.
+          socket.send(JSON.stringify(pairingMessage()));
         }
         // TVs waiting with no show (the laptop's page reloaded, or the app
         // just opened) are this display's now.
@@ -578,10 +736,52 @@ wss.on('connection', (socket, req) => {
 
     const from = roles.get(socket);
     // Nothing is relayed for a socket that never said hello with the key.
-    if (from === 'unknown' || RELAY_ONLY.has(message.type)) return;
+    if (from === 'unknown' || from === 'pairing' || RELAY_ONLY.has(message.type)) return;
+    // The laptop's answer to a TV asking to pair, and its Forget. From the
+    // laptop's own page only: a phone remote is a guest's as often as not.
+    if (message.type === 'tv-allow' || message.type === 'tv-refuse' || message.type === 'tv-forget') {
+      if (from !== 'display') return;
+      if (message.type === 'tv-forget') {
+        pairing.forget();
+        console.log('  paired TVs forgotten');
+        for (const c of clientsOf('tv')) if (pairedTvs.has(c)) refuseTv(c, 'unpaired');
+      } else if (message.type === 'tv-allow') {
+        const ok = pairing.allow(String(message.id));
+        if (ok && ok.socket.readyState === 1) {
+          console.log('  a TV paired');
+          sendTo(ok.socket, { type: 'tv-key', key: ok.key });
+          pairedTvs.add(ok.socket);
+          admitTv(ok.socket);
+        }
+      } else {
+        const no = pairing.refuse(String(message.id));
+        if (no) {
+          // Counted as a wrong key: No three times locks the address out,
+          // so a stranger's asks cannot keep the laptop's screen busy.
+          if (!LOOPBACK.test(no.address ?? '')) wrongKey(no.address);
+          console.log('  a TV was refused');
+          refuseTv(no.socket, 'refused');
+        }
+      }
+      tellPairing();
+      return;
+    }
+    // A TV's remote picks a look (PLAN 12-tv-remote): only a preset the
+    // laptop listed, at most one every TV_PICK_MS (`tv-remote.js` says why),
+    // handed to the laptop as the `preset` a phone sends, through the guard
+    // as a phone's message goes. From anyone but a TV it is dropped: a phone
+    // has `preset` already.
+    if (message.type === 'tv-pick') {
+      const pick = from === 'tv' ? tvRemote.pick(socket, message) : null;
+      if (pick) {
+        guard.onPerformer(pick);
+        broadcastTo('display', JSON.stringify(pick));
+      }
+      return;
+    }
     // A TV's handshake: display → the one TV it names, TV → its own display
-    // with its id added. A TV says nothing else: it only watches, and a
-    // patch from it must never reach the show as a phone's would.
+    // with its id added. A TV says nothing else but its pick (above): it
+    // watches, and a patch from it must never reach the show as a phone's would.
     if (message.type === 'tv-signal' && (from === 'display' || from === 'tv')) {
       const signal = message.signal;
       if (!signal || typeof signal !== 'object' || typeof signal.kind !== 'string') return;
@@ -616,7 +816,13 @@ wss.on('connection', (socket, req) => {
         reply = updatesCall(message, assistantMode(), appUpdates);
       } else if (message.type === 'assistant-outputs' && RELAY_OUTPUTS.includes(message.do)) {
         // OSC in, Syphon and their status (PLAN 44k-14): the relay's own, answered once the socket has bound.
-        void outputsCall(message, assistantMode(), appOutputs ?? serverOutputs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+        const outs = appOutputs ?? serverOutputs;
+        const oscBefore = message.do === 'osc-in' ? outs.state()?.oscIn?.mode ?? 'off' : null;
+        void outputsCall(message, assistantMode(), outs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+          if (oscBefore !== null && r?.ok) {
+            if (message.mode !== 'network') assistantOpenedOsc = null;
+            else if (oscBefore !== 'network' && assistantOpenedOsc === null) assistantOpenedOsc = oscBefore;
+          }
           if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...r }));
         });
         return;
@@ -652,6 +858,9 @@ wss.on('connection', (socket, req) => {
     if (from === 'display' && message.type === 'state') {
       guard.onDisplayState(message.state);
       broadcastTo('assistant', raw);
+      // The TVs hear the presets and the live one, and only when they change.
+      const looks = tvRemote.onDisplayState(message.state);
+      if (looks) for (const tv of clientsOf('tv')) sendTo(tv, looks);
     }
     // A still is the assistant's alone: a pad on Draw paints the stream, and
     // a 1280 picture a phone would drop unpainted is half a megabyte on its Wi-Fi.
@@ -718,6 +927,7 @@ wss.on('connection', (socket, req) => {
       const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
       broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
     }
+    if (role === 'pairing' && pairing.drop(socket)) tellPairing();
     if (role === 'tv') {
       const display = tvDisplay.get(socket);
       if (display) sendTo(display, { type: 'tv-leave', id: tvIds.get(socket) });
@@ -978,7 +1188,29 @@ const portTaken = (err) => {
 server.on('error', portTaken);
 wss.on('error', portTaken);
 
+/*
+  The https port is taken first and is never a reason to stop the show: if
+  something else holds it, the server says why and runs http only, as before.
+  The http port is listened on once that is settled, so the addresses printed
+  below are only ones that answer.
+*/
+const tlsReady = new Promise((settle) => {
+  if (!tlsServer) { settle(); return; }
+  tlsServer.once('error', (e) => {
+    tlsWhyNot = e?.code === 'EADDRINUSE' ? `port ${HTTPS_PORT} is in use (HTTPS_PORT=<another> moves it)` : String(e?.message ?? e);
+    tlsServer = null;
+    settle();
+  });
+  tlsServer.listen(HTTPS_PORT, '0.0.0.0', () => settle());
+});
+await tlsReady;
+// The Bonjour advert, so a TV app finds this show by itself (PLAN 12-tv-2,
+// `bonjour.js`). CHROMAGLASS_BONJOUR=0 keeps it quiet.
+let bonjour = null;
+/** Say goodbye on the network, for the Mac app's quit. */
+export const stopBonjour = () => { bonjour?.stop(); bonjour = null; };
 server.listen(PORT, '0.0.0.0', () => {
+  if (process.env.CHROMAGLASS_BONJOUR !== '0') bonjour = advertise({ port: PORT, id: pairing.showId(), name: instanceLabel(hostname()) });
   const hosts = lanAddresses();
   console.log('\n  ChromaGlass show server\n');
   console.log(`  Show key:           ${SHOW_KEY}${process.env.SHOW_KEY ? '' : '  (kept between launches; delete server/.show-key for a new one)'}`);
@@ -992,10 +1224,12 @@ server.listen(PORT, '0.0.0.0', () => {
   } else {
     for (const host of hosts) {
       console.log(`  Phone (the remote): http://${host}:${PORT}/?remote=1&key=${SHOW_KEY}`);
-      console.log(`  Network display:    http://${host}:${PORT}/?cast=true&key=${SHOW_KEY}`);
+      if (tlsServer) console.log(`  Network display:    https://${host}:${HTTPS_PORT}/?cast=true&key=${SHOW_KEY}`);
       console.log(`  TV at home:         http://${host}:${PORT}/tv?key=${SHOW_KEY}`);
     }
   }
+  if (tlsServer) console.log('  (A network display\'s browser warns once that the connection is not private: Advanced, then Proceed.)');
+  else console.log(`  Network displays need https, which is off: ${tlsWhyNot || 'HTTPS_PORT=0'}.`);
   console.log('\n  Same Wi-Fi: use the addresses above. Across buildings, other access points');
   console.log('  or the internet: run "npm run tunnel" in another window and use the https');
   console.log(`  address it prints, with ?cast=true&key=${SHOW_KEY} or ?remote=1&key=${SHOW_KEY}.\n`);

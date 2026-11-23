@@ -1223,6 +1223,15 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
 - In a thick look it should move much less. Does that read as the liquid being thick,
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.
+- Since 15g-11 the breath is a jet: drag a short way and hold. Does the liquid keep
+  streaming the way you dragged, a tongue running on a palm ahead of the pointer, for
+  as long as you hold? Does a slanted stroke blow along the slant, without wavering?
+  If the plume reads too long, too short or too wide, say which: its core and spread
+  are textbook numbers for a jet, not a measurement of a breath over this dish.
+- Since 15g-12 wind lays no bubbles and a press that never moves is the straw: one
+  round bubble that grows while you hold. Is anything left of the flower-like ring
+  round floating bubbles after a Blow (PLAN 15g-15)? If you miss the wind's bubbles,
+  say so: they were a stand-in, and what would be real is foam at a dish's edge.
 
 
 ## 46. Turing Print (PLAN 26d)
@@ -1565,7 +1574,7 @@ at a show, through the microphone in the room as well as through the laptop:
 Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
 the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).
 
-## 66. The cartoons, poured and filmed (PLAN 14ac)
+## 66. The cartoons, poured and filmed (PLAN 14ac) — withdrawn 2026-11-13: the shelf is gone (14ag)
 
 On the desk, the Dye panel has a Cartoons shelf under Image… and Video…; on the phone, it is at
 the bottom of the dye sheet. Each cartoon has Pour and Film.
@@ -1926,7 +1935,7 @@ until the app next goes online (no grace period, PLAN 23.17h).
 4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
    hot reds acceptable, or should the end hold only half the brightness back?
 
-## 85. The colour cartoons (PLAN 14ac, 14ac-4)
+## 85. The colour cartoons (PLAN 14ac, 14ac-4) — withdrawn 2026-11-13: the shelf is gone (14ag)
 
 Five cartoons in colour on the Cartoons shelf (the desk's Dye panel, the phone's dye sheet), marked "colour":
 Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Travels.
@@ -2480,6 +2489,8 @@ stuck on "Finish in your browser" after the browser signed in.
 
 ## 114. Song titles painted as ink, then swept away (PLAN 37x-10)
 
+*Cancelled 2026-11-12: the owner shelved the poured-ink titles (PLAN 37x-10m), so there is nothing here to judge; the steps below are kept as the record.*
+
 The lab measures a still plate; how a look's own flow treats a title is taste, and only the
 Mac's film shows the letters at the solver's full grid.
 
@@ -2546,6 +2557,8 @@ the song and whether the show it designs plays well.
 
 ## 117. Song titles poured as ink from the phone (PLAN 37x-10c)
 
+*Cancelled 2026-11-12: the owner shelved the poured-ink titles (PLAN 37x-10m), so there is nothing here to judge; the steps below are kept as the record.*
+
 `npm run assistant` and `npm run remotemix` hold the message: what the phone's box and the
 assistant send, what the guard lets through, and how the rows are laid out. Only the wall
 can say whether the words read when they land and how a look's own flow carries them off.
@@ -2581,8 +2594,8 @@ square or a halo around it, the plate around it clearing or dimming.
 
 ## 120. Song titles as a 1980s corner caption (PLAN 37x-10j)
 
-1. Settings → **Logo & Titles** → **Song titles** on, **As a corner caption** on (the
-   default). Play a song the ear names, or have the assistant call `song_title`, on a dark
+1. Settings → **Logo & Titles** → **Song titles** on (the caption is the only kind of
+   title since 37x-10m). Play a song the ear names, or have the assistant call `song_title`, on a dark
    look and a bright one, and once with the Live Show on air.
 2. The card should come up in the bottom-left corner in about a fifth of a second: the
    artist, the song in quotation marks, the album, the label, white with a dark drop shadow,
@@ -2658,3 +2671,354 @@ real seconds (about 3 s for the liquid, 6 s for the wax), so a risen body cools 
 3. Bad: the wax hanging in the middle in a line where the cool glass starts (half the
    height), a pool on the floor that turns over in itself and never lets a blob go, or a
    cycle so quick it looks like boiling.
+
+## 125. The Android TV app finds the Mac and pairs by four digits (PLAN 12-tv-2)
+
+The check (`npm run tvpair`) asks the advert and pairs on Linux; a real Google TV, the Mac's
+own mDNSResponder beside the advert, and the WebView's video decode are only seen here.
+
+1. Download `chromaglass-tv-debug` from the newest green run of the **Android TV app**
+   workflow (Actions), unzip it, and side-load `app-debug.apk` on a Google TV or Android TV
+   box (Settings → Developer options → USB or network debugging, then
+   `adb connect <tv-ip>` and `adb install app-debug.apk`).
+2. Open the Mac app with a show running, on the same Wi-Fi. Start **ChromaGlass** on the TV.
+   It should find the Mac within a few seconds and show four large digits.
+3. On the Mac, a card *A TV wants to join* shows the same four digits: press **Allow**. The
+   TV should go live with the plate within a few seconds.
+4. Quit the TV app and open it again: it should go straight to the plate, asking nothing.
+   Quit the Mac app: the TV's list should drop the Mac at once (the goodbye), and find it
+   again when the Mac app reopens.
+5. **Cast → TV at home → Forget the paired TV**: the TV should show four new digits.
+6. Bad: the list stays empty with the Mac app open (the advert not heard: try
+   `node server/bonjour.js` on another computer on the Wi-Fi), digits that never reach the
+   Mac, a black picture after Allow, or a picture that stutters where the browser's `/tv`
+   on the same TV did not.
+
+## 126. The TV's remote picks the look (PLAN 12-tv-remote)
+
+The check (`npm run tvremote`) presses the keys on the built `/tv` page as the app hands
+them over and watches the presets a stand-in laptop is handed; a real remote through the
+Android TV WebView, and the look changing on the Mac, are only seen here.
+
+1. With the TV app paired and live (§125), press **right** on the remote: the Mac should play
+   the next preset in its list, and the TV's top line say *Next: …* then *Now playing: …*.
+   **Left** goes back one.
+2. Hold **right** for two seconds: one look on, not ten.
+3. Press **OK**: a random look, never the one already playing.
+4. Press **up** (or **Menu**, if the remote has one): the list of looks opens on the right,
+   the playing one marked. Move with up and down, press OK: that look plays and the list
+   shuts. Open it again and press **Back**: the list shuts and the TV stays on the show
+   (a second Back leaves for the list of Macs, as before).
+5. Good: each press changes the Mac within a second. Bad: a key that does nothing, Back
+   leaving the show while the list is open, or the D-pad moving a focus ring on the page.
+
+## 127. Soap Film is a real film (PLAN 32d)
+
+The check (`npm run soapplate`) proves the plate draws the film's own colours from its
+thickness, that the plate's flow moves it, and that a drained film is drawn again, on the
+lab's software WebGPU. How it looks moving at sixty frames, and with the band playing, is only
+seen here.
+
+1. Open **Soap Film**. Good: one sheet of interference colour over the whole view, thin
+   (gold, blue, magenta) at the top and paler, higher orders lower down, mottled into patches
+   that rise and sink. Bad: black, one hue, a flat rainbow by height, or the colours upside
+   down (pale at the top).
+2. Let it play two or three minutes: the top should thin through gold and blue toward black,
+   the black creeping down; then a fresh film is drawn from the top down in about two seconds.
+3. With music, the kicks open soap on the plate and its flow should swirl the film into combed
+   streaks. Bad: the film never moves, or moves as a whole.
+4. Settings → Camera → **Film Angle**: leaning it should move every band toward the thin end
+   (as if the film were thicker). **Drain Rate** at 4: everything above happens four times as fast.
+5. On another look, Soap Film at 0: the look exactly as before.
+
+
+## 128. Foam Cells: a packed foam at 120° (PLAN 47z-5)
+
+The check (`npm run foam`) proves, on the lab's software WebGPU at the app's 384², that the
+cells hold and that their junctions turn from the lay's random angles toward Plateau's 120°.
+How it looks at sixty frames, and with a band, is only seen here.
+
+1. Open **Foam Cells** on the lamp. Good: the dish filled with pale cells (icy blue, amber,
+   lavender) pressed into polygons, thin rust lines between them that meet in threes, a small
+   rust triangle at each meeting. Bad: round drops in rust water (a wet crowd), drops merging
+   in the first seconds, or square, grid-shaped cells.
+2. Watch the first five seconds: corners that start crooked should even out toward three equal
+   angles and the films straighten. The foam then stands almost still.
+3. With music, a hard kick should pop a film here and there, two cells becoming one with a
+   rust tail drawn back into the borders; the foam grows coarser over a few minutes. Bad:
+   every film popping at once, or none ever.
+4. Beside the macro film it was built from (`npm run watch -- --refs`,
+   `cosmo-packed-foam-cells`): the cells are bigger than the film's (PLAN 47z-8 says why).
+
+## 129. Glitter, the lens and a side lamp (PLAN 47e, 47d-1, 47b-1)
+
+The check (`npm run glint`) proves the laws, that off is off to the byte, that the side lamp
+lights the dye from its side and leaves black black, that glitter darkens a lamp ground in
+proportion, and that the lens spreads specks into discs wide open and draws six-pointed stars
+stopped down, on the lab's software WebGPU at one frame. How it moves at sixty frames is
+only seen here.
+
+1. Open a blue-glowing look on black. Settings → Lamp & Light → **Side Light** to 0.6. Good:
+   the dye's near side takes on an amber sheen, the slopes of fronts and blobs facing the lamp
+   catch it, the ground stays black. Bad: the whole frame tinted, a hard line across the plate,
+   or the far side as bright as the near.
+2. **Side Angle** round the dial: the lit side should walk round the plate. **Side Colour** to
+   magenta: the sheen follows.
+3. Settings → Camera → **Glitter** to 0.5, then zoom into the closeup with Light Play up. Good:
+   pin-point glints scattered through the liquid that drift with the dye (not across it),
+   flashing on and off as the flakes turn, thickest where the flow shears. Bad: glints sliding
+   over still dye, all flashing at once, or a frozen field.
+4. **Lens Stop** to 1.4: out-of-focus specks swell into soft round discs; move **Projector
+   Focus** and different specks come sharp. Lens Stop to 16: the discs shrink to small hexagons
+   and the brightest glints grow six-pointed stars. Bad: square or cross-shaped stars, or stars
+   on every speck alike.
+5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
+6. Glitter and Side Light at 0 on any look: the look exactly as before.
+
+## 130. The closeup with nothing drawn over it (PLAN 38u-1, 38u-2, 38u-3)
+
+**Judged 2026-11-13.** The owner watched the before and after films from their Mac (Macro Bead, Cell Bloom, Classic at 5x) the same day: "looks good". Seen in both films and older than this change: the beads' scalloped rims (38h-17) and grid steps where dye is freshly poured at 5x (the fine detail's, section 47).
+
+The check (`npm run stillcloseup`) proves a still plate draws a still closeup, that no shadow
+falls to one side of a pool and that Depth / Focus only defocuses, in the lab at one frame.
+Whether the closeup still reads as deep and wet without the drawn shadow is only seen here.
+
+1. Macro Bead, Cell Bloom and any look with Close-up on, at 4x to 6x. Good: pool and drop
+   edges are smooth curves that hold still when the liquid does; the clear ground is an even
+   light with no paper grain; depth reads from the soft surround and the relief's light and
+   dark along slopes. Bad: the closeup reads flat, like a sticker, with nothing to say which
+   liquid is over which.
+2. Before 38h-17 merges, the oil beads' own outline is still scalloped (their mask's grid);
+   that is its PR's, not this one's.
+3. A bubble in the closeup at Iridescence 1, the plate left alone: its colours hold. Stir
+   beside it: they shift as it moves.
+
+## 131. The music stirs the liquid through a cord (PLAN 38u-4, 38u-5)
+
+The solver no longer reads the sound: each look carries a patch from the sound's Mid onto
+Turbulence instead, set so its stir with music is about what it was. The numbers hold each
+look within a quarter (`npm run musicstir`); what they cannot hold is the picture, because
+the old eddies were one scale and only under the dye, and Turbulence is three scales over the
+whole dish. Judge from the before and after films (same look, same song, same seconds):
+
+1. Does each look still move with the music about as much as before? Good: the same amount
+   of churn in the loud passages, calm in the quiet ones. Bad: plainly calmer, or the whole
+   dish swimming where before only the colour stirred.
+2. Settings → Patches: the patch "Sound · Mid → Turbulence" is there on every built-in look.
+   Pull it (or Music Stir to 0 on the phone) with music playing: the stir should fall to the
+   look's own Turbulence and stop following the band.
+3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
+   swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
+   too much in the quiet parts.
+
+## 132. No black lines where two colours meet (PLAN 18e-5)
+
+The check (`npm run holeline`) proves that Boundary Contrast moves no pixel in focus and that a
+seam between two dyes is no darker than the darker dye beside it, on the lab's software WebGPU
+at one frame. Whether the looks read better without the line is only seen here.
+
+1. **Comet River**, a minute in: colours meet and blend where they overlap (orange over violet
+   a dark red, cyan over yellow a green) with no black band between them. Bad: a hard dark
+   line along a boundary, or the colours duller than before.
+2. Any look with two layers (Comet River is one): the back plate's rims are still a little
+   brighter than its dye, as before.
+3. **Macro Zoom** to 4x on Comet River: judged in §142 (PLAN 18e-7 took the band up close).
+4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
+   Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
+5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
+   at the dye's edges strengthen.
+
+## 133. A clip to post: Record's 9:16 frame (PLAN 34f)
+
+What changed: the Record panel (the sliders button beside Record) has a **Frame**, *As the plate is* or
+*Portrait 9:16*; on the phone it is More › Record › Clip frame. Portrait makes the one Record button write a
+tall MP4 with sound, with the plate drawn tall while it records. A phone opens on Portrait, a desk on the plate.
+
+1. On the Mac app or the site at a laptop's size, pick Portrait 9:16, press R, drop and stir for ten seconds, press R.
+   While it records the plate on your screen becomes a tall strip with bars either side (the plate drawn tall, not the
+   landscape picture); the moment you stop it should widen back with no hitch you would notice mid-set.
+2. Open the file: it should be 9:16 with the music in it. Compare an edge of the plate with the screen: a drop near the left
+   edge of your window should be in the clip, because the plate was laid out tall, not cut down.
+3. Post it: send it to your phone and put it on Instagram and TikTok as a Reel and a post. Bad: either app refusing the file
+   (say which), the sound missing, or the picture stuttering.
+4. On the free site (signed out of a licence): the clip stops at 15 seconds and the word ChromaGlass sits centred a fifth of the
+   way up from the bottom. Is it clear of Reels' caption and TikTok's account name when you look at it in the app?
+5. With a projector attached (Cast › Second display), record a Portrait clip: the wall must not change shape. The clip is the
+   middle 9:16 of the wall (a third of its width, PLAN 34f-2). Bad: the wall flickering or reshaping.
+6. On the phone, Play's Share clip: the clip should open the phone's share sheet. Check More › Record › Clip frame reads
+   Portrait 9:16 and the clip is the middle of the screen, 9:16.
+7. Decide: is losing the plate's size on your own screen for the length of a clip acceptable on a laptop mid-set, or should it
+   record the slice and keep the screen as it is (cheaper, but a crop, 34f-2)?
+
+## 134. A faster start, and a loading line until the plate shows (PLAN 14v-12)
+
+The show now compiles a display for the look it opens on, without every other look's
+effects, and builds the whole one just after the plate appears. On software WebGPU (all
+CPU, as on a phone) the first frame came about a fifth to a third sooner; nothing about any
+look's picture changed (`npm run leandisplay`: every look the same bytes). Under the mark,
+while nothing is drawn yet, a line now says what the wait is: "Loading", "Starting the
+graphics", "Compiling shaders 23 of 67", "Pouring the first frame", each with the seconds
+since the page opened, over a thin bar.
+
+1. On the phone, open chromaglass.art fresh (after a deploy, so the shaders are cold) and
+   again a second time. Write down the seconds the line shows at each stage and when the
+   plate appears, both times. This is the reading PLAN 14v-13 waits on.
+2. Does the line read clearly on the phone, under the mark and above the dock? Good: legible
+   at arm's length, steady (not blinking). Bad: too faint, too small, or under the dock.
+3. The count sometimes pauses for a second or two and then jumps: that is a render pipeline
+   compiling, when changing the words would stall the page's frames. Say if it looks stuck.
+4. Within the first seconds after the plate appears, change to a look with something
+   different (Ben-Day dots, Lacing, Lumia): the effect may come in a second or two late,
+   never a frozen plate. Say if anything looks wrong in those seconds.
+
+## 135. Your own video: played, poured, read and framed (PLAN 14ag)
+
+Load a video of your own in the Video panel (on the Perform tab's deck, or Settings → Video):
+Video file. Its row shows Play and Pour.
+
+1. **Pour** while it plays: both lit, the picture through the dye and poured into it at once.
+2. **Video Zoom** at 0.5 with a 16:9 clip: the whole frame, smaller, with no picture round it
+   and no smeared edge. At 2, pushed in. **Across** and **Up** slide it; **Fit** puts it back.
+   Try a portrait phone clip and a 4:3 reel: can you frame each where it reads?
+3. **Film Drive** at about 0.5 with the film off and only the pour running: does the poured
+   footage stir the dish it pours into?
+4. Bad: Play or Pour that does not start, a zoomed-out frame with a stretched border, a drive
+   that does nothing with only the pour on.
+
+## 136. A network display over https (PLAN 14m-https)
+
+Start the show on the Mac (`npm run remote` or the Mac app) and open the network display address
+it prints, `https://<laptop-ip>:3443/?cast=true&key=…`, on a second computer, a tablet or a
+TV's browser on the same Wi-Fi. The browser should warn once that the connection is not
+private; choose Advanced, then Proceed (Safari: Show Details, then visit this website). The
+plate should then come up and follow the laptop, as a projector on HDMI does. Say which
+browsers took it, and whether the warning came back on a later visit (it should not on the same
+device, unless the laptop's Wi-Fi address changed).
+
+## 137. A palette from any picture or video (PLAN 43d)
+
+"Palette from a picture or video" (the Dyes panel, under Palette; the phone's Dye sheet)
+takes a file's four main colours as the dyes, shown as "From picture" in the palette list
+and locked like any palette. Only the dye colours change: the look's liquids, motion and
+settings are the look's. A video's colours are taken from eight frames across it.
+
+1. With Classic up, press it and pick an album cover with two or three strong colours. Do
+   the four swatches on the button read as the cover's colours? Good: a person who knows
+   the cover would name them. Bad: a colour the cover does not have, or the cover's main
+   colour missing.
+2. Watch the plate for a minute on a lamp look (Liquid Light Lab or Overhead) and a dark
+   one (Classic): does every dye show on both? Bad: a dye that vanishes into the ground.
+3. A cover that is mostly black or white with one colour (a black sleeve, a pink title):
+   the palette should be that colour in strengths, not grey. Say if it looks dull.
+4. A video of a few seconds with changing scenes: are colours from its later scenes in
+   the palette, not only the first shot's?
+5. Reload the page: "From picture" is still the palette, in the same four colours.
+
+## 138. Polarised light (PLAN 31p-1)
+
+**Judged 2026-11-14.** The owner watched the Mac films (lamp and dye looks, before and after) and approved the look.
+
+The check (`npm run polar`) proves the laws against Jones matrices and the spectrum, that off
+is off to the byte, that a still plate between crossed sheets is black and a stirred one
+lights in colour, and that the quarter-wave plates take the dark lines out, on the lab's
+software WebGPU at one frame. How the bands move with the music at sixty frames is only seen
+here.
+
+1. Open any look with Turbulence up (or the music on, which stirs it through its cord).
+   Settings → Lamp & Light → **Polarisers** to 1. Good: rainbow bands where the liquid moves,
+   broad and smooth like the photograph's dishes, flowing with the liquid and darker where it
+   is calm. Bad: a flat tint everywhere, bands that slide over still dye, speckle or noise.
+2. **Analyser** from 90 down to 0: the dark field turns white and every band swings to its
+   opposite colour. Bad: a jump, or bands that do not change.
+3. **Quarter Wave** to 0: dark curving arms appear through the bands; back to 1, they go.
+4. **Birefringence** from 0.1 to 1: from greys and straw up through the full rainbow to pale
+   pinks and greens. The default 0.3 should feel like the photograph.
+5. Polarisers at 0 on any look: the look exactly as before.
+
+## 139. Three physics fixes: Rain Drip needs a tilt, the clear drop's lens, colours push apart (PLAN 38u-7, 38u-12, 38u-14)
+
+Looks change here on purpose. Judge from the film (before and after, same looks).
+
+1. Acid Trip, Neon Coral Reef (Rain Drip 0.4 to 0.6, now on a plate tipped
+   about 15 degrees): the streaks run down at a quarter of the old pull. Good: still streaks,
+   slower, with the heavy colour sinking in fingers. Bad: nothing runs, or the tilt's buoyancy
+   changes the look past what you want (then raise Rain Drip, or set Gravity lower).
+2. Classic on a level plate: no downhill streaks at all now (its Rain Drip 0.15 had a trace).
+   Velvet Underground on a plate tipped about 3 degrees (its 0.6 streaked its pools, which should
+   stay pools): the three pools stay apart and drift slowly, no streaks running out of them.
+3. Pour a clear drop (no dye) on bare water, projected: its dark ring is as strong as a dyed
+   drop's, thin and clear, not a faint ghost.
+4. Two colours side by side with Polarity up: the line between them stays an even edge, no
+   patches where they smear into each other.
+
+## 140. Faraday waves: the music shakes the dish (PLAN 48f)
+
+Settings → Tilt & Rock (the phone's Sound sheet): Shaker sits the dish on a speaker at a
+frequency, Shake is how hard it shakes in g, and the phone's Music Shake puts the music's
+bass on Shake through a cord (on the desk, that cord is laid in Patches: bass onto Shake). Past the water's threshold the surface stands up in a lattice of
+standing waves at half the Shaker's frequency, drawn by the lamp's light through it.
+
+1. On Classic, Shaker 40 Hz, Shake 0.05: nothing should show (under the threshold, about
+   0.09 g at 40 Hz). Raise Shake slowly to 0.3 and wait two seconds: does a fine lattice
+   of light grow over the dye? Bad: a pattern that flashes on at once, or none at all.
+2. With the lattice up, sweep Shaker from 20 to 120 Hz: do the cells get finer as it
+   rises (about 2 cm across at 20 Hz, 5 mm at 120)? Good: it reads as water, not a
+   texture laid over the plate.
+3. Shake to 0: does the lattice settle away over a second or two, not vanish?
+4. Shake 0, Music Shake 50% on the phone (or the bass cord on Shake in Patches), a song
+   with a strong bass: does the lattice grow with the
+   bass lines and settle in the quiet bars? Say whether it is too faint or too strong to
+   read on the wall; the light is the real lens of the water's surface, and a stronger
+   default depth is a dial away.
+5. Watch for flicker: the pattern must hold still while it grows and fades, never strobe.
+
+## 141. The video as the lamp under the dish (PLAN 14ag-3)
+
+The check (`npm run videolamp`) proves the dye filters the video's light by the same share it
+takes of a white lamp, that bare water shows the video, and that a glycerine pool's rim moves a
+striped picture, on the lab's software WebGPU at one frame. Whether it reads as a lamp under a
+dish, and how strong the lenses should be, is only seen here.
+
+1. Load a video, Play it, press **Lamp** on its row. Good: the video is the light; where the dye
+   is thick it goes dark and tinted, where the water is clear it shows plainly, and the colours
+   mix like gels over a light table. Bad: the video laid on top of the dye, or the plate gone flat
+   white with the video faint.
+2. An oil look (Splodascope, Oil & Water): the picture under each drop should be bent and
+   magnified a little, and slide as the drops move. Say if the bending is too weak to notice or
+   too strong (14ag-5 gives it a slider if so).
+3. Film Mix from 1 down to 0: the look fades back to its own ground with no jump at 0.
+4. Press Lamp again: the video goes back over the plate, as Play showed it before.
+
+## 142. No black lines up close, and the closeup's depth from the liquid (PLAN 18e-7)
+
+Judged 2026-11-15 by the owner on the Mac's frame-locked films of main against the fix: "Looks good"
+(Comet River 4x and Classic 6x better than main, Splodascope 4x about the same).
+
+The checks (`npm run holeline` lines 6 to 6b, `npm run camrelief`) prove in the lab that up close
+Boundary Contrast moves nothing, a seam between two dyes is no darker than its two dyes, a swell
+gathers light and a cluster of bubbles stays clean. How the closeup reads at 60 fps is only seen
+here.
+
+1. **Macro Zoom** to 4x on **Comet River**: where two colours meet there is no dark band, up close
+   as on the wall (§132). Bad: a darker line along any boundary between two colours.
+2. The same closeup: it still has depth. A thick pool's edge into clear water carries a soft
+   shadow on one side and a bright edge on the other, as wide as the lens's blur. Bad: the
+   closeup flat as a printed photograph, or the relief a hard outline.
+3. **Splodascope** or any look with bubbles, up close: no white patch or bright halo round a
+   cluster of bubbles. Bad: a bubble's surroundings brighter than the dye away from it.
+4. Macro Relief from 0 to 1 up close: the shading deepens and widens a little; the frame's
+   brightness stays about the same. Boundary Glow from 0 to 1 up close: nothing moves.
+
+## 143. A clear drop's bright rim falls inside its disc (PLAN 18e-9)
+
+The check (`npm run derive -- --owed=grad`) proves in the lab that `calcOpl`'s optical path
+through a clear film is `(n_water + 0.087·film)·h` across gaps and film shares, and that the
+path's Laplacian is negative just inside a clear drop's edge and positive just outside. How
+a clear film drop looks on a projected plate is judged here.
+
+1. Turn on **Clear Film** (or a look with clear film drops) and turn **Projector Focus** off
+   centre (toward 0.8 or 0.2): a clear drop's bright rim (at positive defocus) falls inside
+   its disc, like a converging lens of higher index than water, not reversed outside it.
+2. With **Lamp** on a video row under the front plate, a clear drop over a patterned video
+   refracts the picture consistently with a higher-index lens (`lampDepthAt` uses the same
+   gap height).

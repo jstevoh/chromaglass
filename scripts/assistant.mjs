@@ -61,6 +61,7 @@ import { SOUND_MUTANTS, soundFullLines, soundPageLines, standInSound } from './a
 import { MEDIA_MUTANTS, mediaDir, mediaFullLines, mediaPageLines, mediaPlayLines, standInMedia } from './assistant-media.mjs';
 import { OUTPUTS_MUTANTS, oscPort, outputsFullLines, outputsPageLines, outputsPlayLines, standInOutputs } from './assistant-outputs.mjs';
 import { PROJECTOR_MUTANTS, projectorFullLines, projectorPageLines, projectorPlayLines, projectorWaitLine, standInProjector } from './assistant-projector.mjs';
+import { notesFrameLine, oscClosesWithSwitchLines, pickSourceLines } from './assistant-safety.mjs';
 import { DESK_MUTANTS, deskFullLines, deskPageLines, deskPlayLines, standInDesk } from './assistant-desk.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -343,6 +344,8 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const noted = await mcp.call('add_note', { note: 'Pink and orange together looked muddy.' });
     const read = await mcp.call('read_notes');
     check('-', 'a note saved is read back', noted.ok && /muddy/.test(read.text), read.text.slice(0, 80));
+    notesFrameLine(read, check);
+    await pickSourceLines(check);
 
     // Off: no switch at all.
     const offTool = await mcp.call('show_state');
@@ -850,6 +853,8 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await outputsFullLines({ mcp, display, check, phone, port });
     await projectorFullLines({ mcp, display, check, phone });
     await deskFullLines({ mcp, display, check, phone });
+    await oscClosesWithSwitchLines({ mcp, check, udp: oscPort(port), setMode });
+    await setMode('full');
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
@@ -960,7 +965,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts'; export * from './src/app/outputsNow.ts'; export * from './src/app/projectorNow.ts'; export * from './src/app/deskNow.ts'; export * from './src/lib/deskTabs.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, typedCaption, rowsCaption, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts'; export * from './src/app/outputsNow.ts'; export * from './src/app/projectorNow.ts'; export * from './src/app/deskNow.ts'; export * from './src/lib/deskTabs.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -987,6 +992,20 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const r2 = page.pourTextRows('One\nTwo\nThree\nFour\nFive');
   say(r1.map((r) => r.text).join('|') === 'SUNSHINE OF|YOUR LOVE|Cream' && r1[2].weight === 0.75 && r2.length === 4 && r2[0].text === 'ONE' && r2[3].text === 'Four',
     `the remote's box reads the first line as the name and the rest as credits, "Song - Artist" as both (${JSON.stringify(r1.map((r) => r.text))}, ${JSON.stringify(r2.map((r) => r.text))})`);
+
+  /* Since the ink was shelved (37x-10m, 2026-11-12) the words go up as the
+     corner caption: the phone's box sends the card itself (typedCaption),
+     and rows from the assistant's pour_text or a phone one build older are
+     read back into one (rowsCaption), a name wrapped onto two rows joined. */
+  const c1 = page.typedCaption('Sunshine of Your Love - Cream');
+  const c2 = page.typedCaption('West End Blues\nLouis Armstrong\nHot Fives\nOKeh\nextra');
+  say(c1?.title === 'Sunshine of Your Love' && c1.artist === 'Cream' && !('album' in c1) && Object.keys(c2 ?? {}).length === 4 && c2?.title === 'West End Blues' && c2.artist === 'Louis Armstrong' && c2.album === 'Hot Fives' && c2.label === 'OKeh' && page.typedCaption(' \n ') === null,
+    `the remote's box reads the song, the artist, the album and the label, "Song - Artist" as both, case as typed (${JSON.stringify(c1)}, ${JSON.stringify(c2)})`);
+  const k1 = page.rowsCaption(r1);
+  const k2 = page.rowsCaption([{ text: 'BEATROOT', weight: 1 }, { text: 'Legendary Flower Punk', weight: 1 }]);
+  const k3 = page.rowsCaption([{ text: 'Song', weight: 1.25 }, { text: 'Band', weight: 0.75 }, { text: 'Album', weight: 0.75 }, { text: 'Label', weight: 0.75 }]);
+  say(k1?.title === 'SUNSHINE OF YOUR LOVE' && k1.artist === 'Cream' && k2?.title === 'BEATROOT' && k2.artist === 'Legendary Flower Punk' && k3?.title === 'Song' && k3.artist === 'Band' && k3.album === 'Album' && k3.label === 'Label' && page.rowsCaption([]) === null,
+    `pour-text rows read back as a caption: the heavy rows the title, the rest the artist, album and label; equal rows the title then credits (${JSON.stringify(k1)}, ${JSON.stringify(k2)})`);
 }
 
 /* The page's own still (44c-4), on the real PadPictureSender: its GPU grab

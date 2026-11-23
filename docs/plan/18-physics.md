@@ -211,12 +211,9 @@ its frame rate live. "Free" means no new passes or texture reads.
     the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
     radial flow (the pressed rings in the picture). A staggered grid takes all three,
     and `dampGrid`'s job.
-  - ~~**18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.~~
-    Dropped: the owner decided to delete the CPU solver's stepping (2.6, 2026-10-06; 3.1).
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
-  - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages` (`docs/judging.md` §19): Thin Gap needs no look turned off (512², 33 ms/frame; H2b 52 fps), and the in-plane viscosity (18a-10) is 1.52 ms. Story in `docs/plan-shipped.md` §18a-11 (moved 2026-10-29, 19m-2).
   - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped.md` §18a-12 (moved 2026-10-29, 19m-2). The open question (whether `hsCycles` from cold should converge on a grid that is not a power of two) is answered by 38r part 2 (#650): it did not, because the multigrid's levels stopped at the first odd level (130² had one coarse level, 65²), and the 2 mm gap's stiffer mobility contrast made the stale pressure read as a ring that came back 18% past where it began (`npm run thingap` at 130²). The levels now halve rounding up down to under four cells (130 → 65, 33, 17, 9, 5; even ladders unchanged), and the thin solve's coarsening takes an odd level's missing face as two faces in series.
   - **18a-13, tilt sloshes the liquid: shipped** (the owner, 2026-10-20: tip it one way
     and then the other and the colour should slop and mix). A shallow-water dish on the
@@ -226,13 +223,6 @@ its frame rate live. "Free" means no new passes or texture reads.
     [`docs/plan-shipped.md`](docs/plan-shipped.md) §18a-13; the owner's eyes on the pace
     are `docs/judging.md` §58. Shortcuts, each named in the code, and the items that
     replace them:
-    - **18a-13a. Two layers: shipped** (2026-10-22). Oil lenses ride the water at their
-      capillary thickness, read from the plate's own oil each frame, with the two-layer
-      laminar drag between them; the dish moved to the GPU (`gpu/slosh.ts`). Plate Rock's
-      swing tips it where Frame Sway lets the frame move (`rockAccel`; how the rock itself is
-      driven is 27f-2's). A kick's glass presses the dish over the same radii it presses the gap
-      (`kickPress`: the sheet's one dent off the frame-moving looks). Story in
-      `docs/plan-shipped.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
     - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
       holds a thin layer still and sheds a vortex when the wave turns there. The
       drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
@@ -251,11 +241,6 @@ its frame rate live. "Free" means no new passes or texture reads.
       rides in a spare channel (the derive pass's alpha is free) rather than a new
       binding; touches the plate shader, so `pops`, `straw`, `ferrolook`, `mixer`,
       `grainedge`, `lampzero` and a `look` render.
-    - **18a-13d. A shock-capturing scheme: shipped** (2026-10-22). HLL fluxes over
-      hydrostatic reconstruction, MUSCL with the MC limiter, Heun in time: a dam
-      break runs at Stoker's speed, two cells wide, and no energy is made. Story in
-      `docs/plan-shipped.md` §18a-13d. Still: no Coriolis or centrifugal term, and the
-      CPU film ignores the slosh.
     - **18a-13e. Hold Gravity's moves out of the slosh.** The dial is hand-only, but the
       tilt it follows is Gravity × Tilt Direction as the plate sees them, so a look
       (Lava Lamp has Gravity 1), Evolve or a patch on Gravity slops the liquid too. If
@@ -278,18 +263,26 @@ its frame rate live. "Free" means no new passes or texture reads.
       shipped** (2026-10-29; found by the first deploy run on the owner's Mac, `npm run
       startup`). `gpu/opening.ts` has a `slosh` flag read by `WebGPUSlosh.prepare` and
       `addSlosh`. Story in `docs/plan-shipped.md` §18a-13i.
-    - **18a-13j. A hand can tip the dish: shipped** (2026-10-31; the owner: "I never saw
-      the control to do that"). The Tip pad (`components/ui/TipPad.tsx`, `lib/tipPad.ts`)
-      in the Tools panel's empty keycaps, at the top of Tilt & Rock and in the phone's
-      Motion sheet: drag the dot to an edge, let go and the dish lies back. `npm run
-      tippad`. Story in `docs/plan-shipped.md` §18a-13j.
     - **18a-13k. The remote's tilt may pour uphill.** `RemoteControl.tsx` sends
       `y = (beta − 40)/30`, so the top edge raised reads as +y, and +y in the plate is the
       top of the screen (`downhill`, Tilt Direction 0): the liquid would run toward the edge
       that went up. The in-app Tilt (`tiltReading`) has it the right way, and `npm run
       tippad` ties the pad to that one. Not yet seen on a phone; check by hand with the
       remote on a tipped plate before changing the sign, and fold it into 18a-13e's turn
-      into the dish's frame.
+      into the dish's frame. (The Tilt knobs, 18a-13m, already turn theirs into the dish:
+      `stepHandTilt`'s `angle`, the place to turn the phone's too once its sign is checked.)
+    - **18a-13m. Tilt the plate from two knobs: shipped** (2026-11-15; the owner: "control
+      the tilt of the plate from my midi controller. Maybe two knobs?"). Tilt Left/Right
+      and Tilt Up/Down (`plateTiltX`, `plateTiltY`): the flat plate tipped by a hand, the
+      remote phone's rock path, eased and turned into the dish (`lib/handTilt.ts`); MIDI,
+      Tilt & Rock, the desks, the remote and the phone's Motion sheet. `npm run handtilt`.
+      Story in `docs/plan-shipped.md` §18a-13m. Open: 18a-13n.
+    - **18a-13n. How far a full knob tips.** Full is the phone's full tip, sinθ about 0.27
+      (rock 1.1 × CUR_ROCK plus the hold), which on a thin gap slides a pool of heavy dye
+      about 6% of the plate a second at the default Speed (ROCK_FALL's own measure). If
+      the owner finds two knobs at full too gentle for a show, the knob's reach can go past
+      the phone's toward Plate Rock's strong-kick swing (rock about 2), still on the same
+      law; judge it on the Mac first (docs/judging.md).
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

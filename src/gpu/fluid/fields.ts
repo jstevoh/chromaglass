@@ -11,7 +11,7 @@ import type { SloshDrive } from '../../lib/slosh';
 import { DISH_GAP_RANGE, dragSeconds } from '../../lib/turntable';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
-import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
+import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, GAP_METRES, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
 import { FluidCore } from './core';
 import { WARM_FIT } from '../wgsl/thinWarm';
 
@@ -346,11 +346,11 @@ export class FluidFields extends FluidCore {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
       this.hsMob = buf('thin gap mobility', this.N);
-      // The oil's lift (PLAN 27f-5, hsBody): the water's colour's mean, and the circulation's Ψ and its right-hand side.
-      this.hsOilMean = buf('thin gap oil mean', 1);
+      // The tipped dish's closed circulation (PLAN 27f-5, hsBody): its Ψ, its right-hand side and the oil's drag.
       this.liftN = liftGrid(this.N);
       this.hsLiftSrc = this.disposer.track(this.device.createBuffer({ label: 'oil lift source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsLiftPsi = this.disposer.track(this.device.createBuffer({ label: 'oil lift psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      this.hsLiftB = this.disposer.track(this.device.createBuffer({ label: 'oil lift drag', size: this.liftN * this.liftN * 4, usage: GPUBufferUsage.STORAGE }));
       // The sealed bottle's (PLAN 27f-9, wgsl/fluid/seal.ts): the same grid, a weight of its own.
       this.hsSealSrc = this.disposer.track(this.device.createBuffer({ label: 'seal source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
@@ -430,6 +430,8 @@ export class FluidFields extends FluidCore {
       particles: this.particles && !this.particles.idle ? this.particles.target : null,
       /** The air field (H6), or null when no bubble is on this plate. */
       air: this.air?.any ? this.air.field : null,
+      /** The bubbles as that field was stamped from them, for the plate to draw each from its own disc (38h-15). */
+      airGeo: this.air?.any ? this.air.geo : null,
       /** The second phase (H7), or null when none has been poured. */
       phase: this.phaseLive ? this.phase.read : null,
       /** The mix (oil, soap, acidity) and the reactions, or null where none. */
@@ -439,8 +441,23 @@ export class FluidFields extends FluidCore {
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
       chem: this.chemLive ? this.chem.read : null,
+      /*
+        The oil's own share of the dye (Oil Bodies, bodyPartition), or null
+        when the oil carries no colour of its own or the plate shows a print:
+        with it the pack lets a part-oil cell's two liquids pass the light
+        side by side (packDyeBodies in wgsl/pack.ts, PLAN 47z-1).
+      */
+      oilDye: this.bodiesWanted && !this.oilDyeStale && this.oilDye && !(this.printLive && this.printDye) && this.mixLive && this.mix ? this.oilDye.read : null,
       /** The poured species field (carries scatter in b channel). */
       species: this.speciesLive && this.species ? this.species.read : null,
+      /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */
+      soapFilm: this.soapPlate?.field ?? null,
+      /** The tank's dye (PLAN 47n), or null when Tank is off: the plate draws it in its own place. */
+      tank: this.tankPlate?.field ?? null,
+      /** The cover glass's live gap, metres (PLAN 38r-17). */
+      coverMetres: this.coverGap * GAP_METRES,
+      /** The shaken dish's standing wave (PLAN 48f), or null with no shaker. */
+      faraday: this.faradayPlate?.field ?? null,
     };
   }
 
@@ -452,6 +469,11 @@ export class FluidFields extends FluidCore {
     this.air?.dispose();
     this.air = null;
     this.slosh?.dispose();
+    this.soapPlate?.dispose();
+    this.tankPlate?.dispose();
+    this.tankPlate = null;
+    this.faradayPlate?.dispose();
+    this.faradayPlate = null;
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();

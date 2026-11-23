@@ -3,6 +3,7 @@ import { Droplets, Laptop, ScanQrCode } from 'lucide-react';
 import { LOCKUP_URL } from '../brand';
 import { goPlay, isPhoneApp, parseLaptopAddress, parseScannedCode, remoteHref, saveLaptop, savedLaptop, scanLaptopCode, type LaptopLink as Link } from '../lib/appLink';
 import { useAccountShows, joinAccountShow } from '../lib/accountShows';
+import { SiteLink } from './SiteLink';
 
 /**
  * The iPhone app asking which laptop to be a remote for (`lib/appLink.ts`).
@@ -147,6 +148,7 @@ export function LaptopLinkForm() {
           <Droplets size={15} /> Play here
         </button>
       </div>
+      <div className="mt-8"><SiteLink look="dark" /></div>
     </form>
   );
 }
@@ -158,7 +160,11 @@ export function LaptopLinkForm() {
  */
 export function AppModeBar() {
   return (
-    <div className="flex items-center justify-end gap-2 border-b border-white/10 px-5 py-2" data-testid="app-mode-bar">
+    <div className="flex flex-wrap items-center justify-end gap-2 border-b border-white/10 px-5 py-2" data-testid="app-mode-bar">
+      {/* The website, on a line of its own under the two buttons, on every remote screen the
+          app shows (SiteLink.tsx). Beside them, on a 390 phone it had 153 px and showed
+          "Try more free visua…" (`npm run applink` measures the box). */}
+      <div className="order-last flex basis-full justify-end"><SiteLink look="bar" /></div>
       <a href="/?remote=1" className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60" data-testid="app-change-laptop">
         Change laptop
       </a>

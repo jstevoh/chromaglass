@@ -75,16 +75,15 @@ permissions:
   pull-requests: read
 
 jobs:
-  # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
-  # push of only PLAN.md, the docs, the sessions' skills, a workflow that
-  # never runs a Mac shard or the scripts that check the workflows does not
-  # queue the Mac shards: it proves
-  # nothing new there, and on 2026-10-03 each such push still waited twenty
-  # to thirty minutes for a Mac and then held one for forty-five runner-minutes
-  # in front of PRs that did change the plate. Measure runs, in full unless the
-  # diff is only check scripts and documents (19k-4, below). A deploy
-  # (`workflow_call`) reaches the Mac unless its gate passed `mac: false`
-  # (deploygate.sh rule 5), and the gate never trusts a run that skipped it.
+  # What the run checks (scripts/reach.mjs). A pull request: no Mac shard, and
+  # of Measure only the parts `shards.pr` names in scripts/checks.json (the node
+  # checks, the typecheck and the build), narrowed further when the diff is
+  # only check scripts and documents (19k-4, below). PLAN.md 19ak-20: 52 of 93
+  # PR runs in the week to 2026-11-21 were red, on browser, lab and Mac lines
+  # timing a page or a plate on a slow runner, and the owner took them off the
+  # PRs. A deploy (`workflow_call`) runs every Measure part and reaches the Mac
+  # unless its gate passed `mac: false` (deploygate.sh rule 5), and the gate
+  # never trusts a run that skipped any of it.
   reach:
     name: What the change reaches
     runs-on: ubuntu-latest
@@ -94,36 +93,21 @@ jobs:
       shards: ${{ steps.reach.outputs.shards }}
       parts: ${{ steps.reach.outputs.parts }}
       only: ${{ steps.reach.outputs.only }}
-      maconly: ${{ steps.reach.outputs.maconly }}
     steps:
       # Two deep: the pull request's merge commit and the base it was merged
       # into, which is the whole of what the PR changes.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 2
-      # Since PLAN.md 19i a diff that does reach a Mac shard is asked once
-      # more: if it differs from this PR's last run that passed the Mac only in
-      # files the PR does not touch (main's, merged in) or files no Mac shard
-      # reads, that run's result is carried and the shards are skipped. The
-      # job leaves a "carried" notice naming the run, which the deploy gate
-      # follows back to it. The earlier runs are read with this job's token
-      # (the repository's default is read for every scope).
-      # esbuild alone, at the lockfile's version, for what each check imports
-      # (PLAN.md 19ak-2): a change to src/ or public/ runs only the Mac checks
-      # that open the app and the lab checks whose bundles import it. A few
-      # seconds, where `npm ci` would be most of a minute before any job could
-      # start. If it fails, reach.mjs finds no esbuild and runs every Mac
-      # check for such a change, as before; it never makes this job red.
-      - name: esbuild, to read what each check imports
-        continue-on-error: true
-        timeout-minutes: 2
-        run: |
-          v=$(node -p "require('./package-lock.json').packages['node_modules/esbuild'].version")
-          npm install --prefix "$RUNNER_TEMP/esbuild" --no-audit --no-fund --no-save "esbuild@$v"
+      # A pull request runs no Mac shard and only the Measure parts the
+      # manifest names under `shards.pr` (PLAN.md 19ak-20, the owner's call of
+      # 2026-11-22). Main's deploy runs every part and every shard, and the
+      # deploy gate never trusts a run that skipped any of them. The earlier
+      # ways of trimming a PR's Mac run (carrying one, per-shard selection,
+      # a re-run skipping what passed: 19i, 19k, 19ak-2, 19ak-3a) went with it.
       - name: Which files reach a Mac shard
         id: reach
         env:
-          ESBUILD_MODULE: ${{ runner.temp }}/esbuild/node_modules/esbuild/lib/main.js
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
@@ -140,7 +124,7 @@ jobs:
   # ones that want Chromium, in two (`browser` and `browser2`, about
   # fourteen and eleven: the site's pages and desks, then the remote, the
   # show's wires and the sound in the app), and the lab on the CPU
-  # rasteriser, in ten (`lab` to `lab10`: Chromium, then the
+  # rasteriser, in nine (`lab` to `lab9`: Chromium, then the
   # frame's passes and the GPU dishes on the first, `lampzero` drawing every
   # look in two labs on the second, the soap's two checks on the third,
   # `holeline` building three labs on the fourth, and on the fifth `samelook`,
@@ -158,12 +142,12 @@ jobs:
   # when it ran 25:06 and 25:17 of the 25 on #802's deploy (attempts 1 and
   # 2, every check in it green, cancelled at the limit), against 19:13 on
   # the same checks on #802's own run: the slow tier again, and the moiré's
-  # 6:23 there the largest piece the second could lose, PLAN 19k-18; and on
-  # the tenth Lava Lamp's cycle, two labs of the look for half a minute, about
-  # fifteen minutes, which beside the moiré would have reached the ninth's
-  # warning line, PLAN 27f-9e). Every check runs whatever failed before it in
-  # its part. GitHub's ubuntu runners are not the queue the Mac's are, so ten
-  # at once cost the queue nothing.
+  # 6:23 there the largest piece the second could lose, PLAN 19k-18). There
+  # was a tenth, Lava Lamp's cycle, while that check watched 50 s of the lamp;
+  # it watches five minutes now, an hour and a half on this rasteriser, and
+  # runs on the Mac's `show` (PLAN 27f-9h, 19k-19). Every check runs whatever
+  # failed before it in its part. GitHub's ubuntu runners are not the queue
+  # the Mac's are, so nine at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the
@@ -208,6 +192,13 @@ jobs:
     # #688 had meanwhile moved sloshgpu, soapgpu and beadmask to lab3 (19k-11a);
     # with holeline gone, sloshgpu and beadmask came back, leaving lab about
     # 13:20, lab3 about 15:20 and lab4 about 11 on the slow tier.
+    # Then lab4 itself, from 2026-11-13 (PLAN 19k-11c): glint (47e, #833) and
+    # bubbleair had joined holeline, encode --grids and shaderdials there, and
+    # on the slow tier lab4 was cancelled at the limit on two of that day's four
+    # PR runs (#842 and #835), no check failing, about 15 minutes of checks
+    # ahead of holeline's 11. glint went to lab9 (3:50 that day) and bubbleair
+    # to lab8 (4:24), which leaves lab4 about the 11 minutes holeline takes on
+    # that tier and its other two checks, with 14 minutes to the bound.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -309,10 +300,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9","lab10"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9","lab10"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -321,7 +312,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9","lab10"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -339,7 +330,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9","lab10"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0
@@ -544,13 +535,10 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         timeout-minutes: 5
         run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
-      # The shard's checks, from scripts/checks.json, as Measure's are.
-      # On a PR whose site files only some Mac checks read, those checks by
-      # name (PLAN.md 19ak-2); empty, every check of the shard.
+      # The shard's checks, from scripts/checks.json, as Measure's are: every
+      # one, since only main's deploy runs a Mac shard (PLAN.md 19ak-20).
       - name: The checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        env:
-          CHECKS_ONLY: ${{ needs.reach.outputs.maconly }}
         run: node scripts/checks.mjs --ci ${{ matrix.shard }}
       # Last on the owner's Mac, whatever happened above, a cancel included:
       # marks this shard's hold on the Mac ended (harnesses wait two minutes

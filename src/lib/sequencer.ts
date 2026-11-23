@@ -63,6 +63,26 @@ export interface ShowSequence {
 }
 
 let idCounter = 0;
+/**
+ * The zoom a stage's Closeup on is given when neither the stage nor its look
+ * sets one: the same 4x as MACRO_PRESET_ZOOM in src/sim/constants.ts, written
+ * here because src/lib does not import src/sim (`npm run closeupland` checks
+ * the two agree).
+ */
+export const STAGE_CLOSEUP_ZOOM = 4;
+
+/**
+ * A stage's Closeup on or off, as the zoom (PLAN QA-32c): the Macro Zoom is
+ * all the frame reads, so the flag alone would do nothing. On keeps a zoom
+ * the stage or its look already asks for past 1.05, or takes
+ * STAGE_CLOSEUP_ZOOM; off is the plate. Writes into `target`, the stage's glide.
+ */
+export function stageCloseup(target: Partial<VisualizerSettings>, macro: boolean): void {
+  target.macroMode = macro;
+  if (!macro) target.macroZoom = 1;
+  else if (!((target.macroZoom ?? 1) > 1.05)) target.macroZoom = STAGE_CLOSEUP_ZOOM;
+}
+
 export const stageId = (): string => `st-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
 /**
@@ -105,6 +125,27 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['microDroplets', 0.05],
   ['thinFilm', 0.05],
   ['filmPhysics', 0.05],
+  ['soapFilm', 0.05],
+  ['soapFilmRate', 0.25],
+  ['soapFilmAngle', 1],
+  ['soapFilmTilt', 1],
+  ['glitter', 0.05],
+  ['lensStop', 0.5],
+  ['sideLight', 0.05],
+  ['sideLightHue', 5],
+  ['sideLightAngle', 5],
+  ['polariser', 0.05],
+  ['analyserAngle', 5],
+  ['quarterWave', 0.05],
+  ['birefringence', 0.05],
+  ['tank', 0.05],
+  ['tankFeed', 0.1],
+  ['tankWeight', 0.05],
+  ['tankNozzle', 0.01],
+  ['tankDrain', 0.05],
+  ['tankHue', 1],
+  ['faradayHz', 1],
+  ['faraday', 0.01],
   ['lumia', 0.05],
   ['chemistry', 0.05],
   ['gelWheel', 0.05],
@@ -120,6 +161,9 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
 ];
 
 /** The numeric fields a stage may glide; everything else switches at stage entry. */
+/** Dials that are a place round a circle, in degrees (PLAN 47b-1's side lamp): `lerpSettings` glides them the short way round. */
+const ROUND_THE_CIRCLE = new Set<keyof VisualizerSettings>(['sideLightHue', 'sideLightAngle']);
+
 export function lerpSettings(
   from: Partial<VisualizerSettings>,
   to: Partial<VisualizerSettings>,
@@ -138,7 +182,9 @@ export function lerpSettings(
         with a second layer wrote 1.002, 1.004… layers, one a tick for the
         whole transition. The ends are left exactly where the stages put them.
       */
-      const v = a + (b - a) * k;
+      // A dial that is a place round a circle glides the short way: from 350° to 10° through 0, not back through every hue or round the far side of the stage.
+      const d = ROUND_THE_CIRCLE.has(key) ? ((((b - a) % 360) + 540) % 360) - 180 : b - a;
+      const v = !ROUND_THE_CIRCLE.has(key) ? a + d * k : k >= 1 ? b : (((a + d * k) % 360) + 360) % 360;
       out[key] = k > 0 && k < 1 ? onSettingStep(String(key), v) : v;
     } else {
       out[key] = k >= 1 || a === undefined ? b : (k > 0.5 ? b : a);

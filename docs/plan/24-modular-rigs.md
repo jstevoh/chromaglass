@@ -81,9 +81,6 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   low notes on one side of the plate and high on the other, a harder note a bigger drop; a
   `Melody Walk` dial, on Aurora Borealis and Oil & Water; `npm run melody`.) Story in
   `docs/plan-shipped.md` §24. Open, found building it:
-  - ~~**24.3-place-1. Only the microphone path, not MIDI.**~~ (shipped with 24.3:
-    `melodyPlace(pitch, line)` extracted in `src/lib/melodyWalk.ts` and shared by
-    `MelodyWalk.update` and `src/lib/noteVoices.ts`, laid through `layMelodyDrop`.)
   - **24.3-place-2. The notes the ear misses.** Under a kick on every beat and a snare on
     the backbeat, 10 of the scale's 15 notes were called (14 of 15 with no drums): the
     note onset (55 to 1000 Hz) is a rise against the band's recent loudness, and a note

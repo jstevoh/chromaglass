@@ -76,7 +76,12 @@ const errors = [];
 try {
   const display = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   display.on('pageerror', e => errors.push(`display: ${e.message}`));
-  await display.goto(`${BASE}/?debug&look=classic&dpr=0.35&key=${KEY}`, { waitUntil: 'networkidle' });
+  /*
+    On Comet River, a look of two plates: the Mixer's back row below takes the
+    back plate, and since 38w-1 (#917) Classic is one dish on one plate, so
+    on Classic that row was never drawn and the run timed out waiting for it.
+  */
+  await display.goto(`${BASE}/?debug&look=comet&dpr=0.35&key=${KEY}`, { waitUntil: 'networkidle' });
   const shown = () => display.evaluate(() => window.chromaglassSettings?.());
   for (let i = 0; i < 40 && !(await shown()); i++) await display.waitForTimeout(250);
 
@@ -220,15 +225,16 @@ try {
   check('the back plate\'s button takes the back plate out, and leaves the front plate where it is',
     backWas > 0 && backNow === 0 && frontHeld, `back ${backWas} → ${backNow}${frontHeld ? '' : ', the front plate moved'}`);
 
-  // ── Words poured from the phone (PLAN 37x-10c) ──────────────────
+  // ── A song's title from the phone (PLAN 37x-10c, 37x-10m) ──────
   // The remote's text box, typed into on the phone and pressed, reaches the
-  // display as one pour-text message whose rows are the box's own reading
-  // (the name in capitals, the credit under it). Witnessed by a second
-  // display socket on the relay, holding the display's key as the laptop's
-  // page does, because the display page without a GPU has no plate to pour
-  // on and so nothing of its own to read back; the page still takes the
-  // message ("no page threw" below), and lib/pourText's parse is checked in
-  // node by `npm run assistant`.
+  // display as one song-title message, the corner caption's, with the song
+  // and the artist as typed. It sent a pour-text of ink rows until the owner
+  // shelved the poured ink (2026-11-12); a pour-text from this box now would
+  // be the shelved path come back, so one heard here fails the line. Witnessed
+  // by a second display socket on the relay, holding the display's key as the
+  // laptop's page does: the display page itself draws the caption over a
+  // plate this harness does not read (that is `npm run caption`'s), and
+  // lib/pourText's `typedCaption` is checked in node by `npm run assistant`.
   {
     const info = await (await fetch(`${BASE}/remote-info.json`)).json();
     const witness = new WebSocket(`ws://localhost:${PORT}/remote-ws`);
@@ -237,7 +243,7 @@ try {
       witness.onopen = () => { witness.send(JSON.stringify({ type: 'hello', role: 'display', key: info.displayKey })); resolve(); };
       witness.onerror = reject;
     });
-    witness.onmessage = (e) => { try { const m = JSON.parse(String(e.data)); if (m.type === 'pour-text') heard.push(m); } catch { /* not ours */ } };
+    witness.onmessage = (e) => { try { const m = JSON.parse(String(e.data)); if (m.type === 'song-title' || m.type === 'pour-text') heard.push(m); } catch { /* not ours */ } };
     await remote.waitForTimeout(300);
     const box = remote.getByTestId('remote-pour-text-input');
     await box.evaluate(el => el.scrollIntoView({ block: 'center' }));
@@ -246,10 +252,10 @@ try {
     await press(remote.getByTestId('remote-pour-text-go'));
     for (let i = 0; i < 20 && heard.length === 0; i++) await remote.waitForTimeout(100);
     await remote.waitForTimeout(300);   // a second pour from one press would land in this
-    const rows = heard[0]?.rows?.map(r => `${r.text}@${r.weight}`).join('|');
-    check('words typed in the phone\'s box and poured reach the display as one pour, the name in capitals over the credit',
-      heard.length === 1 && rows === 'SUNSHINE OF@1.25|YOUR LOVE@1.25|Cream@0.75' && heard[0].colour === 'contrast', `${heard.length} pours: ${rows} (button "${label}")`);
-    check('and the box is empty after, so the same title is never one tap from pouring twice', (await box.inputValue()) === '' && await remote.getByTestId('remote-pour-text-go').isDisabled(), `"${await box.inputValue()}"`);
+    const got = heard.map(m => (m.type === 'song-title' ? `song-title "${m.title}" by "${m.artist}"` : m.type)).join(', ');
+    check('a title typed in the phone\'s box and pressed reaches the display as one song-title, the song and the artist as typed, and no pour',
+      heard.length === 1 && heard[0].type === 'song-title' && heard[0].title === 'Sunshine of Your Love' && heard[0].artist === 'Cream', `${heard.length} heard: ${got} (button "${label}")`);
+    check('and the box is empty after, so the same title is never one tap from showing twice', (await box.inputValue()) === '' && await remote.getByTestId('remote-pour-text-go').isDisabled(), `"${await box.inputValue()}"`);
     witness.close();
   }
 

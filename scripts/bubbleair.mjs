@@ -4,7 +4,7 @@
  * 15g-8c, 15g-8e, 15g-8f and 15g-8g in docs/plan/15-tools-on-liquids.md).
  *
  *   npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press
- *                             (the lab: any adapter that computes; in Measure's lab4 part)
+ *                             (the lab: any adapter that computes; in Measure's lab8 part)
  *
  * Each line under an id is printed as owed while what it asks for is absent,
  * and is red the day it passes with its id still listed (the convention of

@@ -9,6 +9,9 @@ import { kernel } from '../wgsl/fluid';
 import { STATS_GROUPS } from '../wgsl/stats';
 import type { SloshDrive } from '../../lib/slosh';
 import { WebGPUSlosh } from '../slosh';
+import type { SoapFilmPlate } from '../soapFilmPlate';
+import type { TankPlate } from '../tankPlate';
+import type { FaradayPlate } from '../faraday';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
@@ -101,6 +104,12 @@ export class FluidCore {
   /** The dish is to be laid level before its next step: it was driven by nothing for a while, or has just been made. */
   protected sloshLevel = true;
   protected sloshTex: GPUTexture | null = null;
+  /** The frame's soap film (PLAN 32d, gpu/soapFilmPlate.ts): made when Soap Film is first up, null on every other look. */
+  protected soapPlate: SoapFilmPlate | null = null;
+  /** The tank's side view (PLAN 47n), made while Tank is up. */
+  protected tankPlate: TankPlate | null = null;
+  /** The shaken dish's standing waves (PLAN 48f), made while Shaker is up. */
+  protected faradayPlate: FaradayPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;
@@ -109,6 +118,15 @@ export class FluidCore {
   protected readonly boilUniF = new Float32Array(this.boilUniData);
   protected readonly boilUniU = new Uint32Array(this.boilUniData);
   protected boilLive = false;
+  /**
+   * A bottle's liquid has been poured since the last clear (addLiquidDrop),
+   * so `liquids0` and `liquids1` hold something for a step to act on
+   * (stepLiquids, PLAN 15e-1). False on a plate of plain dye, which then
+   * runs neither of that pass's two dispatches, and does not carry the two
+   * fields either (carryLiquids, PLAN 46g): addLiquidDrop is their one
+   * writer, and it is cleared where both halves of each pair are zeroed.
+   */
+  protected liquidsLive = false;
   protected boilFresh = false;
   protected boilTail = 0;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
@@ -211,9 +229,9 @@ export class FluidCore {
   /** What the step's hsPrep reads as the velocity after the body forces: hsMid, or hsPrev when no body force ran. */
   protected hsMidNow: GPUTexture | null = null;
   protected hsMob: GPUBuffer | null = null;
-  protected hsOilMean: GPUBuffer | null = null;
   protected hsLiftSrc: GPUBuffer | null = null;
   protected hsLiftPsi: GPUBuffer | null = null;
+  protected hsLiftB: GPUBuffer | null = null;
   /** The sealed bottle's (PLAN 27f-9): the weight's right-hand side and its Ψ, on the lift's grid. */
   protected hsSealSrc: GPUBuffer | null = null;
   protected hsSealPsi: GPUBuffer | null = null;
@@ -374,6 +392,15 @@ export class FluidCore {
   protected handFastest = 0;
   /** A Blow's breath on the liquid (applyDeltas' `breath`, lib/breath.ts), on the CPU's grid and on the solver's, made at the first breath on a thin gap. */
   protected cpuBreathTex: GPUTexture | null = null;
+  /*
+    A look's lay saying which of the dye it lays is the oil's (Oil Bodies,
+    PLAN 47z-1): the CPU's L² share and the solver's N² one, made the first
+    time a lay sends one (applyDeltas' oilAdd), and whether the fold still
+    owes the share to the oil (bodyLay).
+  */
+  protected cpuOilTex: GPUTexture | null = null;
+  protected deltaOilTex: GPUTexture | null = null;
+  protected oilLayPending = false;
   protected breathTex: GPUTexture | null = null;
   /** Whether the next step has a breath on it: laid each step the wind blows, gone the step after, as the hands are. */
   protected breathLive = false;
@@ -686,6 +713,10 @@ export class FluidCore {
     // on the next deposit, and until then the plate shows the (empty) dye.
     this.printLive = false;
     this.resetFilm();
+    // And the tank's water clear again (PLAN 47n): the performer's wipe is the tank emptied and refilled.
+    this.tankPlate?.reset();
+    // And the shaken dish's water still again (PLAN 48f).
+    this.faradayPlate?.reset();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
     // The sim buffer only needs its grid sizes for a fill, and the cover's gap
@@ -701,6 +732,7 @@ export class FluidCore {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
@@ -737,6 +769,7 @@ export class FluidCore {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     this.speciesClears++;

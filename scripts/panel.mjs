@@ -1146,7 +1146,7 @@ check('and a new song does not repaint a look being built', /if \(designing\) re
 check('saving can write over the look in hand', /const saveOver = useCallback/.test(presetHook));
 check('and saving is no longer a download', !/upsert\(p\);\n    downloadText/.test(presetHook) && /const exportPreset/.test(presetHook));
 check('and there is a way to start from nothing',
-  /const newLook = \(\) => \{/.test(app) && /setSettings\(\{ \.\.\.DEFAULT_SETTINGS \}\)/.test(app));
+  /const newLook = \(\) => \{/.test(app) && /setSettings\(\{ \.\.\.NEW_LOOK \}\)/.test(app));
 check('and the document says when it is unsaved', /setDocDirty\(true\)/.test(app) && /edited=\{docDirty\}/.test(app));
 // One flag, not two: `lookEdited` was derived from the pinned preset and could
 // not be true of an empty plate somebody had since painted.
@@ -1204,12 +1204,6 @@ check('and neither starts over the limit',
 // and `boilingPoint` were read by nothing, so they were deleted rather than
 // given a slider (docs/bubbles-plan.md says why).
 //
-// `surfaceTension` is the plate's own film tension,
-// read by the solver, carried by every preset between 0.01 and 0.3, and
-// reachable from nothing. `surge` shapes the automation into gusts with quiet
-// between — the thing that makes a plate look worked-on rather than busy —
-// same story.
-//
 // The exceptions are listed by name rather than by a rule, because each is a
 // decision and a rule would hide the next one.
 {
@@ -1226,6 +1220,9 @@ check('and neither starts over the limit',
     // Blend pad per row, not a slider or a select on this sheet. `npm run phone`
     // presses them.
     'ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend',
+    // The shelved ink title's dials (37x-10m): read only by the ink's run,
+    // their controls gone with the ink; removing them is 37x-10n.
+    'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   ]);
   const panelSrc = settingsSource();
   const drawn = new Set([
@@ -1755,7 +1752,6 @@ check('and neither starts over the limit',
     ['parity', 'compared the two solvers; the CPU one went at P7'],
     ['post', 'compared the post chain against its GLSL twin; both went at P7'],
     ['uniforms', 'compared the two uniform packs field for field; the WebGL one went at P7'],
-    ['clip', 'docs/clip-plan.md plans it; scripts/clip* are local-only and run with node'],
   ]);
   const have = new Set(Object.keys(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts));
   const walk = (dir, out = []) => {

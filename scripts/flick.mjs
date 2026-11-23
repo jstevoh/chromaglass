@@ -60,8 +60,12 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
 
-let bad = 0;
+// The tally line ("n/m checks passed") is what scripts/checks.mjs counts a
+// quarantine against (19ak-1): without it no line here could be held, and
+// main's deploy of 2026-11-22 needed four of them held (22s-1).
+let bad = 0, total = 0;
 const check = (name, ok, detail = '') => {
+  total++;
   if (!ok) bad++;
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
 };
@@ -236,5 +240,5 @@ try {
   check('on the thick liquid the picture is with the glass at once', k.liquid > 0.75 * k.dish && k.dish > 0,
     `${k.liquid.toFixed(3)} against ${k.dish.toFixed(3)} rad/s`);
 } finally { await browser.close(); stop(); }
-console.log(bad ? `\n${bad} failed` : '\nall flick checks passed');
+console.log(`\n${total - bad}/${total} checks passed`);
 process.exit(bad ? 1 : 0);

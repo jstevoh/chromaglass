@@ -18,7 +18,9 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
+import { basename } from 'node:path';
 import { isGpuEngine } from './frame.mjs';
+import { acquireFilmLock } from './maclock.mjs';
 import { port } from './ports.mjs';
 
 const PORT = port(4327, 'WEBGPU_PORT');
@@ -55,6 +57,7 @@ const watch = (page) => {
 };
 
 // ── With WebGPU ──────────────────────────────────────────────────────
+await acquireFilmLock({ label: `webgpu-smoke.mjs (${basename(process.cwd())})` });
 {
   const browser = await chromium.launch({ headless: true, channel: 'chromium' });
   try {

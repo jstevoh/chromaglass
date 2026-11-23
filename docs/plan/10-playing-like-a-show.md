@@ -258,6 +258,15 @@ The steps, most visible first. Each is one PR with its own check, and every step
        11 s is 10 to 22 steps. Judge on the Mac whether a fast colour move looks stepped;
        if so, step short glides faster (not the whole interval: `npm run renders`
        counts App's renders).
+     - **8d-3** (open, found 2026-11-13 on the soap film's PR): `npm run slowevolve`'s
+       "at full, no dial moves faster than 5 % of its travel a second" holds a draw of the
+       planner, not a bound it keeps. A dial glided the length of its reach (two fifths of
+       its travel) in the full-speed floor glide of 3.8 s peaks at 1.5 × 0.4 / 3.8 = 16 %/s
+       under the smoothstep, so any new key in Evolve's pool reshuffles the draws and can
+       land past 5 % (5.69 with the soap film's three keys in it: granulation, 0.39 → 0.63
+       in 6.1 s; Kick Bloom did the same to the half-minute line). Either make the pace a
+       bound the planner keeps (a glide no shorter than its reach over 5 %/s × 2/3), or
+       hold the check to that bound over many seeds instead of one.
 
 Small things that ride along with the steps: drops with a coloured rim lined up in
 chains along the flow (with batch 3), letting the dish rim show now and then as a phrase
