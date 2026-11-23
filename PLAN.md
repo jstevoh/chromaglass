@@ -450,7 +450,7 @@ Where each batch stands, as of 2026-09-27:
 | | Batch | State |
 |---|---|---|
 | 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; the Finger's own "adds none" reds traced to the ambient seeder being left on in that one section (2026-10-22: off, the plate's idle drift falls from +35 to 1 and the hand adds nothing on pools of 357 and 611); its slack and quiet bars **set from the shards' noise** (#449: 48 trials on pools of 39 to 357, at most 0.17% outside the bracket; both bars now 2% of the pool and 1, the slack was 15% and 5), thin pools included; it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
-| 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands; 1l the thin carry's MC limiter shipped, 1m open |
+| 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands; 1l the thin carry's MC limiter and 1n Galaxy's particles and no edge relief shipped, 1m and 1o open |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
 | 4 | Liquids that behave differently | **Shipped**; milk's opacity shipped (#353, 18j) |
