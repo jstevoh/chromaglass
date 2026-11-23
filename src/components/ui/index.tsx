@@ -457,7 +457,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   if (dense && !touch) {
     return (
-      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
+      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
         {tip.card}
         <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
         <div className="min-w-0 flex-1">{track}</div>
@@ -471,7 +471,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     );
   }
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
+    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (

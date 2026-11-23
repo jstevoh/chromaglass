@@ -27,15 +27,17 @@ const check = (name, ok, detail = '') => {
 };
 
 /*
-  A line written ahead of its build (PLAN 18e-2), printed as owed while it
-  fails and red the day it passes with its id still listed (the convention
-  of timers.mjs and wallflash.mjs): an owed line is excused only while what
-  it asks for is absent (here, while .z is still the signed Laplacian), and a
-  build that is there and misses is red.
+  Lines written ahead of their build (PLAN 18e-2, and 18e-9 under
+  "height"), printed as owed while they fail and red the day they pass with
+  their id still listed (the convention of timers.mjs and wallflash.mjs): an
+  owed line is excused only while what it asks for is absent (for grad,
+  while .z is still the signed Laplacian; for height, while a clear film's
+  path still reads under the water beside it), and a build that is there
+  and misses is red.
 
-    npm run derive -- --owed=grad
+    npm run derive -- --owed=grad,height
 */
-const IDS = ['grad'];
+const IDS = ['grad', 'height'];
 const flag = process.argv.find((a) => a.startsWith('--owed='));
 const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
 const unknown = [...owed].filter((id) => !IDS.includes(id));
@@ -239,8 +241,123 @@ try {
       water: flatMost(0.72, 0.72, 0.05),
     };
 
+    /*
+      The optical path over a clear film (PLAN 18e-9, owed). The plate's view
+      carries the clear film (PLAN §20b) as a share f of the gap, 0 to 1 in
+      steps of 1/255 in the top byte of its last word (packView,
+      wgsl/fluid/fields.ts): a column of gap h holds f·h of the film's clear
+      oil and (1 − f)·h of the dyed water under it, so the path through it is
+      the sum over its layers of each one's index times its thickness,
+
+        OPL = n_water·(1 − f)·h + n_film·f·h = (n_water + (n_film − n_water)·f)·h,
+
+      longer where the gap is deeper, and longer where the film is, since an
+      oil's index is over water's. That is a clear drop seen from above: a
+      lens of the higher index, adding path where it is thick. calcOpl
+      (wgsl/plate.ts) takes the index right, n_water + 0.087·f, and then the
+      height as h·(1 − 0.5·f), so a whole film at the rest gap reads
+      1.42 × 0.5 = 0.71 against water's 1.333: the path drops by 0.62 rest
+      gaps where it should rise by 0.087, and every slope and curvature the
+      plate draws from it runs backwards over a clear drop.
+
+      n_film is 1.420 here, n_water + 0.087, the plan item's number and the
+      index calcOpl already gives the film (a light clear oil; the shelf's
+      own oils run 1.402 to 1.47, src/bottles.ts). The heights are worked in
+      metres: the view's gap is in GAP_METRES a unit and the pass's unit is
+      the rest gap (DISH_REST_GAP, 2 mm at DISH_GAP_METRES), so each
+      column's real depth in metres times its mixture's index is the path
+      in metres, and a reading times DISH_REST_GAP · GAP_METRES is the
+      pass's path in metres. Three gaps, 0.6, 1 and 1.5 rest gaps (inside
+      calcOpl's own 0.3 to 3 clamp), each with a disc of whole film (f = 1,
+      round 0.72, 0.72) and one of half film (f = 0.5, round 0.5, 0.5),
+      radius 0.1, on a plate of clear water read at 0.9, 0.5, away from the
+      dye and the pools above. The bar is the clear pools' above, 0.005 of
+      a rest gap (10 µm at 2 mm): the film adds 0.087 · f · h, 0.026 to
+      0.13 of a rest gap here, so a build that only flips the sign, keeps
+      any share of the 0.5·f height loss, or scales the film's path by
+      anything but the gap misses it at one of the six columns. The path is
+      read in the pass's own output (.w), the number every slope, the
+      shadowgraph and the Becke line are drawn from, so a build that paints
+      a rim the right way round without fixing the path fails it.
+
+      And the item's own check, the side the rim falls on: the path's
+      Laplacian, worked out from .w with the pass's stencil as above, is
+      negative just inside the whole film's disc (within 3 cells of the
+      logical grid of its edge, where the stencil sees the step) and
+      positive just outside it: the high side of the step is inside, as it
+      is for a converging lens, so the shadowgraph's bright and dark lobes
+      fall on the sides the real drop puts them at either sign of focus.
+      On main the step is reversed and so is each lobe.
+
+      Owed only while the path runs backwards: while the whole film at the
+      rest gap reads under the clear water beside it (main 0.71 against
+      1.333). A rebuilt height that gets the sign and misses the size is
+      red, not owed, and so is one whose rim lobes stay reversed.
+    */
+    const N_FILM = N_WATER + 0.087;
+    const filmDiscs = [
+      { f: 1, x: 0.72, y: 0.72 },
+      { f: 0.5, x: 0.5, y: 0.5 },
+    ];
+    const restMetres = lab.DISH_REST_GAP * lab.GAP_METRES;
+    const filmPlate = async (hRest) => {
+      const gapWord = Math.round(65535 * hRest * lab.DISH_REST_GAP / 0.06);
+      const v = device.createTexture({ size: [n, n], format: 'rgba32uint', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+      const wds = new Uint32Array(n * n * 4);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        let f8 = 0;
+        for (const d of filmDiscs) if (Math.hypot((x + 0.5) / n - d.x, (y + 0.5) / n - d.y) < 0.1) f8 = Math.round(255 * d.f);
+        wds[(x + y * n) * 4 + 3] = (gapWord | (f8 << 24)) >>> 0;
+      }
+      device.queue.writeTexture({ texture: v }, wds, { bytesPerRow: n * 16 }, [n, n]);
+      const res = await derived({ dye: solver.dye.read, velForced: solver.velForced, grain: null, particles: null, air: null, view: v, species: solver.fields.species });
+      const mean = (cx, cy) => {
+        let s = 0, c = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          if (Math.hypot((x + 0.5) / w - cx, (y + 0.5) / h - cy) > 0.04) continue;
+          s += res.at(x, y, 3); c++;
+        }
+        return (s / c) * restMetres;
+      };
+      // The depth this column really is, in metres, from the 16 bits the view carries.
+      const depth = (gapWord / 65535) * 0.06 * lab.GAP_METRES;
+      return {
+        res, hRest, depth,
+        water: { read: mean(0.9, 0.5), expected: N_WATER * depth },
+        discs: filmDiscs.map((d) => {
+          const fq = Math.round(255 * d.f) / 255;
+          return { f: fq, read: mean(d.x, d.y), expected: (N_WATER * (1 - fq) + N_FILM * fq) * depth };
+        }),
+      };
+    };
+    const filmPlates = [];
+    for (const hr of [0.6, 1, 1.5]) filmPlates.push(await filmPlate(hr));
+    // The rim's two sides on the rest-gap plate's whole film, the Laplacian of .w by the pass's stencil.
+    const rest = filmPlates[1].res;
+    const wAtR = (fx, fy) => {
+      const cx = Math.min(Math.max(fx, 0), w - 1), cy = Math.min(Math.max(fy, 0), h - 1);
+      const x0 = Math.min(Math.floor(cx), w - 2), y0 = Math.min(Math.floor(cy), h - 2), ax = cx - x0, ay = cy - y0;
+      return (rest.at(x0, y0, 3) * (1 - ax) + rest.at(x0 + 1, y0, 3) * ax) * (1 - ay)
+        + (rest.at(x0, y0 + 1, 3) * (1 - ax) + rest.at(x0 + 1, y0 + 1, 3) * ax) * ay;
+    };
+    const reach = 3 / 192;
+    let inS = 0, inK = 0, outS = 0, outK = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const d = Math.hypot((x + 0.5) / w - 0.72, (y + 0.5) / h - 0.72) - 0.1;
+      if (Math.abs(d) > reach || Math.abs(d) < 1 / w) continue;
+      const c = rest.at(x, y, 3);
+      const l = ((wAtR(x - k, y) + wAtR(x + k, y) + wAtR(x, y - k) + wAtR(x, y + k) - 4 * c)
+        + 0.5 * (wAtR(x - k, y - k) + wAtR(x + k, y - k) + wAtR(x - k, y + k) + wAtR(x + k, y + k) - 4 * c)) * 25;
+      if (d < 0) { inS += l; inK++; } else { outS += l; outK++; }
+    }
+    const film = {
+      restMetres,
+      plates: filmPlates.map((p) => ({ hRest: p.hRest, depth: p.depth, water: p.water, discs: p.discs })),
+      rim: { inside: inK ? inS / inK : 0, outside: outK ? outS / outK : 0, inK, outK },
+    };
+
     const corr = (cn * czl - cz * cl) / Math.sqrt(Math.max(1e-12, (cn * czz - cz * cz) * (cn * cll - cl * cl)));
-    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, corr, paths, thickness, grad };
+    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, corr, paths, thickness, grad, film };
   });
   const at = (x, y) => `${x.toFixed(2)},${y.toFixed(2)}`;
   check('the derive pass finds slopes at all', r.sum > 0, `weight ${r.sum.toFixed(1)}`);
@@ -271,6 +388,23 @@ try {
       g.zMin > -1e-3 && peak > 0 && atStep && flat < 0.05 * peak && ratio > 0.85 && ratio < 1 / 0.85,
       `.z min ${g.zMin.toFixed(4)}; rim peaks ${g.rims.map((p) => `${p.id} ${p.peak.toFixed(4)}, ${p.at.toFixed(2)} of it on the step (${p.n} px) (Δn ${p.dn.toFixed(3)}, middle ${p.middle.toFixed(4)})`).join(', ')}; clear water ${g.water.toFixed(4)}; syrup over glycerine ${ratio.toFixed(2)} of the index steps' ratio; .z against the path's Laplacian r = ${r.corr.toFixed(3)}`,
       r.corr > 0.9);
+  }
+  {
+    const f = r.film, um = (m) => (m * 1e6).toFixed(1);
+    const cols = f.plates.flatMap((p) => [{ hRest: p.hRest, f: 0, ...p.water }, ...p.discs.map((d) => ({ hRest: p.hRest, ...d }))]);
+    const worst = Math.max(...cols.map((c) => Math.abs(c.read - c.expected)));
+    const restPlate = f.plates.find((p) => p.hRest === 1);
+    const whole = restPlate.discs.find((d) => d.f === 1);
+    // What main's backwards height leaves, measured: the whole film at the rest gap reads under the clear water beside it.
+    const backwards = whole.read < restPlate.water.read;
+    line('height', '18e-9: the path through a clear film is each layer\'s index times its thickness, n_water·(1 − f)·h + 1.420·f·h, at 0.6, 1 and 1.5 rest gaps and film shares 0, ½ and 1 (within 0.005 of a rest gap)',
+      worst < 0.005 * f.restMetres,
+      `${cols.map((c) => `h ${c.hRest} f ${c.f.toFixed(2)}: ${um(c.read)} µm against ${um(c.expected)}`).join('; ')}; at the rest gap the whole film adds ${um(whole.read - restPlate.water.read)} µm to the water's path, against ${um(whole.expected - restPlate.water.expected)}; worst ${um(worst)} µm, bar ${um(0.005 * f.restMetres)}`,
+      backwards);
+    line('height', '18e-9: a clear drop\'s rim has the high side of the path inside it: the path\'s Laplacian negative just inside the whole film\'s edge and positive just outside',
+      f.rim.inK > 0 && f.rim.outK > 0 && f.rim.inside < 0 && f.rim.outside > 0,
+      `Laplacian of .w within 3 cells of the edge: inside ${f.rim.inside.toFixed(3)} (${f.rim.inK} px), outside ${f.rim.outside.toFixed(3)} (${f.rim.outK} px)`,
+      f.rim.inside > 0);
   }
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);

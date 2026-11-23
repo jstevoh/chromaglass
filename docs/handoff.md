@@ -109,7 +109,12 @@ Controls: each check-skeptic control run and what it read (red where it should b
 Review owed: before-merge, sampled or none, then why and what was only done by hand
 Check changes: "none", or one list line per change to a check's bar or input (below)
 Left: the next concrete step, if the work stops here
+Failed: each approach tried that did not work, and why, or none
 ```
+
+`Failed:` records dead ends and why they failed so the next run, or Claude fixing a red
+PR, does not spend hours retrying something already ruled out. It is not enforced by any
+check (`checkguard` does not require it).
 
 Two of these lines are read by programs, so keep their shape: `Plan item:` starts a
 line and is followed by the item's id and a space (`ready.yml` copies the id into its
@@ -197,7 +202,8 @@ One or two lines is enough: what, where, when, and what is now no longer owed.
 ## Stopping halfway
 
 When a session runs out of credit mid-task: push what it has, even if it is red, fill in
-`Left:` with the very next step, and add the `handoff` label. The other tool picks it up
+`Left:` with the very next step and `Failed:` with anything already tried that did not work,
+and add the `handoff` label. The other tool picks it up
 with `gh pr checkout <n>`, reads the PR body and the one plan section (`docs/plan/`), then removes
 the label and carries on in the same PR.
 
@@ -233,18 +239,22 @@ subscribed to it wakes on, and every hop names the commit it is about, so nothin
 reviewed or merged on a head that has moved since (PLAN.md 19al).
 
 **Which PRs owe a review before merge** (`Review owed: before-merge`, label
-`review-owed` from the moment the PR opens):
+`review-owed` from the moment the PR opens). Since 2026-11-15 (the owner's rule: "just
+get them live") only these:
 
-- physics and taste: `src/gpu/`, WGSL, how a liquid, tool or look behaves;
-- anything that changes a check or moves a bar or input (`Check changes:` not "none");
-- sign-in, keys, payments, licences and the Workers under `server/`;
+- sign-in, keys, payments, licences and the Workers under `server/` (the licence Worker
+  among them);
+- security: anything that changes who may reach what, a secret's handling, or a
+  permission;
 - any class the owner has put back on review before merge after an escape (the guards
   under "Who takes what").
 
-Other changes under `src/` (UI and its phone version, presets, settings plumbing,
-layout, ports) are `Review owed: sampled` and also carry `review-owed`: they merge on
-green and Claude Code reviews about one in five after merge (below). Docs and the plan
-alone are `none`.
+Everything else, physics and taste, `src/gpu/` and WGSL, a changed check or a moved bar
+included, is `Review owed: none`: it merges as soon as its checks are green, with no
+Claude Code review before or after. The `Check changes:` lines and the `Measure` guard
+still hold a moved bar to its stated reason; what changed is only that no one waits on a
+reading of the diff. (Until 2026-11-15 physics, taste and check changes owed a review
+before merge and the rest a sampled one after; an older PR's `sampled` reads as `none`.)
 
 **1. Green.** When `Checks` finishes green on an Antigravity PR's head (or any PR
 labelled `review-owed`), `.github/workflows/ready.yml` adds `ready-for-review` and posts
@@ -305,24 +315,23 @@ and no one merges it, Antigravity or Claude Code, whatever the PR's own checks s
 PR labelled `fixes-main` merges until a deploy is green. The label goes on the PR that
 fixes the red check, and on nothing else; the status says which check and which deploys.
 
-A PR that owes no review before merge (`sampled` or `none`) is merged by Antigravity
-the same way, pinned to its green head. A clean merge of `main` after a `PASS` (no
+A PR that owes no review before merge (`none`, or `sampled` on an older PR) is merged
+the same way, pinned to its green head, by Antigravity or by any Claude Code session that
+finds it green; no `PASS` is written for it. A clean merge of `main` after a `PASS` (no
 conflict to resolve) needs no new review, only the green; a merge that resolved a
 conflict does, of the resolution alone.
 
 ## Claude Code's review pass
 
-The `PASS`/`CHANGES` verdict above for PRs that owe one before merge, and a sampled pass
-after merge for the rest. The steps are the same.
+The `PASS`/`CHANGES` verdict above, for the PRs that still owe one before merge (sign-in,
+keys, payments, licences, the Workers, security). There is no sampled pass after merge
+since 2026-11-15.
 
 **When.** At the start of a Claude Code session, before taking new work, run
 `gh pr list --label ready-for-review --label review-owed`: those are waiting on a review
-before they can merge, and come first (three at most per session). Then
-`gh pr list --state merged --label review-owed --limit 5`: if anything is listed, review
-the **oldest one** in this session and leave the rest for the next. That keeps the sampled
-pass to roughly one PR per session, about one in five of the mechanical PRs. If nothing is
-labelled but five or more `antigravity/` PRs have merged since the last review comment,
-pick one of them at random instead.
+before they can merge (three at most per session). Then merge the green Antigravity PRs
+that owe nothing, each pinned to the head its `READY` line names:
+`gh pr list --label ready-for-review --search "head:antigravity/ -label:review-owed"`.
 
 **What, in this order, stopping at the first real problem:**
 

@@ -67,13 +67,8 @@
   moved the 6 mm one: the stress three times over, the speed √3 of it,
   14 m/s, 1.18 Pa, 5.3 cm/s on the default liquid. That is a firm breath
   from closer, a couple of centimetres rather than a few, inside what lips
-  blow at. What moves with it: the surface tears at the same 5.4 m/s
-  (AIR_TAKEN_FROM, below), which is now Amount 0.39 of a firm breath and not
-  0.67, so a Blow at Amount 0.5 lays bubbles where it laid none; the
-  lowest settings (0.25 and under) still lay none, which is what QA-20
-  asked (`npm run blowrange` holds the gentle breaths at 0.05, 0.25 and
-  0.35). The straw's volume and the wind's spawns are shares of a firm
-  breath's and do not move.
+  blow at. The straw's volume is a share of a firm breath's and does not
+  move with it (the wind's bubbles, which did, are gone: below).
 
   Why 8 and not the gentler 6 m/s this was first written with: at 6 the
   Mac's `npm run tools` read a stroke moving its pool 0.13% to 0.51% of the
@@ -93,109 +88,194 @@ export const BREATH_SPEED = 14;
 export const WALL_JET_FRICTION = 0.01;
 export const BREATH_STRESS = 0.5 * AIR_DENSITY * WALL_JET_FRICTION * BREATH_SPEED * BREATH_SPEED;
 
+/*
+  Where the breath's stress lands: a jet along the surface, not a disc under
+  the pointer (PLAN.md 15g-11).
+
+  What was reported (the owner, 2026-11-13, on Foam Cells at the desk): the
+  Blow "doesn't blow across the surface like I would expect (unless you're
+  blowing hard), it doesn't seem to have a direction in mind". What was
+  there: the stress above laid on a disc the tool's radius across (6 mm on
+  the 0.2 m dish) under the pointer, for the steps the pointer was over it.
+  A hand crossing the plate in a second is over any one cell for a fortieth
+  of a second, in which a film going at 5 cm/s goes a millimetre; and the
+  moment the hand paused the breath stopped (it became the straw). So the
+  air touched only what was under the pointer and nothing ahead of it,
+  which is a finger's footprint and not a breath's.
+
+  What a breath on a dish is. Air from the lips or a straw meets the liquid
+  at a slant and turns along it: a wall jet, which runs on over the surface
+  long after the place it landed, spreading sideways and slowing as it
+  goes. Measured wall jets from a round nozzle (Launder and Rodi, "The
+  turbulent wall jet: measurements and modeling", Annu. Rev. Fluid Mech. 15,
+  1983, and the three-dimensional jets they collect) keep the nozzle's speed
+  for the jet's first few diameters (its core), then lose it as one over the
+  distance, U_m ∝ 1/s, while the half-width across the flow grows as about
+  0.21 of the distance, five times faster than the jet thickens off the
+  wall. The stress on the liquid goes as the speed squared, so it holds for
+  the core and then falls as 1/s², and its half-width (the speed's over √2)
+  grows as 0.15 s.
+
+  So the stress is laid as that plume: full over the place the breath lands
+  (the tool's footprint, as it was: a half-width of 0.54 of the radius is
+  the old disc's), full for a core five radii long (3 cm: the lips a couple
+  of centimetres back and the jet's six diameters), then τ₀/(1 + (s/s_c)²)
+  along the way it blows with a Gaussian across it whose half-width is
+  0.54 r + 0.15 s. Behind the landing it falls off as the footprint does. It
+  is laid down to a twentieth of the middle's stress, 22 radii out (13 cm),
+  brought smoothly to nothing there, since a force with a hard edge is a
+  sheet of vorticity no breath has. What it leaves out is still 15g-2's
+  (the jet's pressure and its dimple) and 15g-3's (the free surface).
+
+  Measured in the lab (`npm run airblow`, software WebGPU), the disc
+  against the jet: under a held breath the liquid ran 19.62 and runs 31.84
+  mm/s (0.37 and 0.61 of τh/2μ: a patch of stress drives the liquid under
+  it against the pressure that sends it back round, and a long patch has a
+  longer way round); a palm on (ten footprints) 0.12 and 8.82 mm/s; as far
+  behind 0.12 and 0.86.
+*/
+/** The jet's core, in footprint radii: how far along the surface it keeps the speed it landed with. */
+export const JET_CORE = 5;
+/** How fast the stress's half-width grows along the jet: a wall jet's 0.21 for the speed, over √2. */
+export const JET_SPREAD = 0.15;
+/** The stress's half-width where the breath lands, in footprint radii: the old disc's, (1 − q²)² = ½. */
+export const JET_LANDING = 0.54;
+/** The share of the middle's stress under which the plume is not laid. */
+export const JET_FLOOR = 0.05;
+/** How far along the surface the plume is laid, in footprint radii: where its axis falls to JET_FLOOR. */
+export const JET_REACH = JET_CORE * Math.sqrt(1 / JET_FLOOR - 1);
+
 /**
- * A breath at (x, y) on an L-cell plate, `r` cells in radius, blowing along
- * (dx, dy) at `share` of a default breath's stress, added into `out`
- * (L × L × 4, τx and τy in pascals). The jet's stress falls off from its
- * middle as its speed squared does, (1 − (d/r)²)², smooth to nothing at its
- * edge: a disc of force with a hard rim is a sheet of vorticity at the rim,
- * which no breath has. Cells at the plate's border are left alone, as every
- * tool leaves them. Returns how many cells it touched.
+ * How much of the middle's stress a breath landing at the origin and blowing
+ * along +s lays at (s, t), in footprint radii: the plume above, 1 at the
+ * landing, 0 past its edge. `npm run airblow` holds layBreath to it.
  */
-export function layBreath(out: Float32Array, L: number, x: number, y: number, r: number, dx: number, dy: number, share = 1): number {
+export function jetShare(s: number, t: number): number {
+  let a: number, w: number;
+  if (s <= 0) { a = Math.exp(-Math.LN2 * (s * s) / (JET_LANDING * JET_LANDING)); w = JET_LANDING; }
+  else { const q = s / JET_CORE; a = 1 / (1 + q * q); w = JET_LANDING + JET_SPREAD * s; }
+  const v = a * Math.exp(-Math.LN2 * (t * t) / (w * w));
+  return v <= JET_FLOOR ? 0 : (v - JET_FLOOR) / (1 - JET_FLOOR);
+}
+
+/**
+ * A breath landing at (x, y) on an L-cell plate with a footprint `r` cells in
+ * radius, blowing along (dx, dy) at `share` of a default breath's stress,
+ * added into `out` (L × L × 4, τx and τy in pascals) as the jet's plume
+ * (jetShare). Cells at the plate's border are left alone, as every tool
+ * leaves them. `rows`, when given, is told the rows it wrote (lib/deltaRows.ts).
+ * Returns how many cells it touched.
+ */
+export function layBreath(out: Float32Array, L: number, x: number, y: number, r: number, dx: number, dy: number, share = 1,
+  rows?: { add(y0: number, y1: number): void }): number {
   const len = Math.hypot(dx, dy);
   if (!(len > 1e-6) || !(r > 0) || !(share > 0)) return 0;
   const ux = dx / len, uy = dy / len;
   const tau = BREATH_STRESS * share;
-  let cells = 0;
-  const reach = Math.ceil(r);
-  const cx = Math.round(x), cy = Math.round(y);
-  for (let j = -reach; j <= reach; j++) {
-    for (let i = -reach; i <= reach; i++) {
-      const nx = cx + i, ny = cy + j;
-      if (nx <= 0 || nx >= L - 1 || ny <= 0 || ny >= L - 1) continue;
-      const s = 1 - Math.hypot(nx - x, ny - y) ** 2 / (r * r);
-      if (s <= 0) continue;
+  // The plume's box: a footprint behind the landing, its reach ahead, and as wide as its far end is.
+  const back = 2.1 * JET_LANDING * r, ahead = JET_REACH * r;
+  const side = 2.1 * (JET_LANDING + JET_SPREAD * JET_REACH) * r;
+  const ax = x - ux * back, ay = y - uy * back, bx = x + ux * ahead, by = y + uy * ahead;
+  const ex = Math.abs(uy) * side, ey = Math.abs(ux) * side;
+  const x0 = Math.max(1, Math.floor(Math.min(ax, bx) - ex)), x1 = Math.min(L - 2, Math.ceil(Math.max(ax, bx) + ex));
+  const y0 = Math.max(1, Math.floor(Math.min(ay, by) - ey)), y1 = Math.min(L - 2, Math.ceil(Math.max(ay, by) + ey));
+  let cells = 0, lo = L, hi = -1;
+  for (let ny = y0; ny <= y1; ny++) {
+    for (let nx = x0; nx <= x1; nx++) {
+      const px = (nx - x) / r, py = (ny - y) / r;
+      const w = jetShare(px * ux + py * uy, py * ux - px * uy);
+      if (w <= 0) continue;
       const k = (nx + ny * L) * 4;
-      out[k] += tau * s * s * ux;
-      out[k + 1] += tau * s * s * uy;
+      out[k] += tau * w * ux;
+      out[k + 1] += tau * w * uy;
       cells++;
+      if (ny < lo) lo = ny;
+      if (ny > hi) hi = ny;
     }
   }
+  if (cells > 0) rows?.add(lo, hi);
   return cells;
 }
 
 /*
-  How much air the breath pulls into the liquid (PLAN.md QA-20).
+  The air the wind puts into the liquid: none (PLAN.md 15g-12).
 
-  What was reported: "At its lowest settings it still blows a ton of ink and
-  creates a lot of bubbles." The moving wind's stress already went with the
-  Amount squared (layBreath's share), but the wind's bubbles did not go with
-  it at all: two were spawned on every sixth step of a moving Blow whatever
-  the Amount, ten spawns a second at the app's 60 steps, so the gentlest
-  breath the dial allows filled the plate with air as fast as a firm one,
-  and each bubble pumps the colour out from under its footprint (the squeeze
-  every bubble lays, LiquidVisualizer's bubble step). That was the ink.
+  What was there (PLAN.md QA-20). A moving Blow laid bubbles as it went: two
+  on every sixth step at first, whatever the Amount, then at a rate that
+  began past the speed at which a gas jet tears a liquid's surface (the
+  blowing number N_B = ρ_air U² / (2 √(ρ g σ)) past 1, about 5.4 m/s on the
+  plate's oil; Subagyo, Brooks, Coley and Irons, ISIJ International 43,
+  2003), ten spawns of two a second at the default Amount. What it did on
+  the plate (the owner, 2026-11-13: "the bubble spawning is weird at best";
+  filmed on a Mac on Foam Cells): three strokes and two held breaths, nine
+  seconds of blowing, left about a hundred bubbles over the plate, each a
+  hole in the colour, and nothing a person watching a breath cross a dish
+  has seen.
 
-  What air blown over a liquid does. A breath drags the surface along (the
-  stress above) and, past a speed, tears it: the surface stays whole while
-  the air's dynamic pressure is under what gravity and surface tension hold
-  a wave down with, and breaks into splashes and entrained air above it.
-  The ratio is the blowing number, N_B = ρ_air U² / (2 √(ρ g σ)) (Subagyo,
-  Brooks, Coley and Irons, ISIJ International 43, 2003, for a gas jet on a
-  liquid bath; the same threshold as the Kelvin-Helmholtz instability's
-  least speed for air over water, about 6.6 m/s), and air is taken in only
-  past N_B = 1. For the plate's oil (σ about 0.03 N/m, ρ 1000) that is
-  √(ρgσ) ≈ 17 Pa against ½ρ_air U², so the surface tears at 5.4 m/s: a
-  breath over the dish gentler than about two thirds of a firm one (the
-  default's 8 m/s) ripples the colour and lays no bubbles at all, a firm
-  one lays them as it always did, and a gale lays more the harder it goes.
-
-  The rate of air taken in past the threshold is drawn here as growing with
-  how far past it the breath is, N_B − 1, set to the old ten spawns a second
-  at the default Amount so a firm breath looks as it did; how fast the
-  entrained volume really grows with N_B (Subagyo's droplets go as about
-  N_B^3.2) is not a number for a dish of oil, and the plate's own limit on
-  how much of it air may cover (bubbles.ts, spawn) is what bounds a gale.
-  And it is a rate a second, not a count a step: a 120-step runner blew twice
-  the air of a 60-step one.
+  Why none. The blowing number's threshold is where a jet on a deep bath
+  starts to throw droplets up off the surface: splashing, which is liquid
+  going into the air and not air into the liquid. Air gets under a surface
+  when the surface folds over it, a wave that breaks or a jet that plunges,
+  and both need depth to fold into. The plate's film is 2 mm, about the
+  liquid's own capillary length (√(σ/ρg), 1.9 mm for the oil), and a firm
+  breath's dynamic pressure where it lands, ½ρ_air U² = 118 Pa at 14 m/s,
+  is six times the weight of the whole film under it (ρ g h = 17 to 20 Pa):
+  the film is pressed aside down toward the glass (the dimple, 15g-2) long
+  before a wave on it could break. So a breath over the film drags it and
+  dents it and folds no air in, at any Amount. Bubbles come from air let
+  out under the liquid, which is what the straw does (a press held still:
+  bubbles.ts, blow), and from the looks and the kicks that lay their own.
 
   The Amount is the breath's speed against a firm breath's (the stress goes
   as its square, which is why the hands pass share = Amount²): so a straw's
   breath, a volume a second through the straw, goes as the speed, √share.
 */
-export const PLATE_LIQUID_DENSITY = 1000;
-export const PLATE_SURFACE_TENSION = 0.03;
-const GRAVITY = 9.81;
 
 /** The breath's speed at the surface, m/s, at `share` of a default breath's stress (the stress goes as U²). */
 export const breathSpeed = (share: number): number => BREATH_SPEED * Math.sqrt(Math.max(0, share));
 
-/** The blowing number of a breath at `speed` m/s on the plate's liquid: past 1 the surface tears and takes air in. */
-export const blowingNumber = (speed: number): number =>
-  AIR_DENSITY * speed * speed / (2 * Math.sqrt(PLATE_LIQUID_DENSITY * GRAVITY * PLATE_SURFACE_TENSION));
-
-/** The speed at which a breath starts to take air into the liquid (N_B = 1), about 5.4 m/s. */
-export const AIR_TAKEN_FROM = Math.sqrt(2 * Math.sqrt(PLATE_LIQUID_DENSITY * GRAVITY * PLATE_SURFACE_TENSION) / AIR_DENSITY);
-
-/** How much air the breath takes in at `share`, against a default breath's: 0 below the tearing speed, 1 at the default. */
-export function airTaken(share: number): number {
-  const n = blowingNumber(breathSpeed(share));
-  return Math.max(0, n - 1) / (blowingNumber(BREATH_SPEED) - 1);
-}
-
-/** Spawns a second of the moving wind's bubbles at a default breath (each spawn two bubbles): what every sixth step at 60 gave. */
-export const WIND_SPAWNS_PER_SECOND = 10;
+/** A breath's dynamic pressure where it lands, in pascals, at `share` of a default breath's stress: ½ρ_air U². */
+export const breathPressure = (share: number): number => 0.5 * AIR_DENSITY * breathSpeed(share) ** 2;
 
 /**
- * How many spawns of air to lay this step, `expected` on average, with `u`
- * a draw in [0, 1): the whole spawns, and the rest by chance, so a gale past
- * one a step lays several and a breath under it lays one some steps.
+ * Seconds a remote hand's breath goes on after its last message (PLAN.md
+ * 15g-5).
+ *
+ * A remote hand's wind (the phone's pad, a game controller, the assistant)
+ * kept the old carries, a take from under the hand and a put a hop ahead,
+ * after the pointer's became air on the film, because its strokes arrive a
+ * message at a time, a few a second, and a breath laid only on the steps a
+ * message landed would push the liquid for one step in every few. So its
+ * breath is held between messages: each one says where it lands and which
+ * way it blows, and the solver's step lays it (FluidSimulation, breatheHeld)
+ * until the next arrives or this long has gone by with none, which is the
+ * hand having stopped. A phone's pad sends a stroke's moves ten to thirty a
+ * second and a controller's stick sixty, so a quarter of a second is two
+ * messages missed at the slowest, and short enough that a finger lifted
+ * reads as the breath stopping. One breath a plate: two remotes blowing the
+ * same plate at once take turns at it (PLAN.md 15g-13).
  */
-export function spawnsOf(expected: number, u: number): number {
-  if (!(expected > 0)) return 0;
-  const n = Math.floor(expected);
-  return n + (u < expected - n ? 1 : 0);
+export const REMOTE_BREATH_HOLD = 0.25;
+
+/** A remote hand's breath as it is held: where it lands, its footprint, its way, its share of a full breath, and the seconds it has left. */
+export type HeldBreath = { x: number; y: number; r: number; dx: number; dy: number; share: number; left: number };
+
+/** A remote hand's message of a moving Blow: the breath it is to hold until the next one, or for REMOTE_BREATH_HOLD. */
+export function holdBreath(h: HeldBreath, x: number, y: number, r: number, dx: number, dy: number, share: number): void {
+  h.x = x; h.y = y; h.r = r; h.dx = dx; h.dy = dy; h.share = share; h.left = REMOTE_BREATH_HOLD;
+}
+
+/**
+ * One solver step of a held breath: lays its jet (layBreath) while it has
+ * time left, and returns the stress laid. `airs` is whether the plate still
+ * takes a breath as air (a thin gap on the GPU); a plate that has stopped
+ * doing so drops the breath rather than keep it for when it does again.
+ */
+export function breatheHeld(h: HeldBreath, out: Float32Array, L: number, dt: number, airs: boolean,
+  rows?: { add(y0: number, y1: number): void }): number {
+  if (!(h.left > 0)) return 0;
+  h.left = airs ? h.left - dt : 0;
+  return airs ? layBreath(out, L, h.x, h.y, h.r, h.dx, h.dy, h.share, rows) : 0;
 }
 
 /** A straw's breath, the volume a second it blows against a default breath's: the speed, √share. */

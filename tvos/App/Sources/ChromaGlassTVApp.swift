@@ -9,14 +9,16 @@ import SwiftUI
 struct ChromaGlassTVApp: App {
     @StateObject private var model = AppModel()
     @Environment(\.scenePhase) private var phase
+    /// The calm loops (CalmLoops.swift) over whatever screen opened them; Menu closes them.
+    @State private var loops = false
 
     var body: some Scene {
         WindowGroup {
             Group {
                 switch model.stage {
                 case .starting: Color.black
-                case .signIn(let code, let problem): SignInView(code: code, problem: problem)
-                case .address(let problem): AddressView(problem: problem) { model.useAddress($0) }
+                case .signIn(let code, let problem): SignInView(code: code, problem: problem, onLoops: { loops = true })
+                case .address(let problem): AddressView(problem: problem, submit: { model.useAddress($0) }, onLoops: { loops = true })
                 case .show:
                     if let address = model.address {
                         ShowView(address: address, onDenied: { model.addressRefused() })
@@ -26,6 +28,7 @@ struct ChromaGlassTVApp: App {
             .background(Color.black)
             .ignoresSafeArea()
             .onAppear { model.launch() }
+            .fullScreenCover(isPresented: $loops) { CalmLoopsView(onClose: { loops = false }) }
         }
     }
 }
@@ -35,6 +38,7 @@ struct ChromaGlassTVApp: App {
 struct SignInView: View {
     let code: TvCode?
     let problem: String?
+    let onLoops: () -> Void
 
     var body: some View {
         VStack(spacing: 48) {
@@ -57,6 +61,8 @@ struct SignInView: View {
                 ProgressView()
             }
             if let problem { Text(problem).font(.title3).foregroundStyle(.orange) }
+            // Free, with no account (CalmLoops.swift): the one thing a TV with no licence can play.
+            Button("Watch a calm loop", action: onLoops)
         }
         .foregroundStyle(.white)
         .padding(80)
@@ -69,6 +75,7 @@ struct SignInView: View {
 struct AddressView: View {
     let problem: String?
     let submit: (String) -> Void
+    let onLoops: () -> Void
     @State private var typed = ""
 
     var body: some View {
@@ -83,9 +90,12 @@ struct AddressView: View {
                 .frame(maxWidth: 1100)
             Button("Connect") { submit(typed) }
             if let problem { Text(problem).font(.title3).foregroundStyle(.orange) }
+            Button("Watch a calm loop", action: onLoops)
         }
         .foregroundStyle(.white)
         .padding(80)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay { SiteCorner() }
     }
 }
 

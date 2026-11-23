@@ -22,13 +22,31 @@ import { VisualizerSettings } from '../types';
  */
 export const MACRO_FULL_ZOOM = 2.0;
 
-/** A preset or a saved show that sets `macroMode` with no zoom of its own. */
+/**
+ * The zoom a look saved with `macroMode` on and no zoom of its own is given
+ * when it is read in (`cleanSettings`, a show's stage), the framing that flag
+ * always meant.
+ */
 export const MACRO_PRESET_ZOOM = 4.0;
 
-/** The zoom the frame is asked for: the slider's, or a macro look's own. */
-export function macroZoomOf(s: VisualizerSettings): number {
-  const setZoom = s.macroZoom ?? 1;
-  return s.macroMode === true ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM) : Math.max(1, setZoom);
+/**
+ * The zoom the frame is asked for: the Macro Zoom, and nothing else.
+ *
+ * It used to be the slider's, or 4 for a look whose `macroMode` was on with
+ * the zoom left at 1, and that second reading is what made two controls of
+ * one thing. A look or a Close-up press that turned the flag on drew the
+ * plate at 4x while every Macro Zoom on the desk, the phone and a controller
+ * read 1.0x, and a zoom fader pulled down to 1 left it at 4x, since 1 was the
+ * value that meant "the look's own". The owner asked for the Close-up button
+ * gone and the Macro Zoom to be the one way in and out (2026-11-14, PLAN
+ * QA-32c), and the zoom can only be that if it is all the frame reads.
+ * `macroMode` stays a look's label (the menus' Closeup looks) and is written
+ * beside the zoom; every look that sets it carries its zoom (presets.ts,
+ * `luckyLook`, `cleanSettings` for a saved one), and a show's stage that says
+ * "macro" with no zoom is given MACRO_PRESET_ZOOM as it plays.
+ */
+export function macroZoomOf(s: { macroZoom?: number }): number {
+  return Math.max(1, s.macroZoom ?? 1);
 }
 
 /**

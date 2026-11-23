@@ -581,18 +581,22 @@ try {
 
     Reported by the owner: layers could be added on some presets and not
     others, and taken off on none. The desk's plus showed only while a look
-    had one layer and there was no minus, so on a two-layer look (Classic,
-    which this page opens on) there was nothing beside the layer tabs. What
-    the desk offers turns on the look's layer count alone, and every
-    built-in carries one or two, so taking Classic's second layer off and
-    putting it back walks both states a preset can open in. Measured: the
+    had one layer and there was no minus, so on a two-layer look there was
+    nothing beside the layer tabs. What the desk offers turns on the look's
+    layer count alone, and every built-in carries one or two, so taking a
+    two-layer look's second layer off and putting it back walks both states
+    a preset can open in. The look is Comet River, gone to for this block
+    and left after it: the page opens on Classic, which since 38w-1 (#917)
+    is one dish on one plate, and the check failed on its one tab before a
+    button was pressed. Measured: the
     tabs, which of the two buttons is beside them, and the solvers the
     engine has (built without a GPU too), after each press. A press that
     did nothing leaves the tabs as they were and fails.
   */
   {
     await clickOn('mode-segmented-perform');
-    await settle(800);
+    await page.evaluate(() => window.chromaglassGo?.('comet', 0));
+    await settle(1500);
     const deskLayers = () => page.evaluate(() => ({
       tabs: document.querySelectorAll('[data-testid^="layer-segmented-"]').length,
       add: !!document.querySelector('[data-testid="add-layer"]'),
@@ -612,6 +616,8 @@ try {
       && taken.tabs === 1 && taken.add && !taken.off && taken.solvers === 1
       && added.tabs === 2 && !added.add && added.off && added.solvers === 2,
       `${says(opened)} → ${says(taken)} → ${says(added)}`);
+    await page.evaluate(() => window.chromaglassGo?.('classic', 0));
+    await settle(1500);
   }
   await clickOn('mode-segmented-perform');
   await settle(1000);

@@ -16,13 +16,6 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
 
   *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia in 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped.md` §28i (moved 2026-10-29, 19m-2).
 
-  - ~~**28i-1. Retire nine**~~ (Antigravity, batch 1, **shipped** in #408; story in
-    `docs/plan-shipped.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
-    named one on its replacement. What it found is **28i-6**.
-  - ~~**28i-5. Retire Lumia**~~ (**shipped**, this PR; story in `docs/plan-shipped.md`
-    28i-5): `lumia` → `velvet-underground` through `RETIRED_PRESETS`; the lamp's Lumia
-    stays. `plate` 5b counts a two-meaning id unless its line has the lamp's shape (`scripts/lookOrLamp.mjs`).
-  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2) **Shipped**: all 21 reworked looks meet their gallery and film bars; Poster's `>= 30 steps/s` is open as **28i-2a** below. Story in `docs/plan-shipped.md` §28i-2 (moved 2026-10-29, 19m-2).
   - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
     (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
     plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at
@@ -99,9 +92,6 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       `clock-glass` (`3.0 swells/min` on 40 s / `0.0` on 30 s, `0.0 colour changes/min`, `r1 = 0.10`),
       `ferro-paint` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.03`),
       `roy` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.08`).
-  - ~~**28i-4. Soap Film**~~ — **Shipped with 32d**: the frame's own film draws its
-    interference colours (`npm run soapplate`: 11 of 12 hue sectors on the lab's picture).
-
   - **28i-6. What retiring nine left a check or a page standing on** (found in 28i-1;
     whoever has credit). Each is a shortcut or a gap the retirement made, named so it
     is not found twice: (a) **no look ships the camera pass any more** (`camera: 1`,
@@ -157,12 +147,36 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       minute and almost none change colour with the song; motion half-life 0.3 s against
       2 to 7 s in real shows. This PR fixes what each look shows, not how it breathes: that
       is 28i-3b's film bar, still open.
-    - **28i-7c, open. Velvet Underground's pools drain, and settings do not bring them
-      back.** 83% near black at the 5th percentile on both passes (more dye and exposure,
-      a brighter lamp, then the screen blend for overlay): the frame is the violet ground
-      with one ultramarine lobe and a fleck of red, where the seed lays three pools. Find
-      where the pools' dye goes (the areas' pours against the regulator and the rim)
-      before touching a number; it matters more now Lumia retires into it (28i-5, #792).
+    - **28i-7f, open (a shortcut named). Turbulence is a noise, and thirteen looks never chose
+      it.** `turbulenceScale` adds curl noise to the flow everywhere, every step (`forcesB`),
+      "the hand stirring the layer" (27c), and its default is 0.5. Between two glasses 2 mm
+      apart nothing stirs by itself: the gap's drag stops any flow nothing drives within
+      milliseconds, so the noise is a stir no real hand makes (a hand moves a solid along a
+      path, the Finger's flow). Velvet Underground never named it and lost its pools to it
+      (28i-7c). Still on the default: cyberpunk, aurora-borealis, solar-flare,
+      jellyfish-bloom, fractal-dream, neon-coral-reef, stardust-collapse, oil-and-water,
+      red-cabbage, magnet-garden, splodascope, ferro-paint, saffron-lace. Each should choose
+      it (a `plate` line, as 5.8 holds `surge`), and the stir itself become a moving hand's
+      real flow (the Finger drawn along a slow path) rather than a noise; filmed on the Mac,
+      since every look's motion changes.
+    - **28i-7g, open. With the motor off and no stir, Velvet's pools still leave.** On the
+      Mac (Rotation Speed 0 and Turbulence 0) they kept 77/78/70% over 90 s, with a steady
+      out-flow from the soap and syrup pools of about 3e-4 that the turning dish does not
+      have (97/96/95% with it). The look ships with the motor on, so this is not in the
+      way of the show; find which force it is (the soap's Marangoni pull at the well's
+      edge, or the liquids' own viscosity contrast in the gap) before a look with still
+      pools and no motor is built on it.
+    - **28i-7h, open. On a slow start the regulator trims Velvet's opening seed by a fifth.**
+      On GitHub's macOS runner (run 43077698169, `npm run pools`) the first run's dish read
+      0.530 of mean dye when its minute began and 0.424 when it ended, every pool losing
+      what the dish lost; the next two runs began at 0.447 and 0.438 and all three ended at
+      0.423, while the owner's Mac reads 0.43 → 0.42. So where the solver starts late (its
+      pipelines built 13 s in there) the plate shows its seed above the level the regulator
+      holds it to and then dims for most of a minute. Find why the seed lays above its own
+      target (`seedMean` is read from `dishSum` straight after the splats; the regulator's
+      `meanDensity` from the rim-masked readback) and lay it at the level it is held to,
+      rather than trimming it in front of an audience. `npm run pools` now begins its
+      minute once the dish has settled, so this is not in its way.
     - **28i-7d, open. Poster, 1969 and Milk Marbling stay white.** More ink (dyeBudget to
       the dial's top, more pours, a lower tension) and, for the milk, lower exposure and
       twice the drops left both frames as they were (Poster 2% near black, Milk 3%): the
@@ -174,19 +188,6 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       took the beads' grain out of proportion: `npm run grainedge` line 2 read body texture
       0.124 and 0.234 at twice the grain, under the 2x it asks (WebGPU macOS, open shard),
       so it came out. A second dye under the beads wants a way that keeps the grain's depth.
-    - ~~**28i-7b. Splodascope's oil is filtered by the water it displaced.**~~ (**shipped** as
-      PLAN 47z-1; story in `docs/plan-shipped.md` 47z-1): a drop's light no longer passes through the
-      water it pushed aside. The cobalt itself, filmed, read darker (47z-1e), so the pale water stays.
-
-  The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
-  (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,
-  Clock Glass, Lava Lamp), proposed as Home's one fixed pack; Fillmore (Acid Trip,
-  Fractal Dream, Classic, Poster 1969, Home Movie, Crowd Plate, Roy); Neon (Comet River,
-  Solar Flare, Cyberpunk, Bass Drop, Galaxy, Stardust Collapse); Lab (Neon Coral Reef,
-  Microscopic Chaos, Turing Print, Chemical Clock, Red Cabbage, Macro Bead, Lacing Run);
-  Ferro & Film (Ferro Paint, Magnet Garden, Soap Film). None of the batches touches the
-  gallery's grey wash (#401).
-
 - **28j. Changing looks without a jump** (the owner, 2026-10-19: "transitions between
   presets are also a little jumpy here and there"). `blendLooks` fades every number and
   colour but switches lists, steps and booleans at the midpoint, and the handoff in
@@ -220,9 +221,6 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
 - **28k. Splodascope: a crowd of oil drops that do not merge** (the owner, 2026-10-25, from a
   photograph of a splodascope: round cells of yellow, green, red and pink oil packed edge
   to edge in blue water, some inside others; "if not, let's fix the physics").
-  - ~~**28k-1. Film Hold and the Splodascope look**~~ (**shipped**, this PR; the story in
-    `docs/plan-shipped.md` §28k). `npm run filmhold`: the look's crowd held 35 → 31 bodies in
-    six seconds, the same plate without the hold 35 → 3.
   - **28k-2. Shortcuts named in 28k-1.** (a) The film is drawn as thick as the field's own
     edge (two to five cells), where a real one is tens of nanometres. (b) A film breaks when
     pressed past what it holds, which is the real threshold but not the real timing: real
@@ -236,17 +234,10 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     colours once 28k-1 is judged.
   - **28k-4. Judged on the Mac** (`docs/judging.md` §79): the look beside the photograph at
     the app's own grid, and whether a kick (Plate Pressure) breaks a few films and no more.
-  - ~~**28k-5. The colours darken at the walls over time**~~ (**shipped** as PLAN 47z-1; story
-    in `docs/plan-shipped.md` 47z-1): the lay handed the water's colour to each drop's rim and
-    the drop's to the water; each drop's colour is now laid in its own oil.
 - **28l. Saffron Lace: yellow lace over lavender, cobalt and coral** (the owner, 2026-11-07,
   from a still of another show: yellow veins and cells of lace, fine spatter, a lavender
   wash, cobalt and coral; "can we create a preset that looks like this?"). Built on Clear
   Film (§20b) and Film Dye (20b-13): the lace is a dyed oil film dewetting, not a drawing.
-  - ~~**28l-1. The look**~~ (**shipped**, this PR): `saffron-lace`, the film at 0.3 of the
-    gap dyed yellow at 0.35, on the lamp, with three thin pools (lib/plateAreas.ts): a wide
-    lavender wash, cobalt with icy blue where the bass pours soap, coral where the treble
-    pours oil. Lab render beside the still in the PR. Judging §112.
   - **28l-2. The lavender cannot be the ground.** Yellow over lavender is amber by
     subtraction, so the look lays its lavender as a thin pool on the lamp's white, and its
     holes elsewhere show white where the still shows lilac everywhere. The still's veins

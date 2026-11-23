@@ -13,6 +13,7 @@ import { WebGPUFluid } from '../gpu/fluid';
 import { MAX_BUBBLES, type BubbleField } from '../lib/bubbles';
 import type { PouredLiquid, SpeciesSnapshot } from '../lib/bubbleLiquid';
 import type { LiquidPhase } from '../lib/liquidPhase';
+import { DISH_GAP_METRES } from '../lib/turntable';
 import type { VisualizerSettings } from '../types';
 import { GRID_SCALE, GRID_SIZE, particleFlowScale } from './constants';
 import type { FluidSimulation } from './fluidSimulation';
@@ -84,10 +85,10 @@ export function stepPlateBubbles(
   simStepS: number,
   tiltX: number,
   tiltY: number,
-  treble01: number,
 ): void {
   const vx = lead?.readVx, vy = lead?.readVy;
   const qk = particleFlowScale(lead, currentSettings);
+  bubbles.gapMetres = lead?.gpu?.coverMetres ?? DISH_GAP_METRES;
   bubbles.liquid(currentSettings);
   const thinGap = (currentSettings.thinGap ?? 1) > 0 && !!lead?.thinGap;
   const snap = thinGap && lead ? lead.speciesPoll.latest : null;
@@ -97,7 +98,7 @@ export function stepPlateBubbles(
     const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
     const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
     return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-  }, tiltX, tiltY, treble01 * 0.6);
+  }, tiltX, tiltY);
   // A bubble is air between the plates: the dye cannot sit under
   // it. A standing squeeze on each footprint keeps pumping the
   // dye out to the rim, so the field flows round the bubbles

@@ -12,6 +12,8 @@ import { Info } from '../Info';
 import { LIT } from '../ui';
 import { Slider, PinChips } from './controls';
 import { PATCH_SOURCES, featuresFor, sceneTargets, TARGET_GROUPS } from './patchLists';
+import { HandControls, MusicHandsFold } from './HandControls';
+import { isMusicCord } from '../../lib/musicCords';
 import type { SectionCtx } from './props';
 
 const SHAPE_NAMES: Record<typeof LFO_SHAPES[number], string> = {
@@ -54,6 +56,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
     settings, onUpdate, readEar, focusSection, lookAreas, areaColours, pins, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
+  // The music's cords folded until opened (HandControls.tsx MusicHandsFold says why).
+  const [handsOpen, setHandsOpen] = React.useState(false);
+  const musicRoles = (settings.sceneMappings ?? []).filter(isMusicCord).map(m => m.role!);
   return (
     <>
 
@@ -102,7 +107,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {(settings.sceneMappings ?? []).map((m, i) => (
+              <MusicHandsFold roles={musicRoles} open={handsOpen} onToggle={() => setHandsOpen(o => !o)} />
+              {(settings.sceneMappings ?? []).map((m, i) => !handsOpen && isMusicCord(m) ? null : (
                 <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
                   <div className="flex items-center gap-1">
                     {/*
@@ -170,18 +176,28 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     >
                       {m.area !== undefined ? AREA_TARGETS.map(t => (
                         <option key={t.key} value={t.key} title={t.hint}>{t.label}</option>
-                      )) : TARGET_GROUPS.map(g => (
-                        <optgroup key={g.id} label={g.name}>
-                          {g.targets.map(t => (
-                            <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
+                      )) : <>
+                        {/* A hand on the whole plate (PLAN 38v-1): the music's own hands are these. */}
+                        <optgroup label="Hands on the plate">
+                          {AREA_TARGETS.map(t => (
+                            <option key={t.key} value={t.key} title={t.hint}>{t.plate}</option>
                           ))}
                         </optgroup>
-                      ))}
+                        {TARGET_GROUPS.map(g => (
+                          <optgroup key={g.id} label={g.name}>
+                            {g.targets.map(t => (
+                              <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </>}
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
                       aria-label="Remove mapping"
+                      // By the patch's index, for the phone's check: the music's folded cords make the nth on screen another patch.
+                      data-testid={`patch-remove-${i}`}
                     >
                       <X size={12} />
                     </button>
@@ -201,8 +217,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     <select
                       value={String(m.layer ?? 'all')}
                       aria-label="Plate"
-                      disabled={m.area !== undefined || !PER_LAYER.has(String(m.setting))}
-                      title={m.area !== undefined ? 'An area cord works on the plate the music plays'
+                      disabled={isAreaTarget(m.setting) || !PER_LAYER.has(String(m.setting))}
+                      title={isAreaTarget(m.setting) ? 'A hand works on the plate the music plays'
                         : PER_LAYER.has(String(m.setting))
                         ? 'Which plate this patch moves'
                         : `${sceneTargets.find(t => t.key === m.setting)?.label ?? 'This control'} is part of the finished picture, not one plate`}
@@ -250,7 +266,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                         band={m.band}
                         feature={m.feature}
                         gain={m.gain ?? 1}
-                        threshold={(m.area !== undefined
+                        threshold={(isAreaTarget(m.setting)
                           ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
                           : m.mode === 'gate')
                           ? (m.threshold ?? 0.3)
@@ -285,7 +301,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                           const next = [...(settings.sceneMappings ?? [])];
                           const { area: _drop, layer: _layer, ...rest } = m;
                           next[i] = area === undefined
-                            ? { ...rest, layer: m.layer ?? 'all', setting: isAreaTarget(m.setting) ? 'turbulenceScale' : m.setting }
+                            // Off its area a hand works the whole plate (38v-1), so it stays a hand.
+                            ? { ...rest, layer: m.layer ?? 'all' }
                             : { ...rest, area, setting: isAreaTarget(m.setting) ? m.setting : 'areaStir' };
                           onUpdate({ sceneMappings: next });
                         }}
@@ -299,9 +316,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     both whole-plate sound/band cords and area cords. Not on the
                     note (PLAN 25i): a name has no level to gate or gain.
                   */}
-                  {(m.source === 'sound' || m.source === 'bands' || m.area !== undefined) && !isClassFeature(m.feature) && (() => {
+                  {(m.source === 'sound' || m.source === 'bands' || isAreaTarget(m.setting)) && !isClassFeature(m.feature) && (() => {
                     const isSoundOrBands = m.source === 'sound' || m.source === 'bands';
-                    const isGated = m.area !== undefined
+                    const isGated = isAreaTarget(m.setting)
                       ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
                       : m.mode === 'gate';
                     return (
@@ -389,6 +406,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       </div>
                     );
                   })()}
+                  <HandControls m={m} i={i} settings={settings} onUpdate={onUpdate} />
                 </div>
               ))}
             </div>
