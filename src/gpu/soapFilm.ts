@@ -72,6 +72,9 @@ export interface SoapFilmGpuReadback {
  */
 export interface SoapFilmGpuBuffers {
   h: GPUBuffer;
+  /** The film's projected face velocities after a step, m/s (what drags the plate's air, gpu/soapAir.ts). */
+  uf: GPUBuffer;
+  vf: GPUBuffer;
   ext: GPUBuffer;
   stats: GPUBuffer;
   ruptured: GPUBuffer;
@@ -156,7 +159,7 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   const film: SoapFilmGpu = {
     nx,
     ny,
-    buffers: { h: hBuf, ext: extBuf, stats: statsBuf, ruptured: rupturedBuf, age: ageBuf },
+    buffers: { h: hBuf, uf: ufBuf, vf: vfBuf, ext: extBuf, stats: statsBuf, ruptured: rupturedBuf, age: ageBuf },
     write(h: ArrayLike<number>): void {
       if (destroyed) return;
       for (let i = 0; i < n; i++) {

@@ -7,7 +7,7 @@ import {
   Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
-  Crosshair, LayoutGrid, Plus,
+  Crosshair, LayoutGrid, Plus, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
@@ -17,6 +17,12 @@ import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { musicStirOf, withMusicStir } from '../../lib/stir';
 import { glassSlideOf, withGlassSlide } from '../../lib/glassSlide';
+import { musicHandOf, withMusicHand } from '../../lib/musicCords';
+import type { MusicRole } from '../../types';
+
+/** The music's hands the phone's Sound sheet turns (PLAN 38v-1), each shown where the look has it. */
+const HAND_SLIDERS: readonly [MusicRole, string][] = [['bloom', 'Kick Pour'], ['pulse', 'Bass Pulse'], ['press', 'Bass Press']];
+import { musicShakeOf, withMusicShake } from '../../lib/shakeCord';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -27,9 +33,11 @@ import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
-import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
+import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { canShareClip, shareClip } from '../../lib/shareClip';
+import type { ClipShape } from '../../lib/clipFrame';
 import { OscOutRow } from '../ui/OscOutRow';
 import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -40,7 +48,9 @@ import { TabStrip } from '../desk/TabStrip';
 import type { TabEdit } from '../../hooks/useDeskLayout';
 import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
+import { SiteLink } from '../SiteLink';
 import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { PicturePaletteButton } from '../PicturePaletteButton';
 
 /**
  * ChromaGlass on a phone.
@@ -163,13 +173,15 @@ export interface PhoneStageProps {
   onLiquid: (id: string) => void;
   dyeColors: readonly string[];
   onDyeColor: (hex: string) => void;
-  palettes: { name: string; colors: string[] }[];
+  palettes: { name: string; colours: string[] }[];
   paletteLock: number | null;
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** A picture or video file's colours as the palette (usePaletteLock, PLAN 43d): the desk's own call. */
+  onPicturePalette?: (file: File) => Promise<string | null>;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -195,9 +207,9 @@ export interface PhoneStageProps {
     something played, not set up.
   */
   spin: { auto: number; rpm: number; beats: number; /** The tempo the dish's Tempo mode is lit by, bpm, or 0. */ bpm: number; onChange: (patch: Partial<VisualizerSettings>) => void };
-  // The closeup
+  // The closeup: the Macro Zoom, the one way in and out of it (PLAN QA-32c).
   zoom: number;
-  onZoom: () => void;
+  onZoom: (zoom: number) => void;
   camera: 'hold' | 'follow' | 'auto';
   onCamera: (c: 'hold' | 'follow' | 'auto') => void;
   /** Auto's cut, "5s" (`shotLabel`, lib/macroCamera.ts), named on its button so it reads apart from Follow (QA-11). */
@@ -359,7 +371,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
-  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
+  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void; shape: ClipShape; onShape: (s: ClipShape) => void; take: { blob: Blob; filename: string; url: string } | null };
   onHide: () => void;
   onFullLayout: () => void;
   /** The desk's tabs, on the phone (More → Tabs). */
@@ -449,6 +461,15 @@ export function PhoneStage(p: PhoneStageProps) {
   const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
+  /*
+    The Macro Zoom's row, opened by the microscope at the top. That button used
+    to be the closeup's on/off (4x in, the plate out); the owner asked for the
+    Close-up button gone everywhere (2026-11-14), the zoom being the one way in
+    and out, so here it opens the zoom itself rather than standing in for it.
+    A pinch still sets the zoom once in; the row is how a phone gets in at all,
+    and back to the whole plate in one drag.
+  */
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   /*
     The camera's hint, for a few seconds after the closeup comes in: the one
@@ -504,11 +525,11 @@ export function PhoneStage(p: PhoneStageProps) {
             </button>
           )}
           <button
-            onClick={p.onZoom}
-            aria-pressed={zoomed}
-            aria-label={zoomed ? 'Leave the closeup' : 'Closeup'}
+            onClick={() => setZoomOpen(o => !o)}
+            aria-expanded={zoomOpen}
+            aria-label="Macro Zoom"
             data-testid="phone-zoom"
-            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomed ? LIT : 'text-text-2 active:bg-active'}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomOpen || zoomed ? LIT : 'text-text-2 active:bg-active'}`}
           >
             <Microscope size={20} />
           </button>
@@ -532,6 +553,22 @@ export function PhoneStage(p: PhoneStageProps) {
         </div>
       </div>
 
+      {zoomOpen && (
+        <div className="pointer-events-auto mx-3 mt-2 rounded-xl border border-border-strong bg-surface/90 px-4 pt-3 backdrop-blur-xl" data-testid="phone-zoom-panel">
+          <Slider
+            label="Macro Zoom"
+            value={Math.max(1, p.zoom)}
+            min={1}
+            max={16}
+            step={0.1}
+            onChange={p.onZoom}
+            display={`${Math.max(1, p.zoom).toFixed(1)}×`}
+            touch
+            testId="phone-zoom-slider"
+            midiKey="setting:macroZoom"
+          />
+        </div>
+      )}
       {zoomed && (
         <div className="pointer-events-auto mx-auto mt-2 flex flex-col items-center gap-2" data-testid="phone-camera">
           <div className="flex rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
@@ -858,12 +895,22 @@ export function PhoneStage(p: PhoneStageProps) {
                 className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] ${p.paletteLock === i ? LIT : 'border-border bg-elevated text-text-2'}`}
               >
                 <span className="flex">
-                  {pal.colors.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
+                  {pal.colours.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
                 </span>
                 <span className="whitespace-nowrap">{pal.name}</span>
               </button>
             ))}
           </div>
+
+          {p.onPicturePalette && (
+            <PicturePaletteButton
+              onFile={p.onPicturePalette}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2 disabled:opacity-60"
+              testId="phone-picture-palette"
+            >
+              <Palette size={18} /> Palette from a picture or video
+            </PicturePaletteButton>
+          )}
 
           <button
             onClick={() => { p.onImageDye(); close(); }}
@@ -877,12 +924,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
-          {/* Not closed on a press, unlike the two above: Pour and Film are
-              each a toggle someone may want both of, and Stop is here too. */}
-          {p.cartoons && (
+          {/* The video loaded (PLAN 14ag), by this sheet's "A video as dye" or
+              the Video section's Video file: not closed on a press, unlike the
+              two above, since Play and Pour are each a toggle someone may want
+              both of, and Pour's Stop is here too. */}
+          {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
-              <CartoonShelf {...p.cartoons} size="phone" />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} onMixOrder={p.mixer ? o => p.mixer!.onSetting({ mixOrder: o }) : undefined} />
             </div>
           )}
           </PanelGuard>
@@ -1152,6 +1201,45 @@ export function PhoneStage(p: PhoneStageProps) {
                 display={`${Math.round(glassSlideOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-glass-slide" />
             </div>
           )}
+          {/*
+            The music's hands (PLAN 38v-1): the kick's pour, the bass's pulse
+            and the press are cords on every look now (lib/musicCords.ts),
+            each with its own depth, and the desk sets them in Patches. The
+            phone has no patch bay, so these three are those cords' depths
+            (`musicHandOf`, `withMusicHand`), 0.5 being what the old block
+            did at Sound Drive's 1x and 1 twice that; Sound Drive above is
+            still the master over all of them.
+          */}
+          {p.mixer && HAND_SLIDERS.filter(([role]) => p.mixer!.settings.sceneMappings?.some(m => m.role === role)).map(([role, label]) => (
+            <div className="mt-3" key={role}>
+              <Slider label={label} value={musicHandOf(p.mixer!.settings.sceneMappings, role)} min={0} max={1} step={0.01}
+                onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicHand(p.mixer!.settings.sceneMappings, role, v) })}
+                display={`${Math.round(musicHandOf(p.mixer!.settings.sceneMappings, role) * 200)}%`} touch testId={`phone-music-${role}`} />
+            </div>
+          ))}
+          {/*
+            The dish on a speaker (PLAN 48f): Shaker, the drive's frequency
+            (nought, none), and while it is on, Shake in g and Music Shake,
+            the depth of the cord from the bass onto Shake
+            (lib/shakeCord.ts), as the desk's Tilt & Rock card has them.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Shaker" value={p.mixer.settings.faradayHz ?? 0} min={0} max={150} step={1}
+                onChange={(v) => p.mixer!.onSetting({ faradayHz: v })}
+                display={(p.mixer.settings.faradayHz ?? 0) > 0 ? `${Math.round(p.mixer.settings.faradayHz ?? 0)} Hz` : 'Off'} touch testId="phone-shaker" midiKey="setting:faradayHz" />
+              {(p.mixer.settings.faradayHz ?? 0) > 0 && (
+                <>
+                  <Slider label="Shake" value={p.mixer.settings.faraday ?? 0} min={0} max={2} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ faraday: v })}
+                    display={`${(p.mixer.settings.faraday ?? 0).toFixed(2)} g`} touch testId="phone-shake" midiKey="setting:faraday" />
+                  <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
+                    display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />
+                </>
+              )}
+            </div>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}
@@ -1196,6 +1284,17 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-3">
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
               display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+          </div>
+          {/*
+            The desk's two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a hand's tip of
+            the flat plate that stays where it is put, for a phone on a stand. Not the
+            phone's own Tilt, which stands the plate up (Gravity), so both can be on.
+          */}
+          <div className="mt-3">
+            <Slider label="Tilt left/right" value={p.mixer.settings.plateTiltX ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltX: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltX ?? 0) * 100)}%`} touch testId="phone-tilt-x" midiKey="setting:plateTiltX" />
+            <Slider label="Tilt up/down" value={p.mixer.settings.plateTiltY ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltY: v })}
+              display={`${Math.round((p.mixer.settings.plateTiltY ?? 0) * 100)}%`} touch testId="phone-tilt-y" midiKey="setting:plateTiltY" />
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
@@ -1343,6 +1442,8 @@ export function PhoneStage(p: PhoneStageProps) {
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
           </div>
+          {/* The website's free visuals, in the apps only (SiteLink.tsx renders nothing on the site). */}
+          <div className="mt-3"><SiteLink look="sheet" /></div>
           {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
           <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
             <SectionLabel>Record makes</SectionLabel>
@@ -1355,6 +1456,31 @@ export function PhoneStage(p: PhoneStageProps) {
               testId="phone-record-makes-segmented"
             />
             <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
+            {/* The clip's frame (lib/clipFrame.ts, PLAN 34f): 9:16 to post, or the screen as it is. */}
+            <SectionLabel>Clip frame</SectionLabel>
+            <Segmented
+              value={p.recording.shape}
+              options={[['portrait', 'Portrait 9:16'], ['plate', 'Screen as it is']] as const}
+              onChange={p.recording.onShape}
+              height={44}
+              fill
+              testId="phone-record-shape"
+            />
+            <p className="text-[12px] text-dim">
+              {p.recording.shape === 'portrait'
+                ? 'The middle 9:16 of the screen, with sound, as an MP4 where this phone can write one: ready for Reels and TikTok.'
+                : 'The whole screen, as it is.'}
+            </p>
+            {p.recording.take && !p.recording.on && canShareClip(p.recording.take) && (
+              <button
+                type="button"
+                onClick={() => { void shareClip(p.recording.take!); }}
+                data-testid="phone-share-clip"
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-[14px] font-medium text-text active:bg-hover"
+              >
+                <Share2 size={16} />Share the last clip
+              </button>
+            )}
           </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">

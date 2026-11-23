@@ -16,7 +16,7 @@ import { lookOf } from '../lib/lookFade';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
 import {
   ShowSequence, ShowStage, SequencerStatus,
-  builtInSequences, loadUserSequences, SEQUENCES_KEY, saveUserSequences, lerpSettings, stageAtOffset,
+  builtInSequences, loadUserSequences, SEQUENCES_KEY, saveUserSequences, lerpSettings, stageAtOffset, stageCloseup,
 } from '../lib/sequencer';
 import { useCloudSyncReload } from '../lib/cloudSyncApp';
 import {
@@ -175,7 +175,8 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     // the stage's own settings over it. A stage with no look is a set of
     // changes to the one already playing, and glides only those.
     const target: Partial<VisualizerSettings> = { ...(preset ? lookOf(preset.settings) : {}), ...(stage.settings ?? {}) };
-    if (stage.macro !== undefined) target.macroMode = stage.macro;
+    // Closeup on or off glides the zoom, the closeup's one control (PLAN QA-32c).
+    if (stage.macro !== undefined) stageCloseup(target, stage.macro);
     const current = a.getSettings();
     const from: Partial<VisualizerSettings> = {};
     for (const key of Object.keys(target) as (keyof VisualizerSettings)[]) (from as Record<string, unknown>)[key] = current[key];
@@ -418,18 +419,32 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     return () => { clearShowInterval(timer); sendPace(PACE_NEUTRAL); };
   }, [enterStage, findSequence, publish, sendPace]);
 
+  /*
+    Each through the state's own updater, not the list this render saw: a set
+    list file carrying three sequences upserts three in one go
+    (useSetActions' importToSet, the show kit), and each upsert over the same
+    stale list kept only the last of them (found building PLAN 44k-16a).
+  */
   const upsertSequence = useCallback((seq: ShowSequence) => {
-    const next = userSequences.some(q => q.id === seq.id)
-      ? userSequences.map(q => (q.id === seq.id ? seq : q))
-      : [...userSequences, seq];
-    persist(next);
-  }, [persist, userSequences]);
+    setUserSequences(prev => {
+      const next = prev.some(q => q.id === seq.id) ? prev.map(q => (q.id === seq.id ? seq : q)) : [...prev, seq];
+      saveUserSequences(next);
+      return next;
+    });
+  }, []);
 
   const removeSequence = useCallback((id: string) => {
-    persist(userSequences.filter(q => q.id !== id));
+    setUserSequences(prev => {
+      const next = prev.filter(q => q.id !== id);
+      saveUserSequences(next);
+      return next;
+    });
     if (runRef.current?.sequenceId === id) stop();
     if (selectedId === id) setSelectedId(builtIns[0]?.id ?? '');
-  }, [builtIns, persist, selectedId, stop, userSequences]);
+  }, [builtIns, selectedId, stop]);
+
+  /** The owner's sequences replaced whole: the assistant's edits and its Undo (app/editNow.ts, PLAN 44k-16a). */
+  const putSequences = persist;
 
   return {
     sequences,
@@ -437,6 +452,6 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     setSelectedId,
     status,
     play, pause, stop, next, prev, goTo, startAt,
-    upsertSequence, removeSequence,
+    upsertSequence, removeSequence, putSequences,
   };
 }

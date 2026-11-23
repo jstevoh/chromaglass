@@ -257,28 +257,10 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-6** (E, S): **shipped**, Measure's lab part split in two (`lab` about 12 min, `lab2` about 10; the required names unchanged). Story in `docs/plan-shipped.md` §19k-6 (moved 2026-10-29, 19m-2). Open: the browser part
   is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
   / the job summary over the next merges and split the browser part next if it passes 21.
-- **19k-8** (E, S): **shipped**, the soap's two checks (`soap`, `soapbreak`) in a sixth Measure
-  part `lab3`, since `lab2` ran 24:18 of its 25 minutes with them. Story in `docs/plan-shipped.md` §19k-8.
-- **19k-9** (E, S): **shipped**, the browser part's last sixteen checks in a seventh Measure
-  part `browser2`, cut at `applink`, which builds `dist/` for the ones after it. Story in
-  `docs/plan-shipped.md` §19k-9.
 - **19k-11** (E, S): **shipped** in part, `holeline` in an eighth Measure part `lab4` (#690),
   since `lab` was cancelled in it at 25 minutes on main's deploys 667 and 670 and on both of
   #688's attempts, all on the slow runner tier. Story in `docs/plan-shipped.md` §19k-11. Open:
   19k-11b.
-  - **19k-11a, shipped 2026-11-07 (#688).** `lab` was cancelled at 25:00 on both of #688's
-    attempts, on the slow tier: the first in holeline at ten minutes, the second with all 11
-    checks green in 24:34 (holeline 10:19), the job's own setup taking it past the limit;
-    `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
-    checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
-    #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
-- **19k-11c, shipped 2026-11-13** (E, S). **`lab4` over its 25 minutes on the slow tier.**
-  `glint` (47e, #833) and `bubbleair` had joined `holeline`, `encode --grids` and `shaderdials`
-  in `lab4`, and on GitHub's slow ubuntu tier it was cancelled at the limit on two of the day's
-  four PR runs (#842 and #835), no check failing: about 15 minutes of checks ahead of
-  holeline's 11. `glint` moved to `lab9` (3:50 that day) and `bubbleair` to `lab8` (4:24);
-  no bar, timeout or check body changed, only each check's shard in `scripts/checks.json`
-  and the comment above `timeout-minutes` in `checks.yml`. The bound stays 25.
 - **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
   slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
   0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
@@ -305,10 +287,6 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   print a line before each of those calls under `CI`, so the next hang names its call, then
   find why that call can stop (D671's same-check red, "the dimmer still reaches the wall", is
   19aa's and may share the cause).
-- **19k-15** (E, S): **shipped**, `ears`'s covered line holds each tick to the wall's ask
-  before it (more than 250 ms after, EAR_ASK_HOLD_MS) rather than wanting none; red on GitHub's
-  Macs on #718 and #734 at one tick each. Story in `docs/plan-shipped.md` §19k-15.
-- **19k-16, shipped** (E, S): `draftwall --frames` opened the wall before the show's first step, so its 8 s count of painted frames could end before the opening did (0 painted on 5 of 54 runs); it waits for the show now (docs/plan-shipped.md, 19k-16).
 - **19k-16a, open** (E, S). **A projector opened during a cold start is asked for frames the show cannot draw.** Found
   with 19k-16: until the wall engine's renderer starts (`startWith`), the projector's rAF asks
   `askFrame` (`src/components/LiquidVisualizer.tsx`, grep `const askFrame`) for a frame sixty times a
@@ -323,15 +301,6 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   `askFrame` and frames painted once the show starts.
 - **19k-20, open** (E, S): **the phone's held Drop reads its dye against a baseline its own drop displaces.** `scripts/phone.mjs`, "a finger holding Drop with Drop Height up lets go of a drop as it lands and one every ten steps after": red once on the Mac's `show` shard on 2026-11-13 (the closeup pull request, 38u), green on the head before with the same source and green on its one re-run. The count it is named for was right (3 drops over 27 steps, 3 wanted); its second half read `-206 dye under it against 0/0/0/-0`. The line before it leaves a pool under the same finger ("A 206 under it"), `dropBefore` is snapped with that pool there, and a drop from Drop Height 0.9 lands with a push: minus 206 is the whole pool out of one disk and none of the three drops' dye inside it 700 ms after the finger lifts, on a plate that stepped 29 times in 1063 ms. The feature is "the drops reach the plate", not "the disk under the finger gained". *Do:* clear the plate before `dropBefore` (or hold a cell no earlier line has used), and read the dye nearest the finger as the two-finger line above it does (within three disks), keeping the mirrors as the control. *Measure:* the line's printed dye over twenty Mac runs has no negative reading and its least is several times the bar of 5; a build that counts drops and hands the solver none is still red. **A second read of the same kind, same file** (2026-11-14, the same pull request's next head, green on its one re-run and red on none of seventeen other runs): "and spreading them zooms in by as much as they spread" printed `4.00× → 12.00× (3.00 times, 3.40 wanted) for fingers 50 → 170 px apart`. 12.00 is 4 × 150/50: the setting was read after `settle(300)` with the sixth touch move not yet in it, on a `show` shard that ran 18:45 of its 18 minutes. The feature is "the zoom follows the spread", not "it has arrived 300 ms on". *Do:* wait on the setting itself (poll `macroZoom` until it stops changing, bounded), then read. *Measure:* twenty Mac runs print the wanted ratio; a build whose pinch stops one move short is still red.
 - **19k-19, open** (E, S): **the Mac's five parts have no room.** `show`, `tools`, `plate`, `open` and `fifth` run 16 to 23 of their 25 minutes on a GitHub Mac (read off #820's run, 2026-11-12), and a GPU check too long for SwiftShader has nowhere else to go: Lava Lamp's cycle (`lavacycle`, six minutes of the lamp, two hours on SwiftShader, a couple of minutes on Metal) went on `show`, the lightest. The next one will not fit. Wanted: a sixth Mac part, or the five rebalanced by measured minutes (`npm run checks` could print each part's last times), weighed against the Mac queue a sixth part lengthens (docs/ci.md).
-- **19k-18, shipped** (E, S): `lab2` over its 25 minutes on #802's deploy, twice, every check green; the moiré sheets' check moved to a part of its own, `lab9` (docs/plan-shipped.md, 19k-18).
-- **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6`, and `inktitle` from `lab3` to `lab7` (docs/plan-shipped.md, 19k-17).
-- **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
-  whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
-  deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also
-  cancelled open at 19:27, a slow runner; 669 also read reds in oscout, ears and startup 1b, 19aa-7,
-  each green on the runs either side). Before #655 fifth ran 17:14 and 17:48. `mirror` (85 s, the
-  shard's last) moved to `show`, which ran 15:56 and 16:23 on those deploys; no bound moves. The
-  same day deploy 667 was cancelled in `lab` at 24:30 of its 25, all eleven green: 19k-11 again.
 - **19k-10** (E, S): a check-only PR can run a `dist/`-leaning check with no `dist/`. Under
   `CHECKS_ONLY` (19k-4) a part runs only the checks the diff reaches, so a PR that changes
   only `scripts/followview.mjs` runs `followview` alone, and it (like `inputpick`,

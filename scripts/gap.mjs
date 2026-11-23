@@ -75,7 +75,7 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 const near = (a, b, tol = 1e-9) => Number.isFinite(a) && Math.abs(a - b) <= tol * Math.abs(b);
-const IDS = ['puddle', 'settle', 'lift', 'pinch'];
+const IDS = ['puddle', 'settle', 'lift', 'pinch', 'readers', 'wired'];
 const flag = process.argv.find((a) => a.startsWith('--owed='));
 const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
 const unknown = [...owed].filter((id) => !IDS.includes(id));
@@ -107,6 +107,10 @@ await build({
       "export { FERRO_DROP_WGSL, GAP_LC } from './src/gpu/wgsl/ferroDrop.ts';",
       "export * as C from './src/lib/cover.ts';",
       "export * as PG from './src/lib/playGesture.ts';",
+      "export * as SQ from './src/lib/squish.ts';",
+      "export * as HS from './src/lib/handSolid.ts';",
+      "export * as ST from './src/gpu/wgsl/standing.ts';",
+      "export * as FD from './src/gpu/wgsl/ferroDrop.ts';",
       "export { DEFAULT_SETTINGS } from './src/types.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
@@ -398,6 +402,12 @@ const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
     plate. The solver's: each Darcy speed (colour's fall, oil's lift, oil's
     pull) carries (h/h₀)², the breath and the glass's drag and the slump read
     the cover's metres, and hsPrep's hand forcing is taken at S.cover.
+    Since PLAN 27f-7 (Classic round five) the oil's lift is no longer its own
+    force: it goes through the tipped dish's circulation with the colour's
+    fall, as κ = OIL_LIFT/ROCK_FALL of it per unit of oil, so its (h/h₀)² is
+    the rock's own (the third reader) and κ is held free of the gap: a κ that
+    carried coverH2 too would square it twice. Both halves of L are read, x
+    and y: a reader of x alone stayed green with the gap dropped from y.
   */
   const d = L.DEFAULT_SETTINGS;
   const share = L.pourShare(0.1, 1e-6, 1 / 60, 2 * H0) / L.pourShare(0.1, 1e-6, 1 / 60);
@@ -405,7 +415,7 @@ const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), passes = readFileSync('src/gpu/fluid/passes.ts', 'utf8'), thin = readFileSync('src/gpu/wgsl/thinGap.ts', 'utf8');
   const solver = [
     /get coverH2\(\): number \{\s*const r = this\.coverGap \/ DISH_REST_GAP;\s*return r \* r;/.test(readFileSync('src/gpu/fluid/cover.ts', 'utf8')),
-    /OIL_TENSION_GAP \* this\.coverH2/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX/.test(fluid), /-OIL_LIFT \* this\.coverH2/.test(fluid),
+    /OIL_TENSION_GAP \* this\.coverH2/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX : 0, rockOn \? ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockY : 0/.test(fluid), /const kappa = -OIL_LIFT \* oilLightnessOf\(p\.oilWeight\) \* seconds \/ \(PLATE_METRES \* Math\.max\(disp, 1e-9\) \* ROCK_FALL\);/.test(fluid),
     /const h0 = this\.coverGap \* GAP_METRES;/.test(fluid), /const b = this\.coverGap \* GAP_METRES;/.test(passes), /const hc = this\.coverGap \* GAP_METRES;/.test(passes),
     /\(A\.a\.x \/ \(S\.cover \* S\.cover\) \* A\.a\.y\)/.test(thin),
   ];
@@ -627,6 +637,102 @@ const wetOf = (s) => (airEdge ? `wet ${(s.wet / A).toFixed(4)} A` : 'no wet in t
     detail = `hands ${hands.map((v) => v.toFixed(3)).join(' ')} over spans ${spans.map((x) => x.toFixed(2)).join(' ')}; monotone ${mono}, odd ${odd}, ends ${ends}, at PINCH_SPAN ${PG.PINCH_SPAN} ${g.toFixed(3)}; reads ${reads.map((b) => (b ? 1 : 0)).join('')}; pinchHand called in ${calls.map(([p]) => p).join(', ') || 'no file'}: wheel ${wheel}, touch ${touch}, back to 0 ${release}`;
   }
   line('pinch', 'a pinch on the trackpad (ctrl-wheel) or two fingers whose span changes sets the glass\'s hand: together presses, apart lifts, gentle at first and full at half or twice the span; a pair moving together still blows', ok, detail, !has);
+}
+
+// 24 and 25: the rest gap's other readers (PLAN 38r-17). The glass is not at
+// its rest gap: the cover (gpu/fluid/cover.ts) floats on what is poured and
+// what the hand presses, and the solver says where it is (coverMetres,
+// coverUnits). Line 1 holds that the rest gap is one number; these hold that
+// the readers which turn a gap into physics read the gap the glass is at, not
+// that number. Each is worked out here from the reader's own law, at a 1 mm
+// glass and at the 2 mm rest, so a reader that keeps the constant gives the
+// same answer twice and misses:
+//   - the kick's dent: the sheet's reach (lib/sheet.ts sheetReach, its
+//     mobility h³/12μ) through dentRadius, which already takes the gap (line
+//     7 holds it), so kickPress(nu, sway, gapMetres) at 1 mm is dentRadius's
+//     own answer at 1 mm;
+//   - a finger's Brinkman edge, two of h/√12 (line 8 at the rest gap), so
+//     handEdge(L, gapMetres) is linear in the gap;
+//   - the spikes' film top and the closeup drop's room, the gap in capillary
+//     lengths, h/l_c: filmTop(gapMetres) and gapLc(gapMetres) are linear in h
+//     (filmTop less its rest offset) and give FILM_TOP and GAP_LC at the rest.
+// The API is the build's to add (the names above, gap in metres last); on
+// main the functions are absent or take no gap, which is the state the lines
+// are owed in. Line 25 is the wiring, which node cannot step: each live
+// reader is handed the cover's gap where the plate is made or stepped. It
+// reads the source with comments stripped (as line 23 does): no dragSeconds()
+// with one argument (the opening's spin lag, gpu/opening.ts, takes the
+// cover's units the way the visualizer's and the sim's already do), the
+// bubbles' gapMetres and the sheet's h0 assigned from coverMetres, and the
+// spikes' and the drop's WGSL no longer carry the rest gap's numbers as
+// literals (FILM_TOP, GAP_LC), which means the shader reads the gap it is
+// given. forces.ts's `nominal` stays the 2 mm on purpose (the old plate's
+// absolute depth drag) and is not a reader here. The milk's scattering
+// depth and the glint's GAP_METRES are 38r-17's other half and are not held
+// here: they are drawn in the plate shader and need the lab (a check owed).
+{
+  const H1 = 0.001;
+  const kp = L.SQ.kickPress, he = L.HS.handEdge, ft = L.ST.filmTop, gl = L.FD.gapLc;
+  // Each part is worked where the build has it and missing where it has not,
+  // so a half-built item is red (a build that is there and misses); the line
+  // is excused only while none of the four takes a gap, which is main.
+  const has = { kick: kp.length >= 3, edge: he.length >= 2, film: typeof ft === 'function', room: typeof gl === 'function' };
+  const none = !has.kick && !has.edge && !has.film && !has.room;
+  const nu = 1e-4;
+  const parts = [];
+  let ok = true;
+  if (has.kick) {
+    const dent = (h) => kp(nu, 0, h).radii[0];
+    const want = (h) => Math.max(4, Math.round(L.dentRadius(nu, L.KICK_HOLD, h) * 128));
+    ok = ok && dent(H1) === want(H1) && dent(H0) === want(H0) && dent(H1) !== dent(H0);
+    parts.push(`dent ${dent(H1)} cells at 1 mm (the sheet's law ${want(H1)}), ${dent(H0)} at 2 mm (${want(H0)})`);
+  } else { ok = false; parts.push('kickPress takes no gap'); }
+  if (has.edge) {
+    ok = ok && near(he(192, H1), L.handEdge(192) / 2, 1e-6) && near(he(192, H0), L.handEdge(192), 1e-6);
+    parts.push(`edge ${he(192, H1).toFixed(3)} cells at 1 mm, ${he(192, H0).toFixed(3)} at 2 mm`);
+  } else { ok = false; parts.push('handEdge takes no gap'); }
+  if (has.film) {
+    const off = ft(0);
+    ok = ok && near(ft(H0), L.FILM_TOP, 1e-6) && near(ft(H1) - off, (L.FILM_TOP - off) / 2, 1e-6);
+    parts.push(`film top ${ft(H1).toFixed(3)} at 1 mm, ${ft(H0).toFixed(3)} at 2 mm (FILM_TOP ${L.FILM_TOP.toFixed(3)})`);
+  } else { ok = false; parts.push('no filmTop(gapMetres)'); }
+  if (has.room) {
+    ok = ok && near(gl(H0), L.GAP_LC, 1e-6) && near(gl(H1), L.GAP_LC / 2, 1e-6);
+    parts.push(`drop room ${gl(H1).toFixed(3)} l_c at 1 mm, ${gl(H0).toFixed(3)} at 2 mm (GAP_LC ${L.GAP_LC.toFixed(3)})`);
+  } else { ok = false; parts.push('no gapLc(gapMetres)'); }
+  const detail = parts.join('; ');
+  line('readers', 'the kick\'s dent, a finger\'s edge, the spikes\' film top and the drop\'s room each follow the gap the glass is at: at 1 mm each is its own law at 1 mm, not the rest gap\'s', ok, detail, none);
+
+  const files = [];
+  const walk = (d) => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(n)) files.push(p); } };
+  walk('src');
+  // Comments stripped (a comment naming a call does not count), their newlines kept so a line number is the file's.
+  const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, '')).replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const src = files.map((p) => [p, code(readFileSync(p, 'utf8'))]);
+  // dragSeconds( calls with one top-level argument (its definition excluded).
+  const oneArg = [];
+  for (const [p, t] of src) {
+    for (const m of t.matchAll(/(?<!function )\bdragSeconds\(/g)) {
+      let depth = 1, commas = 0, i = m.index + m[0].length;
+      for (; i < t.length && depth > 0; i++) { const c = t[i]; if ('([{'.includes(c)) depth++; else if (')]}'.includes(c)) depth--; else if (c === ',' && depth === 1) commas++; }
+      if (commas === 0) oneArg.push(`${p}:${t.slice(0, m.index).split('\n').length}`);
+    }
+  }
+  const all = src.map(([, t]) => t).join('\n');
+  const bubbles = /\.gapMetres\s*=[^;\n]*cover(Metres|Units)/.test(all.replace(/this\.gapMetres\s*=\s*opts\.gapMetres[^;\n]*/g, ''));
+  const sheet = /\.h0\s*=[^;\n]*cover(Metres|Units)/.test(all);
+  // The spikes' ceiling is compiled into phaseForces as FILM_TOP's digits, and
+  // the drop's room is handed to its kernel as 0.95 GAP_LC (gpu/ferroDrop.ts):
+  // both the rest gap's, whatever the glass does.
+  const text = (f) => (src.find(([p]) => p === f) || [f, ''])[1];
+  const film = /\$\{\s*FILM_TOP\b/.test(text(join('src', 'gpu', 'wgsl', 'fluid', 'phaseForces.ts')));
+  const room = /\bGAP_LC\b/.test(text(join('src', 'gpu', 'ferroDrop.ts')));
+  const opening = oneArg.some((x) => x.startsWith(join('src', 'gpu', 'opening.ts')));
+  const wiredOk = oneArg.length === 0 && bubbles && sheet && !film && !room;
+  line('wired', 'the plate hands its readers the cover\'s gap: no spin lag at the rest gap, the bubbles\' and the sheet\'s gap set from coverMetres, the spikes\' ceiling and the drop\'s room not the rest gap\'s',
+    wiredOk,
+    `one-argument dragSeconds at ${oneArg.join(', ') || 'none'}; bubbles' gap from the cover ${bubbles}; sheet's h0 from the cover ${sheet}; FILM_TOP compiled into phaseForces ${film}; GAP_LC handed to the drop ${room}`,
+    opening && !bubbles && !sheet && film && room);
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall ok');

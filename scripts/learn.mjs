@@ -483,7 +483,8 @@ const M = (source, depth, key = 'turbulenceScale') => {
     // NOT_ON_A_BEAT). The other three toggles the first version let through.
     { id: 'x7', source: 'kick', target: { kind: 'action', action: 'blackout-toggle' } },
     { id: 'x8', source: 'snare', target: { kind: 'action', action: 'automate-toggle' } },
-    { id: 'x9', source: 'bar', target: { kind: 'action', action: 'macro-toggle' } },
+    // (x9 was Macro, a toggle until the Close-up press was taken out, PLAN QA-32c.)
+    { id: 'x9', source: 'bar', target: { kind: 'action', action: 'overlays-toggle' } },
     { id: 'x10', source: 'beat', target: { kind: 'action', action: 'seq-play-pause' } },
     // A master: learnable on a fader, but the patch bay refuses it as a
     // target, so as a mapping it would load, do nothing, and light Sound Impact.
@@ -527,7 +528,9 @@ const M = (source, depth, key = 'turbulenceScale') => {
   const actions = Object.keys(ACTION_LABELS);
   const toggles = actions.filter(a => a.endsWith('-toggle') || a === 'seq-play-pause');
   const letThrough = toggles.filter(a => triggerable(a));
-  check('no toggle can be pressed by the music', toggles.length >= 9 && letThrough.length === 0,
+  // Eight since Macro (`macro-toggle`) went with the Close-up press (PLAN QA-32c): the floor
+  // is the list as it stands, so a list that emptied could not pass.
+  check('no toggle can be pressed by the music', toggles.length >= 8 && letThrough.length === 0,
     `${toggles.length} toggles refused${letThrough.length ? `; let through: ${letThrough.join(', ')}` : ''}; a trigger may press ${actions.filter(triggerable).join(', ')}`);
 
   // The same rule for a setting as the patch bay's, both ways.

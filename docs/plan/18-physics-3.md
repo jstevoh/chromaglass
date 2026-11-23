@@ -27,6 +27,12 @@ Part 3 of 3 of §18; it begins at 18l-7. The section starts in `18-physics.md`.
   deeper than four; inside that range the colour is the stored absorbance exactly. A
   thinner floor reads as a milky halo on the black ground; on the lamp ground (18b) the
   depth is not clamped.
+- **18l-8. Colour through the gap's depth** (M; Medium). Only 2 of 34 looks turn on `gapScale`
+  (`plate.ts:2346`); transmission is under 1 on 9; and `saturationBoost` (`plate.ts:3475`)
+  lifts 31 looks by 1.3 to 1.6. Light through dye falls by Beer–Lambert, T = 10^(−εch), so a
+  thinner gap is paler and a deeper one richer with no boost. Draw every look through the
+  gap's depth and retune the boosts away. Check: halving the gap halves ln T within 5%. (38v,
+  from RS-51.)
 
 ## 18m. A drop slumps under its own weight (replaces a drop that sits or blurs)
 **Shipped** (#364): a pool of dye on a level plate runs out along the lower glass as a
@@ -60,16 +66,15 @@ measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same nu
   Weight's contrast. The species carries each poured liquid's real density (18d-4), and
   the ferrofluid's share of a cell is read as water. Take Δρ from the species, and the
   ferrofluid's share out of the current's room as the oil's is.
+  38v (2026-11-21): the thin solve's viscosity (`passes.ts:573-596`) still carries the old
+  scale, and the slump (`slump.ts:99-125`) shows it. Divide by exp(lnNu), so a slump spreads
+  as r ∝ (t/ν)^(1/8): 0.42 as far for a liquid 1000× thicker. Check: in `npm run slump`,
+  within 15%. (From RS-6.)
 - **18m-4. The lobes.** A real pool's front is lobed; this one is round. On a still
   plate a viscous current's front is stable (Huppert's own pools were round), so the
   lobes are the plate's: the drop landing off true, the glass not flat, the lamp's heat
   (18f) and the flow streaking it (18h). Look again once 18f and 18h are in; build
   nothing for them here.
-- ~~**18m-5. The grid filter makes dye at a drop's rim.**~~ **Shipped**: `dampGrid` takes its clamp's excess back across the 7×7 neighbourhood around the stencil (`dampGridCurv`, `dampGridLimit`, `dampGrid`); story and numbers in [`docs/plan-shipped.md`](docs/plan-shipped.md).
-- ~~**18m-5a. Run `npm run slump` with the grid filter on.**~~ **Shipped**: checks 1 to 11 run with `dampGrid` on, and check 14 holds the glycerine drop's dye and front to the filter-off run; story in [`docs/plan-shipped.md`](docs/plan-shipped.md).
-- ~~**18m-5b. The grid filter's three passes each work out the stencil again.**~~ **Shipped**: `dampGridCurv` stores c, `dampGrid` writes only near a clamp and reads β once per workgroup; the dye is the same to the bit, and the stage's Metal time fell by a third to a half; story in [`docs/plan-shipped.md`](docs/plan-shipped.md).
-- ~~**18m-5c. The grid filter still reshapes a slumping drop's edge.**~~ **Shipped**: `[lo, hi]` is held to `here` unless the cross-curvature `m = δx²δy²f` oscillates along both grid axes (`ax & ay` in `dampGridCurv`, `dampGridLimit`, `dampGrid`), `npm run slump` 14b holds the 2% front to +0.000 mm of the bare run's at 2 s and 20 s, and `--owed=front` is removed from `scripts/checks.json`; story and numbers in [`docs/plan-shipped.md`](docs/plan-shipped.md).
-
 ## Kept, named as dials or looks
 
 These are not physics and do not pretend to be: vorticity confinement (declared "not
@@ -84,11 +89,15 @@ kaleidoscope. The noise stirring stays as a stir dial once 18a gives the plate i
 motion. The numerical patches of the collocated grid (`dampGrid`, the Rhie–Chow faces,
 `mixRelax`) are numerics, not faked physics, and are worth reconsidering with 18a.
 
+38v (2026-11-21): the room stir, the video flow and the splat push per step, not per second,
+so they change with the step rate: 38v-8.
+
 ## Already physical
 
 The multigrid projection. The gap field, with the press as a −ḣ/h source. The oil's
 Cahn–Hilliard phase with a curvature capillary force, moved in flux form and conserved
-exactly. Oil Bodies' partition of the colour. Marangoni flow as conservative surface
+exactly. Oil Bodies' split of the colour by the oil fraction (no dye has a partition
+coefficient yet; corrected 2026-11-21 by 38v, see 18d-13). Marangoni flow as conservative surface
 transport. Buoyancy in `mixForce` only when the plate stands up. The dye stored as
 per-channel absorbance. Acid and base as signed equivalents. BZ and Liesegang. The
 ferrofluid's pull as ∇|B|² with Langevin saturation, and the Ohta–Kawasaki labyrinth.

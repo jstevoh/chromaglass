@@ -37,6 +37,7 @@
  */
 import { chromium } from 'playwright';
 import { chromiumPath } from './chromium.mjs';
+import { acquireFilmLock } from './maclock.mjs';
 import { watchVideo, freezes } from './watch.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -61,6 +62,7 @@ const check = (name, ok, detail = '') => {
 };
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codecblip-'));
+await acquireFilmLock({ label: `codecblip.mjs (${path.basename(process.cwd())})` });
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: ['--autoplay-policy=no-user-gesture-required'] });
 const takes = [];
 try {

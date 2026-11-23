@@ -8,12 +8,13 @@
  *
  * PLAN 38u-8 and 38u-11. What was found (2026-11-13, the physics audit):
  * Glass Smear, the cover glass sliding over the liquid, defaulted to 0.3, and
- * twenty-two of the forty-one looks slid it all the time with nobody's hand
- * on it; a real cover glass is still until the performer pushes it.
+ * nineteen of the looks on main slid it all the time with nobody's hand on
+ * it (after 38w-1 rested Lava Pop and its moiré pair at 0); a real cover
+ * glass is still until the performer pushes it.
  * Granulation, a speckle laid in the dye, sat at 0.5 on every look; a dye in
  * solution has no grain, so the speckle was invented noise on every plate.
  * The owner chose (2026-11-14) both dials at rest by default, Granulation's
- * dial kept for whoever wants grain, and the slide those twenty-two looks
+ * dial kept for whoever wants grain, and the slide those nineteen looks
  * were built around kept as a cord anyone can see and pull: LFO 1 on Glass
  * Smear at the look's old dial over the dial's travel, so the top of each
  * wave is exactly the old constant speed (lib/glassSlide.ts).
@@ -102,15 +103,16 @@ const { FluidSimulation, PatchBay, SETTING_TRAVEL, slide, PRESETS, DEFAULT_SETTI
 const { GLASS_TRAVEL, slideCord, isSlideCord, glassSlideOf, withGlassSlide } = slide;
 
 /*
-  Glass Smear on main (1d3a94d6) for every look that slid it with no cord of
-  its own on the dial: its written value, or the old default of 0.3 where it
-  wrote none. Here and not computed, so the lib cannot move its own target.
+  Glass Smear on main for every look that slid it with no cord of its own on
+  the dial: its written value, or the old default of 0.3 where it wrote none.
+  Here and not computed, so the lib cannot move its own target. (`classic`
+  rests at 0 since 38w-1, and `moire-star` and `moire-waves` inherit it.)
 */
 const SLID = {
-  classic: 0.3, comet: 0.3, cyberpunk: 0.8, 'acid-trip': 0.9, 'microscopic-chaos': 0.5, 'aurora-borealis': 0.4,
+  comet: 0.3, cyberpunk: 0.8, 'acid-trip': 0.9, 'microscopic-chaos': 0.5, 'aurora-borealis': 0.4,
   'solar-flare': 0.6, 'fractal-dream': 0.7, 'velvet-underground': 0.22, 'neon-coral-reef': 0.45, 'stardust-collapse': 0.45,
   'cell-bloom': 0.25, 'lace-run': 0.4, 'crowd-plate': 0.25, 'soap-film': 0.35, 'chemical-clock': 0.25, 'home-movie': 0.3,
-  'clock-glass': 0.25, 'moire-star': 0.3, 'moire-waves': 0.3, 'moire-ripple': 0.25, 'moire-groove': 0.3,
+  'clock-glass': 0.25, 'moire-ripple': 0.25, 'moire-groove': 0.3,
 };
 // Down to hundredths, as lib/glassSlide.ts slideDepth rounds, so the wave's top is never faster than the old speed.
 const floor2 = (x) => Math.floor(x * 100 + 1e-9) / 100;
@@ -140,7 +142,7 @@ console.log('\n2. The looks that slid carry the slide as a cord');
     const cords = (p.settings.sceneMappings ?? []).filter(isSlideCord);
     if (cords.length !== 1 || cords[0].depth !== floor2(old / 3)) wrong.push(`${id} ${cords.map(c => c.depth).join('+') || 'none'} want ${floor2(old / 3)}`);
   }
-  check('each has exactly one slide cord at its old dial over the travel, rounded down', wrong.length === 0, wrong.join('; ') || 'all 22');
+  check('each has exactly one slide cord at its old dial over the travel, rounded down', wrong.length === 0, wrong.join('; ') || `all ${Object.keys(SLID).length}`);
   const extra = PRESETS.filter(p => !(p.id in SLID) && (p.settings.sceneMappings ?? []).some(isSlideCord)).map(p => p.id);
   check('no other look carries one', extra.length === 0, extra.join(', ') || 'none');
   const bd = lookOf('bass-drop');
@@ -207,9 +209,9 @@ function oldSpeed(settings, old) {
   check('the wave\'s top is the old constant speed, within the cord\'s rounding (0.03 of the dial, under)', worstTop <= 0.0301, `worst ${f3(worstTop)} of the dial under`);
   check('and never faster than the look was written to slide', worstOver <= 1e-9, `worst ${f3(worstOver)} over`);
   check('the glass comes to rest at the wave\'s foot (under a twentieth of the old speed)', worstFoot < 0.05, `worst foot ${f3(worstFoot)}`);
-  const c = glassRun(full(lookOf('classic')), 16);
+  const c = glassRun(full(lookOf('home-movie')), 16);
   check('it moves in silence: the beat clock runs the LFO with no music, and the dial swings from rest to the old 0.3',
-    c.top > 0 && c.lo < 0.01 && Math.abs(c.hi - 0.3) < 0.02, `classic's dial ${f3(c.lo)}..${f3(c.hi)}`);
+    c.top > 0 && c.lo < 0.01 && Math.abs(c.hi - 0.3) < 0.02, `home-movie's dial ${f3(c.lo)}..${f3(c.hi)}`);
 }
 
 console.log('\n4. Pull the cord and the glass stops');

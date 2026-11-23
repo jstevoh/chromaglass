@@ -46,7 +46,7 @@
  * (docs/judging.md).
  */
 import { readFileSync } from 'node:fs';
-import { SlowEvolve, GLIDE_MIN, GLIDE_MAX, MIN_REST, REST_FLOOR, AIM_STEP, DIAL_SPEED_MAX, evolvePace } from '../src/lib/slowEvolve.ts';
+import { SlowEvolve, GLIDE_MIN, GLIDE_MAX, MIN_REST, REST_FLOOR, AIM_STEP, DIAL_RATE_MAX, evolvePace } from '../src/lib/slowEvolve.ts';
 import { DRIFTABLE, FRAME_MOTION, THEMES } from '../src/lib/drift.ts';
 import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -253,19 +253,16 @@ console.log('\nThe dial sets the pace');
     hi.r.peak <= 0.05, `fastest ${(hi.r.peak * 100).toFixed(2)} %/s`);
   /*
     The line above reads one seed's fastest dial, and since the planner caps
-    a glide's speed (slowEvolve.ts DIAL_SPEED_MAX) it reads that cap back. The
-    check-skeptic took the cap out: the one seed went red, but over seeds 1 to
-    12 only six of the twelve did (4.6 to 6.0 %/s), so one more draw in the
-    planner could put this seed on a green path with the cap gone. So the
-    promise itself is held for every move on eight seeds at full speed: no
-    move is planned faster than the cap, and each run's measured fastest dial
-    stays under the 5 % above.
+    each dial's step (slowEvolve.ts DIAL_RATE_MAX) it reads that cap back.
+    So the promise itself is held for every move on eight seeds at full speed:
+    no move is planned faster than the cap, and each run's measured fastest
+    dial stays under the 5 % above.
   */
   const capped = [1, 2, 3, 4, 5, 6, 7, 8].map(seed => run(look('classic'), (t, rr) => songEar(t, 0, rr), 900, { seed, rate: 1 }));
   const topPlanned = Math.max(...capped.flatMap(r => r.moves.map(m => m.topSpeed)));
   const topRun = Math.max(...capped.map(r => r.peak));
-  check(`at full, every move on eight seeds is planned no faster than ${(DIAL_SPEED_MAX * 100).toFixed(1)} % of a dial's travel a second, and none runs over 5 %`,
-    capped.every(r => r.moves.length >= 3) && topPlanned <= DIAL_SPEED_MAX + 1e-9 && topRun <= 0.05,
+  check(`at full, every move on eight seeds is planned no faster than ${(DIAL_RATE_MAX * 100).toFixed(1)} % of a dial's travel a second, and none runs over 5 %`,
+    capped.every(r => r.moves.length >= 3) && topPlanned <= DIAL_RATE_MAX + 1e-9 && topRun <= 0.05,
     `${capped.reduce((n, r) => n + r.moves.length, 0)} moves, fastest planned ${(topPlanned * 100).toFixed(2)} %/s, fastest run ${(topRun * 100).toFixed(2)} %/s`);
   /*
     The song above never drops closer than 51 s, so it cannot test a 20 s
