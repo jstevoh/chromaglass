@@ -19,7 +19,6 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   and last call. No bar moved. When a red names the pour, either mark it as the show's own
   in the log (the way the dye log marks `auto`) or hold the show off the plate for the
   window, as `__bottleTest` already holds `doseLiquid` off.
-- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** The hook keeps what it was asked (`forcedStepDown`); no bar, no governor change. Story in `docs/plan-shipped.md` §19aa-10 (moved 2026-10-29, 19m-2).
 - **19aa-11. The Mac `webgpu` check "the stage starts, with nothing asked for" (3 of 192,
   read 2026-10-25; two of them within twenty minutes that day).** `no stage` with no
   `gpuFailure`, 30 s after load, on the first page of the run only: every later page of
@@ -56,8 +55,8 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   before any app check leans on software WebGPU for its commits.
 - **19aa-15. A pull request's Measure part builds the site first when a full run would
   have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
-- **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
-  the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
+- ~~**19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
+  the cause is not found, a breakdown is printed).**~~ Dropped 2026-11-22 (19ak-21, the owner's "cut the shit out of things"): the line is deleted from its harness and prints as a note, not fixed. The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
   *earlier* than the control. Over the 192 Mac runs of the week the show's own ran 0.40 to
   3.25 s (median 0.78, 2.0 s or more on 8%), and the control's has the same tail (0.5 to
@@ -117,24 +116,6 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
     2.02, still red, so 7b is not a change to the check alone and stays open: the next step
     is what in the page's first second stretches four frames over 0.85 s after a fast device.
     Merged with 7a's fix in the same PR; judge on `npm run flakes` a week on as above.
-  - **19aa-7d. Shipped 2026-11-15: the control's compile, when one frame got through.** Main's
-    deploys 832 and 839 (both on the owner's second Mac runner) went red on 1b's first two
-    lines with the control pricing no compile: "0.00 s compiling ... (0 stops), 8.55 s the
-    page's own". The control built its 59 on its first step (0.81 s), its page was held from
-    then on (its timer on time for about 0.16 s of the next 1.72 s), one frame got through at
-    2.53 s, and the frames then stopped 6.61 s with the page silent: the stop began 1.72 s
-    after the builds, outside the second, and the first-use rule rightly will not vouch for a
-    stop the page stood still through. A build now also sits in the first stop after it when
-    that stop began under two seconds after it, the page never ran (ticks and frames no more
-    than a quarter second apart) for half a second at a time between, and its timer was on
-    time for half of the second before the build; read from the build: `scripts/compilestop.mjs`
-    (`buildsIn`, beside startup.mjs at its ceiling), `npm run compilestop` on thirteen made-up
-    openings. Not asked: whether one long task covered the stretch (the log does not print
-    the control's long tasks after its first step). 839's control reads 8.33 s of compile and 0.23 s its own. Not #861 (?prepare=0
-    returns before the prepare). Judge on the next deploys' `open` shard on both owner runners.
-- **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
-  §19aa-2 (moved 2026-10-29, 19m).
-- **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
 - **19aa-4. `deploygate.sh` keeps the token off curl's command line.** It passes
   `-H "Authorization: Bearer $GH_TOKEN"` as an argument (`scripts/deploygate.sh`, the `api()`
   helper), and the owner runs it locally with `GH_TOKEN=$(gh auth token)`, so any process
@@ -144,9 +125,6 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   that the same merges are trusted. Found by the check-skeptic on 19aa-3.
 
 ## 19ab. A shard's tool fetches are bounded, and the browser is cached
-
-- **19ab-1. A slow download no longer reads as a failing check (shipped 2026-10-24).** Story
-  in `docs/plan-shipped.md` §19ab-1 (moved 2026-10-29, 19m).
 
 - **19ab-2. apt runs only for a library that is really missing, and a missing one fails by
   name (shipped 2026-10-24).** Story in `docs/plan-shipped.md` §19ab-2 (moved 2026-10-29,
@@ -181,8 +159,6 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
 
 ## 19ac. The phone's double tap on Speed is judged on two taps landing in time
 
-- **19ac-1. The double tap's two taps carry a finger's times (shipped 2026-10-24).** Story
-  in `docs/plan-shipped.md` §19ac-1 (moved 2026-10-29, 19m).
 - **19ac-2. How long a tap on the phone's sheet takes to answer is unjudged.** The double
   tap now prints it ("handled N ms apart"); the old red implied up to about 400 ms on a
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
@@ -193,13 +169,6 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
   The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
   the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
-- **19ac-4. `mirror`'s "and nowhere else" named the hand's own drop (shipped 2026-10-30).**
-  Since #512 the check photographs the Perform tab's preview, a wide window on the dish
-  where a cell is 0.055 of the plate tall and 0.154 wide, and a held drop reaches two cells
-  up its column (0.11 of the plate, 22 to 25 against a drift of 8 to 9) where the check
-  counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
-  under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
-  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
 - **19ac-6, open** (E, S): **`mirror`'s "and nowhere else" reads at its bar on main since 2026-11-14.**
   Red once on a GitHub Mac (`show`, the closeup pull request for 38u, head b7c33e8): "Classic, calm,
   layer 1 turned a quarter: and nowhere else", 28.5 past its drift where 27.4 was allowed, 95.4 under
@@ -217,6 +186,15 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   bar's share was set on the old one (then re-measure DROP_REACH as 19ac-4 did, never widen the bar
   to fit). *Measure:* twenty Mac runs, GitHub's and the owner's, read under half the allowance on
   all three scenes; a drop mirrored where it should not be is still red.
+  *Seen again 2026-11-22* on the video-lamp pull request (14ag-3, head b5bbf9a, a GitHub Mac, twice:
+  the run and its one re-run): 27.9 and 25.2 past the drift where 24.6 was allowed, 91.0 and 90.9
+  under the drop, all four drops alike (past it 14.8 28.6 31.5 27.2; 15.5 26.4 26.1 24.3), the
+  first drop's drift high both times (12.1, 11.6). The same cell, row 6 column 4, 0.164 from the
+  hand. That diff moves no solver code, and with no video loaded it draws Classic's plate from the
+  same lines (the lamp ground's line moved below the closeup's detail, where nothing between reads
+  it; `videolamp` holds Film Mix 0 to the byte). Its head before main came in (5f08157) read green
+  on a GitHub Mac. Eight other Mac runs on main since bbfded1 read 14.0 to 24.4 against 23.9 to
+  26.2 allowed, so the line sits within a few levels of its bar on most trees.
 - **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
   and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
   the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
@@ -250,6 +228,13 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   A third presentation on 2026-10-30 (#550, f3f052e): **68 ask, 0 frame, 0 tick over 71 frames
   asked for**, the "fewer is an ask the ear missed" side of the same line, three in two seconds
   with no stray reading against a bar of two; the same diff read the line green on four other runs.
+  *2026-11-21/22:* main's deploy 879 (492caba, GitHub's Macs) was red on this line and on its
+  neighbour "covered with no wall, the worker's tick keeps the ear going", and four or more PRs
+  that touch neither went red on them too, after #769's fix to the ear. Both lines are
+  quarantined on pull requests and main's deploys from 2026-11-22 to 2026-12-06 (19ak-18),
+  bars unmoved; the PR that finds which side is wrong takes the two entries out. Each line ANDs
+  several clauses and the entry matches its name, so while it holds the ear reading its own
+  frames while covered is held too: the fix splits the flaky clause into a line of its own first.
 
 - **19ad-2. The same shard failed with no check having failed, and with a check that is
   green seven times out of seven on the owner's Mac.** Two more presentations on PR
@@ -341,9 +326,6 @@ Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   the runner's moment, not the branch). Found reviewing #352 (2026-10-24).
 
 ## 19af. The repository's front page: a short README, the guide in docs/, a clean root (shipped 2026-10-25)
-
-**Shipped.** Story in `docs/plan-shipped.md` §19af (moved 2026-10-29, 19m).
-
 - **19af-2. Open, the owner's, GitHub settings a session cannot change** (the agent proxy
   refuses writes to repository-settings paths): the About description, the website link
   (`https://chromaglass.art`) and the topics. Suggested text is in the PR that shipped
@@ -357,11 +339,6 @@ Permissions-Policy, so anything could frame the show and a script injected into 
 with the visitor's licence key and sign-in in reach; and the root `npm audit` counted fifteen
 advisories.
 
-- **19ag-1. Shipped.** `firebase.json` sends, on every path: an **enforced**
-  `Content-Security-Policy` of the four directives that cannot break a page this app serves
-  (`frame-ancestors` for the site's own three names only, which the Auth iframe needs;
-  `object-src 'none'`; `base-uri 'self'` … Story in `docs/plan-shipped.md` §19ag-1 (moved
-  2026-10-29, 19m).
 - **19ag-2. Open, the CSP enforced.** The report-only policy keeps `'unsafe-inline'` in
   `script-src` for three inline scripts in `index.html` and the preload list the build writes
   into the page (`vite.config.ts`), whose text, and so hash, changes with every build.
@@ -400,13 +377,6 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 - **19ah-2. Open: a separate macOS user for the runner.** Jobs run as the owner and can read
   the owner's signing keys and `gh` sign-in. Only main's reviewed workflow runs there, but a
   user of its own (logged in, for the GPU) would take the reach away.
-- **19ah-3. Shipped (with 19ah): a shard queued for a Mac that went to sleep after the
-  probe.** `deploy.yml`'s `Watchdog` (`scripts/macwatch.mjs`) starts the deploy again with
-  `hosted` and cancels the stalled run after 15 minutes queued with none running. It
-  counts the run finished only when the checks' `WebGPU (macOS)` job has (19ah-3a: every
-  job made so far is briefly finished after `reach`, before the shards' jobs exist). Still
-  open: it holds an ubuntu runner for the length of the shards (free on a public
-  repository); a shorter way would be a watchdog that wakes on a schedule.
 - **19ah-4. Open: the by-hand Mac workflows** (`gallery`, `controls`, `pixels`, `film`) could
   take the same probe and lane; they are the longest Mac jobs and queue the same way.
 - **19ah-5. Open: the job-started hook is copied by hand.** `macrunner-setup.sh` installs
@@ -497,35 +467,17 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
 the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai-2 (the lighter `CLAUDE.md` and the folder maps), 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
 
-- **19ai-1. Shipped: a lighter `CLAUDE.md`.** 18,082 → 12,008 bytes loaded on every step;
-  the checks table to `docs/checks-map.md`, CI to `docs/ci.md`, the domain map and the
-  splits to `docs/architecture.md` (story in `docs/plan-shipped.md` §19ai-1).
-- **19ai-2. Shipped: a `README.md` per folder** (`src/gpu`, `src/gpu/fluid`, `src/gpu/wgsl`,
-  `src/gpu/wgsl/fluid`, `src/sim`, `src/lib`, `src/hooks`, `src/components/desk`,
-  `src/components/phone`, `server`, `scripts`; `src/app` and `src/components/settings`
-  came with their splits). A PR that changes a folder's exports updates its README.
 - **19ai-10. Open: the frame loop, a piece at a time.** The visualizer's frame loop is one
   `useEffect` of about 5,500 lines (most of `LiquidVisualizer.tsx`'s 434 KB). Not split in
   one move: a PR that changes a piece of it first moves that piece to its own module (a
   function taking the frame's state, no per-frame allocation) in its own commit, held
   against the checks that read the file as text (19ai-3a), then changes it.
-- **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
-  was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
-  2026-10-29, 19m).
 - **19ai-3a. Found along the way.** The review said `lib/stir`, `squish`, `plateRock` and
   `turntable` import types from the component; they only name it in comments. The one
   importer was `hooks/useSongRender.ts`. And 26 checks read `LiquidVisualizer.tsx` as text:
   a later split of the frame loop (the review's item 11) moves code those checks grep, so
   each piece moved has to be held against them the way this one was (a pattern that matched
   the old file and no longer matches the new one is a check that moved with the code).
-- **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
-  reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
-  whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
-- **19ai-4a. Shipped with 19ai-8 for App's setters** (the story in `docs/plan-shipped.md`).
-  The plate's setters in `LiquidVisualizer.tsx` still cast, and drop theirs when next edited.
-- **19ai-8. Shipped: `App()` into its domains' hooks** (`src/app/`, 34 hooks; `App.tsx` 372,525
-  → 215,830 bytes; the story in `docs/plan-shipped.md`). A check that reads App's source as
-  text reads `scripts/appSource.mjs`, App and its hooks as one text.
 - **19ai-8a. Open: what stayed in `App()`.** The settings' writers at its heart (the ride,
   the drift, `updateSettings`, `applyPreset`, the saved-look document, `lookPhase` and
   `magnetInHand`, the automation's effect: about 30 KB) were left, because they reach
@@ -538,22 +490,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   so `useCommandPalette` takes 52 parameters, `useRemote` 48, `useWallLook` 37. Once
   19ai-8a has moved the settings' writers, the ones that read a domain's state and its
   setters can take that domain's hook result instead of its pieces.
-- **19ai-9. Shipped: the settings panel's sections into `src/components/settings/`**
-  (`SettingsPanel.tsx` 201,442 → 23,916 bytes; the story in `docs/plan-shipped.md`). A check
-  that reads the panel's markup as text reads `scripts/settingsSource.mjs`, the panel and
-  its sections as one text.
 - **19ai-9a. Open, found along the way: the panel's seventy-two props.** App hands
   `SettingsPanel` its props one by one (thirteen for the film and the pour, eight for the
   tempo), and the panel hands them on to its sections in `SectionCtx`. Once 19ai-8b gives
   each domain one hook result, the panel can take the film's or the tempo's whole, as its
   sections read them; until then a new value a section reads is four edits for one name
   (App, the props, `SectionCtx` and the object the panel builds).
-- **19ai-5. Shipped: `npm run sizes`, a size ratchet.** Story in `docs/plan-shipped.md`
-  §19ai-5 (moved 2026-10-29, 19m).
-- **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** Story in
-  `docs/plan-shipped.md` §19ai-5c (moved 2026-10-29, 19m).
-- **19ai-5d. Shipped: a warning at 40 KB, a failure at 100 KB** (the owner's pick,
-  2026-10-29). Story in `docs/plan-shipped.md` §19ai-5d (moved 2026-10-29, 19m).
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
   App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
   such PR now has to move as many bytes out as it adds, wiring lines included. If that turns
@@ -562,8 +504,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
 - **19ai-5b. Open: the ledgers come out.** 19m (PLAN.md split by section) takes PLAN.md and
   the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
   part of the app; `scripts/checks.json` could be one file per shard.
-- **19ai-6. Shipped:** `wgsl/fluid.ts` split into one file a pass under
-  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped.md, 19ai-6).
 - **19ai-6a. Open, found along the way.** About sixty comments across `src/` and
   `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
   file's header, which names each pass's file. Repoint one when its file is next touched,
@@ -573,8 +513,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   file's header says what the WGSL port changes everywhere"), but the index opens with its
   imports and no header. `src/gpu/wgsl/fluid/README.md` lists the files in step order for
   now; the header comes back (or the pointers move to the README) with the next edit there.
-- **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
-  a pure move (docs/plan-shipped.md, 19ai-7).
 - **19ai-8. `npm run wgsl` passes a shader that will not build.** Found 2026-10-30 (32g): a
   kernel naming a variable `from` (a WGSL reserved word) passed `npm run wgsl`, and only
   `soapgpu` failed, at its first pipeline ("soapTransport failed to build"). The compile gate
@@ -582,26 +520,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
   plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
   (`npm run microscope` read 0.00 at every zoom).
-- **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
-  rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
-  and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share
-  of straw steps in the stroke move with the machine. On GitHub's Macs it went 301 → 242 on a
-  PR that does not touch the bubbles (run 41129450339, green on re-run) and 325 → 284 on #603,
-  where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
-  measure over a fixed number of plate steps, not wall time, so its bar means the same on
-  every runner.
-  Quarantined 2026-11-01 to 2026-11-15, renewed 2026-11-15 to 2026-12-06 (19ak-8).
-- **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
-  dark" goes red on PRs that do not touch the wall.** Quarantined 2026-11-01 to 2026-11-15
-  and renewed 2026-11-15 to 2026-12-06 (19ak-1, 19ak-8) so it reports without blocking.
-  The corner patch it reads (0.26–0.31, 0.11–0.20 of a 64×36 grid) sits close to the
-  circle's edge; find whether the red runs read a lit edge
-  (the sample too close) or a frame not yet drawn (the read too early), and measure the
-  feature, not the moment.
-- **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
-  an end date (docs/plan-shipped.md, 19ak).
-- **19ak-2. Shipped:** a PR's site files run only the Mac checks that read them
-  (docs/plan-shipped.md, 19ak).
 - **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
   saves 13%; what still runs every Mac check is the solver and the libraries the lab's
   one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
@@ -619,15 +537,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   none of the 68 lab checks runs under `PW_WEBGPU=1` as its header says it should.
   `checkReads` now gives `site` from esbuild's import graph; quick should use it for
   `here`, once a session has timed the lab checks on software WebGPU.
-- **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
-  children run as a first attempt (docs/plan-shipped.md, 19ak).
-- **19ak-6. Shipped:** the iPhone build fetches Capacitor's two binaries itself (curl
-  retries, then the API's asset download) into a SwiftPM cache of its own, so a 504 from
-  GitHub's release page no longer fails it (docs/plan-shipped.md, 19ak).
-- **19ak-7. Shipped:** the other release-page downloads survive a 504 too: actionlint falls
-  back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
-  prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
-  (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
 - **19ak-8. Open: the three quarantines renewed 2026-11-15, to 2026-12-06.** The first
   three quarantines (19aa-7, 19aj-1, 19aj-2) ended on 2026-11-15 with none of the three
   fixes shipped. That morning about half the open PRs (a count of PRs, not of runs) went
@@ -640,3 +549,87 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   at 37bae99, which carries #861, passed it), and whether 19aa-7d (#878, the control's
   compile stop priced) moves the control's side of the line. A second renewal is not
   the answer: fix the item or take the line out of the bar with its own reasons.
+- **19ak-9. Open: the quarantines of 2026-11-21, to 2026-12-06 (intro 9c, the drawwall
+  control).** Reported: "The PR runs keep failing. All the time." Measured over the
+  `Checks` runs of pull requests from 2026-11-14 to 11-21 (none ran 11-16 to 11-20): 52
+  red of 93 that finished. On 11-21, 11 of 26 were red, and 8 of the 11 were the intro's
+  9c on `Measure · browser` (ubuntu), "N changes during the 4 render compiles", red on
+  main's own deploy too (run 44895188598, ec9dfd0), on PRs that do not touch the loading
+  line. 3 of those 8 were also 9 and 9b's "no opening in the prepare log", the check not
+  finding the log, which #900 (14v-12b) fixes and which is not quarantined: its line reads
+  "never", and a line that read nothing is not the flake. Two more were the drawwall
+  control, "lands on the wall elsewhere ... median ~390, centre none", the same numbers on
+  every run since the 11-21 merges, so a change of behaviour (8-draw-a-7, #900 prints
+  the display's own account of it), not noise. Both are quarantined on pull requests
+  from 2026-11-21 to 2026-12-06 so unrelated PRs stop going red on main's reds; no bar
+  moved, main's deploys still run both lines, and the line still prints in full as a
+  warning. The PR that fixes each (#897 for 9c, the 8-draw-a-7 fix for drawwall) takes
+  its entry out. *Found 2026-11-21 (PR #679's run 44927401897): 9c's entry never held,
+  because `scripts/intro.mjs` printed "1 of 14 FAILED" and never the "13/14 checks
+  passed" tally that `quarantined()` in `scripts/checks.mjs` needs before it honours a
+  line; the films PR adds the tally line (the drawwall harness already printed one).*
+- **19ak-10. Decided: a deploy still trusts a PR run that was green through a
+  quarantine.** `deploygate.sh` rules 4 and 5 trust a PR's green `Checks` run, and a run a
+  quarantine held green is green, so a line red on the merged tree can go live on the PR's
+  word; docs/ci.md said main's deploy holds every line to its bar, which held only for a
+  deploy that ran its own checks. On 2026-11-21, 7 of the 15 green PR runs were held
+  green by startup's quarantined line (19aa-7) and one by the wall's (19aj-2): the
+  job's `Quarantined: <check>` warning annotation says so, and a gate could read it and
+  run the checks itself. Put to the owner the same day with the cost: the site would stop
+  updating until the startup line and 9c are fixed. The owner chose to keep trusting
+  them. docs/ci.md now says so.
+- **19ak-12. Open, found by 19ak-9: the live stream with AAC on GitHub's Macs.** Three
+  runs (11-15 twice, 11-21 on #893, which does not touch the stream): "the audio covers
+  the stream — 29.95 s of them against 30.57 s streamed", "the sound is where the page
+  made it ... 85, 65, 58, 58, 56 ms" against ±31 ms, and once 3 clicks of 5. The same
+  shape as 37x-4g-1 (the audio encoder's queue has no bound, so a loaded Mac emits AAC
+  late), so it may be the app, not the check: read the run's `audioQueue` before
+  touching the bar.
+- **19ak-14. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
+  keeps the heat" reads ×0.9997, 0.9748 and 0.9657 where its bar wants the heat held. Not yet
+  run down: either Heat Spread at 2 now loses heat it kept (a real regression in the heat
+  field's diffusion) or the check reads a quantity that a later change made swing. Find which
+  before touching the bar.
+- **19ak-15. Open, found 2026-11-08: `oscout`'s `plate >= 10` is a fixed floor under a count
+  that swings with load.** A main deploy went red on 9 kicks in 15 s; on the Mac the same count
+  ran 10 to 24 before 14d-2. *Fix:* assert what the feature promises (each kick the ear hears
+  goes out as a message), by counting the ear's kicks over the same window and holding the OSC
+  count to them, not to a number. *Measure:* the ratio on a loaded and an idle run.
+- **19ak-18. Decided: main's deploys honour the quarantines too, until 2026-12-06.** From
+  11-21 12:26 PM Pacific the site stayed on deploy 869 while deploys 871, 872, 879 and 881
+  were each red on a line already known to flake and that none of their changes reached:
+  startup's "moving for good" (19aa-7), intro's 9c (19ak-9), the ear behind the wall
+  (19ad-1) and the Live Show's film (19ak-19). Put to the owner on 2026-11-22 with the cost
+  (a regression on one of those lines could go live while the entry holds); the owner chose
+  to hold them on main too until 12-06. `quarantined()` in `scripts/checks.mjs` honours an
+  entry off a pull request only before `MAIN_QUARANTINE_UNTIL` (2026-12-06), whatever the
+  entry's own end date, so from that day main holds every line to its bar again without
+  anyone taking anything out; a run outside CI holds every line. The ear's two lines and
+  the Live Show film line got entries for the first time, and `scripts/liveshow.mjs` now
+  closes on "N/M checks passed", without which no entry on it could hold. *Measure:*
+  `node scripts/checks.mjs --self-test` (held on a push before the cut-off, red from it,
+  red outside CI). *Open:* each line's fix is its own item; when 12-06 comes, a line still
+  red on main is red on every deploy again, which is the point. `checkguard` flags an
+  entry's end date moving later but not `MAIN_QUARANTINE_UNTIL`; moving the date into
+  `scripts/checks.json` would let it.
+- **19ak-19. Open, found 2026-11-21: the Live Show's "the Plate source's stream moves with
+  the film" goes red when the test film's own clock stalls.** On deploys 871 and 872
+  (owner-mac-2) and #900's first PR run (a GitHub Mac), the film the harness plays went 0.5
+  to 1.3 s in a 2.5 s window, so the stream rightly showed a still bar; green on 867 and
+  869. The stream is not the fault; the runner's load starves the film. *Fix:* make
+  `moving()` in `scripts/liveshow.mjs` say when the film's own clock stalled (its `during`
+  line already reads it) and hold the stream to the film it was given, then find why the
+  film stalls under load. Never a looser bar. Until then the entry also holds a stream
+  frozen while the film ran, the regression the line is for: split that case into its own
+  line ("the film ran and the stream stood still") first. Quarantined on PRs and main's deploys
+  2026-11-22 to 2026-12-06 (19ak-18); the fix takes the entry out.
+- **19ak-22. Open, found on main's deploy of 2026-11-22 (ebfa3324): Classic, calm, moves the
+  plate beyond a drop's reach.** `npm run mirror`'s "and nowhere else" read 29.0 levels past
+  the drift at row 4, column 4 against 26.6 allowed (layer 1), and 30.8 against 25.1 turned a
+  quarter (28.3 against 27.7 on an earlier run), with 91 to 95 under the drop. Classic's
+  plate has had a crowd of small cells since 38w-15 (#923) and the physics merges of the day
+  (#930, #932), so what lies beyond a drop's reach is no longer still. Find whether Classic
+  calm moves on its own (then the allowance should read the plate's own motion without the
+  drop, as the drift column does) or whether a drop's reach grew. Never a looser bar.
+  Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes
+  the entries out.

@@ -191,7 +191,7 @@ const NOT_THE_LOOK = new Set([
     it (a granulation glide drawn the length of its reach in 6 s) and 4.20
     without (PLAN 10-8d-3).
   */
-  'soapFilm', 'soapFilmRate', 'soapFilmAngle',
+  'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
   /*
     The glitter, the lens and the side lamp (PLAN 47e, 47d, 47b-side) are the
     photographer's: what is in the dish, the stop the lens is set to, and a
@@ -207,6 +207,19 @@ const NOT_THE_LOOK = new Set([
     dials it reached for before (they were not in it, being new).
   */
   'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
+  /*
+    The dish on a speaker (PLAN 48f): whether there is a shaker and how
+    hard it shakes are the performer's and the music's (through its cord),
+    never a wander of Evolve's.
+  */
+  'faradayHz', 'faraday',
+  /*
+    Polarised light (PLAN 31p-1): the sheets are put into the beam and the
+    analyser turned by a hand at the projector. Wandering in, the sheets
+    would black the plate out under nobody's hand (crossed, a still plate
+    is dark); left out, the pool and Evolve's pace are as they were.
+  */
+  'polariser', 'analyserAngle', 'quarterWave', 'birefringence',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

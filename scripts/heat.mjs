@@ -21,6 +21,10 @@
  *      of equal volume/density (Beer-Lambert decode via lampThrough)
  *   9. The heat rides the liquid on a thin gap (PLAN 38f): a warm heavy blob sinking down a
  *      standing plate takes its heat with its colour (carryHeat)
+ *
+ * Owed line (PLAN 36e-6), red until built, run as `npm run heat -- --owed=once`:
+ *   once  the lamp's heat diffuses once: a 50 K spot on a level plate spreads as
+ *         4·κ·t with the sandwich's κ, and the same at Double Diffusion 0 and 1
  */
 import { openLab } from './lab.mjs';
 
@@ -28,6 +32,26 @@ const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
+};
+
+/*
+  The owed lines (the convention of scripts/gap.mjs). A line named in
+  --owed=<ids> is excused while the code is in main's state, and only then:
+  if it passes it is no longer owed and the run says to take its id out; if
+  it misses while the code has left main's state (half built, or built and
+  wrong) it is a FAIL, so a build cannot hide behind the excuse.
+*/
+const IDS = ['once'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknown = [...owed].filter((id) => !IDS.includes(id));
+if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+/** `mainState`: what the line is owed for is absent, which is the only state an owed line is excused in. */
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
 };
 
 const { page, close } = await openLab();
@@ -208,7 +232,7 @@ try {
     await lab.create(N, N);
     lab.dye(0.5, 0.5, 0.15, [1, 1, 1], 1.0);
     lab.flush();
-    await lab.step(30, { thinGap: 1, gapThickness: 0.45, drip: 0.5, plateUpright: 0, dt: 1 / 60 });
+    await lab.step(30, { thinGap: 1, gapThickness: 0.45, air: 0.5, plateUpright: 0, dt: 1 / 60 });
     const vCold = await lab.field('vel');
     const speedCold = Math.abs(vCold[probe + 1]);
 
@@ -217,7 +241,7 @@ try {
     lab.dye(0.5, 0.5, 0.15, [1, 1, 1], 1.0);
     lab.vel(0.5, 0.5, 2.0, [0, 0, 30.0, 0]);
     lab.flush();
-    await lab.step(30, { thinGap: 1, gapThickness: 0.45, drip: 0.5, plateUpright: 0, dt: 1 / 60, heatDecay: 1.0 });
+    await lab.step(30, { thinGap: 1, gapThickness: 0.45, air: 0.5, plateUpright: 0, dt: 1 / 60, heatDecay: 1.0 });
     const vWarm = await lab.field('vel');
     const speedWarm = Math.abs(vWarm[probe + 1]);
 
@@ -351,6 +375,131 @@ try {
     rides.dyeShift < -1 && rides.heatShift < 0.8 * rides.dyeShift && rides.heatShift > 1.2 * rides.dyeShift && Math.abs(rides.kept - 1) < 0.03,
     `colour moved ${rides.dyeShift.toFixed(2)} cells, heat ${rides.heatShift.toFixed(2)} (0 without the carry), heat kept ${(rides.kept * 100).toFixed(1)}%`
   );
+
+  // ── 36e-6 (lift): not a line yet, and why ──
+  /*
+    The item also asks that warm water rise at the Hele-Shaw speed of its own
+    lift, (ρ(20 °C) − ρ(T))·g·h²/(12·μ(T)) with water's μ at the patch's T. A
+    line for it was written (an 80 °C patch, dyed, low on a standing water
+    gap, its dye's rise between 2.5 and 3 s held to a Darcy solve on the
+    plate's own temperature field, bar 0.85 to 1.15), and a review of it
+    measured on main (2026-11-21) that building 36e-6 alone cannot pass it,
+    so it is not owed here: an owed line has to be one the item's build can
+    turn green. Main's numbers:
+
+      as written                         dye rises 11.61 mm/s
+      Buoyancy 0                                    9.65 mm/s
+      no heat patch at all                         16.56 mm/s
+      boil off                    about 143 mm/s in 0.5 s
+      plate level                                   0.00 mm/s
+      heat kept on the standing plate     0.20 / 0.09 (0.09 after 3 s)
+
+    Two things the line does not own move the water. The dye climbs a
+    standing plate with no heat laid at all, faster than with it: most
+    likely the lamp-floor kick of the capillary pass reading the dye as wax
+    (src/gpu/wgsl/fluid/capillary.ts, around line 426), a lift that has
+    nothing to do with temperature. And the heat is gone too soon to lift
+    anything: with the boil live on a standing plate, 9% of it is left after
+    3 s, where air cooling the two faces of a 2 mm water gap between two
+    1 mm glasses takes minutes: the sandwich holds ρc·d ≈ 1.26e4 J/(m²·K)
+    (water 4.18e6 × 2 mm, glass 2.1e6 × 2 mm), so at h = 10 W/(m²·K) a face
+    (still air and radiation) it falls to 1/e in ρc·d / 2h ≈ 630 s, and even
+    a generous 50 a face leaves two minutes; main's falls to 1/e in about
+    1.2 s (9% left at 3 s is e to the −2.4). So lift
+    waits on two other fixes, the dye's own climb and the boil's heat loss
+    on a standing plate, and comes back as a line after them, with its
+    prediction (Kell's density and Vogel's viscosity for water, a Darcy
+    solve with harmonic-mean face mobilities on the sealed dish) as the
+    draft had it.
+  */
+
+  // ── owed 36e-6 (once): the lamp's heat diffuses once ──
+  /*
+    What the audit found: with the boil running, the boil's own conduction
+    spreads the heat (water and glass together, lampBoil.ts), and the
+    solver's older heat diffusion (fluid.ts, at water's κ, 1.4e-7 m²/s,
+    times 1 + 99·Double Diffusion) runs as well, because it is gated on
+    nothing; the heat carry beside it is gated off while the boil runs, the
+    diffusion was not. So the heat spreads twice, and at Double Diffusion 1
+    a hundred times too fast.
+
+    The real law. Heat in a plate of water between two glasses spreads
+    sideways by conduction through all three layers at once, so its
+    diffusivity is the sandwich's: κ = (k_w·d + k_g·2t_g)/(ρc_w·d + ρc_g·2t_g)
+    with water's k 0.6 W/(m·K) and ρc 4.18e6 J/(m³·K), glass's k 1.0 and
+    ρc 2.1e6 (2500 kg/m³ times 840 J/(kg·K)), a water gap d of 2 mm and two
+    1 mm glasses (the boil's GLASS_THICK of 2 mm in all): 2.6e-7 m²/s, a
+    little under twice water's alone because glass conducts better and holds
+    less. In two dimensions a conserved spot's second moment about its centre
+    grows by exactly 4κt whatever its shape (and a uniform cooling would not
+    change it), so over t = 10 s the spot's ⟨r²⟩ grows by 10.2 mm², 4.18
+    cells² at the 128 grid's 1.5625 mm cells. Diffusing once at water's κ
+    alone would give 2.3; diffusing once by the sandwich and again at
+    water's κ gives about 6.5.
+
+    The line lays a 50 K spot in still water on a level plate (no flow, so
+    the moment is conduction alone), the boil running with the lamp dimmed,
+    and steps 100 steps of 0.1 s at Double Diffusion 0 and again at 1. Bar:
+    the growth at 0 within 15% of 4κt with the sandwich's κ, and the growth
+    at 1 within 10% of the growth at 0, since the boil's conduction is the
+    plate's one diffusion and Double Diffusion (a show's knob for the older
+    diffusion) has nothing left to scale while it runs.
+
+    Why a look cannot pass. The moment is a number with no picture in it: a
+    build that blurs the heat less to look right passes only if what is left
+    is one conduction at the sandwich's κ, and turning down one of the two
+    diffusions until 0 matches still fails at 1 unless the gated one is the
+    older one. What the build must add: the older heat diffusion (fluid.ts,
+    heatVisc) skipped while the boil runs, as the heat carry already is.
+
+    mainState: both halves in main's state, the growth at 0 over 1.3 of
+    4κt (main 1.53) and the growth at 1 over three times that at 0 (main
+    about 28): a build that gates the diffusion at one setting and not the
+    other leaves main's state and is red.
+  */
+  {
+    const N = 128, dx = 0.2 / N, t = 10;
+    const kappa = (0.6 * 0.002 + 1.0 * 0.002) / (4.18e6 * 0.002 + 2500 * 840 * 0.002);
+    const expected = (4 * kappa * t) / (dx * dx);
+    const grow = await page.evaluate(async (N) => {
+      const inDish = (i, j) => ((i + 0.5) / N - 0.5) ** 2 + ((j + 0.5) / N - 0.5) ** 2 < 0.45 * 0.45;
+      const r2 = (v) => {
+        let h = 0, x = 0, y = 0, m = 0;
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+          if (!inDish(i, j)) continue;
+          const t = Math.max(0, v[(j * N + i) * 4 + 2]);
+          h += t; x += t * (i + 0.5); y += t * (j + 0.5);
+        }
+        x /= h; y /= h;
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+          if (!inDish(i, j)) continue;
+          const t = Math.max(0, v[(j * N + i) * 4 + 2]);
+          m += t * ((i + 0.5 - x) ** 2 + (j + 0.5 - y) ** 2);
+        }
+        return { h, r2: m / h };
+      };
+      const out = {};
+      for (const dd of [0, 1]) {
+        await lab.create(N, N);
+        lab.vel(0.5, 0.5, 0.05, [0, 0, 50, 0]);
+        lab.flush();
+        const over = { thinGap: 1, plateUpright: 0, heat: 0.001, dimmer: 0, heatDecay: 1, doubleDiffusion: dd, dt: 1 / 60, magnetSeconds: 0.1 };
+        await lab.step(1, over);
+        const a = r2(await lab.field('vel'));
+        await lab.step(100, over);
+        const b = r2(await lab.field('vel'));
+        out[dd] = { grow: b.r2 - a.r2, kept: b.h / a.h };
+      }
+      return out;
+    }, N);
+    const r0 = grow[0].grow / expected, r1 = grow[1].grow / grow[0].grow;
+    line('once',
+      'the lamp\'s heat diffuses once, at the water-and-glass sandwich\'s κ, whatever Double Diffusion says (PLAN 36e-6)',
+      Math.abs(r0 - 1) < 0.15 && Math.abs(r1 - 1) < 0.1,
+      `⟨r²⟩ grew ${grow[0].grow.toFixed(2)} cells² in 10 s at Double Diffusion 0, 4κt is ${expected.toFixed(2)} (κ ${kappa.toExponential(2)} m²/s), ratio ${r0.toFixed(2)}, bar 0.85–1.15; at 1 it grew ${grow[1].grow.toFixed(1)}, ${r1.toFixed(2)} times, bar 0.9–1.1; heat kept ${grow[0].kept.toFixed(2)}`,
+      r0 > 1.3 && r1 > 3);
+  }
+
   check('no GPU pass failed validation', gpuErrors.length === 0, gpuErrors.join(', '));
 } finally {
   await close();

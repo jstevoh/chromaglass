@@ -2,7 +2,8 @@
 
 `CLAUDE.md` holds this repo's rules for every agent, whatever tool runs it. Read it
 first. It says how work is done, what to read in the plan (`PLAN.md`, the index, and one section under `docs/plan/`)
-and how PRs ship.
+and how PRs ship. Per-area rules live in `.agents/rules/` (generated from `.claude/rules/`
+by `npm run rules`): read the one for the files you touch.
 
 If you are not Claude Code, read `docs/handoff.md` next. It covers how to claim work
 alongside Claude Code sessions, the handoff block every PR body carries, and what to do
