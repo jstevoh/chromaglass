@@ -357,6 +357,19 @@
       ]
     },
     {
+      "name": "One film at a time on the owner's Mac",
+      "shard": "logic",
+      "run": "npm run maclock -- --selftest",
+      "why": [
+        "The Mac film lock and FIFO queue (scripts/maclock.mjs, PLAN.md 19ak-23):",
+        "exclusive execution, FIFO ordering across queued waiters, dead-pid and",
+        "over-timeout stale recovery, manual one-line locks honoured and aged,",
+        "timeout cleanup, CG_FILM_LOCK_HELD nesting, stale-rename race protection,",
+        "--max-wait exit 75 with no leftover ticket, deploy-mark priority, and",
+        "scripts/macbusy.sh refusing a live film.lock."
+      ]
+    },
+    {
       "name": "Two runners on one Mac never share a harness port",
       "shard": "logic",
       "run": "npm run ports",
@@ -1835,7 +1848,7 @@
         "and that the dial is live out of focus so nothing moving is the shader's",
         "answer. It also",
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
-        "with airNear's mask taken off finds the glow again), and a pool's edge",
+        "with the slope's air hold taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
         "so it sits here beside lampzero rather than in the Mac queue.",
         "In a Measure part of its own, `lab4`, since main's deploys 667 and 670",
@@ -2838,6 +2851,15 @@
       "why": [
         "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
         "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
+      ]
+    },
+    {
+      "name": "The flower",
+      "shard": "plate",
+      "run": "npm run flower",
+      "why": [
+        "No ghost copies of a thin rim one cell apart round a drop or a bubble (PLAN 31s-8): the slope reads each tap as its cell's mean, so a rim thinner than a cell is not copied at every tap offset.",
+        "The point-read control (each tap read at one texel again, what drew the flower) must read the comb, or the measure sees nothing."
       ]
     },
     {
