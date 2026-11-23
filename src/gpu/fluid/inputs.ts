@@ -8,7 +8,7 @@
 import { PingPong, bindGroup } from '../kit';
 import { splatKernel } from '../wgsl/splat';
 import { kernel } from '../wgsl/fluid';
-import { SPLAT_FLOATS, type SplatList } from '../splats';
+import { SPLAT_FLOATS, SplatList } from '../splats';
 import type { SolverCarry } from '../solverTypes';
 import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
@@ -105,7 +105,11 @@ export class FluidInputs extends FluidPasses {
     }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
-    this.writeSplatArgs(0);
+    // The presses' bowls since the last flush, as records (pressBowl).
+    const bowls = !this.bowls.empty;
+    if (bowls) this.splatRecords(this.bowls);
+    this.writeSplatArgs(this.bowls.count);
+    this.bowls.clear();
     const enc = this.device.createCommandEncoder({ label: 'deltas' });
     const pass = enc.beginComputePass({ label: 'deltas' });
     // Onto the full grid, the same bilinear the delta passes used to do
@@ -113,11 +117,14 @@ export class FluidInputs extends FluidPasses {
     // frames since the last flush are added on the way (pourVideo).
     if (this.videoPending) {
       this.upsampleSum(pass, this.cpuDyeTex, this.videoDye!.read, this.deltaDyeTex);
-      this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
+      if (!bowls || !this.splatRun(pass, 'upsampleDeltaSumPress', RGBA32, [this.cpuVelTex, this.videoVel!.read, this.splatBuf!, this.deltaVelTex], this.N))
+        this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
       this.videoPending = false;
     } else {
       this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
-      this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
+      // The gap rides in the velocity's delta (.w), and the bowls with it.
+      if (!bowls || !this.splatRun(pass, 'upsampleDeltaPress', RGBA32, [this.cpuVelTex, this.splatBuf!, this.deltaVelTex], this.N))
+        this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
     }
     this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
@@ -138,6 +145,20 @@ export class FluidInputs extends FluidPasses {
   applySplats(list: SplatList, dt: number): void {
     if (list.empty) return;
     const q = this.device.queue;
+    this.splatRecords(list);
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
+    q.writeBuffer(this.sim, 0, this.simData);
+    this.writeSplatArgs(list.count);
+    const enc = this.device.createCommandEncoder({ label: 'splats' });
+    const pass = enc.beginComputePass({ label: 'splats' });
+    this.splatPass(pass);
+    this.foldDeltas(pass);
+    pass.end();
+    this.submit(enc);
+  }
+
+  /** The records into the splat buffer, grown to hold them. */
+  private splatRecords(list: SplatList): void {
     const bytes = Math.max(64, list.count * SPLAT_FLOATS * 4);
     if (!this.splatBuf || this.splatBuf.size < bytes) {
       if (this.splatBuf) this.disposer.release(this.splatBuf);
@@ -148,16 +169,21 @@ export class FluidInputs extends FluidPasses {
       this.groups.clear();
       this.groupRoot = { kids: new Map() };
     }
-    q.writeBuffer(this.splatBuf, 0, list.records);
-    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
-    q.writeBuffer(this.sim, 0, this.simData);
-    this.writeSplatArgs(list.count);
-    const enc = this.device.createCommandEncoder({ label: 'splats' });
-    const pass = enc.beginComputePass({ label: 'splats' });
-    this.splatPass(pass);
-    this.foldDeltas(pass);
-    pass.end();
-    this.submit(enc);
+    this.device.queue.writeBuffer(this.splatBuf, 0, list.records);
+  }
+
+  /** The presses' bowls waiting for the next flush (pressBowl). */
+  private readonly bowls = new SplatList(16);
+
+  /**
+   * A press on a thin gap, laid as the glass's own bowl at the solver's
+   * resolution (PLAN 18a-14; the reason is upsampleDeltaPress's, in
+   * wgsl/splat.ts). In logical cells, as the splat records are, with the
+   * centre and radius unrounded. It lands with the next applyDeltas, which
+   * the caller owes (the simulation's foldDue).
+   */
+  pressBowl(x: number, y: number, radius: number, amount: number): void {
+    this.bowls.disc(x, y, radius, { gap: -3 * amount, falloff: 'plate' });
   }
 
   /**

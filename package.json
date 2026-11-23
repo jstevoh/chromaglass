@@ -262,6 +262,7 @@
     "wind": "node scripts/wind.mjs",
     "thingap": "node scripts/thingap.mjs",
     "presslift": "node scripts/presslift.mjs",
+    "pressfacets": "npm run build && node scripts/pressfacets.mjs",
     "fingerflow": "node scripts/fingerflow.mjs",
     "airblow": "node scripts/airblow.mjs",
     "blowrange": "node scripts/blowrange.mjs",

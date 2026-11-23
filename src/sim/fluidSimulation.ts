@@ -49,6 +49,7 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
+import { layPress } from './pressLay';
 import { SolverSeeds, takeBack, addShare, scaleSince } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
@@ -2044,6 +2045,9 @@ export class FluidSimulation {
    * fingers on the way down that every press used to draw.
    */
   applySquish(x: number, y: number, radius: number, amount: number, fingering = 0, pileTips = false, stroke: Exclude<Stroke, 'lift'> = 'press', who: Presser = 'hand') {
+    // On a thin gap the bowl is the solver's, unrounded (pressBowl, PLAN 18a-14): what follows only counts it.
+    const fine = this.thinGap && stroke === 'press' && !!this.gpu!.pressBowl;
+    if (fine) { this.gpu!.pressBowl!(x + 0.5, y + 0.5, radius * GRID_SCALE, amount); this.foldDue = true; }
     radius = Math.round(radius * GRID_SCALE);
     /*
       A press lands on a whole cell. Beat Squeeze's centre was the middle of
@@ -2071,19 +2075,7 @@ export class FluidSimulation {
     if (pileTips && this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
     const pile = pileTips && fingering > 0 && this.squishSteps <= 45 ? 0.02 * fingering * Math.min(1, amount * 250) : 0;
     if (pileTips && stroke === 'press') this.pressLift.press(who, x, y, radius, amount, fingering, nowMs);
-    // Counted by who pressed, whole cells that close the gap only (a
-    // fractional one is dropped by the arrays, and a cell pressed by nothing
-    // is no press), with the depth laid there, so `npm run squeeze` can ask
-    // whether a kick's press reached the plate at all, and whether the kick's
-    // release gave back what it took.
-    let laid = 0, depth = 0;
-    // On a thin gap a press lays only the glass, as a bowl, and the flow moves the liquid (squishDisc).
-    squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, (idx, g, vx, vy, m) => {
-      if (Number.isInteger(idx) && g < 0) { laid++; depth -= g; }
-      this.squishCell(idx, g, vx, vy, m);
-    }, this.thinGap);
-    this.pressedCells[who] += laid;
-    this.pressedDepth[who] += depth;
+    layPress(this.size, x, y, radius, amount, fingering, stroke, pile, this.thinGap, fine, who, this.squishCell, this.pressedCells, this.pressedDepth);
   }
 
   /**

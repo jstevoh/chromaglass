@@ -2887,6 +2887,16 @@
       ]
     },
     {
+      "name": "A light press is round, not the grid's facets",
+      "shard": "plate",
+      "run": "npm run pressfacets",
+      "why": [
+        "A light press on a thin gap lays its bowl as a smooth plate contact",
+        "patch at the solver's own resolution: the bowl is as deep as asked,",
+        "and its curvature carries no creases one CPU cell apart (PLAN 18a-14)."
+      ]
+    },
+    {
       "name": "The Finger drags the liquid",
       "shard": "plate",
       "run": "npm run fingerflow",
