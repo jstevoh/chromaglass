@@ -262,7 +262,31 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     whatever the flow does, and these are Rhie–Chow faces, which see the
     grid-scale part the projection cannot.
 
-    A copy of mixAdvect over four channels, into the dye's own format.
+    A copy of mixAdvect over four channels, into the dye's own format, but
+    with a different slope limiter (PLAN 1l, asked 2026-11-22: Galaxy looked
+    like a blurry lens, not a sharp Hubble picture). mixAdvect's minmod takes
+    the smaller of the two one-sided slopes, and wherever they differ much,
+    which is at every edge of colour, it gives back first-order upwind, whose
+    error is a diffusion of about ½|u|Δx(1 − c). At a look's speeds on a 192²
+    grid that is near 1e-7 m²/s, about three hundred times what dye in water
+    spreads by itself (D_MOLECULAR, 4e-10 m²/s, a Péclet number of some
+    25 000 for a centimetre swirl): every edge the flow carried came out a
+    ramp several cells wide, however fine the grid. This one uses the
+    monotonized central limiter (van Leer's MC): the centred slope, held to
+    twice either one-sided slope. It is still total-variation diminishing, so
+    it makes no new peaks or dips and the flux makes and loses nothing, but
+    it keeps second order in smooth colour and gives an edge twice the slope
+    before it falls back. Measured with `npm run dyeedge` (three flat discs on
+    Galaxy's thin gap, 128², two hundred steps of a solid swirl): part-full
+    cells per full cell 0.713 with minmod, 0.541 with MC, 0.457 with
+    superbee, against about 0.29 for a disc carried exactly and resampled.
+    Superbee would be sharper still, but it is compressive: it steepens a
+    smooth ramp into a step, so a soft wash of colour would square off into
+    terraces, which is a look the liquid does not have. mixAdvect and the
+    phase field keep minmod for now (PLAN 1m): what they carry is an
+    interface profile that mixRelax and the phase field's own step hold to a
+    set width, so a sharper limiter there would fight that relaxation rather
+    than keep a real edge; whether it would help them is measured apart.
   */
   bodyAdvect: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -272,7 +296,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${PACKED}
 fn mx(p: vec2i, n: i32) -> vec4f { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0); }
 fn mm(a: vec4f, b: vec4f) -> vec4f {
-  return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));
+  let l = min(min(2.0 * abs(a), 2.0 * abs(b)), 0.5 * abs(a + b));
+  return select(vec4f(0.0), sign(a) * l, a * b > vec4f(0.0));
 }
 fn flux(a: vec2i, e: vec2i, n: i32) -> vec4f {
   let b = a + e;

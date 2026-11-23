@@ -1762,6 +1762,18 @@
       ]
     },
     {
+      "name": "A colour's edge stays sharp on the thin gap",
+      "shard": "lab2",
+      "run": "npm run dyeedge",
+      "why": [
+        "The thin gap's dye flux keeps an edge as sharp as the grid can hold (PLAN.md 1l,",
+        "scripts/dyeedge.mjs): three flat discs on Galaxy's gap turned two hundred steps",
+        "by a solid swirl keep their colour, overshoot nowhere, and leave under 0.62",
+        "part-full cells per full cell (minmod left 0.713, the MC limiter 0.541, an exact",
+        "carry about 0.29). Lab at 128², so SwiftShader runs it in under a minute."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",

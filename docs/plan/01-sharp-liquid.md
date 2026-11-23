@@ -83,3 +83,16 @@
   (§1) retired it; Evolve never raises it. Remove the pass, the slider and the CC with a
   settings migration that drops the key. Check: `npm run panel` and `npm run desk` pass and a
   saved look with Sharpness loads. (38v, from RS-9.)
+- **1l. The thin gap's dye carry rounded every edge it moved** (asked 2026-11-22: Galaxy
+  looked like a blurry lens, not a sharp Hubble picture of a galaxy). `bodyAdvect`'s MUSCL
+  flux limited its slope with minmod, which falls back to first-order upwind at every edge
+  of colour; its numerical diffusion (about 1e-7 m²/s at a look's speeds) is some three
+  hundred times dye's own in water, so the carry, not the liquid, made every edge a ramp.
+  **Shipped** with the monotonized central limiter (still TVD, second order in smooth
+  colour). `npm run dyeedge`: part-full cells per full cell 0.713 → 0.541 (an exact carry
+  is about 0.29), colour kept to 0.000%, no overshoot.
+- **1m. mixAdvect and the phase field still limit with minmod** (found building 1l).
+  `mixAdvect` (the oil's fraction, `carry.ts`) and the phase step (`phase.ts`) carry an
+  interface profile that their relaxation holds to a set width, so MC may fight it rather
+  than sharpen anything real. Try MC on each in the lab and keep it only if the profile's
+  width holds and `oilmass`-style totals stay put; unbuilt.
