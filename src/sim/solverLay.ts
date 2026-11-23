@@ -1,5 +1,5 @@
 /*
-  Classic's dish laid at the solver's own grid (PLAN 38w-8), moved out of
+  Lava Pop's dish laid at the solver's own grid (PLAN 38w-8), moved out of
   fluidSimulation.ts, which is at its size ceiling.
 
   What was reported: Classic was "pixelated" and "mush" beside the 1960s
