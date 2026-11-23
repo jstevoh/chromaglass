@@ -193,7 +193,7 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   lively, measured by `npm run watch`'s turnover and lifetime against the reference
   library, never by speeding the clock (38u-6 is the clock's own item).
 
-  **First part shipped** (#PRNUM, `npm run pace`): five lively looks (Oil and Water, Home
+  **First part shipped** (#944, `npm run pace`): five lively looks (Oil and Water, Home
   Movie, Red Cabbage, Splodascope, Crowd Plate) run in a thin water-and-glycerine (4–8 cSt,
   Thickness 0.2–0.3) instead of light oil (22 cSt), with a firmer Plate Rock, Beat Squeeze
   and pours (`src/presetsPace.ts`). In the thin gap a body force moves the liquid at

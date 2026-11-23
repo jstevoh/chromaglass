@@ -45,7 +45,7 @@ real, and the plate shader draws only what the solver makes.
    several times slower than real shows, and the cause is the forcing, not the camera.
    The widest change on the list, since it touches most looks: work the liquid harder by
    real means on the looks meant to be lively, measured by `npm run watch` against the
-   reference library. **First part shipped (#PRNUM):** five lively looks
+   reference library. **First part shipped (#944):** five lively looks
    in a thin water-and-glycerine (4–8 cSt) with a firmer hand, median 1.58x faster on the
    Mac's film (`npm run pace`); the calm looks, Comet and water's mud are 48q-1 to 48q-4.
 5. **Polarised light: stress rainbows** (**31p-1**, PR #855, the liquid's flow
