@@ -182,3 +182,6 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   `desktop.mjs` and the standalone browser launchers (`caption.mjs`, `codecblip.mjs`, `detail.mjs`,
   `webgpu-smoke.mjs`), updated `scripts/macbusy.sh` to treat a live `film.lock` as busy via
   `status --json`, and added the check to `scripts/checks.json`.
+- **19aj-3. Shipped: the pouring tools are held for the plate's steps, not the wall's
+  milliseconds** (2026-11-21, found when `npm run tools` "and spreads it out from where it
+  lands" went red on both of #897's hosted-Mac runs). Story in `docs/plan-shipped.md` §19aj-3.

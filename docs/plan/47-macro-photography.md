@@ -431,6 +431,10 @@ an unsteady measure says "may vary from take to take", and every word names its 
   not the bar. Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the
   check now closes on the "n/m checks passed" tally a quarantine counts against, where its old
   "watchwords: 1 of 58 FAIL" line read as a second FAIL and no quarantine could match.
+- **47x-15** refit the card's bands from the owner's ratings once there are enough.
+- **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
+  references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
+  five canons per row; today three rows leave each film outside one or two peers' bands.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 

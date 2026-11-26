@@ -25,6 +25,7 @@
  * same signal.
  */
 import { stream } from './rng';
+import { clearShowInterval, showInterval, type ShowIntervalHandle } from './showClock';
 
 export type Section = 'intro' | 'verse' | 'chorus' | 'break';
 
@@ -147,7 +148,7 @@ export function startSimulatedMusic(): SimulatedMusic {
   const secondsPerStep = BAND_STEP_S;
   let step = 0;
   let nextAt = 0;
-  let timer: ReturnType<typeof setInterval> | null = null;
+  let timer: ShowIntervalHandle | null = null;
   let current: Section = 'intro';
 
   /** An enveloped oscillator: the whole instrument kit is this and noise. */
@@ -231,7 +232,7 @@ export function startSimulatedMusic(): SimulatedMusic {
   const start = () => {
     if (timer) return;
     nextAt = ctx.currentTime + 0.05;
-    timer = setInterval(pump, TICK_MS);
+    timer = showInterval(pump, TICK_MS, 'simulated-band');
     pump();
   };
 
@@ -255,7 +256,7 @@ export function startSimulatedMusic(): SimulatedMusic {
       start();
     },
     stop() {
-      if (timer) clearInterval(timer);
+      if (timer) clearShowInterval(timer);
       timer = null;
       dest.stream.getTracks().forEach(t => t.stop());
       void ctx.close().catch(() => {});
