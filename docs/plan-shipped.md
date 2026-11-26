@@ -12448,6 +12448,28 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4d-1. Stream the mixer's stack, not only the laptop's plate
+
+  - **37x-4d-1. Stream the mixer's stack, not only the laptop's plate (#667).**
+    The Live Show panel streamed `#liquid-canvas`, the laptop's plate, so a show with the film,
+    the mark or a back plate in the mixer streamed the plate without them, while the Wall output
+    (`CastDisplay`'s `#stage-canvas`) carries the wall's keystone, masks and warp, which on a
+    stream would be a skewed picture. The panel (`src/components/LiveShowPanel.tsx`) now offers a
+    Source choice (`data-testid="live-source"`, values `plate` by default and `stack` for Mixer
+    stack), kept in `LiveFormat` (`src/lib/liveShow.ts`) and forwarded to `LiveEncoder`
+    (`src/lib/liveStream.ts`, `frames: 'stack'`). While a stream with `source: 'stack'` is live,
+    `WebGPUOutput` (`src/gpu/output.ts`) draws a second pass of `this.scene` with
+    `fillOutputUniforms(..., true)` (identity warp, `IDENTITY_CORNERS`, zero masks and feather,
+    neutral gain/gamma, no per-frame allocation) into a WebGPU canvas of the stream's size
+    (`1920x1080` or `1080x1920`, asked via `liveFrameSize('stack')` in `src/lib/liveFrame.ts`),
+    and `LiquidVisualizer.tsx` hands that canvas to `tapLiveFrame('stack', ...)` inside the frame
+    task beside `tapFrameCopies` (zero cost when no Mixer stack stream is live). The phone's
+    live chip only stops a stream and the source is chosen on the Mac before Go live, so there is
+    no phone control. Each destination's health line in the panel also shows the stream's frame
+    time (`ms a frame`). *Measured:* `npm run liveshow -- --stack` (`stack` taken out of
+    `--owed` in `scripts/checks.json`), `npm run liveshow`, `PW_WEBGPU=1 npm run mixer`,
+    `PW_WEBGPU=1 npm run wallpattern`, `npm run qa`.
+
 #### 37x-10c. Words poured from the phone, the show server and the assistant
 
   - **37x-10c. Words poured from the phone, the show server and the assistant (shipped
@@ -15440,6 +15462,44 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+## 46a. A faster opening (2026-11-14)
+
+Classic's opening waits for fewer pipelines before its first step without dropping anything a
+look draws or changing `src/gpu/opening.ts`.
+
+- **Fused back-to-back kernels** (`same-look` kept byte-for-byte in arithmetic):
+  1. `deltaFold` (`src/gpu/wgsl/fluid/splats.ts`, `src/gpu/fluid/inputs.ts`): merges `deltaDye`
+     and `deltaVel`, and reads `cpuMulTex` directly via bilinear filtering (keeping `cpuDyeTex` /
+     `cpuVelTex` upsampling, skipping the `cpuMulTex` upsample dispatch when no `bodyLand` /
+     `bodyLay` needs `deltaMulTex`).
+  2. `forcesB` (`src/gpu/wgsl/fluid/forces.ts`, `src/gpu/fluid.ts`): merges `addCurrent` and
+     `bodyBuoyancy` (keeping `'current grid thin'` and `'add current'` arg names for `46r`).
+  3. `grainStep` (`src/gpu/wgsl/fluid/dye.ts`, `src/gpu/fluid.ts`): merges grain advection and
+     decay/mix where `float32Filterable` builds grain (`opening` / `later`).
+  4. `decay` (`src/gpu/wgsl/fluid/dye.ts`, `src/gpu/fluid.ts`): merges `decayDye` and
+     `decayVel` (including `#811`'s `boilLive` gate on heat decay/source).
+  5. `packVel` (`src/gpu/wgsl/pack.ts`, `src/gpu/plate.ts`): merges per-layer flow packing and
+     drop masking into one dispatch (`packVelDrop` remains once per drop pass after the loop).
+- **Clear and scratch reuse**: `clear()` uses `enc.clearBuffer` for `press`, `spress`, `hsPour`,
+  `hsLiftPsi`, and `hsSealPsi` (keeping `mgZero` inside `hsCycle()` for `encode`'s `H2c-3`
+  control), and `velScratch` avoids an extra `scaleDye:rgba32float` in the opening.
+- **Deferred behind the opening (`later`)**: pipelines Classic's first 40 steps never dispatch —
+  `jacobi:rgba32float`, `airGiveSub:thin`, `airGiveThin:thin`, `beadDrops`, `beadHoles`,
+  `beadFinish`, `packDyeBodies`, and `output` — build right after `opening` while the plate
+  already steps; `npm run startup` passes across all 33 looks (`0` built on a frame in the
+  opening or across all 33 looks, longest heartbeat/step wait `0.26 s`).
+
+Main moved from 66 WebGPU / 65 ledger (when `OPENING_MOST = 52` was set) to 68 WebGPU /
+67 ledger after `#811` added `heatPack` and `heatUnpack` to `THIN_GAP_KERNELS`. On merged
+main, Classic's opening drops from **67 to 52** in the ledger (all 52 drawn in Classic's first
+40 steps), and WebGPU calls before step 1 drop from **68 to 54–57** (with `prepareShow`
+kicking off `later` before frame 1 steps); flagged for `46-3` to align `OPENING_MOST`.
+`npm run samelook` passes `0.00 %` pixel diff (`colour 0.00, detail 0.0 %, histogram 0.000`)
+across all 6 looks (`classic`, `poster-1969`, `soap-film`, `oil-and-water`, `ferro-paint`,
+`roy`); `physics` 20/20, `thingap` 16/16, `argnames` 9/9, `liquidpush` 9/9, `dropcolour` 4/4,
+`grating` 24/24, `videoflow` 24/24, `cellride` 14/14, `followview` 13/13, `crash` 37/37,
+`encode` 13/13, `quick` 21/21.
 
 ## 14ag-3. The video as the lamp under the dish (shipped 2026-11-21)
 
