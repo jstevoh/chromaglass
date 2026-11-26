@@ -131,9 +131,13 @@ export interface LiveOptions {
    * WebGPU canvas, black when read on the stream's own clock (37x-4d-6).
    */
   frames?: LiveFrameKind;
+  /** Which picture to stream (37x-4d-1): 'plate' (default, #liquid-canvas) or 'stack' (the mixer's stack drawn square). */
+  source?: LiveSource;
 }
 
 export type LiveAcceleration = 'no-preference' | 'prefer-hardware' | 'prefer-software';
+/** Which picture the stream takes (37x-4d-1): the laptop's plate canvas, or the mixer's stack drawn square without the wall's geometry. */
+export type LiveSource = LiveFrameKind;
 
 export interface LiveProbe {
   acceleration: LiveAcceleration;
@@ -493,6 +497,7 @@ export class LiveEncoder {
       const started = await transport.start({ outputs, destinations: this.destinations });
       this.transportState = started.state ?? null;
       if (!started.ok) throw new Error(started.error ?? 'the server refused the stream');
+      if (this.stopping) return;
 
       /*
         The first picture before the clock starts. Started at once, the
@@ -503,10 +508,13 @@ export class LiveEncoder {
         a page whose plate never draws (no WebGPU) gives up after half a
         second and starts black, as before.
       */
-      if (this.opts.frames) {
+      const frameKind = this.opts.frames ?? this.opts.source;
+      if (frameKind) {
+        const tall = this.outs.every((o) => o.spec.height > o.spec.width);
+        const size = frameKind === 'stack' ? (tall ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 }) : null;
         let first: () => void = () => {};
         const came = new Promise<void>((res) => { first = res; });
-        this.unlisten = listenLiveFrames(this.opts.frames, (c) => { if (this.take(c)) first(); });
+        this.unlisten = listenLiveFrames(frameKind, (c) => { if (this.take(c)) first(); }, size);
         await Promise.race([came, new Promise<void>((res) => setTimeout(res, FIRST_PICTURE_WAIT_MS))]);
       }
       // Stopped while it waited: `stop` has torn down what there was.
@@ -547,7 +555,8 @@ export class LiveEncoder {
   /** The frame timer: the next frame at t0 + n/fps, for every output; late ones skipped, never queued. */
   private tick(n: number): void {
     if (this.phase !== 'live') return;
-    const { fps, canvas, keySeconds = 2, frames } = this.opts;
+    const { fps, canvas, keySeconds = 2, frames, source } = this.opts;
+    const framed = !!(frames ?? source);
     const frameMs = 1000 / fps;
     const now = performance.now() - this.t0;
     // n is the frame due now; if more than one is due, the ones between are skipped.
@@ -562,7 +571,7 @@ export class LiveEncoder {
       let frame: VideoFrame | null = null;
       try {
         const t = performance.now();
-        frame = new VideoFrame(frames ? this.stageOf(o) : this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
+        frame = new VideoFrame(framed ? this.stageOf(o) : this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
         if (i === 0 && o.counts.frames === 0) this.timing.firstEncodeAt = t;
         o.encoder.encode(frame, { keyFrame });
         if (i === 0) this.timing.grabMs += performance.now() - t;
@@ -903,6 +912,7 @@ export interface LiveConsoleOptions {
   videoBitrate?: number;
   audioBitrate?: number;
   acceleration?: LiveAcceleration;
+  source?: LiveSource;
 }
 
 /**
