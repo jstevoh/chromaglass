@@ -458,6 +458,8 @@ export class FluidFields extends FluidCore {
       coverMetres: this.coverGap * GAP_METRES,
       /** The shaken dish's standing wave (PLAN 48f), or null with no shaker. */
       faraday: this.faradayPlate?.field ?? null,
+      /** The water's glow (PLAN 48c), or null when Glow is off. */
+      glow: this.glowPlate?.field ?? null,
     };
   }
 
@@ -474,6 +476,8 @@ export class FluidFields extends FluidCore {
     this.tankPlate = null;
     this.faradayPlate?.dispose();
     this.faradayPlate = null;
+    this.glowPlate?.dispose();
+    this.glowPlate = null;
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();

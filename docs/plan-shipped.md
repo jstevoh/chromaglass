@@ -15684,6 +15684,48 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+
+### 48c. Bioluminescent trails: the water glows where it is sheared (shipped 2026-11-21)
+
+*§48's idea 48c, asked with the music-driven visuals on 2026-11-21: the dark plate glows where
+the liquid is sheared, each cell lighting where the shear passes a threshold and spending a
+charge that refills with a time constant. Its open items are in §30.*
+
+- **What shipped.** Glow (`glow`, 0 off to 2), Glow Shear (`glowShear`, 30 per second) and
+  Glow Recharge (`glowRecharge`, 8 s) in Settings → Camera, MIDI, the desks, the remote and the
+  phone's Sound sheet. The music reaches it only through the cords that move the water.
+- **The physics** (`gpu/glow.ts`, `wgsl/glow.ts`). The water holds dinoflagellates, which
+  flash when the stress on them passes a threshold (Lingulodinium, 0.02 to 0.1 Pa, Latz et al.
+  1994; 30 s⁻¹ in seawater is 0.03 Pa). A 256² grid over the plate carries each cell's charge
+  and light, moved with the water by the plate's own semi-Lagrangian carry. The shear is the
+  flow's strain rate S = √(2uₓ² + 2v_y² + (u_y + vₓ)²) together with the shear of the gap's
+  Poiseuille profile, which runs from zero at the middle of the gap to 6U/h at the glass.
+  The two add in quadrature, so the share of the water past the threshold th is 1 where
+  S ≥ th and 1 − √(th² − S²)/wall below it, and the light rises smoothly as a stroke speeds up. A firing share spends its
+  charge over GLOW_SPEND (0.25 s) and the store refills over Recharge; the step relaxes the
+  charge exactly to its steady value under both rates, so a long step never overshoots. The
+  flash fades over GLOW_FADE (0.12 s, luciferase's tenth of a second, Widder and Case 1981).
+- **The light** (`wgsl/plateGlow.ts`, display binding 26). Added in linear light as 475 nm
+  blue over the plate's colour, scaled by the depth of water against the rest gap (a thicker
+  layer holds more cells), before the soap film's encode.
+- **Measured** (`npm run glow`, the 128² lab): a still plate at most 0 light and full
+  charge; a stroke at 1.5 peaks at 0.18 in its band, spends 0.047 of the charge along it and
+  none in its mirror band or far from it; a drift at a twentieth of its speed spends none,
+  and the same drift under a threshold twenty times lower spends 0.054, so that none is the
+  threshold's; five strokes down the same path 30 steps apart peak 0.180, 0.166, 0.155,
+  0.146 and 0.138, and with the same rest but Recharge at its 0.05 s floor the second
+  matches the first (0.1836 and 0.1837), so the dimming is the spent store and not the first
+  stroke's leftover flow; off, nothing is made; the picture's blue over red in the band
+  17.1, in its mirror 0 (a glow drawn upside down fails), far 0. On Metal (the owner's Mac)
+  the check runs in about 25 s.
+- **The one thing on a lit plate that makes its own light.** 38h's rule is that nothing drawn on
+  a lit plate makes light: every colour is the lamp's, taken away by what it passes. The glow is
+  the exception, because the organisms are the light source; the owner agreed (2026-11-22). It
+  is added after the plate's colour and before the soap film, so a lamp at 0 draws only it.
+- **Why a second pass dims only a little.** A passing finger fires a cell for a moment and a
+  flash spends only a share of the store (a Lingulodinium cell gives several flashes from
+  one), so one pass dims the next by about 8%; a path stroked again and again tires
+  progressively, which is what the check asks of five.
 ## 46k. `dyeDisperse` gated on its own coefficients (2026-11-15)
 
 `src/gpu/fluid.ts` gated the `'dye disperse'` stage on `dispCells > 0 || (kappaT > 0 ? dm > 0
