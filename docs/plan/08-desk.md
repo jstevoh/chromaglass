@@ -57,6 +57,14 @@ Open from Desk v2, each its own thread (the UI lane):
       starved (the stand-in's held reads cover the sender). A phase that slows the
       display itself, a page in the same browser loading the shared GPU until the show
       draws about 14 frames, would test it on every run. *Measure:* the line's trace.
+    - **8-draw-a-6** (S) Found 2026-11-21: `drawwall --app`'s control ("through the
+      camera without the dish's turn, it lands on the wall elsewhere") reads only that
+      cell 21 changed, with no guard against the whole wall changing in the window. On
+      #872's Mac re-run it went red at "cell 21: 293, most changed 33 (500), median
+      388": every cell changed, so the reading measured the plate's own motion, not the
+      press (the same head read median 4 on its first run). Hold the control to a
+      quiet wall (median change under a bar, as the turned reading is) and re-take the
+      window when it is not, rather than reading the press against a moving plate.
     - **8-draw-a-7** (S) Found 2026-11-21 (the main-green thread), beside 8-draw-a-6:
       the control's red is not the plate's noise. Four GitHub Mac runs on two heads
       (#896's branch ad85989 twice, #893's f1e11db) read the same numbers, "cell 21:

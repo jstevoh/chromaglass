@@ -117,3 +117,17 @@ Detail, Macro section, default 1; `gpu/fineDye.ts`, `npm run finedye`).
 ~~**47a-1** Particles and the edge at screen scale~~ (dropped for 47a, 2026-11-13): the particles
 born in the window drew Poisson grain; the edge is the fine field's seed, which undoes the grid's
 blur.
+- ~~**47x-12**~~ Reading YouTube footage honestly (**shipped**, this PR: `scripts/watchfootage.mjs`): crops black-and-still
+  letterbox/pillarbox bars (`--crop` wins, `--no-autocrop` disables), masks burnt-in sharp
+  still overlays out of every read, excludes title-card spans, estimates global camera
+  translation from block flow (`cameraShare`, keeping `wholeShare`), and flags detail
+  measures unreliable under compression softness.
+- ~~**47x-13**~~ An artistic report card (**shipped**, this PR: `scripts/watchcard.mjs`): `reportCard(read, { cal, ratings })`
+  scores seven canons (Unity, Complexity, Intensity, Arc, Surprise, Music fit, Restraint)
+  from 0 to 10 by calibrating each measure against real liquid shows in `REAL_SHOW_CARDS`
+  using the existing just-noticeable steps, prints `## Report card` in `summary.md` and side
+  by side under `--vs`, and computes Spearman's rho against a library `ratings.json`.
+- ~~**47x-14**~~ From a gap to the settings that close it (**shipped**, this PR: `scripts/watchsettings.mjs`): `MEASURE_SETTINGS`
+  maps every comparable measure to `DEFAULT_SETTINGS` keys (`src/types.ts`) with real physics
+  before post grades, and `gapSettings(gaps)` writes `## Settings to try` under `--vs` (with
+  current values when `--settings` or a take's settings block is given).
