@@ -281,6 +281,7 @@
     "oillaid": "node scripts/oillaid.mjs",
     "lavawax": "node scripts/lavawax.mjs",
     "lavacycle": "node scripts/lavacycle.mjs",
+    "lavaround": "node scripts/lavaround.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "musiccords": "esbuild scripts/musiccords.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/musiccords.mjs && node node_modules/.cache/musiccords.mjs",
     "pace": "esbuild scripts/pace.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/pace.mjs && node node_modules/.cache/pace.mjs",
