@@ -3020,7 +3020,7 @@
     {
       "name": "A held press moves only its own neighbourhood",
       "shard": "plate",
-      "run": "npm run heldpress -- --owed=presstwist",
+      "run": "npm run heldpress",
       "why": [
         "A press held in one place (each bubble's) moves the liquid around it,",
         "not the whole plate: the projection's source sums to zero exactly."
@@ -3272,7 +3272,7 @@
       "run": "npm run filmlook",
       "why": [
         "Film Physics on the plate: nothing but the film changes; the projector's bubbles take the",
-        "faint tint the light through a film is, the closeup's the soap's own reflected gold."
+        "faint tint the light through a film is, the closeup's the light through the film too, at every Film Physics (38h-6)."
       ]
     },
     {
