@@ -13680,6 +13680,46 @@ phones, the song action's modes and kicks), the page's own still rule on the rea
 `PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
 drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).
 
+## 43b. A seamless loop, for a Canvas (#693, 2026-11-07)
+
+A seamless loop for a Spotify Canvas, built as an edit of the finished film's frames with
+the plate shader and the solver untouched:
+
+- **Seam picker and crossfade weights (`src/lib/loopSeam.ts`).** Plain functions over small
+  grey frames (`Uint8Array`): `frameDistance(a, b)` returns the mean per-element `|a - b|`
+  (`0..255`) and throws on a length mismatch; `pickSeam(thumbs, loopFrames, fadeFrames)`
+  picks the earliest start `s` (`0 <= s <= n - loopFrames - fadeFrames`) with the least
+  `frameDistance(thumbs[s], thumbs[s + loopFrames])`, never picking a start whose fade runs
+  past the last frame and throwing when `n < loopFrames + fadeFrames`; `fadeWeight(t, fadeFrames)`
+  is `0` at `t = 0`, rises linearly (`t / fadeFrames`) to `1` at `t = fadeFrames`, stays `1`
+  past the fade, and returns `1` throughout when `fadeFrames === 0`. Helpers `rgbaToGrey`,
+  `blendRgba` and `pickLoudestWindow` support the two-pass render.
+- **Two-pass loop render (`src/app/loopRender.ts`, wired in `src/app/useSongRendering.ts` and `src/lib/checkHooks.ts`).**
+  Decodes the song and locates the loudest contiguous search window (`loopFrames` plus 2 s)
+  from the offline `SongEar` bands (§6) unless `startSec` is typed. Pass 1 lays the look on
+  `seed` on the fixed clock and steps the search window, keeping only a 64×64 grey thumbnail
+  (4 KB) per frame so `pickSeam` chooses `start`. Pass 2 resets the clock, seed, plate and
+  app state to the exact starting state of Pass 1, holds only the half-second fade's early
+  frames (`s .. s + fadeFrames - 1`), streams the middle frames (`s + fadeFrames .. s + loopFrames - 1`)
+  straight to the H.264 MP4 encoder with `audio: null`, and blends the held early frames with
+  the late frames (`s + loopFrames .. s + loopFrames + fadeFrames - 1`) at the end of the file.
+  `window.chromaglassRender` (`?debug`) accepts `loop: { seconds, crossfade, startSec }` and
+  returns `bytes` and `loop: { startFrame, seconds, distance }`; `crossfade: false` renders the
+  same pick and frames with no blend.
+- **Render panel (`src/components/RenderPanel.tsx`).** Adds a "Full song" / "Loop for a Canvas"
+  segmented choice, a 3 to 8 s loop length selector (default 8 s) and an optional start-time
+  field; the free site keeps its 720p cap and watermark.
+
+Measured: `npm run loopseam` 14/14 (`pickSeam` and `fadeWeight` on made-up frames, and the 6 s
+joined loop with seam 1.72 at 1.4x vs 50.87 at 41.7x without weights); `npm run loopseam -- --app`
+on the Mac (`apple metal-3`): 4 s loop renders 120 frames, 4.000 s, 0 audio tracks; seam 0.34
+against a median step of 0.41 (0.8x, bar 3x), first-to-middle 15.72 (38.3x, bar 4x); without
+crossfade fails the seam line at 22.11 against a median step of 0.36 (60.9x); both renders pick
+startFrame 225 and stay within 0.08 in the middle half against the 0.41 median step. The
+cut-inside line (`CUT_OVER_MEDIAN = 8`) reads 3.95 (9.6x of 0.41) on the unedited film's own
+kick beat at frame 90→91 (inside the crossfade the steps are 1.39..1.97, 3.4x..4.8x of the
+median; between kicks 80% of the frames drift at 0.26..0.41 while `BassPress` lurches 3.14..3.95
+on each 120 bpm kick of `songWav(14)`). Left open: 43b-2, 43b-3.
 ## 37x-10. The song's title painted as ink, then swept away (2026-11-08), with 37x-10d
 
 The owner's words of 2026-11-07, replacing a lower third: "let titles get painted on as
@@ -15666,6 +15706,48 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+
+### 48c. Bioluminescent trails: the water glows where it is sheared (shipped 2026-11-21)
+
+*§48's idea 48c, asked with the music-driven visuals on 2026-11-21: the dark plate glows where
+the liquid is sheared, each cell lighting where the shear passes a threshold and spending a
+charge that refills with a time constant. Its open items are in §30.*
+
+- **What shipped.** Glow (`glow`, 0 off to 2), Glow Shear (`glowShear`, 30 per second) and
+  Glow Recharge (`glowRecharge`, 8 s) in Settings → Camera, MIDI, the desks, the remote and the
+  phone's Sound sheet. The music reaches it only through the cords that move the water.
+- **The physics** (`gpu/glow.ts`, `wgsl/glow.ts`). The water holds dinoflagellates, which
+  flash when the stress on them passes a threshold (Lingulodinium, 0.02 to 0.1 Pa, Latz et al.
+  1994; 30 s⁻¹ in seawater is 0.03 Pa). A 256² grid over the plate carries each cell's charge
+  and light, moved with the water by the plate's own semi-Lagrangian carry. The shear is the
+  flow's strain rate S = √(2uₓ² + 2v_y² + (u_y + vₓ)²) together with the shear of the gap's
+  Poiseuille profile, which runs from zero at the middle of the gap to 6U/h at the glass.
+  The two add in quadrature, so the share of the water past the threshold th is 1 where
+  S ≥ th and 1 − √(th² − S²)/wall below it, and the light rises smoothly as a stroke speeds up. A firing share spends its
+  charge over GLOW_SPEND (0.25 s) and the store refills over Recharge; the step relaxes the
+  charge exactly to its steady value under both rates, so a long step never overshoots. The
+  flash fades over GLOW_FADE (0.12 s, luciferase's tenth of a second, Widder and Case 1981).
+- **The light** (`wgsl/plateGlow.ts`, display binding 26). Added in linear light as 475 nm
+  blue over the plate's colour, scaled by the depth of water against the rest gap (a thicker
+  layer holds more cells), before the soap film's encode.
+- **Measured** (`npm run glow`, the 128² lab): a still plate at most 0 light and full
+  charge; a stroke at 1.5 peaks at 0.18 in its band, spends 0.047 of the charge along it and
+  none in its mirror band or far from it; a drift at a twentieth of its speed spends none,
+  and the same drift under a threshold twenty times lower spends 0.054, so that none is the
+  threshold's; five strokes down the same path 30 steps apart peak 0.180, 0.166, 0.155,
+  0.146 and 0.138, and with the same rest but Recharge at its 0.05 s floor the second
+  matches the first (0.1836 and 0.1837), so the dimming is the spent store and not the first
+  stroke's leftover flow; off, nothing is made; the picture's blue over red in the band
+  17.1, in its mirror 0 (a glow drawn upside down fails), far 0. On Metal (the owner's Mac)
+  the check runs in about 25 s.
+- **The one thing on a lit plate that makes its own light.** 38h's rule is that nothing drawn on
+  a lit plate makes light: every colour is the lamp's, taken away by what it passes. The glow is
+  the exception, because the organisms are the light source; the owner agreed (2026-11-22). It
+  is added after the plate's colour and before the soap film, so a lamp at 0 draws only it.
+- **Why a second pass dims only a little.** A passing finger fires a cell for a moment and a
+  flash spends only a share of the store (a Lingulodinium cell gives several flashes from
+  one), so one pass dims the next by about 8%; a path stroked again and again tires
+  progressively, which is what the check asks of five.
 ## 46k. `dyeDisperse` gated on its own coefficients (2026-11-15)
 
 `src/gpu/fluid.ts` gated the `'dye disperse'` stage on `dispCells > 0 || (kappaT > 0 ? dm > 0
@@ -15685,3 +15767,29 @@ samelook` 0.00 % past 2 and 0.000 % past 24 on all six looks at 5, 20 and 60 ste
 physics` 20/20; `npm run dispersion` 5/5; `npm run encode` 17/17 (`encode` steps with `BASE.diff
 = 0.0001`, so `dm = 5.20e-6 > 0` and its step still runs `dyeDisperse`: 270 thin-gap and 494
 open-plate dispatches).
+
+### P7-cpu (step 3.1): Delete the CPU solver's stepping
+
+Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and
+CPU-only fallback paths while keeping the delta arrays, readback mirrors, beads,
+bubbles, macro camera, `liquidPhase`, and every pour/seed/GPU handoff path.
+
+- Deleted in `src/sim/fluidSimulation.ts` (184,913 → 172,192 bytes): CPU-only
+  `solveSqueezePressure`, `updateSqueezeVelocity`, `applyImmiscibility`,
+  `applyAirflow`, `applySmear`, `applyDripping`, the CPU `else` branches in
+  `stepLiquid`, `thinDye`, `squishCell`, `blowAir`, and CPU-only scratch
+  arrays (`pressure`, `dhdt`, `temp0`, `fvx`, `fvy`).
+- Deleted in `src/sim/constants.ts` (7,845 → 7,756 bytes): unused `DRIP_SPEED`.
+- Deleted in `src/components/LiquidVisualizer.tsx` (402,887 → 396,999 bytes):
+  the CPU drain advection/evaporation fallback loop in favour of
+  `af.gpu?.drainStep(t)`.
+- Left under the check stop rule (for follow-up cleanup with their checks):
+  `private sharpenDye` (with `shp`, `shpA`, `SHARP_FLOOR`) for `scripts/plate.mjs`,
+  the `settings.glassSmear > 0` reference in `step()` for `scripts/widedials.mjs`,
+  `stepCurrentCpu` (`src/sim/stepping.ts`, 15,878 → 15,923 bytes) plus
+  `stepCurrent` / `CM` / `cvx` / `cvy` / `cpr` / `cdv` in `FluidSimulation`
+  (unreachable from `step()`) for `scripts/plateboil.mjs --part=zero`, and
+  the minimal CPU curl/transport path in `step()` (`diffuse`, `linSolve`,
+  `project`, `advect`, `advectMacCormack`, `setBoundary`, `applyCurlTurbulence`,
+  `s`/`sR`/`sG`/`sB`/`vx0`/`vy0`/`mcA`/`mcB`, and `TURB_SPEED`) for
+  `scripts/musicstir.mjs`.
