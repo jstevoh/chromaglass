@@ -82,7 +82,7 @@ const N = 256, SIZE = 384, ZOOM = 6;
 const STILL = 0.0002, CONTROL = 50, KEY = 0.005, KEY_CONTROL = 5, POOL = 0.7;
 /** The camera's depth of field begins at 0.30 of the frame's height (plate.ts, `dof`, in DISPLAY_MAIN): inside FOCUS_R it is in focus, outside SOFT_R it is not. */
 const FOCUS_R = 0.25, SOFT_R = 0.42;
-const LOOKS = ['macro-bead', 'cell-bloom'];
+const LOOKS = ['macro-bead', 'cell-bloom', 'lace-run'];
 /**
  * What the closeup still draws on the clock, by the plan item that ends it:
  * printed, not judged still, and together they are line 1d's control (the
@@ -90,7 +90,6 @@ const LOOKS = ['macro-bead', 'cell-bloom'];
  * another clocked device that is meant to be one (the Lumia projector).
  */
 const OWED = [
-  { name: 'lace-run', look: 'lace-run', item: '38u-9' },
   { name: 'Paint Cells at 1', set: { macroCells: 1 }, item: '38u-9' },
   { name: 'Thin Film at 1', set: { thinFilm: 1 }, item: '38u-9' },
 ];
