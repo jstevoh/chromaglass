@@ -521,7 +521,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 28 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-22 | 51 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-24 | 51 |
 |  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19ao-1 | 8 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 19 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
