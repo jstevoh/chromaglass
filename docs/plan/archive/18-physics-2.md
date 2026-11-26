@@ -133,3 +133,7 @@ and a stream held on the plate, lay their colour with their own volume; story in
   plate). Shipped (2026-11-21): it is gone and a plate left alone gains no colour; the
   emergency seed for a drained plate stays (`npm run tools`). Story in
   `docs/plan-shipped.md` §18c-14.
+
+## 18e. Edges come from refraction (replaces the painted rims and highlights)
+
+- ~~**18e-2. A clear pour's edge, and the deflection from the optical path.**~~ **Shipped, this PR** (the derive pass writes `|∇OPL|` in `.z`, the closeup keeps its dye-path Laplacian in `camLap` via `TRANSMIT_WGSL`, and `oplPupilLoss` deflects the front plate's light by `|∇OPL| · DISH_REST_GAP · logicalGrid` against `DROP_NA = 0.25` beside `defocusShadow`; `npm run derive` 5/5, `npm run nolight -- --owed=film` 15/15; story in `docs/plan-shipped.md` §18e).

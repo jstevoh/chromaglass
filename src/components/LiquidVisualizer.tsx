@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { attachCoverPinch, pinchSpan, applyZoomPinch } from './coverPinch';
 import { strawFlow } from '../lib/breath';
 import { BLOW_LEASH, blowStep, blowGoing, blowHeld, blowAim, type BlowDir } from '../lib/blowAim';
 import { BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
@@ -3792,7 +3793,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 new look is all but HANDOFF_KEEP of the plate.
               */
               if (!h.seeds) {
-                for (const fluid of handed) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
+                for (const fluid of handed) { fluid.clearChemistry(); fluid.liquid.clear(); }
                 fluidsRef.current[0]?.gpu?.clearChemistry?.();
                 h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
@@ -3876,7 +3877,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const lambda = -Math.log(HANDOFF_KEEP);
                 fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
                 if (!h.seed) {
-                  if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry();
+                  fluid.clearChemistry();
                   fluid.liquid.clear();
                   let seeded: number[] = [];
                   h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D); });
@@ -5834,10 +5835,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       preparing = s.device;
       try {
         // What the look now up turns on: the opening's, or the one on when a
-        // lost device is replaced mid-show (`gpu/opening.ts`).
+        // lost device is replaced mid-show, and its oil (`gpu/opening.ts`).
         // The intro held still until the opening is built (`Quiet` in
         // gpu/prepare.ts says why), and the builds counted on its line.
-        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: introQuiet }, openingOf(settingsRef.current));
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: introQuiet }, openingOf(settingsRef.current, fluidsRef.current.some((f) => f.oilPending)));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }
@@ -6794,36 +6795,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       came off the dock. `targetTouches` is the fingers that began on the
       canvas.
     */
-    const pinchSpan = (e: TouchEvent) => {
-      const a = e.targetTouches[0], b = e.targetTouches[1];
-      return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 };
-    };
     const letGo = () => {
       isMouseDownRef.current = false;
       primaryTouchRef.current = null;
       extraHandsRef.current.clear();
       spinLetGo();
     };
-    const applyPinch = (pinch: NonNullable<typeof pinchRef.current>, span: { d: number; mx: number; my: number }) => {
-      onPinchZoomRef.current?.(Math.max(1, Math.min(16, pinch.zoom0 * span.d / pinch.d0)));
-      /*
-        The pan, as the Alt-drag has it (panAim): the plate follows the
-        fingers. Only once they have moved together, a few pixels: an aim
-        takes the camera off Auto (App's aimMacro), and a pinch that only
-        zooms should leave Auto on.
-      */
-      if (!pinch.panned && Math.hypot(span.mx - pinch.mx0, span.my - pinch.my0) < 8) return;
-      pinch.panned = true;
-      const rect = drawnRect();
-      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-      const scale = Math.max(rect.width, rect.height) * 1.5 * Math.max(0.0001, macroShotRef.current.zoom);
-      const sx = span.mx - pinch.mx0, sy = -(span.my - pinch.my0);
-      const du = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale;
-      const dv = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale;
-      onAimRef.current?.(Math.min(1, Math.max(0, pinch.aimX - du)), Math.min(1, Math.max(0, pinch.aimY - dv)));
-    };
+    const sendZoomPinch = (pinch: NonNullable<typeof pinchRef.current>, span: { d: number; mx: number; my: number }) =>
+      applyZoomPinch(pinch, span, drawnRect(), rotationAnglesRef.current[activeLayerRef.current] || 0, macroShotRef.current.zoom, onPinchZoomRef.current, onAimRef.current);
     const handleTouchStart = (e: TouchEvent) => {
-      if (pinchRef.current) return;
+      if (pinchRef.current || coverPinch.active()) return;
       /*
         On the closeup by what the look asks for, not by where the camera
         has got to: the camera eases in over a second or so after the Zoom
@@ -6864,7 +6845,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (e.targetTouches.length === 0) {
           // The last move a frame's throttle held back, so the camera ends
           // where the fingers did, as the Alt-drag's mouseup does.
-          if (pinch.last) applyPinch(pinch, pinch.last);
+          if (pinch.last) sendZoomPinch(pinch, pinch.last);
           pinchRef.current = null;
         }
         return;
@@ -6902,9 +6883,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const now = performance.now();
         if (now - pinch.sent < 16) return;   // at most once a frame: each is a settings write
         pinch.sent = now;
-        applyPinch(pinch, pinch.last);
+        sendZoomPinch(pinch, pinch.last);
         return;
       }
+      if (coverPinch.active()) return;
       const activeFluid = fluidsRef.current[activeLayerRef.current];
       for (const t of Array.from(e.changedTouches)) {
         const { x, y } = touchCell(t);
@@ -6922,6 +6904,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
 
+    const coverPinch = attachCoverPinch({
+      canvas,
+      isCloseup: () => macroZoomOf(settingsRef.current) > 1.05,
+      getTool: () => activeToolRef.current,
+      getFluids: () => fluidsRef.current,
+      getLayer: () => activeLayerRef.current,
+      onPinchEnter: letGo,
+    });
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
@@ -6959,6 +6949,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       renderApiRef.current = null;
       // Not the film: it is a <video>, not a GPU object, and outlives a rebuild (stopped on unmount, by the effect above `__cgVideo`).
       window.removeEventListener('resize', resize);
+      coverPinch.detach();
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);

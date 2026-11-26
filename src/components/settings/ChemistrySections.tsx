@@ -105,7 +105,7 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
         <Slider
           label="Liquid"
           value={settings.liquidMl ?? COVER_FULL_ML}
-          min={9}
+          min={1}
           max={150}
           step={1}
           onChange={(v: number) => onUpdate({ liquidMl: v })}

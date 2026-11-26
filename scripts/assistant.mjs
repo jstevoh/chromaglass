@@ -63,6 +63,7 @@ import { OUTPUTS_MUTANTS, oscPort, outputsFullLines, outputsPageLines, outputsPl
 import { PROJECTOR_MUTANTS, projectorFullLines, projectorPageLines, projectorPlayLines, projectorWaitLine, standInProjector } from './assistant-projector.mjs';
 import { notesFrameLine, oscClosesWithSwitchLines, pickSourceLines } from './assistant-safety.mjs';
 import { DESK_MUTANTS, deskFullLines, deskPageLines, deskPlayLines, standInDesk } from './assistant-desk.mjs';
+import { EDIT_MUTANTS, EDIT_PAGE, editLines, editPage, standInEdit } from './assistant-edit.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -172,7 +173,7 @@ function standInDisplay(port, displayKey) {
   const songs = { follow: true, running: null, current: 'show-a' };
   const player = standInPlayer();
   const ear = standInEar();
-  const rec = standInRecord(), snd = standInSound(), med = standInMedia(), out = standInOutputs(), pj = standInProjector(), dk = standInDesk();
+  const rec = standInRecord(), snd = standInSound(), med = standInMedia(), out = standInOutputs(), pj = standInProjector(), dk = standInDesk(), ed = standInEdit(setl, seq);
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
@@ -229,14 +230,8 @@ function standInDisplay(port, displayKey) {
       }
       sendState();
     }
-    if (m.type === 'assistant-music') player.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-ear') ear.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-record') rec.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-sound') snd.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-media') med.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-outputs') out.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-projector') pj.onMessage(m, answer, sendState);
-    if (m.type === 'assistant-desk') dk.onMessage(m, answer, sendState);
+    // Each side module's stand-in takes its own message type.
+    ({ music: player, ear, record: rec, sound: snd, media: med, outputs: out, projector: pj, desk: dk, edit: ed })[/^assistant-(\w+)$/.exec(m.type)?.[1]]?.onMessage(m, answer, sendState);
     if (m.type === 'assistant-songs') {
       const find = (id) => shows.find((x) => x.id === (id ?? songs.current));
       if (m.do === 'read') { const x = find(m.show); answer(x ? { ok: true, data: x } : { ok: false, reason: `no song show "${m.show}"` }); return; }
@@ -853,6 +848,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await outputsFullLines({ mcp, display, check, phone, port });
     await projectorFullLines({ mcp, display, check, phone });
     await deskFullLines({ mcp, display, check, phone });
+    await editLines({ mcp, display, check, phone, setMode });
     await oscClosesWithSwitchLines({ mcp, check, udp: oscPort(port), setMode });
     await setMode('full');
 
@@ -943,6 +939,7 @@ const MUTANTS = [
   ...OUTPUTS_MUTANTS,
   ...PROJECTOR_MUTANTS,
   ...DESK_MUTANTS,
+  ...EDIT_MUTANTS,
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
@@ -965,7 +962,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, typedCaption, rowsCaption, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts'; export * from './src/app/outputsNow.ts'; export * from './src/app/projectorNow.ts'; export * from './src/app/deskNow.ts'; export * from './src/lib/deskTabs.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, typedCaption, rowsCaption, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts'; export * from './src/app/outputsNow.ts'; export * from './src/app/projectorNow.ts'; export * from './src/app/deskNow.ts'; export * from './src/lib/deskTabs.ts';" + EDIT_PAGE);
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -1103,6 +1100,7 @@ await outputsPageLines(page, say);
 await projectorPageLines(page, say);
 projectorWaitLine(page, say, ROOT);
 await deskPageLines(page, say, await import('../server/assistantDesk.js'));
+await editPage(page, say, ROOT, MUTANTS_ON);
 say((await import(join(ROOT, 'server', 'assistantMusic.js'))).MUSIC_PATH === page.ASSISTANT_MUSIC_PATH, `the page takes a file at the show server's own address (${page.ASSISTANT_MUSIC_PATH})`);
 
 /* The page's own tempo door (44k-7), on the real tempoNow: it takes the

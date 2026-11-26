@@ -30,9 +30,9 @@
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
 import { chromium } from 'playwright';
-import { launchChromium, port, untilServing } from './chromium.mjs';
+import { launchChromium, port, presentsInXvfb, untilServing } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
+import { engineQuery, settlePlate, STEP_SHARE, waitForEngine } from './frame.mjs';
 
 const PORT = port(4346);
 const checks = [];
@@ -109,6 +109,60 @@ try {
     await page.mouse.down();
     await settle(ms);
     await page.mouse.up();
+  };
+  /*
+    Held, and then left, for the plate's own seconds: its solver steps times
+    the seconds each stands for (stepIndex, dtSeconds), not the page's
+    milliseconds. What was seen (#897, 2026-11-21): "and spreads it out from
+    where it lands" red on both of that PR's hosted-Mac runs, the Pour's share
+    from 0.02 to 0.07 at 75 and 76% against the Drop's 78%, where main's
+    deploy 854 read 84% and four other PRs that morning 86 to 87%. The Pour's
+    total laid fell with its share (879 and 921 on the red runs, 1345 on 854,
+    1557 to 1640 on the others), and the Drop's share held at 76 to 78%
+    whatever the runner did. The Pour lays its dye with an outward push each
+    time it is applied, and the push spreads it only as the solver steps, so
+    a runner that stepped the plate fewer times in 1.2 s of the wall's laid
+    less and spread it less, while the Drop's share is the shape of its own
+    disc. The line was reading the runner's step rate. So both tools are
+    held, and then left, for a count of the solver's steps (stepIndex): sixty
+    to a second, whatever `dtSeconds` says, because the tools lay their dye
+    and the Pour its push once a step, not scaled by the step's length, and
+    a governor that dropped the plate to thirty a second would otherwise end
+    a "1.2 s of plate" hold after half the steps (check-skeptic). In software
+    (Xvfb, about 0.4 steps a second) the count is settlePlate's share of
+    them, with its cap, as every other wait here is. A wait that runs out
+    before its steps is said and turns the lines it fed red: a short hold
+    would read as a tool that lays little, and a short 0.4x hold would pass
+    the Amount's line for the wrong reason. No stepIndex (an old page) waits
+    the wall's time, as before.
+  */
+  let pourTimed = true;
+  const plateFor = async (seconds) => {
+    const soft = presentsInXvfb();
+    const want = Math.max(1, Math.ceil(seconds * 60 * (soft ? STEP_SHARE : 1)));
+    const cap = soft ? want * 10_000 + 30_000 : seconds * 8000 + 5000;
+    const read = () => page.evaluate(() => { const f = window.chromaglassDebug().fluids?.[0]; return { n: f?.stepIndex ?? -1, dt: f?.dtSeconds ?? 0 }; });
+    const t0 = Date.now();
+    const a = await read();
+    if (!(a.n >= 0)) { await settle(seconds * 1000); return null; }
+    let b = a;
+    while (Date.now() - t0 < cap) {
+      await page.waitForTimeout(20);
+      b = await read();
+      if (b.n - a.n >= want) break;
+    }
+    const ok = b.n - a.n >= want;
+    if (!ok) pourTimed = false;
+    return { steps: b.n - a.n, want, dt: b.dt, ms: Date.now() - t0, ok };
+  };
+  const holdPlate = async (t, at, seconds) => {
+    await tool(t);
+    await settle(300);   // the pick is a React render away, as in hold
+    await page.mouse.move(...screen(...at));
+    await page.mouse.down();
+    const held = await plateFor(seconds);
+    await page.mouse.up();
+    return held;
   };
   const stroke = async (t, from, to, ms, stay = 0) => {
     await tool(t);
@@ -302,31 +356,33 @@ try {
 
   // ── The pouring tools ───────────────────────────────────────────
   const laid = {};
-  for (const [t, ms] of [['dropper', 1200], ['pour', 1200], ['spray', 1200], ['splatter', 1200]]) {
+  const plateSaid = (w) => w ? `held ${w.steps} of ${w.want} steps (a step ${(1000 * w.dt).toFixed(1)} ms of plate) in ${(w.ms / 1000).toFixed(1)} s` : 'held by the wall clock (no stepIndex)';
+  const timedSaid = () => pourTimed ? '' : '; a hold or its wait ran out before its steps';
+  for (const t of ['dropper', 'pour', 'spray', 'splatter']) {
     await clear();
     await page.mouse.move(...screen(...A));
     const p = await snap(`${t}0`);
-    await hold(t, A, ms);
-    await settle(700);
+    const held = await holdPlate(t, A, 1.2);
+    await plateFor(0.7);
     await snap(`${t}1`);
     const a = await measure(`${t}0`, p), b = await measure(`${t}1`, p);
     const an = await measure(`${t}0`, p, 0.02, 0.07), bn = await measure(`${t}1`, p, 0.02, 0.07);
     laid[t] = { disc: b.disc - a.disc, ring: b.ring - a.ring, total: b.total - a.total, near: bn.disc - an.disc, spread: bn.ring - an.ring };
-    console.log(`     ${t.padEnd(8)} laid ${laid[t].total.toFixed(0)}: ${laid[t].disc.toFixed(0)} within 0.07 of the hand, ${laid[t].ring.toFixed(0)} from 0.07 to 0.16`);
+    console.log(`     ${t.padEnd(8)} laid ${laid[t].total.toFixed(0)}: ${laid[t].disc.toFixed(0)} within 0.07 of the hand, ${laid[t].ring.toFixed(0)} from 0.07 to 0.16; ${plateSaid(held)}`);
   }
-  check('Drop lays dye where it is held', laid.dropper.disc > 5 && laid.dropper.disc > 0.6 * laid.dropper.total,
+  check('Drop lays dye where it is held', pourTimed && laid.dropper.disc > 5 && laid.dropper.disc > 0.6 * laid.dropper.total,
     `${laid.dropper.disc.toFixed(0)} of ${laid.dropper.total.toFixed(0)} within 0.07`);
-  check('Pour lays more than Drop', laid.pour.total > 10 && laid.pour.total > 1.3 * laid.dropper.total,
+  check('Pour lays more than Drop', pourTimed && laid.pour.total > 10 && laid.pour.total > 1.3 * laid.dropper.total,
     `${laid.pour.total.toFixed(0)} against ${laid.dropper.total.toFixed(0)}`);
   // At the pour's own scale: its stream is about 0.03 of the plate across.
   const spreadOf = (l) => l.spread / Math.max(1e-6, l.near + l.spread);
   // Pour's "spreads it out from where it lands" stood here until PLAN.md
   // 19ak-21: the tools are held for wall time, so the share it compared
   // moved with the runner's frame rate (19ak-13), and it only ever flaked.
-  console.log(`     Pour spread ${(100 * spreadOf(laid.pour)).toFixed(0)}% from 0.02 to 0.07, Drop's ${(100 * spreadOf(laid.dropper)).toFixed(0)}% (printed, not judged)`);
-  check('Spray lays a wider mist than Drop', laid.spray.total > 5 && laid.spray.ring / laid.spray.total > laid.dropper.ring / Math.max(1e-6, laid.dropper.total),
+  console.log(`     Pour spread ${(100 * spreadOf(laid.pour)).toFixed(0)}% from 0.02 to 0.07, Drop's ${(100 * spreadOf(laid.dropper)).toFixed(0)}% (printed, not judged)${timedSaid()}`);
+  check('Spray lays a wider mist than Drop', pourTimed && laid.spray.total > 5 && laid.spray.ring / laid.spray.total > laid.dropper.ring / Math.max(1e-6, laid.dropper.total),
     `${(100 * laid.spray.ring / Math.max(1e-6, laid.spray.total)).toFixed(0)}% beyond 0.07`);
-  check('Splat flings dye round the hand', laid.splatter.total > 5 && laid.splatter.disc + laid.splatter.ring > 0.7 * laid.splatter.total,
+  check('Splat flings dye round the hand', pourTimed && laid.splatter.total > 5 && laid.splatter.disc + laid.splatter.ring > 0.7 * laid.splatter.total,
     `${laid.splatter.total.toFixed(0)} laid, ${(100 * (laid.splatter.disc + laid.splatter.ring) / Math.max(1e-6, laid.splatter.total)).toFixed(0)}% within 0.16`);
 
   // ── The Amount ──────────────────────────────────────────────────
@@ -339,13 +395,14 @@ try {
     await page.evaluate(() => window.chromaglassToolAmount?.('dropper', 0.4));
     await page.mouse.move(...screen(...A));
     const p = await snap('amt0');
-    await hold('dropper', A, 1200);
-    await settle(700);
+    // In the plate's seconds, as the 1x hold it is judged against was.
+    await holdPlate('dropper', A, 1.2);
+    await plateFor(0.7);
     await snap('amt1');
     const a = await measure('amt0', p), b = await measure('amt1', p);
     await page.evaluate(() => window.chromaglassToolAmount?.('dropper', 1));
     const less = b.total - a.total;
-    check("a tool's Amount sets how much it does — the dropper at 0.4x lays less dye", less > 0 && less < 0.7 * laid.dropper.total,
+    check("a tool's Amount sets how much it does — the dropper at 0.4x lays less dye", pourTimed && less > 0 && less < 0.7 * laid.dropper.total,
       `${less.toFixed(0)} against ${laid.dropper.total.toFixed(0)} at 1x`);
   }
 
