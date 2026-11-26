@@ -461,6 +461,8 @@ export class FluidCore {
     no longer read there.
   */
   protected airCoverPrev = 0;
+  /** How many quiet seconds the air field has gone with neither bubbles nor boil. */
+  protected airQuietSeconds = 0;
   /** How much of a press reaches the flow, from the look's plate pressure. */
   protected squeezeGain = 0;
   protected lastDt = 1 / 60;
@@ -787,6 +789,10 @@ export class FluidCore {
     this.boilLive = false;
     this.boilFresh = true;
     this.boilTail = 0;
+    this.airPush = 0;
+    this.airCover = 0;
+    this.airCoverPrev = 0;
+    this.airQuietSeconds = 0;
     this.air?.setBoilAlpha(null);
     if (this.grain) {
       // Identity coordinates: reseed both phases without sampling the previous frame.
