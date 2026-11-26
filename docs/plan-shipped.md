@@ -15481,3 +15481,22 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+## 46k. `dyeDisperse` gated on its own coefficients (2026-11-15)
+
+`src/gpu/fluid.ts` gated the `'dye disperse'` stage on `dispCells > 0 || (kappaT > 0 ? dm > 0
+: dm > 0.0039)`, so whenever the plate moved (`dispCells > 0`) `dyeDisperse` ran even when both
+diffusion terms were zero (`dm = 0` and `kappaT = 0`, as on Classic and the thirteen other
+looks with Diffusion Rate at 0): one full-grid dispatch a step, 25 loads of the rgba32float
+dye a cell, every face flux `±0`, writing back what it read.
+
+Moved to `disperseDye` and `disperseWanted` in `src/gpu/fluid/passes.ts` (`fluid.ts` shrinks by
+689 bytes) and gated on `bodies || dm > 0 || (kappaT > 0 && dispCells > 0)`. Oil Bodies
+(`bodiesOn && !bodiesFresh`) stays outside the gate because `bodyUnspread` (`src/gpu/wgsl/fluid/oil.ts`)
+computes `max(dye - spread, 0) + max(kept, 0)`: `slump` and `decayDye` at the end of the
+previous step act on `this.dye` without updating `this.oilDye`, so a cell where `dye` fell
+below `oilDye` is clamped back up to `oilDye`, and where both are positive `(dye - od) + od`
+in IEEE 754 float32 is not bit-identical to `dye` across different exponents. `npm run
+samelook` 0.00 % past 2 and 0.000 % past 24 on all six looks at 5, 20 and 60 steps; `npm run
+physics` 20/20; `npm run dispersion` 5/5; `npm run encode` 17/17 (`encode` steps with `BASE.diff
+= 0.0001`, so `dm = 5.20e-6 > 0` and its step still runs `dyeDisperse`: 270 thin-gap and 494
+open-plate dispatches).
