@@ -249,9 +249,9 @@ The owner's hunt (2026-11-09) takes this wave's written items to Antigravity und
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
   14ab-13 with #591, finished in #596; 14ab-6 the beads' mask on the GPU). Left: 14ab-10, -11,
   -14.
-- **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
+- **4.4** ~~**H2c-7**~~, **H2c-6, H2c-8, H2c-5** (S each): ~~the readback straight into its ring~~ (shipped), no aux
   target without the camera, air only where there are bubbles, first-order velocity.
-  H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-7 and H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
+  H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
 - **4.7** ~~**14c-4k, 14c-governor, H2c-10**~~ (shipped, `npm run rungs`; story in `docs/plan-shipped.md`), ~~**H2c-labels**~~ (S, shipped, `npm run timelabels`: 133 → 0 readings off their pass, `gpuFrameMs` move on a change 30.0 % → 0.0 %; story in `docs/plan-shipped.md`). Then **H2a**, **H1**, **H3a**.
