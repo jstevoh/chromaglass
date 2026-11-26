@@ -171,3 +171,29 @@ In a before/after pair, **How it felt** puts both paragraphs side by side and sa
 arc, the character, the peak, the surges and the hold on the music changed. Swells, rests and
 the peak's place come from one take of a moving fluid and can differ between two takes of the
 same look; the paragraph says so.
+
+## The report card
+
+`scripts/watchcard.mjs` (`reportCard`) grades a film across seven canons from 0 to 10 against calibrated moving liquid light shows (`REAL_SHOW_CARDS`), falling with each just-noticeable step outside the real-show band (the step sizes `compareDesign`, `comparePhysics`, and `compareReads` already use). Unreliable or missing measures (e.g., silent films on *Music fit*, or compression-softened footage on *Complexity*) stay ungraded (`null`) rather than scoring zero.
+
+| Canon | What it grades | Measures | Sources |
+|---|---|---|---|
+| **Unity** | Two or three related hues held long enough | hues a frame, hue spread, main hues' gap, lifetime, reorganisations/min | Monroe Beardsley (*Aesthetics*, 1958) |
+| **Complexity** | Multi-scale detail without greyed colour mud (inverted U) | spectrum slope, forms a frame, form scale, colour mud penalty | Monroe Beardsley; George Birkhoff (*Aesthetic Measure*, 1933); Daniel Berlyne (*Aesthetics and Psychobiology*, 1971) |
+| **Intensity** | Contrast, vivid colourfulness, true darks | RMS contrast, colourfulness, near-black share, p5 luminance | Monroe Beardsley |
+| **Arc** | Build, peak, and release against flat drift | arc shape, thirds spread, peak over median, surge spread | Leonard Meyer (*Emotion and Meaning in Music*, 1956); David Huron (*Sweet Anticipation*, 2006) |
+| **Surprise** | Pattern breaks without chaotic churn (inverted U) | reorganisations/min, swells/min | David Huron; Daniel Berlyne |
+| **Music fit** | Motion breathing with loudness ("not graded" without audio) | motion-sound correlation, best lag | David Huron |
+| **Restraint** | Dark space and pauses between moves | near-black share, longest rest, calm share | the wet show |
+
+## From a gap to a setting
+
+`scripts/watchsettings.mjs` (`MEASURE_SETTINGS`, `gapSettings`) connects every ranked comparison gap (`compareDesign`, `comparePhysics`, and `reportCard`) to keys of `DEFAULT_SETTINGS` (`src/types.ts`). Every entry states which way to turn the control to raise the measure (and `gapSettings` flips it when a gap asks to lower the measure).
+
+Following the real-physics rule, physical controls always come first and are labeled apart from post grades:
+
+- **Colour & intensity**: adjust `dyeBudget`, `transmission` (Beer–Lambert optical depth), `hueJourney`, `polarity`, `dimmer`, `lampWarmth`, `lampHotspot`, `lampGround`, and `boundaryContrast` before post grades (`saturationBoost`, `exposure`, `ledContrast`, `ledHue`).
+- **Edges, scale & flow**: adjust `diffusionRate`, `polarity`, `focus`, `turbulenceScale`, `turbulenceDetail`, `oilTension`, `beads`, `oilBodies`, `filmHold`, `blobSurfaceTension`, `advection`, `globalSpeed`, `damping`, `gapThickness`, `rotationSpeed`, `plateTiltX` before `postBlurRadius`.
+- **Arc, surprise, restraint & sync**: adjust `surge`, `pacing`, `automateRate`, `damping`, `audioImpact`, `soundImpact`, `sensitivity`, `beatPrediction`, `beatLead`, and `kickBloom`.
+
+Under `--vs`, any gap of 1.0 just-noticeable step or larger appears under `## Settings to try` with 1 to 3 settings; if `--settings file.json` (or a take's own `settings` metadata) is supplied, each suggestion includes the setting's current value.
