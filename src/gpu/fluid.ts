@@ -421,6 +421,7 @@ export class WebGPUFluid extends FluidCover {
     const oilRho = oilRhoOf(p.oilWeight);
     f[52] = oilRho; f[53] = OIL_EXPAND;
     f[54] = lampCoolOf(this.coverGap * GAP_METRES, p.magnetSeconds);
+    f[55] = oilBodyLn(1e-6, p.oilThickness);
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -827,7 +828,7 @@ export class WebGPUFluid extends FluidCover {
         this.ensureThinGap();
         let closed = [0, 0];
         if (lifting) {
-          const m = this.liftN, lnB = oilBodyLn(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
+          const m = this.liftN, lnB = oilBodyLn(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS), p.oilThickness);
           // Signed by the oil's own weight (Oil Weight, PLAN 27f-9c): a wax heavier than the water falls down the tipped plate.
           const kappa = -OIL_LIFT * oilLightnessOf(p.oilWeight) * seconds / (PLATE_METRES * Math.max(disp, 1e-9) * ROCK_FALL);
           this.hsRun(pass, 'hsLiftSource', `hsLiftSource:${mixTex.label}:${this.dye.read.label}:${oilDyeTex.label}`, this.arg('lift source', [m, lnB, kappa, 0]),

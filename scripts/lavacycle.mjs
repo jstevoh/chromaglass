@@ -174,7 +174,7 @@ async function inLab(opts, seconds) {
 async function measureRun({ seconds }) {
   const N = 128;
   const look = lab.look('lava-lamp').settings;
-  for (const k of ['oilTension', 'oilBodies', 'oilWeight', 'solutalBuoyancy', 'heatDecay', 'buoyancy', 'advection', 'damping', 'turbulenceScale', 'doubleDiffusion', 'plateUpright']) {
+  for (const k of ['oilTension', 'oilBodies', 'oilWeight', 'oilThickness', 'solutalBuoyancy', 'heatDecay', 'buoyancy', 'advection', 'damping', 'turbulenceScale', 'doubleDiffusion', 'plateUpright']) {
     if (!Number.isFinite(look[k])) throw new Error(`lavacycle: Lava Lamp's ${k} is ${look[k]}, not a number`);
   }
   if (!(look.oilWeight > 0)) throw new Error(`lavacycle: Lava Lamp's Oil Weight is ${look.oilWeight}: this check is about a heavy wax`);
@@ -185,7 +185,7 @@ async function measureRun({ seconds }) {
   const tu = Math.max(0, Math.min(1, look.turbulenceScale));
   const p = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, plateUpright: look.plateUpright, solutalBuoyancy: look.solutalBuoyancy,
     gravityX: 0, gravityY: -1, gravityReach: 0.3, dt: 1 / 60, heatDecay: look.heatDecay, currentBuoy: look.buoyancy * 0.3, maxCurrent: 0.3,
-    doubleDiffusion: look.doubleDiffusion, oilTension: look.oilTension, oilBodies: look.oilBodies, oilWeight: look.oilWeight,
+    doubleDiffusion: look.doubleDiffusion, oilTension: look.oilTension, oilBodies: look.oilBodies, oilWeight: look.oilWeight, oilThickness: look.oilThickness,
     advection: look.advection, diff: look.diffusionRate ?? 0, damping: look.damping || 0.99, visc, nu: visc * 0.0001,
     sharpness: sh * (0.225 - 0.09 * sh), turbScale: tu * (1 + 3 * tu ** 3), turbDetail: Math.round(look.turbulenceDetail ?? 3),
     platePressure: look.platePressure ?? 0.4 };
