@@ -662,6 +662,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'analyserAngle',   label: 'Analyser',         min: 0, max: 180 },
   { key: 'quarterWave',     label: 'Quarter Wave',     min: 0, max: 1 },
   { key: 'birefringence',   label: 'Birefringence',    min: 0, max: 1 },
+  { key: 'dishStress',      label: 'Dish Stress',      min: 0, max: 1 },
   { key: 'tank',            label: 'Tank',             min: 0, max: 1 },
   { key: 'tankFeed',        label: 'Feed',             min: 0, max: 6 },
   { key: 'tankWeight',      label: 'Dye Weight %',     min: 0.05, max: 3 },

@@ -132,6 +132,7 @@ export const CONTROL_HELP: Record<string, string> = {
   analyserAngle: 'The top sheet\'s turn. 90 crossed: dark until the liquid flows. 0 parallel: white, with the opposite colours.',
   quarterWave: 'Quarter-wave plates. Full: bands with no dark lines. Down: dark pinwheel arms where the flow lines up with a sheet.',
   birefringence: 'How strongly the liquid\'s stretch turns the light. Low gives greys and straw; higher climbs the rainbow\'s orders to pinks and greens.',
+  dishStress: 'The stress frozen into the moulded dish: rainbow rings round its middle, a pale bright rim, and a dark cross with Quarter Wave down.',
   tank: 'A water tank seen through its side instead of the dish: heavy dye falls from a nozzle, thins to a thread and runs along the floor.',
   tankFeed: 'How fast the nozzle feeds dye into the tank. More feed, a thicker jet.',
   tankWeight: 'How much heavier the dye is than water. Heavier dye falls faster and thins to a finer thread.',

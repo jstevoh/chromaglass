@@ -839,6 +839,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Slider label="Analyser" field="analyserAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('analyserAngle') as number | undefined} {...sliderProps} connected={connected} />
               <Slider label="Quarter Wave" field="quarterWave" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('quarterWave') as number | undefined} {...sliderProps} connected={connected} />
               <Slider label="Birefringence" field="birefringence" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('birefringence') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Dish Stress" field="dishStress" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dishStress') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
