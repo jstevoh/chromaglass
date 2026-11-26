@@ -15663,3 +15663,29 @@ samelook` 0.00 % past 2 and 0.000 % past 24 on all six looks at 5, 20 and 60 ste
 physics` 20/20; `npm run dispersion` 5/5; `npm run encode` 17/17 (`encode` steps with `BASE.diff
 = 0.0001`, so `dm = 5.20e-6 > 0` and its step still runs `dyeDisperse`: 270 thin-gap and 494
 open-plate dispatches).
+
+### P7-cpu (step 3.1): Delete the CPU solver's stepping
+
+Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and
+CPU-only fallback paths while keeping the delta arrays, readback mirrors, beads,
+bubbles, macro camera, `liquidPhase`, and every pour/seed/GPU handoff path.
+
+- Deleted in `src/sim/fluidSimulation.ts` (184,913 → 172,192 bytes): CPU-only
+  `solveSqueezePressure`, `updateSqueezeVelocity`, `applyImmiscibility`,
+  `applyAirflow`, `applySmear`, `applyDripping`, the CPU `else` branches in
+  `stepLiquid`, `thinDye`, `squishCell`, `blowAir`, and CPU-only scratch
+  arrays (`pressure`, `dhdt`, `temp0`, `fvx`, `fvy`).
+- Deleted in `src/sim/constants.ts` (7,845 → 7,756 bytes): unused `DRIP_SPEED`.
+- Deleted in `src/components/LiquidVisualizer.tsx` (402,887 → 396,999 bytes):
+  the CPU drain advection/evaporation fallback loop in favour of
+  `af.gpu?.drainStep(t)`.
+- Left under the check stop rule (for follow-up cleanup with their checks):
+  `private sharpenDye` (with `shp`, `shpA`, `SHARP_FLOOR`) for `scripts/plate.mjs`,
+  the `settings.glassSmear > 0` reference in `step()` for `scripts/widedials.mjs`,
+  `stepCurrentCpu` (`src/sim/stepping.ts`, 15,878 → 15,923 bytes) plus
+  `stepCurrent` / `CM` / `cvx` / `cvy` / `cpr` / `cdv` in `FluidSimulation`
+  (unreachable from `step()`) for `scripts/plateboil.mjs --part=zero`, and
+  the minimal CPU curl/transport path in `step()` (`diffuse`, `linSolve`,
+  `project`, `advect`, `advectMacCormack`, `setBoundary`, `applyCurlTurbulence`,
+  `s`/`sR`/`sG`/`sB`/`vx0`/`vy0`/`mcA`/`mcB`, and `TURB_SPEED`) for
+  `scripts/musicstir.mjs`.
