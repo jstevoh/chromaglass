@@ -776,6 +776,7 @@ export class WebGPUFluid extends FluidCover {
       const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
       const gx = upright * (p.gravityX ?? 0) / gl, gy = upright * (p.gravityY ?? -1) / gl;
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
+      if (lamp > 0) this.heatLive = true;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
       // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
@@ -1169,7 +1170,7 @@ export class WebGPUFluid extends FluidCover {
       }
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
-    stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && !this.boilLive);
+    stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && this.heatLive && !this.boilLive);
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
       GRID_DAMP a step in every look. Jacobi diffusion took 8a/(1+8a) of it a

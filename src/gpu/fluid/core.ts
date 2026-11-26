@@ -118,6 +118,8 @@ export class FluidCore {
   protected readonly boilUniF = new Float32Array(this.boilUniData);
   protected readonly boilUniU = new Uint32Array(this.boilUniData);
   protected boilLive = false;
+  /** Whether a writer has laid a temperature in `vel.z` since the last clear (`carryHeat`, PLAN 46s). */
+  protected heatLive = false;
   /**
    * A bottle's liquid has been poured since the last clear (addLiquidDrop),
    * so `liquids0` and `liquids1` hold something for a step to act on
@@ -724,6 +726,7 @@ export class FluidCore {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.heatLive = false;
     this.glassFlow = [0, 0];
     for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
