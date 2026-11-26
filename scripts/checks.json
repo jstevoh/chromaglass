@@ -499,6 +499,25 @@
       ]
     },
     {
+      "name": "Watching footage, report card & settings",
+      "shard": "sound",
+      "run": "npm run watchcard",
+      "quarantine": [
+        { "line": "(f2) REAL_SHOW_CARDS leave-one-out", "plan": "47x-16", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
+      "why": [
+        "The watch tool's YouTube footage robustness (47x-11, watchfootage.mjs),",
+        "artistic report card and ratings agreement (47x-10, watchcard.mjs), and",
+        "gap-to-setting suggestions (47x-12, watchsettings.mjs): synthetic clips",
+        "encoded with ffmpeg prove letterbox autocrop vs dark-ground plates,",
+        "still overlay masking, title-card span exclusion, global camera",
+        "subtraction, compression-softness reliability flags, canon scoring and",
+        "REAL_SHOW_CARDS self-check, Spearman ratings agreement, and",
+        "DEFAULT_SETTINGS mapping, with mutants that break autocrop, camera,",
+        "compression, and card calibration. In the sound shard for its ffmpeg."
+      ]
+    },
+    {
       "name": "Following a song",
       "shard": "logic",
       "run": "npm run songfollow",
