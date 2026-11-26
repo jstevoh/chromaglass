@@ -107,6 +107,16 @@ each band.
   one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
   two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
   one sample then lags of 3, 8 and 10, each seeded from the last.
+
+## 47a. Detail at the closeup's own scale: a fine window, with the dye finer than the flow (L)
+
+~~**47a** The fine window~~ (shipped; story in `docs/plan-shipped.md` §47a): the dye carried over
+the closeup's frame at two screen pixels a texel through the solver's velocity, without diffusion,
+about once a frame, drawn at the grid's thickness round each cell (Fine
+Detail, Macro section, default 1; `gpu/fineDye.ts`, `npm run finedye`).
+~~**47a-1** Particles and the edge at screen scale~~ (dropped for 47a, 2026-11-13): the particles
+born in the window drew Poisson grain; the edge is the fine field's seed, which undoes the grid's
+blur.
 - ~~**47x-12**~~ Reading YouTube footage honestly (**shipped**, this PR: `scripts/watchfootage.mjs`): crops black-and-still
   letterbox/pillarbox bars (`--crop` wins, `--no-autocrop` disables), masks burnt-in sharp
   still overlays out of every read, excludes title-card spans, estimates global camera

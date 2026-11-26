@@ -275,6 +275,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'macroLacing', label: "Macro Lacing", min: 0, max: 1, section: 'macro' },
   { key: 'macroDepth', label: "Depth / Focus", min: 0, max: 1, section: 'macro' },
   { key: 'macroRelief', label: "Relief / 3D", min: 0, max: 1, section: 'macro' },
+  { key: 'macroFine', label: "Fine Detail", min: 0, max: 1, section: 'macro' },
   { key: 'platePressure', label: "Plate Pressure", min: 0, max: 1, section: 'squish' },
   { key: 'phaseAmount', label: "Ferrofluid", min: 0, max: 1, section: 'ferro' },
   { key: 'phaseScale', label: "Domain Size", min: 0, max: 1, section: 'ferro' },
