@@ -346,9 +346,6 @@ through cords and preset patches, and the plate shader is untouched.
   `useControllers` only through App(), which may not grow, so `show_state` does not say
   whether a browser's title bar is on the wall. The Mac app fills the projector's screen
   itself, so this matters only in a browser. Pass it with the next byte App() frees.
-- ~~**44k-16a. Set lists' and sequences' own editing, from the assistant.**~~ **Shipped**
-  2026-11-12: `set_list_edit`, `sequence_edit` (`npm run assistant`, `edit-*`, `phone-edit`). Story in
-  `docs/plan-shipped.md` §44.
 - **44k-16b. A set item's own fade and captured rides, from the assistant.** *(S, found
   building 44k-16a.)* A set item can carry its own Go fade (`SetItem.fade`) and the rides
   as they stood (the item menu's capture), and `set_list_edit` sets neither: the fade has

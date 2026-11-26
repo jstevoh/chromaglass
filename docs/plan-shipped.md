@@ -2477,7 +2477,10 @@ before the measured one (untested, and #396's warm in the same page did not help
     wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner. And the
     line says nothing at the start of the builds: its "0 of 67" changed the picture as the
     opening began waiting for the page's frames, and the Mac asked its first compile 1.12 s
-    after the device (0.06 s on main).
+    after the device (0.06 s on main). After it merged, the words still changed as one render pipeline
+    finished, in the millisecond the next was asked (`intro` 9c red 2 of 3 on #881's branch):
+    the count now holds until every render pipeline is asked for (they come first), and 9c
+    also reads the two frames before each compile (red on the old code: 8 changes).
   - Every look the same bytes: `npm run leandisplay` (new, lab9) draws all 41 looks lean
     and whole, plate and close-up, 85/85 (also with five steps each, before the switch
     to literal `false`), with controls (a gate the look uses taken out differs by 1329
@@ -4531,6 +4534,21 @@ line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven
 out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
 every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
 lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
+
+### 19aj-3. The pouring tools are held for the plate's steps (2026-11-21)
+
+What was seen: `npm run tools` "and spreads it out from where it lands" red on both of #897's
+hosted-Mac runs, the Pour's share from 0.02 to 0.07 at 76 and 75% against the Drop's 78%,
+on a PR that changed only the loading line. Across that morning's runs the Pour's total
+fell with its share (879 and 921 laid on the red runs, 1345 at 84% on deploy 854, 1557 to
+1640 at 86 to 87% on four other PRs) while the Drop's share held at 76 to 78%: the Pour
+lays its dye with an outward push once a step, and the push spreads it only as the solver
+steps, so 1.2 s of the wall's on a runner that stepped less laid less and spread less. The
+line was reading the runner's step rate. What changed: the five pouring lines and the
+Amount's hold and wait for a count of solver steps (72 and 42 on a GPU, sixty to a second,
+not `dtSeconds`, which the governor can halve; check-skeptic), settlePlate's share in
+software, and a wait that runs out before its steps turns those lines red instead of
+feeding them a short hold. Each tool's line now prints the steps it was held for.
 
 ### 19ak. The Mac runs what a PR reaches, and known flakes report without blocking (2026-11-01)
 
@@ -6631,6 +6649,77 @@ SwiftShader, so the check left Measure (`lab10` is gone) for the Mac's `show` (1
 controls above. Shortcuts kept, each named in 27f-9g: the glass temperatures laid by height,
 the thin gap's rate standing in for a fat bottle's, and dye wax (no oil phase) still on the
 old kick. The Mac's film of two minutes is the owner's verdict.
+
+### 27f-9m. A look's oil laid before its solver is there (2026-11-12)
+
+The owner, 2026-11-12, of the new lamp on the Mac: the wax smears into streaks instead of
+holding round blobs. The lab's lamp, same settings, held fat round bodies for the whole of
+150 s (27f-9f's account), so the first question was what the app's plate had that the lab's
+did not, and the answer was what it did not have. Read from the filmed build's own fields on
+the Mac (the page opened as every film opened it, `?look=lava-lamp`, eleven samples over
+150 s): the mix field's oil summed to 0 and not one cell was wax, while the dye was all
+there. The lamp that was filmed was red dye in convecting water. A dye is a passive colour:
+the convection folds it into sheets and streaks and nothing gathers it back, because nothing
+in it has an interface. The look laid again on the running page had its wax (6.67% of the
+plate, the area of its four bodies).
+
+Why: `seedPreset` laid a look's oil with `this.gpu?.addMix?.(…)`, and the look a page opens
+on is seeded before the GPU solver is attached. The dye of the same lay lands in the
+simulation's own arrays, which the solver takes over when it attaches; the oil had nowhere
+to land and the optional call dropped it without a word. Clock Glass and Splodascope lose
+theirs the same way, and so does any look laid between a lost device and the next solver.
+It was never seen in a check because the lab lays the oil itself and the app's harnesses
+apply their looks to a running page.
+
+The oil waits now. `src/sim/mixWait.ts` keeps the splats a look lays while there is no
+solver, `attachGpu` lays them into the first one, they are kept as that solver's seed
+beside the dye's (a solver dropped before it has spoken, out of memory on the first rung,
+hands the next one the same plate), and they are dropped when a carry holds the oil
+already, when the plate is cleared, and when a fade to another look wipes the chemistry
+(`FluidSimulation.clearChemistry`, which the visualizer's fade now calls instead of reaching
+for the solver, so a Go in the page's first second cannot lay two looks' oil).
+
+`npm run oillaid`. The simulation's half (node, Measure's `logic`) drives the real
+`FluidSimulation` against a stand-in solver that keeps every `addMix` it is given: each oil
+look laid before a solver holds the same oil, splat for splat, as laid with one; after a
+solver that never spoke; after a regrid, once and by the carry; a cleared plate and a fade
+leave none of the old look's. Before the fix 4 of its first 8 lines failed (0 bodies
+against 4, 12 and 45). The app's half (the Mac's `open`) opens the built app on each oil
+look and reads the solver: the mix field's oil against the same look laid again on the
+running page, the solver's own count of the oil poured (which a second lay would double;
+the field cannot see one, a cell being full at 1), and Lava Lamp's against the area of its
+four bodies. On the Mac (Metal), the build before the fix: every oil look opens with 0.00%
+of the plate oil, held and poured, and 3 of the app half's lines fail (12 of 15 in all).
+With it, 15 of 15: Lava Lamp opens with 6.67% held and 6.67% poured, the same laid again
+(Σπr² of its four bodies is 6.67%); Clock Glass 8.25% held and 10.38% poured against 9.17%
+and 11.47% laid again (its bodies are random, so the bar between the two is 0.6 to 1.5 and
+only Lava Lamp is held to a tenth); Splodascope 26.16% against 26.80%.
+
+*And what the show builds before it opens.* With the oil kept, `npm run startup` on Metal
+went red on this PR's first run: Clock Glass and Splodascope asked on the frame for
+fourteen and fifteen pipelines their opening had not waited for (the mix's splat, carry,
+relax, potential and update, the oil's smoothed shape, rim pressure and force, the
+bodies' three, the lift's three, and Splodascope's Film Hold), and Lava Lamp for eight.
+The check was right: those kernels had always been "built behind the show" because no
+opening ran them, and no opening ran them because the oil was lost. So the opening now
+learns of the oil from the plate and not from a list of looks: the visualizer asks the
+simulation whether oil waits for the solver (`FluidSimulation.wait.pending`) and
+`openingOf` takes it, and `Opening.oil`, `oilPull`, `oilBodies`, `filmHold` and `oilLift`
+are the step's own conditions for each group of kernels (`WebGPUFluid.prepare`). A look
+with the settings and nothing poured (Oil & Water) still waits for none of them.
+
+*And the wax, once it is really there (the same Mac, 150 s, no hands):* it goes round (its
+centre of mass between 0.13 and 0.53 of the plate's height, about every 35 s) and it is
+bodies with their own edges, not a wash, but it is not round: heads on stalks, threads and
+rows of beads, an area-weighted roundness (4πA/P², a disc is 1) of 0.3 to 0.6, and the
+cells over half oil fall from 8.45% of the plate to 4.48% while the oil's sum is kept
+(the rest is fringe, 939 cells to 3,119). That is the next piece, 27f-9q, with what the lab
+measured of it.
+
+Found on the way, open: a lost device mid-show loses the oil (27f-9n), a bottle's dose with
+no solver is dropped (27f-9o), and every verdict drawn from the lamp's earlier Mac films was
+a verdict on dye (27f-9p); and the laid wax is heads on stalks because the tension is capped
+a step and stops being stable when the cap is lifted (27f-9q).
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
@@ -14281,6 +14370,35 @@ Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setli
 `songs` and `display` lines now passing (an item tapped arms its look on the laptop,
 `cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
 the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
+
+## 12-ctl-2. Scan the laptop's code (2026-11-12)
+
+The Laptop remote form asked a phone to type or paste the laptop's address and key.
+The show's Phone · iPad panel already draws that address as a QR code (8f,
+`lib/qr.ts`), so the app now reads it: **Scan the laptop's code**, drawn only in the
+iPhone and Android apps (the website's remote needs no address, and has no camera
+plugin). One code serves both: a phone's own camera opens the show server's remote
+in the browser, and the app links with it, so 4a's open "QR code" needed no
+`chromaglass://` scheme.
+
+Each shell has a local plugin, `LaptopScan`, called through the bridge
+(`appLink.ts`'s `scanLaptopCode()`; the bundle still imports no Capacitor package).
+On the iPhone it is VisionKit's `DataScannerViewController` (`ios/App/App/LaptopScan.swift`,
+registered by `AppViewController`, which the storyboard and SceneDelegate now name in
+place of the bare bridge controller), asking for the camera the Info.plist already
+names. On Android it is Google's code scanner from Play services
+(`LaptopScanPlugin.java`, `play-services-code-scanner`), which draws its own camera
+view and needs no camera permission. The ML Kit Capacitor plugin was the obvious
+choice and was not taken: on iOS it installs only through CocoaPods, and this project
+is Swift Package Manager. What the scanner reads goes through `parseScannedCode`: only
+http(s), then the same parser as a typed address, so the code's own key is used; a
+cancel says nothing, and anything else is refused in words on the form.
+
+Measured: `npm run controller` 25 of 25 with nothing owed (it was 24 of 25 owed
+`scan`). The check's scan part had been written after the part that hangs up its
+stand-in Mac, so a correct scan reached the right address and read Offline; it now
+runs while the stand-in is connected. The scanners themselves need a phone: `ios.yml`
+and `android.yml` prove they compile.
 
 ## 12-ctl-3. The Android app (2026-11-11)
 
