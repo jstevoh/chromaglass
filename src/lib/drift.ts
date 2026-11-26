@@ -163,6 +163,15 @@ const NOT_THE_LOOK = new Set([
   'melodyWalk',
   // The projector lamp's heat (PLAN 36e-2): played by hand with a hold on the glass, not drifted by Evolve.
   'heat',
+  // The cover glass sliding (Glass Smear, PLAN 38u-11): the owner chose a glass that is still until a
+  // hand or a cord moves it (2026-11-14), and every look rests it at 0 with its slide on a cord
+  // (lib/glassSlide.ts). A wander up would slide the glass with nobody touching it, the very thing
+  // that was taken out.
+  'glassSmear',
+  // Granulation (PLAN 38u-8): smooth by default, because a dye in solution has no grain and the
+  // speckle is invented noise. The owner kept the dial for the performer to turn up; Evolve walking
+  // it up from 0 would lay the speckle over every look by itself, which is the default taken back.
+  'granulation',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*
@@ -176,6 +185,9 @@ const NOT_THE_LOOK = new Set([
   'magnetX', 'magnetY',
   // And how big that hand's magnet is (Magnet Size): the performer's choice.
   'magnetSize',
+  // Bubble Melt (PLAN 38b-2): its first step off zero is a million times
+  // nature, so a nudge would start a look's bubbles melting by themselves.
+  'bubbleMelt',
   // The clear film (PLAN §20b): moving it pours clear oil over the dish or
   // draws it off, so a wander would fill the lace's holes back in by itself.
   'clearFilm',

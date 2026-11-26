@@ -57,6 +57,7 @@ import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
 const c01 = (v: number | undefined) => Math.max(0, Math.min(1, v ?? 0));
+type Noise2D = (x: number, y: number) => number;
 
 export class FluidSimulation {
   size: number;
@@ -1336,7 +1337,7 @@ export class FluidSimulation {
    * there. A seed only adds to the four dye arrays (the state on the CPU
    * path, the deltas pending on the GPU), so what it added scales either way.
    */
-  seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
+  seedPresetScaled(presetId: string, noise2D: Noise2D, w: number): number[] {
     const k = c01(w);
     const before = this.dye().map(a => a.slice());
     const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
@@ -1345,11 +1346,11 @@ export class FluidSimulation {
     return harmony;
   }
 
-  seedPreset(look: string, noise2D: (x: number, y: number) => number, dyes: readonly number[] | null = null): number[] {
+  seedPreset(look: string, noise2D: Noise2D, dyes: readonly number[] | null = null): number[] {
     return this.owed.lay(!this.gpu && this.seeds.plain(), look, noise2D, () => this.layLook(look, noise2D, dyes), dyes);
   }
 
-  private layLook(look: string, noise2D: (x: number, y: number) => number, dyes: readonly number[] | null = null): number[] {
+  private layLook(look: string, noise2D: Noise2D, dyes: readonly number[] | null = null): number[] {
     const presetId = plateLook(look);
     const S = this.size;
     const cx = S / 2, cy = S / 2;
@@ -2559,7 +2560,7 @@ export class FluidSimulation {
     }
   }
 
-  step(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number) {
+  step(settings: VisualizerSettings, time: number, noise2D: Noise2D) {
     this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
@@ -2802,7 +2803,7 @@ export class FluidSimulation {
   /** This layer's spin drag (38v-4): ν, gap (m), τ = h²/12ν. */
   spinDrag(settings: VisualizerSettings) { return layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS); }
 
-  private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
+  private deriveStep(settings: VisualizerSettings, time: number, noise2D: Noise2D): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
 
@@ -3386,7 +3387,7 @@ export class FluidSimulation {
     }
   }
 
-  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: (x: number, y: number) => number) {
+  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: Noise2D) {
     if (scale <= 0.005) return;
     const step = 2;
     const eps = 0.75;

@@ -12448,6 +12448,28 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4d-1. Stream the mixer's stack, not only the laptop's plate
+
+  - **37x-4d-1. Stream the mixer's stack, not only the laptop's plate (#667).**
+    The Live Show panel streamed `#liquid-canvas`, the laptop's plate, so a show with the film,
+    the mark or a back plate in the mixer streamed the plate without them, while the Wall output
+    (`CastDisplay`'s `#stage-canvas`) carries the wall's keystone, masks and warp, which on a
+    stream would be a skewed picture. The panel (`src/components/LiveShowPanel.tsx`) now offers a
+    Source choice (`data-testid="live-source"`, values `plate` by default and `stack` for Mixer
+    stack), kept in `LiveFormat` (`src/lib/liveShow.ts`) and forwarded to `LiveEncoder`
+    (`src/lib/liveStream.ts`, `frames: 'stack'`). While a stream with `source: 'stack'` is live,
+    `WebGPUOutput` (`src/gpu/output.ts`) draws a second pass of `this.scene` with
+    `fillOutputUniforms(..., true)` (identity warp, `IDENTITY_CORNERS`, zero masks and feather,
+    neutral gain/gamma, no per-frame allocation) into a WebGPU canvas of the stream's size
+    (`1920x1080` or `1080x1920`, asked via `liveFrameSize('stack')` in `src/lib/liveFrame.ts`),
+    and `LiquidVisualizer.tsx` hands that canvas to `tapLiveFrame('stack', ...)` inside the frame
+    task beside `tapFrameCopies` (zero cost when no Mixer stack stream is live). The phone's
+    live chip only stops a stream and the source is chosen on the Mac before Go live, so there is
+    no phone control. Each destination's health line in the panel also shows the stream's frame
+    time (`ms a frame`). *Measured:* `npm run liveshow -- --stack` (`stack` taken out of
+    `--owed` in `scripts/checks.json`), `npm run liveshow`, `PW_WEBGPU=1 npm run mixer`,
+    `PW_WEBGPU=1 npm run wallpattern`, `npm run qa`.
+
 #### 37x-10c. Words poured from the phone, the show server and the assistant
 
   - **37x-10c. Words poured from the phone, the show server and the assistant (shipped
@@ -13356,6 +13378,42 @@ judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music stil
 slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
 saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
+## 38u-8, 38u-11. The glass still and the dye smooth unless someone moves them
+
+Found by the third physics pass (38u, 2026-11-13). Two dials did something on every plate
+that nobody had asked for. Glass Smear, the cover glass sliding over the liquid (a thin-gap
+Couette drag at half the glass's speed, `thinProject`), defaulted to 0.3, and 19 of the looks
+on main (after 38w-1 rested Lava Pop and its moiré pair at 0) slid it all the time with no
+hand on it; a real cover glass is still until the performer pushes it. Granulation laid a
+value-noise speckle in the dye's depth, 0.5 on every look; a dye in solution has no grain (a
+pigment like India ink flocculates, and the real thing is a concentration the solver would
+carry below the grid, 47a). The owner chose (2026-11-14, the recommended option on each card)
+both defaults at 0, Granulation's dial kept, and the drift the sliding looks were built around
+kept where the performer can see and pull it.
+
+What changed: both defaults are 0 and no look writes either above it. The slide is a cord,
+LFO 1 (a sine over eight bars, 0..1) on Glass Smear, laid by `presetsLay.ts` over the written
+looks like the music's stir (`laySlideCords`, lib/glassSlide.ts), at the look's old dial over
+the dial's travel of 3, rounded down to hundredths: the top of each wave is the old constant
+speed, never faster (rounded to the nearest, soap-film's top would have been 3% over), and
+the glass comes to rest at the foot. An LFO and not the sound, because the slide was never
+the music's: the beat clock falls back to a steady tempo in silence, so the look breathes
+with nothing playing. bass-drop keeps its own hats cords on the glass. Evolve never wanders
+either dial (`NOT_THE_LOOK`), Lucky rolls the slide as a cord no deeper than a third, and the
+phone's mixer has a Glass Slide slider beside Music Stir. `SceneMapping.feature` now names
+the LFOs and envelopes (`ModulatorFeature`), which the 'shape' source always read.
+
+Measured (`npm run glassstill`, node, the real patch bay, LFOs and solver): every look rests
+both dials at 0; the 19 carry one cord each; folded through 16 s of silence the glass's derived
+speed peaks within rounding of the old constant speed (never over) and falls to 0.000; with
+the cord pulled, or the LFOs' share at 0, it is 0; the others stay still. `npm run grainedge`
+now asks every look at 0.5 where it ships with none, since asking only the looks with grain
+would ask none. `npm run soundpatch` counts the slide cord apart from a look's answers to the
+sound, as it counts the stir and the music's hands. Taking the two dials out of Evolve changed
+what its seeded dice drew, and `npm run slowevolve` also holds main's dial rate cap
+(`DIAL_RATE_MAX`, 0.04 in `slowEvolve.ts`) across every move on eight seeds.
+Left open: 38u-17 (the glass's direction is still a noise path) and 38u-18 (a look saved
+before this still slides all the time).
 
 ## 38u-16. A look saved before the cord gains it, once (2026-11-22)
 
@@ -15441,6 +15499,44 @@ both ways): 27 gate, 11 owed.
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
 
+## 46a. A faster opening (2026-11-14)
+
+Classic's opening waits for fewer pipelines before its first step without dropping anything a
+look draws or changing `src/gpu/opening.ts`.
+
+- **Fused back-to-back kernels** (`same-look` kept byte-for-byte in arithmetic):
+  1. `deltaFold` (`src/gpu/wgsl/fluid/splats.ts`, `src/gpu/fluid/inputs.ts`): merges `deltaDye`
+     and `deltaVel`, and reads `cpuMulTex` directly via bilinear filtering (keeping `cpuDyeTex` /
+     `cpuVelTex` upsampling, skipping the `cpuMulTex` upsample dispatch when no `bodyLand` /
+     `bodyLay` needs `deltaMulTex`).
+  2. `forcesB` (`src/gpu/wgsl/fluid/forces.ts`, `src/gpu/fluid.ts`): merges `addCurrent` and
+     `bodyBuoyancy` (keeping `'current grid thin'` and `'add current'` arg names for `46r`).
+  3. `grainStep` (`src/gpu/wgsl/fluid/dye.ts`, `src/gpu/fluid.ts`): merges grain advection and
+     decay/mix where `float32Filterable` builds grain (`opening` / `later`).
+  4. `decay` (`src/gpu/wgsl/fluid/dye.ts`, `src/gpu/fluid.ts`): merges `decayDye` and
+     `decayVel` (including `#811`'s `boilLive` gate on heat decay/source).
+  5. `packVel` (`src/gpu/wgsl/pack.ts`, `src/gpu/plate.ts`): merges per-layer flow packing and
+     drop masking into one dispatch (`packVelDrop` remains once per drop pass after the loop).
+- **Clear and scratch reuse**: `clear()` uses `enc.clearBuffer` for `press`, `spress`, `hsPour`,
+  `hsLiftPsi`, and `hsSealPsi` (keeping `mgZero` inside `hsCycle()` for `encode`'s `H2c-3`
+  control), and `velScratch` avoids an extra `scaleDye:rgba32float` in the opening.
+- **Deferred behind the opening (`later`)**: pipelines Classic's first 40 steps never dispatch —
+  `jacobi:rgba32float`, `airGiveSub:thin`, `airGiveThin:thin`, `beadDrops`, `beadHoles`,
+  `beadFinish`, `packDyeBodies`, and `output` — build right after `opening` while the plate
+  already steps; `npm run startup` passes across all 33 looks (`0` built on a frame in the
+  opening or across all 33 looks, longest heartbeat/step wait `0.26 s`).
+
+Main moved from 66 WebGPU / 65 ledger (when `OPENING_MOST = 52` was set) to 68 WebGPU /
+67 ledger after `#811` added `heatPack` and `heatUnpack` to `THIN_GAP_KERNELS`. On merged
+main, Classic's opening drops from **67 to 52** in the ledger (all 52 drawn in Classic's first
+40 steps), and WebGPU calls before step 1 drop from **68 to 54–57** (with `prepareShow`
+kicking off `later` before frame 1 steps); flagged for `46-3` to align `OPENING_MOST`.
+`npm run samelook` passes `0.00 %` pixel diff (`colour 0.00, detail 0.0 %, histogram 0.000`)
+across all 6 looks (`classic`, `poster-1969`, `soap-film`, `oil-and-water`, `ferro-paint`,
+`roy`); `physics` 20/20, `thingap` 16/16, `argnames` 9/9, `liquidpush` 9/9, `dropcolour` 4/4,
+`grating` 24/24, `videoflow` 24/24, `cellride` 14/14, `followview` 13/13, `crash` 37/37,
+`encode` 13/13, `quick` 21/21.
+
 ## 14ag-3. The video as the lamp under the dish (shipped 2026-11-21)
 
 Of the four ways put to the owner for a video and the liquid to meet (2026-11-13), the owner
@@ -15759,6 +15855,30 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+## 38b-2. Bubble Melt, air dissolving past nature (2026-10-31)
+
+Asked by the owner: "Let's add a bubble dial for them to melt away", answering the open
+38b-2 question, with the standing rule that a dial scales a physical quantity past real
+and never swaps the law. With #603 a pocket of air between the glasses dissolves only at
+Henry's law's rate, 2π·D·L·(Δp/p₀)/ln(R_plate/R) in area, which is years for a millimetre
+pocket. Bubble Melt (`bubbleMelt`, default 0) is a factor on D alone: exactly 1 at 0, then
+10^(6 + 5v), because even a fully degassed liquid (Δp/p₀ from 3e-4 to 1) is only about
+3,000× nature and still days, so the dial's first step jumps to 1.8e6 and its travel is
+five decades on a log scale, very gentle to very extreme (the owner, 2026-10-31: "very
+gentle options and very extreme options", a principle for every dial). Melt times at the
+6 mm gap for a 2 mm bubble, the size the music's and the straw's start at: about 25 min at
+0.05, 2.5 min at 0.25, 9 s at 0.5, half a second at 0.75; at 1 even the straw's 8 mm goes
+in a fraction of a second. The small go first and each speeds up as its Laplace pressure
+climbs. Two mappings were filmed on the owner's Mac first (Classic, Bubbles 0.7, five straw
+bubbles of 1.8–8 mm, 40 s takes): 10^(6 + 3v) melted nothing visible below 0.9 (a 3 mm
+bubble went only to 2.83 mm in 40 s at 0.5, the flow taking most to the rim in 5–30 s);
+10^(8 + 3v) melted gradually at 0.25 (1.8 mm at 4.7 s ... 4 mm at 28.4 s), everything by
+5.5 s at 0.5 (8 mm at 22 s), and emptied the plate at 0.9, smallest first, none popped:
+all strong and nothing gentle, so the range opened at both ends. `liquid()` sets it from the settings each frame, so nothing in the frame loop
+changed. On the sheet under Bubbles (and so the phone's settings sheet), pinnable as a
+look control, MIDI-learnable, a patch target. Checks: `npm run bubblephysics` 27/27, its
+three new lines: off is exactly nature; melt time × factor constant across the dial within
+5%; 2 mm and 1 mm pockets at the middle melt on the law's own integral, the small first.
 
 ### 48c. Bioluminescent trails: the water glows where it is sheared (shipped 2026-11-21)
 
