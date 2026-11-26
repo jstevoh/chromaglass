@@ -13378,6 +13378,42 @@ judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music stil
 slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
 saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
+## 38u-8, 38u-11. The glass still and the dye smooth unless someone moves them
+
+Found by the third physics pass (38u, 2026-11-13). Two dials did something on every plate
+that nobody had asked for. Glass Smear, the cover glass sliding over the liquid (a thin-gap
+Couette drag at half the glass's speed, `thinProject`), defaulted to 0.3, and 19 of the looks
+on main (after 38w-1 rested Lava Pop and its moiré pair at 0) slid it all the time with no
+hand on it; a real cover glass is still until the performer pushes it. Granulation laid a
+value-noise speckle in the dye's depth, 0.5 on every look; a dye in solution has no grain (a
+pigment like India ink flocculates, and the real thing is a concentration the solver would
+carry below the grid, 47a). The owner chose (2026-11-14, the recommended option on each card)
+both defaults at 0, Granulation's dial kept, and the drift the sliding looks were built around
+kept where the performer can see and pull it.
+
+What changed: both defaults are 0 and no look writes either above it. The slide is a cord,
+LFO 1 (a sine over eight bars, 0..1) on Glass Smear, laid by `presetsLay.ts` over the written
+looks like the music's stir (`laySlideCords`, lib/glassSlide.ts), at the look's old dial over
+the dial's travel of 3, rounded down to hundredths: the top of each wave is the old constant
+speed, never faster (rounded to the nearest, soap-film's top would have been 3% over), and
+the glass comes to rest at the foot. An LFO and not the sound, because the slide was never
+the music's: the beat clock falls back to a steady tempo in silence, so the look breathes
+with nothing playing. bass-drop keeps its own hats cords on the glass. Evolve never wanders
+either dial (`NOT_THE_LOOK`), Lucky rolls the slide as a cord no deeper than a third, and the
+phone's mixer has a Glass Slide slider beside Music Stir. `SceneMapping.feature` now names
+the LFOs and envelopes (`ModulatorFeature`), which the 'shape' source always read.
+
+Measured (`npm run glassstill`, node, the real patch bay, LFOs and solver): every look rests
+both dials at 0; the 19 carry one cord each; folded through 16 s of silence the glass's derived
+speed peaks within rounding of the old constant speed (never over) and falls to 0.000; with
+the cord pulled, or the LFOs' share at 0, it is 0; the others stay still. `npm run grainedge`
+now asks every look at 0.5 where it ships with none, since asking only the looks with grain
+would ask none. `npm run soundpatch` counts the slide cord apart from a look's answers to the
+sound, as it counts the stir and the music's hands. Taking the two dials out of Evolve changed
+what its seeded dice drew, and `npm run slowevolve` also holds main's dial rate cap
+(`DIAL_RATE_MAX`, 0.04 in `slowEvolve.ts`) across every move on eight seeds.
+Left open: 38u-17 (the glass's direction is still a noise path) and 38u-18 (a look saved
+before this still slides all the time).
 
 ## 38u-16. A look saved before the cord gains it, once (2026-11-22)
 
