@@ -984,37 +984,11 @@ export class WebGPUFluid extends FluidCover {
     const dispCells = disp * (N - 2);
     const kappaT = p.kappaT ?? 0.0;
     const dispCap = 0.25;
-    /*
-      Skip the dye disperse pass when there is no plate displacement and physical
-      diffusion is negligible. `dm` is the step's molecular spread in cells²
-      ((D_m / plate_area) * dt * (N-2)² * diffScale).
-      At 0.0039 ≈ 1/256 (one 8-bit unorm quantum, 1/255 ≈ 0.00392), a step's
-      explicit Laplacian flux across a full-strength edge (|ΔC| = 1.0) produces
-      less than a single 8-bit quantization step of change.
-      At default show resolution (N = 256, dx ≈ 0.79 mm, dt = 1/60 s) with
-      p.diff = 0.0002, physical food dye diffusion in water (Dm ≈ 4e-10 m²/s)
-      yields dm ≈ 1.08e-5 cells²/step — ~360× below 1/256. Skipping this near
-      no-op pass saves ~0.4 ms/step on the GPU with zero visible change.
-      If dt or grid N changes, dm scales as dt * (N - 2)²; 0.0039 remains the
-      threshold where a step's diffusion alters an 8-bit level.
-    */
+    // Gated on its own coefficients in passes.ts (disperseDye, PLAN 46k).
+    const bodiesDisperse = bodiesOn && !bodiesFresh;
     stage('dye disperse', (pass) => {
-      this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
-        this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
-      this.dye.swap();
-      if (bodiesOn && !bodiesFresh) {
-        const od = this.oilDye!;
-        // Keep oil's pre-dispersion share in scratchB for bodyUnspread
-        this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
-        this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
-          this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
-        od.swap();
-        this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
-        this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
-        this.dye.swap();
-        od.swap();
-      }
-    }, dispCells > 0 || (kappaT > 0 ? dm > 0 : dm > 0.0039));
+      this.disperseDye(pass, dm, kappaT, dispCells, dispCap, bodiesDisperse);
+    }, this.disperseWanted(dm, kappaT, dispCells, bodiesDisperse));
     /*
       The poured liquids' species rides the colour's carry when it can (PLAN
       18d-11a, bodyAdvectPairSub): the same faces in the same substeps, found

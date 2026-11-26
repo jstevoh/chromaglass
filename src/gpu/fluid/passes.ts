@@ -1221,6 +1221,55 @@ export class FluidPasses extends FluidFields {
   }
 
   /**
+   * The dye's molecular diffusion and along-flow dispersion (`dyeDisperse`,
+   * PLAN 18h, 46k), or nothing when both diffusion terms are zero (`dm <= 0`
+   * and `kappaT <= 0` or `dispCells <= 0`, as on Classic and the thirteen
+   * other looks with Diffusion Rate at 0) and Oil Bodies is not unspreading.
+   *
+   * Read in the code (2026-11-13): the stage's gate had `dispCells > 0 || …`
+   * in front of the diffusion check, from when shear dispersion was always on,
+   * so every moving step ran `dyeDisperse` (one full-grid dispatch, 25 loads
+   * of the rgba32float dye a cell) even with `dm = 0` and `kappaT = 0`. In
+   * `wgsl/fluid/dye.ts`, `getDisp` returns `vec3f(dm + fac * v.x², dm + fac *
+   * v.y², fac * v.x * v.y)` where `shear = kappaT * gapRel² * |v|²` and `v =
+   * vel * dispCells`. When `dm = 0` and either `kappaT = 0` or `dispCells =
+   * 0`, `getDisp` is `vec3f(0)` at every cell, every face flux `fluxX` and
+   * `fluxY` is `±0`, and `here + netFlux` writes back the cell's own dye bit
+   * for bit (the previous step's `decayDye` clamped every channel to `+0.0` or
+   * above, so `x + (±0.0)` is `x`).
+   *
+   * Oil Bodies (`bodies`: `bodiesOn && !bodiesFresh`) stays outside the gate:
+   * `bodyUnspread` (`wgsl/fluid/oil.ts`) writes `max(dye - spread, 0) +
+   * max(kept, 0)`, and because `slump` and `decayDye` at the end of the step
+   * before act on `this.dye` alone and not `this.oilDye`, a cell where `dye`
+   * dropped below `oilDye` is raised back to `oilDye` by that clamp, and a
+   * cell with both above zero computes `(dye - od) + od` in float32, which is
+   * not bit-identical to `dye` across different exponents.
+   */
+  protected disperseWanted(dm: number, kappaT: number, dispCells: number, bodies: boolean): boolean {
+    return bodies || dm > 0 || (kappaT > 0 && dispCells > 0);
+  }
+
+  protected disperseDye(pass: GPUComputePassEncoder, dm: number, kappaT: number, dispCells: number, dispCap: number, bodies: boolean): void {
+    if (!this.disperseWanted(dm, kappaT, dispCells, bodies)) return;
+    this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
+      this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+    this.dye.swap();
+    if (bodies) {
+      const od = this.oilDye!;
+      // Keep oil's pre-dispersion share in scratchB for bodyUnspread
+      this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
+      this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
+        this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+      od.swap();
+      this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
+      this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
+      this.dye.swap();
+      od.swap();
+    }
+  }
+
+  /**
    * The poured liquids' two fields, carried as the step carries the dye
    * (`how`: the thin gap's substepped carry, MacCormack, or the old plate's
    * bodyAdvect), or not at all while nothing has been poured since the plate
