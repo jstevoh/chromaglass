@@ -213,6 +213,12 @@ frame's mean, 0 now; the ground beside a pool was 20% darker on one side, 0.004%
   thickness (Beer–Lambert), so the lace takes the colour, deeper where the film is thick,
   and the holes show the water's. On the desk, the phone's Dye sheet, the remote and MIDI.
   0 in every look, which leaves the plate exactly as it was (`npm run lace` 8).
+### Added — Bubble Melt, the bubbles' air dissolving away (PLAN 38b-2)
+
+- A new dial under Bubbles (Settings → Look, the desks, MIDI, the phone): how fast a
+  bubble's air dissolves into the liquid, by Henry's law with air's diffusivity scaled past
+  nature. Off is nature's rate, where a bubble stays all night; up, the small ones melt
+  first, from minutes at the bottom of the dial to seconds at the top. Every look keeps it off.
 
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
