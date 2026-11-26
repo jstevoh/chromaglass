@@ -641,6 +641,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
   { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
   { key: 'soapFilmTilt',    label: 'Frame Tilt',       min: 0, max: 90 },
+  // The water's glow (PLAN 48c): how bright, the shear it fires at, how fast it refills.
+  { key: 'glow',            label: 'Glow',             min: 0, max: 2 },
+  { key: 'glowShear',       label: 'Glow Shear',       min: 5, max: 200 },
+  { key: 'glowRecharge',    label: 'Glow Recharge',    min: 0.5, max: 60 },
   // Glitter in the liquid and the lens photographing it (PLAN 47e, 47d): a
   // fader for how much, and the f-number on a curve, so the knob's travel
   // spends as long on the wide-open discs as on the stopped-down stars.
