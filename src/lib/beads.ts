@@ -452,19 +452,6 @@ export class BeadField {
     }
   }
 
-  /** Something landed or pressed at (x, y): shove the beads out of its way. */
-  disturb(x: number, y: number, r: number, strength = 1): void {
-    for (const b of this.beads) {
-      const dx = b.x - x, dy = b.y - y;
-      const d = Math.hypot(dx, dy);
-      if (d > r * 2 || d < 1e-3) continue;
-      const push = (1 - d / (r * 2)) * r * 0.6 * strength;
-      b.x += dx / d * push;
-      b.y += dy / d * push;
-    }
-    this.dirty = true;
-  }
-
   step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number): void {
     const N = this.grid;
     const bs = this.beads;

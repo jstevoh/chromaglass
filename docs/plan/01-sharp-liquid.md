@@ -115,3 +115,10 @@
   share of the dye (deposit on birth, return on death) or a sub-grid scalar. Galaxy at
   particles 0.5 measured about 10 ms more per frame headless under load, which the governor
   does not see, so a phone may drop frames before it sheds anything. Unbuilt.
+- **1p. The sealed meter's control read 85.1% after 1l, against a bar of under 85%**
+  (main's report, 2026-11-23). Shipped. `npm run sealed` line 1 holds the seal off on purpose
+  to prove the meter sees a drain. On the Mac GPU the open plate kept 84.7% with minmod and
+  85.1% with MC; the sealed plate (99.7%), the lone drop (95.6%) and the lamp passed both
+  ways. What the open plate loses is the dye that reaches the rim, and minmod's smear carried
+  each drop's lower edge there early, so the higher number is the right one. The bar moved
+  to under 90% (twenty times the sealed line's 0.5% allowance) with the owner's OK, 2026-11-26.

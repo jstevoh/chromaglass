@@ -2194,35 +2194,6 @@ export class FluidSimulation {
   }
 
   /**
-   * Cavity collapse and fluid shockwave when a bubble pops.
-   *
-   * Surface tension and pressure drive surrounding liquid rapidly inward
-   * to fill the collapsing void, while asymmetric rupture rolls an annular
-   * vortex ring into the flow. Unlike an outward air puff, dye is preserved
-   * rather than erased, leaving the fill pass (bubbleDye.ts) to heal the hole.
-   */
-  popBubble(x: number, y: number, radius: number, strength: number) {
-    radius = Math.round(radius * GRID_SCALE);
-    const r2 = radius * radius;
-    for (let i = -radius; i <= radius; i++) {
-      for (let j = -radius; j <= radius; j++) {
-        const distSq = i * i + j * j;
-        if (distSq >= r2 || distSq === 0) continue;
-        const nx = x + i;
-        const ny = y + j;
-        if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
-          const idx = nx + ny * this.size;
-          const dist = Math.sqrt(distSq);
-          this.dirty = true;
-          const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
-          this.vx[idx] += ((-i / dist) + (-j / dist) * swirl) * strength;
-          this.vy[idx] += ((-j / dist) + (i / dist) * swirl) * strength;
-        }
-      }
-    }
-  }
-
-  /**
    * A finger drawn through the liquid: it carries what it touches and loosens it.
    *
    * The drag is the easy half and it is deliberately not a push. A push is
@@ -3141,7 +3112,8 @@ export class FluidSimulation {
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: c01(settings.oilTension),
       oilBodies: c01(settings.oilBodies),
-      // The oil's weight against the water (PLAN 27f-9c): −0.05, the mineral oil's lightness, where a look leaves it out.
+      // Oil weight (27f-9c; −0.05 left out), thickness (38w-31).
+      oilThickness: settings.oilThickness,
       oilWeight: Math.max(-1, Math.min(1, Number.isFinite(settings.oilWeight) ? settings.oilWeight : -0.05)),
       filmHold: c01(settings.filmHold),
       surfactantFlow: c01(settings.surfactantFlow),

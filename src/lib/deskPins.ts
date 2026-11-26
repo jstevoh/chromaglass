@@ -202,6 +202,7 @@ const SECTION_OF: Record<string, string> = {
   oilBodies: 'oil',
   filmHold: 'oil',
   oilWeight: 'oil',
+  oilThickness: 'oil',
   soapBreakdown: 'oil',
   clearFilm: 'oil',
   clearFilmDye: 'oil',
