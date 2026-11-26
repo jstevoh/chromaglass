@@ -201,6 +201,8 @@ const NOT_THE_LOOK = new Set([
     without (PLAN 10-8d-3).
   */
   'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
+  /* The water's glow (PLAN 48c) is a light the look turns on, not a tint to drift. */
+  'glow', 'glowShear', 'glowRecharge',
   /*
     The glitter, the lens and the side lamp (PLAN 47e, 47d, 47b-side) are the
     photographer's: what is in the dish, the stop the lens is set to, and a
