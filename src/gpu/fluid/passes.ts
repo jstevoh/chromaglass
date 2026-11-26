@@ -20,6 +20,7 @@ import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
 import { SoapFilmPlate, SOAP_PLATE_DX, soapLean } from '../soapFilmPlate';
 import { TankPlate } from '../tankPlate';
 import { FaradayPlate } from '../faraday';
+import { GlowPlate, GLOW_SHEAR, GLOW_RECHARGE } from '../glow';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
@@ -273,12 +274,33 @@ export class FluidPasses extends FluidFields {
 
   /**
    * The solvers that run beside the plate's own, on `enc` before the step's
-   * pass: the frame's soap film and the tank's side view.
+   * pass: the frame's soap film, the tank's side view, the dish on a shaker
+   * and the water's glow.
    */
   protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
     this.stepSoapPlate(enc, p);
     this.stepTankPlate(enc, p);
     this.stepFaradayPlate(enc, p);
+    this.stepGlowPlate(enc, p);
+  }
+
+  /**
+   * The water's glow (PLAN 48c, gpu/glow.ts): made the first time Glow is up,
+   * stepped on the show's own seconds with the flow the last step left (the
+   * flow over the glass, the glass's own drift taken off, since it is the
+   * water's shear against the glass the organisms feel) and the squeeze
+   * film's gap, whose depth sets the gap's wall shear and how much water
+   * glows. Turned off, it goes, and the next time the sea has rested.
+   */
+  protected stepGlowPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.glow ?? 0) > 0.001)) {
+      if (this.glowPlate) { this.glowPlate.dispose(); this.glowPlate = null; }
+      return;
+    }
+    if (!this.glowPlate) this.glowPlate = new GlowPlate(this.device);
+    // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N);
+    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE);
   }
 
   /**

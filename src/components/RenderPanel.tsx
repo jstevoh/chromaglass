@@ -41,8 +41,28 @@ export const RENDER_SIZES = [
   { id: 'vertical', label: 'Vertical 1080', width: 1080, height: 1920 },
 ] as const;
 export const RENDER_RATES = [60, 30, 24] as const;
+export const LOOP_LENGTHS = [3, 4, 5, 6, 7, 8] as const;
 
-export interface RenderChoice { width: number; height: number; fps: number; seed: string }
+export interface RenderChoice {
+  width: number;
+  height: number;
+  fps: number;
+  seed: string;
+  loop?: { seconds: number; startSec?: number };
+}
+
+function parseStartSec(raw: string): number | undefined {
+  const s = raw.trim();
+  if (!s) return undefined;
+  const parts = s.split(':');
+  if (parts.length === 2) {
+    const m = Number(parts[0]);
+    const sec = Number(parts[1]);
+    if (Number.isFinite(m) && Number.isFinite(sec) && m >= 0 && sec >= 0) return m * 60 + sec;
+  }
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
 
 interface Props {
   songName: string;
@@ -63,6 +83,9 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 
 export function RenderPanel(p: Props) {
   const freeGated = isFreeTierGated();
+  const [loopMode, setLoopMode] = useState<boolean>(false);
+  const [loopSeconds, setLoopSeconds] = useState<number>(8);
+  const [loopStart, setLoopStart] = useState<string>('');
   const [sizeId, setSizeId] = useState<string>(() => (freeGated ? '720p' : '1080p'));
   const [fps, setFps] = useState<number>(60);
   const [seed, setSeed] = useState<string>(String(p.currentSeed));
@@ -70,9 +93,17 @@ export function RenderPanel(p: Props) {
   useEffect(() => {
     if (freeGated && sizeId !== '720p') setSizeId('720p');
   }, [freeGated, sizeId]);
+  const pickLoopMode = (loop: boolean) => {
+    setLoopMode(loop);
+    if (loop) {
+      setFps(30);
+      if (!freeGated) setSizeId('vertical');
+    }
+  };
   const chosen = RENDER_SIZES.find((s) => s.id === sizeId) ?? (freeGated ? RENDER_SIZES[1] : RENDER_SIZES[0]);
-  const frames = Math.ceil(p.songSeconds * fps);
-  const filmBytes = estimateFilmBytes(chosen.width, chosen.height, fps, p.songSeconds);
+  const clipSeconds = loopMode ? loopSeconds : p.songSeconds;
+  const frames = Math.ceil(clipSeconds * fps);
+  const filmBytes = estimateFilmBytes(chosen.width, chosen.height, fps, clipSeconds);
   const size = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
   const st = p.state;
   const pct = st.frames > 0 ? Math.round((st.frame / st.frames) * 100) : 0;
@@ -109,6 +140,34 @@ export function RenderPanel(p: Props) {
       ) : (
         <>
           <div className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 px-1 text-[11px] text-white/70">
+            <span>Make</span>
+            <div className="flex flex-wrap gap-1">
+              <button aria-pressed={!loopMode} disabled={p.running} onClick={() => pickLoopMode(false)} data-testid="render-mode-song"
+                className={`h-6 rounded-full border px-2.5 ${!loopMode ? LIT : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
+                Full song
+              </button>
+              <button aria-pressed={loopMode} disabled={p.running} onClick={() => pickLoopMode(true)} data-testid="render-mode-loop"
+                className={`h-6 rounded-full border px-2.5 ${loopMode ? LIT : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
+                Loop for a Canvas
+              </button>
+            </div>
+            {loopMode && (
+              <>
+                <span>Length</span>
+                <div className="flex flex-wrap gap-1">
+                  {LOOP_LENGTHS.map((s) => (
+                    <button aria-pressed={loopSeconds === s} key={s} disabled={p.running} onClick={() => setLoopSeconds(s)} data-testid={`render-loop-${s}`}
+                      className={`h-6 rounded-full border px-2.5 ${loopSeconds === s ? LIT : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
+                      {s} s
+                    </button>
+                  ))}
+                </div>
+                <span>Start</span>
+                <input value={loopStart} disabled={p.running} onChange={(e) => setLoopStart(e.target.value)} placeholder="Loudest stretch" data-testid="render-loop-start"
+                  className="h-6 w-40 rounded-md border border-white/20 bg-white/5 px-2 font-mono text-[11px] text-white/90 placeholder:text-white/40 disabled:opacity-60"
+                  title="Leave blank to start at the song's loudest stretch, or type a start time (seconds or m:ss)." />
+              </>
+            )}
             <span>Size</span>
             <div className="flex flex-wrap gap-1">
               {RENDER_SIZES.map((s) => {
@@ -139,7 +198,8 @@ export function RenderPanel(p: Props) {
           </div>
           <p className="mt-2 px-1 text-[11px] leading-relaxed text-white/60">
             {chosen.width}x{chosen.height} at {fps} fps: {frames.toLocaleString()} frames, every one computed, none dropped, about {size(filmBytes)}.
-            {p.streamsToDisk && ' Written to a file you choose as it renders.'}
+            {loopMode && ' Seamless H.264 MP4 loop with a 0.5 s crossfade and no audio track.'}
+            {!loopMode && p.streamsToDisk && ' Written to a file you choose as it renders.'}
             {' '}The film plays the look on the plate now, with Evolve if it is on.
             {p.showRunning && ' The running sequence or song show stops for the render: it does not play in a render yet.'}
           </p>
@@ -170,8 +230,8 @@ export function RenderPanel(p: Props) {
             Cancel
           </button>
         ) : p.webcodecs && (
-          <button onClick={() => p.onRender({ width: chosen.width, height: chosen.height, fps, seed })} className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-white/25" data-testid="render-start">
-            {finished ? 'Render again' : 'Render'}
+          <button onClick={() => p.onRender({ width: chosen.width, height: chosen.height, fps, seed, ...(loopMode ? { loop: { seconds: loopSeconds, startSec: parseStartSec(loopStart) } } : {}) })} className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-white/25" data-testid="render-start">
+            {finished ? 'Render again' : loopMode ? 'Render loop' : 'Render'}
           </button>
         )}
       </div>
