@@ -3314,6 +3314,40 @@ three seconds of the old rule laid 60 bubbles; the straw's growth with the Amoun
 it was (16 / 40 / 88 / 170 cells² after a second at 0.05 / 0.2 / 0.5 / 1). The flower itself was not rebuilt in
 isolation: 15g-15 says what was ruled out.
 
+### 15g-17. The pointer shoved bubbles and beads, and a pop pushed and swirled (shipped)
+
+Found in the physics-shortcut audit (2026-11): every pointer stroke and every drop called
+`disturb` on the bubbles and the beads, which kicked each one inside a radius straight
+away from the hand by a speed of its own, whatever the liquid under it did; and a pocket's
+pop called `popBubble`, which pushed the liquid inward and gave it a turn. No such force
+exists. A pocket of air in a thin gap is moved by the liquid round it, at the
+Taylor–Saffman speed (twice the liquid's mean speed for an inviscid bubble), and a bead
+of oil at 2/(1+λ) of it, both of which `step` already did; the kick came on top. A pop is
+the gap closing over the air: the squeeze that held the pocket open lets go, and the
+liquid flows in from all round, which is a sink with no curl. The fix: `disturb` is gone
+from both fields, and the one real thing a tool does to a pocket stays as `engulf(x, y,
+r)`: liquid laid over a pocket (only the laying tools) takes it, popped. The pop's push is
+gone too: the standing squeeze it releases already makes the sink. The sound's kick press
+no longer moves the beads either; it moves the liquid, which carries them. Measured by
+`npm run bubblephysics` ("a drop beside a pocket on still liquid leaves it where it
+was"): on main the pocket moved 1.7 cells, on the branch 0, with 25 of 25 passing.
+
+### 15g-18. A press twisted the liquid it squeezed (shipped)
+
+Found in the same audit: the local press (the pointer held with Press) laid a vortex round
+its disc on every frame, on top of the squeeze (`applySquish`) and the squeeze-out; the
+remote press (`performGesture` 'press', the phone and the show server) had only the
+squeeze. Two glasses pressed together push the liquid straight out from under the
+pressed patch, a source flow, and turn nothing unless the hand turns. The twist loop is
+gone, and both paths are the squeeze and the squeeze-out. Measured by `npm run tools`
+("a press squeezes the liquid out and does not turn it", mouse and remote, on the thin
+gap and with Thin Gap off): the arc a pool beside the palm turned round it in 1.5 s held
+down. With Thin Gap off it was 0.0046 and 0.0059 plate widths on main, against 0.0007 at
+rest (it fails), and 0.0000 and 0.0001 on the branch. On the thin gap main turned it 0.0010 against 0.0003 at rest
+and the branch 0.0000, too small to fail: the twist was 0.16·k a cell a frame, and the thin
+gap's wall drag takes away a velocity nobody keeps pushing within a few steps. The
+squeeze still moved the pool +0.035 out on the thin gap and +0.20 on the open plate.
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
@@ -4825,6 +4859,18 @@ time τ = √(ρD³/σ) (`dropEntrySeconds`: 0.043 s, three steps, at amount 5; 
 through the whole window rather than `DROP_CORE`'s 0.7 patch over five numerical steps. In the
 lab, a yellow drop of amount 30 in a cyan pool: the pool's red in the middle 1.795 → 0.061
 (0.090 before), the same dye stamped with no volume 0.856, no window.
+
+### 18c-14. The idle plate laid dye and heat by itself (shipped)
+
+Found in the physics-shortcut audit (2026-11): "ambient seeding" laid 0.05 of dye and 0.02
+of heat a frame each from three Lissajous orbits, on every look, every frame, whether or
+not anything touched the plate. A real plate has no hidden hand: a quiet passage should
+settle, the colour on it spreading, diffusing and draining. It also meant every check that
+read where a hand's colour went had to switch the seeder off first through a debug hook
+(`ambientSeed`), which is gone with it. The emergency seed, which wakes a plate that is
+entirely empty, stays. Measured by `npm run tools` ("a plate left alone gains no colour"):
+with nothing touching it the plate's colour went 602 → 638 over 242 steps on main (+5.9%) and
+529 → 529 over 243 steps on the branch (0.0%).
 
 ### 18d. Each liquid has its real properties
 
@@ -15407,6 +15453,44 @@ Two Wave 4 / §46b frame-budget items cleared from `scripts/checks.json`'s `npm 
 **H2c-5.** On the open plate (`!thin`, `src/gpu/fluid.ts`), `advect velocity` ran a full MacCormack pair (forward carry, backward carry, error correction) on a field never drawn directly, while thin-gap transport was left untouched. Replacing it with a single first-order semi-Lagrangian `advect` keeps MacCormack on dye, `liquids0`, `liquids1`, and `chem`, while dropping two dispatches per open-plate step. Physically, first-order semi-Lagrangian transport introduces numerical momentum diffusion at grid scale, reducing small-scale shear contrast (`npm run physics`: divergence per unit speed `0.0006` → `0.0007`, vorticity confinement `|curl| 4.4 → 57.9` → `4.4 → 61.2`). Measured: `npm run encode` open plate `500` → `498` dispatches (`0` velocity MacCormack corrections, `1` velocity carry; `3` and `7` on dye, liquids, and grain); `npm run stages -- --grid 512 --set thinGap=0` in alternating pairs reduced `advect velocity` on layers 0 and 1 from `0.406 ms (3.0%)` / `0.431 ms (5.1%)` and `0.303 ms (3.2%)` / `0.288 ms (5.3%)` down to `0.019 ms (0.2%)` / `0.044 ms (0.8%)` and `0.025 ms (0.2%)` / `0.026 ms (0.5%)`; `npm run ab -- --preset poster-1969 --set "thinGap=0"` open-plate `edge%` stayed `1.5` → `1.3`; `npm run samelook` passed (`all checks passed`).
 
 **H2c-8.** Every layer previously constructed `WebGPUAir` (`rgba16float` pair, 4 MiB at 512²) on its first step and ran an `air splat` render pass every step, even on background layers that never saw a bubble; meanwhile `LiquidVisualizer` pushed `setBubbles` once per frame while `which` flipped every step, landing 100% of a multi-step frame's bubble rate in step 0. `WebGPUFluid` now allocates `WebGPUAir` only on the first bubble (`setBubbles` with `count > 0`) or plate boil (`stepPlateBoil`), skips `splat` once both ping-pong targets have been cleared after bubbles pop (`needsSplat` tracks a 2-step clear cycle), frees `WebGPUAir` and `airGive`/`airIn` targets after 60 quiet seconds (`dropAir`, resetting bind-group caches), binds `blank('rgba')` when `this.air === null`, removes per-call uniform/finger allocations in `WebGPUAir.setBubbles`, and packs/uploads the lead layer's stepped bubble list per `simStep` in `LiquidVisualizer.tsx` so multi-step frames spread bubble motion and growth evenly across steps. Measured: `npm run encode` bare plate dropped from `1` air pass and `2` air textures alive to `0` and `0` (control with 1 bubble: `1` a step, `4` alive); `npm run bubblephysics` (`24/24`) and `npm run pops` (`9/9`) unchanged to the printed digit.
+## 46a. A faster opening (2026-11-14)
+
+Classic's opening waits for fewer pipelines before its first step without dropping anything a
+look draws or changing `src/gpu/opening.ts`.
+
+- **Fused back-to-back kernels** (`same-look` kept byte-for-byte in arithmetic):
+  1. `deltaFold` (`src/gpu/wgsl/fluid/splats.ts`, `src/gpu/fluid/inputs.ts`): merges `deltaDye`
+     and `deltaVel`, and reads `cpuMulTex` directly via bilinear filtering (keeping `cpuDyeTex` /
+     `cpuVelTex` upsampling, skipping the `cpuMulTex` upsample dispatch when no `bodyLand` /
+     `bodyLay` needs `deltaMulTex`).
+  2. `forcesB` (`src/gpu/wgsl/fluid/forces.ts`, `src/gpu/fluid.ts`): merges `addCurrent` and
+     `bodyBuoyancy` (keeping `'current grid thin'` and `'add current'` arg names for `46r`).
+  3. `grainStep` (`src/gpu/wgsl/fluid/dye.ts`, `src/gpu/fluid.ts`): merges grain advection and
+     decay/mix where `float32Filterable` builds grain (`opening` / `later`).
+  4. `decay` (`src/gpu/wgsl/fluid/dye.ts`, `src/gpu/fluid.ts`): merges `decayDye` and
+     `decayVel` (including `#811`'s `boilLive` gate on heat decay/source).
+  5. `packVel` (`src/gpu/wgsl/pack.ts`, `src/gpu/plate.ts`): merges per-layer flow packing and
+     drop masking into one dispatch (`packVelDrop` remains once per drop pass after the loop).
+- **Clear and scratch reuse**: `clear()` uses `enc.clearBuffer` for `press`, `spress`, `hsPour`,
+  `hsLiftPsi`, and `hsSealPsi` (keeping `mgZero` inside `hsCycle()` for `encode`'s `H2c-3`
+  control), and `velScratch` avoids an extra `scaleDye:rgba32float` in the opening.
+- **Deferred behind the opening (`later`)**: pipelines Classic's first 40 steps never dispatch —
+  `jacobi:rgba32float`, `airGiveSub:thin`, `airGiveThin:thin`, `beadDrops`, `beadHoles`,
+  `beadFinish`, `packDyeBodies`, and `output` — build right after `opening` while the plate
+  already steps; `npm run startup` passes across all 33 looks (`0` built on a frame in the
+  opening or across all 33 looks, longest heartbeat/step wait `0.26 s`).
+
+Main moved from 66 WebGPU / 65 ledger (when `OPENING_MOST = 52` was set) to 68 WebGPU /
+67 ledger after `#811` added `heatPack` and `heatUnpack` to `THIN_GAP_KERNELS`. On merged
+main, Classic's opening drops from **67 to 52** in the ledger (all 52 drawn in Classic's first
+40 steps), and WebGPU calls before step 1 drop from **68 to 54–57** (with `prepareShow`
+kicking off `later` before frame 1 steps); flagged for `46-3` to align `OPENING_MOST`.
+`npm run samelook` passes `0.00 %` pixel diff (`colour 0.00, detail 0.0 %, histogram 0.000`)
+across all 6 looks (`classic`, `poster-1969`, `soap-film`, `oil-and-water`, `ferro-paint`,
+`roy`); `physics` 20/20, `thingap` 16/16, `argnames` 9/9, `liquidpush` 9/9, `dropcolour` 4/4,
+`grating` 24/24, `videoflow` 24/24, `cellride` 14/14, `followview` 13/13, `crash` 37/37,
+`encode` 13/13, `quick` 21/21.
+
 ## 14ag-3. The video as the lamp under the dish (shipped 2026-11-21)
 
 Of the four ways put to the owner for a video and the liquid to meet (2026-11-13), the owner

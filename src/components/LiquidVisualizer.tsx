@@ -861,20 +861,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const aimProbeRef = useRef({ downs: 0, altDowns: 0, aims: 0, zoom: 0, hasAim: false });
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
-  /*
-    `ambientSeed(false)`: the three Lissajous orbits stop laying their dye
-    (the "Ambient seeding" block below). They lay 0.05 a frame each, every
-    frame on every look, wherever they are, so a cleared plate gathers
-    their trails a quarter to a third of the plate out from its middle. A
-    check that reads where a hand's colour went reads those trails too: on
-    the Mac the tools check's pool, settled 1.5, 8 or 12 of the plate's
-    seconds, drifted out from the palm at the same 0.004 of the plate a
-    second whatever its age (a spreading drop slows as it ages; a source
-    that never stops does not), and the plate's colour grew 6% in three
-    seconds with nothing touching it. Only a harness turns it off;
-    a ref, so a rebuild of the frame loop (a self-heal, a lost device) keeps it.
-  */
-  const ambientSeedRef = useRef(true);
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -1043,9 +1029,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     }
     // And it lands: a pour pushes the plate out of the way.
     af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25, true);
-    if (bubbles > 0) {
-      bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
-    }
+    // A pocket the pour lands on is taken into it (PLAN 38b); the rest move
+    // only as far as the blow above moves the liquid round them.
+    if (bubbles > 0) bubblesRef.current.engulf(Math.floor(cx), Math.floor(cy), R * 0.6);
   };
   /** The frame's Bubbles, patches and modulators folded in, for a pour that lands between frames. */
   const frameBubblesRef = useRef(0);
@@ -1194,9 +1180,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const kToolRaw = toolAmountRef.current;
     const kTool = kToolRaw * kToolRaw;
     const kSoftTool = Math.sqrt(kTool);
-    if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
-      const airy = g.tool === 'blow' || g.tool === 'press';
-      bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * kSoftTool * GRID_SCALE, airy ? 'air' : 'dye', kSoftTool);
+    // Liquid laid on a pocket takes it (PLAN 38b). Nothing else here touches
+    // the bubbles or the beads: they move because the hand moves the liquid
+    // they sit in (PLAN 15g-17), through the forcing each tool does below.
+    if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && LAYING_TOOLS.has(g.tool)) {
+      bubblesRef.current.engulf(g.x * GRID_SIZE, g.y * GRID_SIZE, 3 * kSoftTool * GRID_SCALE);
     }
     const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
     const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
@@ -1259,7 +1247,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         af.applySquish(x, y, 12 + 6 * amt, a, fg);
         af.applySquish(x, y, 6, a, fg);
         af.squeezeOut(x, y, (20 + 12 * amt) * GRID_SCALE, a);
-        if (layer === 0) beadsRef.current.disturb(x, y, (10 + 6 * amt) * GRID_SCALE, 0.2);
         break;
       }
       case 'finger': {
@@ -1276,7 +1263,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         */
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
           af.fingerDrag(x, y, 7, 0.09 * amt * 0.5, g.dx, g.dy, true, { x: g.dx * S, y: g.dy * S });
-          if (layer === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
         }
         break;
       }
@@ -3246,12 +3232,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const k = kRaw * kRaw;
               // Its square root for a push and a reach: twice the dye is not twice the shove, and a drop with twice the dye in it covers twice the area.
               const kSoft = Math.sqrt(k);
-              // Whatever lands on the lead plate lands on its bubbles too:
-              // dye bursts the one under it and shoves the rest, air shoves.
-              if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
-                if (tool !== 'magnet') bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * kSoft * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye', kSoft);
+              /*
+                Liquid laid on the lead plate takes the pocket it lands on
+                (PLAN 38b): a drop falling on a bubble fills it. That is all
+                the hand does to the bubbles and the beads directly.
+
+                It used to shove them as well: every bubble within a few cells
+                of the pointer got a kick of velocity of its own (40 for a blow
+                or a press, 22 for dye), and the beads under any tool were
+                pushed out from the pointer every third frame, whatever the
+                liquid round them was doing. On a real plate nothing touches a
+                bead but the liquid it sits in, so a bead that moved while the
+                liquid stood still was the hand reaching through the glass.
+                Now each tool forces the liquid (the press closes the gap, the
+                finger drags the film, the blow is wind on the surface, a pour
+                brings volume) and the bubbles and beads ride that flow in
+                their own `step`, at the speed a drop or a pocket really moves
+                in a Hele-Shaw cell (PLAN 15g-17).
+              */
+              if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && LAYING_TOOLS.has(tool)) {
+                bubblesRef.current.engulf(x, y, (tool === 'spray' ? 6 : 3) * kSoft * GRID_SCALE);
               }
-              if (activeLayerRef.current === 0 && tool !== 'press' && tool !== 'magnet' && (currentSettings.beads ?? 0) > 0 && gestureFrameRef.current % 3 === 0) beadsRef.current.disturb(x, y, 4 * GRID_SCALE, 0.5);
 
               // Feed the performance recorder (~15 Hz while painting)
               if (primary && onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
@@ -3294,25 +3295,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const prR = 30;
                 af.squeezeOut(x, y, prR * GRID_SCALE, pa);
 
-                // The Photoscope (European School): Shearing/Twisting!
-                // Twisting one slide against another tears the film into cellular structures.
-                // We add a strong rotational velocity field within the press radius.
-                const twistR = prR * GRID_SCALE;
-                const twistAmount = 40.0 * pa * kSoft;
-                for (let ddy = -twistR; ddy <= twistR; ddy++) {
-                  for (let ddx = -twistR; ddx <= twistR; ddx++) {
-                    const dd = Math.sqrt(ddx*ddx + ddy*ddy);
-                    if (dd > twistR || dd < 0.1) continue;
-                    const px = Math.floor(x + ddx);
-                    const py = Math.floor(y + ddy);
-                    if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
-                    // Rotational velocity: (-dy, dx) normalized, stronger towards the center
-                    const w = Math.pow(1 - dd/twistR, 2) * twistAmount;
-                    af.addVelocity(px, py, (-ddy / dd) * w, (ddx / dd) * w);
-                  }
-                }
-
-                if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
+                /*
+                  That is the whole press. It used to add a twist on top: a
+                  ring of rotational velocity across the 30-cell disc, 40 x
+                  the press a cell at its middle, "the Photoscope's slides
+                  turned against each other". But a palm pressed straight down
+                  does not turn the glass, and on a thin gap a press closing
+                  the gap can only drive the liquid outward (the squish above
+                  and the solver's own pressure): the swirl was most of what a
+                  press did to the plate, and it made a squeeze look like a
+                  stir (PLAN 15g-18). A turned slide is a gesture of its own,
+                  and if it comes back it comes back as a tool that turns.
+                */
               } else if (tool === 'blow') {
                 /*
                   A press held and never moved, on the lead plate, is a
@@ -3363,7 +3357,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   still does nothing, which is right — you mix by moving.
                 */
                 af.fingerDrag(x, y, 7, Math.min(0.25, 0.09 * k), strokeDx, strokeDy);
-                if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
                 // Wide cone of fine mist — many small random particles in a radius
@@ -3584,8 +3577,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const rx = at ? Math.floor(at.x) : DICE.evolve.int(GRID_SIZE - 20) + 10;
                 const ry = at ? Math.floor(at.y) : DICE.evolve.int(GRID_SIZE - 20) + 10;
                 const isBlow = DICE.evolve.float() < airShare;
-                if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0) {
-                  bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
+                if (!isBlow && af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0) {
+                  bubblesRef.current.engulf(rx, ry, 4 * GRID_SCALE);
                 }
                 if (isBlow) {
                   af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05, true);
@@ -3677,9 +3670,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const af = fluidsRef.current[0];
               if (af) {
                 af.fingerDrag(stroke.x, stroke.y, 7, 0.07, stroke.dx * 3, stroke.dy * 3, false, { x: stroke.dx * 1.6, y: stroke.dy * 1.6 });
-                if ((currentSettings.bubbles ?? 0) > 0) {
-                  beadsRef.current.disturb(stroke.x, stroke.y, 9 * GRID_SCALE, 0.18);
-                }
               }
               stroke.x += stroke.dx * 1.6;
               stroke.y += stroke.dy * 1.6;
@@ -3889,32 +3879,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
 
           if (isActiveRef.current && drainFrameRef.current === 0) {
-            // ── Ambient seeding ────────────────────────────────
-            const af = fluidsRef.current[activeLayerRef.current];
-            if (af && ambientSeedRef.current) {
-              // Three Lissajous orbits, each carrying its own harmony color —
-              // keeps several distinct hues alive in the frame at all times.
-              const phase = time * 0.18;
-              const injPts = [
-                { x: GRID_SIZE / 2 + Math.cos(phase) * GRID_SIZE * 0.28,
-                  y: GRID_SIZE / 2 + Math.sin(phase * 1.3) * GRID_SIZE * 0.28 },
-                { x: GRID_SIZE / 2 + Math.cos(phase * 0.7 + Math.PI) * GRID_SIZE * 0.3,
-                  y: GRID_SIZE / 2 + Math.sin(phase * 0.9 + 1.0) * GRID_SIZE * 0.3 },
-                { x: GRID_SIZE / 2 + Math.cos(phase * 1.1 + 2.1) * GRID_SIZE * 0.22,
-                  y: GRID_SIZE / 2 + Math.sin(phase * 0.6 + 4.2) * GRID_SIZE * 0.33 },
-              ];
-
-              injPts.forEach((pt, idx) => {
-                const px = Math.floor(pt.x), py = Math.floor(pt.y);
-                if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
-                  const c = harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.25 + idx * 1.4);
-                  af.addDensity(px, py, 0.05, c.r, c.g, c.b);
-                  af.addTemp(px, py, 0.02);
-                }
-              });
-
-            }
-
+            /*
+              There used to be "ambient seeding" here: three Lissajous orbits
+              that laid 0.05 of dye and 0.02 of heat a frame each, every frame
+              on every look, a quarter to a third of the plate out from its
+              middle. No real plate has a hidden hand pouring into it, and it
+              meant a quiet passage never settled: the plate's colour grew 6%
+              in three seconds with nothing touching it (the tools check,
+              2026-10), and every check that read where a hand's colour went
+              had to switch it off first. A plate left alone now keeps what is
+              on it and lets it spread, diffuse and drain the way the liquids
+              do (PLAN 18c-14). The one seed left is the emergency seed below,
+              which wakes a plate that is entirely empty.
+            */
             /*
               The music's own hands are gone from here (PLAN 38v-1). This was
               a block of its own: a pulse of dye and heat at the middle on the
@@ -4078,7 +4055,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 */
                 const a = kickDepth(squeezeAmt, bass01, accent);
                 leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, nu, Math.max(-1, Math.min(1, currentSettings.plateCurve ?? 0)));
-                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, (sheet ? press.radii[0] : 30) * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }
             stepRock(rock, simStepS);
@@ -5560,7 +5536,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           onEngineStatusRef.current?.(next);
         },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
-        ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
         ladderRungs: () => governorRef.current?.rungs ?? [],
         ...(renderer?.debug?.() ?? {}),
