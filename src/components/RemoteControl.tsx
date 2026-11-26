@@ -807,6 +807,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Slider label="Frame Tilt" field="soapFilmTilt" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
+          {/* The water's glow (PLAN 48c), and while it is up the shear it fires at and how fast it refills, as on the desk. */}
+          <Slider label="Glow" field="glow" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glow') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.glow ?? 0) > 0.001 && (
+            <>
+              <Slider label="Glow Shear" field="glowShear" step={1} format={(v) => `${Math.round(v)}/s`} value={value('glowShear') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Recharge" field="glowRecharge" step={0.5} format={(v) => `${v.toFixed(1)} s`} value={value('glowRecharge') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
           {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
           <Slider label="Glitter" field="glitter" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.glitter ?? 0) > 0.001 && (
@@ -911,6 +919,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* And Oil Weight, how heavy that oil is: a lava lamp's wax on a standing plate (PLAN 27f-9c). */}
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Oil Weight" field="oilWeight" step={0.05} format={(v) => (v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2))} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/* And Oil Thickness, how thick that oil is: a lamp's thin molten wax against a thick oil (PLAN 38w-31). */}
+          {(settings?.oilTension ?? 0) > 0.001 && (
+            <Slider label="Oil Thickness" field="oilThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
           {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (

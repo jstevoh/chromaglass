@@ -945,12 +945,14 @@ the one captured before it. It asserts `grid === 1024` now, which is the thing
 that would have caught both. **A check whose detail string contradicts its own
 premise is failing quietly** — read the number, not the colour.
 
-**Still to do:** the CPU solver's stepping. It is unreachable — there is no
-rung, no pin and no fallback that leads to it — but the class is threaded
-with `if (this.gpu)` pairs whose other halves are the CPU maths, and pulling
-them out is surgery on the simulation's core rather than a sweep. The arrays
-themselves stay whatever happens: the deltas, the readback mirrors, the
-beads, the bubbles, the macro camera and `liquidPhase` all live there.
+**Shipped in 3.1 (P7-cpu, PR #766, `docs/plan-shipped.md` §P7-cpu):** the CPU solver's
+stepping and CPU-only `if (this.gpu)` halves are deleted from
+`src/sim/fluidSimulation.ts` and `src/components/LiquidVisualizer.tsx`, leaving
+the delta buffers, readback mirrors, beads, bubbles, macro camera, and
+`liquidPhase` in place. Two check-guarded pieces remain in `fluidSimulation.ts`
+under the stop rule for text checks (`private sharpenDye` + `SHARP_FLOOR` for
+`scripts/plate.mjs`, and a `settings.glassSmear > 0` reference for
+`scripts/widedials.mjs`).
 
 ## P3, the shape of the split
 

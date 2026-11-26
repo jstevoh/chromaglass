@@ -90,3 +90,19 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   0.55 the frame changed by 0.95 grey levels a half-second and 13 from first frame to last; at
   0.8 by 3.25 and 21. The rock is the real one (lib/plateRock.ts: the gap tips, the oil slides
   at Darcy's speed in it), only stronger.
+- ~~**38w-30. Classic Light Show is named Lava Pop**~~ (S; shipped 2026-11-23, the owner: the
+  old name promised a 1960s show the plate does not look like yet, so a new fun one). Only the
+  name shown changes: the preset, the Guide, the song show's example and the docs. The id stays
+  `classic`, so saved shows, set lists, song shows and `?look=classic` links still open it; the
+  code and the checks still call it Classic in comments. `npm run draw` reads the new name off
+  the phone's Draw sheet.
+- ~~**38w-31. Every oil has its own thickness**~~ (S; High, Lava Lamp's wax stopped cycling after
+  #946). Shipped: #946 made the oil drag in the Hele-Shaw gap (a drop rides the flow at
+  2/(1+λ), λ = ρν_oil/ν_water) but baked the oil in as 50 mm²/s mineral oil for every look, so
+  Lava Lamp's wax, molten paraffin at about 9 mm²/s at 60 °C (Anton Paar; Prowax 610 3.5–4.5 at
+  100 °C), dragged as if five times thicker: 77% of the cold wax stayed up for 3 s and the lamp
+  stalled at 0.55 of the height (`npm run lavacycle` 4/7, `npm run lavawax` failing the colour).
+  The new Oil Thickness setting (Thickness's scale, default 0.566 = 50 mm²/s, every look as it
+  was) reaches hsPrep through the Sim struct's slot 55, the lift and the spin; Lava Lamp sets
+  0.32. Measured: lavacycle 7/7 (peaks 0.63 at 18 s, down to 0.15 by 40 s, round again to
+  0.62), lavawax 3/3 (25% of the cold wax stays up).

@@ -570,6 +570,16 @@ export interface VisualizerSettings {
     standing plate (Gravity) for the weight to act.
   */
   oilWeight: number;
+  /**
+    Oil Thickness, 0..1 on the same scale as Thickness (10^(3t) mm²/s): how
+    thick the oil itself is. The default, log10(50)/3 ≈ 0.566 (50 mm²/s), is the light
+    mineral oil every oil look had; molten paraffin, a lava lamp's wax, is
+    about 9 mm²/s at 60 °C (0.32). A drop in a Hele-Shaw gap rides the flow
+    at 2/(1+λ) of its speed, λ its viscosity over the water's, so a thin
+    oil is carried and sinks freely where a thick one lags
+    (gpu/fluid/constants.ts oilNuOf, PLAN 38w-31). Needs Oil Tension.
+  */
+  oilThickness: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
@@ -1000,6 +1010,9 @@ export interface VisualizerSettings {
   soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
   soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
   soapFilmTilt: number;       // the frame's tilt from flat, degrees: 90 hangs it (gravity along the film is g sin of it, 32h)
+  glow: number;               // the water's bioluminescence, 0 (off) to 2: blue light where a stroke shears it past a threshold, tiring as it is spent (PLAN 48c)
+  glowShear: number;          // the shear rate, per second, the organisms fire at: lower and a gentle stir lights, higher and only a hard stroke does (48c)
+  glowRecharge: number;       // seconds the organisms take to refill their light once they have flashed (48c)
   glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
   lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
   sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
@@ -1157,6 +1170,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
+  oilThickness: Math.log10(50) / 3, // 50 mm²/s, the light mineral oil every oil look had (constants.ts OIL_THICKNESS, the same double)
   oilWeight: -0.05,         // the light mineral oil every oil look had: it floats up a standing plate
   surfactantFlow: 0,
   soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
@@ -1292,6 +1306,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   soapFilmRate: 1,
   soapFilmAngle: 0,
   soapFilmTilt: 90,
+  glow: 0,                  // the water is dark: every look but the ones that glow
+  glowShear: 30,
+  glowRecharge: 8,
   glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
   lensStop: 4,
   sideLight: 0,
