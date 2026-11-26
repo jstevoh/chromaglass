@@ -15968,6 +15968,29 @@ Analysing songs ahead from decoded PCM and file bytes so cues can lead the beat 
 - **17f (`readSongTags`):** parses ID3v2.4 (synchsafe sizes), ID3v2.3 (UTF-16/Latin-1/UTF-8), and FLAC Vorbis comments + PICTURE blocks, selecting picture type 3 (front cover) when present, normalising 12-character ISRCs, and returning `{}` safely on untagged or truncated input.
 - Checked by `npm run hearahead` (all `--owed` flags removed from `scripts/checks.json`). Left open: `17b-2`, `17c-2`, `17f-2`, `17g`, `17h`, and the Web Audio player part of `17e` with `17g`.
 
+## H2c-6. No aux target while the camera is off (2026-11-13)
+
+`WebGPUPlate.draw` (`src/gpu/plate.ts`) allocated a frame-size `rgba8unorm` aux texture and
+the display pass wrote it every frame, though only the camera pass reads it: 4 bytes a pixel,
+about 16 MB a frame at 2560x1600 with the camera off. The plate now reads the camera's state
+from its own uniforms (`this.pack.get('cameraOn')`, which `LiquidVisualizer` already fills with
+`!!cam`), so `draw`'s signature is as it was. `displayName` and `displayRecipe` take an `aux`
+flag: with it, the display pipeline has two colour targets (the picture and the aux); without
+it, one, and the render pass is given one colour attachment (a pipeline built for two targets
+rejects a pass with one, which is a black screen). `keepAux` makes the aux when it is wanted
+and lets it go when it is not, so one made for the camera is released the frame after the
+camera goes off, and `auxTarget` is null while it is. The aux is wanted while the camera is on,
+while the lens pass (glitter, side light: it samples the aux) is up, and while the tank's draw
+is up (its own pipeline writes a second target). `WebGPUPlate.prepare` builds the one-target
+display for the stock's picture and the two-target one for the camera (and the lens pass's
+scene), each behind the show's opening only where the opening's first frame draws it.
+
+Measured by `scripts/framereads-owed.mjs` (the `h2c6` line, taken out of `--owed`): a plate kept
+across frames, camera off from its first frame, on, then off again, drawn at 72² over a 128²
+grid so a texture at the frame's size can only be a frame target. Main 2 display targets and 1
+frame-size texture alive in both off stretches; now 1 and 0 in both, with the camera-on control
+at 2 targets, 1 alive and `auxTarget` there. Not done (left in section 40): the tank's draw and
+the projector sources' `aux (sources)` keep their second target.
 ### P7-cpu (step 3.1): Delete the CPU solver's stepping
 
 Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and
