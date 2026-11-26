@@ -6,7 +6,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 
 - `stage.ts`: `WebGPUStage`: canvas, device, frame.
 - `fluid.ts` (99 KB, grep it): `WebGPUFluid`, the solver's `step` and the pipelines built ahead. The rest of the class is in `fluid/`, and the map is in this file's header; `fluid/README.md` has the order.
-- `plate.ts`: `WebGPUPlate`; `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms.
+- `plate.ts`: `WebGPUPlate`; `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms. Its `PlateFluid.gpu` may take `setCloseupWindow(w, amount)` and give `fineWindow` and `fineStrength` (the closeup's fine dye, PLAN 47a).
 - `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (`GpuStepParams` carries the tank's six settings, PLAN 47n; including `speciesShare` and `speciesSnapshot`, and `pourInk`, a title's mask added to the dye at the solver's own grid, PLAN 37x-10, with an optional `carrier` laid into the species field under it, the thick ink's pad, PLAN 37x-10g; and `layOil`, the oil laid cell for cell at the solver's grid, Foam Cells' pressed drops, PLAN 47z-5; and `layDye` with `layShare`, a look's dye laid at the solver's grid and added a share at a time, Classic's cells, PLAN 38w-8; and the optional `pourReady`, PLAN 18c-2).
 - `kit.ts` (48 KB, grep it): `PipelineCache` (`hasRender(name, ask)` says whether a render pipeline is built without building it), `PingPong`, `Disposer`, `bindGroup`, `ReadbackRing` (`hasFree`, `reserve`, `copyFrom`, `collect`), `GpuProfiler`.
 
@@ -33,6 +33,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `output.ts`: projector pass: mirror, keystone, blanking, grade; `fillOutputUniforms(..., square?)` and `WebGPUOutput.drawStream` / `streamCanvas` / `dropStream` for the Mixer stack live stream (37x-4d-1).
 - `padGrab.ts`: the remote's Draw picture.
 - `particles.ts`: dye carried by particles.
+- `closeupWindow.ts`: where the closeup looks (`CloseupWindow`, `closeupWindowOf`, `closeupFine`, `WINDOW_*`). `fineDye.ts`: `FineDye` (`setWindow`, `step`, `window`, `strength`, `detail`, `prepare(device, open)`: before the show opens when the look opens in the closeup, `Opening.closeup`), `FINE_LIFE`, `FINE_TICK`: the dye finer than the grid over that window (PLAN 47a).
 - `post.ts`: post-effects chain and finish.
 - `prepare.ts`: `prepareShow`, pipelines built before opening (three at a time) and behind it (two); `prepareLog` (each prepare once done), `prepareProgress` (each while it runs: builds settled, the last settle, the cap on one build) and `pipelinesSeen` (both and the ledger, for `chromaglassDebug().pipelines()`).
 - `probe.ts`: delivered brightness for the flash guard.
@@ -49,4 +50,4 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 
 ## Checks
 
-`npm run quick`; by hand `lint`, `wgsl`, `physics`, `maze`, `spikes`, `disc`, `straw`, `derive`. `output.ts`: `map`, `beams`, `wallpattern`. Per-frame calls: `framegroups`, `framereads`, `frameuploads`. `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `particles.ts`, `tank.ts`: `sloshgpu`, `soapgpu`, `boilgpu`, `particles`, `tankgpu` (and `tank` for `lib/tank.ts`). `standing.ts`: `standing`. A changed constant: `checkguard`.
+`npm run quick`; by hand `lint`, `wgsl`, `physics`, `maze`, `spikes`, `disc`, `straw`, `derive`. `output.ts`: `map`, `beams`, `wallpattern`. Per-frame calls: `framegroups`, `framereads`, `frameuploads`. `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `particles.ts`, `tank.ts`: `sloshgpu`, `soapgpu`, `boilgpu`, `particles`, `tankgpu` (and `tank` for `lib/tank.ts`). `fineDye.ts`, `closeupWindow.ts`: `finedye`. `standing.ts`: `standing`. A changed constant: `checkguard`.

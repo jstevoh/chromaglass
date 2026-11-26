@@ -151,6 +151,7 @@ export const CONTROL_HELP: Record<string, string> = {
   macroCellScale: 'How big those cells are. Small is many tiny cells.',
   macroLacing: 'Dark filaments along the edges of the dye, seen up close.',
   macroDepth: 'The close-up camera\'s depth of field: how fast the liquid goes soft away from the point it is focused on.',
+  macroFine: 'Dye finer than the grid up close, carried without blur: stirring folds it into fine threads. 0 is the grid magnified.',
   macroRelief: 'Depth up close: focused just past the liquid, swells gather the light from beneath and hollows spread it; steep walls go dark.',
 
   // Mirror rig
