@@ -90,3 +90,9 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   0.55 the frame changed by 0.95 grey levels a half-second and 13 from first frame to last; at
   0.8 by 3.25 and 21. The rock is the real one (lib/plateRock.ts: the gap tips, the oil slides
   at Darcy's speed in it), only stronger.
+- ~~**38w-30. Classic Light Show is named Lava Pop**~~ (S; shipped 2026-11-23, the owner: the
+  old name promised a 1960s show the plate does not look like yet, so a new fun one). Only the
+  name shown changes: the preset, the Guide, the song show's example and the docs. The id stays
+  `classic`, so saved shows, set lists, song shows and `?look=classic` links still open it; the
+  code and the checks still call it Classic in comments. `npm run draw` reads the new name off
+  the phone's Draw sheet.

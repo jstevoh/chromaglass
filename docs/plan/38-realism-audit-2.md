@@ -286,4 +286,3 @@ is in the project's files).
   colour made it four times worse (9,200 to 5,300). In the real dish a dye dissolved in oil
   moves with the oil, so the fix is to carry the oil's dye as its concentration times the
   oil's own flux, in the carry and in the Cahn–Hilliard flux alike, so no colour is stranded.
-

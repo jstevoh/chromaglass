@@ -74,6 +74,14 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    first (§30, 2026-10-11: Link is the shared clock of the iPad's music apps, AUM, Loopy
    Pro, Drambo, Koala, as well as of Resolume, VDMX and TouchDesigner, and VS offers it
    as a clock source):
+   - **13.5-link-rescan-2.** Found 2026-11-21: `npm run link`'s "an interface that
+     comes up later is found on the next rescan" went red on main's deploy 854
+     (Measure · logic: "peers 0, 0.000 bpm, 5027 ms after it came up"), where it
+     reads 100 ms on every run in a cloud session. The stand-in Live announces on
+     loopback multicast beside the other harnesses of the logic shard; read whether
+     another check on the shard binds the same group or port in the same seconds
+     (the shard runs its checks side by side), and give the line its own port or
+     group if so, before calling it a flake.
    - ~~**13.5-osc**~~ **Shipped** (2026-11-01): OSC out of the plate's colour, the ear's
      readings and bands, the tempo and the beat, from Settings → Sound and the phone
      layout (`npm run oscout`); story in `docs/plan-shipped.md` §13.5-osc. **Owed:** the

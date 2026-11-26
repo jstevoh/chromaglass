@@ -365,11 +365,20 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   const counted = counts.length > 2 && lastCount !== null && lastCount[2] === lastCount[3];
   const firstWords = said.find(([, k]) => k === 'first');
   const beforeStep = !!firstWords && at.steppedAt !== undefined && firstWords[0] <= at.steppedAt + 1;
-  const changedInCompile = said.filter(([t]) => inCompile(t));
+  /*
+    And none just before one: a change of words in the 34 ms (two frames)
+    before a render compile was asked had no frame of its own, and waits
+    behind that compile all the same. On main after 14v-12 the words changed
+    as one render pipeline finished, in the millisecond the next was asked,
+    so the change sat on the compile's edge and this line read it only now
+    and then (2 of 3 runs on #881's branch).
+  */
+  const justBefore = (t) => renders.some(([a]) => t <= a && a - t < 34);
+  const changedInCompile = said.filter(([t]) => inCompile(t) || justBefore(t));
   const heldBack = opening ? opening.settles.filter((t) => inCompile(t)).length : 0;
   check('9c. its loading line says what the show waits for, counts the opening\'s builds, and holds its words while a render pipeline compiles',
     inOrder && kinds.includes('gpu') && counted && beforeStep && renders.length > 0 && heldBack > 0 && changedInCompile.length === 0,
-    `${said.length} changes: ${[...new Set(kinds)].join(' → ') || 'none'}; ${counts.length} counts, the last ${lastCount ? `${lastCount[2]} of ${lastCount[3]}` : 'none'} (the opening asked ${opening?.asked ?? '?'}); the first frame's words at ${firstWords ? s(firstWords[0]) : 'never'}, the plate stepped at ${at.steppedAt === undefined ? 'never' : s(at.steppedAt)}; ${changedInCompile.length} changes during the ${renders.length} render compiles, ${heldBack} builds settled during them and held back`);
+    `${said.length} changes: ${[...new Set(kinds)].join(' → ') || 'none'}; ${counts.length} counts, the last ${lastCount ? `${lastCount[2]} of ${lastCount[3]}` : 'none'} (the opening asked ${opening?.asked ?? '?'}); the first frame's words at ${firstWords ? s(firstWords[0]) : 'never'}, the plate stepped at ${at.steppedAt === undefined ? 'never' : s(at.steppedAt)}; ${changedInCompile.length} changes during the ${renders.length} render compiles or in the two frames before one, ${heldBack} builds settled during them and held back`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {
