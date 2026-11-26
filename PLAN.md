@@ -333,7 +333,7 @@ style (§31).
   **25c**, **25f** (after 18f and 18d).
 - **6.10** The realism audit's top picks (§38), each its own thread, in its order: ~~**38a** the lamp
   as a condenser~~ (shipped; 38a-2 the always-on cos⁴ waits on the Mac's eyes), ~~**38c**~~ soap conserved (and ~~**38c-3**~~ Soap Breakdown), **38e** oil's σ, ~~**38b**~~ bubbles without clocks (with ~~38g~~ and ~~38n~~, #603), ~~**38h**~~
-  nothing on the plate makes light (~~38h-2~~ the edges lit from beneath, ~~38h-7~~ the closeup's bubbles traced, shipped; ~~38h-4~~ the back plate's grain and ~~38h-3~~ one shadowgraph for the whole column, ~~38h-15~~ bubbles and ~~38h-17~~ beads drawn at the screen's resolution shipped; 38h-5, 38h-6, 38h-8, 38h-9, 38h-11, 38h-12, 38h-14 and 38h-16 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f** (~~38f-1~~ the heat carried and ~~38f-2~~ the deep-quench oil shipped; ~~27f-9e~~ a standing lamp's cool top shipped; every look's cooling in real seconds open), **38g-2**, **38i**, **38j**; **38r** (the rest
+  nothing on the plate makes light (~~38h-2~~ the edges lit from beneath, ~~38h-7~~ the closeup's bubbles traced, shipped; ~~38h-4~~ the back plate's grain and ~~38h-3~~ one shadowgraph for the whole column, ~~38h-15~~ bubbles and ~~38h-17~~ beads drawn at the screen's resolution shipped; 38h-5, 38h-6, 38h-8, 38h-9, 38h-11, 38h-12, 38h-14 and 38h-16 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f** (~~38f-1~~ the heat carried and ~~38f-2~~ the deep-quench oil shipped; ~~27f-9e~~ a standing lamp's cool top shipped; ~~27f-9m~~ a look's oil laid before its solver shipped; every look's cooling in real seconds open), **38g-2**, **38i**, **38j**; **38r** (the rest
   gap, shipped: one number, #613, then a real 2 mm, #655; **38r-5** the liquid's amount sets it, Liquid
   and Cover Weight, part 1 shipped, then **38r-16** the pinch and the air edge: ~~G1 the pinch and the
   ledger~~ built (`npm run gap` green), G2 `npm run airedge` still owed) is read before 38d and 38i.
@@ -523,7 +523,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 28 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
 |  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-22 | 51 |
-|  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19an-1 | 5 |
+|  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19ao-1 | 8 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 19 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
 | 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 8 |
@@ -532,7 +532,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 24 | Modular rigs: patch the rack into the liquid | [`24-modular-rigs.md`](docs/plan/24-modular-rigs.md) |  | 10 |
 | 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 13 |
 | 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 8 |
-| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 28 |
+| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 33 |
 | 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 20 |
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28l | 21 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 15 |

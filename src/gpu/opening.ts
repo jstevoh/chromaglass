@@ -153,6 +153,31 @@ export interface Opening {
    * opening compiles a display with only these, and the whole one behind it.
    */
   display: number;
+  /**
+   * The look's own oil, laid with the look and waiting for the solver (Clock
+   * Glass, Splodascope, Lava Lamp, Lava Pop).
+   *
+   * Not a setting: it is what is on the plate. The mix's kernels run only
+   * once something has been poured into the mix (`mixLive`), and on every
+   * other opening nothing has, so they were built behind the show. Until
+   * PLAN 27f-9m these looks' oil was laid before the solver existed and let
+   * go, so their openings never ran the mix either, and the lists were right
+   * about a show that was wrong. With the oil kept for the solver (`mixWait` /
+   * `OwedLay`) it is laid on the solver's first step, and `npm run startup`
+   * on Metal read each asking on the frame for the mix's carry, relax,
+   * potential and update, the oil's force, and the bodies' and lift's kernels.
+   * The simulation says whether oil is waiting (`FluidSimulation.oilPending`),
+   * and the four below follow from it and the settings the step reads.
+   */
+  oil: boolean;
+  /** That oil's surface tension: smoothed shape, rim pressure and force (Oil Tension on, over oil that is there). */
+  oilPull: boolean;
+  /** Oil Bodies: each body's colour kept to it (partition, unspread, land, lay), which runs only over oil that pulls. */
+  oilBodies: boolean;
+  /** Film Hold's push between two drops, on over oil that pulls or under a standing plate's weight. */
+  filmHold: boolean;
+  /** The oil's lift up a rocked plate (PLAN 27f-5): a thin gap, Plate Rock above zero and oil that pulls. */
+  oilLift: boolean;
 }
 
 /**
@@ -188,8 +213,11 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   return false;
 }
 
-export function openingOf(s: Partial<VisualizerSettings>): Opening {
+export function openingOf(s: Partial<VisualizerSettings>, oilWaiting = false): Opening {
   const on = (v: number | undefined) => (v ?? 0) > 0;
+  const thin = (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5;
+  const gravity = on(s.plateUpright) || on(s.solutalBuoyancy);
+  const oilPull = oilWaiting && on(s.oilTension);
   return {
     vorticity: on(s.vorticityConfinement),
     mix: on(s.surfactantFlow),
@@ -201,18 +229,23 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     particles: on(s.particles),
     camera: on(s.camera),
     stock: on(s.stock),
-    thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
+    thinGap: thin,
     spin: lookOpensSpinning(s),
     chemistry: on(s.chemistry),
-    gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
-    slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
+    gravity,
+    slosh: thin
       && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway))
         // The Tilt knobs tip it too, either way (lib/handTilt.ts).
         || (on(s.slosh) && (on(s.plateUpright) || on(Math.abs(s.plateTiltX ?? 0)) || on(Math.abs(s.plateTiltY ?? 0))))),
     film: (s.clearFilm ?? 0) > 0.001,
-    sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
+    sealed: thin && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
     faraday: (s.faradayHz ?? 0) > 0,
     display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
+    oil: oilWaiting,
+    oilPull,
+    oilBodies: oilPull && on(s.oilBodies),
+    filmHold: on(s.filmHold) && on(s.oilTension) && (oilWaiting || gravity),
+    oilLift: oilPull && thin && on(s.plateRock ?? DEFAULT_SETTINGS.plateRock),
   };
 }
