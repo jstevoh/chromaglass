@@ -286,4 +286,10 @@ is in the project's files).
   colour made it four times worse (9,200 to 5,300). In the real dish a dye dissolved in oil
   moves with the oil, so the fix is to carry the oil's dye as its concentration times the
   oil's own flux, in the carry and in the Cahn–Hilliard flux alike, so no colour is stranded.
+- ~~**38w-30. Classic Light Show is named Lava Pop**~~ (S; shipped 2026-11-23, the owner: the
+  old name promised a 1960s show the plate does not look like yet, so a new fun one). Only the
+  name shown changes: the preset, the Guide, the song show's example and the docs. The id stays
+  `classic`, so saved shows, set lists, song shows and `?look=classic` links still open it; the
+  code and the checks still call it Classic in comments. `npm run draw` reads the new name off
+  the phone's Draw sheet.
 

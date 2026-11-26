@@ -153,7 +153,7 @@ export const COMMON_ACTIONS: CommonAction[] = [
   { label: 'New dyes at every section', when: { at: 'section', section: 'any' }, what: { do: 'dyes' } },
   { label: 'Drain at the bridge', when: { at: 'section', section: 'bridge' }, what: { do: 'drain' } },
   { label: 'Switch look at the bridge', when: { at: 'section', section: 'bridge' }, what: { do: 'look', look: { kind: 'preset', id: 'galaxy', name: 'Galaxy' }, fade: 4 } },
-  { label: 'Switch look at 1:00', when: { at: 'time', sec: 60 }, what: { do: 'look', look: { kind: 'preset', id: 'classic', name: 'Classic Light Show' }, fade: 4 } },
+  { label: 'Switch look at 1:00', when: { at: 'time', sec: 60 }, what: { do: 'look', look: { kind: 'preset', id: 'classic', name: 'Lava Pop' }, fade: 4 } },
   { label: 'Drain 8 s before the end', when: { at: 'before-end', sec: 8 }, what: { do: 'drain' } },
   { label: 'Show the name 6 s before the end', when: { at: 'before-end', sec: 6 }, what: { do: 'signoff' } },
   { label: 'Fade to black 4 s before the end', when: { at: 'before-end', sec: 4 }, what: { do: 'blackout', over: 4 } },

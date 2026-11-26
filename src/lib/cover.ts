@@ -36,8 +36,22 @@
  * length l_c = √(σ/ρg): 2πR · (π/4) l_c², about 3.6 mL of water round a
  * 0.1 m cover. Past that it runs off the dish and is gone. A hand lifting
  * the glass harder than it weighs (P < 0) draws the bead back in at the same
- * Stefan rate until it is empty; past that the air comes in, which is the
- * air edge (38r-12, the owner's pick, its own PR).
+ * Stefan rate until it is empty.
+ *
+ * **The puddle (air edge).** Once the bead is empty and a lift beats the
+ * gap's capillary suction (`P + 2σ cosθ / h < 0`), or when less than a full
+ * film sits under the glass (`wet = plate / h < A`), air comes in from the
+ * rim and the liquid forms a puddle of area `wet = plate / h` (`h · wet = plate`
+ * always). Over the puddle, weight and hand spread across `wet` (`P · A / wet`)
+ * together with the meniscus suction `2σ cosθ / h` drive Stefan flow at
+ *
+ *     dh/dt = −(2/3) h³ (P · A / wet + 2σ cosθ / h) / (μ · wet / π),
+ *
+ * integrated by step-size-free RK4 substepping until it hits the rim
+ * (`wet = A`, then pinned), the floor, or the ceiling (`COVER_TOP_M`).
+ * Turning Liquid down wicks the bead first and then shrinks `wet` at fixed `h`
+ * down to 1 mL; adding liquid widens a puddle at fixed `h` to the rim, then
+ * lifts the glass.
  *
  * Plain functions over a small state, as the frame loop wants (CLAUDE.md
  * "No ceremony in the frame"). The solver owns the state
@@ -54,8 +68,8 @@ export const COVER_AREA = Math.PI * COVER_RADIUS * COVER_RADIUS;
 export const COVER_FULL_ML = COVER_AREA * DISH_GAP_METRES * 1e6;
 /** A 2 mm float glass, 2500 kg/m³ × 2 mm = 5 kg/m², in grams: the Cover weight dial's default (157 g). */
 export const COVER_GLASS_G = COVER_KG_M2 * COVER_AREA * 1000;
-/** The dials' ranges: from the gap's floor (a full film at the solver's thinnest) to past what any cover holds; a weightless cover to a heavy hand-made one. */
-export const LIQUID_ML_RANGE = [Math.ceil(COVER_AREA * DISH_GAP_RANGE[0] * DISH_GAP_FIELD_METRES * 1e6), 150] as const;
+/** The dials' ranges: from 1 mL (a tiny puddle on the floor) to past what any cover holds; a weightless cover to a heavy hand-made one. */
+export const LIQUID_ML_RANGE = [1, 150] as const;
 export const COVER_G_RANGE = [0, 1000] as const;
 /** Water on an oiled glass: the meniscus angle at the pinned edge. */
 export const CONTACT_ANGLE = Math.PI / 3;
@@ -143,8 +157,9 @@ export function stefanLift(h0: number, pressure: number, mu: number, t: number):
 
 /**
  * The liquid's ledger, in m³: under the glass, in the bead at the rim, run off
- * the dish, and everything ever put in (dialled and poured). `h` is the gap,
- * V/A while the liquid fills the cover. The check holds plate + bead + off to
+ * the dish, and everything ever put in (dialled and poured). `h` is the gap
+ * and `wet` is the wetted area under the glass (`COVER_AREA` on a full film),
+ * keeping `h · wet = plate` always. The check holds plate + bead + off to
  * the ledger's `added`.
  */
 export interface CoverState {
@@ -153,27 +168,35 @@ export interface CoverState {
   off: number;
   added: number;
   h: number;
+  wet: number;
   /** The carrier's σ at the last step, for the bead's size (water's until a step has run). */
   sigma: number;
 }
 
 export function coverNew(ml: number): CoverState {
   const v = Math.max(0, ml) * 1e-6;
-  const s = { plate: v, bead: 0, off: 0, added: v, h: 0, sigma: 0.072 };
+  const s: CoverState = { plate: v, bead: 0, off: 0, added: v, h: 0, wet: 0, sigma: 0.072 };
   return coverSettleTop(s);
 }
 
 /**
- * The gap the plate's volume gives, between the solver's floor and top. Over
- * the top (a weightless glass on more than 125 mL) the rest overflows: the
- * solver's gap field has a ceiling (4 mm, DISH_GAP_RANGE) that a real glass
- * floating on a deep pool does not, so this is the one place the ledger
- * leaves nature; it is written in as such (PLAN 38r-5).
+ * The gap the plate's volume gives, between the solver's floor and top, and
+ * the wetted area `wet = plate / h` (`COVER_AREA` once at or past a full
+ * floor film). Over the top (a weightless glass on more than 125 mL) the rest
+ * overflows: the solver's gap field has a ceiling (4 mm, DISH_GAP_RANGE) that
+ * a real glass floating on a deep pool does not, so this is the one place the
+ * ledger leaves nature; it is written in as such (PLAN 38r-5).
  */
 function coverSettleTop(s: CoverState): CoverState {
   const top = COVER_AREA * COVER_TOP_M;
   if (s.plate > top) { coverSpill(s, s.plate - top, beadCapacity(s.sigma)); }
-  s.h = Math.max(COVER_FLOOR_M, s.plate / COVER_AREA);
+  if (s.plate >= COVER_AREA * COVER_FLOOR_M) {
+    s.h = s.plate / COVER_AREA;
+    s.wet = COVER_AREA;
+  } else {
+    s.h = COVER_FLOOR_M;
+    s.wet = s.plate > 0 ? s.plate / COVER_FLOOR_M : 0;
+  }
   return s;
 }
 
@@ -189,21 +212,29 @@ function coverSpill(s: CoverState, v: number, cap: number): void {
 /**
  * Liquid put on the plate (a pour, or the Liquid dial turned up) or taken off
  * it (the dial turned down: wicked off at the rim, so out of the bead first,
- * then from under the glass, never below the floor's full film). m³.
+ * then from under the glass down to 1 mL, shrinking `wet` at fixed `h`). m³.
  */
 export function coverAdd(s: CoverState, v: number): CoverState {
   if (v >= 0) {
     s.plate += v;
     s.added += v;
+    if (s.h > 0 && s.plate <= COVER_AREA * s.h) {
+      s.wet = s.plate / s.h;
+      return s;
+    }
     return coverSettleTop(s);
   }
   let take = -v;
   const fromBead = Math.min(s.bead, take);
   s.bead -= fromBead; take -= fromBead;
-  const fromPlate = Math.min(Math.max(0, s.plate - COVER_AREA * COVER_FLOOR_M), take);
+  const minPlate = LIQUID_ML_RANGE[0] * 1e-6;
+  const fromPlate = Math.min(Math.max(0, s.plate - minPlate), take);
   s.plate -= fromPlate;
   s.added -= fromBead + fromPlate;
-  return coverSettleTop(s);
+  if (s.h > 0) {
+    s.wet = Math.min(COVER_AREA, s.plate / s.h);
+  }
+  return s;
 }
 
 /** What one step is told: the carrier, the glass, and the hand on it (−1 lifting to 1 pressing). */
@@ -214,27 +245,112 @@ export interface CoverInputs {
 }
 
 /**
- * One step of the glass on its liquid, `dt` seconds. Pressed past what the
- * edge holds, it settles by Stefan into the bead and off the dish; lifted
- * harder than it weighs, it draws the bead back in until the bead is empty.
+ * One step of the glass on its liquid, `dt` seconds. On a full film, pressing
+ * past what the edge holds settles by Stefan into the bead and off the dish;
+ * lifting draws the bead back in until empty, then air enters once
+ * `P + 2σ cosθ / h < 0`. On a puddle (or past bead empty), the area-scaled
+ * pressure and capillary suction evolve by step-size-free RK4 until hitting
+ * the rim (`wet = A`, then pinned), the floor, or `COVER_TOP_M`.
  * Returns the gap in metres.
  */
+function stepPuddle(s: CoverState, P: number, sigma: number, mu: number, dt: number): number {
+  const V = s.plate;
+  if (!(V > 0) || !(dt > 0)) return s.h;
+  const hMin = Math.max(COVER_FLOOR_M, V / COVER_AREA);
+  const hMax = COVER_TOP_M;
+  const rate = (hh: number): number => {
+    const hSafe = Math.max(COVER_FLOOR_M * 0.25, Math.min(COVER_TOP_M * 1.25, hh));
+    const wet = Math.min(COVER_AREA, V / hSafe);
+    const suck = (2 * sigma * Math.cos(CONTACT_ANGLE)) / hSafe;
+    return -((2 / 3) * hSafe * hSafe * hSafe * ((P * COVER_AREA) / wet + suck)) / ((mu * wet) / Math.PI);
+  };
+  let h = s.h;
+  let rem = dt;
+  while (rem > 0) {
+    const k1 = rate(h);
+    if (k1 === 0) break;
+    if (k1 < 0 && h <= hMin) break;
+    if (k1 > 0 && h >= hMax) break;
+    let dtSub = Math.min(rem, (0.002 * h) / Math.max(1e-30, Math.abs(k1)));
+    let hNext = h;
+    for (let shrink = 0; shrink < 8; shrink++) {
+      const k2 = rate(h + 0.5 * dtSub * k1);
+      const k3 = rate(h + 0.5 * dtSub * k2);
+      const k4 = rate(h + dtSub * k3);
+      hNext = h + (dtSub * (k1 + 2 * k2 + 2 * k3 + k4)) / 6;
+      if (Math.abs(hNext - h) <= 0.005 * h && Math.abs(k4) <= 1.2 * Math.abs(k1) + 1e-18) break;
+      dtSub *= 0.5;
+    }
+    if (hNext <= hMin && k1 < 0) {
+      const frac = h > hMin && h !== hNext ? Math.max(0, Math.min(1, (h - hMin) / (h - hNext))) : 0;
+      const remAfter = Math.max(0, rem - dtSub * frac);
+      s.h = hMin;
+      if (V >= COVER_AREA * COVER_FLOOR_M) {
+        s.wet = COVER_AREA;
+        if (remAfter > 0 && P > holdPressure(sigma, hMin) && hMin > COVER_FLOOR_M) {
+          const settled = Math.max(COVER_FLOOR_M, stefanSettle(hMin, P, sigma, mu, remAfter));
+          coverSpill(s, (hMin - settled) * COVER_AREA, beadCapacity(sigma));
+          return coverSettleTop(s).h;
+        }
+      } else {
+        s.wet = V / hMin;
+      }
+      return s.h;
+    }
+    if (hNext >= hMax && k1 > 0) {
+      s.h = hMax;
+      s.wet = Math.min(COVER_AREA, V / hMax);
+      return s.h;
+    }
+    h = hNext;
+    rem -= dtSub;
+  }
+  s.h = h;
+  s.wet = V / h >= COVER_AREA * (1 - 1e-12) ? COVER_AREA : V / h;
+  return s.h;
+}
+
 export function coverStep(s: CoverState, dt: number, k: CoverInputs): number {
   const sigma = carrierTension(k.nu);
   s.sigma = sigma;
   const mu = DENSITY * Math.max(1e-7, k.nu);
   const hand = Math.max(-1, Math.min(1, Number.isFinite(k.hand) ? k.hand : 0));
   const P = weightPressure(k.grams) + hand * HAND_PA;
-  const h0 = s.h;
-  if (P > holdPressure(sigma, h0) && h0 > COVER_FLOOR_M) {
-    const h = Math.max(COVER_FLOOR_M, stefanSettle(h0, P, sigma, mu, dt));
-    coverSpill(s, (h0 - h) * COVER_AREA, beadCapacity(sigma));
-  } else if (P < 0 && s.bead > 0) {
-    const h = stefanLift(h0, P, mu, dt);
-    // Drawn in whole once the lift outruns it, so an emptied bead is 0, not a rounding's 1e-22.
-    const v = h >= h0 + s.bead / COVER_AREA ? s.bead : (h - h0) * COVER_AREA;
-    s.bead -= v;
-    s.plate += v;
+  if (!(dt > 0) || !(s.plate > 0)) {
+    if (s.plate <= 0) { s.h = COVER_FLOOR_M; s.wet = 0; }
+    return s.h;
   }
-  return coverSettleTop(s).h;
+  const h0 = s.h;
+  if (s.wet >= COVER_AREA * (1 - 1e-12)) {
+    if (P > holdPressure(sigma, h0) && h0 > COVER_FLOOR_M) {
+      const h = Math.max(COVER_FLOOR_M, stefanSettle(h0, P, sigma, mu, dt));
+      coverSpill(s, (h0 - h) * COVER_AREA, beadCapacity(sigma));
+      return coverSettleTop(s).h;
+    }
+    if (P < 0 && s.bead > 0 && h0 < COVER_TOP_M) {
+      const h = stefanLift(h0, P, mu, dt);
+      const fullNeed = s.bead / COVER_AREA;
+      if (h >= h0 + fullNeed) {
+        const hEnd = h0 + fullNeed;
+        const rate = (4 / 3) * (-P) / (Math.max(1e-9, mu) * COVER_RADIUS * COVER_RADIUS);
+        const tBead = Math.min(dt, (1 / (h0 * h0) - 1 / (hEnd * hEnd)) / rate);
+        s.bead = 0;
+        s.plate += fullNeed * COVER_AREA;
+        coverSettleTop(s);
+        const rem = dt - tBead;
+        return rem > 0 && s.h < COVER_TOP_M ? coverStep(s, rem, k) : s.h;
+      }
+      // Drawn in whole once the lift outruns it, so an emptied bead is 0, not a rounding's 1e-22.
+      const v = (h - h0) * COVER_AREA;
+      s.bead -= v;
+      s.plate += v;
+      return coverSettleTop(s).h;
+    }
+    const suck = (2 * sigma * Math.cos(CONTACT_ANGLE)) / Math.max(1e-9, h0);
+    if (s.bead === 0 && P + suck < 0 && h0 < COVER_TOP_M) {
+      return stepPuddle(s, P, sigma, mu, dt);
+    }
+    return s.h;
+  }
+  return stepPuddle(s, P, sigma, mu, dt);
 }
