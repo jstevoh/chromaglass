@@ -6,6 +6,23 @@ thread takes the top open item in a tier; the PR that fixes it strikes the line 
 Perform and Design desks), **phone**, **wall** (the show screen or projector), **Mac**
 (the desktop app).
 
+**The bug bash (QA-33, 2026-11-26).** The owner asked for an automated bug bash.
+`npm run bugbash` (scripts/bugbash.mjs) opens every look, puts every desk panel out on
+seven seeded tabs and turns, presses or picks each of their controls end to end, then
+does the same on the phone layout, one level into each sheet. It notes crashes, hangs,
+freezes, a plate gone black, flat or NaN, settings past finite, new console errors,
+switches that do not come back, and (low, to read rather than fix blind) controls that
+change nothing. It is a report, never a gate, and runs on the Mac's GPU through the
+film queue. Antigravity runs it and triages; its grouped list becomes one fix thread per
+area, each fix striking its own line here.
+
+- **QA-33a** Run the bug bash on main and write the grouped findings (Antigravity, the
+  Mac). Shipped as a report when the list is in the project's files.
+- **QA-33b** Fix threads, one per area of the list, each a QA item of its own.
+- **QA-33c** The sweep cannot judge what a control *should* do, only that it did
+  something and nothing broke; a dial that works but feels wrong is the owner's list
+  and the heuristic review, not this.
+
 **Tier 1. Seen by the room, or it stops the show.**
 
 - **QA-32a** A held closeup whose frame empties while it is in (the pool flows out of it,

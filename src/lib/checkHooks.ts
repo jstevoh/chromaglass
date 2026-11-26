@@ -110,8 +110,8 @@ declare global {
     chromaglassCastState?: () => unknown;
     /** What a render could leave running in the live show: fades and glides on the film's clock. */
     chromaglassRenderPending?: () => { lookFade: boolean; dimmerFade: boolean; glides: number };
-    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app`; `toDisk` writes through the save picker instead of memory, for `npm run tvloops`. */
-    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number; toDisk?: boolean; hashFrames?: boolean; raw?: boolean }) => Promise<unknown>;
+    /** Render the loaded song (or the bytes given) to hashed frames, for `npm run render-app` and `npm run loopseam`; `toDisk` writes through the save picker instead of memory, for `npm run tvloops`. */
+    chromaglassRender?: (o: { song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number; loop?: { seconds: number; crossfade?: boolean; startSec?: number }; toDisk?: boolean; hashFrames?: boolean; raw?: boolean }) => Promise<unknown>;
     /** The last `chromaglassRender`'s file as bytes, kept so a film too long for one base64 string (`raw: true`, `npm run sitefilms`) is read back in slices. */
     chromaglassRenderBytes?: Uint8Array | null;
     /** The MIDI input and the gamepad as the desk sees them. */
@@ -125,6 +125,8 @@ declare global {
     __cgTestLicensePublicKey?: JsonWebKey;
     /** Where the Android app's Open in Chrome hands the show's address instead of Chrome, so a check can read it (`lib/appLink.ts`, `openInChrome`; `npm run controller`). */
     __cgOpenExternal?: (url: string) => void;
+    /** Stands in for the phone apps' camera: the text a scanned code says, or null for a cancel (`lib/appLink.ts`, `scanLaptopCode`; `npm run controller`, part scan). */
+    __cgScan?: () => Promise<string | null>;
 
     // ── Elsewhere (the file and its gate on each line) ──
 

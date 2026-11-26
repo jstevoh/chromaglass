@@ -129,3 +129,11 @@ and a stream held on the plate, lay their colour with their own volume; story in
   drop from the same height does not splash. Lines are at 801a815e; after #905 the water constants
   sit at `dropImpact.ts:89` and the satellites at `dropSplash.ts:193-207`, each still laying 0.22
   of the drop's dye. (38v, from RS-13.)
+- ~~**18c-14**~~ The idle plate laid dye and heat by itself (a hidden seeder orbiting the
+  plate). Shipped (2026-11-21): it is gone and a plate left alone gains no colour; the
+  emergency seed for a drained plate stays (`npm run tools`). Story in
+  `docs/plan-shipped.md` §18c-14.
+
+## 18e. Edges come from refraction (replaces the painted rims and highlights)
+
+- ~~**18e-2. A clear pour's edge, and the deflection from the optical path.**~~ **Shipped, this PR** (the derive pass writes `|∇OPL|` in `.z`, the closeup keeps its dye-path Laplacian in `camLap` via `TRANSMIT_WGSL`, and `oplPupilLoss` deflects the front plate's light by `|∇OPL| · DISH_REST_GAP · logicalGrid` against `DROP_NA = 0.25` beside `defocusShadow`; `npm run derive` 5/5, `npm run nolight -- --owed=film` 15/15; story in `docs/plan-shipped.md` §18e).

@@ -70,17 +70,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { physicsAcc, physicsFrame, physicsSummary, physicsLines, comparePhysics, techniqueLines } from './watchphysics.mjs';
-import { designFrame, designSummary, designLines, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
+import { physicsAcc, physicsFrame, physicsSummary, physicsLines, physicsGaps, comparePhysics, techniqueLines } from './watchphysics.mjs';
+import { designFrame, designSummary, designLines, designGaps, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
 import { thumb, findDissolves } from './watchcuts.mjs';
 import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
 import { overall } from './watchoverall.mjs';
 import { describe } from './watchwords.mjs';
+import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watchfootage.mjs';
+import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
+import { gapSettings } from './watchsettings.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, vs: '', keep: '', note: '', refs: false };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -108,8 +111,10 @@ function parseArgs(argv) {
     else if (a === '--refs') opt.refs = true;
     // A footage of the whole room (the projector, the hands, the screen) reads
     // the room; `--crop x,y,w,h` (fractions of the picture) reads only the
-    // projection or the plate.
+    // projection or the plate. `--no-autocrop` turns off letterbox/pillarbox detection.
     else if (a === '--crop') { const [x, y, w, h] = v().split(',').map(Number); if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) opt.crop = { x, y, w, h }; else fail('--crop wants x,y,w,h as fractions, e.g. 0.5,0,0.25,0.35', 2); }
+    else if (a === '--no-autocrop') opt.noAutocrop = true;
+    else if (a === '--settings') opt.settings = v();
     else if (a === '--selftest') opt.selftest = true;
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else if (!opt.input) opt.input = a;
@@ -353,10 +358,10 @@ function seekArgs() {
  * The frame size is read from ffmpeg's "Output #0 … rawvideo … WxH" line (see
  * the header for why), and stdout is held until that line has been seen.
  */
-function decode(vf, onFrame) {
+function decode(vf, onFrame, extraArgs = []) {
   return new Promise((resolve, reject) => {
     const p = spawn(ff(), ['-hide_banner', '-nostats', ...seekArgs(), '-an', '-vf', vf,
-      '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1']);
+      '-fps_mode', 'passthrough', ...extraArgs, '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1']);
     let err = '', w = 0, h = 0, pending = [], buf = Buffer.alloc(0), n = 0;
     const feed = chunk => {
       buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
@@ -461,22 +466,53 @@ async function watch() {
   const rate = opt.rate > 0 ? opt.rate : Math.max(2, Math.min(pr.fps ?? 30, 10, known ? 1000 / known : 10));
   const aw = 320;
 
-  // Pass 1: every sample, small, for the numbers and the slit scan.
+  // Pass 1: every sample, small, for the footage checks and the reads.
   const rows = [], slit = [], design = [], thumbs = [], pacc = paletteAcc(), phys = physicsAcc();
   // The spectrum costs an FFT a sample: take it on about 400 of them.
   phys.spectrumEvery = known ? Math.max(1, Math.ceil((known * rate) / 400)) : 1;
-  let prev = null;
-  // `crop` ({ x, y, w, h } as fractions of the picture) keeps only part of it:
-  // a harness filming the whole page wants the plate, not the desk's meters,
-  // which move with the music whether the plate does or not.
-  const c = opt.crop;
+  // Autocrop black letterbox/pillarbox bars unless `--crop` or `--no-autocrop` is given.
+  let autocrop = null;
+  if (!opt.crop && !opt.noAutocrop) {
+    const preRate = known && known > 15 ? Math.max(0.5, Math.min(rate, 30 / known)) : Math.min(rate, 4);
+    const preFrames = []; let pw = 0, ph = 0;
+    await decode(`fps=${preRate},scale=${aw}:-2:flags=area`, (px, _, W, H) => { pw = W; ph = H; preFrames.push(Buffer.from(px)); });
+    autocrop = detectAutocrop(preFrames, pw, ph);
+  }
+  const c = opt.crop ?? (autocrop ? { x: autocrop.x, y: autocrop.y, w: autocrop.w, h: autocrop.h } : null);
   const pre = c ? `crop=trunc(iw*${c.w}/2)*2:trunc(ih*${c.h}/2)*2:trunc(iw*${c.x}):trunc(ih*${c.y}),` : '';
-  const { n, w, h } = await decode(`${pre}fps=${rate},scale=${aw}:-2:flags=area`, (px, k, W, H) => {
-    let lum = 0, sat = 0, dark = 0, bright = 0, diff = 0, coloured = 0;
+  const sampled = [];
+  const { n, w, h } = await decode(`${pre}fps=${rate},scale=${aw}:-2:flags=area`, (px) => { sampled.push(Buffer.from(px)); });
+  if (!n) fail('decoded no frames');
+  const span = n / rate;
+
+  // Native-resolution sample frames for 8 px blockiness when stored width > 360.
+  const storedW = Number(String(pr.stored ?? '').split('x')[0]) || w;
+  let nativeFrames = null;
+  if (storedW > 360) {
+    const nf = [];
+    const nRate = Math.max(0.05, Math.min(2, 5 / Math.max(1, span)));
+    await decode(`${pre}fps=${nRate}`, (px, _, W, H) => nf.push({ px: Buffer.from(px), W, H }), ['-frames:v', '6']);
+    if (nf.length) nativeFrames = nf;
+  }
+
+  // Run footage checks (title cards, still sharp overlays, compression softness) before any reads.
+  const footage = analyseFootage({ frames: sampled, W: w, H: h, rate, from: opt.from, file: opt.file, pr, span, crop: c, autocrop, optCrop: opt.crop, ff: ff(), nativeFrames });
+  const mask = footage.overlayMask;
+  const isTitle = footage.isTitle;
+
+  let prev = null;
+  for (let k = 0; k < sampled.length; k++) {
+    const px = sampled[k], W = w, H = h;
+    let lum = 0, sat = 0, dark = 0, bright = 0, diff = 0, coloured = 0, mCount = 0;
     const hue = new Float64Array(8), hist = new Float32Array(64), hue12 = new Float32Array(12), hv = new Float32Array(39);
+    const N = W * H;
+    const cur = new Float32Array(N);
     for (let i = 0, p = 0; i < px.length; i += 3, p++) {
       const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
       const Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      cur[p] = Y;
+      if (mask?.[p]) continue;
+      mCount++;
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b), S = mx > 0 ? (mx - mn) / mx : 0;
       lum += Y; sat += S;
       if (Y < 0.1) dark++;
@@ -488,13 +524,6 @@ async function watch() {
         H0 = mx === r ? ((g - b) / (mx - mn)) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4;
         H0 = (H0 * 60 + 360) % 360;
       }
-      // For the show's shape (below): twelve 30° hues, and the same with the
-      // grey pixels in a slot of their own, each in three values. The bins
-      // are centred on the hues (red is 345° to 15°), not started at them.
-      // Started at 0°, pure red sits on the edge between two bins and the
-      // codec's rounding splits it: the self-test's red-and-cyan grating read
-      // as four hues, and a red turning slowly towards magenta read as a
-      // composition change the moment it began, as its pixels crossed 0°.
       const hb = H0 < 0 ? 12 : Math.floor((H0 + 15) / 30) % 12;
       hv[hb * 3 + (mx < 0.15 ? 0 : mx < 0.5 ? 1 : 2)]++;
       if (H0 >= 0 && mx > 0.15) {
@@ -503,23 +532,26 @@ async function watch() {
         hue[H0 < 15 || H0 >= 330 ? 0 : H0 < 40 ? 1 : H0 < 70 ? 2 : H0 < 160 ? 3 : H0 < 200 ? 4 : H0 < 255 ? 5 : H0 < 290 ? 6 : 7]++;
       }
     }
-    const N = W * H;
-    const cur = new Float32Array(N);
-    for (let i = 0, p = 0; p < N; i += 3, p++) cur[p] = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
-    rows.push({ t: opt.from + k / rate, lum: lum / N, sat: sat / N, dark: dark / N, bright: bright / N,
-      motion: prev ? (diff / N) * 100 : 0, coloured, colour: coloured / N, hue, hue12, hist: hist.map(v => v / N), hv: hv.map(v => v / N) });
+    const den = Math.max(1, mCount);
+    const sameShot = prev && !isTitle[k] && !isTitle[k - 1];
+    rows.push({ t: opt.from + k / rate, lum: lum / den, sat: sat / den, dark: dark / den, bright: bright / den,
+      motion: sameShot ? (diff / den) * 100 : 0, coloured, colour: coloured / den, hue, hue12, hist: hist.map(v => v / den), hv: hv.map(v => v / den),
+      title: isTitle[k] });
     prev = cur;
-    thumbs.push(thumb(cur, W, H));
-    // The design read (colour, form, light, composition) of the same sample:
-    // scripts/watchdesign.mjs says what each number is and why.
-    design.push(designFrame(px, W, H, pacc));
-    physicsFrame(px, W, H, phys, k);
+    if (mask) {
+      const mLum = lum / den;
+      const maskedCur = Float32Array.from(cur, (v, p) => (mask[p] ? mLum : v));
+      thumbs.push(thumb(maskedCur, W, H));
+    } else {
+      thumbs.push(thumb(cur, W, H));
+    }
+    if (!isTitle[k]) design.push(designFrame(px, W, H, pacc, mask));
+    physicsFrame(px, W, H, phys, k, { mask, skip: isTitle[k] });
     const col = Buffer.alloc(H * 3);
     for (let y = 0; y < H; y++) px.copy(col, y * 3, (y * W + (W >> 1)) * 3, (y * W + (W >> 1)) * 3 + 3);
     slit.push(col);
-  });
-  if (!n) fail('decoded no frames');
-  const span = n / rate;
+  }
+  sampled.length = 0;
 
   // Loudness over the same window each motion value covers: the motion at
   // sample k is the change from k-1 to k, so its sound is [t(k-1), t(k)).
@@ -558,6 +590,7 @@ async function watch() {
   const median = a => (a.length ? [...a].sort((x, y) => x - y)[a.length >> 1] : 0);
   const change = rows.map((r, k) => (k ? r.hist.reduce((s, v, i) => s + Math.abs(v - rows[k - 1].hist[i]), 0) / 2 : 0));
   for (let k = 1; k < n; k++) {
+    if (rows[k].title || rows[k - 1].title) continue;
     const lo = Math.max(1, k - 6, (cuts.at(-1) ?? 0) + 1), hi = Math.min(n, k + 7);
     const cB = median(change.slice(lo, k)), cA = median(change.slice(k + 1, hi));
     const mB = median(rows.slice(lo, k).map(r => r.motion)), mA = median(rows.slice(k + 1, hi).map(r => r.motion));
@@ -671,37 +704,49 @@ async function watch() {
     ...rows.map(r => [r.t.toFixed(2), r.lum.toFixed(3), r.dark.toFixed(3), r.bright.toFixed(3), r.sat.toFixed(3),
       r.motion.toFixed(3), r.loud?.toFixed(1) ?? '', r.cut ? 1 : 0].join('\t'))].join('\n') + '\n');
 
-  const mean = f => rows.reduce((s, r) => s + f(r), 0) / n;
+  const activeRows = rows.filter(r => !r.title);
+  const useRows = activeRows.length >= 2 ? activeRows : rows;
+  const activeSpan = useRows.length / rate;
+  const activeIdx = new Map();
+  useRows.forEach((r, idx) => activeIdx.set(r, idx));
+  const activeCuts = cuts.map(k => activeIdx.get(rows[k])).filter(k => k != null);
+
+  const mean = f => useRows.reduce((s, r) => s + f(r), 0) / useRows.length;
   const q = (arr, p) => { const s = [...arr].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
   const hueTot = new Float64Array(8); let colTot = 0;
-  for (const r of rows) { r.hue.forEach((v, i) => (hueTot[i] += v)); colTot += r.coloured; }
+  for (const r of useRows) { r.hue.forEach((v, i) => (hueTot[i] += v)); colTot += r.coloured; }
   const HUES = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'magenta'];
   const hues = [...hueTot].map((v, i) => [HUES[i], v / Math.max(1, colTot)]).sort((a, b) => b[1] - a[1]).filter(x => x[1] >= 0.05).slice(0, 4);
   const pct = x => `${(x * 100).toFixed(0)}%`;
-  const motions = rows.slice(1).map(r => r.motion);
+  const motions = useRows.slice(1).map(r => r.motion);
 
   let sync = null;
   if (loud) {
-    const pear = (a, b) => {
-      const m = a.length, ma = a.reduce((s, x) => s + x, 0) / m, mb = b.reduce((s, x) => s + x, 0) / m;
-      let sab = 0, saa = 0, sbb = 0;
-      for (let i = 0; i < m; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
-      return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
-    };
-    const ok = rows.map((r, k) => k > 0 && !r.cut && !r.fade);
-    let bestLag = { lag: 0, r: -2 };
-    const maxLag = Math.round(rate);
-    for (let lag = -maxLag; lag <= maxLag; lag++) {
+    const okLoud = rows.filter((r, k) => k > 0 && !r.cut && !r.fade && !r.title).map(r => r.loud);
+    const lMean = okLoud.reduce((s, x) => s + x, 0) / Math.max(1, okLoud.length);
+    const lStd = Math.sqrt(okLoud.reduce((s, x) => s + (x - lMean) ** 2, 0) / Math.max(1, okLoud.length));
+    if (okLoud.length > 8 && lStd > 1e-3) {
+      const pear = (a, b) => {
+        const m = a.length, ma = a.reduce((s, x) => s + x, 0) / m, mb = b.reduce((s, x) => s + x, 0) / m;
+        let sab = 0, saa = 0, sbb = 0;
+        for (let i = 0; i < m; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+        return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
+      };
+      const ok = rows.map((r, k) => k > 0 && !r.cut && !r.fade && !r.title);
+      let bestLag = { lag: 0, r: -2 };
+      const maxLag = Math.round(rate);
+      for (let lag = -maxLag; lag <= maxLag; lag++) {
+        const a = [], b = [];
+        for (let k = 1; k < n; k++) { const j = k - lag; if (j >= 1 && j < n && ok[k] && ok[j]) { a.push(rows[k].motion); b.push(loud[j]); } }
+        if (a.length > 8) { const r = pear(a, b); if (r > bestLag.r) bestLag = { lag, r }; }
+      }
       const a = [], b = [];
-      for (let k = 1; k < n; k++) { const j = k - lag; if (j >= 1 && j < n && ok[k] && ok[j]) { a.push(rows[k].motion); b.push(loud[j]); } }
-      if (a.length > 8) { const r = pear(a, b); if (r > bestLag.r) bestLag = { lag, r }; }
+      for (let k = 1; k < n; k++) if (ok[k]) { a.push(rows[k].motion); b.push(loud[k]); }
+      sync = { r0: pear(a, b), best: bestLag.r, lag: bestLag.lag / rate };
     }
-    const a = [], b = [];
-    for (let k = 1; k < n; k++) if (ok[k]) { a.push(rows[k].motion); b.push(loud[k]); }
-    sync = { r0: pear(a, b), best: bestLag.r, lag: bestLag.lag / rate };
   }
 
-  const sh = shape({ rows, rate, span, cuts });
+  const sh = shape({ rows: useRows, rate, span: activeSpan, cuts: activeCuts });
   const f1 = x => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(1));
   const shapeLines = [
     `- shape: ${sh.swells.perMin.toFixed(1)} swells a minute (median gap ${f1(sh.swells.gap)} s, rise ${f1(sh.swells.rise)} s, decay ${f1(sh.swells.decay)} s, peak ${f1(sh.swells.peakOverMedian)}× the median); calm ${pct(sh.calm)} of the time; motion half-life ${f1(sh.halfLife)} s`,
@@ -714,20 +759,40 @@ async function watch() {
   const ds = designSummary(design, pacc);
   // The physics read needs the cuts (no flow is measured across one) and the
   // form size from the design read (for the turnover time).
-  const ps = physicsSummary(phys, { rate, cut: rows.map(r => !!(r.cut || r.fade)), W: w, scale: ds.scaleX?.med ?? null });
+  const ps = physicsSummary(phys, { rate, cut: rows.map(r => !!(r.cut || r.fade)), W: w, scale: ds.scaleX?.med ?? null, mask });
   phys.frames.length = 0;
+  footage.cameraShare = ps.cameraShare;
+  if (footage.reliable?.detail === false) {
+    for (const k of ['edgeWidth', 'scaleX', 'scaleY', 'forms']) {
+      ds[k] = ds[k] ? { ...ds[k], reliable: false } : { med: null, p10: null, p90: null, reliable: false };
+    }
+    ps.spectrum = ps.spectrum ? { ...ps.spectrum, reliable: false } : { med: null, p10: null, p90: null, reliable: false };
+  }
   ds.physics = ps;
-  const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, cuts.length / Math.max(1 / 60, span / 60))];
-  let refWords = null, refTitle = null;
+  const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))];
+  let refWords = null, refTitle = null, refDoc = null;
+  let takeSettings = null;
+  if (opt.settings) {
+    if (typeof opt.settings === 'string') {
+      try { takeSettings = JSON.parse(fs.readFileSync(path.resolve(opt.settings), 'utf8')); } catch { fail(`--settings: could not read JSON at ${opt.settings}`, 2); }
+    } else if (typeof opt.settings === 'object') {
+      takeSettings = opt.settings;
+    }
+  } else if (info?.settings && typeof info.settings === 'object') {
+    takeSettings = info.settings;
+  }
   if (opt.vs) {
     // A path to a design.json, a folder holding one, or a kept reference's name.
     const vf = resolveRef(opt.vs);
     let ref = null;
     try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs}, and no reference of that name (npm run watch -- --refs lists them; watch the reference first, with this version of the tool)`, 2); }
+    refDoc = ref;
     refTitle = ref.title ?? vf;
     refWords = ref.words?.lines?.length ? ref.words : describe({ design: ref });
     designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
     if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
+    const allGaps = [...designGaps(ref, ds).rows, ...(ref.physics ? physicsGaps(ref.physics, ps).rows : [])];
+    designOut.push('', ...gapSettings(allGaps, takeSettings));
   }
 
   const buckets = Math.min(40, n);
@@ -739,11 +804,19 @@ async function watch() {
     table.push(`| ${stamp(g[0].t)} | ${m(r => r.lum).toFixed(2)} | ${pct(m(r => r.dark))} | ${m(r => r.sat).toFixed(2)} | ${m(r => r.motion).toFixed(2)}${g.some(r => r.cut) ? ' cut' : ''} | ${loud ? m(r => r.loud).toFixed(0) : '–'} |`);
   }
 
-  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, sheets, tiles, picks, timeline, span, pr, w, h, rate };
-  const words = describe(result);
-  result.words = words;
-  result.overall = overall(result);   // the whole film's arc and feel, before the words one measure at a time (47x-8)
-  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, words }, null, 1) + '\n');
+  const ftOut = footageOut(footage);
+  const readForText = { out, rows: useRows, cuts: activeCuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, sheets, tiles, picks, timeline, span: activeSpan, pr, w, h, rate };
+  const words = describe(readForText);
+  const ov = overall({ ...readForText, words });   // the whole film's arc and feel, before the words one measure at a time (47x-8)
+  const { ratings, libDirs } = loadRatings();
+  const card = reportCard({ ...readForText, overall: ov }, { ratings, libDirs });
+  if (refDoc) {
+    const refCard = refDoc.card?.canons?.length ? refDoc.card : reportCard(refDoc);
+    designOut.push('', ...formatSideBySideCards(card, refCard, refTitle));
+  }
+  const cardOut = { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines };
+  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, words }, null, 1) + '\n');
   const palettePng = path.join(out, 'palette.png');
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
 
@@ -754,15 +827,21 @@ async function watch() {
     `- file: ${opt.file}`,
     `- ${w}x${h} as decoded (stored ${pr.stored}), ${pr.fps ?? '?'} fps, ${pr.duration != null ? `${pr.duration.toFixed(1)} s` : 'no duration in the header'}; watched ${stamp(opt.from)} to ${stamp(opt.from + span)} at ${rate} samples/s (${n} samples)`,
     `- brightness ${mean(r => r.lum).toFixed(2)}; near black ${pct(mean(r => r.dark))} of the frame; blown ${pct(mean(r => r.bright))}; saturation ${mean(r => r.sat).toFixed(2)}`,
-    `- colour: ${pct(colTot / (n * w * h))} of pixels are coloured; of those ${hues.map(([nme, v]) => `${nme} ${pct(v)}`).join(', ') || 'none'}`,
+    `- colour: ${pct(mean(r => r.colour))} of pixels are coloured; of those ${hues.map(([nme, v]) => `${nme} ${pct(v)}`).join(', ') || 'none'}`,
     `- motion (mean % change between samples): median ${q(motions, 0.5)?.toFixed(2) ?? 0}, 90th ${q(motions, 0.9)?.toFixed(2) ?? 0}, max ${q(motions, 1)?.toFixed(2) ?? 0}`,
     `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t) + (rows[k].dissolve ? ' (dissolve)' : '')).join(', ') : 'none'}${dissolves.length ? `; ${dissolves.length} of them dissolves, ${dissolves.map(v => `${((v.to - v.from) / rate).toFixed(1)} s`).join(', ')}` : ''}`,
     ...shapeLines,
     sync ? `- sound: loudness median ${q(loud, 0.5).toFixed(0)} dB; motion vs loudness r = ${sync.r0.toFixed(2)} at no lag, best ${sync.best.toFixed(2)} with motion ${sync.lag >= 0 ? 'following' : 'leading'} the sound by ${Math.abs(sync.lag).toFixed(2)} s` : '- sound: no audio track',
     '',
+    ...footageLines(footage),
+    '',
     '## Overall',
     '',
     ...result.overall.lines,
+    '',
+    '## Report card',
+    '',
+    ...card.lines,
     '',
     '## In words',
     '',

@@ -105,7 +105,7 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
         <Slider
           label="Liquid"
           value={settings.liquidMl ?? COVER_FULL_ML}
-          min={9}
+          min={1}
           max={150}
           step={1}
           onChange={(v: number) => onUpdate({ liquidMl: v })}
@@ -223,6 +223,16 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           step={0.05}
           onChange={(v: number) => onUpdate({ oilWeight: v })}
           settingKey="oilWeight"
+        />
+        {/* How thick the oil itself is (PLAN 38w-31), on Thickness's scale: a thin oil (a lamp's molten wax) is carried and sinks freely, a thick one lags the water. */}
+        <Slider
+          label="Oil Thickness"
+          value={settings.oilThickness ?? Math.log10(50) / 3}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilThickness: v })}
+          settingKey="oilThickness"
         />
         <Slider
           label="Soap Bursts"

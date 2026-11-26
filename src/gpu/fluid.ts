@@ -50,7 +50,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { phaseCHPlan, phaseCapillaryPull } from './fluid/phase';
 import { heatViscPlan } from './fluid/heat';
@@ -116,63 +116,52 @@ export class WebGPUFluid extends FluidCover {
       ['gapRest', [RGBA32], true],
       // A change to the plate's shape: a look changed to mid-show, never an opening.
       ['gapReshape', [RGBA32], false],
-      ['deltaDye', [dye], true],
-      ['deltaVel', [VEL], true],
+      ['deltaFold', [dye], true],
       ['squeezeUpdate', [RGBA32], true],
-      ['scaleDye', [dye], true],
+      ['scaleDye', [dye], false],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
       ['addSlosh', [VEL], open.slosh],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
       ['dampGridCurv', [dye], true],
       ['dampGridLimit', [dye], true],
       ['dampGrid', [dye], true],
-      // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
-      ['jacobi', [VEL, dye], true],
+      // Viscosity diffuses velocity only; no caller diffuses dye via jacobi.
+      ['jacobi', [VEL], true],
       ['dyeDisperse', [dye], true],
-      ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye], true],
       ['forcesB', [VEL], true],
       ['currentForces', [VEL], true],
       ['curDivergence', [R32], true],
       ['curPressure', [R32], true],
       ['curGradient', [VEL], true],
-      ['addCurrent', [VEL], true],
       // The spun dish (PLAN §22): waited for when the look's own motor starts
       // its dish ahead of its liquid at opening (PLAN 22j, opening.ts).
       ['spinSwirl', [VEL], open.spin],
-      ['decayDye', [dye], true],
-      ['decayVel', [VEL], true],
+      ['decay', [dye], true],
       ['packView', ['rgba32uint'], true],
       ['downsample', [RGBA32], true],
-      ...(opts.float32Filterable ? [['seedGrain', [RGBA32], true] as [string, GPUTextureFormat[], boolean]] : []),
+      ...(opts.float32Filterable ? [['grainStep', [RGBA32], true] as [string, GPUTextureFormat[], boolean]] : []),
       // Vorticity (galaxy): the curl into a single-channel scratch.
       ['curl', [R32], open.vorticity],
       ['confine', [VEL], open.vorticity],
       // The mix (soap-film), always full float, and its surface tension on
-      // the dye as well as on itself.
+      // the dye as well as on itself, plus any oil waiting on the look (Opening.oil).
       ['marangoniFlux', [dye, RGBA32], open.mix],
-      ['mixSplat', [RGBA32], open.mix],
+      ['mixSplat', [RGBA32], open.mix || open.oil],
       // The mix's carry on the old plate; on a thin gap it is carried in
       // substeps (mixAdvectSub, below), so a look opening on one never asks.
-      ['mixAdvect', [RGBA32], open.mix && !open.thinGap],
-      ['mixRelax', [RGBA32], open.mix],
-      ['mixMu', [RGBA32], open.mix],
-      ['mixUpdate', [RGBA32], open.mix],
+      ['mixAdvect', [RGBA32], (open.mix || open.oil) && !open.thinGap],
+      ['mixRelax', [RGBA32], open.mix || open.oil],
+      ['mixMu', [RGBA32], open.mix || open.oil],
+      ['mixUpdate', [RGBA32], open.mix || open.oil],
       /*
-        Oil Bodies, and the oil's smoothed shape that its reach and the
-        oil's surface tension (mixForce) both read: built behind the show,
-        like mixForce. They were first waited for whenever a look with Oil
-        Bodies opened the show, and `npm run startup` on Metal failed it:
-        Oil & Water, opened on its own, asked for none of the six in its
-        first forty steps, because nothing runs them until oil has been
-        poured, and the opening's rule is to wait only for what a look's
-        first steps use. Behind the show they are ready some fifteen
-        seconds after it opens, as mixForce always has been.
+        Oil Bodies, and the oil's smoothed shape read by reach and mixForce:
+        settings alone do not wait (Oil & Water pours nothing at open); a
+        look's own oil does (Opening.oilPull, oilBodies), as does a standing
+        plate's gravity or thin-gap phase.
       */
-      // Except on a look that stands the plate up, whose dye's weight runs
-      // the mix force from its first step (Opening.gravity).
-      ['mixSmooth', [R32], open.gravity || (open.phase && open.thinGap)],
+      ['mixSmooth', [R32], open.gravity || (open.phase && open.thinGap) || open.oilPull],
       // The oil's pressure along the open rim, which mixForce reads (PLAN 18g-6): with it, as it runs with it.
-      ['rimLaplace', [R32], open.gravity],
+      ['rimLaplace', [R32], open.gravity || open.oilPull],
       /*
         The poured liquids' species (PLAN 18d): its pour and fade, and its
         carry in substeps, below. Built behind the show: nothing runs them
@@ -182,14 +171,8 @@ export class WebGPUFluid extends FluidCover {
       ['speciesSplat', [RGBA32], false],
       // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
       ['inkSpecies', [RGBA32], false],
-      /*
-        The layered seed's oil share (38w-15, `layShare` in fluid/inputs.ts),
-        added without an entry here, so the first look that laid oil built it
-        on a frame: main's deploy of 2026-11-22 read "1 in the ledger (0 in
-        the opening), fluid/seedShare:rgba32float" in `npm run startup`. No
-        look's opening asks for it, so it is built behind the show.
-      */
-      ['seedShare', [RGBA32], false],
+      // The layered seed's oil share (38w-15, `layShare`): waited for when oil waits (Lava Pop).
+      ['seedShare', [RGBA32], open.oil],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       ['liquidForces', [VEL], false],
@@ -202,10 +185,10 @@ export class WebGPUFluid extends FluidCover {
       */
       ['bodyAdvect', [dye], open.maze && !open.thinGap],
       ['bodyAdvectThin', [dye], open.maze && open.thinGap],
-      ['bodyPartition', [dye], false],
-      ['bodyUnspread', [dye], false],
-      ['bodyLand', [dye], false],
-      ['bodyLay', [dye], false],
+      ['bodyPartition', [dye], open.oilBodies],
+      ['bodyUnspread', [dye], open.oilBodies],
+      ['bodyLand', [dye], open.oilBodies],
+      ['bodyLay', [dye], open.oilBodies],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -260,11 +243,9 @@ export class WebGPUFluid extends FluidCover {
       // drain. None was seen in a look's first steps, the mix's and the
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
-      ['mixForce', [VEL], open.gravity],
-      // Film Hold's push: built behind the show, as the oil's other kernels
-      // are (no look opens with it in its first steps' set; startup fails one
-      // waited for and never run).
-      ['mixFilm', [VEL], false],
+      ['mixForce', [VEL], open.gravity || open.oilPull],
+      // Film Hold's push, inside the mix force: waited for where that runs at once with it on (Opening.filmHold).
+      ['mixFilm', [VEL], open.filmHold],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
@@ -273,10 +254,6 @@ export class WebGPUFluid extends FluidCover {
       ['seedChem', [dye], open.chemistry],
       ['drainVel', [VEL], false],
     ];
-    // The ones asked for by name alone, each with the one format it writes:
-    // zeroing a pressure (the old plate's, between projections) and a
-    // coarse level, which both solvers do every step. The old plate's own
-    // solve is in oldPlateBuilds.
     const byName: [string, GPUTextureFormat][] = [['mgZero', R32]];
     const keyed = new Map<string, [string, boolean]>();
     const add = (key: string, code: string, now: boolean) => keyed.set(key, [code, now || (keyed.get(key)?.[1] ?? false)]);
@@ -294,14 +271,15 @@ export class WebGPUFluid extends FluidCover {
     */
     if (open.thinGap) {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
-      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
+      for (const name of THIN_GAP_LATER_KERNELS) add(`${name}:thin`, kernel(name, 'rgba16float'), false);
+      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix || open.oil);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
       // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
-      // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
-      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
+      // The oil's lift up a rocked plate (PLAN 27f-5): waited for where a look's own oil opens on one (Opening.oilLift), else behind the show.
+      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.oilLift && name.startsWith('hs'));
       // The sealed bottle's (PLAN 27f-9): waited for where the look opens stood up, whose first step is sealed (opening.ts).
       for (const name of SEAL_KERNEL_NAMES) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.sealed);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
@@ -320,8 +298,9 @@ export class WebGPUFluid extends FluidCover {
       */
       for (const [key, code] of WebGPUFluid.oldPlateBuilds(dye)) add(key, code, true);
     }
-    // The splats' deltas brought up to the grid, every step.
-    for (const f of [RGBA32, R32] as GPUTextureFormat[]) add(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f), true);
+    // Dye and velocity deltas brought up to the grid every step; cpuMulTex samples directly via deltaFold until bodyLand needs deltaMulTex.
+    add(`upsampleDelta:${RGBA32}`, splatKernel('upsampleDelta', RGBA32), true);
+    add(`upsampleDelta:${R32}`, splatKernel('upsampleDelta', R32), false);
     // A tool, a pour: the splats, always into the full-float deltas. And the
     // plate measured (`measure`), keyed by name as `statsRun` asks. Neither
     // was asked for in any look's first forty steps, nor in the classic
@@ -377,7 +356,9 @@ export class WebGPUFluid extends FluidCover {
     return [
       ...byName.map(([name, f]): [string, string] => [name, kernel(name, f)]),
       [`divergence:${R32}`, kernel('divergence', R32)],
+      [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       // The dye's backtrace and the velocity's self-advection (one key when the dye is half float).
+      ...[...new Set([dye, VEL])].map((f): [string, string] => [`advect:${f}`, kernel('advect', f)]),
       ...[...new Set([dye, VEL])].map((f): [string, string] => [`macCormack:${f}`, kernel('macCormack', f)]),
     ];
   }
@@ -436,6 +417,7 @@ export class WebGPUFluid extends FluidCover {
     const oilRho = oilRhoOf(p.oilWeight);
     f[52] = oilRho; f[53] = OIL_EXPAND;
     f[54] = lampCoolOf(this.coverGap * GAP_METRES, p.magnetSeconds);
+    f[55] = oilBodyLn(1e-6, p.oilThickness);
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -751,13 +733,16 @@ export class WebGPUFluid extends FluidCover {
     if (bodiesOn) this.oilDyeStale = false;
     else if (this.oilDye) this.oilDyeStale = true;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
-    const pull = oil * (thin ? OIL_TENSION_GAP * this.coverH2 : OIL_TENSION) * perSecond * N * N, cells = OIL_CELLS / Math.max(disp * N, 1e-9);
+    // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
+    const sealed = thin && upright > 0.001 && this.sealReady();
+    const pull = oil * (thin ? OIL_TENSION_GAP * this.coverH2 * (sealed ? SEALED_TENSION : 1) : OIL_TENSION) * perSecond * N * N;
+    const cells = (sealed ? SEALED_CELLS : OIL_CELLS) / Math.max(disp * N, 1e-9);
     const phaseCapOn = thin && this.phaseLive && (p.magnetSeconds ?? 1 / 60) > 0;
     stage('phase capillary', (pass) => {
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [this.phase.read], none);
       this.run(pass, 'phaseCapillary', this.vel.write, [this.vel.read, smooth, this.ensureStand()],
-        this.arg('phase cap', [phaseCapillaryPull(this.coverH2, perSecond, N), cells, 0, 0]));
+        this.arg('phase cap', [phaseCapillaryPull(this.coverH2, perSecond, N), OIL_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
       this.vel.swap();
     }, phaseCapOn);
     stage('mix force', (pass) => {
@@ -766,9 +751,8 @@ export class WebGPUFluid extends FluidCover {
         room. The dish is drawn turned (Rotation, and a flick), and gravity
         does not turn with it: reported, Lava Lamp's wax poured off toward
         whichever corner the dish had started turned to and the plate was
-        empty in twenty seconds. (Its rock moves the dye already: on a thin
-        gap as the dye's weight down the tipped plate, in hsBody, and on the
-        old plate through the lasting current.)
+        empty in twenty seconds. (Its rock moves the dye already: the dye's
+        weight down the tipped gap, hsBody; the old plate's current.)
 
         And a lamp at the floor: what sinks there is warmed and rises,
         and the cold glass above cools it till it sinks (27f-9e).
@@ -778,8 +762,7 @@ export class WebGPUFluid extends FluidCover {
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
-      const sealed = thin && upright > 0.001 && this.sealReady(), wax = buoy * DYE_WEIGHT * perSecond, heatLift = buoy * HEAT_LIFT * perSecond;
+      const wax = buoy * DYE_WEIGHT * perSecond, heatLift = buoy * HEAT_LIFT * perSecond;
       const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)), gx, gy, sealed ? 0 : wax, sealed ? 0 : heatLift]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
@@ -842,7 +825,7 @@ export class WebGPUFluid extends FluidCover {
         this.ensureThinGap();
         let closed = [0, 0];
         if (lifting) {
-          const m = this.liftN, lnB = oilBodyLn(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
+          const m = this.liftN, lnB = oilBodyLn(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS), p.oilThickness);
           // Signed by the oil's own weight (Oil Weight, PLAN 27f-9c): a wax heavier than the water falls down the tipped plate.
           const kappa = -OIL_LIFT * oilLightnessOf(p.oilWeight) * seconds / (PLATE_METRES * Math.max(disp, 1e-9) * ROCK_FALL);
           this.hsRun(pass, 'hsLiftSource', `hsLiftSource:${mixTex.label}:${this.dye.read.label}:${oilDyeTex.label}`, this.arg('lift source', [m, lnB, kappa, 0]),
@@ -915,24 +898,14 @@ export class WebGPUFluid extends FluidCover {
       "What the step no longer does", says why they can go and what it costs).
     */
     if (thin) {
-      stage('forces', (pass) => {
-        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], this.arg('forces thin', [1, 0, 0, 0]));
-        this.vel.swap();
-      });
       /*
-        And the lasting current with them. On the old plate the current is a
-        speed laid over the flow after both projections, divergence-free in
-        u, which in a gap is not liquid conserved: stirred with a current,
-        glycerine's |∇·(hu)| came to 0.0093 of its flux where without one it
-        was 0.0030 (npm run thingap). Here it goes in as the other forces do,
-        a speed the liquid is driven to against the glass, and the solve
-        makes it conserve liquid with everything else. The rock, the
-        buoyancy and the lamp's pull still come from the current's own
-        solver (PLAN §18a has their move into this field as forces).
+        The lasting current before forcesB: on the old plate the current is laid
+        over the flow after both projections; here it goes into the same
+        velocity the solve makes conserve liquid with everything else.
       */
-      stage('current', (pass) => {
-        this.stepCurrent(pass);
-        this.run(pass, 'addCurrent', this.vel.write, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('current grid thin', [0, this.M, 0, swirlScale]));
+      stage('current', (pass) => this.stepCurrent(pass));
+      stage('forces', (pass) => {
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('current grid thin', [1, this.M, 0, swirlScale]));
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
@@ -959,23 +932,20 @@ export class WebGPUFluid extends FluidCover {
       stage('project 1', (pass) => this.project(pass));
       stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
       stage('project 2', (pass) => this.project(pass));
-
-      // 6.5–8.7 The post-projection forces
-      stage('forces', (pass) => {
-        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
-        this.vel.swap();
-      });
     }
 
     // 8.9. The lasting current, and the flow the dye rides (a thin gap took
     // its current in before the solve, above).
-    stage('current', (pass) => {
-      this.stepCurrent(pass);
-      // The gap rides along: the plate's depth is a mobility on the flow that
-      // carries the dye (F), and this is the field that carries it.
-      this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read],
-        this.arg('add current', [0, this.M, p.depthDrag, swirlScale]));
-    }, !thin);
+    stage('current', (pass) => this.stepCurrent(pass), !thin);
+    if (!thin) {
+      stage('forces', (pass) => {
+        // The gap rides along: the plate's depth is a mobility on the flow that
+        // carries the dye (F), fused into forcesB for velForced.
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read],
+          this.arg('add current', [0, this.M, p.depthDrag, swirlScale]));
+        this.vel.swap();
+      });
+    }
 
     // 9. Dye: dispersion along the flow plus molecular diffusion (PLAN 18h, 18h-2)
     /*
@@ -1007,37 +977,11 @@ export class WebGPUFluid extends FluidCover {
     const dispCells = disp * (N - 2);
     const kappaT = p.kappaT ?? 0.0;
     const dispCap = 0.25;
-    /*
-      Skip the dye disperse pass when there is no plate displacement and physical
-      diffusion is negligible. `dm` is the step's molecular spread in cells²
-      ((D_m / plate_area) * dt * (N-2)² * diffScale).
-      At 0.0039 ≈ 1/256 (one 8-bit unorm quantum, 1/255 ≈ 0.00392), a step's
-      explicit Laplacian flux across a full-strength edge (|ΔC| = 1.0) produces
-      less than a single 8-bit quantization step of change.
-      At default show resolution (N = 256, dx ≈ 0.79 mm, dt = 1/60 s) with
-      p.diff = 0.0002, physical food dye diffusion in water (Dm ≈ 4e-10 m²/s)
-      yields dm ≈ 1.08e-5 cells²/step — ~360× below 1/256. Skipping this near
-      no-op pass saves ~0.4 ms/step on the GPU with zero visible change.
-      If dt or grid N changes, dm scales as dt * (N - 2)²; 0.0039 remains the
-      threshold where a step's diffusion alters an 8-bit level.
-    */
+    // Gated on its own coefficients in passes.ts (disperseDye, PLAN 46k).
+    const bodiesDisperse = bodiesOn && !bodiesFresh;
     stage('dye disperse', (pass) => {
-      this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
-        this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
-      this.dye.swap();
-      if (bodiesOn && !bodiesFresh) {
-        const od = this.oilDye!;
-        // Keep oil's pre-dispersion share in scratchB for bodyUnspread
-        this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
-        this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
-          this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
-        od.swap();
-        this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
-        this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
-        this.dye.swap();
-        od.swap();
-      }
-    }, dispCells > 0 || (kappaT > 0 ? dm > 0 : dm > 0.0039));
+      this.disperseDye(pass, dm, kappaT, dispCells, dispCap, bodiesDisperse);
+    }, this.disperseWanted(dm, kappaT, dispCells, bodiesDisperse));
     /*
       The poured liquids' species rides the colour's carry when it can (PLAN
       18d-11a, bodyAdvectPairSub): the same faces in the same substeps, found
@@ -1452,7 +1396,7 @@ export class WebGPUFluid extends FluidCover {
       const m = mix!;
       if (this.mixLive) {
         // The oil with its colour: in the dye's substeps on a thin gap (carryPlan).
-        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect thin', [+sealed, 0, 0, 0, 0, disp, 1, REST_GAP]));
         else {
           this.runPressed(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
           m.swap();
@@ -1476,8 +1420,8 @@ export class WebGPUFluid extends FluidCover {
           this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
-            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04, sp[5]])
-            : this.arg('mix update oil', [0.012, 0, 0, 0, 1]));
+            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04, sp[5], +sealed])
+            : this.arg('mix update oil', [0.012, 0, 0, 0, 1, +sealed]));
           m.swap();
         }
       }
@@ -1630,17 +1574,13 @@ export class WebGPUFluid extends FluidCover {
     // 9.6. Pigment coordinates ride along with the dye
     if (this.grain) {
       stage('grain', (pass) => {
-        this.run(pass, 'advect', this.grain!.write, [this.grain!.read, this.velForced, this.sampler], this.arg('advect grain', [disp, 0, 0, 0]));
-        this.grain!.swap();
         const before = this.grainAge;
         this.grainAge = (this.grainAge + p.dt) % GRAIN_PERIOD;
         const crossed = (from: number, to: number, at: number) => (from < at && to >= at) || to < from;
         const keepA = crossed(before, this.grainAge, 0) && this.grainAge < GRAIN_PERIOD * 0.5 ? 0 : 1;
         const keepB = before < GRAIN_PERIOD * 0.5 && this.grainAge >= GRAIN_PERIOD * 0.5 ? 0 : 1;
-        if (keepA === 0 || keepB === 0) {
-          this.run(pass, 'seedGrain', this.grain!.write, [this.grain!.read], this.arg('grain keep', [keepA, keepB, 0, 0]));
-          this.grain!.swap();
-        }
+        this.run(pass, 'grainStep', this.grain!.write, [this.grain!.read, this.velForced, this.sampler], this.arg('grain step', [disp, keepA, keepB, 0]));
+        this.grain!.swap();
       });
     }
 
@@ -1668,9 +1608,8 @@ export class WebGPUFluid extends FluidCover {
 
     // 10. Decay: damping, the speed limit, evaporation, the cap, heat decay
     stage('decay', (pass) => {
-      this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
+      this.run2(pass, 'decay', this.dye.write, this.vel.write, [this.dye.read, this.vel.read], this.boilLive ? this.arg('decay boil', [1, 0, 0, 0]) : none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], this.boilLive ? this.arg('decay boil', [1, 0, 0, 0]) : none);
       this.vel.swap();
     });
 
@@ -1757,6 +1696,7 @@ export class WebGPUFluid extends FluidCover {
         // The kernels; the snapshot before the forces and the copy the dye
         // rides, both into the velocity's format; the dye's carry in substeps.
         for (const [key, code] of WebGPUFluid.thinBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
+        for (const name of THIN_GAP_LATER_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, kernel(name, 'rgba16float'));
         // And the oil's (carryPlan), which only a look with the mix asks for.
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;

@@ -15,3 +15,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 - ~~**14c-4k · A 4K wall opens at the right rung** (A, S).~~ **Shipped** (`stageLadder` in `src/lib/platform.ts`, `npm run rungs`: 3840×2160 opens on 2880×1620, 4.67 Mpx, 0 of 8 move down in the first 10 s; story in `docs/plan-shipped.md`).
 - ~~**14c-governor · A wall coming or going keeps the governor's memory** (A, S).~~ **Shipped** (`QualityGovernor.carry` in `src/lib/governor.ts`, `npm run rungs`: 2 changes after the wall vs 2 with none; story in `docs/plan-shipped.md`).
 - ~~**14c-readout · The readout says what the share is of** (A, S).~~ **Shipped** (`engineLabel` in `src/sim/stepping.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
+
+## The frame budget (Wave 4, lane C, M or S each)
+
+- ~~**H2c-6 · No aux target while the camera is off** (C, S).~~ **Shipped** (`src/gpu/plate.ts`, `npm run framereads`: off from the first frame 2 targets and 1 frame-size texture alive → 1 and 0, and again after the camera was on, 2 and 1 → 1 and 0, the camera-on control still 2 targets with `auxTarget` there; 46b; story in `docs/plan-shipped.md`). Left: the tank's draw (`src/gpu/tankDraw.ts`) and the projector sources' `aux (sources)` still write a second target nothing but the lens pass can read; a one-target variant of each is a later item.
