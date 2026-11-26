@@ -27,18 +27,24 @@
  */
 export type LiveFrameKind = 'plate' | 'stack';
 export type LiveFrameListener = (canvas: HTMLCanvasElement | OffscreenCanvas) => void;
+export interface LiveFrameSize { width: number; height: number }
 
-let listening: { kind: LiveFrameKind; fn: LiveFrameListener } | null = null;
+let listening: { kind: LiveFrameKind; fn: LiveFrameListener; size: LiveFrameSize | null } | null = null;
 
 /** Called by the encoder at start; the function it returns ends the listening. */
-export function listenLiveFrames(kind: LiveFrameKind, fn: LiveFrameListener): () => void {
-  const me = { kind, fn };
+export function listenLiveFrames(kind: LiveFrameKind, fn: LiveFrameListener, size: LiveFrameSize | null = null): () => void {
+  const me = { kind, fn, size };
   listening = me;
   return () => { if (listening === me) listening = null; };
 }
 
 /** Whether a stream wants this kind of picture now: a draw that exists only for the stream asks before it draws. */
 export function liveFrameWanted(kind: LiveFrameKind): boolean { return listening?.kind === kind; }
+
+/** The stream size the listener asked for (e.g. 'stack' draws at the stream's size), or null when none or not listening. */
+export function liveFrameSize(kind: LiveFrameKind): LiveFrameSize | null {
+  return listening?.kind === kind ? listening.size : null;
+}
 
 /** Called by the frame task with a canvas it just drew. Never throws into it: a stream's frame is not worth the show's. */
 export function tapLiveFrame(kind: LiveFrameKind, canvas: HTMLCanvasElement | OffscreenCanvas): void {

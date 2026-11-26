@@ -45,6 +45,7 @@ scratch/
 gallery/
 handpour.json
 controls/
+bugbash/
 film/
 
 # The Mac app's packed builds (npm run mac-app)

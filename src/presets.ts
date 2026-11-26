@@ -1310,7 +1310,6 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.5,
       rotationSpeed: 0.095,
       centerGravity: 0.05,
-      granulation: 0.5,
       diffusionRate: 0.00012,
       buoyancy: 0.45,
       advection: 0.6,
@@ -2386,7 +2385,7 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-// The moiré pack, the music's stir and its hands, over every look (presetsLay.ts).
+// The moiré pack, the music's stir, the glass's slide and the music's hands, over every look (presetsLay.ts).
 layLooks(PRESETS);
 
 /*

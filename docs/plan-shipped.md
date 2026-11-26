@@ -6696,6 +6696,53 @@ controls above. Shortcuts kept, each named in 27f-9g: the glass temperatures lai
 the thin gap's rate standing in for a fat bottle's, and dye wax (no oil phase) still on the
 old kick. The Mac's film of two minutes is the owner's verdict.
 
+### 27f-9q. Lava Lamp's wax holds round, and the lamp keeps all of it (2026-11-14)
+
+The owner asked for the lamp's wax to hold round blobs. With the wax really laid,
+it hung in heads on stalks, threads and rows of beads: an area-weighted roundness (4πA/P²
+of each body over half oil, a disc 1) of 0.3 to 0.6 on the Mac's app. The lab had found
+that more `OIL_TENSION` bought nothing under the force's cap of half a cell a step, and
+that lifting the cap at ×4 gave four fat round bodies and lost a fifth of the oil in two
+minutes.
+
+*Why it was heavy.* Between two glasses a blob's weight and its tension are both resisted
+by the same Darcy drag, 12μ/h², so its shape is set by their ratio, the Bond number
+Δρ g R²/σ, and the gap drops out of it. 38r took the rest gap from 6 mm to 2 mm and scaled
+the oil's tension by (2/6)², a ninth (`OIL_TENSION_GAP`), but not the standing plate's
+weight (`DYE_WEIGHT`, `HEAT_LIFT`): in the lamp every body was nine times as heavy against
+its own skin as the tension had been set for. The consistent fix is ×9 on the tension of a
+sealed bottle's oil; ×4 ships (`SEALED_TENSION`, with the cap at one cell, `SEALED_CELLS`)
+because at ×9 the explicit force sheds the edge as a haze (27f-9s).
+
+*Where the oil went.* Measured on the Mac's Metal, the lab on the app's own step and lay,
+256², 120 s, Σc over the disc 4,373 at the start. ×4 as first tried: 4,229 over the grid
+and 4,202 in the disc. Two ways out, each shut and each put back alone to see it:
+- **the open rim's lip.** A standing plate's weight is laid as a closed circulation
+  (27f-9), but the gap's carry still had the open rim, and `lipHolds` let oil over it with
+  the water wherever the dish's pressure stood above the trough's. A sealed bottle has no
+  trough: now no oil crosses its lip. Lip open alone: the grid kept 4,373 but the disc
+  4,165, 208 outside the wall (4.8%).
+- **the runaway guard.** `mixUpdate` clamped every cell to -0.25..1.25 after the
+  Cahn–Hilliard step, and wax pressed against the wall packs to about 1.8 before
+  `mixRelax` shares it back: each step destroyed the excess. The guard is ±8 now, which
+  still stops a runaway. Guard alone: the grid 4,338 (-0.8%).
+With both: 4,373 to the cell at every sample of 180 s, and at today's tension (before) the
+oil was kept too, so neither was a leak until the force was strong enough to press on them.
+
+*What it looks like (the same lab, mean of the samples):* roundness 0.81 against 0.57 at
+the old tension (0.79 against 0.67 at 192²); the cells over half oil 5.1% of the plate at
+120 s against 4.7%, so the wax is gathered, not hazed. ×6 read 0.85 and ×9 0.94 but
+×9 lost the cells over half oil to 3.0% at 120 s and 2.1% at 180 s; ×9 with the cap at
+half a cell 0.73. The cycle the owner approved (27f-9h) is unchanged: `lavacycle` 7/7, the
+wax rising to 0.63 of the height, falling to 0.18, and again in the second minute. Only
+Lava Lamp stands its plate (`plateUpright`), so no other look moves.
+
+`npm run lavaround` (the Mac's `show`): two minutes at 256², the disc's oil within 0.1% at
+every five-second reading; the lip opened again must lose 2% and the guard put back 0.3%;
+the bodies' roundness from 20 s 0.72 or more and 0.12 above the old tension. At 192² neither
+leak shows, which is why it is 256². Its first run (an M4, 62 s): the disc 4,373 to the cell,
+the lip 4.76% gone, the guard 0.80%, round 0.821 against 0.604. Found on the way: the full nine (27f-9s), the second
+curvature tried again on this (27f-9t), and wax gathering at the wall over minutes (27f-9u).
 ### 27f-9m. A look's oil laid before its solver is there (2026-11-12)
 
 The owner, 2026-11-12, of the new lamp on the Mac: the wax smears into streaks instead of
@@ -12448,6 +12495,28 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4d-1. Stream the mixer's stack, not only the laptop's plate
+
+  - **37x-4d-1. Stream the mixer's stack, not only the laptop's plate (#667).**
+    The Live Show panel streamed `#liquid-canvas`, the laptop's plate, so a show with the film,
+    the mark or a back plate in the mixer streamed the plate without them, while the Wall output
+    (`CastDisplay`'s `#stage-canvas`) carries the wall's keystone, masks and warp, which on a
+    stream would be a skewed picture. The panel (`src/components/LiveShowPanel.tsx`) now offers a
+    Source choice (`data-testid="live-source"`, values `plate` by default and `stack` for Mixer
+    stack), kept in `LiveFormat` (`src/lib/liveShow.ts`) and forwarded to `LiveEncoder`
+    (`src/lib/liveStream.ts`, `frames: 'stack'`). While a stream with `source: 'stack'` is live,
+    `WebGPUOutput` (`src/gpu/output.ts`) draws a second pass of `this.scene` with
+    `fillOutputUniforms(..., true)` (identity warp, `IDENTITY_CORNERS`, zero masks and feather,
+    neutral gain/gamma, no per-frame allocation) into a WebGPU canvas of the stream's size
+    (`1920x1080` or `1080x1920`, asked via `liveFrameSize('stack')` in `src/lib/liveFrame.ts`),
+    and `LiquidVisualizer.tsx` hands that canvas to `tapLiveFrame('stack', ...)` inside the frame
+    task beside `tapFrameCopies` (zero cost when no Mixer stack stream is live). The phone's
+    live chip only stops a stream and the source is chosen on the Mac before Go live, so there is
+    no phone control. Each destination's health line in the panel also shows the stream's frame
+    time (`ms a frame`). *Measured:* `npm run liveshow -- --stack` (`stack` taken out of
+    `--owed` in `scripts/checks.json`), `npm run liveshow`, `PW_WEBGPU=1 npm run mixer`,
+    `PW_WEBGPU=1 npm run wallpattern`, `npm run qa`.
+
 #### 37x-10c. Words poured from the phone, the show server and the assistant
 
   - **37x-10c. Words poured from the phone, the show server and the assistant (shipped
@@ -13356,6 +13425,42 @@ judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music stil
 slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
 saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
+## 38u-8, 38u-11. The glass still and the dye smooth unless someone moves them
+
+Found by the third physics pass (38u, 2026-11-13). Two dials did something on every plate
+that nobody had asked for. Glass Smear, the cover glass sliding over the liquid (a thin-gap
+Couette drag at half the glass's speed, `thinProject`), defaulted to 0.3, and 19 of the looks
+on main (after 38w-1 rested Lava Pop and its moiré pair at 0) slid it all the time with no
+hand on it; a real cover glass is still until the performer pushes it. Granulation laid a
+value-noise speckle in the dye's depth, 0.5 on every look; a dye in solution has no grain (a
+pigment like India ink flocculates, and the real thing is a concentration the solver would
+carry below the grid, 47a). The owner chose (2026-11-14, the recommended option on each card)
+both defaults at 0, Granulation's dial kept, and the drift the sliding looks were built around
+kept where the performer can see and pull it.
+
+What changed: both defaults are 0 and no look writes either above it. The slide is a cord,
+LFO 1 (a sine over eight bars, 0..1) on Glass Smear, laid by `presetsLay.ts` over the written
+looks like the music's stir (`laySlideCords`, lib/glassSlide.ts), at the look's old dial over
+the dial's travel of 3, rounded down to hundredths: the top of each wave is the old constant
+speed, never faster (rounded to the nearest, soap-film's top would have been 3% over), and
+the glass comes to rest at the foot. An LFO and not the sound, because the slide was never
+the music's: the beat clock falls back to a steady tempo in silence, so the look breathes
+with nothing playing. bass-drop keeps its own hats cords on the glass. Evolve never wanders
+either dial (`NOT_THE_LOOK`), Lucky rolls the slide as a cord no deeper than a third, and the
+phone's mixer has a Glass Slide slider beside Music Stir. `SceneMapping.feature` now names
+the LFOs and envelopes (`ModulatorFeature`), which the 'shape' source always read.
+
+Measured (`npm run glassstill`, node, the real patch bay, LFOs and solver): every look rests
+both dials at 0; the 19 carry one cord each; folded through 16 s of silence the glass's derived
+speed peaks within rounding of the old constant speed (never over) and falls to 0.000; with
+the cord pulled, or the LFOs' share at 0, it is 0; the others stay still. `npm run grainedge`
+now asks every look at 0.5 where it ships with none, since asking only the looks with grain
+would ask none. `npm run soundpatch` counts the slide cord apart from a look's answers to the
+sound, as it counts the stir and the music's hands. Taking the two dials out of Evolve changed
+what its seeded dice drew, and `npm run slowevolve` also holds main's dial rate cap
+(`DIAL_RATE_MAX`, 0.04 in `slowEvolve.ts`) across every move on eight seeds.
+Left open: 38u-17 (the glass's direction is still a noise path) and 38u-18 (a look saved
+before this still slides all the time).
 
 ## 38u-16. A look saved before the cord gains it, once (2026-11-22)
 
@@ -15780,6 +15885,30 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+## 38b-2. Bubble Melt, air dissolving past nature (2026-10-31)
+
+Asked by the owner: "Let's add a bubble dial for them to melt away", answering the open
+38b-2 question, with the standing rule that a dial scales a physical quantity past real
+and never swaps the law. With #603 a pocket of air between the glasses dissolves only at
+Henry's law's rate, 2π·D·L·(Δp/p₀)/ln(R_plate/R) in area, which is years for a millimetre
+pocket. Bubble Melt (`bubbleMelt`, default 0) is a factor on D alone: exactly 1 at 0, then
+10^(6 + 5v), because even a fully degassed liquid (Δp/p₀ from 3e-4 to 1) is only about
+3,000× nature and still days, so the dial's first step jumps to 1.8e6 and its travel is
+five decades on a log scale, very gentle to very extreme (the owner, 2026-10-31: "very
+gentle options and very extreme options", a principle for every dial). Melt times at the
+6 mm gap for a 2 mm bubble, the size the music's and the straw's start at: about 25 min at
+0.05, 2.5 min at 0.25, 9 s at 0.5, half a second at 0.75; at 1 even the straw's 8 mm goes
+in a fraction of a second. The small go first and each speeds up as its Laplace pressure
+climbs. Two mappings were filmed on the owner's Mac first (Classic, Bubbles 0.7, five straw
+bubbles of 1.8–8 mm, 40 s takes): 10^(6 + 3v) melted nothing visible below 0.9 (a 3 mm
+bubble went only to 2.83 mm in 40 s at 0.5, the flow taking most to the rim in 5–30 s);
+10^(8 + 3v) melted gradually at 0.25 (1.8 mm at 4.7 s ... 4 mm at 28.4 s), everything by
+5.5 s at 0.5 (8 mm at 22 s), and emptied the plate at 0.9, smallest first, none popped:
+all strong and nothing gentle, so the range opened at both ends. `liquid()` sets it from the settings each frame, so nothing in the frame loop
+changed. On the sheet under Bubbles (and so the phone's settings sheet), pinnable as a
+look control, MIDI-learnable, a patch target. Checks: `npm run bubblephysics` 27/27, its
+three new lines: off is exactly nature; melt time × factor constant across the dial within
+5%; 2 mm and 1 mm pockets at the middle melt on the law's own integral, the small first.
 
 ### 48c. Bioluminescent trails: the water glows where it is sheared (shipped 2026-11-21)
 
@@ -15851,6 +15980,29 @@ Analysing songs ahead from decoded PCM and file bytes so cues can lead the beat 
 - **17f (`readSongTags`):** parses ID3v2.4 (synchsafe sizes), ID3v2.3 (UTF-16/Latin-1/UTF-8), and FLAC Vorbis comments + PICTURE blocks, selecting picture type 3 (front cover) when present, normalising 12-character ISRCs, and returning `{}` safely on untagged or truncated input.
 - Checked by `npm run hearahead` (all `--owed` flags removed from `scripts/checks.json`). Left open: `17b-2`, `17c-2`, `17f-2`, `17g`, `17h`, and the Web Audio player part of `17e` with `17g`.
 
+## H2c-6. No aux target while the camera is off (2026-11-13)
+
+`WebGPUPlate.draw` (`src/gpu/plate.ts`) allocated a frame-size `rgba8unorm` aux texture and
+the display pass wrote it every frame, though only the camera pass reads it: 4 bytes a pixel,
+about 16 MB a frame at 2560x1600 with the camera off. The plate now reads the camera's state
+from its own uniforms (`this.pack.get('cameraOn')`, which `LiquidVisualizer` already fills with
+`!!cam`), so `draw`'s signature is as it was. `displayName` and `displayRecipe` take an `aux`
+flag: with it, the display pipeline has two colour targets (the picture and the aux); without
+it, one, and the render pass is given one colour attachment (a pipeline built for two targets
+rejects a pass with one, which is a black screen). `keepAux` makes the aux when it is wanted
+and lets it go when it is not, so one made for the camera is released the frame after the
+camera goes off, and `auxTarget` is null while it is. The aux is wanted while the camera is on,
+while the lens pass (glitter, side light: it samples the aux) is up, and while the tank's draw
+is up (its own pipeline writes a second target). `WebGPUPlate.prepare` builds the one-target
+display for the stock's picture and the two-target one for the camera (and the lens pass's
+scene), each behind the show's opening only where the opening's first frame draws it.
+
+Measured by `scripts/framereads-owed.mjs` (the `h2c6` line, taken out of `--owed`): a plate kept
+across frames, camera off from its first frame, on, then off again, drawn at 72² over a 128²
+grid so a texture at the frame's size can only be a frame target. Main 2 display targets and 1
+frame-size texture alive in both off stretches; now 1 and 0 in both, with the camera-on control
+at 2 targets, 1 alive and `auxTarget` there. Not done (left in section 40): the tank's draw and
+the projector sources' `aux (sources)` keep their second target.
 ### P7-cpu (step 3.1): Delete the CPU solver's stepping
 
 Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and

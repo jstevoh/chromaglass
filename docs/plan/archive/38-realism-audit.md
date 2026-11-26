@@ -177,3 +177,6 @@ build and what it adds to the frame. S is under a day, M a few days, L a week or
 Every item here keeps today's look reachable until the Mac has judged the new one (the
 operating rules), and each ships from its own thread with the check that measures it
 written first. Line numbers are as read on main at d07ac31.
+- ~~**38u-8. Granulation is value noise**~~ — **Shipped** (the story is in
+  `docs/plan-shipped.md`). The owner's call: default 0 in every look, the dial kept;
+  `npm run glassstill`. The real grain (a concentration carried below the grid) stays 47a's.

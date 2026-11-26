@@ -13,7 +13,7 @@
  * and dark, a pixel or two across, like a dithered picture's.
  *
  * The cause was the order of two steps in the plate shader (wgsl/plate.ts).
- * Granulation, the pigment's grain (on at 0.5 in every look), scaled the
+ * Granulation, the pigment's grain (then on at 0.5 in every look), scaled the
  * dye's opacity up and down by a noise; then the gooey contrast curve, which
  * is the meniscus that rounds a pool's edge, steepened that opacity about
  * 0.5 by as much as five times. Inside a pool the opacity is near 1 and the
@@ -27,7 +27,8 @@
  * The fix draws the grain after the edge, as what it is: pigment that sits
  * deeper in some places than others, which changes how much light the dye
  * stops (its optical depth), not where the liquid ends. Asked here, of every
- * shipped look with any grain, on one stirred plate of nine pools at 256²
+ * shipped look at its grain (or at 0.5 where, since PLAN 38u-8, it ships
+ * with none), on one stirred plate of nine pools at 256²
  * (the rung the website's governor gives a laptop most often, and the
  * coarsest), each picture against the same plate with the grain at 0:
  *
@@ -104,12 +105,17 @@ const { page, close } = await openLab();
 const rows = [];
 let looks = [];
 try {
-  // Every shipped look whose grain is on, over the defaults as the app lays it.
+  // Every shipped look, over the defaults as the app lays it. Until PLAN
+  // 38u-8 (2026-11-15) every look shipped its grain on at 0.5 and this asked
+  // the looks whose grain was on; now every look ships it off (a dye in
+  // solution is smooth) and the grain is the performer's to turn up, so each
+  // look is asked at the grain it ships with where that is above zero, and at
+  // 0.5, the old default and the dial's middle, where it is not. Asking only
+  // the looks that ship grain would ask none, and pass on nothing.
   const all = await page.evaluate(() => lab.lookIds());
   const unknown = (only ?? []).filter((id) => !all.includes(id));
   if (unknown.length) throw new Error(`GRAINEDGE_ONLY: no look ${unknown.join(', ')}`);
-  looks = (await page.evaluate((CONTROL) => lab.lookIds().filter((id) => lab.look(id).settings.granulation > 0 || CONTROL.includes(id)), CONTROL))
-    .filter((id) => !only || only.includes(id));
+  looks = all.filter((id) => !only || only.includes(id));
   await page.evaluate(async ({ N, STEPS }) => {
     await lab.create(N);
     // Nine pools of three colours, stirred by pushes for STEPS steps, so the
@@ -127,6 +133,7 @@ try {
   for (const [id, back] of [...looks.map((id) => [id, false]), ...lampLooks.map((id) => [id, true])]) {
     const row = await page.evaluate(async ({ id, SIZE, FLECK, back, CONTROL_GRAIN }) => {
       const Lk = lab.look(id);
+      // The grain asked about: the look's own, or CONTROL_GRAIN (0.5) where it ships with none (above).
       const g0 = Lk.settings.granulation > 0 ? Lk.settings.granulation : CONTROL_GRAIN;
       // What the plate draws of it: the film stock's grain takes the plate's
       // place (plateUniforms.ts), so a look on film has less of its own.

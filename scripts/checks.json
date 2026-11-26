@@ -1044,6 +1044,18 @@
       ]
     },
     {
+      "name": "The glass is still and the dye smooth unless someone moves them",
+      "shard": "logic",
+      "run": "npm run glassstill",
+      "why": [
+        "Glass Smear and Granulation rest at 0 on every look (PLAN 38u-8,",
+        "38u-11); the 19 looks that slid the glass carry it on an LFO cord whose",
+        "top is their old speed and never faster, folded by the real patch bay",
+        "and stepped by the real solver; pulling the cord stops it; Evolve and",
+        "Lucky cannot slide the glass or grain the dye."
+      ]
+    },
+    {
       "name": "The melody walks across the plate",
       "shard": "logic",
       "run": "npm run melody",
@@ -1576,7 +1588,7 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads -- --owed=h2c6,h2c9",
+      "run": "npm run framereads -- --owed=h2c9",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",
@@ -1957,6 +1969,25 @@
         "is half a minute on an M4's Metal, 78 s on the hosted Mac (this PR's first `show` run,",
         "2026-11-12; the four minutes are three times that) and two hours on SwiftShader, where",
         "it had Measure's lab10 to itself while it watched 50 s."
+      ]
+    },
+    {
+      "name": "Lava Lamp's wax holds round, and the lamp keeps all of it",
+      "shard": "show",
+      "run": "npm run lavaround",
+      "timeout": 6,
+      "why": [
+        "The owner: the lamp's wax would not hold round blobs (PLAN 27f-9q). In a Hele-Shaw gap",
+        "a blob's shape is its Bond number, weight against tension, and the gap drops out of it;",
+        "38r scaled the tension by h^2 and not the standing plate's weight, so the wax was nine",
+        "times too heavy for its skin. Four times the tension in a sealed bottle rounded it and",
+        "lost a fifth of the oil in two minutes, over the open rim's lip and to the runaway",
+        "guard's clamp at 1.25; both are closed. Two minutes of the look at 256^2 on the app's",
+        "lay: the disc's oil within 0.1% at every reading, the bodies' roundness 0.72 or more and",
+        "0.12 above the tension it had, and two controls that put each way out back and must see",
+        "it (the lip: 2% gone; the guard: 0.3%). At 192^2 neither leak shows, so 256^2 it is,",
+        "four labs of two minutes: the Mac's Metal only. 62 s on an M4 (2026-11-14: the disc kept",
+        "4,373 to the cell, the lip lost 4.76%, the guard 0.80%, round 0.821 against 0.604)."
       ]
     },
     {
@@ -4108,15 +4139,14 @@
     {
       "name": "The Live Show streams the picture",
       "shard": "fifth",
-      "run": "npm run liveshow -- --stack --owed=stack",
+      "run": "npm run liveshow -- --stack",
       "quarantine": [{ "line": "the Plate source's stream moves with the film", "plan": "19ak-19", "since": "2026-11-22", "until": "2026-12-06" }],
       "why": [
         "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
         "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
         "mixer and a keystone on the wall, streamed and decoded, against the",
-        "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
-        "the Mixer stack source is not built; printed as owed until the PR that",
-        "builds it takes its id out (the Plate source's black frames, 37x-4d-6, are fixed)."
+        "plate read in its own frame. On a Mac because it needs WebGPU (both",
+        "the Plate source, 37x-4d-6, and the Mixer stack source, 37x-4d-1, hold)."
       ]
     },
     {
