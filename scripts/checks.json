@@ -1044,6 +1044,18 @@
       ]
     },
     {
+      "name": "The glass is still and the dye smooth unless someone moves them",
+      "shard": "logic",
+      "run": "npm run glassstill",
+      "why": [
+        "Glass Smear and Granulation rest at 0 on every look (PLAN 38u-8,",
+        "38u-11); the 19 looks that slid the glass carry it on an LFO cord whose",
+        "top is their old speed and never faster, folded by the real patch bay",
+        "and stepped by the real solver; pulling the cord stops it; Evolve and",
+        "Lucky cannot slide the glass or grain the dye."
+      ]
+    },
+    {
       "name": "The melody walks across the plate",
       "shard": "logic",
       "run": "npm run melody",

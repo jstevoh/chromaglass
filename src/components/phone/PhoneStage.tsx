@@ -16,6 +16,7 @@ import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { musicStirOf, withMusicStir } from '../../lib/stir';
+import { glassSlideOf, withGlassSlide } from '../../lib/glassSlide';
 import { musicHandOf, withMusicHand } from '../../lib/musicCords';
 import type { MusicRole } from '../../types';
 
@@ -1182,6 +1183,23 @@ export function PhoneStage(p: PhoneStageProps) {
               <Slider label="Music Stir" value={musicStirOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                 onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicStir(p.mixer!.settings.sceneMappings, v) })}
                 display={`${Math.round(musicStirOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-stir" />
+            </div>
+          )}
+          {/*
+            Glass Slide: the depth of the look's cord from LFO 1 onto Glass
+            Smear. The cover glass is still unless a hand or a cord moves it
+            (PLAN 38u-11), and the looks that were built sliding carry their
+            slide on that cord (lib/glassSlide.ts). The desk shows it in
+            Patches; the phone has no patch bay, so this is the cord's
+            control here, beside the music's. At 0 the cord is pulled and
+            the glass rests; at 100% the glass's top speed is the dial's
+            whole travel, three times the old default's.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Glass Slide" value={glassSlideOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
+                onChange={(v) => p.mixer!.onSetting({ sceneMappings: withGlassSlide(p.mixer!.settings.sceneMappings, v) })}
+                display={`${Math.round(glassSlideOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-glass-slide" />
             </div>
           )}
           {/*

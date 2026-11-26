@@ -4,6 +4,7 @@ import { MOIRE_LOOKS } from '../presetsMoire';
 import { DROPPER_COLORS } from '../constants';
 import { DIFFUSION_CEILING } from './deskPins';
 import { stream } from './rng';
+import { GLASS_TRAVEL, withGlassSlide } from './glassSlide';
 
 /**
  * The backdrop's two colours, which have to be two.
@@ -198,7 +199,9 @@ export function luckyLook(
     */
     globalSpeed: 0.005 + rand() * 0.0202,
     audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
-    platePressure: rand(), glassSmear: rand(), rainDrip: rand(),
+    // The glass rests and a roll that slides it does so on its cord (PLAN 38u-11, lib/glassSlide.ts):
+    // the same draw as the dial it used to set, so the stream after it rolls what it always did.
+    platePressure: rand(), glassSmear: 0, sceneMappings: withGlassSlide(current.sceneMappings, rand() / GLASS_TRAVEL), rainDrip: rand(),
     viscosity: rand() > 0.5 ? 'thick' : 'thin', polarity: rand(),
     evaporationRate: rand() * 0.05,
     airVelocity: rand() * 0.5, vibrationFrequency: rand(),

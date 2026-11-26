@@ -1,6 +1,7 @@
 import type { SourceName } from './lib/audioFeatures';
 import type { HitFeature } from './lib/hitSource';
 import type { NoteFeature } from './lib/noteVoices';
+import type { ModulatorFeature } from './lib/modulators';
 
 export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
@@ -254,8 +255,8 @@ export type CordMode = 'follow' | 'gate';
 export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
-  /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName | HitFeature | NoteFeature;
+  /** A room/film feature, an audio one, a named source or an LFO/envelope ('shape'), depending on the source. */
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature | NoteFeature | ModulatorFeature;
   /**
    * Any numeric setting — the same list a MIDI fader can learn — or, on a
    * cord aimed at an area, what the hand does there (`AreaTarget`).
@@ -830,6 +831,8 @@ export interface VisualizerSettings {
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: how many the plate carries (0 = none; a few go a long way); they leave by the rim and merges, never a clock
+  /** How fast trapped air dissolves into the liquid (PLAN 38b-2): 0 is nature's rate, nil on a show's clock; up, Henry's law with air's diffusivity scaled 1e6 to 1e11 times, very gentle to very extreme, the small bubbles melting first (lib/bubbles.ts meltFactor). */
+  bubbleMelt?: number;
   plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
@@ -1193,7 +1196,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   liesegang: 0,
   thicknessOptics: 0,
   spectralOptics: 0,
-  glassSmear: 0.3,          // gentle smear from plate contact
+  // The cover glass is still until a hand or a cord slides it (PLAN 38u-11, 2026-11-14): the looks
+  // that slid it carry the slide as a cord now (lib/glassSlide.ts), so 0 here is a still plate.
+  glassSmear: 0,
   rainDrip: 0.0,
   viscosity: 'thick',
   polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
@@ -1241,7 +1246,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // CC15; a plate that wants it can have it, and the pass will now do something
   // when it is asked to.
   sharpness: 0,
-  granulation: 0.5,         // pigment texture between the boundaries, not just at them
+  // Smooth by default (PLAN 38u-8, 2026-11-14): a dye in solution has no grain, and the speckle is
+  // invented noise, so it is the performer's to turn up on the dial, not every look's ground.
+  granulation: 0,
   grainScale: 110,
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
   buoyancy: 0.45,
@@ -1273,6 +1280,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,
+  bubbleMelt: 0,            // nature's rate: a pocket between the glasses stays (PLAN 38b)
   plateRock: 0.45,
   frameSway: 0,             // the frame holds still; the music moves the liquid (lib/plateRock.ts)
   layerScaleVariety: 0.5,

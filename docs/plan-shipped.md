@@ -13429,6 +13429,42 @@ judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music stil
 slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
 saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
+## 38u-8, 38u-11. The glass still and the dye smooth unless someone moves them
+
+Found by the third physics pass (38u, 2026-11-13). Two dials did something on every plate
+that nobody had asked for. Glass Smear, the cover glass sliding over the liquid (a thin-gap
+Couette drag at half the glass's speed, `thinProject`), defaulted to 0.3, and 19 of the looks
+on main (after 38w-1 rested Lava Pop and its moiré pair at 0) slid it all the time with no
+hand on it; a real cover glass is still until the performer pushes it. Granulation laid a
+value-noise speckle in the dye's depth, 0.5 on every look; a dye in solution has no grain (a
+pigment like India ink flocculates, and the real thing is a concentration the solver would
+carry below the grid, 47a). The owner chose (2026-11-14, the recommended option on each card)
+both defaults at 0, Granulation's dial kept, and the drift the sliding looks were built around
+kept where the performer can see and pull it.
+
+What changed: both defaults are 0 and no look writes either above it. The slide is a cord,
+LFO 1 (a sine over eight bars, 0..1) on Glass Smear, laid by `presetsLay.ts` over the written
+looks like the music's stir (`laySlideCords`, lib/glassSlide.ts), at the look's old dial over
+the dial's travel of 3, rounded down to hundredths: the top of each wave is the old constant
+speed, never faster (rounded to the nearest, soap-film's top would have been 3% over), and
+the glass comes to rest at the foot. An LFO and not the sound, because the slide was never
+the music's: the beat clock falls back to a steady tempo in silence, so the look breathes
+with nothing playing. bass-drop keeps its own hats cords on the glass. Evolve never wanders
+either dial (`NOT_THE_LOOK`), Lucky rolls the slide as a cord no deeper than a third, and the
+phone's mixer has a Glass Slide slider beside Music Stir. `SceneMapping.feature` now names
+the LFOs and envelopes (`ModulatorFeature`), which the 'shape' source always read.
+
+Measured (`npm run glassstill`, node, the real patch bay, LFOs and solver): every look rests
+both dials at 0; the 19 carry one cord each; folded through 16 s of silence the glass's derived
+speed peaks within rounding of the old constant speed (never over) and falls to 0.000; with
+the cord pulled, or the LFOs' share at 0, it is 0; the others stay still. `npm run grainedge`
+now asks every look at 0.5 where it ships with none, since asking only the looks with grain
+would ask none. `npm run soundpatch` counts the slide cord apart from a look's answers to the
+sound, as it counts the stir and the music's hands. Taking the two dials out of Evolve changed
+what its seeded dice drew, and `npm run slowevolve` also holds main's dial rate cap
+(`DIAL_RATE_MAX`, 0.04 in `slowEvolve.ts`) across every move on eight seeds.
+Left open: 38u-17 (the glass's direction is still a noise path) and 38u-18 (a look saved
+before this still slides all the time).
 
 ## 38u-16. A look saved before the cord gains it, once (2026-11-22)
 
@@ -15841,6 +15877,30 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+## 38b-2. Bubble Melt, air dissolving past nature (2026-10-31)
+
+Asked by the owner: "Let's add a bubble dial for them to melt away", answering the open
+38b-2 question, with the standing rule that a dial scales a physical quantity past real
+and never swaps the law. With #603 a pocket of air between the glasses dissolves only at
+Henry's law's rate, 2π·D·L·(Δp/p₀)/ln(R_plate/R) in area, which is years for a millimetre
+pocket. Bubble Melt (`bubbleMelt`, default 0) is a factor on D alone: exactly 1 at 0, then
+10^(6 + 5v), because even a fully degassed liquid (Δp/p₀ from 3e-4 to 1) is only about
+3,000× nature and still days, so the dial's first step jumps to 1.8e6 and its travel is
+five decades on a log scale, very gentle to very extreme (the owner, 2026-10-31: "very
+gentle options and very extreme options", a principle for every dial). Melt times at the
+6 mm gap for a 2 mm bubble, the size the music's and the straw's start at: about 25 min at
+0.05, 2.5 min at 0.25, 9 s at 0.5, half a second at 0.75; at 1 even the straw's 8 mm goes
+in a fraction of a second. The small go first and each speeds up as its Laplace pressure
+climbs. Two mappings were filmed on the owner's Mac first (Classic, Bubbles 0.7, five straw
+bubbles of 1.8–8 mm, 40 s takes): 10^(6 + 3v) melted nothing visible below 0.9 (a 3 mm
+bubble went only to 2.83 mm in 40 s at 0.5, the flow taking most to the rim in 5–30 s);
+10^(8 + 3v) melted gradually at 0.25 (1.8 mm at 4.7 s ... 4 mm at 28.4 s), everything by
+5.5 s at 0.5 (8 mm at 22 s), and emptied the plate at 0.9, smallest first, none popped:
+all strong and nothing gentle, so the range opened at both ends. `liquid()` sets it from the settings each frame, so nothing in the frame loop
+changed. On the sheet under Bubbles (and so the phone's settings sheet), pinnable as a
+look control, MIDI-learnable, a patch target. Checks: `npm run bubblephysics` 27/27, its
+three new lines: off is exactly nature; melt time × factor constant across the dial within
+5%; 2 mm and 1 mm pockets at the middle melt on the law's own integral, the small first.
 
 ### 48c. Bioluminescent trails: the water glows where it is sheared (shipped 2026-11-21)
 
