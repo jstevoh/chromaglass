@@ -80,12 +80,14 @@ import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun'
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { dropBottle, layStream } from '../sim/dropSplash';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter, runThemePour } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles, syncBubblesGpu } from '../sim/speciesPoll';
 import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../sim/noteVoicesStep';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
+import { buildPlateSnapshot, applyPlateSnapshot, type PlateSnapshotData } from '../sim/plateSnapshot';
+import type { PlateSnapshot } from './visualizerHandle';
 import { recolourHandoff, type Handoff } from './paletteRecolour';
 
 interface LiquidVisualizerProps {
@@ -1928,70 +1930,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       autoEventsRef.current.palettes = (autoEventsRef.current.palettes ?? 0) + 1;
     },
     triggerTheme: (theme: string, energy = 0.6) => {
-      const af = fluidsRef.current[activeLayerRef.current];
-      if (!af || drainFrameRef.current > 0) return;
-      const S = GRID_SIZE;
-      const rx = () => Math.floor(S * 0.2 + DICE.hands.float() * S * 0.6);
-      const pick = (idxs: number[]) => PALETTE_RGB[DICE.hands.pick(idxs)];
-      const amt = 4 + energy * 8;
-
-      switch (theme) {
-        case 'fire': { // warm palette, low placement, heat drives it upward
-          const c = pick([0, 1, 3]);
-          const x = rx(), y = Math.floor(S * 0.75);
-          af.autoInject('splatter', x, y, amt, c.r, c.g, c.b, energy);
-          af.addTemp(x, y, 3 + energy * 4);
-          break;
-        }
-        case 'water': { // cool palette pours downward from the top
-          const c = pick([7, 8, 9]);
-          const x = rx(), y = Math.floor(S * 0.2);
-          af.autoInject('pour', x, y, amt, c.r, c.g, c.b, energy);
-          for (let d = 0; d < 10; d++) af.addVelocity(x, Math.min(S - 2, y + d), 0, 0.08);
-          break;
-        }
-        case 'sky': { // icy blue + white mist high in the frame
-          const c = pick([7, 15]);
-          af.autoInject('spray', rx(), Math.floor(S * 0.25), amt, c.r, c.g, c.b, energy);
-          break;
-        }
-        case 'earth': { // heavy warm browns settle low
-          const c = pick([12, 13, 1]);
-          af.autoInject('pour', rx(), Math.floor(S * 0.8), amt, c.r, c.g, c.b, energy * 0.6);
-          break;
-        }
-        case 'love': { // pink bloom from the center
-          const c = pick([2, 11]);
-          af.autoInject('drop', Math.floor(S / 2), Math.floor(S / 2), amt * 1.2, c.r, c.g, c.b, energy);
-          af.addTemp(Math.floor(S / 2), Math.floor(S / 2), 1.5);
-          break;
-        }
-        case 'dark': { // ink splatter
-          const c = pick([14, 4]);
-          af.autoInject('splatter', rx(), rx(), amt, c.r * 0.4, c.g * 0.4, c.b * 0.4, energy);
-          break;
-        }
-        case 'light': { // white-gold radial burst
-          const c = pick([15, 0]);
-          const x = Math.floor(S / 2), y = Math.floor(S / 2);
-          af.autoInject('drop', x, y, amt, c.r, c.g, c.b, energy);
-          af.applyRadialImpulse(x, y, Math.round(20 * GRID_SCALE), 0.3 + energy * 0.4);
-          af.addTemp(x, y, 2 + energy * 2);
-          break;
-        }
-        case 'motion': { // fast streaks in the current harmony
-          const c = harmonyColor(harmonyOf(activeLayerRef.current));
-          af.autoInject('streak', rx(), rx(), amt, c.r, c.g, c.b, Math.min(1, energy + 0.3));
-          break;
-        }
-        default: {
-          const c = harmonyColor(harmonyOf(activeLayerRef.current));
-          af.autoInject('drop', rx(), rx(), amt, c.r, c.g, c.b, energy);
-        }
-      }
+      if (drainFrameRef.current === 0) runThemePour(fluidsRef.current[activeLayerRef.current], harmonyOf(activeLayerRef.current), theme, energy);
     },
     applyGesture: (g) => performGestureBanked(g),
     wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
+    takeSnapshot: () => buildPlateSnapshot(fluidsRef.current, bubblesRef.current, beadsRef.current, {
+      livePreset: livePresetRef.current, laidPreset: laidPresetRef.current, harmony: harmonyRef.current,
+      harmonyLock: harmonyLockRef.current, contract: presetContractRef.current, paletteWindow: paletteWindowRef.current,
+      journey: journeyRef.current, injectStyle: injectStyleRef.current, plateLiquids: plateLiquidsRef.current,
+      areas: areasRef.current, melodyLine: melodyLineRef.current, rotationAngles: rotationAnglesRef.current,
+      spinVel: spinVelRef.current, dishSpin: dishSpinRef.current, liquidSpin: liquidSpinRef.current, backDyes: backDyesRef.current,
+    }) as PlateSnapshot,
+    restoreSnapshot: (raw) => {
+      const r = applyPlateSnapshot(fluidsRef.current, bubblesRef.current, beadsRef.current, raw as PlateSnapshotData);
+      livePresetRef.current = r.livePreset; laidPresetRef.current = r.laidPreset; harmonyRef.current = r.harmony;
+      harmonyLockRef.current = r.harmonyLock; presetContractRef.current = r.contract; paletteWindowRef.current = r.paletteWindow;
+      journeyRef.current = r.journey; injectStyleRef.current = r.injectStyle; plateLiquidsRef.current = r.plateLiquids;
+      areasRef.current = r.areas as PlateArea[] | null; melodyLineRef.current = r.melodyLine as MelodyLine;
+      rotationAnglesRef.current = r.rotationAngles; spinVelRef.current = r.spinVel; dishSpinRef.current = r.dishSpin;
+      liquidSpinRef.current = r.liquidSpin; backDyesRef.current = r.backDyes; drainFrameRef.current = 0; handoffRef.current = null;
+      lastClearTrigger.current = clearTriggerRef.current; lastDrainTrigger.current = drainTriggerRef.current; lastSeedCount.current = seedCountRef.current;
+    },
   }));
 
   // Between frames too (the opening, a covered window, a harness's `pour`): at each reading

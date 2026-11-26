@@ -249,6 +249,33 @@ export class BeadField {
     this.liquidSet = true;
   }
 
+  /** Forget every drop cleanly; wait for repopulate/restore. */
+  snapshot() {
+    return {
+      beads: this.beads.map((b) => ({
+        ...b,
+        color: b.color ? ([...b.color] as [number, number, number]) : undefined,
+        inner: b.inner ? { ...b.inner, color: [...b.inner.color] as [number, number, number] } : undefined,
+      })),
+      dropAmt: this.dropAmt,
+      viscosityRatio: this.viscosityRatio,
+    };
+  }
+
+  restore(s: ReturnType<BeadField['snapshot']>): void {
+    this.beads.length = 0;
+    for (const b of s.beads) {
+      this.beads.push({
+        ...b,
+        color: b.color ? ([...b.color] as [number, number, number]) : undefined,
+        inner: b.inner ? { ...b.inner, color: [...b.inner.color] as [number, number, number] } : undefined,
+      });
+    }
+    this.dropAmt = s.dropAmt;
+    this.viscosityRatio = s.viscosityRatio;
+    this.dirty = true;
+  }
+
   /** Paterson's Hele-Shaw shape/coalescence relaxation time 2 μ R³ / (b² σ). */
   private patersonTau(rCells: number): number {
     const R = Math.max(0.1, rCells) * (DISH_METRES / this.grid);

@@ -25,6 +25,7 @@ import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
 import { RemoteSongs } from './RemoteSongs';
+import { AppToast } from './ui/AppToast';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -202,7 +203,33 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   }, [patchThrottled]);
   useEffect(() => () => { if (mixerHoldRef.current) clearTimeout(mixerHoldRef.current); }, []);
 
-  const action = useCallback((a: RemoteAction) => send({ type: 'action', action: a }), [send]);
+  const [localUndo, setLocalUndo] = useState<{ id: number; title: string } | null>(null);
+  const prevServerUndoRef = useRef<RemoteState['undo']>(null);
+  useEffect(() => {
+    const srv = state?.undo ?? null;
+    if (srv) setLocalUndo(null);
+    else if (prevServerUndoRef.current && !srv) setLocalUndo(null);
+    prevServerUndoRef.current = srv;
+  }, [state?.undo]);
+  useEffect(() => {
+    if (!localUndo) return;
+    const t = setTimeout(() => setLocalUndo(null), 8000);
+    return () => clearTimeout(t);
+  }, [localUndo]);
+
+  const action = useCallback((a: RemoteAction) => {
+    send({ type: 'action', action: a });
+    if (a === 'lucky' || a === 'drain' || a === 'clear') {
+      const title = a === 'lucky' ? 'Look randomised' : a === 'drain' ? 'Plate drained' : 'Plate cleared';
+      setLocalUndo({ id: Date.now(), title });
+    } else if (a === 'undo-reset') {
+      setLocalUndo(null);
+    }
+  }, [send]);
+  const activeUndo = state?.undo ?? localUndo;
+  const undoToast = activeUndo
+    ? { id: activeUndo.id, title: activeUndo.title, actionLabel: 'Undo', durationMs: 8000 }
+    : null;
 
   // The laptop's own preset list when it sends one (the user's files included); the built-ins until then.
   const presetGroups = useMemo(() => {
@@ -618,6 +645,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         onPadMove={onPadMove}
         onPadUp={onPadUp}
         action={action}
+        undoToast={undoToast}
+        onUndoToast={() => action('undo-reset')}
         onControls={openControls}
         onSongs={() => openSongs('draw')}
       />
@@ -1201,6 +1230,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </button>
         </div>
       </div>
+      <AppToast toast={undoToast} onAction={() => action('undo-reset')} phone bottomClass="bottom-24" />
     </div>
   );
 }

@@ -14,8 +14,10 @@ import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
 import { pouredOf } from '../../lib/bubbleLiquid';
 import { LIQUID_SIGMA } from '../../lib/bubbles';
-import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RGBA32, type FieldCarry } from './constants';
+import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
 import { FluidPasses } from './passes';
+import type { CoverState } from '../../lib/cover';
+import { captureFluidSnapshot, restoreFluidSnapshot, type FieldSnapshot, type SnapshotScalars, type SnapshotTargets } from './snapshot';
 
 export class FluidInputs extends FluidPasses {
   /**
@@ -1098,6 +1100,140 @@ export class FluidInputs extends FluidPasses {
     if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
     this.submit(enc);
     return true;
+  }
+
+  private snapshotTargets(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): SnapshotTargets {
+    return {
+      device: this.device,
+      n: this.N,
+      m: this.M,
+      disposed: this.disposed,
+      submit: (enc) => this.submit(enc),
+      dye: this.dye,
+      vel: this.vel,
+      velForced: this.velForced,
+      squeeze: this.squeeze,
+      cur: this.cur,
+      swirl: this.swirl,
+      phase: this.phase,
+      mix: this.mix,
+      ensureMix: () => this.ensureMix(),
+      oilDye: this.oilDye,
+      ensureOilDye: () => this.ensureOilDye(),
+      liquids0: this.liquids0,
+      liquids1: this.liquids1,
+      species: this.species,
+      ensureSpecies: () => (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species')),
+      chem: this.chem,
+      activeMat: this.activeMat,
+      rxn: this.rxn,
+      ensureRxn: () => this.ensureRxn(),
+      lies: this.lies,
+      ensureLies: () => this.ensureLies(),
+      boilAlpha: this.boilAlpha,
+      ensureBoilAlpha: () => (this.boilAlpha ??= new PingPong(this.device, this.disposer, [this.N, this.N], RG32, 'boil alpha')),
+      film: this.film,
+      ensureFilm: () => this.ensureFilm(),
+      hsGap: this.hsGap,
+      hsP: this.hsP,
+      hsP2: this.hsP2,
+      ensureThinGap: () => this.ensureThinGap(),
+      scalars: {
+        phaseLive: this.phaseLive,
+        mixLive: this.mixLive,
+        oilPoured: this.oilPoured,
+        oilDyeStale: this.oilDyeStale,
+        bodiesWanted: this.bodiesWanted,
+        oilLayPending: this.oilLayPending,
+        liquidsLive: this.liquidsLive,
+        speciesLive: this.speciesLive,
+        speciesClears: this.speciesClears,
+        speciesPoured: this.speciesPoured,
+        speciesSnap: this.speciesSnap,
+        speciesDisp: this.speciesDisp,
+        lastSpeciesCarry: this.lastSpeciesCarry,
+        chemLive: this.chemLive,
+        reagentLive: this.reagentLive,
+        rxnLive: this.rxnLive,
+        liesLive: this.liesLive,
+        swirlLive: this.swirlLive,
+        swirlTail: this.swirlTail,
+        boilLive: this.boilLive,
+        boilFresh: this.boilFresh,
+        boilTail: this.boilTail,
+        airPush: this.airPush,
+        airCover: this.airCover,
+        airCoverPrev: this.airCoverPrev,
+        airQuietSeconds: this.airQuietSeconds,
+        filmLaid: this.filmLaid,
+        grainAge: this.grainAge,
+        heatSeconds: this.heatSeconds,
+        coverGap: this.coverGap,
+        lastCurve: this.lastCurve,
+        thinLive: this.thinLive,
+        hsPrimed: this.hsPrimed,
+        phaseGapPrimed: this.phaseGapPrimed,
+        glassFlow: this.glassFlow,
+        ...cover,
+      },
+    };
+  }
+
+  protected captureFieldSnapshot(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): FieldSnapshot | null {
+    return captureFluidSnapshot(this.snapshotTargets(cover));
+  }
+
+  protected applyFieldSnapshot(snap: FieldSnapshot): SnapshotScalars | null {
+    if (!restoreFluidSnapshot(this.snapshotTargets({
+      cover: null, coverMl: 0, coverPoured: 0, coverLaid: 0,
+    }), snap)) return null;
+    const s = snap.scalars;
+    this.phaseLive = s.phaseLive;
+    this.mixLive = s.mixLive;
+    this.oilPoured = s.oilPoured;
+    this.oilDyeStale = s.oilDyeStale;
+    this.bodiesWanted = s.bodiesWanted;
+    this.oilLayPending = s.oilLayPending;
+    this.liquidsLive = s.liquidsLive;
+    this.speciesLive = s.speciesLive;
+    this.speciesClears = s.speciesClears;
+    this.speciesPoured = s.speciesPoured ? { ...s.speciesPoured } : null;
+    this.speciesSnap = s.speciesSnap
+      ? { L: s.speciesSnap.L, data: new Float32Array(s.speciesSnap.data), poured: { ...s.speciesSnap.poured } }
+      : null;
+    this.speciesDisp = s.speciesDisp;
+    this.lastSpeciesCarry = s.lastSpeciesCarry;
+    this.chemLive = s.chemLive;
+    this.reagentLive = s.reagentLive;
+    this.rxnLive = s.rxnLive;
+    this.liesLive = s.liesLive;
+    this.swirlLive = s.swirlLive;
+    this.swirlTail = s.swirlTail;
+    this.boilLive = s.boilLive;
+    this.boilFresh = s.boilFresh;
+    this.boilTail = s.boilTail;
+    this.airPush = s.airPush;
+    this.airCover = s.airCover;
+    this.airCoverPrev = s.airCoverPrev;
+    this.airQuietSeconds = s.airQuietSeconds;
+    this.air?.setBoilAlpha(this.boilLive && this.boilAlpha ? this.boilAlpha.read : null);
+    this.filmLaid = s.filmLaid;
+    this.grainAge = s.grainAge;
+    this.heatSeconds = s.heatSeconds;
+    this.coverGap = s.coverGap;
+    this.lastCurve = s.lastCurve;
+    this.thinLive = s.thinLive;
+    this.hsPrimed = s.hsPrimed;
+    this.phaseGapPrimed = s.phaseGapPrimed;
+    this.glassFlow = [s.glassFlow[0], s.glassFlow[1]];
+    this.printLive = false;
+    this.videoPending = false;
+    this.rbDyeSeq = -1;
+    return s;
   }
 
   /** One frame of the drain: inward spiral, transport, evaporate. */

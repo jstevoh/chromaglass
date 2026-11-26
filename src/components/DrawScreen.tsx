@@ -10,6 +10,8 @@ import { MARK_URL } from '../brand';
 import { LIT } from './ui';
 import { LensCap } from './ui/Playful';
 import { LiveRemoteChip } from './LiveRemoteChip';
+import { AppToast } from './ui/AppToast';
+import type { ToastItem } from '../app/useToast';
 
 /**
  * Draw (PLAN §8-draw, the Desk v2 design's #3c phone and #3d iPad): the
@@ -168,6 +170,8 @@ export interface DrawScreenProps {
   onPadMove: (e: ReactPointerEvent) => void;
   onPadUp: (e: ReactPointerEvent) => void;
   action: (a: RemoteAction) => void;
+  undoToast?: ToastItem | null;
+  onUndoToast?: () => void;
   onControls: () => void;
   /** The Songs screen: the Mac's set list and song shows (PLAN 12-ctl-1). */
   onSongs: () => void;
@@ -537,6 +541,7 @@ export function DrawScreen(p: DrawScreenProps) {
             {blackout(56, false)}
           </div>
         </footer>
+        <AppToast toast={p.undoToast ?? null} onAction={() => p.onUndoToast?.()} phone bottomClass="bottom-24" />
       </div>
     );
   }
@@ -590,6 +595,7 @@ export function DrawScreen(p: DrawScreenProps) {
             {blackout(52, true)}
           </div>
         </footer>
+        <AppToast toast={p.undoToast ?? null} onAction={() => p.onUndoToast?.()} phone bottomClass={side ? 'bottom-24' : 'bottom-40'} />
       </div>
     </div>
   );

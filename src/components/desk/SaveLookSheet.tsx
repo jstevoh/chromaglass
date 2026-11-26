@@ -14,7 +14,7 @@ import { Button, Sheet, Toggle } from '../ui';
  * which: the sheet is where both are, rather than Save quietly doing the
  * second whenever a look was open (see saveLook in App).
  */
-export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceName = null, onReplace }: {
+export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceName = null, onReplace, existingLooks = [], onReplaceExisting }: {
   suggested: string;
   /** The track playing now, if one was identified. */
   songName: string | null;
@@ -23,20 +23,46 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
   /** The saved look that is open, which the second button writes over. Replace closes the sheet itself, and leaves it up if the look has gone. */
   replaceName?: string | null;
   onReplace?: () => void;
+  /** Existing saved looks, so saving under a colliding name asks before creating a twin (PLAN 49a). */
+  existingLooks?: { id: string; name: string }[];
+  onReplaceExisting?: (id: string, name: string, description: string, forSong: boolean) => void;
 }) {
   const [name, setName] = useState(suggested);
   const [description, setDescription] = useState('');
   const [forSong, setForSong] = useState(false);
+  const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
 
-  const save = () => {
-    const trimmed = name.trim();
+  const trimmed = name.trim();
+  const findCollision = (candidate: string) => {
+    const key = candidate.toLowerCase();
+    return existingLooks.find(l => l.name.trim().toLowerCase() === key) ?? null;
+  };
+
+  const keepBoth = () => {
     if (!trimmed) return;
     onSave(trimmed, description.trim(), forSong && !!songName);
     onClose();
   };
 
+  const replaceExisting = () => {
+    if (!trimmed || !duplicate) return;
+    if (onReplaceExisting) onReplaceExisting(duplicate.id, trimmed, description.trim(), forSong && !!songName);
+    else onSave(trimmed, description.trim(), forSong && !!songName);
+    onClose();
+  };
+
+  const save = () => {
+    if (!trimmed) return;
+    const hit = findCollision(trimmed);
+    if (hit && !duplicate) {
+      setDuplicate(hit);
+      return;
+    }
+    keepBoth();
+  };
+
   return (
-    <Sheet title="Save as a new palette" onClose={onClose} width={480} height={360} testId="save-sheet">
+    <Sheet title="Save as a new palette" onClose={onClose} width={480} height={380} testId="save-sheet">
       {/* w-full: the sheet's body is a row, and without it this column took
           only its content's width, the fields 200 px wide in a 480 px sheet. */}
       <div className="flex h-full w-full flex-col gap-4 p-5">
@@ -47,7 +73,7 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
             // Selected, so typing a name replaces the suggestion outright.
             onFocus={e => e.currentTarget.select()}
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={e => { setName(e.target.value); setDuplicate(null); }}
             onKeyDown={e => { if (e.key === 'Enter') save(); }}
             className="h-10 w-full rounded-md border border-border-strong bg-elevated px-3 text-[14px] text-text outline-none focus:border-accent"
             data-testid="save-name"
@@ -71,6 +97,15 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
             onChange={setForSong}
             testId="save-for-song"
           />
+        )}
+        {duplicate && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="save-duplicate-warning">
+            <span>A look named “{duplicate.name}” already exists.</span>
+            <div className="flex gap-2">
+              <Button height={32} onClick={keepBoth} testId="save-keep-both">Keep both</Button>
+              <Button height={32} variant="primary" onClick={replaceExisting} testId="save-replace-existing">Replace</Button>
+            </div>
+          </div>
         )}
         <div className="mt-auto flex items-center justify-end gap-2">
           {replaceName && onReplace && (

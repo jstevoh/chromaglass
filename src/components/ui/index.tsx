@@ -912,7 +912,7 @@ export function PanelFrame({
         </button>
         )}
         {!popped && (
-          <button className={icon} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
+          <button className={`${icon} ml-1.5`} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden><path d="M3 3l6 6M9 3l-6 6" /></svg>
           </button>
         )}

@@ -12,7 +12,7 @@ import { PanelBrowser } from './PanelBrowser';
 import { PanelWindow, openPanelWindow } from './PanelWindow';
 import {
   PANEL_BY_ID, closePanel, collapseAll, dockPanel, floatPanel, openPanel, openPanels,
-  placeFloating, raiseFloating, toggleCollapsed, whereIs,
+  placeFloating, raiseFloating, restoreClosedPanel, snapshotPanelSpot, toggleCollapsed, whereIs,
   type DeskLayout, type Slot,
 } from '../../lib/deskLayout';
 import { getEffectiveTier } from '../../lib/tierGates';
@@ -268,6 +268,12 @@ export function Desk(p: DeskProps) {
     const spec = PANEL_BY_ID.get(id);
     if (!spec) return null;
     const collapsed = l.collapsed.includes(id);
+    const closeWithUndo = (closePop?: boolean) => {
+      const spot = snapshotPanelSpot(l, id);
+      if (closePop) popIn(id);
+      set(x => closePanel(x, id));
+      p.onPanelClosed?.(spec.name, () => set(x => restoreClosedPanel(x, spot)));
+    };
     if (popped[id] && !opts.popped) {
       // Its place on the desk while it is out: what it is, where, and the way back.
       return (
@@ -282,7 +288,7 @@ export function Desk(p: DeskProps) {
           style={opts.style}
           onFloat={() => set(x => floatPanel(x, id))}
           onDock={() => set(x => dockPanel(x, id, 'deck'))}
-          onClose={() => { popIn(id); set(x => closePanel(x, id)); }}
+          onClose={() => closeWithUndo(true)}
           onGripDown={startDrag(id)}
           onHeaderDown={opts.floating ? startFloatGesture(id, 'move') : undefined}
           onResizeDown={opts.floating ? startFloatGesture(id, 'resize') : undefined}
@@ -314,14 +320,14 @@ export function Desk(p: DeskProps) {
         popped={opts.popped}
         onPopIn={() => popIn(id)}
         onCollapse={() => set(x => toggleCollapsed(x, id))}
-        onClose={() => set(x => closePanel(x, id))}
+        onClose={() => closeWithUndo()}
         onGripDown={startDrag(id)}
         onHeaderDown={opts.floating ? startFloatGesture(id, 'move') : undefined}
         onResizeDown={opts.floating ? startFloatGesture(id, 'resize') : undefined}
         onTitleMenu={opts.popped ? undefined : (e) => { e.preventDefault(); setMenu({ id, x: e.clientX, y: e.clientY }); }}
       >
         {/* Its own guard: one panel that throws is a card in its place, not the end of the desk. */}
-        <PanelGuard name={spec.name} inline onClose={() => set(x => closePanel(x, id))}>
+        <PanelGuard name={spec.name} inline onClose={() => closeWithUndo()}>
           <PanelBody id={id} p={p} />
         </PanelGuard>
       </PanelFrame>
