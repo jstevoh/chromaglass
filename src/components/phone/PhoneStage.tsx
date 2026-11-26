@@ -16,6 +16,7 @@ import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { musicStirOf, withMusicStir } from '../../lib/stir';
+import { glassSlideOf, withGlassSlide } from '../../lib/glassSlide';
 import { musicHandOf, withMusicHand } from '../../lib/musicCords';
 import type { MusicRole } from '../../types';
 
@@ -29,6 +30,7 @@ import { MixerPanel } from '../MixerPanel';
 import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
+import { lookStill } from '../../lib/lookStills';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
@@ -1031,7 +1033,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       data-testid={`phone-look-${l.id}`}
                       className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
                     >
-                      <SlideMount swatch={l.swatch} size={44} />
+                      <SlideMount swatch={l.swatch} still={lookStill(l.id)} size={44} />
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
@@ -1184,6 +1186,23 @@ export function PhoneStage(p: PhoneStageProps) {
             </div>
           )}
           {/*
+            Glass Slide: the depth of the look's cord from LFO 1 onto Glass
+            Smear. The cover glass is still unless a hand or a cord moves it
+            (PLAN 38u-11), and the looks that were built sliding carry their
+            slide on that cord (lib/glassSlide.ts). The desk shows it in
+            Patches; the phone has no patch bay, so this is the cord's
+            control here, beside the music's. At 0 the cord is pulled and
+            the glass rests; at 100% the glass's top speed is the dial's
+            whole travel, three times the old default's.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Glass Slide" value={glassSlideOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
+                onChange={(v) => p.mixer!.onSetting({ sceneMappings: withGlassSlide(p.mixer!.settings.sceneMappings, v) })}
+                display={`${Math.round(glassSlideOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-glass-slide" />
+            </div>
+          )}
+          {/*
             The music's hands (PLAN 38v-1): the kick's pour, the bass's pulse
             and the press are cords on every look now (lib/musicCords.ts),
             each with its own depth, and the desk sets them in Patches. The
@@ -1218,6 +1237,29 @@ export function PhoneStage(p: PhoneStageProps) {
                   <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
                     display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />
+                </>
+              )}
+            </div>
+          )}
+          {/*
+            The water's glow (PLAN 48c): plankton that flash blue where the
+            music's hands above shear the water, and tire. Glow, and while it
+            is up the shear it fires at and its recharge, as the desk's Camera
+            section has them, through the same mixer setting.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Glow" value={p.mixer.settings.glow ?? 0} min={0} max={2} step={0.05}
+                onChange={(v) => p.mixer!.onSetting({ glow: v })}
+                display={`${Math.round((p.mixer.settings.glow ?? 0) * 100)}%`} touch testId="phone-glow" midiKey="setting:glow" />
+              {(p.mixer.settings.glow ?? 0) > 0.001 && (
+                <>
+                  <Slider label="Glow Shear" value={p.mixer.settings.glowShear ?? 30} min={5} max={200} step={1}
+                    onChange={(v) => p.mixer!.onSetting({ glowShear: v })}
+                    display={`${Math.round(p.mixer.settings.glowShear ?? 30)}/s`} touch testId="phone-glow-shear" midiKey="setting:glowShear" />
+                  <Slider label="Glow Recharge" value={p.mixer.settings.glowRecharge ?? 8} min={0.5} max={60} step={0.5}
+                    onChange={(v) => p.mixer!.onSetting({ glowRecharge: v })}
+                    display={`${(p.mixer.settings.glowRecharge ?? 8).toFixed(1)} s`} touch testId="phone-glow-recharge" midiKey="setting:glowRecharge" />
                 </>
               )}
             </div>

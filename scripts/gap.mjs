@@ -384,8 +384,8 @@ const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
   // The solver lays the cover's gap: the uniform is packed from the ledger, and the gap kernels read it.
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), cover = readFileSync('src/gpu/fluid/cover.ts', 'utf8'), shared = readFileSync('src/gpu/wgsl/fluid/shared.ts', 'utf8');
   const packed = /f\[51\] = this\.coverGap;/.test(fluid) && /this\.coverAdvance\(p\);\n\s*this\.writeSim\(p, disp\);/.test(fluid);
-  // Nothing but comments between lampHeat (50) and cover, so the field is slot 51. The oil's weight and expansion follow it (52, 53; PLAN 27f-9c), then the lamp's glass cooling (54; PLAN 27f-9e), each after a comment, so cover is no longer the last field: they are asked for after it.
-  const field = /lampHeat: f32,\n(\s*\/\/[^\n]*\n)*\s*cover: f32,\n\s*\/\*[\s\S]*?\*\/\n\s*oilRho: f32,\n\s*oilExpand: f32,\n\s*\/\*[\s\S]*?\*\/\n\s*lampCool: f32,\n\};/.test(shared);
+  // Nothing but comments between lampHeat (50) and cover, so the field is slot 51. The oil's weight and expansion follow it (52, 53; PLAN 27f-9c), then the lamp's glass cooling (54; PLAN 27f-9e) and the oil's thickness (55; PLAN 38w-31), each after a comment, so cover is no longer the last field: they are asked for after it.
+  const field = /lampHeat: f32,\n(\s*\/\/[^\n]*\n)*\s*cover: f32,\n\s*\/\*[\s\S]*?\*\/\n\s*oilRho: f32,\n\s*oilExpand: f32,\n\s*\/\*[\s\S]*?\*\/\n\s*lampCool: f32,\n(\s*\/\/[^\n]*\n)*\s*oilVisc: f32,\n\};/.test(shared);
   const metres = /this\.coverGap = h \/ DISH_GAP_FIELD_METRES;/.test(cover) && /\[this\.lastCurve, p\.plateCurve, this\.coverLaid, this\.coverGap\]/.test(cover)
     && /else if \(this\.lastCurve !== p\.plateCurve \|\| this\.coverGap !== this\.coverLaid\)/.test(cover) && /\n\s*this\.coverLaid = this\.coverGap;/.test(cover);
   check('the solver packs the cover\'s gap (gap units, h over the metres in a unit) as S.cover at 51, before the step\'s kernels, and a cover that moves shifts the field',
@@ -402,6 +402,12 @@ const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
     plate. The solver's: each Darcy speed (colour's fall, oil's lift, oil's
     pull) carries (h/h₀)², the breath and the glass's drag and the slump read
     the cover's metres, and hsPrep's hand forcing is taken at S.cover.
+    Since PLAN 27f-7 (Classic round five) the oil's lift is no longer its own
+    force: it goes through the tipped dish's circulation with the colour's
+    fall, as κ = OIL_LIFT/ROCK_FALL of it per unit of oil, so its (h/h₀)² is
+    the rock's own (the third reader) and κ is held free of the gap: a κ that
+    carried coverH2 too would square it twice. Both halves of L are read, x
+    and y: a reader of x alone stayed green with the gap dropped from y.
   */
   const d = L.DEFAULT_SETTINGS;
   const share = L.pourShare(0.1, 1e-6, 1 / 60, 2 * H0) / L.pourShare(0.1, 1e-6, 1 / 60);
@@ -409,7 +415,7 @@ const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), passes = readFileSync('src/gpu/fluid/passes.ts', 'utf8'), thin = readFileSync('src/gpu/wgsl/thinGap.ts', 'utf8');
   const solver = [
     /get coverH2\(\): number \{\s*const r = this\.coverGap \/ DISH_REST_GAP;\s*return r \* r;/.test(readFileSync('src/gpu/fluid/cover.ts', 'utf8')),
-    /OIL_TENSION_GAP \* this\.coverH2/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX/.test(fluid), /-OIL_LIFT \* this\.coverH2/.test(fluid),
+    /OIL_TENSION_GAP \* this\.coverH2/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX : 0, rockOn \? ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockY : 0/.test(fluid), /const kappa = -OIL_LIFT \* oilLightnessOf\(p\.oilWeight\) \* seconds \/ \(PLATE_METRES \* Math\.max\(disp, 1e-9\) \* ROCK_FALL\);/.test(fluid),
     /const h0 = this\.coverGap \* GAP_METRES;/.test(fluid), /const b = this\.coverGap \* GAP_METRES;/.test(passes), /const hc = this\.coverGap \* GAP_METRES;/.test(passes),
     /\(A\.a\.x \/ \(S\.cover \* S\.cover\) \* A\.a\.y\)/.test(thin),
   ];

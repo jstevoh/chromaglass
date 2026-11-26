@@ -14,8 +14,11 @@
  *
  *   level      a knob at its middle (CC 64, and a hand's few steps either
  *              side) leaves the plate level, exactly, so a knob left alone
- *              for a set does not drain the plate to one edge; the ends are
- *              still the phone's full tip either way;
+ *              for a set does not drain the plate to one edge;
+ *   reach      a full knob tips the plate to Plate Rock's strong swing, rock 2
+ *              (KNOB_ROCK, PLAN 18a-13n), past the phone's full tip (1.1),
+ *              at the same sinθ plateSin gives that swing; the steps near
+ *              level are as fine as they were, and no step tips it back;
  *   eased      a knob thrown end to end in one message moves the plate
  *              there over a hand's time, not in a step: its first sixtieth of
  *              a second moves it less than a fiftieth of the way, it is past
@@ -28,7 +31,8 @@
  *              sim/fluidSimulation.ts), so on a look whose dish turns, right
  *              is still the screen's right;
  *   joined     the remote phone's tilt adds to it, reaching no further
- *              than the phone alone can, and still fades out after its last reading;
+ *              than the knobs' own corner, the slosh's tilt no further than
+ *              the phone's, and the phone still fades out after its last reading;
  *   learnable  MIDI can learn both, over −1..1, they sit in Tilt & Rock, and
  *              neither the sound, the patch bay nor Evolve can move them
  *              (the plate tipped on the beat is the whole picture moving);
@@ -43,8 +47,8 @@
  * other way) and `npm run slosh`; and how it looks at sixty frames a second is
  * the Mac's.
  */
-import { knobTip, makeHandTilt, stepHandTilt, levelHandTilt, tipPlate, TILT_DEAD } from '../src/lib/handTilt.ts';
-import { HOLD_TILT } from '../src/lib/plateRock.ts';
+import { knobTip, makeHandTilt, stepHandTilt, levelHandTilt, tipPlate, TILT_DEAD, KNOB_REACH, KNOB_ROCK } from '../src/lib/handTilt.ts';
+import { HOLD_TILT, plateSin, ROCK_LEAN } from '../src/lib/plateRock.ts';
 import { LEARNABLE_SETTINGS, soundMappable, valueAt } from '../src/lib/midi.ts';
 import { PIN_RANGE, PINNABLE } from '../src/lib/deskPins.ts';
 import { PATCH_TARGETS } from '../src/lib/sceneMap.ts';
@@ -74,9 +78,44 @@ const cc = (n) => valueAt(n / 127, -1, 1);
 {
   const mid = [62, 63, 64, 65, 66].map(n => knobTip(cc(n)));
   check('a knob at its middle, and two steps either side, is level', mid.every(v => v === 0), `CC 62–66 → ${mid.map(f3).join(' ')}`);
-  check('the ends are still the full tip', knobTip(cc(0)) === -1 && knobTip(cc(127)) === 1, `CC 0 → ${f3(knobTip(cc(0)))}, CC 127 → ${f3(knobTip(cc(127)))}`);
   check('past the level middle the tip starts from zero, not with a jump', knobTip(TILT_DEAD + 0.01) < 0.02, `just past it → ${knobTip(TILT_DEAD + 0.01).toFixed(4)}`);
   check('a reading that is not a number is level', knobTip(undefined) === 0 && knobTip(NaN) === 0);
+}
+
+// ── reach (PLAN 18a-13n) ──
+{
+  const ends = [knobTip(cc(0)), knobTip(cc(127))];
+  check('the ends are a full knob\'s reach either way, past the phone\'s full tip', ends[0] === -KNOB_REACH && ends[1] === KNOB_REACH && KNOB_REACH > 1.5,
+    `CC 0 → ${f3(ends[0])}, CC 127 → ${f3(ends[1])} of the phone's full tip`);
+  // The plate as the solver takes it, knob held at full until the ease has arrived, no Plate Rock.
+  const h = makeHandTilt();
+  for (let i = 0; i < 240; i++) step(h, noPhone, NOW, 1, 0, 1 / 60);
+  const knobSin = plateSin(plate.tiltX, plate.rockX);
+  const phone = makeHandTilt();
+  for (let i = 0; i < 2; i++) step(phone, { x: 1, y: 0, at: NOW }, NOW, 0, 0, 1 / 60);
+  const phoneSin = plateSin(plate.tiltX, plate.rockX), phoneRock = plate.rockX;
+  // Plate Rock at the top of its dial (3) on a full lean with the sway at its crest: its swing, and the sinθ it hands the solver.
+  const strong = ROCK_LEAN * 3 * (1 + 0.12 / 0.55);
+  const strongSin = plateSin(strong * HOLD_TILT, strong);
+  step(h, noPhone, NOW, 1, 0, 1 / 60);
+  check('a full knob hands the solver Plate Rock\'s strong swing, rock 2, not the phone\'s 1.1',
+    Math.abs(plate.rockX - KNOB_ROCK) < 1e-9 && KNOB_ROCK === 2 && Math.abs(phoneRock - 1.1) < 1e-12,
+    `knob rock ${plate.rockX.toFixed(3)}, phone's ${phoneRock.toFixed(3)}, Plate Rock's top ${strong.toFixed(3)}`);
+  check('on the same law: the plate\'s sinθ a full knob gives is Plate Rock\'s at that swing, within 2%',
+    Math.abs(knobSin / plateSin(KNOB_ROCK * HOLD_TILT, KNOB_ROCK) - 1) < 0.02 && knobSin > phoneSin * 1.7 && knobSin <= strongSin * 1.1,
+    `sinθ knob ${knobSin.toFixed(3)} (${(Math.asin(knobSin) * 180 / Math.PI).toFixed(1)}°), phone ${phoneSin.toFixed(3)} (${(Math.asin(phoneSin) * 180 / Math.PI).toFixed(1)}°), Plate Rock at 3 ${strongSin.toFixed(3)}`);
+  // The gentle end: where a performer lays a slow drain (a tip under a tenth of the phone's full),
+  // each CC step tips no more than it did when full was the phone's.
+  const before = (v) => { const a = Math.abs(v); return a <= TILT_DEAD ? 0 : Math.sign(v) * (a - TILT_DEAD) / (1 - TILT_DEAD); };
+  let worst = 0, last = 64;
+  for (let n = 64; knobTip(cc(n + 1)) < 0.1; n++) { worst = Math.max(worst, (knobTip(cc(n + 1)) - knobTip(cc(n))) / (before(cc(n + 1)) - before(cc(n)) || 1)); last = n + 1; }
+  check('near level each CC step tips the plate as finely as before (within 20%)', worst < 1.2 && last > 68, `largest step × the old step ${worst.toFixed(3)} over CC 64–${last}, tips under 0.1`);
+  let back = 0, prev = 0;
+  for (let n = 64; n <= 127; n++) { const t = knobTip(cc(n)); back = Math.min(back, t - prev); prev = t; }
+  check('no step of the knob tips the plate back', back >= 0);
+  const at = (f) => knobTip(TILT_DEAD + f * (1 - TILT_DEAD));
+  check('half a turn from the middle is gentler than the phone, the last third is past it',
+    at(0.5) < 1 && at(0.5) > 0.5 && at(0.7) > 1, `half ${at(0.5).toFixed(3)}, 0.7 ${at(0.7).toFixed(3)} of the phone's full tip`);
 }
 
 // ── eased ──
@@ -86,12 +125,13 @@ function throwKnob(rate, seconds, to = 1) {
   const steps = Math.round(seconds * rate);
   for (let i = 0; i < steps; i++) {
     step(h, noPhone, NOW, to, 0, 1 / rate);
-    trace.push(plate.extTiltX);
+    trace.push(plate.rockX / 1.1);  // the tip in the phone's units (the slosh's extTiltX stops at the phone's reach)
   }
   return trace;
 }
 {
   const t60 = throwKnob(60, 1);
+  for (let i = 0; i < t60.length; i++) t60[i] /= KNOB_REACH;  // the share of the way to where the knob is
   check('one sixtieth of a second after the throw the plate has hardly moved', t60[0] < 0.02, `${t60[0].toFixed(4)} of the way`);
   check('past nine tenths by 0.4 s', t60[23] > 0.9, `at 0.4 s: ${t60[23].toFixed(3)}`);
   check('never past where the knob is', Math.max(...t60) <= 1 + 1e-12, `most ${Math.max(...t60).toFixed(6)}`);
@@ -148,17 +188,22 @@ function throwKnob(rate, seconds, to = 1) {
     Math.max(...lens) - Math.min(...lens) < 1e-3 && dirs.every(d => Math.abs(d - 45) < 0.1),
     `lengths ${lens.map(v => v.toFixed(3)).join(' ')}, screen direction ${dirs.map(d => d.toFixed(1)).join(' ')}°`);
   step(h, noPhone, NOW, 1, 0, 1 / 60, Math.PI / 2);
-  check('the dish turned a quarter: the screen\'s right is the dish\'s −y', Math.abs(plate.extTiltX) < 1e-6 && plate.extTiltY < -0.99, `x ${f3(plate.extTiltX)}, y ${f3(plate.extTiltY)}`);
+  check('the dish turned a quarter: the screen\'s right is the dish\'s −y', Math.abs(plate.rockX) < 1e-6 && plate.rockY < -KNOB_ROCK + 0.01, `rock x ${f3(plate.rockX)}, y ${f3(plate.rockY)}`);
 }
 
 // ── joined ──
 {
   const h = makeHandTilt();
   const phone = { x: 0.8, y: 0, at: NOW };
-  for (let i = 0; i < 60; i++) step(h, { x: 1, y: 1, at: NOW }, NOW, 0.6, 0, 1 / 60);
-  const reach = Math.hypot(plate.extTiltX, plate.extTiltY);
-  check('the phone and the knob together reach no further than the phone alone can', Math.abs(reach - Math.SQRT2) < 1e-12 && plate.extTiltX > plate.extTiltY,
-    `phone (1, 1) + knob (0.6, 0) → (${f3(plate.extTiltX)}, ${f3(plate.extTiltY)}), length ${reach.toFixed(4)}`);
+  for (let i = 0; i < 120; i++) step(h, { x: 1, y: 1, at: NOW }, NOW, 1, 0.6, 1 / 60);
+  // In the phone's units, from the rock (× 1.1) the plate is handed.
+  const tip = [plate.rockX / 1.1, plate.rockY / 1.1], reach = Math.hypot(...tip);
+  check('the phone and the knobs together reach no further than the knobs\' own corner', Math.abs(reach - KNOB_REACH * Math.SQRT2) < 1e-9 && tip[0] > tip[1],
+    `phone (1, 1) + knobs (1, 0.6) → (${f3(tip[0])}, ${f3(tip[1])}), length ${reach.toFixed(4)} of ${(KNOB_REACH * Math.SQRT2).toFixed(4)}`);
+  const slosh = Math.hypot(plate.extTiltX, plate.extTiltY);
+  check('the slosh\'s tilt stays within the phone\'s reach, in the same direction', Math.abs(slosh - Math.SQRT2) < 1e-9 && Math.abs(plate.extTiltX / plate.extTiltY - tip[0] / tip[1]) < 1e-9,
+    `slosh tilt length ${slosh.toFixed(4)}`);
+  for (let i = 0; i < 120; i++) step(h, noPhone, NOW, 0.6, 0, 1 / 60);
   step(h, phone, NOW + 3, 0.6, 0, 1 / 60);
   check('the phone fades out after its last reading, and the knob stays', plate.extTiltX === h[0] && h[0] > 0.55, `3 s on: ${f3(plate.extTiltX)}, the knob's own ${f3(h[0])}`);
 }

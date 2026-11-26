@@ -276,13 +276,13 @@ its frame rate live. "Free" means no new passes or texture reads.
       and Tilt Up/Down (`plateTiltX`, `plateTiltY`): the flat plate tipped by a hand, the
       remote phone's rock path, eased and turned into the dish (`lib/handTilt.ts`); MIDI,
       Tilt & Rock, the desks, the remote and the phone's Motion sheet. `npm run handtilt`.
-      Story in `docs/plan-shipped.md` §18a-13m. Open: 18a-13n.
-    - **18a-13n. How far a full knob tips.** Full is the phone's full tip, sinθ about 0.27
-      (rock 1.1 × CUR_ROCK plus the hold), which on a thin gap slides a pool of heavy dye
-      about 6% of the plate a second at the default Speed (ROCK_FALL's own measure). If
-      the owner finds two knobs at full too gentle for a show, the knob's reach can go past
-      the phone's toward Plate Rock's strong-kick swing (rock about 2), still on the same
-      law; judge it on the Mac first (docs/judging.md).
+      Story in `docs/plan-shipped.md` §18a-13m. 18a-13n (a full knob past the phone, archived) shipped; open: 18a-13o.
+    - **18a-13o. The dish's slop past the phone's tip.** A named shortcut: past the phone's
+      reach the knobs' tip no longer adds to the slosh dish's held tilt (`extTiltX`,
+      limited to √2 in `tipPlate`; `sloshAccel` clamps it to a unit an axis), because the
+      dish's step keeps its Courant limit only to the Slosh dial's own lean (lib/slosh.ts
+      rockAccel's note). The real answer is a dish step that substeps past that lean, so a
+      steep hand slops the dish as far as it tips it; then lift the limit.
   - **18a-14, a light press looked pixelated: shipped** (2026-11-22; the owner: "when I use
     the press tool on a small size, the pressed area becomes pixelated", with Press Amount
     low on its slider). The thin-gap press laid its bowl, a clamped plate's deflection

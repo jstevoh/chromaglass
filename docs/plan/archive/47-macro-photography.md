@@ -101,3 +101,23 @@ each band.
   strongest moment and the longest rest, the light and colour drift, the reorganisations and
   the hold on the music, and the look in a line. It is `## Overall` in summary.md and `## How it
   felt` in diff.md, with how the arc changed.
+- ~~**47x-10**~~ the flow read aliased (shipped, this PR). The words check's drifting
+  stripes (a 64-pixel period moving a pixel a frame) move almost half their period in the
+  second the physics read pairs over, so the backward shift matched as well as the true one:
+  one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
+  two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
+  one sample then lags of 3, 8 and 10, each seeded from the last.
+- ~~**47x-12**~~ Reading YouTube footage honestly (**shipped**, this PR: `scripts/watchfootage.mjs`): crops black-and-still
+  letterbox/pillarbox bars (`--crop` wins, `--no-autocrop` disables), masks burnt-in sharp
+  still overlays out of every read, excludes title-card spans, estimates global camera
+  translation from block flow (`cameraShare`, keeping `wholeShare`), and flags detail
+  measures unreliable under compression softness.
+- ~~**47x-13**~~ An artistic report card (**shipped**, this PR: `scripts/watchcard.mjs`): `reportCard(read, { cal, ratings })`
+  scores seven canons (Unity, Complexity, Intensity, Arc, Surprise, Music fit, Restraint)
+  from 0 to 10 by calibrating each measure against real liquid shows in `REAL_SHOW_CARDS`
+  using the existing just-noticeable steps, prints `## Report card` in `summary.md` and side
+  by side under `--vs`, and computes Spearman's rho against a library `ratings.json`.
+- ~~**47x-14**~~ From a gap to the settings that close it (**shipped**, this PR: `scripts/watchsettings.mjs`): `MEASURE_SETTINGS`
+  maps every comparable measure to `DEFAULT_SETTINGS` keys (`src/types.ts`) with real physics
+  before post grades, and `gapSettings(gaps)` writes `## Settings to try` under `--vs` (with
+  current values when `--settings` or a take's settings block is given).

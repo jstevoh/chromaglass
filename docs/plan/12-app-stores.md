@@ -93,9 +93,13 @@ forms and a 15 % cut.
    yet run.*
 2. **Open both accounts** *(owner)*: Apple Developer Program and Play Console, and
    install Xcode. *Apple's is open (2026-10); Play Console not started, to be opened
-   as the LLC (12-play-org).* Still owed on Apple's side when the work starts: the
-   App Store Connect record for `app.chromaglass`, and an App Store Connect API key
-   as a secret in one of main's environments so CI can upload to TestFlight.
+   as the LLC (12-play-org).* Apple's side, 2026-11-13: the App Store Connect record
+   "ChromaGlass TV" (`app.chromaglass.tv`) exists and an Admin API key is kept by the
+   owner outside the repo; the Apple TV app's builds go up from the owner's Mac with
+   it (`tvos/README.md`, "TestFlight and the App Store"). Still owed: the iPhone
+   app's own record for `app.chromaglass`, the key as a secret in one of main's
+   environments so CI can upload, and the EU trader status (DSA) in App Store
+   Connect, which only the owner can fill in.
 3. **The Android shell** (one PR; *replaced by 12-ctl-3, 2026-11-09: a Capacitor app, since a TWA cannot be the Mac's controller*): a Bubblewrap project, `assetlinks.json` in
    `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
@@ -131,10 +135,10 @@ forms and a 15 % cut.
    phone. Open: the iPad in the app gets the full layout, which has no Laptop
    remote button yet, and neither does a phone that took More › Full layout
    (until the app is reopened); a QR code on the laptop that opens the app straight
-   into its remote (a `chromaglass://` link) would save the typing. The full layout's button has its
+   into its remote (a `chromaglass://` link) would save the typing *(done without the URL scheme by 12-ctl-2, 2026-11-12: Scan reads the Phone · iPad panel's code in the app)*. The full layout's button has its
    check written first (2026-11-08): `npm run deskreach` line `remote` (in the app at 1024×1366 and
    1366×1024, `desk-laptop-remote` drawn without a tap, asking for the laptop as the phone's does),
-   owed; the QR code needs Xcode's URL scheme and is not in it.
+   owed; the QR code is 12-ctl-2's Scan, not this line.
 5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
    Photos. The only feature that needs new code to work at all. *Not started.*
 6. **A privacy policy page** on Firebase Hosting, and the store listings: text,
@@ -198,12 +202,7 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
-  which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
-  Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is
-  refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
-  camera (it opens the show server's own remote in the browser) and the app. *Measure:*
-  `controller` line `scan`.
+- ~~**12-ctl-2**~~ *(shipped 2026-11-12)*: Scan on the Laptop remote form, in both apps; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
   when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,
@@ -488,10 +487,35 @@ runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
   Home account claimed the code, and played the live plate over WebRTC. That run used a
   local copy of the licence Worker with a demo signing key and a local show server with
   a throwaway key, the address handed in at launch. LiveKit's tvOS simulator slice is
-  arm64 only, so `project.yml` excludes x86_64 for the simulator SDK. Left: run it
-  against the Mac app's own show and the live Worker, then on an Apple TV (judging),
-  and sign it with the owner's team for TestFlight once the App Store Connect record
-  exists (12-ship).
+  arm64 only, so `project.yml` excludes x86_64 for the simulator SDK. Signed with the
+  owner's team and on TestFlight since 12-tv-apple-7. Left: the owner installs it
+  from TestFlight on an Apple TV against the Mac app's own show and the live Worker,
+  and judges it before it is submitted for review.
+- **12-tv-apple-7, TestFlight and the App Store.** Built 2026-11-13: the bundle is
+  `app.chromaglass.tv` (the record's), version 1.0; `npm run brand` draws the layered
+  App Store icon (back, middle, front at 1280x768 and 400x240) and the top shelf
+  (1920x720, wide 2320x720); a privacy manifest; `ITSAppUsesNonExemptEncryption`
+  false; camera and microphone purpose strings, because LiveKit's WebRTC framework
+  links the capture APIs and App Store Connect bounced build 1 without them
+  (ITMS-90683); `Info.plist` versions read from the build settings. The archive is
+  built unsigned and the export signs it in the cloud, since the team has no devices
+  for a development profile (`tvos/README.md`). Build 1.0 (2) uploaded; the privacy
+  page gained the Apple TV item. Left: the internal TestFlight group, the store page
+  (screenshots from `docs/brand/store/tv/`, privacy and support URLs, the 3.1.3(f)
+  review note: a free companion that only opens what was bought on the web, no price
+  and no buy button), then submit once the owner has judged the build (12-tv-apple-6).
+- **12-tv-apple-9, something for App Review to see.** Found 2026-11-13 writing the
+  review notes: the app opens on "Link this TV" (a Home or Pro account claims the code
+  on a phone) and then "Find your Mac" (type the Mac's TV address), and App Review has
+  neither a Mac nor a licence, so it would see a code screen and nothing more, a
+  likely 2.1 rejection. The Android TV app answers the same problem with "Watch a
+  sample film" on its first screen (the press clips, no account). The Apple TV app
+  wants the same (`AVPlayer` on the public films, which is also 12-tv-apple-3's
+  films while the show is off), plus a demo account with a Home licence and a short
+  video of the Mac and TV together in the review notes. Before submitting.
+- **12-tv-apple-8, the upload from CI.** Builds go up from the owner's Mac by hand.
+  A job on the macOS runner with the API key as an environment secret would archive
+  and upload on a tag, with the build number from the run number.
 
 - **12-tv-signin-1, the TVs read it.** The Apple TV app (12-tv-apple) and the
   Google TV shell (route 2) call `/tv/code` and `/tv/poll`, show the code and a QR

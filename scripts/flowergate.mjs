@@ -99,8 +99,15 @@ export async function pageHasFix(page) {
 function check() {
   return new Promise((resolve) => {
     // The bundled harnesses run from node_modules/.cache, so the check is found from the repo root.
+    // The checkout being filmed comes first: the harnesses serve `dist` from the working directory, and
+    // a worktree here links node_modules to the main checkout, so the bundle's own path resolves to the
+    // main checkout, whose source may be a different branch (or older than this gate, with no
+    // flower.mjs at all: a worktree's film was refused for that on 2026-11-22). Asking the main
+    // checkout would judge a source other than the one being filmed.
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const root = here.includes(`${path.sep}node_modules${path.sep}`) ? here.slice(0, here.indexOf(`${path.sep}node_modules${path.sep}`)) : path.resolve(here, '..');
+    const cwd = process.cwd();
+    const root = fs.existsSync(path.join(cwd, 'scripts', 'flower.mjs')) ? cwd
+      : here.includes(`${path.sep}node_modules${path.sep}`) ? here.slice(0, here.indexOf(`${path.sep}node_modules${path.sep}`)) : path.resolve(here, '..');
     let out = '';
     const p = spawn(process.execPath, [path.join(root, 'scripts', 'flower.mjs')], { cwd: root });
     const kill = setTimeout(() => { out += `\nFAIL the flower check ran past ${LIMIT_MS / 60_000} minutes and was stopped`; p.kill('SIGKILL'); }, LIMIT_MS);

@@ -281,6 +281,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('analyserAngle', ((((an % 180) + 180) % 180) * Math.PI) / 180);
   pack.set('quarterWave', Number.isFinite(s.quarterWave) ? clamp01(s.quarterWave) : 1);
   pack.set('birefringence', Math.max(0, Number.isFinite(s.birefringence) ? s.birefringence : 0.3) * BIREF_NM_PER_STRAIN);
+  // The dish's frozen stress (PLAN 31p-3; lib/polarDish.ts): 0, the dish retarding nothing, for every look saved before it.
+  pack.set('dishStress', Math.max(0, Number.isFinite(s.dishStress) ? s.dishStress : 0));
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('crispEdges', Number.isFinite(s.crispEdges) ? clamp01(s.crispEdges as number) : 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
@@ -390,6 +392,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
     // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
     pack.set('faraday', (s.faradayHz ?? 0) > 0 ? 1 : 0);
+    // The water's glow (PLAN 48c): its light's brightness, past the real one up to twice the stage's.
+    pack.set('glow', Number.isFinite(s.glow) ? Math.max(0, Math.min(2, s.glow as number)) : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they

@@ -199,13 +199,20 @@ liquid that lights where its flow stretches it ("Let's do it!").*
   sets), and take the retardation and axis from its anisotropy. A solver field, so it lives
   in `src/gpu/fluid` and the plate reads it. *Measure:* a stir stopped dead keeps its colour
   for about the relaxation time and then goes dark, in the lab; a check in `npm run polar`.
-- **31p-3. Stressed solids on the plate: dishes and cellophane.** The owner's photograph is
-  of moulded dishes with stress frozen round the injection gate (radial and hoop axes, so a
-  pinwheel crossed with plane sheets and rings with the plates in) and cellophane is the
-  classic light-show retarder (a fixed retardation per layer, stacked to climb the orders).
-  Retarders in series with different axes combine by Jones matrices, which needs the third
-  table term 31p-1 already carries. *Measure:* a dish's gate shows a four-armed cross with
-  Quarter Wave at 0 and none at 1; two cellophane layers at the same axis add.
+- **31p-3a. The dish warms and its stress relaxes.** 31p-3's dish is the frozen stress of
+  moulding, fixed in the plastic. A real dish under a hot projector lamp also carries
+  thermal stress (the middle warmer than the rim, so the base pulls in hoop tension that
+  shifts the rings as it warms) and, near its glass transition, creeps. Carry the dish's
+  temperature from the lamp (the plate's lamp power and on-time), add the thermal hoop stress
+  (E alpha dT over 2, the plane-stress disc) to the moulded one, and let the rings drift as
+  it warms. *Measure:* with the lamp on, the rings move outward over minutes in the lab and
+  stop when the temperature does.
+- **31p-3b. Cellophane: a third retarder of fixed retardation.** The classic light-show
+  retarder, a sheet of cellophane laid on the plate (about 400 nm a layer, slow axis along
+  its roll), stacked to climb the orders, turned to swing the colours. A third rotation in
+  `polarSeries` (lib/polarDish.ts's series law takes any number: the Stokes vector through
+  each retarder in turn), its layers and angle as settings. *Measure:* two layers at the same
+  axis add to one of twice the retardation; crossed, they cancel to dark.
 - **31p-4. The second plate's liquid.** 31p-1 reads the lead plate's flow (`vel0`); a
   two-plate look's back plate retards too. Two retarders in series at different axes are
   not one retarder; for small retardations the doubled-angle vectors add, and exactly they
@@ -224,7 +231,6 @@ liquid that lights where its flow stretches it ("Let's do it!").*
   depolarise; the side lamp is not polarised by the stage's polariser and passes the
   analyser at a half. *Measure:* with the sheets in and crossed, a still plate's glints are
   dimmed by the analyser and not by the polariser.
-
 
 ## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
 
@@ -291,17 +297,6 @@ lens-shaped drop, no shadow beside it.*
   `npm run sitefilms` and swap them the same way. The Mac app's last release (1.3.1652) was
   built before #933 and draws the flower until the next release. A preview server left running
   from an old checkout shows it too; judge only from main or the live site.
-- ~~**31s-8. The flower's second life: four texels a cell.**~~ **Shipped** (`npm run flower`).
-  #933's dense stencil still drew the flower at headed 2x Chrome on Galaxy at tier=local: its
-  taps sit a cell apart (logicalGrid 192) but the dye is 768², four texels a cell, and each tap
-  read one texel, so a rim thinner than a cell was copied at every tap offset. Each tap now reads
-  its cell's mean (`cellDensity`, 3x3 bilinear sub-taps), the air is read as missing dye held to
-  the middle's density (`heldAt`, `AIR_HELD`) and the slope and ∇² are weighed by the dye under
-  the pixel, so `airNear`'s flattening is gone. `npm run flower` reads the comb (what a one-cell
-  box leaves of the slope and ∇² near a rim) on a ring, a disc and a bubble: build 0.04 to 0.08
-  against a point-read control of 0.33 to 0.35 (bars 0.10 and 0.3). Every harness that films the
-  plate (recorder, film, showreel, sitefilms) runs it first and refuses to record a build that
-  fails; `FILM_ALLOW_FLOWER=1` films anyway for a private take, flagged in the log.
 - **31s-9. Open: ∇² ripples on a gentle tilt.** Found by `npm run flower`: dye on a linear tilt
   (no rim, no air) should read zero Laplacian, but the derive pass reads a smooth ripple of
   period three cells (about ±0.07 in its units) all across the tilt, far past the slope's
@@ -320,6 +315,24 @@ lens-shaped drop, no shadow beside it.*
   `sitefilms` (and its `--films-from`), `tvloops` (and `--from-raw`) and `tvfilms --from`.
   Left out on purpose: `render-app` and `clipApp` record only for their own checks, and
   `landingfilms` and `render.mjs` record nothing.
+- **31s-11. Open, found 2026-11-23 filming PR #946: the gate calls a fixed dev server old.**
+  `pageHasFix` (`scripts/flowergate.mjs:75`) finds the plate's module through
+  `performance.getEntriesByType('resource')`, and the browser keeps only 250 resource entries by
+  default. Under vite's dev server the page loads every module as its own file, so the list stops
+  at about 244 scripts before `plateSlope.ts`, and the gate refuses a build that does carry the
+  fix (curl of both servers showed `fn cellDensity`). The built site bundles its modules, so it is
+  not affected. Fix: raise the buffer before the page loads (`performance.setResourceTimingBufferSize`
+  in an init script) or fetch the module by its path and look for the marker there. *Measure:* the
+  gate passes a vite server of main and still refuses one checked out before #933.
+- **31s-12. Open: the flower gate times out in a busy film queue.** Found 2026-11-23 in 48q:
+  `film.mjs` asks `untilFlowerFree` before it takes the film lock, and `npm run flower` then
+  queues on that lock itself, so with the queue over ten minutes long the gate's limit ran
+  out and refused the film ("the flower check ran past 10 minutes"). A run inside
+  `maclock.mjs run` does not hit it, since the check inherits the held lock. Take the lock
+  first, or let the gate's limit start when the check gets the GPU. The same run found the
+  gate checking the main checkout's source from a worktree whose node_modules links there
+  (refused for a missing `flower.mjs`); #944 fixed that by checking the working directory's
+  checkout first, the one whose `dist` is filmed.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see

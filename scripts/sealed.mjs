@@ -17,8 +17,19 @@
  *
  *   1. The meter sees a drain: the same plate with the seal held off (the
  *      solver's sealReady answering false, which is the plate before this
- *      change: the weight on the open rim) keeps under 85% of its dye over
- *      eight seconds (68% when this was written).
+ *      change: the weight on the open rim) keeps under 90% of its dye over
+ *      eight seconds (68% when this was written). The bar was 85% until PLAN
+ *      1p (the owner's OK, 2026-11-26). This line is the meter's control, not
+ *      a property of the feature: it shows the measurement can see a drain
+ *      the sealed line (at least 99.5%) would fail, and 90% asks for a loss
+ *      twenty times that line's allowance. What the open plate loses is the
+ *      dye that reaches the rim in eight seconds, and part of that was
+ *      numerical diffusion smearing each drop's lower edge ahead of the drop.
+ *      When the thin gap's carry moved from minmod to MC (PLAN 1l), the smear
+ *      shrank and the loss fell with it: 84.7% to 85.1% kept on the same run,
+ *      while the sealed plate, the lone drop and the lamp held, and the lone
+ *      drop fell 4% faster because it stays compact. The lower number was
+ *      the error, so the limiter stays and the bar moves.
  *   2. Sealed, it keeps at least 99.5% over the same eight seconds, and the
  *      seal ran (its kernels built and asked for every step).
  *   3. The wax still falls. A lone drop in the middle of the plate, where the
@@ -129,8 +140,8 @@ try {
 const kept = (x) => x.b.amount / x.a.amount;
 const pct = (v) => `${(100 * v).toFixed(1)}%`;
 // 1.
-check('the meter sees a drain: with the seal held off, the standing plate keeps under 85% of its dye over eight seconds',
-  kept(r.open) < 0.85, `${pct(kept(r.open))} kept (${r.open.a.amount.toFixed(0)} → ${r.open.b.amount.toFixed(0)}); 68% when this was written`);
+check('the meter sees a drain: with the seal held off, the standing plate keeps under 90% of its dye over eight seconds',
+  kept(r.open) < 0.90, `${pct(kept(r.open))} kept (${r.open.a.amount.toFixed(0)} → ${r.open.b.amount.toFixed(0)}); 68% when this was written`);
 // 2.
 check('sealed, the standing plate keeps at least 99.5% of its dye over the same eight seconds, and the seal ran',
   r.sealed.ready && kept(r.sealed) >= 0.995, `${pct(kept(r.sealed))} kept (${r.sealed.a.amount.toFixed(0)} → ${r.sealed.b.amount.toFixed(0)}), the seal ${r.sealed.ready ? 'built and on' : 'NOT built'}; its centroid ${r.sealed.a.y.toFixed(3)} → ${r.sealed.b.y.toFixed(3)} (open ${r.open.a.y.toFixed(3)} → ${r.open.b.y.toFixed(3)})`);

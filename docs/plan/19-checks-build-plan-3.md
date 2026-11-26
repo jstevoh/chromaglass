@@ -520,6 +520,11 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
   plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
   (`npm run microscope` read 0.00 at every zoom).
+- **19aj-4. Open, found 2026-11-21: Measure · lab9 runs out of its 25 minutes on a slow
+  runner.** It takes 14 to 19 minutes on a normal one (deploy 854: moiré 3:28, leandisplay
+  7:14, glitter 2:58) and was cancelled at 25:00 on #878's run 44884668374 with leandisplay
+  alone at 12:56. Move "Glitter, the lens and the side lamp" (about 3 minutes) to lab8 or
+  lab5 (two checks each), so a runner at two thirds of the usual speed still finishes.
 - **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
   saves 13%; what still runs every Mac check is the solver and the libraries the lab's
   one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
@@ -567,7 +572,7 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   its entry out. *Found 2026-11-21 (PR #679's run 44927401897): 9c's entry never held,
   because `scripts/intro.mjs` printed "1 of 14 FAILED" and never the "13/14 checks
   passed" tally that `quarantined()` in `scripts/checks.mjs` needs before it honours a
-  line; the films PR adds the tally line (the drawwall harness already printed one).*
+  line; the films PR adds the tally line (the drawwall harness already printed one).* *9c's entry came out with #897 (14v-12's loading line holding its count until the render compiles are all asked), the fix it named; the drawwall entry stays until 8-draw-a-7.*
 - **19ak-10. Decided: a deploy still trusts a PR run that was green through a
   quarantine.** `deploygate.sh` rules 4 and 5 trust a PR's green `Checks` run, and a run a
   quarantine held green is green, so a line red on the merged tree can go live on the PR's
@@ -633,12 +638,3 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   drop, as the drift column does) or whether a drop's reach grew. Never a looser bar.
   Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes
   the entries out.
-- **19ak-23. Shipped 2026-11-22: one film at a time on the owner's Mac, in a real queue (`scripts/maclock.mjs`).**
-  Several agent sessions driving Chrome or the ChromaGlass app at once overloaded the owner's Mac
-  (16 GB MacBook Air). Replaced the manual `~/cg-scratch/film.lock` rule with `scripts/maclock.mjs`
-  (atomic `wx` lock, FIFO `~/cg-scratch/film.queue/`, dead-pid and over-timeout stale recovery with
-  atomic rename-compare race protection, deploy-shard priority via `macdeploy.mjs`, `CG_FILM_LOCK_HELD`
-  nesting, `run`/`status`/`--selftest` CLI and `npm run maclock`), wired it into `chromium.mjs`,
-  `desktop.mjs` and the standalone browser launchers (`caption.mjs`, `codecblip.mjs`, `detail.mjs`,
-  `webgpu-smoke.mjs`), updated `scripts/macbusy.sh` to treat a live `film.lock` as busy via
-  `status --json`, and added the check to `scripts/checks.json`.

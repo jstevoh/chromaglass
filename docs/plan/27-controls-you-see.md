@@ -151,15 +151,23 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     weigh all the colour, oil's included, over the app's mean, and a plate stood up (Plate Upright,
     Rain Drip) lifts no oil: the same circulation with gravity's in-plane share in place of the
     rock's tilt.
-  - **27f-7, open (a shortcut named). The lift's circulation is the even gap's.** Ψ is solved with
-    the plate's mobility taken as even, then the gap's own solve takes what is left where the gap is
-    not (a press, a domed plate), with its open rim: exact on an even gap, and under a press a little
-    of the lift can reach the rim. The full answer is the lift's own solve with the gap's mobility
-    and a closed rim, a second multigrid; or one solve with the rim's held pressure set per liquid
-    (18g-6 holds the surface tension's this way, as a gradient taken off the force near the rim). And the oil in the mix has the water's viscosity in the gap: a light
-    mineral oil is fifty times thicker (OIL_NU), which would slow a lens to about 1/25 of this in
-    water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
-    when the mix's oil gets its viscosity.
+  - **27f-7, partly shipped (Classic round five, 2026-11-22). The oil has its own viscosity in
+    the gap, and the lift's circulation sees it.** hsPrep now gives the mix's oil its own body,
+    B = (0.88·OIL_NU/ν)^c (`oilBodyLn`), so a lens of light mineral oil is about twice as stiff as
+    the water round it at the default gap and moves at a Hele-Shaw inclusion's speed in a round
+    cell, (1−ε)/(λ(1−ε)+1+ε) of Darcy's with λ ≈ 2 and ε its area share (`npm run oillift`,
+    0.52 mm/s against 0.52). The tipped dish's closed
+    circulation is solved with that uneven mobility, −∇·(B∇Ψ) = ∂φ/∂a, and the dyed water's own
+    weight goes through the same circulation (φ = water dye + κ·oil): handing it to the open-rim
+    solve under an uneven mobility leaked a mean flow, 4.5% of Clock Glass's frame a second,
+    now 0.2%. Still open, two shortcuts:
+    - **27f-7a, open (a shortcut named).** The circulation's B is the oil's alone: a press or a
+      domed plate (the gap's own h³) is still left to the gap's open-rim solve, so under a press
+      a little of the lift reaches the rim. The full answer folds h³ into B.
+    - **27f-7b, open (a shortcut named).** Past LIFT_MOST (256) the circulation's grid is coarser
+      than the solver's, so the dyed water's finest swirls are weighed as a block average: a
+      sub-block stripe of colour feels no lift. The full answer is the circulation on the
+      solver's own grid (a multigrid, like the pressure's).
   - **27f-9. A standing plate is a sealed bottle (shipped 2026-11-11; story in
     docs/plan-shipped.md §27f-9).** Lava Lamp's wax poured out over the open rim; on a standing
     plate the weight is now the closed cell's circulation (`wgsl/fluid/seal.ts`). `npm run sealed`.
@@ -218,6 +226,55 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       solver's `REST_GAP`); a lab script that passes
       it as the gap is wrong by the name alone (it cost an hour here). Rename the key with a
       migration, or say so where `VisualizerSettings` declares it.
+    - **27f-9s, open (the shortcut 27f-9q names). A tension the step cannot break, so the
+      lamp can have all nine.** 27f-9q gives the sealed bottle's oil four times its tension,
+      not the nine its Bond number asks: at ×9 (cap one cell) the bodies read 0.94 round, but
+      the cells over half oil fall from 5.1% of the plate to 3.0% in two minutes and 2.1% in
+      three, the edge shed as a haze, because the capillary force is explicit and past the
+      step's limit (Δt ≲ √(ρΔx³/2πσ), Brackbill 1992) it rings. Take it semi-implicitly (the
+      interface's motion over the step counted in its curvature, Hysing 2006) or substep it
+      as the slump and the ferrofluid are, so `SEALED_TENSION` can be 9 and the caps
+      (`OIL_CELLS`, `SEALED_CELLS`) can go. With a check that the cells over half oil hold.
+    - **27f-9t, open. The second curvature of a body in a bottle.** The solver's κ is the
+      edge's curve in the plate, right between two glasses, but a lamp's wax is a body of
+      revolution: a stalk of width w has 2/w round itself, which drains a real stalk into its
+      head and pinches it off (Rayleigh–Plateau). A first try (κ₂ as 2 over the body's chord
+      along the edge's normal, weighted by Plate Upright, in `capillaryAt`) read 0.68 → 0.79
+      round with `lavacycle` 7/7 but over-pinched into twenty small bodies and a haze, and
+      with the cap lifted drained the oil (now known to be the lip and the guard 27f-9q
+      shut). Try it again on 27f-9q, and with the wax's own viscosity (Tomotika's pinch rate
+      σ/μR with the viscosity ratio; both liquids have the water's mobility here). The diff
+      and the lab: `/mnt/project-files/handoff/roundcurve-27f9q-b.patch` (the owner's shared
+      files).
+    - **27f-9u, open. Wax gathers at the lamp's wall over minutes.** In every lab of 27f-9q,
+      before and after it, the oil in the band within 3% of the rim grows over two minutes
+      while the bodies' edges show a fine serration; a real lamp's wax wets the glass little
+      and leaves it. Measure the rim band's share over five minutes and look at the wall's
+      contact angle (the oil's potential at the rim, `rimSide`) before tuning.
+    - **27f-9n, open. A lost device mid-show loses the plate's oil.** `dropGpu(true)` on a
+      solver that has spoken keeps the dye (the CPU's arrays, read back) and nothing of the
+      chemistry: the mix, the heat and the species live only on the GPU, and a device lost
+      without a hand-over has no carry to give the next solver. The plate comes back as its
+      colours in plain water. Wanted: the chemistry read back with the dye (slowly, a field
+      every few seconds is enough), or the look's oil laid again where its dye now is.
+    - **27f-9o, open. A bottle's dose given before the solver is there is dropped too.**
+      Read, not measured: the bottles' oil, soap and acid go to the solver by the same
+      optional call as the looks' did (`liquid.onDeposit`), so a pour in the page's first
+      second, or between a lost device and the next, lays its colour and not its liquid.
+      `mixWait` holds a look's splats; a pour is a stream over frames, so it wants its own
+      account of what is still owed.
+    - **27f-9p, open. What the lamp's Mac films showed was dye, so their verdicts want
+      reading again.** Every Mac take of Lava Lamp before 27f-9m opened the page on the look
+      (`?look=lava-lamp`), so 27f-9h's "hovers after 60 to 80 s", the "pale ghosts" and the
+      rim columns of its second take, and 27f-9f's Mac minute below were all a passive dye
+      in convecting water, not wax. The lab's numbers (which lay the oil themselves) stand.
+      Film the look again from an opened page before tuning anything on those verdicts.
+    - **27f-9r, open. A crowd look's oil colour across an OOM retry.** `addOilDensity`'s
+      colour share (`layOilShare`, PLAN 47z-1) now populates `oilAdd` even before a solver
+      attaches (and `clearChemistry` clears it), so Clock Glass and Splodascope opened with
+      the page keep their oil colour on the first attach; only `restoreSeed` after an OOM
+      drop following `flushDeltas` does not replay `oilAdd` yet. Keep it in `mixWait` if
+      needed.
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
@@ -255,13 +312,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       wax (oil above a half) is 97% laid, then 81% to 92% at every 15 s sample, the wax's
       cells 1,095 laid and 837 to 909 after, the fringe (a tenth to a half oil) 138 laid
       and 164 to 334 after. So the lab's wax keeps its colour and its area for the whole
-      take and the app's picture does not. What differs between the two is not yet known,
-      and is the next thing to measure before anything is changed: the app's grid and step
-      on this Mac's tier against the lab's 128² at a sixtieth; what the plate draws (the
-      dye, at the dye's own grid) against what the probe reads (the oil); and whether the
-      sheets are 27f-9i's short capillary length seen at the app's finer grid. A check for
-      it would read the app's own fields after two minutes (the share of the dye inside
-      the wax, and the count of separate bodies), which the lab's `lavawax` does not.
+      take and the app's picture does not. *What differed (27f-9m, the same day):* the
+      app's plate had no wax. Read from the filmed build's own fields over 150 s
+      (`?look=lava-lamp`, the Mac, Metal): the mix field's oil sums to 0 and no cell is
+      wax at any of eleven samples, while the dye is all there. The film is a dye in
+      convecting water, which folds into sheets as any passive colour does. With the wax
+      laid (27f-9m) the same 150 s on the Mac is bodies that go round and keep their edges,
+      though not round ones (27f-9q).
+      Still wanted: a check that reads the app's own fields after two minutes (the share
+      of the dye inside the wax, and the count of separate bodies), which the lab's
+      `lavawax` does not; `oillaid` asks only that the oil is there at the start.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).
