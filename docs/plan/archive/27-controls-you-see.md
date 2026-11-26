@@ -65,3 +65,11 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   Dye Weight and Heat Spread to 2, Pushes Dye to 1.2, Drop Height to 2, Background Loop to
   1.4, Glass Smear to 3 with no gate, Momentum's lasting current to 0.999. Story in
   `docs/plan-shipped.md` §27h-2; `npm run widedials`.
+- **27f-9m. A look's oil laid before its solver is there (shipped 2026-11-12; story in
+  docs/plan-shipped.md §27f-9m).** The owner: on the Mac the wax smears into streaks
+  instead of holding round blobs. The filmed lamp had no wax in it: the look the page
+  opens on is seeded before the GPU solver is attached, its oil went to
+  `this.gpu?.addMix?.(…)` and was dropped, and its dye landed in water (the mix field's
+  oil 0 at every sample of 150 s). Clock Glass and Splodascope lost theirs the same way.
+  The oil waits now (`src/sim/mixWait.ts`) and is laid when the solver attaches;
+  `npm run oillaid`.

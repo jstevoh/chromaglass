@@ -10,10 +10,11 @@
  * sizes`) and may not grow, so the block moved here whole, and the new read
  * came with it.
  */
-import { SOAP_LUT_STEP_NM } from '../../lib/soapFilm';
+import { SOAP_LUT_MAX_NM, SOAP_LUT_STEP_NM } from '../../lib/soapFilm';
 import { SOAP_FRAME_LO, SOAP_FRAME_SPAN } from '../soapFrame';
 import { FARADAY_PLATE_WGSL } from './plateFaraday';
 import { SURFACE_PLATE_WGSL } from './plateSurface';
+import { GLOW_PLATE_WGSL } from './plateGlow';
 
 export const THIN_FILM_WGSL = /* wgsl */ `
 /*
@@ -168,7 +169,7 @@ fn thinFilmOver(c: vec3f, film0: f32, bare0: f32, t: texture_2d<f32>, fuv: vec2f
   reference picture is soapFilmRgb's, encoded, over a dark ground.
 */
 @group(0) @binding(18) var<storage, read> soapH: array<f32>;
-@group(0) @binding(19) var<storage, read> soapLut: array<vec4f>;
+@group(0) @binding(19) var<uniform> soapLut: array<vec4f, ${Math.round(SOAP_LUT_MAX_NM / SOAP_LUT_STEP_NM) + 1}>;
 
 const SOAP_LUT_STEP: f32 = ${SOAP_LUT_STEP_NM}.0;
 // Physical Airy reflectance in linear light (PLAN 32d-6): R <= ~7.8% and T = 1 - R.
@@ -212,7 +213,7 @@ fn soapEncode(c: vec3f) -> vec3f {
 fn soapFilmOver(c: vec3f, fuv: vec2f) -> vec3f {
   // A 1×1 stand-in is bound while the frame holds no film: nothing to draw.
   let n = i32(round(sqrt(f32(arrayLength(&soapH)))));
-  let count = arrayLength(&soapLut);
+  let count = ${Math.round(SOAP_LUT_MAX_NM / SOAP_LUT_STEP_NM) + 1}u;
   // The frame on the plate (gpu/soapFrame.ts), its row 0 at the top: the plate's uv runs up the picture.
   let f = (fuv - SOAP_FRAME_LO) / SOAP_FRAME_SPAN;
   if (n < 4 || count < 2u || any(f < vec2f(0.0)) || any(f > vec2f(1.0))) { return c; }
@@ -228,14 +229,17 @@ fn soapFilmOver(c: vec3f, fuv: vec2f) -> vec3f {
 /*
   What lies over the plate's liquid, in the order light meets it: a shaken
   dish's standing waves bend the lamp's light (PLAN 48f, plateFaraday.ts),
-  then the frame's soap film reflects over all of it (32d). Here and not in
+  the water's own glow is added in linear light (48c, plateGlow.ts), then
+  the frame's soap film reflects over all of it (32d). Here and not in
   plate.ts, which is at its size ceiling.
 */
 ${SURFACE_PLATE_WGSL}
 ${FARADAY_PLATE_WGSL}
+${GLOW_PLATE_WGSL}
 fn coversOver(c: vec3f, fuv: vec2f) -> vec3f {
   var o = c;
   if (U.faraday > 0.5) { o = faradayOver(o, fuv); }
+  if (U.glow > 0.001) { o = glowOver(o, fuv); }
   if (U.soapFilm > 0.001) { o = soapFilmOver(o, fuv); }
   // Bound read-only for 31s-2 caustics; 31s-1 does not draw it yet.
   if (U.gridSize < 0.0) { o += vec3f(surfaceHeightAt(fuv)); }

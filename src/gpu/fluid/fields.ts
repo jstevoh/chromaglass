@@ -460,6 +460,8 @@ export class FluidFields extends FluidCore {
       faraday: this.faradayPlate?.field ?? null,
       /** Free-surface and oil-layer height field in metres (PLAN 31s-1). */
       surfaceHeight: this.surfaceHeight?.live ? this.surfaceHeight.field : null,
+      /** The water's glow (PLAN 48c), or null when Glow is off. */
+      glow: this.glowPlate?.field ?? null,
     };
   }
 
@@ -478,6 +480,8 @@ export class FluidFields extends FluidCore {
     this.faradayPlate = null;
     this.surfaceHeight?.dispose();
     this.surfaceHeight = null;
+    this.glowPlate?.dispose();
+    this.glowPlate = null;
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();

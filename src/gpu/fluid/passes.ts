@@ -20,6 +20,7 @@ import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
 import { SoapFilmPlate, SOAP_PLATE_DX, soapLean } from '../soapFilmPlate';
 import { TankPlate } from '../tankPlate';
 import { FaradayPlate } from '../faraday';
+import { GlowPlate, GLOW_SHEAR, GLOW_RECHARGE } from '../glow';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
@@ -273,12 +274,33 @@ export class FluidPasses extends FluidFields {
 
   /**
    * The solvers that run beside the plate's own, on `enc` before the step's
-   * pass: the frame's soap film and the tank's side view.
+   * pass: the frame's soap film, the tank's side view, the dish on a shaker
+   * and the water's glow.
    */
   protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
     this.stepSoapPlate(enc, p);
     this.stepTankPlate(enc, p);
     this.stepFaradayPlate(enc, p);
+    this.stepGlowPlate(enc, p);
+  }
+
+  /**
+   * The water's glow (PLAN 48c, gpu/glow.ts): made the first time Glow is up,
+   * stepped on the show's own seconds with the flow the last step left (the
+   * flow over the glass, the glass's own drift taken off, since it is the
+   * water's shear against the glass the organisms feel) and the squeeze
+   * film's gap, whose depth sets the gap's wall shear and how much water
+   * glows. Turned off, it goes, and the next time the sea has rested.
+   */
+  protected stepGlowPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.glow ?? 0) > 0.001)) {
+      if (this.glowPlate) { this.glowPlate.dispose(); this.glowPlate = null; }
+      return;
+    }
+    if (!this.glowPlate) this.glowPlate = new GlowPlate(this.device);
+    // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N);
+    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE);
   }
 
   /**
@@ -1195,6 +1217,55 @@ export class FluidPasses extends FluidFields {
     }
     this.run(pass, 'curGradient', this.cur.write, [this.cur.read, this.curP.read], m, this.M);
     this.cur.swap();
+  }
+
+  /**
+   * The dye's molecular diffusion and along-flow dispersion (`dyeDisperse`,
+   * PLAN 18h, 46k), or nothing when both diffusion terms are zero (`dm <= 0`
+   * and `kappaT <= 0` or `dispCells <= 0`, as on Classic and the thirteen
+   * other looks with Diffusion Rate at 0) and Oil Bodies is not unspreading.
+   *
+   * Read in the code (2026-11-13): the stage's gate had `dispCells > 0 || …`
+   * in front of the diffusion check, from when shear dispersion was always on,
+   * so every moving step ran `dyeDisperse` (one full-grid dispatch, 25 loads
+   * of the rgba32float dye a cell) even with `dm = 0` and `kappaT = 0`. In
+   * `wgsl/fluid/dye.ts`, `getDisp` returns `vec3f(dm + fac * v.x², dm + fac *
+   * v.y², fac * v.x * v.y)` where `shear = kappaT * gapRel² * |v|²` and `v =
+   * vel * dispCells`. When `dm = 0` and either `kappaT = 0` or `dispCells =
+   * 0`, `getDisp` is `vec3f(0)` at every cell, every face flux `fluxX` and
+   * `fluxY` is `±0`, and `here + netFlux` writes back the cell's own dye bit
+   * for bit (the previous step's `decayDye` clamped every channel to `+0.0` or
+   * above, so `x + (±0.0)` is `x`).
+   *
+   * Oil Bodies (`bodies`: `bodiesOn && !bodiesFresh`) stays outside the gate:
+   * `bodyUnspread` (`wgsl/fluid/oil.ts`) writes `max(dye - spread, 0) +
+   * max(kept, 0)`, and because `slump` and `decayDye` at the end of the step
+   * before act on `this.dye` alone and not `this.oilDye`, a cell where `dye`
+   * dropped below `oilDye` is raised back to `oilDye` by that clamp, and a
+   * cell with both above zero computes `(dye - od) + od` in float32, which is
+   * not bit-identical to `dye` across different exponents.
+   */
+  protected disperseWanted(dm: number, kappaT: number, dispCells: number, bodies: boolean): boolean {
+    return bodies || dm > 0 || (kappaT > 0 && dispCells > 0);
+  }
+
+  protected disperseDye(pass: GPUComputePassEncoder, dm: number, kappaT: number, dispCells: number, dispCap: number, bodies: boolean): void {
+    if (!this.disperseWanted(dm, kappaT, dispCells, bodies)) return;
+    this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
+      this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+    this.dye.swap();
+    if (bodies) {
+      const od = this.oilDye!;
+      // Keep oil's pre-dispersion share in scratchB for bodyUnspread
+      this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
+      this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
+        this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+      od.swap();
+      this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
+      this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
+      this.dye.swap();
+      od.swap();
+    }
   }
 
   /**

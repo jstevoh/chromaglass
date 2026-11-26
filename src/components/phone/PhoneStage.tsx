@@ -29,6 +29,7 @@ import { MixerPanel } from '../MixerPanel';
 import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
+import { lookStill } from '../../lib/lookStills';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
@@ -1031,7 +1032,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       data-testid={`phone-look-${l.id}`}
                       className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
                     >
-                      <SlideMount swatch={l.swatch} size={44} />
+                      <SlideMount swatch={l.swatch} still={lookStill(l.id)} size={44} />
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
@@ -1218,6 +1219,29 @@ export function PhoneStage(p: PhoneStageProps) {
                   <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
                     display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />
+                </>
+              )}
+            </div>
+          )}
+          {/*
+            The water's glow (PLAN 48c): plankton that flash blue where the
+            music's hands above shear the water, and tire. Glow, and while it
+            is up the shear it fires at and its recharge, as the desk's Camera
+            section has them, through the same mixer setting.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Glow" value={p.mixer.settings.glow ?? 0} min={0} max={2} step={0.05}
+                onChange={(v) => p.mixer!.onSetting({ glow: v })}
+                display={`${Math.round((p.mixer.settings.glow ?? 0) * 100)}%`} touch testId="phone-glow" midiKey="setting:glow" />
+              {(p.mixer.settings.glow ?? 0) > 0.001 && (
+                <>
+                  <Slider label="Glow Shear" value={p.mixer.settings.glowShear ?? 30} min={5} max={200} step={1}
+                    onChange={(v) => p.mixer!.onSetting({ glowShear: v })}
+                    display={`${Math.round(p.mixer.settings.glowShear ?? 30)}/s`} touch testId="phone-glow-shear" midiKey="setting:glowShear" />
+                  <Slider label="Glow Recharge" value={p.mixer.settings.glowRecharge ?? 8} min={0.5} max={60} step={0.5}
+                    onChange={(v) => p.mixer!.onSetting({ glowRecharge: v })}
+                    display={`${(p.mixer.settings.glowRecharge ?? 8).toFixed(1)} s`} touch testId="phone-glow-recharge" midiKey="setting:glowRecharge" />
                 </>
               )}
             </div>

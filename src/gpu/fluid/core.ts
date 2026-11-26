@@ -13,6 +13,7 @@ import type { SoapFilmPlate } from '../soapFilmPlate';
 import type { TankPlate } from '../tankPlate';
 import type { FaradayPlate } from '../faraday';
 import { SurfaceHeight } from '../surfaceHeight';
+import type { GlowPlate } from '../glow';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
@@ -113,6 +114,8 @@ export class FluidCore {
   protected faradayPlate: FaradayPlate | null = null;
   /** Free-surface and oil-layer height field `h` in metres (PLAN 31s-1). */
   protected surfaceHeight: SurfaceHeight | null = null;
+  /** The water's glow (PLAN 48c, gpu/glow.ts), made while Glow is up. */
+  protected glowPlate: GlowPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;
@@ -161,7 +164,6 @@ export class FluidCore {
   protected readonly sampler: GPUSampler;
 
   protected readonly rbRow: number;
-  protected readonly rbStaging: { dye: GPUBuffer; vel: GPUBuffer };
   protected readonly rbRings: { dye: ReadbackRing; vel: ReadbackRing };
   protected readonly rbDye: Float32Array;
   /** The reading `rbDye` holds: the ring's sequence when it was copied in, not when the next one landed. */
@@ -594,8 +596,6 @@ export class FluidCore {
     this.rbVel = new Float32Array(this.L * this.L * 4);
     this.rbRow = Math.ceil((this.L * 16) / 256) * 256;
     const bytes = this.rbRow * this.L;
-    const staging = (label: string) => this.disposer.track(device.createBuffer({ label, size: bytes, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
-    this.rbStaging = { dye: staging('readback dye'), vel: staging('readback vel') };
     this.rbRings = { dye: new ReadbackRing(device, this.disposer, bytes, 2, 'dye readback'), vel: new ReadbackRing(device, this.disposer, bytes, 2, 'vel readback') };
 
     this.clear();

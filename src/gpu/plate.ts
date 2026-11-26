@@ -30,7 +30,7 @@ import { DISH_REST_GAP } from '../lib/turntable';
 import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
 import { BEAD_FLOATS } from '../lib/beadPack';
-import { soapFilmLut } from '../lib/soapFilm';
+import { SOAP_LUT_MAX_NM, SOAP_LUT_STEP_NM, soapFilmLut } from '../lib/soapFilm';
 import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
 import { drawTank } from './tankDraw';
 import type { TankPlateField } from './tankPlate';
@@ -203,6 +203,7 @@ export class WebGPUPlate {
    * samples WebGPU's sixteen.
    */
   private readonly blankStore: GPUBuffer;
+  private readonly blankSoapLut: GPUBuffer;
   private soapLut: GPUBuffer | null = null;
   private readonly blankList: GPUBuffer;
   /** No bead list: args with S 0 (the plate reads the beads' picture), and one empty bead to bind. */
@@ -294,6 +295,11 @@ export class WebGPUPlate {
     }));
     device.queue.writeTexture({ texture: this.blankU }, new Uint32Array(4), { bytesPerRow: 16 }, [1, 1]);
     this.blankStore = this.disposer.track(device.createBuffer({ label: 'plate blank store', size: 16, usage: GPUBufferUsage.STORAGE }));
+    this.blankSoapLut = this.disposer.track(device.createBuffer({
+      label: 'blank soap lut',
+      size: (Math.round(SOAP_LUT_MAX_NM / SOAP_LUT_STEP_NM) + 1) * 16,
+      usage: GPUBufferUsage.UNIFORM,
+    }));
     this.blankSpecies = this.disposer.track(device.createTexture({
       label: 'blank species', size: [1, 1], format: 'rgba32float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
@@ -405,7 +411,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -585,7 +591,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -620,7 +626,7 @@ export class WebGPUPlate {
     uniforms: GPUBuffer,
     /** What `uniforms` was written from: which of the display's effects this draw turns on. */
     bytes: ArrayBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; surfaceHeight?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -642,7 +648,7 @@ export class WebGPUPlate {
     const soap = fields[0]?.soapFilm?.h ?? null;
     if (soap && !this.soapLut) {
       const lut = soapFilmLut();
-      this.soapLut = this.disposer.track(this.device.createBuffer({ label: 'soap film colour', size: lut.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
+      this.soapLut = this.disposer.track(this.device.createBuffer({ label: 'soap film colour', size: lut.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
       this.device.queue.writeBuffer(this.soapLut, 0, lut);
     }
     const pass = encoder.beginRenderPass({
@@ -663,13 +669,15 @@ export class WebGPUPlate {
       grain(0), grain(1),
       this.source('film'), this.source('mark'), this.source('beads'),
       parts(0), parts(1), air(0), air(1), view(0),
-      soap ?? this.blankStore, (soap && this.soapLut) || this.blankStore,
+      soap ?? this.blankStore, (soap && this.soapLut) || this.blankSoapLut,
       // The lead plate's bubbles as its air was stamped (38h-15); the back plate carries none.
       fields[0].airGeo?.discs ?? this.blankList, fields[0].airGeo?.rims ?? this.blankList,
       // The rings' list the beads' mask was drawn from, read at the screen's resolution (38h-17).
       rings?.args ?? this.blankBeadArgs, rings?.beads ?? this.blankBeads, rings?.tiles ?? this.blankList,
       // The shaken dish's standing waves (48f), the front plate's alone.
       fields[0].faraday?.h ?? this.blankStore,
+      // The water's glow (48c), the lead plate's alone; a 4-float stand-in while it is off.
+      fields[0].glow?.light ?? this.blankStore,
       // Free-surface and oil-layer height h (PLAN 31s-1), read-only for 31s-2 caustics.
       this.surfaceReady && this.surfaceBuf ? this.surfaceBuf : this.blankStore,
     ]));

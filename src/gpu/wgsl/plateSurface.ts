@@ -1,16 +1,17 @@
 /**
  * Read-only surface height binding for the plate display shader (PLAN 31s-1).
  *
- * `surfaceH` is bound at `@binding(26)` (the eighth and final storage buffer in
- * the fragment stage under WebGPU default limits) and packed from the solver's
- * `r32float` height texture (`surfaceHeight`) during `WebGPUPlate.draw`.
+ * `surfaceH` is bound at `@binding(27)` (the eighth and final storage buffer in
+ * the fragment stage under WebGPU default limits, after `soapLut` at `@binding(19)`
+ * moved to a uniform array) and packed from the solver's `r32float` height
+ * texture (`surfaceHeight`) during `WebGPUPlate.draw`.
  * PLAN 31s-2 will trace lamp rays through `surfaceH`; 31s-1 only exposes it
  * without drawing it.
  */
 import { PLATE_METRES } from '../fluid/constants';
 
 export const SURFACE_PLATE_WGSL = /* wgsl */ `
-@group(0) @binding(26) var<storage, read> surfaceH: array<f32>;
+@group(0) @binding(27) var<storage, read> surfaceH: array<f32>;
 
 const SURFACE_PLATE_METRES: f32 = ${PLATE_METRES};
 

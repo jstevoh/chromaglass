@@ -159,11 +159,12 @@ again ten times a second for three meters and a percentage.
     1. `BubbleField.step` (`src/lib/bubbles.ts:498`, called from `stepPlateBubbles` in `src/sim/speciesPoll.ts:93`): `stepPlateBubbles` allocates a `(bx, by) => [vx, vy]` closure each step, and `BubbleField.step` calls `velocity(x, y)` 8 times on the ring (`b.r + 1.5`) per bubble plus 4 strain taps per large bubble (`tau2 > 1e-3`), allocating a 2-number tuple each call.
     2. `squishDisc` under the bass hand (`src/sim/fluidSimulation.ts:2190` `pressBass` → `BassPress.follow` in `src/lib/squish.ts:710` → `squishDisc` in `src/lib/squish.ts:180` → `FluidSimulation.squishCell` in `src/sim/fluidSimulation.ts:2199`): `spokesAt` allocates `{ count: 0, phase: 0, seed: 0 }`, `BassPress.follow` allocates `{ x, y, r: radius, thin }`, and `squishDisc`'s inner loop calls `cell(idx, -3 * amount * q * q, 0, 0, 1)` per disc cell.
     3. The tempo `estimate` (`BarGrid.estimate` / `estimatePeriod` / `median` in `src/lib/barGrid.ts:144,229,378`, called from `BarGrid.step` at `src/lib/barGrid.ts:360`, and `BeatClock.step` in `src/lib/beatClock.ts:212`, called every frame at `src/components/LiquidVisualizer.tsx:2601`): `BarGrid.estimate` allocates `all`, `gaps` of `{ dt, w }` objects, a `score` closure, `.filter`/`.map` arrays, and `a.slice().sort((x, y) => x - y)` in `median`; `BeatClock.step` allocates `ivs: number[] = []` and runs `ivs.sort((a, b) => a - b)` on every frame once `onsets.length >= 4` even when no onset arrived or expired.
-- **46k · `dyeDisperse` runs as an exact no-op where diffusion is zero** (S; Classic and
-  thirteen other looks): its gate passes whenever the plate moves, and with `dm = 0` and
-  `kappaT = 0` every flux is ±0. One full-grid dispatch a step, 25 loads of the rgba32f dye
-  a cell; the file's own comment puts it near 0.4 ms. Skip it for that case (not oil bodies
-  until read); `samelook`, `physics`, `encode`.
+- ~~**46k · `dyeDisperse` runs as an exact no-op where diffusion is zero**~~ (**shipped**,
+  `disperseDye` and `disperseWanted` in `src/gpu/fluid/passes.ts`: gated on `bodies || dm > 0
+  || (kappaT > 0 && dispCells > 0)` so Classic and the other looks with Diffusion Rate at 0
+  and no Oil Bodies skip the full-grid dispatch; Oil Bodies stays outside the gate because
+  `bodyUnspread` clamps `dye` against `oilDye` after `slump` and `decayDye`; `samelook`,
+  `physics`, `encode`; story in `docs/plan-shipped.md`).
 - **46l · Taps the display takes and throws away** (S each): the milk's five taps a layer
   where the lamp ground is off (ten a pixel on Classic); the ferrofluid dome's curvature
   loading again the four neighbours it holds; the projector's `scene` sample overwritten
@@ -220,3 +221,12 @@ again ten times a second for three meters and a percentage.
   the open plate) is stepped by no count. (4) `renders`' work counter does not count a
   mount, so a leaf that remounted on every reading would cost work and count as none.
 
+- **46u · The lean display is one byte off the whole one for two looks on the owner's Mac**
+  (S; found 2026-11-21 by the 48c PR): `npm run leandisplay` on an M-series Mac reads
+  `comet (plate)` and `saffron-lace (plate)` 1 of 102400 bytes from the whole display, on
+  `origin/main` itself as well as on the 48c branch, so it is not that branch's. One byte in
+  a 160² rgba8 picture is a rounding step: the lean shader, with its gates folded to
+  constants, lets Metal's compiler order or fuse a sum differently. Find which effect's
+  folding moves it (take out one kept gate at a time), then either keep that expression's
+  order in both shaders or let the check allow one 8-bit step where a gate was folded, with
+  a control that a real dropped effect (hundreds of bytes) still fails.
