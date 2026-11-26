@@ -6696,6 +6696,53 @@ controls above. Shortcuts kept, each named in 27f-9g: the glass temperatures lai
 the thin gap's rate standing in for a fat bottle's, and dye wax (no oil phase) still on the
 old kick. The Mac's film of two minutes is the owner's verdict.
 
+### 27f-9q. Lava Lamp's wax holds round, and the lamp keeps all of it (2026-11-14)
+
+The owner asked for the lamp's wax to hold round blobs. With the wax really laid,
+it hung in heads on stalks, threads and rows of beads: an area-weighted roundness (4πA/P²
+of each body over half oil, a disc 1) of 0.3 to 0.6 on the Mac's app. The lab had found
+that more `OIL_TENSION` bought nothing under the force's cap of half a cell a step, and
+that lifting the cap at ×4 gave four fat round bodies and lost a fifth of the oil in two
+minutes.
+
+*Why it was heavy.* Between two glasses a blob's weight and its tension are both resisted
+by the same Darcy drag, 12μ/h², so its shape is set by their ratio, the Bond number
+Δρ g R²/σ, and the gap drops out of it. 38r took the rest gap from 6 mm to 2 mm and scaled
+the oil's tension by (2/6)², a ninth (`OIL_TENSION_GAP`), but not the standing plate's
+weight (`DYE_WEIGHT`, `HEAT_LIFT`): in the lamp every body was nine times as heavy against
+its own skin as the tension had been set for. The consistent fix is ×9 on the tension of a
+sealed bottle's oil; ×4 ships (`SEALED_TENSION`, with the cap at one cell, `SEALED_CELLS`)
+because at ×9 the explicit force sheds the edge as a haze (27f-9s).
+
+*Where the oil went.* Measured on the Mac's Metal, the lab on the app's own step and lay,
+256², 120 s, Σc over the disc 4,373 at the start. ×4 as first tried: 4,229 over the grid
+and 4,202 in the disc. Two ways out, each shut and each put back alone to see it:
+- **the open rim's lip.** A standing plate's weight is laid as a closed circulation
+  (27f-9), but the gap's carry still had the open rim, and `lipHolds` let oil over it with
+  the water wherever the dish's pressure stood above the trough's. A sealed bottle has no
+  trough: now no oil crosses its lip. Lip open alone: the grid kept 4,373 but the disc
+  4,165, 208 outside the wall (4.8%).
+- **the runaway guard.** `mixUpdate` clamped every cell to -0.25..1.25 after the
+  Cahn–Hilliard step, and wax pressed against the wall packs to about 1.8 before
+  `mixRelax` shares it back: each step destroyed the excess. The guard is ±8 now, which
+  still stops a runaway. Guard alone: the grid 4,338 (-0.8%).
+With both: 4,373 to the cell at every sample of 180 s, and at today's tension (before) the
+oil was kept too, so neither was a leak until the force was strong enough to press on them.
+
+*What it looks like (the same lab, mean of the samples):* roundness 0.81 against 0.57 at
+the old tension (0.79 against 0.67 at 192²); the cells over half oil 5.1% of the plate at
+120 s against 4.7%, so the wax is gathered, not hazed. ×6 read 0.85 and ×9 0.94 but
+×9 lost the cells over half oil to 3.0% at 120 s and 2.1% at 180 s; ×9 with the cap at
+half a cell 0.73. The cycle the owner approved (27f-9h) is unchanged: `lavacycle` 7/7, the
+wax rising to 0.63 of the height, falling to 0.18, and again in the second minute. Only
+Lava Lamp stands its plate (`plateUpright`), so no other look moves.
+
+`npm run lavaround` (the Mac's `show`): two minutes at 256², the disc's oil within 0.1% at
+every five-second reading; the lip opened again must lose 2% and the guard put back 0.3%;
+the bodies' roundness from 20 s 0.72 or more and 0.12 above the old tension. At 192² neither
+leak shows, which is why it is 256². Its first run (an M4, 62 s): the disc 4,373 to the cell,
+the lip 4.76% gone, the guard 0.80%, round 0.821 against 0.604. Found on the way: the full nine (27f-9s), the second
+curvature tried again on this (27f-9t), and wax gathering at the wall over minutes (27f-9u).
 ### 27f-9m. A look's oil laid before its solver is there (2026-11-12)
 
 The owner, 2026-11-12, of the new lamp on the Mac: the wax smears into streaks instead of
@@ -7485,6 +7532,57 @@ owner's photograph of dishes between polarisers (2026-11-14).
   axis not carried, or with light from speed instead of stretch, it goes red (one skeptic
   pass found the first version could not tell those apart).
 
+## 31p-3. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
+
+**Dish Stress** (Settings → Lamp & Light under Polarisers, MIDI, the desks' lamp pins and the
+phone's remote). Shipped in the PR that wrote this, from the owner's photograph of moulded
+petri dishes between polarisers (2026-11-14), after 31p-1 gave the liquid's own colours.
+
+- The dish (`src/lib/polarDish.ts`, its WGSL in `platePolar.ts`): an injection-moulded dish
+  freezes stress about its gate in the base's middle, falling off as the melt spread, with
+  its principal axes radial and hoop; its retardation is taken as 1200 nm times Dish Stress
+  times half the rim's radius over the radius (1/r, held at 4% of the radius about the gate),
+  slow axis along the hoop, and the wall's far greater retardation (6000 nm, the moulding's
+  last and fastest-cooled plastic, past the chart's orders so it reads as the photograph's
+  pale rims) in a band 3% of the radius wide at the rim, nothing outside it.
+- The series (`seriesTransmission`, `polarSeries`): the dish and the liquid are two linear
+  retarders at different axes, light through the dish first. On the Poincare sphere each is
+  a rotation about its axis by its retardation; the light through the analyser is
+  (1 + a.R2 R1 s) / 2. Multiplied out, it is nine terms, each a weight from the two axes and
+  the analyser times cos or sin at G1, G2, G1 + G2 or G1 - G2, and each of those is a column
+  of 31p-1's two tables (cos = white - 2 S, sin = N). So the exact two-retarder light costs
+  four table reads, no new table, and at G1 = 0 it is 31p-1's light to the bit. Plane sheets
+  and quarter-wave plates are blended by Quarter Wave as before.
+- What it looks like: with Quarter Wave at 1 the dish alone is coloured rings, tightening
+  toward the gate; at 0 its dark cross lies along the sheets (the hoop axis is parallel to a
+  sheet there) and the rings light on the diagonals, the photograph's pinwheel. With the
+  liquid moving, the liquid's stretch adds to the dish's where it runs along the hoop and
+  takes from it across, so the rings wobble and shift colour where the liquid flows.
+- At 0 (the default) the branch is not taken: the plate is the look as before, to the byte.
+- `npm run polar` 39/39 (15 new): the series law against Jones matrices, plane and with the
+  plates (worst 8e-16), the nine weights against the rotations (2e-15), the table series
+  against the spectrum within the tables (0.005 of white), G1 = 0 is the liquid's own law,
+  two retarders along one axis add and across it subtract, the dish's 1/r, hoop axis, wall
+  and outside; then the lab: Dish Stress changes no byte at Polarisers 0 and reaches the
+  picture at 1; on a still plate with the plates in, each ring is the law's colour at its
+  radius times the open plate (worst 0.8 levels along the axes and diagonals); between plane
+  sheets the cross along the sheets is dark (at most 4 levels) and the diagonals lit
+  (81 to 128), and stays on the sheets with the plate turned 45 under them; on a gentle flow
+  with the dish in, analyser at 60 and the plates half in, each pixel is the series law with
+  the dish first (mean 4.85, 95th percentile 12.2 levels; the liquid alone misses its own law
+  by 4.3, the strain being read one texture away from the display's); a laid flow with the
+  dish in, crossed plus parallel is the open plate (worst 2.7, mean 0.8 levels over the 80%
+  of pixels in gamut) and the dish moves 80% of them against the same sheets without it.
+- The check review found the first lab checks blind to the dish's axis, the order of the two
+  retarders and a dropped liquid. Mutants of the shader against the final checks: the
+  retarders swapped (mean 22.5), a K term's sign flipped (18.1), the liquid's strain dropped
+  with the dish in (36.9), the dish's axis left in the plate's uv (the turned cross lands on
+  the diagonals): each fails one line.
+- Two things found: the look's saturation grade comes after the sheets (plate.ts packs
+  `saturationBoost`, default 1.45, applied after `polar()`), so law-exact lab checks render
+  with it at 1; and the high orders the dish brings are partly outside sRGB (a negative
+  primary in the spectrum's own light), so the shader's clip at 0 takes up to 0.3 of white
+  from a crossed plus parallel sum. The sum is checked only where no channel clipped.
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (#403)
@@ -15950,6 +16048,29 @@ Analysing songs ahead from decoded PCM and file bytes so cues can lead the beat 
 - **17f (`readSongTags`):** parses ID3v2.4 (synchsafe sizes), ID3v2.3 (UTF-16/Latin-1/UTF-8), and FLAC Vorbis comments + PICTURE blocks, selecting picture type 3 (front cover) when present, normalising 12-character ISRCs, and returning `{}` safely on untagged or truncated input.
 - Checked by `npm run hearahead` (all `--owed` flags removed from `scripts/checks.json`). Left open: `17b-2`, `17c-2`, `17f-2`, `17g`, `17h`, and the Web Audio player part of `17e` with `17g`.
 
+## H2c-6. No aux target while the camera is off (2026-11-13)
+
+`WebGPUPlate.draw` (`src/gpu/plate.ts`) allocated a frame-size `rgba8unorm` aux texture and
+the display pass wrote it every frame, though only the camera pass reads it: 4 bytes a pixel,
+about 16 MB a frame at 2560x1600 with the camera off. The plate now reads the camera's state
+from its own uniforms (`this.pack.get('cameraOn')`, which `LiquidVisualizer` already fills with
+`!!cam`), so `draw`'s signature is as it was. `displayName` and `displayRecipe` take an `aux`
+flag: with it, the display pipeline has two colour targets (the picture and the aux); without
+it, one, and the render pass is given one colour attachment (a pipeline built for two targets
+rejects a pass with one, which is a black screen). `keepAux` makes the aux when it is wanted
+and lets it go when it is not, so one made for the camera is released the frame after the
+camera goes off, and `auxTarget` is null while it is. The aux is wanted while the camera is on,
+while the lens pass (glitter, side light: it samples the aux) is up, and while the tank's draw
+is up (its own pipeline writes a second target). `WebGPUPlate.prepare` builds the one-target
+display for the stock's picture and the two-target one for the camera (and the lens pass's
+scene), each behind the show's opening only where the opening's first frame draws it.
+
+Measured by `scripts/framereads-owed.mjs` (the `h2c6` line, taken out of `--owed`): a plate kept
+across frames, camera off from its first frame, on, then off again, drawn at 72² over a 128²
+grid so a texture at the frame's size can only be a frame target. Main 2 display targets and 1
+frame-size texture alive in both off stretches; now 1 and 0 in both, with the camera-on control
+at 2 targets, 1 alive and `auxTarget` there. Not done (left in section 40): the tank's draw and
+the projector sources' `aux (sources)` keep their second target.
 ### P7-cpu (step 3.1): Delete the CPU solver's stepping
 
 Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and

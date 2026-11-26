@@ -767,6 +767,10 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
             <Slider label="Birefringence" value={settings.birefringence ?? 0.3} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ birefringence: v })}
               settingKey="birefringence"
             />
+            {/* The dish's own frozen moulding stress (PLAN 31p-3): rings round the gate, a pale wall, the cross with plane sheets. */}
+            <Slider label="Dish Stress" value={settings.dishStress ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ dishStress: v })}
+              settingKey="dishStress"
+            />
           </>
         )}
         <Slider

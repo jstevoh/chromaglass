@@ -248,7 +248,7 @@ The owner's hunt (2026-11-09) takes this wave's written items to Antigravity und
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
   14ab-13 with #591, finished in #596; 14ab-6 the beads' mask on the GPU). Left: 14ab-10, -11,
   -14.
-- **4.4** ~~**H2c-7**~~, **H2c-6, H2c-8, H2c-5** (S each): ~~the readback straight into its ring~~ (shipped), no aux
+- **4.4** ~~**H2c-7**~~, ~~H2c-6~~ (shipped 2026-11-13), **H2c-8, H2c-5** (S each): ~~the readback straight into its ring~~ (shipped), no aux
   target without the camera, air only where there are bubbles, first-order velocity.
   H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -315,7 +315,7 @@ style (§31).
 - **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d; ~~18e-5~~ no line where two dyes meet, shipped #857, ~~18e-7~~ none up close either, the closeup's relief from the dye's path, shipped #881, ~~18e-9~~ clear film OPL height shipped, with **18e-6** what Boundary Contrast is for now, **18e-10**, **18e-11** and **18e-12**), then ~~**18e-2** a clear pour's edge~~ (shipped, `npm run derive` 5/5, `npm run nolight -- --owed=film` 15/15; story in `docs/plan-shipped.md` §18e; **18e-2b** moiré bend open; 38h-6's film, `--owed=film`, open), **31a** the projector's
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses
   (31f-1 one lens model, then 31f-2 projector types, 31f-3 camera types, 31f-4 the picker on desks and phone, 31f-5 Pro's own lens types).
-  ~~**31p-1** polarised light~~ (shipped; `npm run polar`), then **31p-2** colour that lingers after the stir, **31p-3** stressed dishes and cellophane, 31p-4 to 31p-7 (§31).
+  ~~**31p-1** polarised light~~ (shipped; `npm run polar`), then **31p-2** colour that lingers after the stir, ~~**31p-3** stressed dishes~~ (shipped; `npm run polar`), **31p-3a** a dish that warms, **31p-3b** cellophane, 31p-4 to 31p-7 (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, ~~**18m-5a**~~ slump check with grid filter on, ~~**18m-5b**~~ its cost, ~~**18m-5c**~~ the filter's edge reshaping), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.

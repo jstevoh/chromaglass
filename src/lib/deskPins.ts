@@ -193,6 +193,7 @@ const SECTION_OF: Record<string, string> = {
   analyserAngle: 'lamp',
   quarterWave: 'lamp',
   birefringence: 'lamp',
+  dishStress: 'lamp',
   tank: 'camera',
   tankFeed: 'camera',
   tankWeight: 'camera',

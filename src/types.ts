@@ -1025,6 +1025,7 @@ export interface VisualizerSettings {
   analyserAngle: number;      // the analyser's turn against the polariser, degrees: 90 crossed (dark field), 0 parallel (white field, complementary colours)
   quarterWave: number;        // quarter-wave plates with the sheets, 0 (plane: dark pinwheel arms where the stretch lines up with a sheet) to 1 (circular: colour bands only)
   birefringence: number;      // how strongly the liquid's stretch retards the light, 0 to 1 (400 nm per unit of the solver's strain rate at 1)
+  dishStress: number;         // the moulded dish's own frozen stress between the sheets, 0 (none) to 1 (1200 nm at half its radius, rings tightening toward the moulding gate; PLAN 31p-3)
   tank: number;               // a tank of water seen through its side instead of the dish: 0 off, else the dye's glow (PLAN 47n)
   tankFeed: number;           // the nozzle's speed, cm/s: how fast dye is fed in at the surface (47n)
   tankWeight: number;         // how much heavier the dye is than water, %: what gravity pulls it down with (47n)
@@ -1326,6 +1327,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   analyserAngle: 90,        // crossed, the classic: dark until the liquid moves
   quarterWave: 1,           // circular: the bands with no black lines through them (the owner dislikes thick black outlines)
   birefringence: 0.3,       // a Turbulence-0.35 stir in broad first- and second-order bands on the Mac (lib/polar.ts)
+  dishStress: 0,            // the dish retards nothing: the sheets show the liquid alone, as before (the shader's branch; lib/polarDish.ts)
   tank: 0,                  // the dish from above: every look but the tank's
   tankFeed: 1.5,
   tankWeight: 0.5,

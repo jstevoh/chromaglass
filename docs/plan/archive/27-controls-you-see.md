@@ -65,6 +65,15 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   Dye Weight and Heat Spread to 2, Pushes Dye to 1.2, Drop Height to 2, Background Loop to
   1.4, Glass Smear to 3 with no gate, Momentum's lasting current to 0.999. Story in
   `docs/plan-shipped.md` §27h-2; `npm run widedials`.
+- **27f-9q. Lava Lamp's wax holds round, and the lamp keeps all of it (shipped
+  2026-11-14; story in docs/plan-shipped.md §27f-9q).** The wax hung in heads on stalks
+  (roundness 0.3 to 0.6). In a Hele-Shaw gap a body's shape is its Bond number and the gap
+  drops out of it, but 38r scaled the oil's tension by h² and not the standing plate's
+  weight, so the wax was nine times too heavy for its skin. A sealed bottle gives the oil
+  four of those nine back (`SEALED_TENSION`, the explicit force's cap at one cell,
+  `SEALED_CELLS`), and the two ways the oil had out under the stronger force are shut:
+  no oil over a sealed bottle's lip (`lipHolds`), and the Cahn–Hilliard update's guard
+  no longer cuts wax packed against the wall. `npm run lavaround`; `lavacycle` 7/7.
 - **27f-9m. A look's oil laid before its solver is there (shipped 2026-11-12; story in
   docs/plan-shipped.md §27f-9m).** The owner: on the Mac the wax smears into streaks
   instead of holding round blobs. The filmed lamp had no wax in it: the look the page

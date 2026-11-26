@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Palette from a picture or video** now changes the colours on the plate, not only the dyes
   still to come: the plate takes the picture's colours over eight seconds, as does any palette
   picked by hand. A look opened while a palette is locked is laid in that palette's dyes.
+### Added — Dish Stress: moulded dishes between the polarisers (PLAN 31p-3)
+
+- **Dish Stress** (under Polarisers in Settings → Lamp & Light, MIDI, the desks and the
+  phone): the plastic dish's own frozen moulding stress between the sheets, in series with
+  the liquid. Coloured rings round the middle and a pale rim; with Quarter Wave down, the dark
+  cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
+  to the dish's and the rings shift. 0 leaves the look as it was.
 ### Changed — the glass still and the dye smooth unless someone moves them (PLAN 38u-8, 38u-11)
 
 - **Granulation** rests at 0 in every look (it was 0.5): a dye in solution has no grain. The
