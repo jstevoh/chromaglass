@@ -241,7 +241,8 @@ export class WebGPUPlate {
           cache.renderPrep(displayName(format, false, open.display), displayRecipe(device, format, false, open.display)),
           cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true),
         ]),
-      ...(['packDye', 'packDyeBodies', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
+      cache.computePrep('packVel', PACK_KERNELS.packVel),
+      cache.computePrep('packDyeBodies', PACK_KERNELS.packDyeBodies, true),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
       // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
@@ -400,7 +401,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -454,16 +455,13 @@ export class WebGPUPlate {
       && FerroDrop.wanted(this.pack.get('macroOn')[0], this.pack.get('macroRelief')[0], this.pack.get('phaseAmount')[0]);
     const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres) : null;
     if (!dropWanted) this.drop.cool();
-    if (height) {
-      const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
-      if (pipe) {
-        packPass.setPipeline(pipe);
-        packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
-        packPass.dispatchWorkgroups(groups, groups);
-        this.drop.notePackedVel(this.layers[0].vel);
-      }
-    }
     for (let i = 0; i < fields.length; i++) {
+      const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
+      if (pipeVel) {
+        packPass.setPipeline(pipeVel);
+        packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].dye, this.layers[i].dye, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
+        packPass.dispatchWorkgroups(groups, groups);
+      }
       /*
         Where the oil carries its own colour (Oil Bodies), a cell part oil
         and part water lets through the two liquids' light side by side, not
@@ -472,22 +470,22 @@ export class WebGPUPlate {
       */
       const { oilDye, mix } = fields[i];
       const bodies = !!oilDye && !!mix && oilDye.width === fields[i].dye.width && mix.width === fields[i].dye.width;
-      const pipeDye = bodies
-        ? this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies)
-        : this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
-      if (pipeDye) {
-        packPass.setPipeline(pipeDye);
-        packPass.setBindGroup(0, groupOf(this.device, pipeDye, bodies
-          ? [this.packArgs, fields[i].dye, oilDye!, mix!, this.layers[i].dye]
-          : [this.packArgs, fields[i].dye, this.layers[i].dye]));
-        packPass.dispatchWorkgroups(groups, groups);
+      if (bodies) {
+        const pipeDye = this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies);
+        if (pipeDye) {
+          packPass.setPipeline(pipeDye);
+          packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, oilDye!, mix!, this.layers[i].dye]));
+          packPass.dispatchWorkgroups(groups, groups);
+        }
       }
-      if (i === 0 && height) continue;
-      const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
-      if (pipeVel) {
-        packPass.setPipeline(pipeVel);
-        packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
+    }
+    if (height) {
+      const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
+      if (pipe) {
+        packPass.setPipeline(pipe);
+        packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
         packPass.dispatchWorkgroups(groups, groups);
+        this.drop.notePackedVel(this.layers[0].vel);
       }
     }
     packPass.end();
@@ -559,7 +557,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -594,7 +592,7 @@ export class WebGPUPlate {
     uniforms: GPUBuffer,
     /** What `uniforms` was written from: which of the display's effects this draw turns on. */
     bytes: ArrayBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -644,6 +642,8 @@ export class WebGPUPlate {
       rings?.args ?? this.blankBeadArgs, rings?.beads ?? this.blankBeads, rings?.tiles ?? this.blankList,
       // The shaken dish's standing waves (48f), the front plate's alone.
       fields[0].faraday?.h ?? this.blankStore,
+      // The water's glow (48c), the lead plate's alone; a 4-float stand-in while it is off.
+      fields[0].glow?.light ?? this.blankStore,
     ]));
     pass.draw(6);
     pass.end();

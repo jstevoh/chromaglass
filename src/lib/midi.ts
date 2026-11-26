@@ -640,6 +640,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
   { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
   { key: 'soapFilmTilt',    label: 'Frame Tilt',       min: 0, max: 90 },
+  // The water's glow (PLAN 48c): how bright, the shear it fires at, how fast it refills.
+  { key: 'glow',            label: 'Glow',             min: 0, max: 2 },
+  { key: 'glowShear',       label: 'Glow Shear',       min: 5, max: 200 },
+  { key: 'glowRecharge',    label: 'Glow Recharge',    min: 0.5, max: 60 },
   // Glitter in the liquid and the lens photographing it (PLAN 47e, 47d): a
   // fader for how much, and the f-number on a curve, so the knob's travel
   // spends as long on the wide-open discs as on the stopped-down stars.
@@ -676,6 +680,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
   // The oil's weight (PLAN 27f-9c): a fader sinks a floating oil to the bottom of a standing plate and lifts it again.
   { key: 'oilWeight',       label: 'Oil Weight',       min: -1, max: 1 },
+  { key: 'oilThickness',    label: 'Oil Thickness',    min: 0, max: 1 },
   { key: 'soapBreakdown',   label: 'Soap Breakdown',   min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.

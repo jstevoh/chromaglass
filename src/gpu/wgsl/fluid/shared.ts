@@ -91,6 +91,8 @@ struct Sim {
     (PLAN 27f-9e, constants.ts KAPPA_WAX), the heat kept exp(−that).
   */
   lampCool: f32,
+  // ln of the oil's drag over water's, ρν against ν_water (Oil Thickness, constants.ts oilBodyLn, PLAN 38w-31): hsPrep's oilBody.
+  oilVisc: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 

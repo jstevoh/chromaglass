@@ -10,9 +10,9 @@ import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
-import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
+import { OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -20,6 +20,7 @@ import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
 import { SoapFilmPlate, SOAP_PLATE_DX, soapLean } from '../soapFilmPlate';
 import { TankPlate } from '../tankPlate';
 import { FaradayPlate } from '../faraday';
+import { GlowPlate, GLOW_SHEAR, GLOW_RECHARGE } from '../glow';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
@@ -273,12 +274,33 @@ export class FluidPasses extends FluidFields {
 
   /**
    * The solvers that run beside the plate's own, on `enc` before the step's
-   * pass: the frame's soap film and the tank's side view.
+   * pass: the frame's soap film, the tank's side view, the dish on a shaker
+   * and the water's glow.
    */
   protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
     this.stepSoapPlate(enc, p);
     this.stepTankPlate(enc, p);
     this.stepFaradayPlate(enc, p);
+    this.stepGlowPlate(enc, p);
+  }
+
+  /**
+   * The water's glow (PLAN 48c, gpu/glow.ts): made the first time Glow is up,
+   * stepped on the show's own seconds with the flow the last step left (the
+   * flow over the glass, the glass's own drift taken off, since it is the
+   * water's shear against the glass the organisms feel) and the squeeze
+   * film's gap, whose depth sets the gap's wall shear and how much water
+   * glows. Turned off, it goes, and the next time the sea has rested.
+   */
+  protected stepGlowPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.glow ?? 0) > 0.001)) {
+      if (this.glowPlate) { this.glowPlate.dispose(); this.glowPlate = null; }
+      return;
+    }
+    if (!this.glowPlate) this.glowPlate = new GlowPlate(this.device);
+    // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N);
+    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE);
   }
 
   /**
@@ -659,7 +681,7 @@ export class FluidPasses extends FluidFields {
 
   protected jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {
     if (a.every((v) => v <= 0)) return;
-    const scratch = label === 'dye' ? this.scratchA : this.scratchB;
+    const scratch = label === 'dye' ? this.scratchA : this.ensureVelScratch();
     // x0, the field before the diffusion, kept while the field ping-pongs.
     this.run(pass, 'scaleDye', scratch, [field.read], this.arg('scale one', [1, 0, 0, 0]));
     const rcp = a.map((v) => 1 / (1 + 4 * v));
@@ -793,7 +815,7 @@ export class FluidPasses extends FluidFields {
       mixOn ? this.mix!.read : this.blank('rgba'),
       this.phaseLive ? this.phase.read : this.blank('r'),
     ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
-      Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT * oilLightnessOf(p.oilWeight)]), this.M);
+      Math.max(1e-7, p.spinNu ?? 1e-6), oilNuOf(p.oilThickness), Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT * oilLightnessOf(p.oilWeight)]), this.M);
     this.swirl.swap();
     /*
       A thin gap stops here, at one dispatch where it was thirteen (PLAN 22k).
