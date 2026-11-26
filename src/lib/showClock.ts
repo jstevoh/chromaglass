@@ -28,12 +28,34 @@
  *
  * With no render running these *are* the browser's: `showNow()` returns
  * `performance.now()`, `showEpochS()` returns `Date.now() * 0.001`, and
- * `showInterval` calls `setInterval` with the same function and period. Not a
+ * `showInterval` calls `setInterval` with the same period. Not a
  * scaled or offset copy of them: the same numbers, so every comparison the
  * show makes live between a stamp taken here and one taken by code that
  * still reads the browser directly (a tapped tempo, the room camera's
  * readings) means what it meant before. `npm run render` holds that: live,
  * each of the three is compared against the browser's own.
+ *
+ * ## When the show window is covered (PLAN.md 14a-timers)
+ *
+ * Chrome holds a hidden page's own `setInterval` callbacks to about one a
+ * second, so a 4 s look fade (`useLookFades`, 33 ms) fired from a MIDI pad
+ * while the show window is behind the projector steps four times instead of
+ * gliding, and the dimmer, the drift glides and the simulated band stall with
+ * it. The ear's worker tick (`useAudioAnalyzer`, 16 ms) runs in a dedicated
+ * Worker whose timers Chrome does not throttle, and calls
+ * `pumpShowIntervals(now)` on every message.
+ *
+ * Each live interval keeps its next `due` mark on `performance.now()`'s clock
+ * and whether its last fire came from the pump (`pumped`). Whichever of the
+ * browser's timer and `pumpShowIntervals(now)` reaches `due` first fires the
+ * callback and steps `due` forward by whole periods past `now`. On a visible
+ * page both run: if the browser's timer ran first, `due` is already past
+ * `now` when the worker tick arrives; if the worker tick landed first in that
+ * period, `pumped` is set and `due` is past `now`, so the browser timer's own
+ * callback for that period sees `pumped && now < due` and passes instead of
+ * doubling the fade's writes. With no worker pumping (`pumped` false), the
+ * browser's timer fires on every callback as it always did, even when the OS
+ * wakes it a fraction of a millisecond before `due`.
  *
  * ## Rendering
  *
@@ -107,8 +129,10 @@ interface ShowTimer {
   readonly seq: number;
   /** The browser's timer, while live; null while the fixed clock drives it. */
   live: ReturnType<typeof setInterval> | null;
-  /** On the fixed clock: when it next fires, in `showNow()` milliseconds. */
+  /** When it next fires: `perf()` milliseconds live, `showNow()` while rendering. */
   due: number;
+  /** Whether its last live fire came from `pumpShowIntervals` rather than `setInterval`. */
+  pumped: boolean;
   cleared: boolean;
 }
 
@@ -145,19 +169,55 @@ export function fixedClock(): { fps: number; frame: number } | null {
   return fixed ? { ...fixed } : null;
 }
 
+function fireLive(t: ShowTimer): void {
+  if (t.cleared || fixed) return;
+  const now = perf();
+  if (t.pumped && now < t.due) return;
+  t.pumped = false;
+  do { t.due += t.ms; } while (t.due <= now);
+  t.fn();
+}
+
 /**
- * `setInterval`, on the show's clock. Live it *is* `setInterval(fn, ms)`.
+ * `setInterval`, on the show's clock. Live it arms `setInterval` and shares
+ * its schedule with `pumpShowIntervals(now)` so a covered window's fades keep
+ * stepping on the ear worker's tick without firing twice when visible.
  * `key` names the timer for the order ties fire in while rendering (see the
  * header); anything stable and distinct will do.
  */
 export function showInterval(fn: () => void, ms: number, key: string): ShowIntervalHandle {
-  const t: ShowTimer = { fn, ms: Math.max(1, ms), key, seq: seq++, live: null, due: 0, cleared: false };
-  if (fixed) t.due = showNow() + t.ms;
-  else t.live = setInterval(fn, ms);
+  const period = Math.max(1, ms);
+  const t: ShowTimer = { fn, ms: period, key, seq: seq++, live: null, due: 0, pumped: false, cleared: false };
+  if (fixed) {
+    t.due = showNow() + t.ms;
+  } else {
+    t.due = perf() + t.ms;
+    t.live = setInterval(() => fireLive(t), ms);
+  }
   timers.add(t);
   const handle = { __showTimer: true } as ShowIntervalHandle;
   handles.set(handle, t);
   return handle;
+}
+
+/**
+ * Fire every live show interval whose period has come due at `now`
+ * (`performance.now()` milliseconds), called from the ear worker's unthrottled
+ * tick so fades, glides and the simulated band keep stepping while the show
+ * window is covered (PLAN.md 14a-timers). No-op while a song render owns the
+ * clock (`tickFixedClock` drives intervals then).
+ */
+export function pumpShowIntervals(now: number = perf()): number {
+  if (fixed) return 0;
+  let fired = 0;
+  for (const t of [...timers]) {
+    if (t.cleared || now < t.due) continue;
+    t.pumped = true;
+    do { t.due += t.ms; } while (t.due <= now);
+    fired++;
+    t.fn();
+  }
+  return fired;
 }
 
 /** `clearInterval` for a show interval. Null and undefined are ignored, as `clearInterval` ignores them. */
@@ -214,9 +274,12 @@ export function tickFixedClock(): number {
 export function endFixedClock(): void {
   if (!fixed) return;
   fixed = null;
+  const now = perf();
   for (const t of timers) {
     if (t.cleared || t.live !== null) continue;
-    t.live = setInterval(t.fn, t.ms);
+    t.pumped = false;
+    t.due = now + t.ms;
+    t.live = setInterval(() => fireLive(t), t.ms);
   }
 }
 
