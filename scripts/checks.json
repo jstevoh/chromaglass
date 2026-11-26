@@ -649,7 +649,7 @@
     {
       "name": "A Canvas loop with no seam",
       "shard": "sound",
-      "run": "npm run loopseam -- --owed=picker",
+      "run": "npm run loopseam",
       "why": [
         "A Spotify Canvas loop is an edit of the finished film, never of the",
         "plate (PLAN 43b): the judge reads an MP4 (3 to 8 s, no audio track,",
@@ -1726,6 +1726,20 @@
       ]
     },
     {
+      "name": "The water's bioluminescence",
+      "shard": "lab4",
+      "run": "npm run glow",
+      "why": [
+        "Glow lights the water where the flow shears it past a threshold (PLAN 48c,",
+        "gpu/glow.ts): a still plate is dark and keeps its charge; a stroke spends charge",
+        "along its own path and not far from it or in its mirror; a drift under the",
+        "threshold spends nothing; a second stroke within the recharge glows less and a sea",
+        "stroked again and again tires, while a short recharge and a rest give the second",
+        "stroke back its first's light; off makes no glow; the plate draws it blue in the",
+        "band and nowhere else. On the lab's software WebGPU; lab4 held three checks."
+      ]
+    },
+    {
       "name": "Polarised light",
       "shard": "lab9",
       "run": "npm run polar",
@@ -1960,6 +1974,36 @@
         "lab are lavacycle's now, on the Mac (PLAN 27f-9h). It was about ten minutes on",
         "SwiftShader with that line, about twenty on the slow tier: a part of its own, lab8,",
         "since lab4 already runs about eleven there."
+      ]
+    },
+    {
+      "name": "A look's oil reaches its solver, whichever came first",
+      "shard": "logic",
+      "run": "npm run oillaid -- --node",
+      "why": [
+        "Lava Lamp's wax filmed as streaks on the Mac (PLAN 27f-9m): the look the page opens",
+        "on is laid before its solver is built, the oil went to `this.gpu?.addMix` and was",
+        "dropped, and the film was of dye alone (oil 0 for 150 s, read off the app's own mix",
+        "field). The real FluidSimulation on a stand-in solver that keeps every oil splat it",
+        "is handed, each line against the same look laid the way that always worked (a solver",
+        "there first): Lava Lamp, Clock Glass and Splodascope laid before any solver, after a",
+        "first solver dropped before it spoke (out of memory), and across a regrid, where the",
+        "carry has the oil and laying it again would double it; a look with no oil lays none,",
+        "and a cleared plate keeps none. The node half: a second, in any container."
+      ]
+    },
+    {
+      "name": "The look the page opens on holds its oil",
+      "shard": "open",
+      "run": "npm run oillaid",
+      "timeout": 4,
+      "why": [
+        "The other half of 27f-9m, in the app on Metal: each oil look opened by the address",
+        "(`?look=`), the solver's own mix field read back a few steps in, against the same",
+        "look laid again on the running page; and Lava Lamp's share against the area of its",
+        "four bodies. Before the fix the first reading was exactly zero. A stand-in cannot",
+        "say that App() and the visualizer lay and attach in the order the node half plays,",
+        "which is why this half is here."
       ]
     },
     {
@@ -2388,7 +2432,6 @@
       "shard": "browser",
       "run": "node scripts/intro.mjs",
       "env": {"PW_WEBGPU":"1"},
-      "quarantine": [{ "line": "9c. its loading line says what the show waits for", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before",
         "the app has arrived, taken into the plate's frame on the desk and the",
@@ -2417,16 +2460,16 @@
     {
       "name": "The phone controller apps, owed",
       "shard": "browser2",
-      "run": "npm run controller -- --owed=scan",
+      "run": "npm run controller",
       "why": [
         "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
         "the iPhone and Android apps as the Mac's controller. The Mac's set list and",
         "song shows on the phone's remote, and the laptop's half that sends them and",
         "acts on a tap (12-ctl-1); Scan the Phone panel's QR code instead of typing",
         "(12-ctl-2); the Android app as a Capacitor project that may open ws:// to the",
-        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). --owed: each",
-        "line is excused only in main's state and printed as owed; the PR that builds",
-        "it takes its id out and never edits a line. The lines with no id hold on main:",
+        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). Every line is",
+        "built since 12-ctl-2 (2026-11-12), so none is owed: --owed is for a line written",
+        "before its build, excused only in main's state. The lines with no id hold too:",
         "the looks stay on Controls, the laptop answers a controller, no Scan on the",
         "website, no Open in Chrome on the iPhone. No plate needed; about a minute."
       ]
@@ -4167,7 +4210,7 @@
     {
       "name": "The app renders a Canvas loop with no seam",
       "shard": "tools",
-      "run": "npm run loopseam -- --app --owed=loop",
+      "run": "npm run loopseam -- --app",
       "why": [
         "The app's own loop render (PLAN 43b), on a Mac because the app's",
         "frames only read back on a GPU, and on this shard because it fetches",
