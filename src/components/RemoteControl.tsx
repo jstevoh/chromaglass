@@ -807,6 +807,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Slider label="Frame Tilt" field="soapFilmTilt" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
+          {/* The water's glow (PLAN 48c), and while it is up the shear it fires at and how fast it refills, as on the desk. */}
+          <Slider label="Glow" field="glow" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glow') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.glow ?? 0) > 0.001 && (
+            <>
+              <Slider label="Glow Shear" field="glowShear" step={1} format={(v) => `${Math.round(v)}/s`} value={value('glowShear') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Recharge" field="glowRecharge" step={0.5} format={(v) => `${v.toFixed(1)} s`} value={value('glowRecharge') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
           {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
           <Slider label="Glitter" field="glitter" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.glitter ?? 0) > 0.001 && (

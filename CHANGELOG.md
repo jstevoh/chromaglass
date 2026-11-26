@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the liquid. Coloured rings round the middle and a pale rim; with Quarter Wave down, the dark
   cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
   to the dish's and the rings shift. 0 leaves the look as it was.
+### Added — the water's glow (PLAN 48c)
+
+- **Glow** (Settings → Camera, MIDI, the desks, the remote and the phone's Sound sheet): the
+  plate's water holds plankton that flash blue where the flow shears it, so a finger, a pour
+  or a stirring cord draws a glowing wake on a dark plate, and still water stays dark.
+- **Glow Shear** is the shear it takes to light (seawater's measured threshold by default);
+  **Glow Recharge** the seconds a spent cell takes to refill, so a path stroked again soon
+  glows less and a quiet passage lets it come back.
 
 ### Added — Soap Film's big swirls and Frame Tilt (PLAN 32k, 32h, 32d-1)
 

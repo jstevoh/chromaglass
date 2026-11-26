@@ -142,6 +142,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'soapFilm', type: 'f32', note: "the frame's soap film's reflection over the plate, 0 off (PLAN 32d, plateThinFilm.ts)" },
   { name: 'soapCosT', type: 'f32', note: "cos of the refracted angle in the film at Soap Film Angle: the path is 2 n h cos θ_t" },
   { name: 'faraday', type: 'f32', note: "1 while the dish sits on a shaker (Shaker above 0 Hz, PLAN 48f): the light through its standing waves, plateFaraday.ts" },
+  { name: 'glow', type: 'f32', note: "the water's bioluminescence over the plate, 0 off (PLAN 48c, plateGlow.ts)" },
   { name: 'time', type: 'f32' },
   { name: 'cellClock', type: 'f32', note: "the lead plate's dye travel, wrapped: what the drawn cells slide and breathe on (lib/detailFlow.ts)" },
   { name: 'transmission', type: 'f32' },
