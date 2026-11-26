@@ -107,6 +107,7 @@ const SECTION_OF: Record<string, string> = {
   dishSpread: 'show',
   cells: 'show',
   bubbles: 'look',
+  bubbleMelt: 'look',
   saturationBoost: 'look',
   colourBody: 'look',
   edgeRelief: 'look',
