@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the liquid. Coloured rings round the middle and a pale rim; with Quarter Wave down, the dark
   cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
   to the dish's and the rings shift. 0 leaves the look as it was.
+### Changed — The liquid moves what floats in it (PLAN 15g-17, 15g-18, 18c-14)
+
+- **Bubbles and beads ride the liquid.** A stroke or a drop no longer kicks the bubbles and
+  oil beads round it away from the hand; they move only as the liquid under them moves (a
+  pocket at the Taylor–Saffman speed, a bead at 2/(1+λ)), and liquid laid on a bubble
+  takes it. A pop no longer pushes and turns the liquid: the gap closing over the air
+  draws it in from all round.
+- **A press squeezes, and turns nothing.** The pointer's press no longer lays a swirl round
+  its disc; it pushes the liquid straight out from under the glass, as the remote press
+  always did.
+- **A plate left alone stays as it is.** The hidden seeding that laid colour and heat from
+  three orbits on every frame is gone, so a quiet passage settles; a plate that is
+  entirely empty is still woken by its emergency seed.
 ### Added — the water's glow (PLAN 48c)
 
 - **Glow** (Settings → Camera, MIDI, the desks, the remote and the phone's Sound sheet): the

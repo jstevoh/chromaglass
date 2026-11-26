@@ -211,9 +211,36 @@ const still = () => [0, 0];
   put(g, 96, 96, 5);
   g.step(dt, still, 0, 0, 0);
   g.bubbles[0].age = 1;
-  g.disturb(96, 96, 3, 'dye', 1);
+  g.engulf(96, 96, 3);
   check('a drop takes the pocket it lands on and throws no daughters',
     g.bubbles.length === 0 && g.events.filter((e) => e.kind === 'pop').length === 1, `${g.bubbles.length} left`);
+
+  /*
+    And it does nothing to the pockets it does not land on (PLAN 15g-17).
+
+    The drop used to kick every pocket within three times its reach outward
+    along "the spreading front", 22 cells a second for dye and 40 for a blow,
+    a velocity of the pocket's own on top of the liquid's. Between two
+    glasses a pocket has nothing to move it but the liquid round it, and
+    the solver carries a drop's spreading (a drop brings volume on a thin
+    gap). So here the liquid is still, a pocket sits 10 cells from where a
+    drop lands (inside the old reach, 3 x 3 + 6 = 15), and after a second on
+    still liquid it must be exactly where it was. On the old `disturb` it
+    went 1.7 cells. A pocket the drop does land on still goes, so the
+    check cannot pass by engulf doing nothing at all (the one above).
+  */
+  const h = new BubbleField(N);
+  put(h, 96, 96, 4);
+  const beside = put(h, 106, 96, 4);
+  h.step(dt, still, 0, 0, 0);
+  for (const b of h.bubbles) b.age = 1;
+  const x0 = beside.x, y0 = beside.y;
+  h.engulf(96, 96, 3);
+  for (let t = 0; t < 60; t++) h.step(dt, still, 0, 0, 0);
+  const moved = Math.hypot(beside.x - x0, beside.y - y0);
+  check('a drop beside a pocket on still liquid leaves it where it was',
+    h.bubbles.length === 1 && h.bubbles[0] === beside && moved < 1e-9,
+    `${h.bubbles.length} of 1 left, the one beside moved ${moved.toExponential(1)} cells in 1 s`);
 }
 
 // ── 6. Leaving at the round rim ──────────────────────────────────────
