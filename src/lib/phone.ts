@@ -29,6 +29,8 @@
  * back to its own layout without typing a URL has lost it.
  */
 export const PHONE_SHORT_SIDE = 600;
+/** Below this width, a non-touch desktop window falls into the phone layout rather than squeezing the desk. */
+export const DESK_MIN_WIDTH = 768;
 
 export function wantsPhoneLayout(env: {
   query: string;
@@ -44,6 +46,7 @@ export function wantsPhoneLayout(env: {
   // Full layout first: chosen on /play it holds for the visit, through a turn of the phone.
   if (env.sessionOff) return false;
   if (env.path && isPlayPath(env.path)) return true;
+  if (!env.coarse && env.width < DESK_MIN_WIDTH) return true;
   return env.coarse && Math.min(env.width, env.height) < PHONE_SHORT_SIDE;
 }
 

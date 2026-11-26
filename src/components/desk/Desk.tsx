@@ -134,12 +134,13 @@ export function Desk(p: DeskProps) {
     setBrowser(b => (b ? null : { top: (r?.bottom ?? 48) + 6, right: Math.max(8, window.innerWidth - (r?.right ?? window.innerWidth - 8)) }));
   }, []);
 
+  const narrow = windowW < 1024;
   // The plate is measured where it is; the columns moving round it do not resize the window.
   const { onRelayout } = p;
   useEffect(() => {
     const id = requestAnimationFrame(() => onRelayout?.());
     return () => cancelAnimationFrame(id);
-  }, [l, p.tab, onRelayout]);
+  }, [l, p.tab, narrow, onRelayout]);
 
   // ── Keys ────────────────────────────────────────────────────────────
   /*
@@ -322,7 +323,7 @@ export function Desk(p: DeskProps) {
       >
         {/* Its own guard: one panel that throws is a card in its place, not the end of the desk. */}
         <PanelGuard name={spec.name} inline onClose={() => set(x => closePanel(x, id))}>
-          <PanelBody id={id} p={p} />
+          <PanelBody id={id} p={p} narrow={windowW < 1024} />
         </PanelGuard>
       </PanelFrame>
     );
@@ -330,6 +331,19 @@ export function Desk(p: DeskProps) {
 
   const dropping = !!drag?.moved;
   const dashed = dropping ? 'outline-dashed outline-1 outline-offset-[-4px] outline-accent-border' : '';
+
+  const sideIds = narrow ? [...l.left, ...l.right] : [];
+  const sideWidth = (ids: string[]): number =>
+    Math.max(
+      LEFT_WIDTH,
+      Math.min(
+        Math.round(windowW * 0.41),
+        Math.max(
+          ids.some(id => l.right.includes(id)) ? RIDES_WIDTH : LEFT_WIDTH,
+          ...ids.map(id => PANEL_BY_ID.get(id)?.columnWidth ?? 0),
+        ),
+      ),
+    );
 
   const column = (slot: 'left' | 'right') => {
     const ids = l[slot];
@@ -342,6 +356,33 @@ export function Desk(p: DeskProps) {
         data-testid={`desk-${slot}`}
       >
         {ids.map(id => frame(id, { className: one ? 'min-h-0 flex-1' : 'shrink-0' }))}
+      </aside>
+    );
+  };
+
+  /**
+   * Below 1024 px, the desk keeps the plate and its controls by folding the two
+   * side columns into one right-hand column without changing `p.layout`, so
+   * snapping the window back to full width restores every panel to its slot.
+   */
+  const foldedColumn = () => {
+    if (sideIds.length === 0) return null;
+    const expanded = sideIds.filter(id => !l.collapsed.includes(id));
+    const one = expanded.length === 1;
+    return (
+      <aside
+        className={`flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide border-l border-border p-2 ${dashed}`}
+        data-slot="right"
+        data-testid="desk-right"
+      >
+        {sideIds.map(id => {
+          const isOne = one && !l.collapsed.includes(id);
+          const clampCues = id === 'cues' && !isOne && !l.collapsed.includes(id);
+          return frame(id, {
+            className: isOne ? 'min-h-0 flex-1' : 'shrink-0',
+            style: clampCues ? { maxHeight: '46vh' } : undefined,
+          });
+        })}
       </aside>
     );
   };
@@ -368,7 +409,9 @@ export function Desk(p: DeskProps) {
     <div
       className="fixed inset-0 z-10 grid bg-bg text-text"
       style={{
-        gridTemplateColumns: `${left ? `${columnWidth('left', l.left, windowW)}px ` : ''}minmax(0, 1fr)${right ? ` ${columnWidth('right', l.right, windowW)}px` : ''}`,
+        gridTemplateColumns: narrow
+          ? `${sideIds.length > 0 ? `minmax(0, 1fr) ${sideWidth(sideIds)}px` : 'minmax(0, 1fr)'}`
+          : `${left ? `${columnWidth('left', l.left, windowW)}px ` : ''}minmax(0, 1fr)${right ? ` ${columnWidth('right', l.right, windowW)}px` : ''}`,
         gridTemplateRows: `48px minmax(0, 1fr) ${deckH}px 28px`,
       }}
       // The tab's id, which a rename never changes: `perform-desk`,
@@ -377,6 +420,7 @@ export function Desk(p: DeskProps) {
       data-desk="v2"
       data-layout={p.tab}
       data-plate-mode={l.plateMode}
+      data-narrow={narrow ? 'true' : undefined}
     >
       <DeskHeader
         breadcrumb={<DocMenu p={p} crumb="Look" />}
@@ -429,7 +473,7 @@ export function Desk(p: DeskProps) {
         }
       />
 
-      {column('left')}
+      {!narrow && column('left')}
 
       {/* ── The plate ─────────────────────────────────────────────── */}
       <section className="flex min-h-0 min-w-0 flex-col px-4 py-3">
@@ -512,7 +556,7 @@ export function Desk(p: DeskProps) {
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
       </section>
 
-      {column('right')}
+      {narrow ? foldedColumn() : column('right')}
 
       {/* ── The deck ──────────────────────────────────────────────── */}
       {l.deckCollapsed && l.deck.length > 0 ? (
@@ -639,15 +683,14 @@ export function Desk(p: DeskProps) {
         <>
           {l.floating.map((stored, i) => {
             const f = gesture?.id === stored.id ? gesture : stored;
-            // Kept on this window: a layout floated on a big display and
-            // opened on a laptop would otherwise put the panel off the edge.
-            const left = Math.max(0, Math.min(f.x, window.innerWidth - 80));
-            const top = Math.max(48, Math.min(f.y, window.innerHeight - 40));
+            const w = Math.min(f.w, Math.max(220, windowW - 16));
+            const left = Math.max(0, Math.min(f.x, Math.max(0, windowW - w)));
+            const top = Math.max(48, Math.min(f.y, Math.max(48, window.innerHeight - 40)));
             return (
             <div
               key={f.id}
               className="fixed"
-              style={{ left, top, width: f.w, height: l.collapsed.includes(f.id) ? undefined : f.h, zIndex: 30 + i }}
+              style={{ left, top, width: w, height: l.collapsed.includes(f.id) ? undefined : f.h, zIndex: 30 + i }}
               onPointerDown={() => set(x => raiseFloating(x, f.id))}
               data-testid={`floating-${f.id}`}
             >
@@ -661,8 +704,8 @@ export function Desk(p: DeskProps) {
       {dropping && drag && createPortal(
         <>
           {/* An empty column, as a strip at the window's edge to drop on. */}
-          {!left && <div className="fixed bottom-[64px] left-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="left">Dock left</div>}
-          {!right && <div className="fixed bottom-[64px] right-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="right">Dock right</div>}
+          {!narrow && !left && <div className="fixed bottom-[64px] left-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="left">Dock left</div>}
+          {(narrow ? sideIds.length === 0 : !right) && <div className="fixed bottom-[64px] right-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="right">{narrow ? 'Dock column' : 'Dock right'}</div>}
           <div
             className="pointer-events-none fixed z-[63] rounded-md border border-border-strong bg-elevated px-2.5 py-1 text-[13px] font-medium text-text shadow-[0_20px_60px_rgba(0,0,0,.6)]"
             style={{ left: drag.x + 12, top: drag.y + 8 }}
