@@ -337,6 +337,24 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     compiling, whichever count of lanes ran.
   */
   let lastSettled = t0;
+  /*
+    The loading line's count, held while a render pipeline compiles or is
+    still to be asked for. Held only while one compiled, the words changed
+    as a render pipeline finished, in the same moment the next was asked
+    (one lane's settle, another lane's ask, no frame between): the new
+    picture then waited in the GPU process behind that compile, and `npm
+    run intro` 9c read it inside the compile on main, 2 of 3 runs red on
+    #881's branch. A wait for the frame before the next ask was tried and
+    cost the opening 2.6 s on software WebGPU (9.9 s to the first step
+    against 7.3 s), every kernel settling renewing the wait. The opening
+    asks its render pipelines first, so the count starts once they are all
+    built, and from then on no render pipeline is asked again.
+  */
+  const say = (): void => {
+    let renders = progress.rendering;
+    for (const b of queue) if (b.kind === 'render') renders++;
+    quiet?.progress?.(progress.settled, progress.asked, renders);
+  };
   const lane = async () => {
     while (queue.length && !gone && !timedOut) {
       /*
@@ -373,7 +391,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
         void waited.then(() => { if (fillLeft > 0 && --fillLeft === 0) fillsDone?.(); });
       } else if (prep.kind === 'render') {
         progress.rendering++;
-        renderBusy = waited.then(() => { renderBusy = null; progress.rendering--; quiet?.progress?.(progress.settled, progress.asked, progress.rendering); });
+        renderBusy = waited.then(() => { renderBusy = null; progress.rendering--; say(); });
       }
       const settled = await waited;
       const now = performance.now();
@@ -381,7 +399,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       lastSettled = now;
       progress.settled++;
       progress.lastAt = Math.round(now);
-      quiet?.progress?.(progress.settled, progress.asked, progress.rendering);
+      say();
       times.push([prep.key, Math.round(from), Math.round(now - from)]);
       const c = stamps.compiled;
       raw.push([prep.key, Math.round(b0), c == null ? null : Math.round(c - b0), c == null || stamps.used == null ? null : Math.round(stamps.used - c)]);
@@ -487,7 +505,8 @@ export interface Quiet {
    * How far the opening has got, each time a build settles and each time a
    * render pipeline finishes (never before the first): the loading line's count
    * (`introStage` in `lib/intro.ts`), which holds its words while
-   * `rendering` is up, for the reason above.
+   * `rendering`, the render pipelines compiling or still to be asked for,
+   * is up (`say` in `buildInTurn`).
    */
   progress?(settled: number, asked: number, rendering: number): void;
 }

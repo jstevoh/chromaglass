@@ -74,3 +74,11 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   `SEALED_CELLS`), and the two ways the oil had out under the stronger force are shut:
   no oil over a sealed bottle's lip (`lipHolds`), and the Cahn–Hilliard update's guard
   no longer cuts wax packed against the wall. `npm run lavaround`; `lavacycle` 7/7.
+- **27f-9m. A look's oil laid before its solver is there (shipped 2026-11-12; story in
+  docs/plan-shipped.md §27f-9m).** The owner: on the Mac the wax smears into streaks
+  instead of holding round blobs. The filmed lamp had no wax in it: the look the page
+  opens on is seeded before the GPU solver is attached, its oil went to
+  `this.gpu?.addMix?.(…)` and was dropped, and its dye landed in water (the mix field's
+  oil 0 at every sample of 150 s). Clock Glass and Splodascope lost theirs the same way.
+  The oil waits now (`src/sim/mixWait.ts`) and is laid when the solver attaches;
+  `npm run oillaid`.

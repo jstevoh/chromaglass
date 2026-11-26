@@ -251,6 +251,30 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       while the bodies' edges show a fine serration; a real lamp's wax wets the glass little
       and leaves it. Measure the rim band's share over five minutes and look at the wall's
       contact angle (the oil's potential at the rim, `rimSide`) before tuning.
+    - **27f-9n, open. A lost device mid-show loses the plate's oil.** `dropGpu(true)` on a
+      solver that has spoken keeps the dye (the CPU's arrays, read back) and nothing of the
+      chemistry: the mix, the heat and the species live only on the GPU, and a device lost
+      without a hand-over has no carry to give the next solver. The plate comes back as its
+      colours in plain water. Wanted: the chemistry read back with the dye (slowly, a field
+      every few seconds is enough), or the look's oil laid again where its dye now is.
+    - **27f-9o, open. A bottle's dose given before the solver is there is dropped too.**
+      Read, not measured: the bottles' oil, soap and acid go to the solver by the same
+      optional call as the looks' did (`liquid.onDeposit`), so a pour in the page's first
+      second, or between a lost device and the next, lays its colour and not its liquid.
+      `mixWait` holds a look's splats; a pour is a stream over frames, so it wants its own
+      account of what is still owed.
+    - **27f-9p, open. What the lamp's Mac films showed was dye, so their verdicts want
+      reading again.** Every Mac take of Lava Lamp before 27f-9m opened the page on the look
+      (`?look=lava-lamp`), so 27f-9h's "hovers after 60 to 80 s", the "pale ghosts" and the
+      rim columns of its second take, and 27f-9f's Mac minute below were all a passive dye
+      in convecting water, not wax. The lab's numbers (which lay the oil themselves) stand.
+      Film the look again from an opened page before tuning anything on those verdicts.
+    - **27f-9r, open. A crowd look's oil colour across an OOM retry.** `addOilDensity`'s
+      colour share (`layOilShare`, PLAN 47z-1) now populates `oilAdd` even before a solver
+      attaches (and `clearChemistry` clears it), so Clock Glass and Splodascope opened with
+      the page keep their oil colour on the first attach; only `restoreSeed` after an OOM
+      drop following `flushDeltas` does not replay `oilAdd` yet. Keep it in `mixWait` if
+      needed.
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
@@ -288,13 +312,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       wax (oil above a half) is 97% laid, then 81% to 92% at every 15 s sample, the wax's
       cells 1,095 laid and 837 to 909 after, the fringe (a tenth to a half oil) 138 laid
       and 164 to 334 after. So the lab's wax keeps its colour and its area for the whole
-      take and the app's picture does not. What differs between the two is not yet known,
-      and is the next thing to measure before anything is changed: the app's grid and step
-      on this Mac's tier against the lab's 128² at a sixtieth; what the plate draws (the
-      dye, at the dye's own grid) against what the probe reads (the oil); and whether the
-      sheets are 27f-9i's short capillary length seen at the app's finer grid. A check for
-      it would read the app's own fields after two minutes (the share of the dye inside
-      the wax, and the count of separate bodies), which the lab's `lavawax` does not.
+      take and the app's picture does not. *What differed (27f-9m, the same day):* the
+      app's plate had no wax. Read from the filmed build's own fields over 150 s
+      (`?look=lava-lamp`, the Mac, Metal): the mix field's oil sums to 0 and no cell is
+      wax at any of eleven samples, while the dye is all there. The film is a dye in
+      convecting water, which folds into sheets as any passive colour does. With the wax
+      laid (27f-9m) the same 150 s on the Mac is bodies that go round and keep their edges,
+      though not round ones (27f-9q).
+      Still wanted: a check that reads the app's own fields after two minutes (the share
+      of the dye inside the wax, and the count of separate bodies), which the lab's
+      `lavawax` does not; `oillaid` asks only that the oil is there at the start.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).

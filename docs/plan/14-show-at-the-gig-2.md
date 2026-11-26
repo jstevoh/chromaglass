@@ -249,6 +249,13 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   device opens, which is the whole opening again; it should be the intro's mark and its
   loading line. `LiquidVisualizer.tsx` is over its size ceiling, so the caption moves to a
   small component first.
+- **14v-19. Found: the first frame's words change as the half behind the show begins.**
+  `go()` says "Pouring the first frame" synchronously at the end of the opening, and
+  `prepareShow` goes straight on to the half behind the show, whose first ask is a
+  render pipeline (`later` sorts render first), so that picture too is painted with a
+  compile under way. Line 9c reads only the opening's compiles and cannot see it. The
+  same remedy (tell it on the next frame, or ask the later half's first compile a frame
+  after `go`) and a 9c that reads the first later compile too.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
