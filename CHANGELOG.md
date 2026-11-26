@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — The liquid moves what floats in it (PLAN 15g-17, 15g-18, 18c-14)
+
+- **Bubbles and beads ride the liquid.** A stroke or a drop no longer kicks the bubbles and
+  oil beads round it away from the hand; they move only as the liquid under them moves (a
+  pocket at the Taylor–Saffman speed, a bead at 2/(1+λ)), and liquid laid on a bubble
+  takes it. A pop no longer pushes and turns the liquid: the gap closing over the air
+  draws it in from all round.
+- **A press squeezes, and turns nothing.** The pointer's press no longer lays a swirl round
+  its disc; it pushes the liquid straight out from under the glass, as the remote press
+  always did.
+- **A plate left alone stays as it is.** The hidden seeding that laid colour and heat from
+  three orbits on every frame is gone, so a quiet passage settles; a plate that is
+  entirely empty is still woken by its emergency seed.
+### Added — the water's glow (PLAN 48c)
+
+- **Glow** (Settings → Camera, MIDI, the desks, the remote and the phone's Sound sheet): the
+  plate's water holds plankton that flash blue where the flow shears it, so a finger, a pour
+  or a stirring cord draws a glowing wake on a dark plate, and still water stays dark.
+- **Glow Shear** is the shear it takes to light (seawater's measured threshold by default);
+  **Glow Recharge** the seconds a spent cell takes to refill, so a path stroked again soon
+  glows less and a quiet passage lets it come back.
+
 ### Added — Soap Film's big swirls and Frame Tilt (PLAN 32k, 32h, 32d-1)
 
 - Soap Film folds into big marbled swirls: the film's large motions run while its small patches

@@ -26,3 +26,11 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   in the Tools panel's empty keycaps, at the top of Tilt & Rock and in the phone's
   Motion sheet: drag the dot to an edge, let go and the dish lies back. `npm run
   tippad`. Story in `docs/plan-shipped.md` §18a-13j.
+- **18a-13n. How far a full knob tips: shipped** (2026-11-26; the owner's "Keep going"
+  on the knobs). A full knob now hands the solver rock 2 (`KNOB_ROCK`), Plate Rock's
+  strong swing at the top of its dial, not the phone's 1.1: sinθ 0.48 (29°) against
+  the phone's 0.27 (15°), on the same thin-gap law, so heavy dye slides 1.8 times as
+  fast. `knobTip` bends the travel, u(1 + (R − 1)u), so near level each CC step is as
+  fine as before and two thirds of a turn is the phone's full tip. Phone and knobs
+  together stop at the knobs' corner. `npm run handtilt` (reach). Films on the Mac for
+  the owner's judging.

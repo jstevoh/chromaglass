@@ -271,7 +271,9 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
     evolve: /const li = fluidsRef\.current\.indexOf\(af\);\s*const color = (?:area \? areaColor\(li, area\) : )?harmonyColor\(harmonyOf\(li\)\);\s*const styles = stylesOf\(li\);/,
     evolveLiquid: /doseLiquid\(af, liquidsOf\(li\)/,
     seed: /fluidsRef\.current\.forEach\(\(fluid, li\) => \{[\s\S]{0,200}const styles = stylesOf\(li\);[\s\S]{0,300}harmonyColor\(harmonyOf\(li\)\)[\s\S]{0,400}doseLiquid\(fluid, liquidsOf\(li\)/,
-    ambient: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.25/,
+    // The ambient orbits were a site here until PLAN 18c-14 took them out:
+    // three hidden hands that laid dye on every plate nobody touched. With no
+    // pour there is nothing to take the back plate's colours, so no site.
     // The music's colour, styles and liquids: since PLAN 38v-1 its hands are
     // cords, laid by the hands on the active plate, whose bottles are that
     // plate's dyes (`plateDyes`), and whose sink (`musicSink`) pours in that
@@ -284,7 +286,7 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
     hand: /g\.color \? hexToRgb\(g\.color\) : harmonyColor\(harmonyOf\(layer\)\)/,
   };
   const missing = Object.entries(sites).filter(([, re]) => !re.test(lv)).map(([k]) => k);
-  check('every pour that can land on the back plate takes that plate\'s colours, styles and liquids (Evolve, Seed, the orbits, the music, a lyric\'s theme, a hand)',
+  check('every pour that can land on the back plate takes that plate\'s colours, styles and liquids (Evolve, Seed, the music, a lyric\'s theme, a hand)',
     missing.length === 0, missing.length ? `still the front's: ${missing.join(', ')}` : `${Object.keys(sites).length} sites`);
   check('and a pinned palette wins on the back plate as on the front',
     /return own \? \(harmonyLockRef\.current \?\? own\.harmony\) : harmonyRef\.current;/.test(lv));

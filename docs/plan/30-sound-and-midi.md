@@ -134,3 +134,36 @@ story is in `docs/plan-shipped.md` under 48f. Open:
   feature without a hand on the desk. Needs the owner's judging first (docs/judging.md
   §140).
 
+## ~~48c. Bioluminescent trails: the water glows where it is sheared~~ (shipped 2026-11-21)
+
+Shipped behind Glow, Glow Shear and Glow Recharge (`npm run glow` 15/15 on the lab's software
+WebGPU). Story in `docs/plan-shipped.md` §48c; written here beside the cords because the music
+plays it through them. Not yet seen on the Mac (`docs/judging.md` §145). Three shortcuts are
+named in the code and each is an item:
+
+- **48c-1. The plankton are spread evenly.** Every cell of the plate's water holds the same
+  population, so a stroke anywhere lights the same. A real bloom is patchy and is carried: a
+  concentration field over the plate, carried and diffused with the water as the dye is,
+  poured from a bottle (a "Plankton" liquid on the bench) and thinned where the water is
+  flushed, would scale both the light and the charge. Its cost: one more field on the glow's
+  256² grid and its carry.
+- **48c-2. The threshold is a shear rate at seawater's viscosity.** The cells answer the
+  stress on them (Latz et al. measure it in pascals), μ·S. The step compares the strain rate
+  with Glow Shear as if every liquid were seawater (1 mPa·s), so a stroke through glycerine
+  or syrup, which stresses the cells hundreds of times harder at the same rate, lights no
+  more than water. The fix reads the local liquid's viscosity (the mix's, 18d-1) and
+  compares the stress with a threshold in pascals.
+- **48c-3. The light is not filtered by the dye.** The emission is added over the plate's
+  colour, so a glow under a thick dye shows as brightly as one in bare water. Real light from
+  the water passes through the dye on its way to the lens and is absorbed by it as the
+  lamp's is (18b): attenuate it by the dye's absorbance over the path, Beer–Lambert, with
+  the blue's own extinction per dye.
+- **48c-4. The display's fragment stage is at its storage-buffer limit.** The glow's light
+  (binding 26) is the display's eighth read-only storage buffer in its fragment stage, after
+  48f's surface (binding 25): the eight every device gives without asking (`gpu/device.ts`
+  asks for no more). The next field the plate draws must pack into a buffer already bound
+  (the glow's light and the Faraday surface fit one array) or be a texture.
+- **48c-5. A look made for the glow.** Every look ships with Glow at 0. A look of dark water,
+  sparse dye and a cord that stirs on the kick (the music lights a wake on each hit and the
+  quiet lets the water recharge) would show it on Go; the owner picks it from Mac films.
+
