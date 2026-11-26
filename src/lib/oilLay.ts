@@ -187,7 +187,7 @@ export function splodascopeCell(x: number, y: number, n: number, discs: readonly
 /*
   The discs are looked up through a coarse grid of buckets, each holding the
   indices (in lay order) of the discs that reach into it. A cell is laid
-  once per lay, but there are n² of them: Classic's dish went from about 160
+  once per lay, but there are n² of them: Lava Pop's dish went from about 160
   discs to about 360 when the owner asked for complexity (2026-11-21), and
   walking every disc for every one of the app's 768² cells took 2.4 s on the
   Mac, every time the look was laid. The order within a bucket is the lay's
@@ -227,7 +227,7 @@ function discCell(x: number, y: number, n: number, discs: readonly OilDisc[], re
 }
 
 /*
-  Classic Light Show's dish (PLAN 38w-1), after the Joshua Light Show's
+  Lava Pop's dish (PLAN 38w-1), after the Joshua Light Show's
   Liquid Loops (1969) and its Fillmore East nights (1968), the period
   photographs of the Avalon and the Fillmore, and Glenn McKay's and Bill
   Ham's own footage (the watch tool's references, 2026-11-21). What every
@@ -412,7 +412,7 @@ export const CLASSIC_JOIN = 0.6;
 export const CLASSIC_TRIES = 12;
 
 /**
- * Classic's dish for one lay, from `float` (a seeded stream), as
+ * Lava Pop's dish for one lay, from `float` (a seeded stream), as
  * splodascopeDiscs lays its crowd: the cells of oil (oil 1), some joined into
  * one body by overlapping (all of one pour, one colour), then the drops of
  * water held in them (oil −1). `dyes` as clockGlassBodies takes it.
@@ -508,7 +508,7 @@ export function classicDiscs(float: () => number, dyes: number, n = 192): OilDis
   return out.concat(holes);
 }
 
-/** One cell of Classic's dish, as splodascopeCell lays the splodascope's: the water's wash flat across the dish, round the oil and in the drops held in it. */
+/** One cell of Lava Pop's dish, as splodascopeCell lays the splodascope's: the water's wash flat across the dish, round the oil and in the drops held in it. */
 export function classicCell(x: number, y: number, n: number, discs: readonly OilDisc[]): { oil: number; disc: number; water: number; dye: number } {
   return discCell(x, y, n, discs, CLASSIC_REACH, CLASSIC_WASH, CLASSIC_BODY_DYE);
 }
@@ -591,7 +591,7 @@ export function layOilShare(share: Float32Array | null, index: number, amount: n
 }
 
 /**
- * Clock Glass's, Splodascope's or Classic's dish for one lay (FluidSimulation's seed):
+ * Clock Glass's, Splodascope's or Lava Pop's dish for one lay (FluidSimulation's seed):
  * the bodies from `float` (a seeded stream), each laid as oil (`oil`, a
  * negative amount cutting a compound drop's hole), then every cell as
  * clockGlassCell, splodascopeCell or classicCell lays it, the water's wash as dye

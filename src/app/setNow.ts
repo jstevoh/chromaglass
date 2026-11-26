@@ -28,6 +28,8 @@ export interface SetNow {
   /** The item on stage, by its id (the desk's live row), for the phone controller (PLAN 12-ctl-1). */
   liveItem: string | null;
   fadeSeconds: number;
+  /** The sets kept by name (the set menu's Save and Open), for the assistant to open one by its name (PLAN 44k-16a). */
+  saved: SetList[];
 }
 
 /** `useLookFades`' half: arm and Go, to the front plate and the back. Each says why not, or null when done. */
@@ -45,16 +47,18 @@ export interface CueDoor {
   cancel: () => void;
 }
 
-let now: SetNow = { list: { name: '', items: [] }, armedItem: null, liveItem: null, fadeSeconds: 2 };
+let now: SetNow = { list: { name: '', items: [] }, armedItem: null, liveItem: null, fadeSeconds: 2, saved: [] };
 let go: GoDoor | null = null;
 let cue: CueDoor | null = null;
 const listeners = new Set<() => void>();
 
 export function publishSet(s: SetNow): void {
-  if (now.list === s.list && now.armedItem === s.armedItem && now.liveItem === s.liveItem && now.fadeSeconds === s.fadeSeconds) return;
+  if (now.list === s.list && now.armedItem === s.armedItem && now.liveItem === s.liveItem && now.fadeSeconds === s.fadeSeconds && now.saved === s.saved) return;
   now = s;
   for (const l of listeners) l();
 }
+/** The set as last published, for a door that reads it outside React (app/editNow.ts's kept sets). */
+export const readSetNow = (): SetNow => now;
 export function setGoDoor(d: GoDoor | null): void { go = d; }
 export function setCueDoor(d: CueDoor | null): void { cue = d; }
 
