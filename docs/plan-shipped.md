@@ -2477,7 +2477,10 @@ before the measured one (untested, and #396's warm in the same page did not help
     wait (3.48 s against 1.11 s) though the show was moving for good 5.8 s sooner. And the
     line says nothing at the start of the builds: its "0 of 67" changed the picture as the
     opening began waiting for the page's frames, and the Mac asked its first compile 1.12 s
-    after the device (0.06 s on main).
+    after the device (0.06 s on main). After it merged, the words still changed as one render pipeline
+    finished, in the millisecond the next was asked (`intro` 9c red 2 of 3 on #881's branch):
+    the count now holds until every render pipeline is asked for (they come first), and 9c
+    also reads the two frames before each compile (red on the old code: 8 changes).
   - Every look the same bytes: `npm run leandisplay` (new, lab9) draws all 41 looks lean
     and whole, plate and close-up, 85/85 (also with five steps each, before the switch
     to literal `false`), with controls (a gate the look uses taken out differs by 1329
@@ -4531,6 +4534,21 @@ line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven
 out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
 every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
 lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
+
+### 19aj-3. The pouring tools are held for the plate's steps (2026-11-21)
+
+What was seen: `npm run tools` "and spreads it out from where it lands" red on both of #897's
+hosted-Mac runs, the Pour's share from 0.02 to 0.07 at 76 and 75% against the Drop's 78%,
+on a PR that changed only the loading line. Across that morning's runs the Pour's total
+fell with its share (879 and 921 laid on the red runs, 1345 at 84% on deploy 854, 1557 to
+1640 at 86 to 87% on four other PRs) while the Drop's share held at 76 to 78%: the Pour
+lays its dye with an outward push once a step, and the push spreads it only as the solver
+steps, so 1.2 s of the wall's on a runner that stepped less laid less and spread less. The
+line was reading the runner's step rate. What changed: the five pouring lines and the
+Amount's hold and wait for a count of solver steps (72 and 42 on a GPU, sixty to a second,
+not `dtSeconds`, which the governor can halve; check-skeptic), settlePlate's share in
+software, and a wait that runs out before its steps turns those lines red instead of
+feeding them a short hold. Each tool's line now prints the steps it was held for.
 
 ### 19ak. The Mac runs what a PR reaches, and known flakes report without blocking (2026-11-01)
 
@@ -6631,6 +6649,77 @@ SwiftShader, so the check left Measure (`lab10` is gone) for the Mac's `show` (1
 controls above. Shortcuts kept, each named in 27f-9g: the glass temperatures laid by height,
 the thin gap's rate standing in for a fat bottle's, and dye wax (no oil phase) still on the
 old kick. The Mac's film of two minutes is the owner's verdict.
+
+### 27f-9m. A look's oil laid before its solver is there (2026-11-12)
+
+The owner, 2026-11-12, of the new lamp on the Mac: the wax smears into streaks instead of
+holding round blobs. The lab's lamp, same settings, held fat round bodies for the whole of
+150 s (27f-9f's account), so the first question was what the app's plate had that the lab's
+did not, and the answer was what it did not have. Read from the filmed build's own fields on
+the Mac (the page opened as every film opened it, `?look=lava-lamp`, eleven samples over
+150 s): the mix field's oil summed to 0 and not one cell was wax, while the dye was all
+there. The lamp that was filmed was red dye in convecting water. A dye is a passive colour:
+the convection folds it into sheets and streaks and nothing gathers it back, because nothing
+in it has an interface. The look laid again on the running page had its wax (6.67% of the
+plate, the area of its four bodies).
+
+Why: `seedPreset` laid a look's oil with `this.gpu?.addMix?.(…)`, and the look a page opens
+on is seeded before the GPU solver is attached. The dye of the same lay lands in the
+simulation's own arrays, which the solver takes over when it attaches; the oil had nowhere
+to land and the optional call dropped it without a word. Clock Glass and Splodascope lose
+theirs the same way, and so does any look laid between a lost device and the next solver.
+It was never seen in a check because the lab lays the oil itself and the app's harnesses
+apply their looks to a running page.
+
+The oil waits now. `src/sim/mixWait.ts` keeps the splats a look lays while there is no
+solver, `attachGpu` lays them into the first one, they are kept as that solver's seed
+beside the dye's (a solver dropped before it has spoken, out of memory on the first rung,
+hands the next one the same plate), and they are dropped when a carry holds the oil
+already, when the plate is cleared, and when a fade to another look wipes the chemistry
+(`FluidSimulation.clearChemistry`, which the visualizer's fade now calls instead of reaching
+for the solver, so a Go in the page's first second cannot lay two looks' oil).
+
+`npm run oillaid`. The simulation's half (node, Measure's `logic`) drives the real
+`FluidSimulation` against a stand-in solver that keeps every `addMix` it is given: each oil
+look laid before a solver holds the same oil, splat for splat, as laid with one; after a
+solver that never spoke; after a regrid, once and by the carry; a cleared plate and a fade
+leave none of the old look's. Before the fix 4 of its first 8 lines failed (0 bodies
+against 4, 12 and 45). The app's half (the Mac's `open`) opens the built app on each oil
+look and reads the solver: the mix field's oil against the same look laid again on the
+running page, the solver's own count of the oil poured (which a second lay would double;
+the field cannot see one, a cell being full at 1), and Lava Lamp's against the area of its
+four bodies. On the Mac (Metal), the build before the fix: every oil look opens with 0.00%
+of the plate oil, held and poured, and 3 of the app half's lines fail (12 of 15 in all).
+With it, 15 of 15: Lava Lamp opens with 6.67% held and 6.67% poured, the same laid again
+(Σπr² of its four bodies is 6.67%); Clock Glass 8.25% held and 10.38% poured against 9.17%
+and 11.47% laid again (its bodies are random, so the bar between the two is 0.6 to 1.5 and
+only Lava Lamp is held to a tenth); Splodascope 26.16% against 26.80%.
+
+*And what the show builds before it opens.* With the oil kept, `npm run startup` on Metal
+went red on this PR's first run: Clock Glass and Splodascope asked on the frame for
+fourteen and fifteen pipelines their opening had not waited for (the mix's splat, carry,
+relax, potential and update, the oil's smoothed shape, rim pressure and force, the
+bodies' three, the lift's three, and Splodascope's Film Hold), and Lava Lamp for eight.
+The check was right: those kernels had always been "built behind the show" because no
+opening ran them, and no opening ran them because the oil was lost. So the opening now
+learns of the oil from the plate and not from a list of looks: the visualizer asks the
+simulation whether oil waits for the solver (`FluidSimulation.wait.pending`) and
+`openingOf` takes it, and `Opening.oil`, `oilPull`, `oilBodies`, `filmHold` and `oilLift`
+are the step's own conditions for each group of kernels (`WebGPUFluid.prepare`). A look
+with the settings and nothing poured (Oil & Water) still waits for none of them.
+
+*And the wax, once it is really there (the same Mac, 150 s, no hands):* it goes round (its
+centre of mass between 0.13 and 0.53 of the plate's height, about every 35 s) and it is
+bodies with their own edges, not a wash, but it is not round: heads on stalks, threads and
+rows of beads, an area-weighted roundness (4πA/P², a disc is 1) of 0.3 to 0.6, and the
+cells over half oil fall from 8.45% of the plate to 4.48% while the oil's sum is kept
+(the rest is fringe, 939 cells to 3,119). That is the next piece, 27f-9q, with what the lab
+measured of it.
+
+Found on the way, open: a lost device mid-show loses the oil (27f-9n), a bottle's dose with
+no solver is dropped (27f-9o), and every verdict drawn from the lamp's earlier Mac films was
+a verdict on dye (27f-9p); and the laid wax is heads on stalks because the tension is capped
+a step and stops being stable when the cap is lifted (27f-9q).
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
@@ -10716,6 +10805,29 @@ for, and the GPU was asked for only after they had arrived and drawn.
   the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
   (`npm run renders`' gamepad phase), and the poll sets `connected` once.
 
+#### 14a-timers, 14j-gamepad. Covered-window fades on the ear worker's tick, and no gamepad timer without a pad
+
+- **14a-timers** (**shipped**): the look fade (`useLookFades`), the dimmer (`useBlackout`),
+  the row fades (`useRowFades`), the drift glides (`useGlides`), the sequencer, song
+  shows and the simulated band (`simulatedMusic.ts`) step on `showInterval`
+  (`src/lib/showClock.ts`), which live arms `setInterval`. Chrome holds a covered
+  window's own timers to about one a second, so a 4 s Go crossfade fired from a MIDI
+  pad with the show window behind the projector stepped 4 times instead of gliding.
+  `pumpShowIntervals(now)` in `src/lib/showClock.ts` is called from the ear worker's
+  unthrottled 16 ms tick in `src/hooks/useAudioAnalyzer.ts`. Each live `ShowTimer`
+  tracks its next `due` mark on `performance.now()` and whether its last fire came
+  from the pump (`pumped`), so on a visible page whichever of the browser timer and
+  the worker tick arrives first fires the period once and steps `due` past `now`, and
+  the other passes without doubling the writes. Measured by `npm run timers`: a 33 ms
+  look fade over 4 s steps 121 times hidden (was 4) and 121 visible (against 122 at
+  most, whether the tick lands before or after the timer); `npm run ears` unchanged.
+- **14j-gamepad** (**shipped**): `src/hooks/useGamepad.ts` used to arm a 16 ms
+  `setInterval` on mount whether or not a controller was plugged in. Now the poll is
+  armed on `gamepadconnected` (and on mount when `navigator.getGamepads()` already
+  reports a connected pad) and cleared on the last `gamepaddisconnected` (or unmount).
+  Measured by `npm run timers`: 0 timers with no pad (was 1), 1 with one plugged in,
+  0 once unplugged, 0 after unmount.
+
 #### 14z-1. On a New Song opens on Keep
 
 - **14z-1** (**shipped**): On a New Song opens on Keep. Nobody gets a look changed by
@@ -10897,6 +11009,13 @@ sheet. Judged on the Mac: `docs/judging.md` §23.
 #### 18e. Edges come from refraction
 
 **Partly shipped** (#355). What shipped: on projected looks, the front plate's edges come from projector pupil aperture loss and shadowgraph Becke line doublets, from the optical path OPL = n·h and its Laplacian in the derive pass. n is water's 1.333 plus the oil (1.47), the film, the poured liquids' own indices from the species field (18d-9) and a named stand-in for the dye (d·0.015·dyeGain: a dilute dye barely moves the index, and the shelf gives dyes none); h is the gap. A separate Projector Focus control (Settings, desks, MIDI, remote, the phone's Looks sheet; 0.5, in focus, by default, so every look is as before until it moves). Painted specular highlights are gone from projected looks and stay on camera and closeup looks. Named shortcuts (each in `refractionOptics`' notes and the archive): the deflection from the dye's slope, not ∇OPL (18e-2); dyeGain, a contrast gain on the step; the pupil overlap a smoothstep against `DROP_NA` 0.25; the shadowgraph's gain max(1, boundaryContrast·2) and edge mask; the back plate's painted line (18e-1); the dye's stand-in index d·0.015·dyeGain; no heat in n (18e-3). What did not ship is below (18e-1 to 18e-4). Follow-ons (§31, 2026-10-11): **31a** gives the defocus Δz a control that also blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with each liquid's dispersion. Shipped story and measurements in [`docs/plan-shipped.md`](docs/plan-shipped.md) §18e. Open:
+
+- **18e-2. A clear pour's edge, and the deflection from the optical path (shipped 2026-11-15).** The projected plate's pupil loss previously read the ray's deflection from the dye's air-masked slope (`|∇density| · 0.35` in `refractionOptics`) gated on `fluid0.a > 0.03`, so a clear pour (glycerine or syrup into water), a clear oil drop, or a pour into clear water with no dye drew no rim in focus (`projectorFocus = 0.5`), even though `calcOpl` in `DERIVE_WGSL` already built the optical path `n·h` in `.w` from the poured liquids' indices, the oil, the film, the gap, and the dye stand-in. Now:
+  - The projector branch of `DERIVE_WGSL` (`src/gpu/wgsl/plate.ts`) writes `|∇OPL| = length(vec2f(oplX, oplY))` in `.z` from the Sobel taps `o00..o22` it already reads, in place of the 9-tap Laplacian; the camera branch keeps `.z = boundaryDiff` and writes `oplAt(decodeDensity(tex2(src, in.uv).a), in.uv, 1.0)` in `.w`.
+  - The closeup's `lapK` read (`macroDetail`, Layer 0 and Layer 1 in `src/gpu/wgsl/plate.ts`) takes its Laplacian from `.w` via `camLap(derived, fuv)` (`pathLap(t, uv, U.macroRelief * CAMERA_DEFOCUS)` in `src/gpu/wgsl/plateTransmit.ts`), sharing `pathLap` with `defocusShadow`.
+  - `oplPupilLoss` (`src/gpu/wgsl/plateTransmit.ts`) converts `|∇OPL|` per texel from rest-gap units (`DISH_REST_GAP = 0.03` of the plate's width; one texel is `1 / U.logicalGrid` of the width) to the small-angle ray bend `θ = |∇OPL| · DISH_REST_GAP · U.logicalGrid` (scaled by `length(normal0.xy) / (0.9 * max(normal0.z, 1e-4)) / length(dyeGrad)` where dye slopes so `airNear` and `reliefGain(U.glossiness)` carry through, and `1.0` across clear index steps), divides by `2 · DROP_NA` (`DROP_NA = 0.25`), and applies `1.0 - clamp(smoothstep(0.0, 1.0, u) * U.edgeRelief * plateAmt, 0.0, 0.85)` on `outColor` (masked by `phaseCover` over opaque ferrofluid domes) beside `defocusShadow` at all Focus settings, ungated by `fluid0.a > 0.03`.
+  - The dye's stand-in index in `calcOpl` is retuned from `0.015` to `0.06` (`0.35 / (0.03 · 192) = 0.0608`), with `dyeGain = max(1.0, U.boundaryContrast * 3.0)` on `.w` (the out-of-focus shadowgraph) and `1.0` on `.z` (the in-focus pupil loss, scaled by `Edge Relief`), and the old `gLen * 0.35` term in `refractionOptics` is retired (the two-dye boundary term having gone in 18e-5).
+  - *Measured:* `npm run derive` 5/5 (`--owed=grad` removed in `scripts/checks.json`: `.z` min `0.0000`, glycerine rim peak `0.1187` with `0.98` on the step, syrup `0.0997` with `0.98` on the step, clear water `0.0000`, syrup/glycerine `1.00` of the index steps' ratio, `r = -0.180` against the Laplacian); `npm run nolight -- --owed=film` 15/15 (`rim` removed from `--owed`: line 14 clear pour `98.35%` of rim darker by 8+, oil `67.63%`, pour on clear water `99.02%`, brightest by `0..1`, middle and ground moved `0`, index-matched pour moved `0`); `npm run holeline` 17/17 (`pool rim into water` `11.11` levels); `npm run spikes` 6/6 (`16 of the 27 domes near it have a bright point on their top`); `npm run stillcloseup` 13/13; `npm run mixer` 68/68 (`contrast spreads it about mid-grey` `27.6 → 41.1`, `back plate's Own` `10.3`); `npm run closeupdepth` 5/5; `npm run macroview` 6/6; `npm run droplens` 21/21; `npm run grainedge` 4/4; `npm run plate` 50/50.
 
 #### 18i. Bubbles and beads live by physics, not timers
 
@@ -13539,6 +13658,46 @@ phones, the song action's modes and kicks), the page's own still rule on the rea
 `PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
 drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).
 
+## 43b. A seamless loop, for a Canvas (#693, 2026-11-07)
+
+A seamless loop for a Spotify Canvas, built as an edit of the finished film's frames with
+the plate shader and the solver untouched:
+
+- **Seam picker and crossfade weights (`src/lib/loopSeam.ts`).** Plain functions over small
+  grey frames (`Uint8Array`): `frameDistance(a, b)` returns the mean per-element `|a - b|`
+  (`0..255`) and throws on a length mismatch; `pickSeam(thumbs, loopFrames, fadeFrames)`
+  picks the earliest start `s` (`0 <= s <= n - loopFrames - fadeFrames`) with the least
+  `frameDistance(thumbs[s], thumbs[s + loopFrames])`, never picking a start whose fade runs
+  past the last frame and throwing when `n < loopFrames + fadeFrames`; `fadeWeight(t, fadeFrames)`
+  is `0` at `t = 0`, rises linearly (`t / fadeFrames`) to `1` at `t = fadeFrames`, stays `1`
+  past the fade, and returns `1` throughout when `fadeFrames === 0`. Helpers `rgbaToGrey`,
+  `blendRgba` and `pickLoudestWindow` support the two-pass render.
+- **Two-pass loop render (`src/app/loopRender.ts`, wired in `src/app/useSongRendering.ts` and `src/lib/checkHooks.ts`).**
+  Decodes the song and locates the loudest contiguous search window (`loopFrames` plus 2 s)
+  from the offline `SongEar` bands (§6) unless `startSec` is typed. Pass 1 lays the look on
+  `seed` on the fixed clock and steps the search window, keeping only a 64×64 grey thumbnail
+  (4 KB) per frame so `pickSeam` chooses `start`. Pass 2 resets the clock, seed, plate and
+  app state to the exact starting state of Pass 1, holds only the half-second fade's early
+  frames (`s .. s + fadeFrames - 1`), streams the middle frames (`s + fadeFrames .. s + loopFrames - 1`)
+  straight to the H.264 MP4 encoder with `audio: null`, and blends the held early frames with
+  the late frames (`s + loopFrames .. s + loopFrames + fadeFrames - 1`) at the end of the file.
+  `window.chromaglassRender` (`?debug`) accepts `loop: { seconds, crossfade, startSec }` and
+  returns `bytes` and `loop: { startFrame, seconds, distance }`; `crossfade: false` renders the
+  same pick and frames with no blend.
+- **Render panel (`src/components/RenderPanel.tsx`).** Adds a "Full song" / "Loop for a Canvas"
+  segmented choice, a 3 to 8 s loop length selector (default 8 s) and an optional start-time
+  field; the free site keeps its 720p cap and watermark.
+
+Measured: `npm run loopseam` 14/14 (`pickSeam` and `fadeWeight` on made-up frames, and the 6 s
+joined loop with seam 1.72 at 1.4x vs 50.87 at 41.7x without weights); `npm run loopseam -- --app`
+on the Mac (`apple metal-3`): 4 s loop renders 120 frames, 4.000 s, 0 audio tracks; seam 0.34
+against a median step of 0.41 (0.8x, bar 3x), first-to-middle 15.72 (38.3x, bar 4x); without
+crossfade fails the seam line at 22.11 against a median step of 0.36 (60.9x); both renders pick
+startFrame 225 and stay within 0.08 in the middle half against the 0.41 median step. The
+cut-inside line (`CUT_OVER_MEDIAN = 8`) reads 3.95 (9.6x of 0.41) on the unedited film's own
+kick beat at frame 90→91 (inside the crossfade the steps are 1.39..1.97, 3.4x..4.8x of the
+median; between kicks 80% of the frames drift at 0.26..0.41 while `BassPress` lurches 3.14..3.95
+on each 120 bpm kick of `songWav(14)`). Left open: 43b-2, 43b-3.
 ## 37x-10. The song's title painted as ink, then swept away (2026-11-08), with 37x-10d
 
 The owner's words of 2026-11-07, replacing a lower third: "let titles get painted on as
@@ -14230,6 +14389,35 @@ Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setli
 `cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
 the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
 
+## 12-ctl-2. Scan the laptop's code (2026-11-12)
+
+The Laptop remote form asked a phone to type or paste the laptop's address and key.
+The show's Phone · iPad panel already draws that address as a QR code (8f,
+`lib/qr.ts`), so the app now reads it: **Scan the laptop's code**, drawn only in the
+iPhone and Android apps (the website's remote needs no address, and has no camera
+plugin). One code serves both: a phone's own camera opens the show server's remote
+in the browser, and the app links with it, so 4a's open "QR code" needed no
+`chromaglass://` scheme.
+
+Each shell has a local plugin, `LaptopScan`, called through the bridge
+(`appLink.ts`'s `scanLaptopCode()`; the bundle still imports no Capacitor package).
+On the iPhone it is VisionKit's `DataScannerViewController` (`ios/App/App/LaptopScan.swift`,
+registered by `AppViewController`, which the storyboard and SceneDelegate now name in
+place of the bare bridge controller), asking for the camera the Info.plist already
+names. On Android it is Google's code scanner from Play services
+(`LaptopScanPlugin.java`, `play-services-code-scanner`), which draws its own camera
+view and needs no camera permission. The ML Kit Capacitor plugin was the obvious
+choice and was not taken: on iOS it installs only through CocoaPods, and this project
+is Swift Package Manager. What the scanner reads goes through `parseScannedCode`: only
+http(s), then the same parser as a typed address, so the code's own key is used; a
+cancel says nothing, and anything else is refused in words on the form.
+
+Measured: `npm run controller` 25 of 25 with nothing owed (it was 24 of 25 owed
+`scan`). The check's scan part had been written after the part that hangs up its
+stand-in Mac, so a correct scan reached the right address and read Offline; it now
+runs while the stand-in is connected. The scanners themselves need a phone: `ios.yml`
+and `android.yml` prove they compile.
+
 ## 12-ctl-3. The Android app (2026-11-11)
 
 The owner asked for the phone apps to be the Mac app's controller (12-ctl), and the
@@ -14437,6 +14625,21 @@ Garden read as scattered specks at this size and is left off too.
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
 
+## 40. H2c-7 · Readback straight into its ring (2026-11-08)
+
+`WebGPUFluid.readbackAsync` (`src/gpu/fluid/reads.ts`) downsampled each field into
+`readTarget`, copied that into `rbStaging`, and only then asked `ReadbackRing`
+(`src/gpu/kit.ts`) for a free slot and copied staging into it: two copies a field
+(2.36 MB across four copies at 384²), and when both slots were still in flight it still
+downsampled and copied into staging before throwing the work away. `ReadbackRing` now
+exposes `hasFree` and `reserve()` beside `copyFrom`; `ReadGate.wants` and `readbackAsync`
+check that both rings have a free slot before encoding anything (leaving `askedNow`
+uncalled when full so the next frame asks again), and `readbackAsync` copies `readTarget`
+straight into the reserved slot buffer with `copyTextureToBuffer`. `rbStaging` is dropped
+from `FluidCore`. `h2c7` is taken out of `--owed` in `scripts/checks.json`; `npm run
+framereads` 16/16 (`1179648` bytes in 2 copies, `1.00x` a field's bytes, down from
+`2359296` in 4 copies, `2.00x`; 0 dispatches and 0 copies across 6 full asks, down from
+12 and 12; the frame after the full asks reads the plate back with 0 error).
 ## 12-tv-2f. The TV's samples are the channel's films, and the logo on its loading screen (2026-11-14)
 
 Asked by the owner on 2026-11-14: "Let's add the logo to the loading screen for the
@@ -15481,3 +15684,48 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+## 46k. `dyeDisperse` gated on its own coefficients (2026-11-15)
+
+`src/gpu/fluid.ts` gated the `'dye disperse'` stage on `dispCells > 0 || (kappaT > 0 ? dm > 0
+: dm > 0.0039)`, so whenever the plate moved (`dispCells > 0`) `dyeDisperse` ran even when both
+diffusion terms were zero (`dm = 0` and `kappaT = 0`, as on Classic and the thirteen other
+looks with Diffusion Rate at 0): one full-grid dispatch a step, 25 loads of the rgba32float
+dye a cell, every face flux `±0`, writing back what it read.
+
+Moved to `disperseDye` and `disperseWanted` in `src/gpu/fluid/passes.ts` (`fluid.ts` shrinks by
+689 bytes) and gated on `bodies || dm > 0 || (kappaT > 0 && dispCells > 0)`. Oil Bodies
+(`bodiesOn && !bodiesFresh`) stays outside the gate because `bodyUnspread` (`src/gpu/wgsl/fluid/oil.ts`)
+computes `max(dye - spread, 0) + max(kept, 0)`: `slump` and `decayDye` at the end of the
+previous step act on `this.dye` without updating `this.oilDye`, so a cell where `dye` fell
+below `oilDye` is clamped back up to `oilDye`, and where both are positive `(dye - od) + od`
+in IEEE 754 float32 is not bit-identical to `dye` across different exponents. `npm run
+samelook` 0.00 % past 2 and 0.000 % past 24 on all six looks at 5, 20 and 60 steps; `npm run
+physics` 20/20; `npm run dispersion` 5/5; `npm run encode` 17/17 (`encode` steps with `BASE.diff
+= 0.0001`, so `dm = 5.20e-6 > 0` and its step still runs `dyeDisperse`: 270 thin-gap and 494
+open-plate dispatches).
+
+### P7-cpu (step 3.1): Delete the CPU solver's stepping
+
+Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and
+CPU-only fallback paths while keeping the delta arrays, readback mirrors, beads,
+bubbles, macro camera, `liquidPhase`, and every pour/seed/GPU handoff path.
+
+- Deleted in `src/sim/fluidSimulation.ts` (184,913 → 172,192 bytes): CPU-only
+  `solveSqueezePressure`, `updateSqueezeVelocity`, `applyImmiscibility`,
+  `applyAirflow`, `applySmear`, `applyDripping`, the CPU `else` branches in
+  `stepLiquid`, `thinDye`, `squishCell`, `blowAir`, and CPU-only scratch
+  arrays (`pressure`, `dhdt`, `temp0`, `fvx`, `fvy`).
+- Deleted in `src/sim/constants.ts` (7,845 → 7,756 bytes): unused `DRIP_SPEED`.
+- Deleted in `src/components/LiquidVisualizer.tsx` (402,887 → 396,999 bytes):
+  the CPU drain advection/evaporation fallback loop in favour of
+  `af.gpu?.drainStep(t)`.
+- Left under the check stop rule (for follow-up cleanup with their checks):
+  `private sharpenDye` (with `shp`, `shpA`, `SHARP_FLOOR`) for `scripts/plate.mjs`,
+  the `settings.glassSmear > 0` reference in `step()` for `scripts/widedials.mjs`,
+  `stepCurrentCpu` (`src/sim/stepping.ts`, 15,878 → 15,923 bytes) plus
+  `stepCurrent` / `CM` / `cvx` / `cvy` / `cpr` / `cdv` in `FluidSimulation`
+  (unreachable from `step()`) for `scripts/plateboil.mjs --part=zero`, and
+  the minimal CPU curl/transport path in `step()` (`diffuse`, `linSolve`,
+  `project`, `advect`, `advectMacCormack`, `setBoundary`, `applyCurlTurbulence`,
+  `s`/`sR`/`sG`/`sB`/`vx0`/`vy0`/`mcA`/`mcB`, and `TURB_SPEED`) for
+  `scripts/musicstir.mjs`.
