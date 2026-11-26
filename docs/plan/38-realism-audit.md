@@ -467,9 +467,12 @@ at the foot of this file):
     and turns a moving cover into flow at the rim; pours add to it; the main readers of the rest
     gap follow it; the dials are on the sheet, the desks, MIDI and the phone's remote. Open:
     - **38r-16. The pinch and the air edge** (M-L; part 2, its own thread). *Design pass and
-      checks written 2026-11-08* (`npm run gap -- --owed=puddle,settle,lift,pinch`, lines 19–23;
-      `npm run airedge -- --owed=rim,front,fingers`; a throwaway proof of the ledger half passes
-      every gap line but the wiring). Built by Antigravity from the brief in the project's files.
+      checks written 2026-11-08*. ~~**G1** (the ledger and the pinch, `npm run gap` lines 1–23,
+      `puddle`, `settle`, `lift`, `pinch` all green)~~ built on `antigravity/38r-16-pinch`
+      (Liquid range 1–150 mL, `lib/cover.ts` puddle ledger + RK4 substepping, `lib/playGesture.ts`
+      `pinchHand`/`PINCH_SPAN`/`playHand` span, `components/coverPinch.ts`, `PhonePlay.tsx`).
+      **G2** (`npm run airedge -- --owed=rim,front,fingers`, the Saffman–Taylor fingers on the
+      GPU solver) remains open.
       - *The pinch.* A two-finger pinch on the desk (trackpad: wheel + ctrlKey over the plate,
         outside the closeup, scale ×exp(−deltaY/100) an event) and the phone (two fingers whose
         span changes past `PINCH_SPAN`, 1.2, told from Blow's pair moving together in
@@ -699,9 +702,9 @@ On in many looks:
 Behind a dial at 0, or in one look:
 
 - **38u-9. The drawn textures that are left** (M, one PR; Low-Medium). Each is noise or a hash
-  on a clock, drawn over the liquid: Macro Lacing (fbm filaments on `U.time`, Lacing Run only;
-  `npm run stillcloseup` prints 3.2% of its frame moving on a still plate, and Paint Cells at 1 the same), Lacing's pale
-  thread (its level jittered by fbm on the clock), Paint Cells and the plate's Cells
+  on a clock, drawn over the liquid: ~~Macro Lacing and Lacing's thread on `U.time`~~ (**shipped**:
+  read in the grain's carried coordinates, `stillcloseup` `lace-run` 0.000%; still drawn noise),
+  Paint Cells (`stillcloseup` prints 3.2% at 1) and the plate's Cells
   (`cellField` on a clock; **20c-1** holds the closeup's), Satellite Droplets (a hashed
   lattice that never moves with the flow; 38h fixed their optics, not their places), Thin
   Film at Film Physics 0 (**38m**, **38n-2**), Colour Body (a chroma grade), the glitter's
