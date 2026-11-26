@@ -8099,6 +8099,43 @@ reduced motion keeps the stills, and a card whose film is on the channel opens i
 youtube-nocookie.com with the credit under it. `npm run landingfilms` holds all of it. Not a
 GIF: 256 colours band a plate's gradients, and a GIF is ten to twenty times the bytes.
 
+### 34a-2. A filmed hero, and a clip that plays to music (2026-11-21)
+
+*(S; the owner's Mac. The owner, 2026-10-22: the video examples should be better and play with
+the music audibly; then 2026-11-21: the hero's cross-fade of five 480 × 300 stills to be a
+full-width loop filmed from the app, and a clip of the plate playing to music, muted until
+tapped, the music the modern ambient tracks the rescore (34a-6d) films the looks to.)*
+**Shipped** both, cut by `npm run landingclips` from the rescore's films (1920 × 1080 at 30 fps,
+the plate's own frames, nothing added), so the Mac's GPU films each look once: the sources are
+named in `src/lib/landingMedia.ts` (`LANDING_HERO.films`, `LANDING_MUSIC.film`). The hero is
+pieces of the films cross-faded into one another and the end blended into the start as
+sitefilms blends a card's loop, in two shapes (1280 × 720, and the film's middle 9:16 at
+720 × 1280 for a phone held upright), WebM and MP4 each under 1.6 MB at the best quality the
+constant-quality ladder fits, no sound track. `LandingMotion.tsx`: the loop's first frame is
+the one eager picture (`npm run loadtime` 4 waits for it as it waited for the five stills),
+and the loop joins the page only once that still has arrived and the browser is idle; reduced
+motion and Save-Data keep the still, and a hidden tab pauses it. The music clip, twenty seconds
+of Scott Buckley's "Undertow" (CC BY 4.0, credited with links under it) played by
+Neon Coral Reef, is asked for only when it is half in view, plays muted, and "Sound on" (or a tap
+on it) is the visitor asking to hear it; the sign-in coming up mutes it. `npm run landinghero`
+holds the files, the loop's length and seam, the order of the requests, the credit, reduced
+motion, Save-Data and the phone.
+
+### 34a-3. Sharper looks in the grid (2026-11-21)
+
+*(S. The owner, 2026-11-21: the "Real looks from the app" grid re-rendered at full size, with
+the newer looks in it.)* **Shipped** twelve cards, the 480 × 300 frames cut from 28i-1's
+contact sheets replaced by `npm run landinglooks`: each look opened by its URL in a 13-inch
+laptop's window at 2x on the top rung, photographed after 1200 drawn frames (frames, not
+seconds, so a busy Mac does not photograph a younger plate), scaled to 960 × 600 (two pixels a
+CSS pixel for the widest card) and written as WebP under 60 KB. New among them: the chemical
+clock; polarised light (31p-1), a look between crossed polarisers set through the harness's
+settings hook as the Lamp & Light panel would, so the colours are the solver's strain through
+the real Michel-Levy shader; and a palette from a picture (43d), a sunset drawn in the page
+(nothing downloaded, nobody's photograph) handed to the desk's own picture input, shown on the
+card beside the still. The list is `LANDING_LOOKS` in `src/lib/landingMedia.ts`;
+`npm run landinghero` 1 holds the cards' size, bytes and that none repeats.
+
 ### 34a-8. The YouTube channel, linked from the landing page (2026-11-08)
 
 Asked: the owner, on 2026-11-08, the day six films went public on the channel: the homepage did
@@ -15610,6 +15647,18 @@ both ways): 27 gate, 11 owed.
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
 
+`forces.ts`'s `nominal` stays the 2 mm on purpose (the old plate's depth drag). Left open:
+the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
+Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
+`npm run sizes`, and `npm run quick`.
+
+## H2c-5 and H2c-8. First-order open-plate velocity and air only with bubbles (2026-11-14)
+
+Two Wave 4 / §46b frame-budget items cleared from `scripts/checks.json`'s `npm run encode` `--owed` list (`h2c5` and `h2c8` removed).
+
+**H2c-5.** On the open plate (`!thin`, `src/gpu/fluid.ts`), `advect velocity` ran a full MacCormack pair (forward carry, backward carry, error correction) on a field never drawn directly, while thin-gap transport was left untouched. Replacing it with a single first-order semi-Lagrangian `advect` keeps MacCormack on dye, `liquids0`, `liquids1`, and `chem`, while dropping two dispatches per open-plate step. Physically, first-order semi-Lagrangian transport introduces numerical momentum diffusion at grid scale, reducing small-scale shear contrast (`npm run physics`: divergence per unit speed `0.0006` → `0.0007`, vorticity confinement `|curl| 4.4 → 57.9` → `4.4 → 61.2`). Measured: `npm run encode` open plate `500` → `498` dispatches (`0` velocity MacCormack corrections, `1` velocity carry; `3` and `7` on dye, liquids, and grain); `npm run stages -- --grid 512 --set thinGap=0` in alternating pairs reduced `advect velocity` on layers 0 and 1 from `0.406 ms (3.0%)` / `0.431 ms (5.1%)` and `0.303 ms (3.2%)` / `0.288 ms (5.3%)` down to `0.019 ms (0.2%)` / `0.044 ms (0.8%)` and `0.025 ms (0.2%)` / `0.026 ms (0.5%)`; `npm run ab -- --preset poster-1969 --set "thinGap=0"` open-plate `edge%` stayed `1.5` → `1.3`; `npm run samelook` passed (`all checks passed`).
+
+**H2c-8.** Every layer previously constructed `WebGPUAir` (`rgba16float` pair, 4 MiB at 512²) on its first step and ran an `air splat` render pass every step, even on background layers that never saw a bubble; meanwhile `LiquidVisualizer` pushed `setBubbles` once per frame while `which` flipped every step, landing 100% of a multi-step frame's bubble rate in step 0. `WebGPUFluid` now allocates `WebGPUAir` only on the first bubble (`setBubbles` with `count > 0`) or plate boil (`stepPlateBoil`), skips `splat` once both ping-pong targets have been cleared after bubbles pop (`needsSplat` tracks a 2-step clear cycle), frees `WebGPUAir` and `airGive`/`airIn` targets after 60 quiet seconds (`dropAir`, resetting bind-group caches), binds `blank('rgba')` when `this.air === null`, removes per-call uniform/finger allocations in `WebGPUAir.setBubbles`, and packs/uploads the lead layer's stepped bubble list per `simStep` in `LiquidVisualizer.tsx` so multi-step frames spread bubble motion and growth evenly across steps. Measured: `npm run encode` bare plate dropped from `1` air pass and `2` air textures alive to `0` and `0` (control with 1 bubble: `1` a step, `4` alive); `npm run bubblephysics` (`24/24`) and `npm run pops` (`9/9`) unchanged to the printed digit.
 ## 46a. A faster opening (2026-11-14)
 
 Classic's opening waits for fewer pipelines before its first step without dropping anything a
@@ -15734,6 +15783,35 @@ creating a palette from it." It was 43d, "the cover sets the colours".
   within ΔE 0.5, the file saying its length was Infinity). `npm run phone`: the Dye
   sheet's button makes "From picture" the palette in the picture's four colours.
 
+### 43d-6. The playing plate takes the picture's colours (2026-11-21)
+
+`src/components/LiquidVisualizer.tsx` (`setHarmonyLock`, the handover), `src/sim/fluidSimulation.ts`
+(`seedPreset`), `src/app/usePaletteLock.ts`, `src/components/CastDisplay.tsx`,
+`src/lib/picturePalette.ts` (`PALETTE_RECOLOUR_SECONDS`), `src/lib/pinnedDyes.ts` (`seedDyes`, new),
+`src/components/paletteRecolour.ts` (`recolourHandoff`, `Handoff`, new), `scripts/pictureplate.mjs` (new).
+
+Reported 2026-11-21: setting a cover switched the harmony to the four picture dyes, but after
+a minute of play the plate still showed the look's colours, and new pours looked like the
+look's (magenta and violet on Classic).
+
+- **Why.** The pours did use the picture's dyes; the dye already laid stays on a lit plate
+  for minutes and a full plate gave the new pours no room. And `seedPreset` laid a look in
+  its own harmony whatever the lock said, so a look opened under a lock (a reload, Go, the
+  back plate) came up in the look's colours. Measured on Classic with The Starry Night as the
+  cover, the share of lit pixels whose hue is nearer a picture dye than a look dye: 0% before
+  the cover, 7.7% at 2 s, 7.4% at 15 s, 5.7% at 60 s, 5.1% at 90 s.
+- **What changed.** `seedPreset` takes the pinned dyes (all five calls pass the lock). A
+  palette chosen by hand (`selectPalette`, desk and phone alike, and a projector hearing a
+  new lock) runs a dye-only handover of `PALETTE_RECOLOUR_SECONDS` (8 s, the mood rule's
+  2 to 8): Go's thinning of the dye laid and a re-seed in the new dyes, without Go's
+  chemistry, liquids, heat or pours. The re-assert on mount passes no seconds, so a reload
+  does not wash the plate. A Go already running re-takes its seed in the new dyes.
+- **Measured.** Probe: 54.6% at 2 s, 100% at 15, 30 and 60 s, 99.6% at 90 s. `npm run
+  pictureplate` (new, 10 lines, laptop and phone): on the code before, 0.0% and 0.3% at
+  20 s and 0.0% at 45 s, red; with the fix 100% at both, the plate still lit (74% against
+  72% before).
+- **Left.** The thinning is a shortcut (43d-7, a real rinse); a pale palette dims the plate
+  over a minute (43d-8).
 
 ## 38v-1. The music's hands are cords (2026-11-21)
 

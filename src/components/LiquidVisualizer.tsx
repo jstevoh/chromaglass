@@ -83,9 +83,10 @@ import { dropBottle, layStream } from '../sim/dropSplash';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
-import { stepPlateBubbles } from '../sim/speciesPoll';
+import { stepPlateBubbles, syncBubblesGpu } from '../sim/speciesPoll';
 import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../sim/noteVoicesStep';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
+import { recolourHandoff, type Handoff } from './paletteRecolour';
 
 interface LiquidVisualizerProps {
   /** The sound as a prop; the app's own plates are handed null (46f). */
@@ -791,18 +792,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const selfHealsRef = useRef<number[]>([]);
   /** Whether the loss just handled kept the plate, so the recovery does not lay the look over it (S1). */
   const plateKeptRef = useRef(false);
-  /*
-    A look handing over to the next (a pressed Go or Back).
-
-    `adoptPreset` changes the palette at once but leaves the plate alone, and
-    at the default evaporation the old dye's half-life is minutes — so after
-    a two-second fade the settings were the new look's and the colours were
-    still the old one's, with the new palette's drops landing in them: for a
-    long while the wall read as neither look. Over the fade now, the old dye
-    thins to a little under half and six pours of the new palette arrive
-    through the second half, so the colours change hands with the settings.
-  */
-  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null; plates?: number; phase?: LookPhase } | null>(null);
+  /** A look handing over to the next, or a recolour (paletteRecolour.ts says why). */
+  const handoffRef = useRef<Handoff | null>(null);
   /**
    * The largest grid this GPU has shown it can hold, learned the hard way.
    * A rebuild makes a new governor, which starts at the ladder's usual rung;
@@ -1402,7 +1393,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     journeyRef.current = { lead: 0, lastAt: -1 };
     const fluid = fluidsRef.current[0];
     if (fluid) {
-      const seeded = fluid.seedPreset(presetId, noise2D);
+      // In the pinned palette's dyes when there is one (43d-6, FluidSimulation.seedPreset).
+      const seeded = fluid.seedPreset(presetId, noise2D, harmonyLockRef.current);
       const contract = presetContractRef.current;
       harmonyRef.current = harmonyLockRef.current ?? (contract && paletteWindowRef.current.size !== null ? harmonyFromContract(contract, false) : seeded);
     }
@@ -1450,8 +1442,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const own = backDyesRef.current;
       if (own) {
         backHandoffRef.current = null;
-        const seeded = later.seedPreset(own.id, noise2D);
-        if (!own.contract && seeded.length > 0) own.harmony = seeded;
+        const seeded = later.seedPreset(own.id, noise2D, harmonyLockRef.current);
+        if (!own.contract && !harmonyLockRef.current && seeded.length > 0) own.harmony = seeded;
         const ownAreas = plateAreas(own.id);
         if (ownAreas) layAreaLiquids(later, 1, ownAreas, 6);
         else for (let i = 0; i < 15; i++) doseLiquid(later, own.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
@@ -1925,9 +1917,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     fireEnvelopes: (velocity = 1, source) => modRef.current.strike(velocity, source),
     noteVoice: (e, target) => handleNoteVoiceEvent(noteVoicesRef.current, voiceDropsRef.current, e, target, melodyLineRef.current, showNow() * 0.001),
     filmVideoEl: () => (filmRef.current.kind === 'none' ? null : filmRef.current.video),
-    setHarmonyLock: (indices: number[] | null) => {
+    setHarmonyLock: (indices: number[] | null, recolourSeconds = 0) => {
       harmonyLockRef.current = indices;
       if (indices) harmonyRef.current = indices;
+      handoffRef.current = recolourHandoff(handoffRef.current, showNow(), recolourSeconds);
     },
     evolvePalette: () => {
       if (harmonyLockRef.current || (settingsRef.current.hueJourney ?? 0) > 0) return;
@@ -2101,7 +2094,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fluid.layerIndex = i;
         if (i === 0) {
           // Seed initial preset pattern
-          harmonyRef.current = fluid.seedPreset('classic', noise2D);
+          harmonyRef.current = fluid.seedPreset('classic', noise2D, harmonyLockRef.current);
           presetContractRef.current = PRESET_CONTRACTS['classic'];
           for (let d = 0; d < 15; d++) {
             doseLiquid(fluid, plateLiquidsRef.current,
@@ -3744,19 +3737,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 new look is all but HANDOFF_KEEP of the plate.
               */
               if (!h.seeds) {
-                for (const fluid of handed) { fluid.clearChemistry(); fluid.liquid.clear(); }
-                fluidsRef.current[0]?.gpu?.clearChemistry?.();
+                if (!h.dyeOnly && h.dosed === 0) {
+                  for (const fluid of handed) { fluid.clearChemistry(); fluid.liquid.clear(); }
+                  fluidsRef.current[0]?.gpu?.clearChemistry?.();
+                }
                 h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
                   if (i === 0) {
                     let seeded: number[] = [];
-                    const seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(id, noise2D); });
+                    const seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(id, noise2D, harmonyLockRef.current); });
                     if (!harmonyLockRef.current && !presetContractRef.current) harmonyRef.current = seeded;
                     return seed;
                   }
                   return null;
                 });
-                h.dosed = 1;
+                h.dosed = Math.max(h.dosed, 1);
               }
               const share = Math.min(1, lambda * dtMs / h.dur);
               h.seeds.forEach((seed, i) => { if (seed && i < handed.length) fluidsRef.current[i]?.addSeedShare(seed, share); });
@@ -3797,6 +3792,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const color = harmonyColor(harmonyRef.current);
                 const styles = injectStyleRef.current;
                 fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+                if (h.dyeOnly) continue;
                 fluid.addTemp(rx, ry, 1.2);
                 doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 0.8);
               }
@@ -3831,8 +3827,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   fluid.clearChemistry();
                   fluid.liquid.clear();
                   let seeded: number[] = [];
-                  h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D); });
-                  if (!dyes.contract && seeded.length > 0) dyes.harmony = seeded;
+                  h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D, harmonyLockRef.current); });
+                  if (!dyes.contract && !harmonyLockRef.current && seeded.length > 0) dyes.harmony = seeded;
                   const backAreas = plateAreas(dyes.id);
                   if (backAreas) layAreaLiquids(fluid, 1, backAreas, 2);
                   else for (let i = 0; i < 4; i++) {
@@ -4182,6 +4178,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // across the plate ahead of the dye it is meant to be thinning.
             const adv = currentSettings.advection ?? 0.45;
             for (const fluid of fluidsRef.current) fluid.stepLiquid(simStepS, fluid.dt * adv * (GRID_SIZE - 2));
+            syncBubblesGpu(fluidsRef.current[0], bubblesRef.current);
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {
@@ -5468,6 +5465,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         aimProbe: { ...aimProbeRef.current },
         gridSize: GRID_SIZE,
         harmony: harmonyRef.current,
+        paletteRgb: () => PALETTE_RGB.map(({ r, g, b }) => [r, g, b]),
         contract: presetContractRef.current,
         paletteWindow: paletteWindowRef.current,
         journey: journeyRef.current,
@@ -6301,19 +6299,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
           /*
             The same list the compositor is given, handed to the solver too
-            (H6 · A). Once a frame rather than once a step: the positions
-            come from `bubbles.ts`, which moves at the frame's pace, and
-            stamping them again on each of the step's iterations would pay
-            for the splat several times over for one picture.
+            (H6 · A). Active frames sync per step in the loop above
+            (`syncBubblesGpu`, H2c-8) so multi-step frames spread bubble rate
+            across steps; frozen/draining frames sync here.
           */
           {
-            // The lead plate only: bubbles sit on the front of the dish, the
-            // same plate `disturb` works on above. Giving the list to every
-            // layer would cut the same holes through the background loop.
+            // The lead plate only: bubbles sit on the front of the dish, so background layers stay empty.
             const lead = fluidsRef.current[0];
             if (lead?.gpu instanceof WebGPUFluid) {
               const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
-              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25, bubblesRef.current.packedFinger);
+              if (!isActiveRef.current || drainFrameRef.current !== 0) syncBubblesGpu(lead, bubblesRef.current);
               /*
                 And the dye those bubbles displace, put back as a ring
                 (H6 · A). Before the hand-off in reading order but after it in

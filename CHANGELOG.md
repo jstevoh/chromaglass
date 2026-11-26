@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a picture palette recolours the plate (PLAN 43d-6)
+
+- **Palette from a picture or video** now changes the colours on the plate, not only the dyes
+  still to come: the plate takes the picture's colours over eight seconds, as does any palette
+  picked by hand. A look opened while a palette is locked is laid in that palette's dyes.
 ### Added — Dish Stress: moulded dishes between the polarisers (PLAN 31p-3)
 
 - **Dish Stress** (under Polarisers in Settings → Lamp & Light, MIDI, the desks and the

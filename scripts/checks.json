@@ -1517,7 +1517,7 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2,h2c5,h2c8",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
@@ -2441,6 +2441,24 @@
         "pointer plays a card's loop and leaving stops it, a click opens its",
         "whole film from the channel with the credit under it, a phone plays the",
         "card in view and a tap opens it, and reduced motion keeps the stills.",
+        "No GPU."
+      ]
+    },
+    {
+      "name": "The webpage's moving hero and music clip",
+      "shard": "browser",
+      "run": "npm run landinghero",
+      "why": [
+        "The webpage's hero loop, looks grid and music clip (scripts/landinghero.mjs,",
+        "PLAN.md 34a-2 and 34a-3): each loop is silent and small with a poster at its",
+        "size, moving and lit, its seam within 2.5 times the frame steps beside it plus a",
+        "codec floor; every look card is a full-size still of a shipped look, not flat and",
+        "unlike the others even mirrored, the picture card nearer its picture's colours than",
+        "the grid's median card; a phone's looks row scrolls sideways in a page that does",
+        "not; the loop is asked for only",
+        "after the poster arrives, never under reduced motion or saving data, and a phone",
+        "gets the tall one; the music clip asks for nothing until scrolled to, plays muted,",
+        "unmutes on a tap, goes quiet under the sign-in and credits its CC BY track.",
         "No GPU."
       ]
     },
@@ -3988,6 +4006,17 @@
         "for none of the ear's ten a second (scripts/renders.mjs, PLAN.md §14f,",
         "46f): the line the",
         "Measure job skips, because there no plate draws. About forty seconds."
+      ]
+    },
+    {
+      "name": "A picture palette recolours the plate",
+      "shard": "fifth",
+      "run": "node scripts/pictureplate.mjs",
+      "why": [
+        "A cover set as the palette recolours the plate that is playing (scripts/pictureplate.mjs,",
+        "PLAN.md 43d-6): the harmony used to switch while the plate kept the look's colours for",
+        "minutes. Reads the plate back on the laptop and the phone and classes its lit pixels by",
+        "hue against the look's dyes and the cover's. About two minutes."
       ]
     },
     {

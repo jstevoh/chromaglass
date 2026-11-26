@@ -20,12 +20,11 @@ import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH 
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
-import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
+import { plateLook } from '../presetPlate';
 import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
-import { PALETTE_RGB, pickHarmony } from '../constants';
 import { THIN_GAP_THICKNESS, thinGapViscosity, NU_REF } from '../gpu/fluid';
 import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, SloshSpin, type SloshPress } from '../lib/slosh';
 import { OPEN_RIM, dyeDensityContrast, layerSpinDrag } from '../lib/turntable';
@@ -34,6 +33,7 @@ import { stirOf } from '../lib/stir';
 import { frameSway, rockStep } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { pourPictureCpu } from '../lib/videoFlow';
+import { seedDyes } from '../lib/pinnedDyes';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
@@ -57,6 +57,7 @@ import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
 const c01 = (v: number | undefined) => Math.max(0, Math.min(1, v ?? 0));
+type Noise2D = (x: number, y: number) => number;
 
 export class FluidSimulation {
   size: number;
@@ -612,7 +613,7 @@ export class FluidSimulation {
     gpu.clear();
     this.carried = !!this.carry && !!gpu.takeOver?.(this.carry);
     this.wait.play(gpu);
-    this.owed.take(!this.carried, (l, n) => this.layLook(l, n));
+    this.owed.take(!this.carried, (l, n, d) => this.layLook(l, n, d));
     // Its readings count from nothing again, and whatever was pending went with the last solver.
     this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
@@ -1336,7 +1337,7 @@ export class FluidSimulation {
    * there. A seed only adds to the four dye arrays (the state on the CPU
    * path, the deltas pending on the GPU), so what it added scales either way.
    */
-  seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
+  seedPresetScaled(presetId: string, noise2D: Noise2D, w: number): number[] {
     const k = c01(w);
     const before = this.dye().map(a => a.slice());
     const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
@@ -1345,18 +1346,17 @@ export class FluidSimulation {
     return harmony;
   }
 
-  seedPreset(look: string, noise2D: (x: number, y: number) => number): number[] {
-    return this.owed.lay(!this.gpu && this.seeds.plain(), look, noise2D, () => this.layLook(look, noise2D));
+  seedPreset(look: string, noise2D: Noise2D, dyes: readonly number[] | null = null): number[] {
+    return this.owed.lay(!this.gpu && this.seeds.plain(), look, noise2D, () => this.layLook(look, noise2D, dyes), dyes);
   }
 
-  private layLook(look: string, noise2D: (x: number, y: number) => number): number[] {
+  private layLook(look: string, noise2D: Noise2D, dyes: readonly number[] | null = null): number[] {
     const presetId = plateLook(look);
     const S = this.size;
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
 
-    const harmony = PRESET_CONTRACTS[look] || pickHarmony();
-    const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
+    const { harmony, col, named } = seedDyes(look, dyes);
 
     const dishSum = () => dishMean(this.density, S, this.dishArea);
     const beforeMean = dishSum();
@@ -1406,8 +1406,8 @@ export class FluidSimulation {
     switch (presetId) {
       case 'galaxy': {
         // Gold core (28i-7) + two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
-        this.splatBlob(cx, cy, 4.2, 3.8, 1.0, 0.8, 0.45);
-        this.splatBlob(cx, cy, 8.5, 1.8, 0.5, 0.25, 0.85);
+        this.splatBlob(cx, cy, 4.2, 3.8, ...named(1.0, 0.8, 0.45, 0));
+        this.splatBlob(cx, cy, 8.5, 1.8, ...named(0.5, 0.25, 0.85, 1));
         // Two logarithmic spiral arms
         for (let arm = 0; arm < 2; arm++) {
           const offset = arm * Math.PI;
@@ -1538,8 +1538,8 @@ export class FluidSimulation {
       }
 
       case 'solar-flare': {
-        this.splatBlob(cx, cy, 8, 6.0, 1.0, 0.95, 0.8);
-        this.splatBlob(cx, cy, 15, 3.0, 1.0, 0.5, 0.0);
+        this.splatBlob(cx, cy, 8, 6.0, ...named(1.0, 0.95, 0.8, 0));
+        this.splatBlob(cx, cy, 15, 3.0, ...named(1.0, 0.5, 0.0, 1));
         for (let f = 0; f < 8; f++) {
           const a = f * Math.PI * 2 / 8 + this.rng.centred() * 0.4;
           const c = col(f);
@@ -2560,7 +2560,7 @@ export class FluidSimulation {
     }
   }
 
-  step(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number) {
+  step(settings: VisualizerSettings, time: number, noise2D: Noise2D) {
     this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
@@ -2803,7 +2803,7 @@ export class FluidSimulation {
   /** This layer's spin drag (38v-4): ν, gap (m), τ = h²/12ν. */
   spinDrag(settings: VisualizerSettings) { return layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS); }
 
-  private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
+  private deriveStep(settings: VisualizerSettings, time: number, noise2D: Noise2D): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
 
@@ -3387,7 +3387,7 @@ export class FluidSimulation {
     }
   }
 
-  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: (x: number, y: number) => number) {
+  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: Noise2D) {
     if (scale <= 0.005) return;
     const step = 2;
     const eps = 0.75;
