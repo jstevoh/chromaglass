@@ -108,3 +108,11 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   If it is seen again with no Blow in play (bubbles from the music, 15e), look first at
   the bead and rim drawing in the open bubble-outline work (38h-15, 38h-17) and at
   `depositBubbleRims`.
+- ~~**15g-17**~~ The pointer shoved bubbles and beads, and a pop pushed and swirled the
+  liquid. Shipped (2026-11-21): a pocket and a bead move only with the liquid round them,
+  liquid laid over a pocket takes it, and a pop is the gap reopening, a curl-free sink
+  (`npm run bubblephysics`). Story in `docs/plan-shipped.md` §15g-17.
+
+- ~~**15g-18**~~ A press twisted the liquid it squeezed (the local press only; the remote
+  press had none). Shipped (2026-11-21): a press is its squeeze and squeeze-out on both
+  paths and turns nothing (`npm run tools`). Story in `docs/plan-shipped.md` §15g-18.

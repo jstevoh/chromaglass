@@ -24,8 +24,9 @@
  *
  * A knob on a controller is the second: a hand on the projector's glass,
  * nudging it one way and back while the plate stays flat. So the two knobs
- * are that tilt, in the phone's units (−1 to 1 on each axis, full being the
- * phone's full tip), added to the phone's and held within the phone's own reach (`tipPlate`).
+ * are that tilt, in the phone's units (1 being the phone's full tip on an
+ * axis), added to the phone's (`tipPlate`). A full turn reaches past the
+ * phone's, to Plate Rock's strong swing (`KNOB_ROCK`, `knobTip`, PLAN 18a-13n).
  * Nothing new in the solver, which is the rule: the knob moves the plate the
  * way a hand on it would, and the physics does the rest.
  *
@@ -75,11 +76,58 @@ export const TILT_DEAD = 0.04;
  */
 export const TILT_FOLLOW = 12;
 
-/** A knob's reading as a tip, −1..1, with the middle level (TILT_DEAD). */
+/**
+ * How far a full knob tips the plate, as the rock it hands the solver: 2,
+ * the swing of Plate Rock's strong kick at the top of its dial (a lean of
+ * ROCK_LEAN 0.55 × the dial's 3, and the sway on it, lib/plateRock.ts).
+ *
+ * What was asked (PLAN 18a-13n; the owner, 2026-11-26, "Keep going" on the
+ * knobs): the knobs shipped (18a-13m) reaching only the remote phone's full
+ * tip, rock 1.1, sinθ about 0.27 with the hold beside it, while Plate Rock
+ * at the top of its dial tips it further than that on every strong beat. Two knobs on a controller
+ * are the hand that should reach furthest, not least. A phone held flat on
+ * a table is tipped by a wrist through its whole range at about fifteen
+ * degrees; the projectionist's hand on the clock glass can lift one side
+ * as far as the liquid stays between the glasses, which is where Plate
+ * Rock's strong kick already takes it on a show.
+ *
+ * Same law, further along it: the thin gap's Darcy slide g·sinθ·Δρ·h²/12μ
+ * (hsBody, ROCK_FALL) is linear in sinθ, so a full knob slides a pool of
+ * heavy dye 2/1.1 as fast as the phone's full tip, and the oil lifts and the
+ * cover glass slides in step (to the rim's room, COVER_ROOM, where it stops
+ * as it always has). The plate's sinθ at a full knob is 0.48 (plateSin, the
+ * rock × CUR_ROCK and the hold × 10), Plate Rock's own at that swing, about
+ * 29 degrees: steep for a dish, which is what the top of a knob is for
+ * (every dial gentle to extreme, PLAN 27h), and no further than the solver
+ * already takes from the music every strong beat.
+ */
+export const KNOB_ROCK = 2;
+/** The phone's rock for its full tip on an axis (× 1.1 since PLAN 27a), which `tipPlate` multiplies every hand's tip by. */
+export const PHONE_ROCK = 1.1;
+/** A full knob's tip, in the phone's units: the reach that makes its rock KNOB_ROCK. */
+export const KNOB_REACH = KNOB_ROCK / PHONE_ROCK;
+
+/**
+ * A knob's reading (−1..1) as a tip in the phone's units, with the middle
+ * level (TILT_DEAD) and the ends at ±KNOB_REACH.
+ *
+ * Bent, not stretched. Stretching the travel straight to 1.82 would make
+ * every CC step near the middle 1.82 times as big, and the middle is where
+ * a performer lays a slow drain across a song: a tip of 0.02 already slides
+ * heavy dye a few cells a minute. So the tip is u(1 + (R − 1)u) over the
+ * travel u past the dead band: its slope at level is 1, the same fine steps
+ * the knob had (and the phone has), and it bends up to R at the end. Half
+ * way from its middle to its end the knob is two thirds of the phone's full
+ * tip, at 0.65 of the way it is the phone's full tip, and the rest is past it. Monotone all the way
+ * (its slope 1 + 2(R − 1)u never goes below 1), so no step of the knob
+ * tips the plate back.
+ */
 export function knobTip(v: number | undefined): number {
   const x = Number.isFinite(v) ? Math.max(-1, Math.min(1, v as number)) : 0;
   const a = Math.abs(x);
-  return a <= TILT_DEAD ? 0 : Math.sign(x) * (a - TILT_DEAD) / (1 - TILT_DEAD);
+  if (a <= TILT_DEAD) return 0;
+  const u = (a - TILT_DEAD) / (1 - TILT_DEAD);
+  return Math.sign(x) * u * (1 + (KNOB_REACH - 1) * u);
 }
 
 /**
@@ -131,24 +179,34 @@ export interface TippedPlate {
  * slosh's held tilt are what the frame loop gave each plate before; each
  * layer turns on its own (Rotation is per layer), so each is turned apart.
  *
- * Limited by length, not axis by axis. The phone is clamped to ±1 on each
- * axis (`setExternalTilt`), so at most √2 corner to corner; the knobs' share
- * is the same square turned. Clamping each dish axis after the turn would
- * cut a corner tip by up to 29% four times a turn on a spinning dish, and
- * swing its direction by six degrees, so right would stop being the
- * screen's right; a limit on the length is the same at every angle. With
- * the knobs at 0 nothing here reaches the limit, so the phone's tip is what
- * it was.
+ * Limited by length, not axis by axis. The knobs reach ±KNOB_REACH on
+ * each axis, so at most KNOB_REACH·√2 corner to corner, and the phone and
+ * the knobs together are held to that, the knobs' own corner (the phone
+ * alone, clamped to ±1 an axis by `setExternalTilt`, is √2 at most and
+ * never meets it). Clamping each dish axis after the turn would cut a
+ * corner tip by up to 29% four times a turn on a spinning dish, and swing
+ * its direction by six degrees, so right would stop being the screen's
+ * right; a limit on the length is the same at every angle. With the knobs
+ * at 0 nothing here reaches the limit, so the phone's tip is what it was.
+ *
+ * The slosh's held tilt (`extTiltX`, lib/slosh.ts sloshAccel) stays within
+ * the phone's reach, √2: the dish's slop is a named shortcut that holds its
+ * Courant limit only up to the Slosh dial's own lean, a unit an axis
+ * (sloshAccel clamps there), so past the phone's tip the dish slops no
+ * further and the thin gap's slide, the oil and the cover take the rest.
+ * Scaled by length for the same reason as above.
  */
+const KNOB_CORNER = KNOB_REACH * Math.SQRT2;
 export function tipPlate(p: TippedPlate, h: Float64Array, swingX: number, swingY: number): void {
   const a = p.plateAngle;
   const c = Number.isFinite(a) ? Math.cos(a) : 1, s = Number.isFinite(a) ? Math.sin(a) : 0;
   let x = h[PHONE_X] + h[0] * c + h[2] * s, y = h[PHONE_Y] - h[0] * s + h[2] * c;
-  const l = Math.hypot(x, y);
-  if (l > Math.SQRT2) { x *= Math.SQRT2 / l; y *= Math.SQRT2 / l; }
+  let l = Math.hypot(x, y);
+  if (l > KNOB_CORNER) { x *= KNOB_CORNER / l; y *= KNOB_CORNER / l; l = KNOB_CORNER; }
   p.tiltX = swingX * HOLD_TILT + x * 0.0045; p.tiltY = swingY * HOLD_TILT + y * 0.0045;
-  p.rockX = swingX + x * 1.1; p.rockY = swingY + y * 1.1;
-  p.extTiltX = x; p.extTiltY = y;
+  p.rockX = swingX + x * PHONE_ROCK; p.rockY = swingY + y * PHONE_ROCK;
+  const e = l > Math.SQRT2 ? Math.SQRT2 / l : 1;
+  p.extTiltX = x * e; p.extTiltY = y * e;
 }
 
 /** Back to level at once (a new show, a look loaded cold): the knobs' ease forgets where it was. */

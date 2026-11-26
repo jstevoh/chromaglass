@@ -176,7 +176,7 @@ export class WebGPUOutput {
     // Waited for, though a show with nothing set never builds it: a projector's
     // mask and pins are the room's, not the look's, so nothing says whether
     // the show opening has them, and a real show opens on a projector.
-    return [PipelineCache.for(device, 'output').renderPrep(`output ${format}`, outputRecipe(device, format))];
+    return [PipelineCache.for(device, 'output').renderPrep(`output ${format}`, outputRecipe(device, format), true)];
   }
 
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {

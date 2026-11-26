@@ -226,10 +226,11 @@
       "why": [
         "PLAN 18a-13m (scripts/handtilt.mjs, lib/handTilt.ts): the owner asked to tilt",
         "the plate from two MIDI knobs. A knob at its middle (CC 62-66) is level and its",
-        "ends the phone's full tip; a throw end to end is eased (under 0.02 in its first",
+        "ends past the phone's full tip at Plate Rock's strong swing, rock 2 (18a-13n), as finely",
+        "stepped near level as before; a throw end to end is eased (under 0.02 in its first",
         "sixtieth, past 0.9 by 0.4 s, never past the knob) and the same at 30, 60 and 120",
         "steps a second; turned into each dish as downhill() turns Tilt Direction, as far at",
-        "every angle; within the phone's reach; the old frame loop's exactly at 0; and",
+        "every angle; within the knobs' corner, the slosh within the phone's; the old frame loop's exactly at 0; and",
         "learnable over -1..1 in Tilt & Rock, out of sound mapping, the patch bay and Evolve."
       ]
     },
@@ -849,7 +850,7 @@
     {
       "name": "Hear the set ahead, from files, owed",
       "shard": "logic",
-      "run": "npm run hearahead -- --owed=files,sections,ahead,loudness,clock,tags",
+      "run": "npm run hearahead",
       "why": [
         "Written before the build (scripts/hearahead.mjs, PLAN §17, 2026-11-08): a",
         "made-up 126 BPM record analysed ahead by the render's own ear, its beat grid",
@@ -2859,7 +2860,7 @@
     {
       "name": "The opening waits for fewer pipelines, owed",
       "shard": "browser2",
-      "run": "node scripts/openingtime.mjs --bar --runs 1 --owed=count",
+      "run": "node scripts/openingtime.mjs --bar --runs 1",
       "env": {
         "PW_WEBGPU": "1"
       },

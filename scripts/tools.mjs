@@ -51,14 +51,8 @@ console.log(`  preview answering after ${(await untilServing(PORT, { child: serv
 
 // `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
 const browser = await launchChromium(chromium, { present: true });
-/*
-  Set once the page exists, and run in the `finally` below: `page` itself is
-  scoped to the `try`, so the restore cannot reach it from there.
-*/
-let restoreSeeding = async () => {};
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  restoreSeeding = () => page.evaluate(() => window.chromaglassDebug?.().ambientSeed?.(true)).catch(() => {});
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
@@ -87,7 +81,7 @@ try {
   const snap = (keep) => page.evaluate((keep) => {
     const d = window.chromaglassDebug();
     const f = d.fluids?.[0];
-    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity), step: f.stepIndex ?? -1, dt: f.dtSeconds ?? 0 };
+    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity), step: f.stepIndex ?? -1, dt: f.dtSeconds ?? 0, rb: f.readbacks ?? -1 };
     return d.pointer();
   }, keep);
   /**
@@ -334,6 +328,32 @@ try {
       : !pooled ? `no pool under the pointer to hover over (${i1.disc.toFixed(1)})`
         : `dye under the pointer ${i1.disc.toFixed(0)} → ${hv.disc.toFixed(0)} hovering over ${span(2, 3)} steps; left alone before ${iA.disc.toFixed(0)} → ${i0.disc.toFixed(0)} → ${i1.disc.toFixed(0)} over ${span(0, 1)} and ${span(1, 2)} steps (${(Math.abs(i0.disc - iA.disc) / Math.max(1, span(0, 1))).toFixed(3)} and ${(Math.abs(i1.disc - i0.disc) / Math.max(1, span(1, 2))).toFixed(3)} a step), ${idleMove.toFixed(1)} at the faster rate over the hover's steps; after, ${hv.disc.toFixed(0)} → ${i2.disc.toFixed(0)} over ${span(3, 4)}`);
 
+  /*
+    The plate left alone gains no colour (PLAN.md 18c-14). The app used to
+    seed itself: three points orbiting a quarter to a third of the plate out
+    laid dye and heat every frame, whatever the performer did, so a plate
+    nobody touched grew colour (+26 then +18 over two idle windows on a
+    plate reading 64, the Finger's section below found). A liquid on a glass
+    plate gains no dye unless someone adds it: it spreads and it mixes, and
+    that is all. So over the four seconds before the
+    hover, a pooled plate with every hand off and the music silent may keep
+    its colour or lose some, and gain at most 1% (the readback's own noise
+    on a settled pool is well under that). Whole plate, not the disc: the
+    orbits laid their dye a quarter of the plate out, far from the pool.
+    Judged only when the plate stepped through both windows and has a pool,
+    so a plate that never ran cannot pass it as "flat", and only when dye
+    readbacks landed in both windows: the mirror it reads is refreshed by the
+    async readback alone, and a stalled one reads flat whatever the plate did.
+  */
+  const rbAt = await page.evaluate(() => ['idleA', 'idle0', 'idle1'].map(k => window.__toolSnaps[k].rb));
+  const rbOk = rbAt[1] > rbAt[0] && rbAt[2] > rbAt[1];
+  check('a plate left alone gains no colour',
+    stepsOk && rbOk && pooled && i1.total <= 1.01 * iA.total,
+    !stepsOk ? `the plate did not step through every window (steps ${stepsAt.join(', ')})`
+      : !rbOk ? `no dye readback landed in a window (readbacks ${rbAt.join(', ')})`
+      : !pooled ? `no pool on the plate to watch (${i1.disc.toFixed(1)})`
+        : `the plate's colour ${iA.total.toFixed(0)} → ${i0.total.toFixed(0)} → ${i1.total.toFixed(0)} over ${span(0, 2)} steps with nothing touching it (${((i1.total / Math.max(1e-6, iA.total) - 1) * 100).toFixed(1)}%)`);
+
   // ── The pouring tools ───────────────────────────────────────────
   const laid = {};
   const plateSaid = (w) => w ? `held ${w.steps} of ${w.want} steps (a step ${(1000 * w.dt).toFixed(1)} ms of plate) in ${(w.ms / 1000).toFixed(1)} s` : 'held by the wall clock (no stepIndex)';
@@ -401,24 +421,21 @@ try {
 
   // ── Finger ──────────────────────────────────────────────────────
   /*
-    No ambient seeding, as through the Blow and the Press (PLAN.md §0).
-
-    This is what made `adds none` fail on commits that never touched the
-    Finger, and it is measured, not argued: with the seeder on and *nothing
-    dropped at all*, the plate reads 64 and gains +26 then +18 over the two
-    idle windows. So "the plate left alone" was the seeder's rate, not the
-    pool's behaviour — which is why the idle reading sat at +31 to +36
-    whether the pool was 66 or 728, an eleven-fold range, and why the bracket
-    built from it had to be wide enough to accept a Finger that doubled a
-    thin pool. With the seeder off the windows measure the pool.
+    Nothing lays dye but the hand. The plate used to seed itself: three
+    points orbiting a quarter to a third of the plate out laid dye and heat
+    every frame, whatever the performer did (PLAN.md 18c-14, removed). This
+    section switched that off through a debug hook, because it is what made
+    `adds none` fail on commits that never touched the Finger: with the
+    seeder on and *nothing dropped at all*, the plate read 64 and gained +26
+    then +18 over the two idle windows, so "the plate left alone" was the
+    seeder's rate, not the pool's behaviour. The hook is gone with the
+    seeder, and the idle windows measure the pool as they did with it off.
 
     The 2026-09-27 finding this item carried — the Finger adding +11 to +21
-    on pools under 150 across 40 shards — was read through those same seeded
+    on pools under 150 across 40 shards — was read through those seeded
     windows, so it is withdrawn rather than confirmed: at that size the
-    seeder alone lays about as much as the Drop does.
+    seeder alone laid about as much as the Drop does.
   */
-  const fSeedOff = await page.evaluate(() => typeof window.chromaglassDebug().ambientSeed === 'function' && (window.chromaglassDebug().ambientSeed(false), true));
-  if (!fSeedOff) throw new Error('chromaglassDebug().ambientSeed is missing: the Finger check cannot stop the ambient seeding');
   await clear();
   await pool(A);
   // Past the pool's own settling, so the plate left alone and the plate
@@ -642,11 +659,6 @@ try {
     }
     console.log(`  finger trials: worst ${worst.toFixed(2)} outside the bracket, ${(worstShare * 100).toFixed(2)}% of its pool\n`);
   }
-  /*
-    The seeder back on for everything after the Finger, as the Blow and the
-    Press put it back after theirs.
-  */
-  await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true)).catch((e) => console.log(`     [seeding not put back] ${e.message}`));
 
   // ── Blow, moved ─────────────────────────────────────────────────
   /*
@@ -680,22 +692,16 @@ try {
   */
   {
     /*
-      No ambient seeding through the Blow, as through the Press below (see
-      there): three points orbiting a quarter to a third of the plate out lay
-      dye every frame, and on a cleared plate that is the only colour beyond
-      the pool. It moves the pool's middle whichever way the orbits happen to
-      be at, so "left alone" was the seeder's drift, not the plate's, and it
-      changed from run to run while the wind's push did not: the same wind
-      moved the middle +0.87% toward B on two runs of #249 an hour apart,
-      against +0.45% to beat on the first and +1.00% on the second (+0.38%
-      and +0.73% left alone after; the pool grew 6 and 7 in each 2.5 s
-      window with nothing touching it). Asked for outright, as the Press
-      does, and put back after, the checks after this one playing the
-      plate as the show does.
+      Nothing seeds the plate through the Blow (PLAN.md 18c-14). When the
+      app laid dye at three orbiting points every frame, on a cleared plate
+      that was the only colour beyond the pool, and it moved the pool's
+      middle whichever way the orbits happened to be: the same wind moved
+      the middle +0.87% toward B on two runs of #249 an hour apart, against
+      +0.45% to beat on the first and +1.00% on the second (the pool grew 6
+      and 7 in each 2.5 s window with nothing touching it). This section
+      switched the seeder off through a debug hook; seeder and hook are gone.
     */
-    const seedOff = await page.evaluate(() => typeof window.chromaglassDebug().ambientSeed === 'function' && (window.chromaglassDebug().ambientSeed(false), true));
-    if (!seedOff) throw new Error('chromaglassDebug().ambientSeed is missing: the Blow check cannot stop the ambient seeding');
-    try {
+    {
       const idleWindow = async (ms) => {
         const p = await snap('wIdle0'); await settle(ms); await snap('wIdle1');
         const a = await measure('wIdle0', p), b = await measure('wIdle1', p);
@@ -937,9 +943,6 @@ try {
       // (272 plate steps on the owner's Mac, 83 to 144 on GitHub's, 19aj-1),
       // and it only ever flaked. Printed, not judged.
       console.log(`     Blow kept: ${kf.says}; the other way ${kb.says} (printed, not judged)`);
-    } finally {
-      // Caught, so a page already dead says why it died, not that this failed.
-      await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true)).catch((e) => console.log(`     [seeding not put back] ${e.message}`));
     }
   }
 
@@ -1167,18 +1170,16 @@ try {
       (#225; the mirror check's thread found the band there, #238). Bubbles
       at 0 clears the look's and stops the kicks laying more. Put back after.
 
-      And no ambient seeding (`chromaglassDebug().ambientSeed`). On the calm
-      plate with no bubbles the pool still drifted out 0.0043 a second (run
-      37166234101), the same as on Classic as it plays and the same settled
-      1.5, 8 or 12 seconds: not a drop still spreading, which would slow as
-      it aged, but a source that never stops. Every look lays dye at three
-      points orbiting a quarter to a third of the plate out from its middle,
-      0.05 a frame each; on a cleared plate that is the only colour beyond
-      the pool, and it grows. The plate's colour grew 6% in the three
-      seconds nothing touched it, a quarter of it lay beyond 0.05 of the
-      palm before the hand came down, and every bit that arrived out there
-      added to the mean distance. The share beyond 0.2
-      of the palm is printed so the next run shows what is left out there.
+      And no seeding. On the calm plate with no bubbles the pool used to
+      drift out 0.0043 a second (run 37166234101), the same settled 1.5, 8 or
+      12 seconds: not a drop still spreading, which would slow as it aged,
+      but a source that never stopped. Every look laid dye at three points
+      orbiting a quarter to a third of the plate out, 0.05 a frame each; the
+      plate's colour grew 6% in the three seconds nothing touched it. That
+      seeder is gone (PLAN.md 18c-14), and the `quiet` test below is now
+      the check that it stays gone: colour arriving with nothing touching
+      the plate fails it. The share beyond 0.2 of the palm is printed so the
+      next run shows what is out there.
     */
     const before = await page.evaluate(() => ({ ...window.chromaglassSettings?.() }));
     await page.evaluate(() => window.chromaglassSettings?.({
@@ -1186,9 +1187,6 @@ try {
       rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0, bubbles: 0,
       audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
     }));
-    // Asked for outright: a switch that was not there would leave the orbits seeding and the check reading what it read before.
-    const seedOff = await page.evaluate(() => typeof window.chromaglassDebug().ambientSeed === 'function' && (window.chromaglassDebug().ambientSeed(false), true));
-    if (!seedOff) throw new Error('chromaglassDebug().ambientSeed is missing: the Press check cannot stop the ambient seeding');
     let off, on, thin = false;
     try {
       await settle(3000);
@@ -1212,7 +1210,6 @@ try {
       // Back as it was, Thin Gap included: on, as every look has it, so the
       // checks after this one run on the plate the show plays.
       await page.evaluate((b) => window.chromaglassSettings?.({ ...b }), before);
-      await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true));
     }
 
     /*
@@ -1258,10 +1255,12 @@ try {
     const pressKept = ratio(on[1], on[2]), liftKept = ratio(on[2], on[3]);
     const laid = on[0].total > 5 && off[0].total > 5;
     /*
-      With the seeding off nothing lays colour but the hand, so no pool may
-      gain colour over the three seconds before it (it was 6% with the
-      seeding on). A plate still gaining colour is still being painted by
-      something the check does not control, and its drift is not the pool's.
+      Nothing lays colour but the hand, so no pool may gain colour over the
+      three seconds before it. It gained 6% while the app seeded itself
+      (PLAN.md 18c-14): this is that item's check, on every run, with no
+      switch to turn the seeder off, since there is none. A plate still
+      gaining colour is being painted by something the check does not
+      control, and its drift is not the pool's.
     */
     const quiet = own(on) <= 1.01 && own(off) <= 1.01;
     const quietNote = quiet ? '' : `; colour still arriving with nothing touching it (${(own(off) * 100).toFixed(0)}% and ${(own(on) * 100).toFixed(0)}% over the drift window)`;
@@ -1282,17 +1281,116 @@ try {
     console.log(`     the colour beyond 0.2 of the palm: pressed on the thin gap ${farOf(on)}; Thin Gap off ${farOf(off)}`);
     console.log(`     the Press's waits, in the plate's seconds: ${waits.join(', ')}`);
   }
+
+  // ── A press does not turn the liquid ────────────────────────────
+  {
+    /*
+      PLAN.md 15g-18. The mouse's press used to add a vortex on top of the
+      squeeze, w = (1 − d/R)²·40·pa·kSoft over the palm ("the Photoscope's
+      slides twisted against each other"), and a remote's press had none, so
+      the same press did two things by hand. A palm pressed straight down
+      onto a cover glass does not turn it: the film under it thins, the
+      liquid is squeezed out radially, and a radial source has no curl. The
+      only real twist is the cover turned (Couette, 42b), which is another
+      tool.
+
+      The solver's velocity is not read back, so the curl is read through
+      what it would do: a pool beside the palm, inside its disc, is carried
+      round the palm by a twist and only out from it by a squeeze. So the
+      pool's centre of mass is followed about the palm's middle while the
+      hand is held: its turn (the arc it moved, r·Δθ, in plate widths)
+      against its move outward, and against the same pool's turn left alone
+      for as long just before, which is its own drift. Once with the mouse
+      and once as a remote's hand, the same palm.
+
+      And once more of each with Thin Gap off. The first version of this
+      check ran only on the thin gap every look plays, and it passed on the
+      plate as it was, twist and all (the mouse's pool turned 0.0008 there
+      against 0.0004 on the branch): the twist was 40 x pa = 0.16·k a cell
+      a frame, and the thin gap's wall drag takes a velocity nobody keeps
+      pushing down within a few steps, while the squeeze is a source the
+      pressure answers every step. So on the thin gap the twist was a
+      small thing, and the check could not see it. On the open plate
+      nothing drags it away and it adds up frame on frame, which is where
+      a press that turns would show. A palm pressed down does not turn the
+      liquid on either plate, so the claim is the same on both. Both run on
+      the quiet plate the Press's own check uses (no turbulence, no sound,
+      no rock, no turn), so the pool's own drift is the pool's.
+    */
+    const palmAt = [A[0] + 0.05, A[1]];
+    const about = (keep, c) => page.evaluate(({ keep, c }) => {
+      const s = window.__toolSnaps[keep]; const n = s.n; let t = 0, x = 0, y = 0;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const v = Math.max(0, s.data[i + j * n]); if (!Number.isFinite(v)) continue; t += v; x += v * i; y += v * j; }
+      if (!t) return null;
+      const dx = x / t - c.x, dy = y / t - c.y;
+      return { r: Math.hypot(dx, dy) / n, a: Math.atan2(dy, dx), total: t };
+    }, { keep, c });
+    const turnOf = (a, b) => {
+      if (!a || !b) return null;
+      let d = b.a - a.a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+      return { arc: Math.abs(d) * a.r, out: b.r - a.r, r: a.r };
+    };
+    const HOLD = 1500;
+    const run = async (remote, gap) => {
+      await page.evaluate((g) => window.chromaglassSettings?.({ thinGap: g }), gap);
+      for (let k = 0; k < 400 && (await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap)) !== !!gap; k++) await settle(50);
+      const gapNow = await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap);
+      await clear();
+      await pool(A);
+      await settle(1500);
+      await tool('press');
+      await settle(300);
+      // The remote's hand lands where the mouse's does: the same grid cell,
+      // sent as the plate's fraction a gesture carries (`performGesture`).
+      await page.mouse.move(...screen(...palmAt));
+      const palm = await page.evaluate(() => window.chromaglassDebug().pointer());
+      const sent = [palm.x / palm.grid, palm.y / palm.grid];
+      await snap('tw0'); await settle(HOLD); await snap('tw1');
+      if (remote) {
+        const t0 = Date.now();
+        while (Date.now() - t0 < HOLD) { await page.evaluate((p) => window.chromaglassDebug().gesture({ tool: 'press', x: p[0], y: p[1], layer: 0 }), sent); await settle(50); }
+      } else { await page.mouse.down(); await settle(HOLD); }
+      await snap('tw2');
+      if (!remote) await page.mouse.up();
+      const s = await page.evaluate(() => ['tw0', 'tw1', 'tw2'].map((k) => window.__toolSnaps[k]));
+      const p0 = await about('tw0', palm), p1 = await about('tw1', palm), p2 = await about('tw2', palm);
+      /*
+        Steps advancing is not the dye copy advancing: `readDensity` is the
+        async readback's mirror, and a mirror that stopped landing reads as a
+        pool that neither turned nor moved, which is exactly a pass. So each
+        window must have had readbacks land in it as well as steps.
+      */
+      const fresh = s[1].rb > s[0].rb && s[2].rb > s[1].rb;
+      return { idle: turnOf(p0, p1), held: turnOf(p1, p2), steps: [s[1].step - s[0].step, s[2].step - s[1].step], fresh, gapOk: gapNow === !!gap };
+    };
+    const quietBefore = await page.evaluate(() => ({ ...window.chromaglassSettings?.() }));
+    await page.evaluate(() => window.chromaglassSettings?.({
+      turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+      rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0, bubbles: 0,
+      audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
+    }));
+    try {
+      for (const [remote, gap] of [[false, 1], [true, 1], [false, 0], [true, 0]]) {
+        const r = await run(remote, gap);
+        const ok = r.gapOk && r.idle && r.held && r.fresh && r.steps.every((n) => n > 0) && r.held.r > 0.02 && r.held.r < 0.12;
+        /*
+          "Does not turn" alone is passed by a press that pressed nothing (a
+          gesture on the wrong cell, one the drain gate dropped), so the claim
+          carries its first half too: held down, the pool is pushed out from
+          the palm, by more than it drifted left alone.
+        */
+        const squeezed = ok && r.held.out > Math.max(0.003, 3 * Math.abs(r.idle.out));
+        check(`a press${remote ? ' from a remote' : ''}${gap ? '' : ' with Thin Gap off'} squeezes the liquid out and does not turn it`,
+          ok && squeezed && r.held.arc <= 0.002 + 2 * r.idle.arc,
+          !r.gapOk ? `Thin Gap never went ${gap ? 'on' : 'off'}`
+            : !ok ? `nothing to follow: the pool ${r.held ? `${r.held.r.toFixed(3)} from the palm` : 'not found'}, steps ${r.steps.join(', ')}, readbacks ${r.fresh ? 'landing' : 'stalled'}`
+            : `the pool ${r.held.r.toFixed(3)} from the palm turned ${r.held.arc.toFixed(4)} round it held down over ${r.steps[1]} steps and moved ${r.held.out >= 0 ? '+' : ''}${r.held.out.toFixed(4)} outward; left alone before, ${r.idle.arc.toFixed(4)} over ${r.steps[0]}`);
+      }
+    } finally {
+      await page.evaluate((b) => window.chromaglassSettings?.({ ...b }), quietBefore);
+    }
+  }
 } finally {
-  /*
-    The seeder back on whatever happened. Three sections turn it off (the
-    Finger, the Blow, the Press) and each puts it back on its own path, but a
-    throw between the off and the restore would leave the page seeded-off. That
-    cannot reach a later check today, because every throw in this file reaches
-    this block and ends the run — but it is accidental, and the Blow's and the
-    Press's own re-offs would mask a leak rather than reveal it. So it is
-    restored here as well, where nothing can step round it.
-  */
-  await restoreSeeding();
   await browser.close();
 }
 
