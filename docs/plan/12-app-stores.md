@@ -131,10 +131,10 @@ forms and a 15 % cut.
    phone. Open: the iPad in the app gets the full layout, which has no Laptop
    remote button yet, and neither does a phone that took More › Full layout
    (until the app is reopened); a QR code on the laptop that opens the app straight
-   into its remote (a `chromaglass://` link) would save the typing. The full layout's button has its
+   into its remote (a `chromaglass://` link) would save the typing *(done without the URL scheme by 12-ctl-2, 2026-11-12: Scan reads the Phone · iPad panel's code in the app)*. The full layout's button has its
    check written first (2026-11-08): `npm run deskreach` line `remote` (in the app at 1024×1366 and
    1366×1024, `desk-laptop-remote` drawn without a tap, asking for the laptop as the phone's does),
-   owed; the QR code needs Xcode's URL scheme and is not in it.
+   owed; the QR code is 12-ctl-2's Scan, not this line.
 5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
    Photos. The only feature that needs new code to work at all. *Not started.*
 6. **A privacy policy page** on Firebase Hosting, and the store listings: text,
@@ -198,12 +198,7 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
-  which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
-  Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is
-  refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
-  camera (it opens the show server's own remote in the browser) and the app. *Measure:*
-  `controller` line `scan`.
+- ~~**12-ctl-2**~~ *(shipped 2026-11-12)*: Scan on the Laptop remote form, in both apps; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
   when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,
