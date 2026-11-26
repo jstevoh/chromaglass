@@ -77,13 +77,6 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   Tate drop falls and queues the falling drop with zero dye using water's fixed `DROP_TATE`,
   and the crater (`applySquish` in `dropSplash.ts`) still uses a fixed depth scale rather than
   scaling with impact energy and the falling liquid's properties.
-- **18c-14** The idle plate lays dye and heat by itself (S–M; High). With nothing touched,
-  `ambientSeedRef` (`LiquidVisualizer.tsx:839`) runs orbits at `3911-3933` that lay 0.05 of
-  dye and 0.02 of heat a frame, so a still plate fills and warms. A plate left alone only
-  spreads what is on it; nothing pours itself. The emergency seed at `4568-4572` (an empty
-  plate) is fine, and `EVOLVE_FLOODS` is already false (`stepping.ts:137`). Remove the orbits'
-  laying, keep the emergency seed. Check: with no input, total dye flat or falling over 60 s.
-  (38v, from RS-38.)
 - **18c-4** An oil drop as a lens or a film by the spreading coefficient
   S = γ_w − γ_o − γ_ow (the bottles carry σ now, 18d-1), with 18d-3.
 - **18c-5** The held pour's rate is one number, a dropper's 0.5 mL/s (`HELD_POUR`,

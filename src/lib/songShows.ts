@@ -38,9 +38,10 @@ export type SectionKind = 'intro' | 'verse' | 'chorus' | 'bridge' | 'drop' | 'ou
 export type ActionWhen =
   | { at: 'start' }                                   // the first note
   | { at: 'time'; sec: number }                       // this far into the song
-  | { at: 'section'; section: SectionKind; nth?: number } // entering a section (the nth one, or every one)
+  | { at: 'section'; section: SectionKind; nth?: number; beatsAhead?: number } // entering a section (the nth one, or every one), optionally N beats ahead
   | { at: 'kick'; every: number }                     // every Nth kick
-  | { at: 'before-end'; sec: number };                // this long before the end
+  | { at: 'before-end'; sec: number }                 // this long before the end
+  | { at: 'last-beat'; beatsAhead?: number };         // the song's last beat, or N beats before it (needs ahead)
 
 export type ActionWhat =
   | { do: 'look'; look: SongLook; fade: number }      // another look, faded in over `fade` seconds
@@ -92,11 +93,25 @@ export function describeWhen(w: ActionWhen): string {
   switch (w.at) {
     case 'start': return 'On the first note';
     case 'time': return `At ${mmss(w.sec)}`;
-    case 'section': return w.section === 'any'
-      ? (w.nth ? `At the ${ordinal(w.nth)} new section` : 'At every new section')
-      : (w.nth ? `At the ${ordinal(w.nth)} ${w.section}` : `At every ${w.section}`);
+    case 'section': {
+      const target = w.section === 'any'
+        ? (w.nth ? `the ${ordinal(w.nth)} new section` : 'every new section')
+        : (w.nth ? `the ${ordinal(w.nth)} ${w.section}` : `every ${w.section}`);
+      if (w.beatsAhead && w.beatsAhead > 0) {
+        const n = Math.round(w.beatsAhead);
+        return `${n} ${n === 1 ? 'beat' : 'beats'} before ${target}`;
+      }
+      return `At ${target}`;
+    }
     case 'kick': return w.every <= 1 ? 'On every kick' : `On every ${ordinal(w.every)} kick`;
     case 'before-end': return `${w.sec} s before the end`;
+    case 'last-beat': {
+      if (w.beatsAhead && w.beatsAhead > 0) {
+        const n = Math.round(w.beatsAhead);
+        return `${n} ${n === 1 ? 'beat' : 'beats'} before the last beat`;
+      }
+      return 'On the last beat';
+    }
   }
 }
 
@@ -232,15 +247,31 @@ function parseLook(raw: unknown): SongLook | null {
   return { kind: l.kind, id: l.id, name: typeof l.name === 'string' ? l.name : undefined };
 }
 
+const beats = (v: unknown): number | undefined =>
+  (typeof v === 'number' && Number.isFinite(v) ? Math.round(num(v, 1, 64, 1)) : undefined);
+
 function parseWhen(raw: unknown): ActionWhen | null {
   const w = raw as Record<string, unknown> | null;
   switch (w?.at) {
     case 'start': return { at: 'start' };
     case 'time': return { at: 'time', sec: num(w.sec, 0, 3600, 0) };
-    case 'section': return SECTIONS.includes(w.section as SectionKind)
-      ? { at: 'section', section: w.section as SectionKind, nth: w.nth === undefined ? undefined : num(w.nth, 1, 99, 1) } : null;
+    case 'section': {
+      if (!SECTIONS.includes(w.section as SectionKind)) return null;
+      const nth = w.nth === undefined ? undefined : num(w.nth, 1, 99, 1);
+      const beatsAhead = beats(w.beatsAhead);
+      return {
+        at: 'section',
+        section: w.section as SectionKind,
+        ...(nth !== undefined ? { nth } : {}),
+        ...(beatsAhead !== undefined ? { beatsAhead } : {}),
+      };
+    }
     case 'kick': return { at: 'kick', every: Math.round(num(w.every, 1, 64, 4)) };
     case 'before-end': return { at: 'before-end', sec: num(w.sec, 0, 600, 8) };
+    case 'last-beat': {
+      const beatsAhead = beats(w.beatsAhead);
+      return beatsAhead !== undefined ? { at: 'last-beat', beatsAhead } : { at: 'last-beat' };
+    }
     default: return null;
   }
 }
@@ -358,6 +389,12 @@ export function songShowTime(run: { manual: boolean; startedAt: number }, nowMs:
   return run.manual ? (nowMs - run.startedAt) / 1000 : Math.max(0, positionNow?.() ?? positionSec);
 }
 
+/** Beat grid and sections known ahead of playback (from `hearAhead.ts`), when the song was analysed. */
+export interface SongAheadSchedule {
+  grid: readonly number[];
+  sections: readonly { start: number; end: number; label: string }[];
+}
+
 /** Where the song is, as the runtime knows it. */
 export interface SongClock {
   /** Seconds since the first note. */
@@ -369,6 +406,8 @@ export interface SongClock {
   sectionCounts: Record<string, number>;
   /** Kicks heard since the first note. */
   kicks: number;
+  /** Ahead schedule when the song was analysed from its file; null or omitted on a live listen. */
+  ahead?: SongAheadSchedule | null;
 }
 
 /** What has fired, so an action fires once (or once per section, or once per kick count). */
@@ -401,6 +440,57 @@ export function sectionsAt(sections: readonly { start: number; end: number; labe
   return { section: { label: sections[index].label, index }, sectionCounts: counts };
 }
 
+export interface AheadMoment {
+  at: number;
+  /** Target section index in `ahead.sections` (for section leads), or 0 (for `last-beat`). */
+  sectionIndex: number;
+  /** End time of the target section (for section leads), or Infinity (for `last-beat`). */
+  until: number;
+}
+
+/**
+ * Target trigger moments for an `ActionWhen` that uses a song's ahead beat
+ * grid (`section` with `beatsAhead`, or `last-beat`).
+ *
+ * Shared by `dueActions` (the runtime) and `scoreOf` in `songScore.ts` (the
+ * timeline) so a lead cue on the score is always drawn on the exact beat the
+ * runtime fires it, never a second copy of the beat-counting arithmetic.
+ */
+export function aheadMoments(when: ActionWhen, ahead: SongAheadSchedule | null | undefined): AheadMoment[] {
+  const grid = ahead?.grid;
+  if (!grid?.length) return [];
+
+  if (when.at === 'last-beat') {
+    const lead = when.beatsAhead && when.beatsAhead > 0 ? Math.round(when.beatsAhead) : 0;
+    const idx = Math.max(0, grid.length - 1 - lead);
+    return [{ at: grid[idx], sectionIndex: 0, until: Infinity }];
+  }
+
+  if (when.at === 'section' && when.beatsAhead && when.beatsAhead > 0) {
+    const sections = ahead?.sections;
+    if (!sections?.length) return [];
+    const lead = Math.round(when.beatsAhead);
+    const counts: Record<string, number> = {};
+    const out: AheadMoment[] = [];
+    for (let i = 0; i < sections.length; i++) {
+      const s = sections[i];
+      const countKey = s.label.toLowerCase().replace(/[^a-z].*$/, '');
+      counts[countKey] = (counts[countKey] ?? 0) + 1;
+      const kind = sectionKind(s.label);
+      const matches = when.section === 'any' || kind === when.section;
+      if (!matches) continue;
+      const count = when.section === 'any' ? i + 1 : (counts[when.section] ?? 0);
+      if (when.nth !== undefined && count !== when.nth) continue;
+      const beatIdx = grid.findIndex((g) => g >= s.start - 1e-6);
+      const at = beatIdx >= 0 ? grid[Math.max(0, beatIdx - lead)] : s.start;
+      out.push({ at, sectionIndex: i, until: s.end });
+    }
+    return out;
+  }
+
+  return [];
+}
+
 /**
  * The actions that are due now, given where the song is and what has fired.
  * Updates `fired`. Pure apart from that, so a harness can run a whole song.
@@ -421,6 +511,15 @@ export function dueActions(show: SongShow, clock: SongClock, fired: FiredState):
         if (last === undefined && clock.duration !== null && clock.t >= clock.duration - w.sec) { fired.set(a.id, clock.t); due.push(a); }
         break;
       case 'section': {
+        if (w.beatsAhead && w.beatsAhead > 0 && clock.ahead?.grid?.length) {
+          for (const m of aheadMoments(w, clock.ahead)) {
+            if (clock.t >= m.at && clock.t < m.until && (last === undefined || m.sectionIndex > last)) {
+              fired.set(a.id, m.sectionIndex);
+              due.push(a);
+            }
+          }
+          break;
+        }
         if (!clock.section) break;
         const kind = sectionKind(clock.section.label);
         const matches = w.section === 'any' || kind === w.section;
@@ -429,6 +528,14 @@ export function dueActions(show: SongShow, clock: SongClock, fired: FiredState):
         if (w.nth !== undefined && count !== w.nth) break;
         // Once per section it matches: keyed by the section's index.
         if (last !== clock.section.index) { fired.set(a.id, clock.section.index); due.push(a); }
+        break;
+      }
+      case 'last-beat': {
+        const moments = aheadMoments(w, clock.ahead);
+        if (moments.length && last === undefined && clock.t >= moments[0].at) {
+          fired.set(a.id, moments[0].at);
+          due.push(a);
+        }
         break;
       }
       case 'kick': {

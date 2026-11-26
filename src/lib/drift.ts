@@ -124,7 +124,7 @@ const NOT_THE_LOOK = new Set([
   // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
   'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
-  'macroRelief', 'macroSync', 'macroChase',
+  'macroRelief', 'macroFine', 'macroSync', 'macroChase',
   // How far the music moves the frame (lib/plateRock.ts): a wander would
   // start the frame sliding under the viewer by itself, the very thing the
   // owner turned off (2026-10-11).
@@ -143,8 +143,9 @@ const NOT_THE_LOOK = new Set([
   // Oil Weight (PLAN 27f-9c): a lava lamp's wax runs its cycle only while it
   // is heavier than the liquid cold and lighter warm; a wander would float it
   // to the top of the bottle or sink it for good with nobody touching it. The
-  // look's own number, held.
-  'oilWeight',
+  // look's own number, held. Oil Thickness (PLAN 38w-31) likewise: how freely
+  // that wax sinks and rises is its thinness, so a wander would stall the cycle.
+  'oilWeight', 'oilThickness',
   // Soap Breakdown (PLAN 38c-3): 0 is conservation, and turning it up lets
   // soap clear off the plate at a chosen half-life; Evolve must not start a
   // loss by itself.
@@ -162,6 +163,15 @@ const NOT_THE_LOOK = new Set([
   'melodyWalk',
   // The projector lamp's heat (PLAN 36e-2): played by hand with a hold on the glass, not drifted by Evolve.
   'heat',
+  // The cover glass sliding (Glass Smear, PLAN 38u-11): the owner chose a glass that is still until a
+  // hand or a cord moves it (2026-11-14), and every look rests it at 0 with its slide on a cord
+  // (lib/glassSlide.ts). A wander up would slide the glass with nobody touching it, the very thing
+  // that was taken out.
+  'glassSmear',
+  // Granulation (PLAN 38u-8): smooth by default, because a dye in solution has no grain and the
+  // speckle is invented noise. The owner kept the dial for the performer to turn up; Evolve walking
+  // it up from 0 would lay the speckle over every look by itself, which is the default taken back.
+  'granulation',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*
@@ -175,6 +185,9 @@ const NOT_THE_LOOK = new Set([
   'magnetX', 'magnetY',
   // And how big that hand's magnet is (Magnet Size): the performer's choice.
   'magnetSize',
+  // Bubble Melt (PLAN 38b-2): its first step off zero is a million times
+  // nature, so a nudge would start a look's bubbles melting by themselves.
+  'bubbleMelt',
   // The clear film (PLAN §20b): moving it pours clear oil over the dish or
   // draws it off, so a wander would fill the lace's holes back in by itself.
   'clearFilm',
@@ -192,6 +205,8 @@ const NOT_THE_LOOK = new Set([
     without (PLAN 10-8d-3).
   */
   'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
+  /* The water's glow (PLAN 48c) is a light the look turns on, not a tint to drift. */
+  'glow', 'glowShear', 'glowRecharge',
   /*
     The glitter, the lens and the side lamp (PLAN 47e, 47d, 47b-side) are the
     photographer's: what is in the dish, the stop the lens is set to, and a
@@ -219,7 +234,7 @@ const NOT_THE_LOOK = new Set([
     would black the plate out under nobody's hand (crossed, a still plate
     is dark); left out, the pool and Evolve's pace are as they were.
   */
-  'polariser', 'analyserAngle', 'quarterWave', 'birefringence',
+  'polariser', 'analyserAngle', 'quarterWave', 'birefringence', 'dishStress',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

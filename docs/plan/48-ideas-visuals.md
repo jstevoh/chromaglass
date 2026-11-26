@@ -25,7 +25,7 @@ the chemical clock counted in:
 
 1. **48a** the chemical clock steered by light, and stirring itself
 2. **48b** every oil drop a lens: caustic rims and focused light on the wall
-3. **48c** bioluminescent trails: a dark plate that glows where the liquid is sheared
+3. **48c** bioluminescent trails: a dark plate that glows where the liquid is sheared (shipped 2026-11-21)
 4. **48d** lift the glass: air fingers branch into ferns
 5. **48e** oil-slick rainbows from a real spreading film
 6. **48f** Faraday waves: the music's vibration stands up as a pattern, through a cord (shipped 2026-11-21)

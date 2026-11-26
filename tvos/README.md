@@ -54,6 +54,29 @@ answering the same offer the `/tv` page answers. Nothing is sold on the TV.
 
   then open `ChromaGlassTV.xcodeproj` in Xcode and run on the tvOS simulator.
 
+## TestFlight and the App Store
+
+The App Store record is "ChromaGlass TV", bundle `app.chromaglass.tv`. The team has
+no registered devices, so Xcode's development signing fails at archive time; the
+archive is built unsigned and the export signs it in the cloud with the team's App
+Store Connect API key (kept by the owner, outside the repo). Every upload needs a
+build number App Store Connect has not seen:
+
+```bash
+cd tvos/App && xcodegen generate && xcodebuild -project ChromaGlassTV.xcodeproj -scheme ChromaGlassTV -configuration Release -destination generic/platform=tvOS -archivePath build/ChromaGlassTV.xcarchive CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=<n> archive
+```
+
+then `xcodebuild -exportArchive` with an export options plist of `method`
+`app-store-connect`, `destination` `upload`, `signingStyle` `automatic` and the
+team id, plus `-allowProvisioningUpdates` and the three `-authenticationKey…`
+flags. `Info.plist` reads its versions from `MARKETING_VERSION` and
+`CURRENT_PROJECT_VERSION`, so the number passed to the archive is the build
+number that goes up.
+
+The camera and microphone purpose strings in `project.yml` are there only because
+LiveKit's WebRTC framework links the capture APIs; App Store Connect refuses a
+build without them (ITMS-90683, build 1). The app never asks for either.
+
 ## Edges
 
 The core reaches the Worker only through its public `/tv/` routes and the relay only
