@@ -570,6 +570,16 @@ export interface VisualizerSettings {
     standing plate (Gravity) for the weight to act.
   */
   oilWeight: number;
+  /**
+    Oil Thickness, 0..1 on the same scale as Thickness (10^(3t) mm²/s): how
+    thick the oil itself is. The default, log10(50)/3 ≈ 0.566 (50 mm²/s), is the light
+    mineral oil every oil look had; molten paraffin, a lava lamp's wax, is
+    about 9 mm²/s at 60 °C (0.32). A drop in a Hele-Shaw gap rides the flow
+    at 2/(1+λ) of its speed, λ its viscosity over the water's, so a thin
+    oil is carried and sinks freely where a thick one lags
+    (gpu/fluid/constants.ts oilNuOf, PLAN 38w-31). Needs Oil Tension.
+  */
+  oilThickness: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
@@ -1162,6 +1172,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
+  oilThickness: Math.log10(50) / 3, // 50 mm²/s, the light mineral oil every oil look had (constants.ts OIL_THICKNESS, the same double)
   oilWeight: -0.05,         // the light mineral oil every oil look had: it floats up a standing plate
   surfactantFlow: 0,
   soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)

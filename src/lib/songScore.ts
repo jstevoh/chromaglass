@@ -47,8 +47,8 @@
 
 import type { SongMap, SongSection } from './musicTypes';
 import {
-  dueActions, sectionsAt, sectionKind, describeWhat, describeWhen,
-  type ActionWhen, type FiredState, type SectionKind, type SongClock, type SongShow,
+  aheadMoments, dueActions, sectionsAt, sectionKind, describeWhat, describeWhen,
+  type ActionWhen, type FiredState, type SectionKind, type SongAheadSchedule, type SongClock, type SongShow,
 } from './songShows';
 
 export interface ScoreSection {
@@ -130,6 +130,7 @@ export function scoreOf(
    */
   durationSec?: number | null,
   points = 160,
+  ahead?: SongAheadSchedule | null,
 ): Score {
   const sections0 = map.sections;
   const duration = Math.max(1, durationSec || map.durationSec || (sections0.length ? sections0[sections0.length - 1].end : 1));
@@ -148,20 +149,24 @@ export function scoreOf(
   if (show) {
     /*
       Every moment something can come due: the top, each section's first
-      second, each time an action names, each countdown to the end. Between
-      them the scheduler's answer cannot change, so stepping through these is
-      the same as stepping through the song a frame at a time, and exact.
+      second, each time an action names, each countdown to the end, and each
+      ahead beat lead (`aheadMoments`). Between them the scheduler's answer
+      cannot change, so stepping through these is the same as stepping through
+      the song a frame at a time, and exact.
     */
     const times = new Set<number>([0]);
     for (const s of sections) if (s.start >= 0 && s.start < duration) times.add(s.start);
     for (const a of show.actions) {
       if (a.when.at === 'time' && a.when.sec <= duration) times.add(Math.max(0, a.when.sec));
       if (a.when.at === 'before-end') times.add(Math.max(0, duration - a.when.sec));
+      for (const m of aheadMoments(a.when, ahead)) {
+        if (m.at >= 0 && m.at <= duration) times.add(m.at);
+      }
     }
     const placed = { ...show, actions: show.actions.filter(a => a.when.at !== 'kick') };
     const fired: FiredState = new Map();
     for (const t of [...times].sort((x, y) => x - y)) {
-      const clock: SongClock = { t, duration, ...sectionsAt(sections0, t), kicks: 0 };
+      const clock: SongClock = { t, duration, ...sectionsAt(sections0, t), kicks: 0, ...(ahead ? { ahead } : {}) };
       for (const a of dueActions(placed, clock, fired)) {
         cues.push({
           actionId: a.id, at: t, x: Math.min(1, t / duration), section: clock.section?.index ?? null,

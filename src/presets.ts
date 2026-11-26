@@ -2170,6 +2170,7 @@ export const PRESETS: Preset[] = [
       oilTension: 1,             // 27f-9h: all the tension the dial has, for the rounder blobs
       oilBodies: 1,
       oilWeight: 0.6,
+      oilThickness: 0.32, // paraffin
       plateUpright: 1,
       /*
         How strongly gravity weighs the liquids' density differences (Dye

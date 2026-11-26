@@ -185,23 +185,6 @@ Left, each its own plan item:
   15g-3). Also seen and not looked into: under the same default breath a pool with
   ferrofluid in it went 23.96% of the plate (the ferrofluid 29.89%) where the colour
   alone went 13.07%.
-- **15g-17 The pointer shoves bubbles and beads, and a pop pushes and swirls** (S; High).
-  Every third frame the pointer calls `bubbles.disturb` and `beads.disturb`
-  (`LiquidVisualizer.tsx:3256, 3258`; `beads.ts:408-418`), which shove them at 40 or 22 cells
-  a second with a 0.22 s decay (`bubbles.ts:468-492`); a pop (`speciesPoll.ts:111-117` to
-  `popBubble`, `fluidSimulation.ts:2283-2302`) adds a push and a parity swirl (`BLOW_SWIRL`)
-  on top of the sink the thin gap already solves (`thinGap.ts:785-800`). A bubble between
-  glasses moves with the liquid at Taylor–Saffman's 2U/(1 + λ), a burst hole is a sink with no
-  curl, and a finger bursts a bubble only where it closes the gap (`OPEN_RIM`,
-  `bubbles.ts:664-668`). Delete the disturbs and the pop's push and swirl; with 18i-2. Check:
-  a bubble beside a passing finger moves no more than the liquid's Taylor–Saffman speed says,
-  and a pop leaves a curl-free sink. (38v, from RS-37.)
-- **15g-18 A press twists the liquid it squeezes** (S; Medium). The local press adds a vortex,
-  w = (1 − d/twistR)²·40·pa·kSoft (`LiquidVisualizer.tsx:3301-3317`); a remote's press
-  (`1218-1228`) has none, so the same press differs by hand. A press squeezes liquid out
-  radially, a source with no curl; the only real twist is the cover turned (Couette, 42b).
-  Delete it. Check: the curl over a press's disc stays at the idle level, local and remote
-  alike. (38v, from RS-36.)
 ## 15f. Found with 15c
 
 - The Finger carries the oil (`carryMix`) whenever the dye mirror is current, and
