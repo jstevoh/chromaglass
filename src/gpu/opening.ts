@@ -159,6 +159,8 @@ export interface Opening {
    * (Shaker above nought Hz); every other look builds them behind the show.
    */
   faraday: boolean;
+  /** The water's glow (PLAN 48c, gpu/glow.ts): its one pipeline ahead when the look opens glowing, behind the show otherwise. */
+  glow: boolean;
   /**
    * The display's effects this look can reach (`displayLean.ts`): the
    * opening compiles a display with only these, and the whole one behind it.
@@ -254,6 +256,7 @@ export function openingOf(s: Partial<VisualizerSettings>, oilWaiting = false): O
     closeup: closeupFine(s, macroAmountOf({ ...DEFAULT_SETTINGS, ...s })) > 0.001
       && Math.round(s.kaleidoscope ?? 0) < 2 && !((s.dishSpread ?? 0) > 0.001),
     faraday: (s.faradayHz ?? 0) > 0,
+    glow: (s.glow ?? 0) > 0.001,
     display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
     oil: oilWaiting,
     oilPull,

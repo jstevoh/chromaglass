@@ -396,6 +396,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
     // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
     pack.set('faraday', (s.faradayHz ?? 0) > 0 ? 1 : 0);
+    // The water's glow (PLAN 48c): its light's brightness, past the real one up to twice the stage's.
+    pack.set('glow', Number.isFinite(s.glow) ? Math.max(0, Math.min(2, s.glow as number)) : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they

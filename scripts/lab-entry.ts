@@ -892,7 +892,7 @@ const api = {
     // and hold nothing, which a check of the flat dye beside a hole would take for the
     // mask not being there. Say so instead.
     if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
-    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: l.solver.fineDetail, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, faraday: l.solver.fields.faraday, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: l.solver.fineDetail, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, faraday: l.solver.fields.faraday, glow: l.solver.fields.glow, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
