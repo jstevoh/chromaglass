@@ -92,6 +92,19 @@ first, because every line above lands through it. The order of work below is unc
 is the order again after this week; this week draws from its Wave 6 (the physics) and §47
 (the closeup), and its Waves 0, 1, 3, 4, 5 and 7 are parked.
 
+**Main's slow checks after the 2026-11-26 merge sweep (19ak-22).** Fifteen PRs merged
+that day; deploy 967 (main at f3414ffd) went live green, and its slow checks came back red
+on lines that were green or cancelled before. ~~`presskit`: `/press` and `/pro` showed a
+broken Ferro Paint picture~~ (34a-2 removed `public/landing/looks/ferro-paint.webp`, which
+both pages still show; restored, `npm run presskit` 58/61 → 61/61). Still owed, each to its
+own thread: `looksgrid --owed=preview` (velvet-underground and a moiré card flat, spread
+under 20), `nolight` 9 (Beads 0.8 rims brighter than the wash), `benday` (dot coverage
+28.1%/33.0% against 28.3%), the open-rim oil meter on WebGPU · fifth, `heldpress
+--owed=presstwist` (after 15g-18), `openingtime` (3 pipelines built on a frame:
+fluid/upsampleDelta, fluid/scaleDye, plate/packDyeBodies, after 46a and 47a), and the Lava
+Lamp wax cycle on WebGPU · show (after 27f-9q and 38w-31 met). `holeline` on lab4 was red
+before the sweep.
+
 ## Order of work
 
 *Ids with no text of their own before 2026-11-01 (H2c-2 to H2c-10, 10.2-*, 10.3-*, 16a-*, 14a-timers and the rest) are written, each with a pass mark and its check, in §40 and §41; the table at the end of §41 says where every other thin id's text lives.*
@@ -522,7 +535,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 28 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-22 | 51 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-24 | 51 |
 |  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19ao-1 | 8 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 19 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |

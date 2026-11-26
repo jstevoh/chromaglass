@@ -283,6 +283,25 @@ its frame rate live. "Free" means no new passes or texture reads.
       dish's step keeps its Courant limit only to the Slosh dial's own lean (lib/slosh.ts
       rockAccel's note). The real answer is a dish step that substeps past that lean, so a
       steep hand slops the dish as far as it tips it; then lift the limit.
+  - **18a-14, a light press looked pixelated: shipped** (2026-11-22; the owner: "when I use
+    the press tool on a small size, the pressed area becomes pixelated", with Press Amount
+    low on its slider). The thin-gap press laid its bowl, a clamped plate's deflection
+    −3·amount·(1 − d²/R²)², on the 192² CPU grid at a rounded centre and radius, and the
+    bilinear upsample carried it to the 384²/512² solver as flat facets with creases. The
+    film's closing (Stefan's law in `squeezeUpdate`) changes rate at each crease, so the
+    liquid driven out of the gap left in a polygon. At a full Amount the middle reaches the
+    gap's floor and hides it; at a low one every crease shows. The press is now one GPU
+    record (`PlateSolver.pressBowl`, falloff `plate`) with an unrounded centre and radius,
+    evaluated at every solver cell inside the same upsample pass (`upsampleDeltaPress`),
+    so the step folds once and the Reynolds source sees a smooth dh/dt. Desk and phone
+    share `applySquish`. `npm run pressfacets` (gpu=high, 512²): crease score of the
+    bowl's curvature 0.70–0.73 on main, 0.01–0.05 now; at gpu=mid (an even 2×, where the
+    relaxation rounds most of it) 0.04–0.10 against 0.01–0.05. Open: 18a-15.
+  - **18a-15, the rest of the thin gap's laying at solver cells.** The lift's spokes
+    (`liftStep`), the kick's release (`kickRelease`), the bass press and the rhythm sheet
+    still lay the gap on the 192² grid and reach the solver through the bilinear. None was
+    reported, but each has the same facets at a low enough amount. Move each to records
+    like 18a-14's, or lay the sheet at N, and measure the crease energy before and after.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

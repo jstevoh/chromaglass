@@ -3020,7 +3020,7 @@
     {
       "name": "A held press moves only its own neighbourhood",
       "shard": "plate",
-      "run": "npm run heldpress -- --owed=presstwist",
+      "run": "npm run heldpress",
       "why": [
         "A press held in one place (each bubble's) moves the liquid around it,",
         "not the whole plate: the projection's source sums to zero exactly."
@@ -3073,6 +3073,16 @@
         "The app's own Press on a thin gap: the ring goes out as far as the",
         "displaced volume says with every drop kept, the colour's carry takes",
         "the substeps it needs, and it comes back when the glass lifts."
+      ]
+    },
+    {
+      "name": "A light press is round, not the grid's facets",
+      "shard": "plate",
+      "run": "npm run pressfacets",
+      "why": [
+        "A light press on a thin gap lays its bowl as a smooth plate contact",
+        "patch at the solver's own resolution: the bowl is as deep as asked,",
+        "and its curvature carries no creases one CPU cell apart (PLAN 18a-14)."
       ]
     },
     {
@@ -3272,7 +3282,7 @@
       "run": "npm run filmlook",
       "why": [
         "Film Physics on the plate: nothing but the film changes; the projector's bubbles take the",
-        "faint tint the light through a film is, the closeup's the soap's own reflected gold."
+        "faint tint the light through a film is, the closeup's the light through the film too, at every Film Physics (38h-6)."
       ]
     },
     {
