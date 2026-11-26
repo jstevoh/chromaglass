@@ -696,7 +696,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // up pours liquid in at the rim and the glass rises; down wicks it off.
   // The weight on a squared curve, so the default 157 g sits two fifths up
   // and the bottom of the travel is a whisper of a glass.
-  { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
+  { key: 'liquidMl',        label: 'Liquid',           min: 1, max: 150 },
   { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
   // The song's title as ink (PLAN 37x-10) had its sweep, size and height on knobs here until the
   // owner shelved the ink on 2026-11-12 (37x-10m): titles are the corner caption, which has no dial,

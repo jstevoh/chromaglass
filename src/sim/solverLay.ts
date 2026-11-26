@@ -182,15 +182,17 @@ export function scaleSince(arrays: Float32Array[], before: Float32Array[], k: nu
   So a plain lay of one of these looks with no solver is remembered with what
   it put in the four dye arrays, and the first solver attached that carries no
   plate across has that taken back out and the look laid again on it, oil and
-  all. The picture is the same look laid fresh a moment later, not the CPU's
-  layout: the CPU's dye spots were never a dish anyone saw with its oil.
+  all. Clock Glass, Splodascope and Lava Lamp keep their oil splats directly in
+  `mixWait` (`src/sim/mixWait.ts`, PLAN 27f-9m); this holds the two looks that
+  lay onto the solver's own grid (`layDye`, `layOil`).
 */
-export const SOLVER_OIL_LOOKS: ReadonlySet<string> = new Set(['classic', 'clock-glass', 'splodascope', 'foam-cells', 'lava-lamp']);
+export const SOLVER_OIL_LOOKS: ReadonlySet<string> = new Set(['classic', 'foam-cells']);
 
 type Noise = (x: number, y: number) => number;
 
 export class OwedLay {
   private owed: { look: string; noise: Noise; delta: Float32Array[] } | null = null;
+  get pending(): boolean { return this.owed !== null; }
 
   /** `arrays` hands over the four dye arrays as they are now (a resize makes new ones). */
   constructor(private readonly arrays: () => Float32Array[]) {}

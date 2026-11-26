@@ -138,7 +138,7 @@ story is in `docs/plan-shipped.md` under 48f. Open:
 
 Shipped behind Glow, Glow Shear and Glow Recharge (`npm run glow` 15/15 on the lab's software
 WebGPU). Story in `docs/plan-shipped.md` §48c; written here beside the cords because the music
-plays it through them. Not yet seen on the Mac (`docs/judging.md` §144). Three shortcuts are
+plays it through them. Not yet seen on the Mac (`docs/judging.md` §145). Three shortcuts are
 named in the code and each is an item:
 
 - **48c-1. The plankton are spread evenly.** Every cell of the plate's water holds the same

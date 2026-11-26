@@ -3023,7 +3023,16 @@ a clear film drop looks on a projected plate is judged here.
    refracts the picture consistently with a higher-index lens (`lampDepthAt` uses the same
    gap height).
 
-## 144. The water's glow (PLAN 48c)
+## 144. A pinch on the cover glass (PLAN 38r-16, G1)
+
+The check (`npm run gap`, lines 15–16 and 19–23) proves the cover ledger's puddle area (`h · wet = plate`), Stefan settle/lift RK4 integration, `pinchHand(scale)`, `playHand` span threshold, and the ctrl-wheel/touch wiring. How the pinch feels on the plate and on a phone at sixty frames is only seen here:
+
+1. **Desk (trackpad pinch over the plate, outside the closeup):** Pinch fingers together over a full film (63 mL). Good: the squeeze should push liquid toward the rim/bead gently at first and firmly by half-span without zooming the browser page, and lifting off (200 ms after the last ctrl-wheel event) lets the glass rest or settle back as weight/suction dictate. Bad: the page zooms, a small pinch jolts the glass violently, or `coverHand` stays stuck after stopping.
+2. **Desk (pinch apart past bead + suction):** Pull fingers apart on the trackpad until `coverHand` lifts past weight + `2σ cosθ / h`. Good: once air clears the bead, the gap rises smoothly toward 4 mm as the puddle draws inward (`wet = V / h`), then settles back to `V / A` when let go. Inside **Macro Zoom > 1.05**, trackpad wheel still drives the closeup camera rather than the cover glass.
+3. **Phone (Play with Dropper picked):** Put two fingers down on `#liquid-canvas` and move them together (blow), then spread them or squeeze them past `1.2×` / `1/1.2` span (`PINCH_SPAN`). Good: moving together blows; crossing the span switch drops blowing and engages the glass pinch smoothly without dropping dye; lifting all fingers resets `coverHand` to 0 and returns to `'dropper'`. With **Blow** or **Press** picked on the tray, two fingers spreading stay Blow/Press. Bad: dye drops during a pinch, or closeup two-finger zoom fights the cover pinch.
+4. **Liquid dial down to 1 mL:** Turn Liquid from 63 mL down to 5 mL or 1 mL. Good: the liquid leaves the rim without snapping the glass instantaneously, then settles toward its floor puddle (`1–8 mL`) or widens back to the rim when Liquid is turned back up.
+
+## 145. The water's glow (PLAN 48c)
 
 The check (`npm run glow`) proves on the lab's software WebGPU that a still plate is dark and
 keeps its charge, that a stroke lights its own path and nothing far from it, that a drift
