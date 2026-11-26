@@ -197,7 +197,7 @@
     {
       "name": "The glass gap, one number",
       "shard": "logic",
-      "run": "npm run gap -- --owed=puddle,settle,lift,pinch",
+      "run": "npm run gap",
       "why": [
         "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
         "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
@@ -496,6 +496,25 @@
         "changed, and find nothing steady changed between two takes of the same",
         "look. Written before the words were built, so it holds them to pictures",
         "and not to the code's own thresholds. In the sound shard for its ffmpeg."
+      ]
+    },
+    {
+      "name": "Watching footage, report card & settings",
+      "shard": "sound",
+      "run": "npm run watchcard",
+      "quarantine": [
+        { "line": "(f2) REAL_SHOW_CARDS leave-one-out", "plan": "47x-16", "since": "2026-11-22", "until": "2026-12-06" }
+      ],
+      "why": [
+        "The watch tool's YouTube footage robustness (47x-11, watchfootage.mjs),",
+        "artistic report card and ratings agreement (47x-10, watchcard.mjs), and",
+        "gap-to-setting suggestions (47x-12, watchsettings.mjs): synthetic clips",
+        "encoded with ffmpeg prove letterbox autocrop vs dark-ground plates,",
+        "still overlay masking, title-card span exclusion, global camera",
+        "subtraction, compression-softness reliability flags, canon scoring and",
+        "REAL_SHOW_CARDS self-check, Spearman ratings agreement, and",
+        "DEFAULT_SETTINGS mapping, with mutants that break autocrop, camera,",
+        "compression, and card calibration. In the sound shard for its ffmpeg."
       ]
     },
     {
@@ -818,7 +837,7 @@
     {
       "name": "The show's timers when nobody is looking",
       "shard": "logic",
-      "run": "npm run timers -- --owed=hidden,gamepad",
+      "run": "npm run timers",
       "why": [
         "A look fade with the window covered, Chrome's one-a-second throttle",
         "modelled in node and the ear's worker tick driven by hand (PLAN 14a-timers),",
@@ -1411,7 +1430,7 @@
     {
       "name": "Nothing on the plate makes light",
       "shard": "lab",
-      "run": "npm run nolight -- --owed=rim,film",
+      "run": "npm run nolight -- --owed=film",
       "why": [
         "A plate lit from beneath shows transmitted light only (PLAN 38h): the",
         "satellite droplets, Glossiness, the gel and the dish's wall each leave",
@@ -1568,7 +1587,7 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads -- --owed=h2c6,h2c7,h2c9",
+      "run": "npm run framereads -- --owed=h2c6,h2c9",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",
@@ -1956,6 +1975,36 @@
       ]
     },
     {
+      "name": "A look's oil reaches its solver, whichever came first",
+      "shard": "logic",
+      "run": "npm run oillaid -- --node",
+      "why": [
+        "Lava Lamp's wax filmed as streaks on the Mac (PLAN 27f-9m): the look the page opens",
+        "on is laid before its solver is built, the oil went to `this.gpu?.addMix` and was",
+        "dropped, and the film was of dye alone (oil 0 for 150 s, read off the app's own mix",
+        "field). The real FluidSimulation on a stand-in solver that keeps every oil splat it",
+        "is handed, each line against the same look laid the way that always worked (a solver",
+        "there first): Lava Lamp, Clock Glass and Splodascope laid before any solver, after a",
+        "first solver dropped before it spoke (out of memory), and across a regrid, where the",
+        "carry has the oil and laying it again would double it; a look with no oil lays none,",
+        "and a cleared plate keeps none. The node half: a second, in any container."
+      ]
+    },
+    {
+      "name": "The look the page opens on holds its oil",
+      "shard": "open",
+      "run": "npm run oillaid",
+      "timeout": 4,
+      "why": [
+        "The other half of 27f-9m, in the app on Metal: each oil look opened by the address",
+        "(`?look=`), the solver's own mix field read back a few steps in, against the same",
+        "look laid again on the running page; and Lava Lamp's share against the area of its",
+        "four bodies. Before the fix the first reading was exactly zero. A stand-in cannot",
+        "say that App() and the visualizer lay and attach in the order the node half plays,",
+        "which is why this half is here."
+      ]
+    },
+    {
       "name": "A standing plate is a sealed bottle",
       "shard": "lab7",
       "run": "npm run sealed",
@@ -2266,7 +2315,7 @@
     {
       "name": "The looks browser: stills and one preview, owed",
       "shard": "browser",
-      "run": "npm run looksgrid -- --owed=stills,preview",
+      "run": "npm run looksgrid -- --owed=preview",
       "why": [
         "PLAN 34b written ahead of its build (scripts/looksgrid.mjs): every shipped",
         "look's card on the Perform desk's grid, the narrow window's look menu and the",
@@ -2381,7 +2430,6 @@
       "shard": "browser",
       "run": "node scripts/intro.mjs",
       "env": {"PW_WEBGPU":"1"},
-      "quarantine": [{ "line": "9c. its loading line says what the show waits for", "plan": "19ak-9", "since": "2026-11-21", "until": "2026-12-06" }],
       "why": [
         "The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before",
         "the app has arrived, taken into the plate's frame on the desk and the",
@@ -2410,16 +2458,16 @@
     {
       "name": "The phone controller apps, owed",
       "shard": "browser2",
-      "run": "npm run controller -- --owed=scan",
+      "run": "npm run controller",
       "why": [
         "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
         "the iPhone and Android apps as the Mac's controller. The Mac's set list and",
         "song shows on the phone's remote, and the laptop's half that sends them and",
         "acts on a tap (12-ctl-1); Scan the Phone panel's QR code instead of typing",
         "(12-ctl-2); the Android app as a Capacitor project that may open ws:// to the",
-        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). --owed: each",
-        "line is excused only in main's state and printed as owed; the PR that builds",
-        "it takes its id out and never edits a line. The lines with no id hold on main:",
+        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). Every line is",
+        "built since 12-ctl-2 (2026-11-12), so none is owed: --owed is for a line written",
+        "before its build, excused only in main's state. The lines with no id hold too:",
         "the looks stay on Controls, the laptop answers a controller, no Scan on the",
         "website, no Open in Chrome on the iPhone. No plate needed; about a minute."
       ]
@@ -2871,7 +2919,7 @@
     {
       "name": "The relief",
       "shard": "plate",
-      "run": "npm run derive -- --owed=grad",
+      "run": "npm run derive",
       "why": [
         "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
         "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
