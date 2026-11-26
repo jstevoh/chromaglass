@@ -10716,6 +10716,29 @@ for, and the GPU was asked for only after they had arrived and drawn.
   the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
   (`npm run renders`' gamepad phase), and the poll sets `connected` once.
 
+#### 14a-timers, 14j-gamepad. Covered-window fades on the ear worker's tick, and no gamepad timer without a pad
+
+- **14a-timers** (**shipped**): the look fade (`useLookFades`), the dimmer (`useBlackout`),
+  the row fades (`useRowFades`), the drift glides (`useGlides`), the sequencer, song
+  shows and the simulated band (`simulatedMusic.ts`) step on `showInterval`
+  (`src/lib/showClock.ts`), which live arms `setInterval`. Chrome holds a covered
+  window's own timers to about one a second, so a 4 s Go crossfade fired from a MIDI
+  pad with the show window behind the projector stepped 4 times instead of gliding.
+  `pumpShowIntervals(now)` in `src/lib/showClock.ts` is called from the ear worker's
+  unthrottled 16 ms tick in `src/hooks/useAudioAnalyzer.ts`. Each live `ShowTimer`
+  tracks its next `due` mark on `performance.now()` and whether its last fire came
+  from the pump (`pumped`), so on a visible page whichever of the browser timer and
+  the worker tick arrives first fires the period once and steps `due` past `now`, and
+  the other passes without doubling the writes. Measured by `npm run timers`: a 33 ms
+  look fade over 4 s steps 121 times hidden (was 4) and 121 visible (against 122 at
+  most, whether the tick lands before or after the timer); `npm run ears` unchanged.
+- **14j-gamepad** (**shipped**): `src/hooks/useGamepad.ts` used to arm a 16 ms
+  `setInterval` on mount whether or not a controller was plugged in. Now the poll is
+  armed on `gamepadconnected` (and on mount when `navigator.getGamepads()` already
+  reports a connected pad) and cleared on the last `gamepaddisconnected` (or unmount).
+  Measured by `npm run timers`: 0 timers with no pad (was 1), 1 with one plugged in,
+  0 once unplugged, 0 after unmount.
+
 #### 14z-1. On a New Song opens on Keep
 
 - **14z-1** (**shipped**): On a New Song opens on Keep. Nobody gets a look changed by
@@ -10897,6 +10920,13 @@ sheet. Judged on the Mac: `docs/judging.md` §23.
 #### 18e. Edges come from refraction
 
 **Partly shipped** (#355). What shipped: on projected looks, the front plate's edges come from projector pupil aperture loss and shadowgraph Becke line doublets, from the optical path OPL = n·h and its Laplacian in the derive pass. n is water's 1.333 plus the oil (1.47), the film, the poured liquids' own indices from the species field (18d-9) and a named stand-in for the dye (d·0.015·dyeGain: a dilute dye barely moves the index, and the shelf gives dyes none); h is the gap. A separate Projector Focus control (Settings, desks, MIDI, remote, the phone's Looks sheet; 0.5, in focus, by default, so every look is as before until it moves). Painted specular highlights are gone from projected looks and stay on camera and closeup looks. Named shortcuts (each in `refractionOptics`' notes and the archive): the deflection from the dye's slope, not ∇OPL (18e-2); dyeGain, a contrast gain on the step; the pupil overlap a smoothstep against `DROP_NA` 0.25; the shadowgraph's gain max(1, boundaryContrast·2) and edge mask; the back plate's painted line (18e-1); the dye's stand-in index d·0.015·dyeGain; no heat in n (18e-3). What did not ship is below (18e-1 to 18e-4). Follow-ons (§31, 2026-10-11): **31a** gives the defocus Δz a control that also blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with each liquid's dispersion. Shipped story and measurements in [`docs/plan-shipped.md`](docs/plan-shipped.md) §18e. Open:
+
+- **18e-2. A clear pour's edge, and the deflection from the optical path (shipped 2026-11-15).** The projected plate's pupil loss previously read the ray's deflection from the dye's air-masked slope (`|∇density| · 0.35` in `refractionOptics`) gated on `fluid0.a > 0.03`, so a clear pour (glycerine or syrup into water), a clear oil drop, or a pour into clear water with no dye drew no rim in focus (`projectorFocus = 0.5`), even though `calcOpl` in `DERIVE_WGSL` already built the optical path `n·h` in `.w` from the poured liquids' indices, the oil, the film, the gap, and the dye stand-in. Now:
+  - The projector branch of `DERIVE_WGSL` (`src/gpu/wgsl/plate.ts`) writes `|∇OPL| = length(vec2f(oplX, oplY))` in `.z` from the Sobel taps `o00..o22` it already reads, in place of the 9-tap Laplacian; the camera branch keeps `.z = boundaryDiff` and writes `oplAt(decodeDensity(tex2(src, in.uv).a), in.uv, 1.0)` in `.w`.
+  - The closeup's `lapK` read (`macroDetail`, Layer 0 and Layer 1 in `src/gpu/wgsl/plate.ts`) takes its Laplacian from `.w` via `camLap(derived, fuv)` (`pathLap(t, uv, U.macroRelief * CAMERA_DEFOCUS)` in `src/gpu/wgsl/plateTransmit.ts`), sharing `pathLap` with `defocusShadow`.
+  - `oplPupilLoss` (`src/gpu/wgsl/plateTransmit.ts`) converts `|∇OPL|` per texel from rest-gap units (`DISH_REST_GAP = 0.03` of the plate's width; one texel is `1 / U.logicalGrid` of the width) to the small-angle ray bend `θ = |∇OPL| · DISH_REST_GAP · U.logicalGrid` (scaled by `length(normal0.xy) / (0.9 * max(normal0.z, 1e-4)) / length(dyeGrad)` where dye slopes so `airNear` and `reliefGain(U.glossiness)` carry through, and `1.0` across clear index steps), divides by `2 · DROP_NA` (`DROP_NA = 0.25`), and applies `1.0 - clamp(smoothstep(0.0, 1.0, u) * U.edgeRelief * plateAmt, 0.0, 0.85)` on `outColor` (masked by `phaseCover` over opaque ferrofluid domes) beside `defocusShadow` at all Focus settings, ungated by `fluid0.a > 0.03`.
+  - The dye's stand-in index in `calcOpl` is retuned from `0.015` to `0.06` (`0.35 / (0.03 · 192) = 0.0608`), with `dyeGain = max(1.0, U.boundaryContrast * 3.0)` on `.w` (the out-of-focus shadowgraph) and `1.0` on `.z` (the in-focus pupil loss, scaled by `Edge Relief`), and the old `gLen * 0.35` term in `refractionOptics` is retired (the two-dye boundary term having gone in 18e-5).
+  - *Measured:* `npm run derive` 5/5 (`--owed=grad` removed in `scripts/checks.json`: `.z` min `0.0000`, glycerine rim peak `0.1187` with `0.98` on the step, syrup `0.0997` with `0.98` on the step, clear water `0.0000`, syrup/glycerine `1.00` of the index steps' ratio, `r = -0.180` against the Laplacian); `npm run nolight -- --owed=film` 15/15 (`rim` removed from `--owed`: line 14 clear pour `98.35%` of rim darker by 8+, oil `67.63%`, pour on clear water `99.02%`, brightest by `0..1`, middle and ground moved `0`, index-matched pour moved `0`); `npm run holeline` 17/17 (`pool rim into water` `11.11` levels); `npm run spikes` 6/6 (`16 of the 27 domes near it have a bright point on their top`); `npm run stillcloseup` 13/13; `npm run mixer` 68/68 (`contrast spreads it about mid-grey` `27.6 → 41.1`, `back plate's Own` `10.3`); `npm run closeupdepth` 5/5; `npm run macroview` 6/6; `npm run droplens` 21/21; `npm run grainedge` 4/4; `npm run plate` 50/50.
 
 #### 18i. Bubbles and beads live by physics, not timers
 
@@ -13989,6 +14019,62 @@ page's wait for the window (2 s) ends inside the MCP server's wait for its answe
 had run `npm run lint` out of heap. `assistantProjector.js`
 joins the Mac app's `server` filter. Found: 44k-15a (the cast on the Mac with a real
 projector), 44k-15b (whether the window fills its screen).
+## 44k-16a. Set lists and sequences built from the assistant (2026-11-12)
+
+The eleventh batch of 44k's gaps, asked for by name by the owner on 2026-11-12 ("Both":
+the set list's editing and the sequences'). Until now `set_list` armed and fired an item
+and `sequencer` chose and ran a sequence, but nothing built one. Two tools, one message
+type (`assistant-edit`), read back in `show_state`'s `set` (which now lists the kept sets
+and each item's song) and `sequencer` (each sequence's `builtIn`, `loop` and song):
+
+- `set_list_edit`: add a look (by name or id, built-in or saved) or a sequence, at a
+  place or at the end, with its own row name; remove, move, name an item, tie it to a
+  song (named, or the one identified now) or untie it; rename the set, empty it, keep it
+  (Save), open a kept set, delete a kept set; import a set list file (a whole set
+  replaces the working one, one look or sequence file is added, with the saved looks
+  and sequences it carries) and export one.
+- `sequence_edit`: read a sequence whole (every stage's look by name, timing, palette,
+  ending, settings); new, copy, rename, loop, delete; add, edit, move and take out
+  stages (never the last); bind or unbind its song; import and export its file.
+  Built-in sequences stay as they shipped: an edit of one is refused with "copy it
+  first".
+- Full, because every edit changes the owner's saved work, as the desk's layout is
+  Full; a read and a file written out change nothing and are Suggest. Every edit is on
+  Undo's list: Undo sends `restore`, and the page puts back what that edit changed only
+  while it is still as the edit left it, so a row the performer added since is never
+  taken away by the assistant's Undo.
+- Files: the MCP server runs on the owner's Mac, so `path` reads a file in or writes
+  one out there, a .json file in the home folder only, never over one already there
+  without `overwrite`; without a path, the text goes in and comes back.
+- The guard (`server/assistantEdit.js`) holds the ops, the shapes and the ranges (a
+  stage's 1 to 3600 seconds, 0 to 300 of transition, 1 to 3 dyes, lead 0 to 7, an item
+  or a stage past the list) and refuses rather than clamps; the page (`app/editNow.ts`)
+  finds the names, refuses a room setting on a stage and a setting out of its range,
+  and keeps each write in a mirror until React renders it, so two calls landing before
+  a render both stand. `useSetActions` sets the door; App.tsx did not grow.
+
+Found on the way and fixed: `useShowSequencer`'s `upsertSequence` wrote over the list
+its render saw, so a set list file or a show kit carrying three sequences, upserted one
+after another, kept only the last. It and `removeSequence` now go through the state's
+own updater, and `putSequences` replaces the list whole. Found and written in: 44k-16b
+(an item's own fade and captured rides) and 44k-16c (the show kit, whose import reloads
+the page).
+
+Also found and fixed: `duplicateSequence` (and a new sequence) took its id from the
+millisecond alone, so two made in the same millisecond shared one and the second
+replaced the first; the id now carries a counter. And the sequence chosen is mirrored as
+the set is, so `new` then `add_stage` naming none, before a render, adds to the new one.
+
+Checks: `npm run assistant` gains `scripts/assistant-edit.mjs`: 8 scenario lines (Suggest,
+Play and Full) with 11 mutants of `server/`, each caught, and a page line on the real
+`editNow.ts`, `setList.ts`, `sequencer.ts` and `userPresets.ts`, fed the guard's own
+messages (so the two cannot drift apart on an op or a field) and holding every op the
+guard sends, two edits before a render, Undo leaving the performer's change and as deep
+as the guard's, a file's sequences and saved look kept, a file written that reads back.
+The page line has its own 15 mutants of `editNow.ts`, built in with an esbuild onLoad,
+each caught. A skeptic pass on the first version found 13 of them living; all were
+closed before the PR.
+
 ## 44k-16, 44k-17. The desk from the assistant (2026-11-12)
 
 The tenth batch of 44k's gaps, built by Claude, toward the owner's goal of complete
@@ -14403,6 +14489,21 @@ Garden read as scattered specks at this size and is left off too.
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
 
+## 40. H2c-7 · Readback straight into its ring (2026-11-08)
+
+`WebGPUFluid.readbackAsync` (`src/gpu/fluid/reads.ts`) downsampled each field into
+`readTarget`, copied that into `rbStaging`, and only then asked `ReadbackRing`
+(`src/gpu/kit.ts`) for a free slot and copied staging into it: two copies a field
+(2.36 MB across four copies at 384²), and when both slots were still in flight it still
+downsampled and copied into staging before throwing the work away. `ReadbackRing` now
+exposes `hasFree` and `reserve()` beside `copyFrom`; `ReadGate.wants` and `readbackAsync`
+check that both rings have a free slot before encoding anything (leaving `askedNow`
+uncalled when full so the next frame asks again), and `readbackAsync` copies `readTarget`
+straight into the reserved slot buffer with `copyTextureToBuffer`. `rbStaging` is dropped
+from `FluidCore`. `h2c7` is taken out of `--owed` in `scripts/checks.json`; `npm run
+framereads` 16/16 (`1179648` bytes in 2 copies, `1.00x` a field's bytes, down from
+`2359296` in 4 copies, `2.00x`; 0 dispatches and 0 copies across 6 full asks, down from
+12 and 12; the frame after the full asks reads the plate back with 0 error).
 ## 12-tv-2f. The TV's samples are the channel's films, and the logo on its loading screen (2026-11-14)
 
 Asked by the owner on 2026-11-14: "Let's add the logo to the loading screen for the
@@ -15447,3 +15548,22 @@ cover gap (`coverMetres` / `coverUnits`):
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
 `npm run sizes`, and `npm run quick`.
+## 46k. `dyeDisperse` gated on its own coefficients (2026-11-15)
+
+`src/gpu/fluid.ts` gated the `'dye disperse'` stage on `dispCells > 0 || (kappaT > 0 ? dm > 0
+: dm > 0.0039)`, so whenever the plate moved (`dispCells > 0`) `dyeDisperse` ran even when both
+diffusion terms were zero (`dm = 0` and `kappaT = 0`, as on Classic and the thirteen other
+looks with Diffusion Rate at 0): one full-grid dispatch a step, 25 loads of the rgba32float
+dye a cell, every face flux `±0`, writing back what it read.
+
+Moved to `disperseDye` and `disperseWanted` in `src/gpu/fluid/passes.ts` (`fluid.ts` shrinks by
+689 bytes) and gated on `bodies || dm > 0 || (kappaT > 0 && dispCells > 0)`. Oil Bodies
+(`bodiesOn && !bodiesFresh`) stays outside the gate because `bodyUnspread` (`src/gpu/wgsl/fluid/oil.ts`)
+computes `max(dye - spread, 0) + max(kept, 0)`: `slump` and `decayDye` at the end of the
+previous step act on `this.dye` without updating `this.oilDye`, so a cell where `dye` fell
+below `oilDye` is clamped back up to `oilDye`, and where both are positive `(dye - od) + od`
+in IEEE 754 float32 is not bit-identical to `dye` across different exponents. `npm run
+samelook` 0.00 % past 2 and 0.000 % past 24 on all six looks at 5, 20 and 60 steps; `npm run
+physics` 20/20; `npm run dispersion` 5/5; `npm run encode` 17/17 (`encode` steps with `BASE.diff
+= 0.0001`, so `dm = 5.20e-6 > 0` and its step still runs `dyeDisperse`: 270 thin-gap and 494
+open-plate dispatches).
