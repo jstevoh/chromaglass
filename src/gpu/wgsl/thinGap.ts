@@ -87,9 +87,8 @@
  */
 
 import { HAND_GRIP } from '../../lib/handSolid';
-import { DISH_GAP_FIELD_METRES, OPEN_RIM, OIL_NU } from '../../lib/turntable';
+import { DISH_GAP_FIELD_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
-import { SPIN_OIL_LIGHT } from '../fluid/constants';
 import { thinWarmKernels } from './thinWarm';
 
 /**
@@ -690,13 +689,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     goes round the cells rather than through them. The drag in a column is
     its dynamic viscosity over the one density the solve carries, so the
     oil's is ρ_oil ν_oil, 0.88 of fifty (SPIN_OIL_LIGHT): λ is 44 against
-    water and 1.9 against the default Thickness. \`mixT\` is 1×1 and
-    empty with no oil laid.
+    water and 1.9 against the default Thickness. Which oil it is comes from
+    Oil Thickness (S.oilVisc, ln of ρ_oil ν_oil over ν_water, constants.ts
+    oilBodyLn, PLAN 38w-31): a lava lamp's molten paraffin is about nine,
+    λ 0.35 against the default; held at fifty, it could not sink.
+    \`mixT\` is 1×1 and empty with no oil laid.
   */
   let mixDims = vec2i(textureDimensions(mixT));
   let oilC = clamp(textureLoad(mixT, min(q * mixDims / n, mixDims - 1), 0).r, 0.0, 1.0);
-  let oilBody = exp(clamp(oilC * (${Math.log((1 - SPIN_OIL_LIGHT) * OIL_NU / WATER_NU).toFixed(4)} - lnClear), -9.0, 9.0));
+  let oilBody = exp(clamp(oilC * (S.oilVisc - lnClear), -9.0, 9.0));
   // Clear light mineral oil (Drakeol / baby oil / light paraffin, ~50 cSt at 20°C, 50x water):
+  // the clear film is its own oil, poured from its own bottle, so Oil Thickness (which sets the
+  // coloured oil's drag above, PLAN 38w-31) does not reach it.
   // Two layers stacked across a pressure-driven Poiseuille gap (oil thickness fm against one
   // wall, water depth a = 1 - fm against the other, continuous velocity and shear stress at interface).
   const OIL_REL_NU: f32 = 50.0;

@@ -921,6 +921,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Oil Weight" field="oilWeight" step={0.05} format={(v) => (v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2))} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* And Oil Thickness, how thick that oil is: a lamp's thin molten wax against a thick oil (PLAN 38w-31). */}
+          {(settings?.oilTension ?? 0) > 0.001 && (
+            <Slider label="Oil Thickness" field="oilThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilThickness') as number | undefined} {...sliderProps} connected={connected} />
+          )}
           {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
           {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
             <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />

@@ -143,8 +143,9 @@ const NOT_THE_LOOK = new Set([
   // Oil Weight (PLAN 27f-9c): a lava lamp's wax runs its cycle only while it
   // is heavier than the liquid cold and lighter warm; a wander would float it
   // to the top of the bottle or sink it for good with nobody touching it. The
-  // look's own number, held.
-  'oilWeight',
+  // look's own number, held. Oil Thickness (PLAN 38w-31) likewise: how freely
+  // that wax sinks and rises is its thinness, so a wander would stall the cycle.
+  'oilWeight', 'oilThickness',
   // Soap Breakdown (PLAN 38c-3): 0 is conservation, and turning it up lets
   // soap clear off the plate at a chosen half-life; Evolve must not start a
   // loss by itself.
