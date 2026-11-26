@@ -19,8 +19,8 @@
   },
   "files": {
     "docs/brand/lockup.svg": 115138,
-    "scripts/panel.mjs": 128434,
-    "scripts/phone.mjs": 145641,
+    "scripts/panel.mjs": 128426,
+    "scripts/phone.mjs": 145373,
     "scripts/qa.mjs": 123755,
     "scripts/startup.mjs": 104321,
     "scripts/wall.mjs": 135706,

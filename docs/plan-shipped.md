@@ -3314,6 +3314,40 @@ three seconds of the old rule laid 60 bubbles; the straw's growth with the Amoun
 it was (16 / 40 / 88 / 170 cells² after a second at 0.05 / 0.2 / 0.5 / 1). The flower itself was not rebuilt in
 isolation: 15g-15 says what was ruled out.
 
+### 15g-17. The pointer shoved bubbles and beads, and a pop pushed and swirled (shipped)
+
+Found in the physics-shortcut audit (2026-11): every pointer stroke and every drop called
+`disturb` on the bubbles and the beads, which kicked each one inside a radius straight
+away from the hand by a speed of its own, whatever the liquid under it did; and a pocket's
+pop called `popBubble`, which pushed the liquid inward and gave it a turn. No such force
+exists. A pocket of air in a thin gap is moved by the liquid round it, at the
+Taylor–Saffman speed (twice the liquid's mean speed for an inviscid bubble), and a bead
+of oil at 2/(1+λ) of it, both of which `step` already did; the kick came on top. A pop is
+the gap closing over the air: the squeeze that held the pocket open lets go, and the
+liquid flows in from all round, which is a sink with no curl. The fix: `disturb` is gone
+from both fields, and the one real thing a tool does to a pocket stays as `engulf(x, y,
+r)`: liquid laid over a pocket (only the laying tools) takes it, popped. The pop's push is
+gone too: the standing squeeze it releases already makes the sink. The sound's kick press
+no longer moves the beads either; it moves the liquid, which carries them. Measured by
+`npm run bubblephysics` ("a drop beside a pocket on still liquid leaves it where it
+was"): on main the pocket moved 1.7 cells, on the branch 0, with 25 of 25 passing.
+
+### 15g-18. A press twisted the liquid it squeezed (shipped)
+
+Found in the same audit: the local press (the pointer held with Press) laid a vortex round
+its disc on every frame, on top of the squeeze (`applySquish`) and the squeeze-out; the
+remote press (`performGesture` 'press', the phone and the show server) had only the
+squeeze. Two glasses pressed together push the liquid straight out from under the
+pressed patch, a source flow, and turn nothing unless the hand turns. The twist loop is
+gone, and both paths are the squeeze and the squeeze-out. Measured by `npm run tools`
+("a press squeezes the liquid out and does not turn it", mouse and remote, on the thin
+gap and with Thin Gap off): the arc a pool beside the palm turned round it in 1.5 s held
+down. With Thin Gap off it was 0.0046 and 0.0059 plate widths on main, against 0.0007 at
+rest (it fails), and 0.0000 and 0.0001 on the branch. On the thin gap main turned it 0.0010 against 0.0003 at rest
+and the branch 0.0000, too small to fail: the twist was 0.16·k a cell a frame, and the thin
+gap's wall drag takes away a velocity nobody keeps pushing within a few steps. The
+squeeze still moved the pool +0.035 out on the thin gap and +0.20 on the open plate.
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
@@ -4825,6 +4859,18 @@ time τ = √(ρD³/σ) (`dropEntrySeconds`: 0.043 s, three steps, at amount 5; 
 through the whole window rather than `DROP_CORE`'s 0.7 patch over five numerical steps. In the
 lab, a yellow drop of amount 30 in a cyan pool: the pool's red in the middle 1.795 → 0.061
 (0.090 before), the same dye stamped with no volume 0.856, no window.
+
+### 18c-14. The idle plate laid dye and heat by itself (shipped)
+
+Found in the physics-shortcut audit (2026-11): "ambient seeding" laid 0.05 of dye and 0.02
+of heat a frame each from three Lissajous orbits, on every look, every frame, whether or
+not anything touched the plate. A real plate has no hidden hand: a quiet passage should
+settle, the colour on it spreading, diffusing and draining. It also meant every check that
+read where a hand's colour went had to switch the seeder off first through a debug hook
+(`ambientSeed`), which is gone with it. The emergency seed, which wakes a plate that is
+entirely empty, stays. Measured by `npm run tools` ("a plate left alone gains no colour"):
+with nothing touching it the plate's colour went 602 → 638 over 242 steps on main (+5.9%) and
+529 → 529 over 243 steps on the branch (0.0%).
 
 ### 18d. Each liquid has its real properties
 
