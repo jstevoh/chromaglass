@@ -116,14 +116,14 @@ function extract(read) {
     rms: finite(ds.rms?.med),
     p95,
     // Edges (Greenberg)
-    edgeWidth: finite(ds.edgeWidth?.med),
+    edgeWidth: ds.edgeWidth?.reliable === false ? null : finite(ds.edgeWidth?.med),
     // Form (wet show / Greenberg)
-    scaleX: finite(ds.scaleX?.med),
+    scaleX: ds.scaleX?.reliable === false ? null : finite(ds.scaleX?.med),
     coherence: finite(ds.coherence?.med),
-    forms: finite(ds.forms?.med),
-    formArea: finite(ds.formArea?.med),
-    elongation: finite(ds.elongation?.med),
-    spectrum: finite(ps.spectrum?.med),
+    forms: ds.forms?.reliable === false ? null : finite(ds.forms?.med),
+    formArea: ds.forms?.reliable === false ? null : finite(ds.formArea?.med),
+    elongation: ds.forms?.reliable === false ? null : finite(ds.elongation?.med),
+    spectrum: ps.spectrum?.reliable === false ? null : finite(ps.spectrum?.med),
     // Composition (Arnheim / Greenberg / Ching)
     spread: finite(ds.spread?.med),
     centroidOffset,

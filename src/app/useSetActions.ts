@@ -1,4 +1,4 @@
-import { useState, useCallback, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useState, useCallback, useEffect, useRef, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import { type SetItemKind, setItemId, readSetListFile, withSavedSet, loadSavedSets, SETLIST_FILE_EXT, writeSetListFile, starterSet, moveItem, type SetList } from '../lib/setList';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import type { SetAction, SetItemAction } from '../components/desk/deskProps';
@@ -9,6 +9,8 @@ import type { ShowSequence } from '../lib/sequencer';
 import type { SongRef } from '../lib/songRef';
 import type { useUserPresets } from '../hooks/useUserPresets';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
+import { setEditDoor } from './editNow';
+import { readSetNow } from './setNow';
 
 /**
  * The set list's own edits: add an item, import a file into the set, the set
@@ -133,6 +135,35 @@ export function useSetActions({
     sequencer.upsertSequence(parsed.sequence);
     sequencer.setSelectedId(parsed.sequence.id);
   };
+
+  /*
+    The owner's assistant builds the set and the sequences through the same
+    writes as the set menu and the Sequences panel (app/editNow.ts, PLAN
+    44k-16a). The door is set once and reads what changes through `live`, so
+    a call never edits through the callbacks of a render gone by.
+  */
+  const live = useRef({ sequencer, userPresets, currentSong });
+  live.current = { sequencer, userPresets, currentSong };
+  useEffect(() => {
+    setEditDoor({
+      set: () => setListRef.current,
+      changeSet: (next) => { setListRef.current = next; changeSet(next); },
+      saved: () => readSetNow().saved,
+      changeSaved: (next) => changeSaved(() => next),
+      sequences: () => live.current.sequencer.sequences,
+      putSequences: (user) => live.current.sequencer.putSequences(user),
+      removeSequence: (id) => live.current.sequencer.removeSequence(id),
+      select: (id) => live.current.sequencer.setSelectedId(id),
+      selected: () => live.current.sequencer.selectedId,
+      looks: () => [...PRESETS.map(p => ({ id: p.id, name: p.name, user: false })), ...userPresetsRef.current.map(p => ({ id: p.id, name: p.name, user: true }))],
+      presets: () => userPresetsRef.current,
+      upsertPreset: (p) => live.current.userPresets.upsert(p),
+      song: () => live.current.currentSong,
+      setLive: (id) => setLiveItemId(id),
+    });
+    return () => setEditDoor(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     addingToSet, setAddingToSet, addToSet, importToSet, onSetAction, onItemAction,
