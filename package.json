@@ -120,6 +120,7 @@
     "ears": "npm run build && node --experimental-strip-types scripts/ears.mjs",
     "renders": "npm run build && node scripts/renders.mjs",
     "kickbubbles": "npm run build && node scripts/kickbubbles.mjs",
+    "pictureplate": "npm run build && node scripts/pictureplate.mjs",
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
     "crash": "npm run build && node scripts/crash.mjs",
     "watch": "node scripts/watch.mjs",

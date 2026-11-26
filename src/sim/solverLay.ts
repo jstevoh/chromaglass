@@ -191,7 +191,7 @@ export const SOLVER_OIL_LOOKS: ReadonlySet<string> = new Set(['classic', 'foam-c
 type Noise = (x: number, y: number) => number;
 
 export class OwedLay {
-  private owed: { look: string; noise: Noise; delta: Float32Array[] } | null = null;
+  private owed: { look: string; noise: Noise; dyes: readonly number[] | null; delta: Float32Array[] } | null = null;
   get pending(): boolean { return this.owed !== null; }
 
   /** `arrays` hands over the four dye arrays as they are now (a resize makes new ones). */
@@ -202,7 +202,7 @@ export class OwedLay {
    * and the look lays its oil on the solver, keep what `f` put in the dye
    * arrays, to take back and lay again at the attach.
    */
-  lay<T>(free: boolean, look: string, noise: Noise, f: () => T): T {
+  lay<T>(free: boolean, look: string, noise: Noise, f: () => T, dyes: readonly number[] | null = null): T {
     /*
       Any later lay supersedes what was owed, whether or not it is owed in
       turn. A Go before the device is up lays the next look through a capture
@@ -220,7 +220,7 @@ export class OwedLay {
         for (let i = 0; i < a.length; i++) d[i] = a[i] - b[i];
         return d;
       });
-      this.owed = { look, noise, delta };
+      this.owed = { look, noise, dyes: dyes?.length ? [...dyes] : null, delta };
     }
     return out;
   }
@@ -230,9 +230,9 @@ export class OwedLay {
   /**
    * At an attach: nothing is owed after it. With `relay` (no plate carried
    * across), the owed lay's dye is taken back out of the arrays and `lay` is
-   * handed its look and noise to lay them on the solver.
+   * handed its look, noise and pinned dyes to lay them on the solver.
    */
-  take(relay: boolean, lay: (look: string, noise: Noise) => void): void {
+  take(relay: boolean, lay: (look: string, noise: Noise, dyes: readonly number[] | null) => void): void {
     const o = this.owed;
     this.owed = null;
     if (!o || !relay) return;
@@ -242,7 +242,7 @@ export class OwedLay {
       const a = arrays[c], d = o.delta[c];
       for (let i = 0; i < a.length; i++) a[i] = Math.max(0, a[i] - d[i]);
     }
-    lay(o.look, o.noise);
+    lay(o.look, o.noise, o.dyes);
   }
 }
 
