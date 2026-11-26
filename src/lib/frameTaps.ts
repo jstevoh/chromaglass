@@ -15,8 +15,9 @@ import { tapPadPicture } from './padPicture';
 import { tapLiveFrame } from './liveFrame';
 import { tapTvFeed } from './tvFeed';
 
-export function tapFrameCopies(canvas: HTMLCanvasElement): void {
+export function tapFrameCopies(canvas: HTMLCanvasElement, stackCanvas: HTMLCanvasElement | null = null): void {
   tapPadPicture(canvas);
   tapLiveFrame('plate', canvas);
+  if (stackCanvas) tapLiveFrame('stack', stackCanvas);
   tapTvFeed(canvas);
 }
