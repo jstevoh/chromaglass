@@ -922,7 +922,23 @@ export class FluidPasses extends FluidFields {
   }
 
   /**
-   * One carry (`bodyAdvect` or `mixAdvect`) of `field` along the step's
+   * Whether the dye can be carried as its two liquids' shares this step
+   * (PLAN 38w-29, 38w-32; the advect dye stage in fluid.ts): the split, the
+   * join and the oil's own carry (`sharp`, the thin gap's with or without
+   * the air, or the old plate's) all built. Asking builds the ones that are
+   * not, so the step after a bubble first lands or Thin Gap is first turned
+   * off carries the old way only until they are in.
+   */
+  /** How many steps carried the oil's colour in the air's room (bodyAdvectSharpSubAir): `npm run oilride -- --plate=air` asks it ran, not only that there was air. */
+  sharpAirCarries = 0;
+
+  protected splitReady(sharp: string, od: PingPong): boolean {
+    const f = od.read.format;
+    return !!this.pipeline('bodyWater', f) && !!this.pipeline('bodyJoin', f) && !!this.pipeline(sharp, f);
+  }
+
+  /**
+   * One carry (`bodyAdvect`, `bodyAdvectSharp` or `mixAdvect`) of `field` along the step's
    * velocity, in the substeps planCarry chose: the first as always, the rest
    * in pairs that go to the write field and back, each pair dispatched
    * indirectly so one this step does not need runs no workgroups. The field
@@ -936,10 +952,11 @@ export class FluidPasses extends FluidFields {
       airArgs; airLiquid in wgsl/fluid.ts, PLAN 15g-8b), in their Air kernels;
       until one is built, the plain carry, which keeps every amount too.
     */
-    const airPipe = argsAt && name === 'bodyAdvect' ? this.pipeline(`${kernelName}Air`, field.format) : null;
+    const airPipe = argsAt && name !== 'mixAdvect' ? this.pipeline(`${kernelName}Air`, field.format) : null;
     const pipe = airPipe ?? this.pipeline(kernelName, field.format);
     if (!pipe) return;
     if (!airPipe) argsAt = undefined;
+    else if (name === 'bodyAdvectSharp') this.sharpAirCarries++;
     const ride = this.ride();
     const air = airPipe ? this.airPair() : null;
     const group = (a: GPUBuffer, src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {

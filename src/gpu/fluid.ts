@@ -189,8 +189,9 @@ export class WebGPUFluid extends FluidCover {
       ['bodyUnspread', [dye], open.oilBodies],
       ['bodyLand', [dye], open.oilBodies],
       ['bodyLay', [dye], open.oilBodies],
-      ['bodyWater', [dye], open.oilBodies && open.thinGap],
-      ['bodyJoin', [dye], open.oilBodies && open.thinGap],
+      ['bodyWater', [dye], open.oilBodies],
+      ['bodyJoin', [dye], open.oilBodies],
+      ['bodyAdvectSharp', [dye], open.oilBodies && !open.thinGap],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -280,6 +281,7 @@ export class WebGPUFluid extends FluidCover {
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // The oil's colour carried as the oil is (PLAN 38w-29, the advect dye stage), from the open where the look keeps its bodies.
       add(`bodyAdvectSharpSub:${dye}`, kernel('bodyAdvectSharpSub', dye), open.oilBodies);
+      add(`bodyAdvectSharpSubAir:${dye}`, kernel('bodyAdvectSharpSubAir', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's lift up a rocked plate (PLAN 27f-5): waited for where a look's own oil opens on one (Opening.oilLift), else behind the show.
@@ -1131,24 +1133,28 @@ export class WebGPUFluid extends FluidCover {
           The oil's colour is carried as the oil is (PLAN 38w-29): the dye
           split into the water's share and the oil's, each through the faces
           with its own liquid's limiter, then joined (bodyAdvectSharp says
-          why). Not yet while there is air: the air's carries are built for
-          the one limiter (PLAN 38w-32).
+          why), with a bubble on the plate too, in the air's room (PLAN
+          38w-32); the old carry until the kernels it needs are built.
         */
-        const split = !thinAt && !!this.pipeline('bodyWater', od.read.format) && !!this.pipeline('bodyJoin', od.read.format);
+        const split = this.splitReady(thinAt ? 'bodyAdvectSharpSubAir' : 'bodyAdvectSharpSub', od);
         if (split) { this.run(pass, 'bodyWater', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
-        this.carrySubsteps(pass, split ? 'bodyAdvectSharp' : 'bodyAdvect', od, thinAdv, undefined, split ? undefined : thinAt);
+        this.carrySubsteps(pass, split ? 'bodyAdvectSharp' : 'bodyAdvect', od, thinAdv, undefined, thinAt);
         if (split) { this.run(pass, 'bodyJoin', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
+      // The old plate's the same way (PLAN 38w-32): its oil rides mixAdvect's superbee too.
+      const split = this.splitReady('bodyAdvectSharp', od);
+      if (split) { this.run(pass, 'bodyWater', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
       this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], adv);
       this.dye.swap();
-      this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
+      this.runPressed(pass, split ? 'bodyAdvectSharp' : 'bodyAdvect', od.write, [od.read, this.velForced], adv);
       od.swap();
+      if (split) { this.run(pass, 'bodyJoin', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
       this.carryLiquids(pass, 'pressed', adv);
       if (this.chemLive) {
         this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);

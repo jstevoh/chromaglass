@@ -3635,6 +3635,28 @@
       ]
     },
     {
+      "name": "The oil's colour rides the oil past a bubble",
+      "shard": "plate",
+      "run": "npm run oilride -- --plate=air",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-32: the same hand with a bubble drifting through the oil, the",
+        "carries taking the air: the oil keeps its share of the dye (0.65% went",
+        "to the water before the split carry ran with air). About nine minutes."
+      ]
+    },
+    {
+      "name": "The oil's colour rides the oil on the old plate",
+      "shard": "plate",
+      "run": "npm run oilride -- --plate=old",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-32: the same hand with Thin Gap off: the oil keeps its share",
+        "of the dye (1.21% went to the water before the old plate's carry was",
+        "split). About five minutes."
+      ]
+    },
+    {
       "name": "Oil and water as bodies",
       "shard": "plate",
       "run": "npm run bodies",
