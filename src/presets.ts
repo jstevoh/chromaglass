@@ -73,7 +73,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0,
       viscosity: 'thick',
-      polarity: 0.85,
       evaporationRate: 0.002,
       airVelocity: 0.02,
       vibrationFrequency: 0.05,
@@ -83,7 +82,6 @@ export const PRESETS: Preset[] = [
         through a hand instead (sceneMappings below, Plate Rock).
       */
       audioImpact: 0,
-      blobSurfaceTension: 0.45,
       boundaryContrast: 0.3,
       saturationBoost: 1.0,
       glossiness: 0.2,
@@ -139,11 +137,9 @@ export const PRESETS: Preset[] = [
       automateRate: 0.3,
       dyeBudget: 0.6,
       viscosity: 'thick',
-      polarity: 0.8,
       evaporationRate: 0.006,
       audioImpact: 0.6,
       turbulenceScale: 0.3,
-      blobSurfaceTension: 0.4,
       boundaryContrast: 0.6,
       saturationBoost: 1.5,
       sceneMappings: [
@@ -188,14 +184,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,             // 0.15 was under the old 0.2 gate and smeared nothing (PLAN 27h-2)
       rainDrip: 0.0,             // no dripping — weightless space
       viscosity: 'thin',         // thin — fluid fragments into filaments and streams
-      polarity: 0.25,            // low — colors intermingle freely like nebula gas
       evaporationRate: 0.006,    // void stays clear between the spiral arms
       airVelocity: 0.02,         // near-vacuum — no turbulence
       vibrationFrequency: 0.0,   // no vibration — serene void
       audioImpact: 0.4,
       turbulenceScale: 0.55,     // strong swirl — spiral arms shear and stretch
       turbulenceDetail: 4,       // fine filament detail down to star-cluster scale
-      blobSurfaceTension: 0.1,   // colours barely hold apart, and run together
       boundaryContrast: 0.25,
       saturationBoost: 1.45,     // vivid nebula color
       // A galaxy is mostly void: at 0.35 with the LED platform on, near-black
@@ -260,7 +254,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
-      polarity: 0.75,
       // 28i-2: at 0.05 on treble density the plate dried to 99% black and one
       // blue hue. At 0.005 on bass density with a 0.70 budget, pink, cyan and
       // lime neon stay on screen (95th-pct near black under 60%, ≥3 hues).
@@ -320,7 +313,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.4,
       plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
-      polarity: 0.75,            // 28i-7: immiscible enough that five colours stay five
       // It lays dye on the weakest thing the music does (timbre) and dried it at
       // 0.04, so with a band playing the plate ran empty and the frame was the
       // bare LED wheel. It holds its dye now, and the wheel shows through it.
@@ -331,7 +323,6 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.9,
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.35,  // 28i-7: was 0.15, and the bodies ran together
       edgeRelief: 0.65,
       boundaryContrast: 0.75,     // hard psychedelic color interfaces
       saturationBoost: 1.6,      // hyper-saturated
@@ -384,7 +375,6 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.08,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.7,
       // 28i-7 (film 2026-11-11): at 0.24 and 0.020 one blue body was left of
       // the three wells' colours. Enough for all three, black still between.
       evaporationRate: 0.012,
@@ -465,8 +455,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.5,
       rainDrip: 0.05,
       viscosity: 'thick',
-      polarity: 0.15,
-      blobSurfaceTension: 0.05,
       evaporationRate: 0.005,    // 28i-7: a little bright field between the cells
       airVelocity: 0.06,
       vibrationFrequency: 0.02,
@@ -517,7 +505,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
-      polarity: 0.4,
       evaporationRate: 0.008,
       // Curtains, not a sheet: a full plate on the lighter blend was one flat
       // green. With less dye and the thin film read as sky, the ocean lamp
@@ -581,7 +568,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.6,
       rainDrip: 0.05,
       viscosity: 'thin',
-      polarity: 0.3,
       evaporationRate: 0.012,
       airVelocity: 0.35,
       vibrationFrequency: 0.6,
@@ -632,7 +618,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.45,
       plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thick',
-      polarity: 0.85,
       evaporationRate: 0.003,
       airVelocity: 0.06,
       vibrationFrequency: 0.25,
@@ -695,7 +680,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.3,
       plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
-      polarity: 0.65,
       evaporationRate: 0.025,
       airVelocity: 0.25,
       vibrationFrequency: 0.55,
@@ -767,7 +751,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.6,
       plateUpright: 0.05, // 3 deg: pools stay pools (38u-12)
       viscosity: 'thick',
-      polarity: 0.9,
       evaporationRate: 0.004,
       airVelocity: 0.04,
       vibrationFrequency: 0.15,
@@ -833,7 +816,6 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.55,
       plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thick',
-      polarity: 0.75,
       evaporationRate: 0.012,
       airVelocity: 0.12,
       vibrationFrequency: 0.4,
@@ -888,7 +870,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.45,
       rainDrip: 0.1,
       viscosity: 'thin',
-      polarity: 0.65,
       evaporationRate: 0.011,
       dyeBudget: 0.24,
       saturationBoost: 1.6,
@@ -922,8 +903,8 @@ export const PRESETS: Preset[] = [
   // ── Macro closeup presets ────────────────────────────────────────
   // These drive the tracking macro camera (macroMode). The frame rides one
   // bead of dye at high magnification, so the settings that matter most are
-  // the ones that keep dye *separated* into distinct beads — high polarity,
-  // low diffusion, low gooey blur — and fast enough to be worth chasing.
+  // the ones that keep dye *separated* into distinct beads — low diffusion,
+  // low gooey blur (Polarity was the third; it went with PLAN 18d-6, and Hold Apart is its dial) — and fast enough to be worth chasing.
   {
     /*
       PLAN.md 26d. The owner's "Mask Reaction Diff" pack, done as the chemistry
@@ -961,14 +942,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.75,
       evaporationRate: 0.0,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
       audioImpact: 0.4,
       turbulenceScale: 0.15,
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0,
       saturationBoost: 1.45,
       dyeBudget: 0.85,
@@ -1044,14 +1023,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 1.0,
       evaporationRate: 0.002,
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
       audioImpact: 0.7,
       turbulenceScale: 0.55,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.6,
       boundaryContrast: 0.9,
       saturationBoost: 1.6,
       glossiness: 0.0,
@@ -1118,14 +1095,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.05,
       viscosity: 'thick',
-      polarity: 0.98,            // strong immiscibility — hard color boundaries
       evaporationRate: 0.005,
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
       audioImpact: 0.6,
       turbulenceScale: 0.45,
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.75,
       layerScaleVariety: 0,
       boundaryContrast: 0.7,
       saturationBoost: 1.55,
@@ -1187,7 +1162,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.85,
       evaporationRate: 0.0,      // 28i-2: keeps the cells bright past 40 s (luma(40s) >= half luma(8s), flat <= 0.4)
       dyeBudget: 0.85,
       airVelocity: 0.05,
@@ -1195,7 +1169,6 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.55,
       turbulenceScale: 0.22,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.65,
       layerScaleVariety: 0,
       boundaryContrast: 0.8,
       saturationBoost: 1.55,
@@ -1258,14 +1231,12 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.2,
       plateUpright: 0.25,      // tipped 15 degrees: Rain Drip's downhill (38u-12)
       viscosity: 'thin',
-      polarity: 0.98,
       evaporationRate: 0.005,
       airVelocity: 0.2,
       vibrationFrequency: 0.1,
       audioImpact: 0.65,
       turbulenceScale: 0.7,
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.15,
       layerScaleVariety: 0,
       boundaryContrast: 0.8,
       saturationBoost: 1.5,
@@ -1315,12 +1286,10 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.7,
       evaporationRate: 0.0025,
       audioImpact: 0.65,           // the music stirs the plate when no camera is on
       turbulenceScale: 0.35,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.1,
       saturationBoost: 1.45,
       dyeBudget: 1.0,
@@ -1395,14 +1364,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.9,               // the colours stay four colours, not one brown one
       evaporationRate: 0.001,      // the ground has to last; this is a long, slow dish
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
       audioImpact: 0.35,           // the beat is when a drop lands, not a shove of its own
       turbulenceScale: 0.08,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.7,
       boundaryContrast: 0.55,      // a bright line where a colour front meets the ground
       saturationBoost: 1.55,
       exposure: 0.72,              // 28i-2: tames the white milk ground so the food colouring holds luma <= 0.6
@@ -1466,14 +1433,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.35,
       rainDrip: 0.0,
       viscosity: 'thin',
-      polarity: 0.5,
       evaporationRate: 0.004,      // a film that is always thinning is always about to go (0.006 left 78% black, 28i-7)
       airVelocity: 0.05,
       vibrationFrequency: 0.05,
       audioImpact: 0.5,
       turbulenceScale: 0.3,        // some vorticity, so the fronts curl instead of ringing
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.2,
       boundaryContrast: 0.7,       // the rim of a hole is the brightest thing in frame
       saturationBoost: 1.35,
       glossiness: 0.2,
@@ -1596,7 +1561,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
       evaporationRate: 0.001,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
@@ -1656,7 +1620,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
       evaporationRate: 0.004,
       airVelocity: 0.05,
       vibrationFrequency: 0.15,
@@ -1713,12 +1676,10 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
       audioImpact: 0.5,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
       /*
         The plate's domes read by the white point on each top against the
@@ -1785,13 +1746,11 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.3,
       rainDrip: 0.1,
       viscosity: 'thick',
-      polarity: 0.75,
       evaporationRate: 0.004,
       airVelocity: 0.06,
       vibrationFrequency: 0.1,
       audioImpact: 0.7,
       turbulenceScale: 0.45,
-      blobSurfaceTension: 0.4,
       boundaryContrast: 0.4,
       saturationBoost: 1.4,
       dyeBudget: 0.8,
@@ -1856,13 +1815,11 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.85,
       evaporationRate: 0.003,
       airVelocity: 0.04,
       vibrationFrequency: 0.05,
       audioImpact: 0.7,
       turbulenceScale: 0.45,
-      blobSurfaceTension: 0.45,
       boundaryContrast: 0.35,
       saturationBoost: 1.45,
       dyeBudget: 0.5,  // 28a: the purple water stood so deep the lamp barely came through (luma 0.08 on the Mac); 18b-8
@@ -1931,12 +1888,10 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.85,
       evaporationRate: 0.002,
       airVelocity: 0.02,
       vibrationFrequency: 0.05,
       audioImpact: 0.5,
-      blobSurfaceTension: 0.45,
       boundaryContrast: 0.3,
       saturationBoost: 1.3,      // at 1.6 the hot pink read as a second red
       dyeBudget: 0.8,
@@ -1998,12 +1953,10 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
       audioImpact: 0.5,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
       saturationBoost: 1.55,
       dyeBudget: 1.0,
@@ -2083,14 +2036,12 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       // Two primaries that meet stay two primaries, with a hard seam.
-      polarity: 1.0,
       evaporationRate: 0.0006,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
       turbulenceScale: 0.3,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.6,
       boundaryContrast: 0.0,
       saturationBoost: 1.5,
       colourBody: 0.5,
@@ -2241,7 +2192,6 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
       evaporationRate: 0.001,
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
@@ -2264,7 +2214,6 @@ export const PRESETS: Preset[] = [
         4% of the oil was gone as oil in fourteen seconds, at 0 none of it.
       */
       turbulenceScale: 0,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
       saturationBoost: 1.45,
       /*
@@ -2349,12 +2298,10 @@ export const PRESETS: Preset[] = [
       glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.85,
       evaporationRate: 0.002,
       airVelocity: 0.02,
       vibrationFrequency: 0.05,
       audioImpact: 0.5,
-      blobSurfaceTension: 0.4,
       boundaryContrast: 0.3,
       saturationBoost: 1.2,
       dyeBudget: 0.7,

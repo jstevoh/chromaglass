@@ -293,6 +293,17 @@ export function provideReport(parts: {
   if (parts.grab) grab = parts.grab;
 }
 
+/**
+ * The plate's frame, read once, for a saved look's chip (lib/lookThumbs.ts,
+ * PLAN 34b-6). The visualizer hands the app one door to its picture, here,
+ * for the report; a second door for the thumbs would grow LiquidVisualizer.tsx,
+ * which is at its size ceiling (`npm run sizes`), to register the same
+ * function twice. Null before a plate is up, and from a draft preview.
+ */
+export function grabPlateFrame(): Promise<{ width: number; height: number; pixels: Uint8Array; painted: boolean } | null> | null {
+  return grab ? grab() : null;
+}
+
 export function subscribe(fn: (e: CrashEntry) => void): () => void {
   listeners.add(fn);
   return () => { listeners.delete(fn); };

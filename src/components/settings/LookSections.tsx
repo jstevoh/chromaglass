@@ -103,15 +103,6 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="grainScale"
         />
         <Slider
-          label="Blob Surface Tension"
-          value={settings.blobSurfaceTension}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
-          settingKey="blobSurfaceTension"
-        />
-        <Slider
           label="Dye Budget"
           value={settings.dyeBudget ?? 0.85}
           min={0.1}
