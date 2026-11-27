@@ -67,6 +67,7 @@ export function useLookLists({ allPresets, userPresetsRef, setList, fadeSeconds,
       return {
         id: item.id,
         name,
+        note: look?.description,
         lookId,
         swatch: swatchOf(lookId),
         fade: item.fade ?? fadeSeconds,

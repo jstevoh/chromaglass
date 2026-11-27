@@ -173,7 +173,7 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           Faraday waves at half the drive's frequency.
         */}
         <Slider
-          label="Shaker Hz"
+          label="Shaker"
           value={settings.faradayHz ?? 0}
           min={0}
           max={150}
@@ -184,7 +184,7 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
         {(settings.faradayHz ?? 0) > 0 && (
           <>
             <Slider
-              label="Shake g"
+              label="Shake"
               value={settings.faraday ?? 0}
               min={0}
               max={2}
@@ -199,7 +199,7 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
               so a bass pulse's pattern reads (wgsl/plateFaraday.ts).
             */}
             <Slider
-              label="Rock Hz"
+              label="Rock"
               value={settings.faradayRock ?? 0}
               min={0}
               max={2}

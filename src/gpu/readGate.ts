@@ -29,6 +29,9 @@ export class ReadGate {
   private asked = 0;
   private readonly taken = new Map<ReadbackRing, number>();
 
+  /** Number of submits that may have changed a field so far (H2c-9). */
+  get count(): number { return this.wrote; }
+
   /** A submit that may have changed a field. */
   wroteOne(): void { this.wrote++; }
 

@@ -35,7 +35,7 @@ export const CONTROL_HELP: Record<string, string> = {
   beatLead: 'How far ahead of a heard beat a predicted kick fires, to make up for the sound\'s trip through the room and the mic.',
 
   // Look
-  dyeBudget: 'How full the plate runs, from mostly clear glass to wall to wall colour. The picked bottle shows what is left.',
+  dyeBudget: 'How full the plate runs, from mostly clear glass to wall to wall colour. The picked bottle leans as room drops.',
   turbulenceScale: 'Adds stirring to the flow: swirls at many sizes, from lazy to churning.',
   turbulenceDetail: 'How many sizes of swirl are stirred in, from broad eddies only to fine curls on top.',
   plateRock: 'A hand tips the dish with the beat, and the heavier colour runs downhill each way.',
