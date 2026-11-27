@@ -3166,3 +3166,18 @@ crosses the solubility curve, the oil is conserved); how it looks in a show is t
    lands. Bad: dye over a large part of the dish, a minute with no white, flat opaque discs
    like paint, the whole plate a grey veil inside a few minutes. Judged from the Mac's film
    of the retune (the thread's page), not by loading the app.
+
+## 151. Oil threads pinch into beads (PLAN 38w-27)
+
+Asked 2026-11-27. On the Mac (the app's 512² or 768² grid; a 192² plate has no thread narrow
+enough to bead, by design).
+1. Open **Classic**, press with a hand (Beat Squeeze 0.6, Plate Rock 1.6) so the oil is pushed
+   into long thin strands, then let go. Good: within a second or two of letting go a strand
+   thinner than the glass gap (about a fifth of a millimetre on screen at 512², a few pixels)
+   breaks into a row of round beads, evenly spaced, like a string of pearls; a wide band of oil
+   stays a band. Bad: oil that crumbles into speckle while still pressed, every edge of a big
+   body going lumpy, or beads that shimmer or jitter cell to cell.
+2. Any oil look poured fine (**Oil & Water**, **Clock Glass**): good, small drops and the edges
+   of big bodies look as they did.
+To put it back: THREAD in `src/gpu/wgsl/fluid/capillary.ts` returns 0 from threadCurve
+(`npm run beads` then reads one body, as main did).

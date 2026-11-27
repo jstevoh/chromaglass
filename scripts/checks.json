@@ -3658,6 +3658,19 @@
       ]
     },
     {
+      "name": "Oil threads pinch into beads",
+      "shard": "plate",
+      "run": "npm run beads",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-27: a pressed thread on Classic stayed a thread. On a thin gap",
+        "at 512², a thread of oil narrower than the gap breaks into beads",
+        "(Rayleigh–Plateau, its curvature across the gap) and a ribbon wider",
+        "than the gap holds (confinement); no oil made or lost. About seven",
+        "minutes on software WebGPU."
+      ]
+    },
+    {
       "name": "The oil's colour rides the oil",
       "shard": "plate",
       "run": "npm run oilride",
