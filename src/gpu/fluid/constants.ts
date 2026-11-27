@@ -723,6 +723,81 @@ export const KAPPA_WATER = 1.4e-7; // m²/s
 */
 export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
 /*
+  Hold Apart: the tension between two waters that differ only in their dye
+  (PLAN 18d-6, forcesB in wgsl/fluid/forces.ts has the stress).
+
+  What was there: a push between unlike colours, sized by two dials at once
+  (Polarity times Blob Surface Tension, 0.02 or so in every look), written
+  as a step's velocity along the gradient of the squared colour difference.
+  Two dyes in the same water are one liquid. They have no interface to
+  carry a tension, and they mix: by the dye's own diffusion (D_MOLECULAR
+  below, 4e-10 m²/s) and by the flow folding one into the other, the light
+  through both taken out band by band (the plate's Beer–Lambert sum). So
+  the real number is nothing, and that is the dial's 0 and every look's
+  default (the owner, 2026-11-27: dyes mix as real dyes do, with a Hold
+  Apart dial past real).
+
+  Not quite nothing, which is where the dial's law comes from. A steep
+  change of composition in one liquid does carry a stress while it lasts,
+  K(|∇c|² I − ∇c⊗∇c) (Korteweg 1901; Joseph 1990): tension along the edge
+  and none across it, K∫|∇c|² dn of it in all, falling as the edge spreads.
+  Measured between glycerine and water it is about half a millinewton a metre on a
+  fresh edge (Petitjeans and Maxworthy 1996), and it goes as the square of the
+  difference, so between two dilute dyes in the same water (a per cent or
+  less of dye) it is some 1e-7 N/m: a millionth of what the dial's 1 lays.
+  The dial scales that stress and nothing else, so past 0 the colours
+  behave as two liquids that will not quite mix: an edge between them
+  pulls itself short, a pool rounds, a filament draws back, and an edge
+  that has blurred holds less than a sharp one.
+
+  HOLD_APART_SIGMA is the tension a sharp step of one unit of absorbance
+  carries at the dial's 1, in N/m: 0.025, a cooking oil's against water,
+  which is also what Oil Tension lays at its 1 (OIL_TENSION_GAP worked back
+  through the same mobility is 0.024). The grid cannot hold the real edge
+  between two streams of dye (micrometres to a tenth of a millimetre), and
+  the few cells it does hold are too sharp to difference, so the stress is
+  read from a blurred copy of the dye on a grid of its own (holdSoft,
+  holdStress and forcesB in wgsl/fluid/forces.ts say what the dye's own
+  cells cost), and K is set for that blur as a diffuse-interface model's
+  is for its edge: a sharp step blurred to a Gaussian of width b carries
+  K/(2√π·b) per unit squared, so K = 2√π·b·σ. HOLD_APART_FINE is that
+  grid's cells to a logical cell, 2, so half a millimetre each on any
+  solver grid. HOLD_APART_BLUR is b in those cells: a five-tap binomial a
+  cell apart and another HOLD_APART_WIDER cells apart, √(1 + 3²), which is
+  1.6 mm on the plate. Both were measured against a straight edge leaning
+  across the grid, which a tension must leave alone: the false flow along
+  it is the stencil's error and falls with the blur's width in cells, 27%
+  of the flow that rounds a pool at one cell, 9.5% at one and a half, 1.8%
+  at 2.2 and 0.9% at these 3.2 (`npm run forces` 6 asks for under 2%). An
+  edge already wider than the blur carries less, and a pool or a filament
+  narrower than it carries less too. Read as a speed through the gap's mobility h²/12μ at the
+  reference liquid (NU_REF, as every force on the thin gap is; hsPrep
+  gives each liquid its own), and by the cover's h² on a live cover
+  (coverH2).
+
+  HOLD_APART_CELLS is the most it may move the liquid in a step, in cells,
+  as OIL_CELLS is the oil's: the stress goes as the square of the step, and
+  a pool poured to the dye's cap beside clear water would ask for sixty
+  times a unit step's.
+*/
+export const HOLD_APART_SIGMA = 0.025;
+export const HOLD_APART_FINE = 2;
+export const HOLD_APART_WIDER = 3;
+export const HOLD_APART_BLUR = Math.sqrt(1 + HOLD_APART_WIDER * HOLD_APART_WIDER);
+export const HOLD_APART_CELLS = 0.5;
+/**
+ * Hold Apart's stress coefficient for a step (`S.tension`), for gradients taken in the stress's own cells (`HOLD_APART_FINE` to a logical one): the dial (0 real, 1 an
+ * oil's tension across a sharp unit step of dye), the cover's h² (1 at the rest gap), seconds over the step's
+ * displacement, and the logical grid (the stress's own is worked out from it here).
+ */
+export function holdApartPull(holdApart: number, coverH2: number, perSecond: number, logical: number): number {
+  const dial = Number.isFinite(holdApart) ? Math.max(0, Math.min(1, holdApart)) : 0;
+  if (dial <= 0) return 0;
+  const mobility = (REST_GAP_METRES * REST_GAP_METRES) / (12 * NU_REF * LIQUID_DENSITY);
+  const cells = logical * HOLD_APART_FINE;
+  return dial * 2 * Math.sqrt(Math.PI) * HOLD_APART_BLUR * HOLD_APART_SIGMA * (mobility / (PLATE_METRES ** 3)) * coverH2 * perSecond * cells * cells;
+}
+/*
   Rain Drip's weight: the speed a unit of dye over the plate's mean drives
   the reference liquid to at the rest gap, per unit of the slider, in the
   flow's per-step speeds. Set so a pool of colour falls as fast as it did on

@@ -33,6 +33,8 @@ comments, which moved with it.
 | `useSetActions` | the set list's own edits and files; sets `editNow.ts`'s door for the owner's assistant (PLAN 44k-16a) |
 | `useLucky` | Lucky (`triggerLucky`), protected by the 8 s Undo toast in `usePlateUndo` (PLAN 49a) |
 | `useSongChangeFades` | a new song, a new look |
+| `useLookLists` | the looks' swatches (`swatchOf`), the phone's grouped list and the set's cue items with each item's `lookId` (PLAN 34b-6) |
+| `useLookThumbCapture` | photographs a saved look for its chip once, idle, six seconds after it goes up (`THUMB_AFTER_MS`, PLAN 34b-6) |
 | `useCastFeed` | the cast window, mirror and network display kept in step; the mark |
 | `useRecording` | the one Record button; in a portrait clip it also lays the wall's canvas out 9:16 for the clip (`wallRef`, `stageRef`, `phone`) and returns `phoneRecording` for the phone's More sheet |
 | `useGlides` | a setting walked to a value over seconds |
@@ -61,7 +63,8 @@ comments, which moved with it.
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption only since the ink was shelved, 37x-10m; `titleCaption` deleted); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film, and `loopRender`, a seamless Canvas loop (PLAN 43b) |
-| `useControllers` | MIDI, the gamepad, the projector window |
+| `useControllers` | MIDI, the gamepad, the projector window; takes `hand` (useHand) and `setSelectedLiquidId` for the grid's pads (PLAN 30c) |
+| `usePadHits` | The grid's pads held on the plate (PLAN 30c): lib/padHits.ts's holds stepped at 30 Hz while any is held, each pad's tool, liquid and colour filled from the hand at the hit, Track Select's picks, each tool's Amount from the device knobs, the pads' LED colours; opens lib/padDoor.ts for the phone's pads |
 | `useCommandPalette` | the palette's commands, panel/section indexing, the `?` shortcut sheet state, and the keyboard; `openPanelNow`, a desk panel opened or brought forward on the tab in view (the Video dot, PLAN 14ag-9) |
 | `useCheckHooks` | the checks' `?debug` doors (`lib/checkHooks.ts` declares them) |
 | `useCrashState` | the black box's half from here |

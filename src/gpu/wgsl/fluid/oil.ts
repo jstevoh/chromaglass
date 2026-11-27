@@ -335,6 +335,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    Oil Bodies on a thin gap: the plate's dye split into its two liquids'
+    shares for the carry, and joined again after it (PLAN 38w-29, the
+    advect dye stage says why). bodyWater writes the water's share, the
+    dye less the oil's (never more of the oil's than the dye holds, as
+    bodyPartition's share() reads it); bodyJoin writes the water's share
+    carried plus the oil's carried. Both read the dye's texture and the
+    oil's share.
+  */
+  bodyWater: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var oil: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let t = max(textureLoad(dye, p, 0), vec4f(0.0));
+  let w = t - clamp(textureLoad(oil, p, 0), vec4f(0.0), t);
+  textureStore(dst, p, select(vec4f(0.0), w, finite4(w)));
+}`,
+  bodyJoin: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var oil: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let t = max(textureLoad(dye, p, 0), vec4f(0.0)) + max(textureLoad(oil, p, 0), vec4f(0.0));
+  textureStore(dst, p, select(vec4f(0.0), t, finite4(t)));
+}`,
+
+  /*
     The oil cannot be packed past full, nor go below empty: the same pressure
     as phaseRelax. Whatever a cell holds above 1 (or below 0) is shared with
     its neighbours, each pair's exchange computed the same way from both

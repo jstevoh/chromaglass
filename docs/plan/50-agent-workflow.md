@@ -54,6 +54,27 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
     owner's files under `antigravity/engine-50c/`, strictly one after another; 50c-6 the
     device's start, which writes the effect's own state, so Claude designs its home first;
     50c-7 on: `renderFrame` by stage) is the README's table.
+  - **50c-2 shipped** (2026-11-27): the debug report (`chromaglassDebug()`), the three
+    hooks `?debug` puts on `window`, and the crash log's provider and report part moved
+    verbatim to `src/engine/debug.ts` (`attachDebug`). `LiquidVisualizer.tsx` 373,274 to
+    359,503 bytes. 254 of the block's 259 lines are main's text less two spaces of indent;
+    the five that differ are one getter (`getRenderer()`) and four setters, below. The
+    report's 66 top-level keys are the same names in the same order on main and after the
+    move, the renderer's own part spread after them as before. No check read the moved text. Next: 50c-3, the GPU's guards.
+  - **50c-2a. Found along the way: the report writes the loop's state, it does not only
+    read it.** Its fault hooks (`throwFrames(n)`, `stepDownFrames(n)`, `forceStepDown()`,
+    `errorStorm(n)`) set four of the effect's own `let`s that the guard and the frame read.
+    The brief allowed getters only and said a piece that writes waits. Decided 2026-11-27:
+    the `let`s stay in the effect and each write goes through a setter passed beside the
+    getter, the mirror of the getter rule, for a hook's plain assignment off the frame's
+    path (the README's "How a piece moves" says where that stops). Open: those four are the
+    guards' state (`scopedFrame` and the frame count them down), so 50c-3 or the frame's own
+    move gives them their home and the setters go.
+  - **50c-2b. Found along the way: the report is the page's.** It writes `window`,
+    `markTest` makes a canvas from `document`, and it hands out live objects (`fluids`,
+    `governor`, `settings`) that checks then read and call. In a worker (50d) none of that
+    crosses a message as it is: the report needs a part that is asked for across the seam
+    and a part that stays on the page. Name it in 50d's message shape, beside 50c-1a.
   - **50c-1a. Found along the way: the pointer reads the frame's box, not its own.** The
     moved handlers read `stageRef`, `frameRef` and `macroShotRef` as the loop writes them,
     so in a worker (50d) the page side needs a copy of the camera's shot each frame to map a

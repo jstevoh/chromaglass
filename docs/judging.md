@@ -3101,3 +3101,39 @@ Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just
    the camera still on the plate; Stop ends only the pour; Off ends both.
 5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
 
+
+## 148. The APC40's pads play the liquid (PLAN 30c)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Settings → Feed → Controller, **Set up the APC40 mkII** (again, to take the new strips).
+   Good: the grid lights as rows of colours, the bottom row dim white (Press); **Grid layout**
+   shows Tools × Colours lit.
+2. Hold a pad on the top row (Drip). Good: a drop on the hit, more while held, none after you let
+   go, landing in the pad's column of the picture. Hold a Pour or Spray pad: it pours until let go.
+   Hold Press: the glass stays pressed until let go. Tap Splatter and hold another: the held one
+   flicks again, smaller each time.
+3. Track Select 4 (Syrup), hold the same Drip pad. Good: far slower drops; Pour slower too.
+4. Turn the top-left device knob (Drip's size). Good: bigger drops at the right, smaller at the left.
+5. **Bank ▶** over the device knobs. Good: the grid relights as Liquids × Colours, then Liquids ×
+   Tools, then the looks, then round; the faders keep their jobs. Bad: Bank ◀ ▶ do nothing (PLAN
+   30c-3: they may send on another channel; Learn shows what they send).
+6. The faders and the knob over each: Dye Budget/Saturation, Speed/Turbulence, Sound
+   Drive/Beat Squeeze, Plate Rock/Slosh, Bubbles/Bubble Melt, Oil Beads/Bead Drops,
+   Iridescence/Edge Relief, Evolve Speed/Hue Journey. The crossfader tips the plate side to side.
+7. On the phone: Motion → Pads. Good: the same grid, held pads keep going.
+
+## 149. Dyes mix as real dyes do, and Hold Apart (PLAN 18d-6)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Open **Macro Bead**, **Roy, 1963**, **Poster, 1969**, **Milk Marbling** and **Lens Pools**, the
+   five looks that had Polarity highest. Good: each still reads as itself, and where two colours
+   meet they blend across the edge as two inks in water do. Bad: a look that has gone to one
+   muddy colour within a minute where it used to keep its colours for the whole song.
+2. On any look with a few colours, Settings → Chemistry → Oil & Soap → **Hold Apart** to 1.
+   Good: over ten or twenty seconds long streaks draw back, small pools round up and the
+   colours keep to bodies, like oil paint in water; a long straight edge between two colours
+   stays put. Bad: speckle, a comb along the edges, or colour pushed off into the clear water.
+3. Back to 0. Good: the colours go back to running into each other.
+4. The same slider on the phone, in Settings under Oil & Soap, where Polarity was.
+To put it back: a look that should keep its colours apart gets `holdApart` in `src/presets.ts`
+(0.3 to 1); the old push itself is not coming back, it was not a tension (`npm run forces` 6).

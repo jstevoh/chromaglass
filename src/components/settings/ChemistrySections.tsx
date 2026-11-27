@@ -300,13 +300,13 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           </div>
         )}
         <Slider
-          label="Polarity (Repulsion)"
-          value={settings.polarity}
+          label="Hold Apart"
+          value={settings.holdApart ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ polarity: v })}
-          settingKey="polarity"
+          onChange={(v: number) => onUpdate({ holdApart: v })}
+          settingKey="holdApart"
         />
       </section>
       )}

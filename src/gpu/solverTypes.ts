@@ -39,7 +39,8 @@ export interface GpuStepParams {
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
-  immiscibility: number;
+  /** Hold Apart, 0 to 1 (PLAN 18d-6): 0 is real, two dyes in one water with no tension between them; past it the Korteweg stress of an edge of composition, an oil's tension across a unit step of dye at 1 (`holdApartPull`). */
+  holdApart: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
   /*
     The second phase and the magnet under the glass (H7).
