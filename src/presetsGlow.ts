@@ -14,14 +14,16 @@ import { shakeCord } from './lib/shakeCord';
  * show it on Go. So: dark water and a little dye, the lamp off, the water
  * full of dinoflagellates, and two real ways for the music to reach them.
  *
- *   1. The dish sits on a speaker (Shaker at 30 Hz, Shake at 0.06 g, under
- *      the water's threshold, so the water is still while the bass is quiet),
+ *   1. The dish sits on a speaker (Shaker at 30 Hz, Shake at 0.03 g, a third
+ *      of the water's threshold, so the water is still while the bass is
+ *      quiet; nearer the threshold the drive props up a dying wave, which
+ *      then rings on for five seconds after the note, at 0.7 of it),
  *      and the music's bass shakes it (Music Shake, the cord on Shake,
  *      lib/shakeCord.ts). A strong bass note takes the dish past the
  *      threshold (0.084 g at 30 Hz, lib/faraday.ts), a lattice of standing
  *      waves 14 mm across stands up over a second or two (it grows at the
- *      Mathieu rate, about 2 per second at 0.3 g, and rings down at about 1
- *      per second between notes, so a bass line keeps it seeded and each
+ *      Mathieu rate, about 2 per second at 0.3 g, and rings down at about
+ *      0.6 per second between notes, so a bass line keeps it seeded and each
  *      strong note swells what the last left), and the waves' strain
  *      fires the cells under them (PLAN 48c-6, wgsl/glow.ts): the sea lights
  *      in the lattice's pattern on the bass and goes dark as the note dies.
@@ -51,7 +53,7 @@ export const NIGHT_SEA: Preset = {
     glowShear: 20,
     glowRecharge: 6,
     faradayHz: 30,
-    faraday: 0.06,
+    faraday: 0.03,
     globalSpeed: 0.0126,
     surge: 0.3,
     layerCount: 1,
@@ -88,12 +90,11 @@ export const NIGHT_SEA: Preset = {
     dishVignette: 0.4,
     /*
       Music Shake at 0.15: under the sound's master depth at 1, a bass reading
-      of 0.8 shakes the dish at 0.06 + 0.8 × 0.15 × 2 g = 0.30 g, three and a
-      half times the threshold, where the lattice settles steep enough (k u
-      about 0.2) to strain the water at about 45 per second; a quiet bass
-      (0.2) shakes it at 0.12 g, where the lattice stands shallow (k u about
-      0.085) and its strain, about 19 per second, stays at the threshold's
-      edge: a faint skin under the crests at most.
+      of 0.8 shakes the dish at 0.03 + 0.8 × 0.15 × 2 g = 0.27 g, three times
+      the threshold, where the lattice settles steep enough (k u about 0.19)
+      to strain the water at about 44 per second; a quiet bass (0.2) shakes
+      it at 0.09 g, just over the threshold, where the lattice barely grows
+      and stands shallow (k u about 0.035, strain about 8 per second): dark.
     */
     sceneMappings: [
       shakeCord(0.15),

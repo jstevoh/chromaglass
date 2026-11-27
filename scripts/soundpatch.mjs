@@ -75,7 +75,7 @@ import { MODULATOR_FEATURES } from '../src/lib/modulators.ts';
 import { FRAME_MOTION } from '../src/lib/drift.ts';
 import { isStirCord } from '../src/lib/stir.ts';
 import { isSlideCord } from '../src/lib/glassSlide.ts';
-import { isShakeCord } from '../src/lib/shakeCord.ts';
+import { isShakeCord, musicShakeOf } from '../src/lib/shakeCord.ts';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { arrange, SR } from './arrangement.mjs';
@@ -201,6 +201,12 @@ for (const p of PRESETS) {
   if (slides > 1) missing28i.push(`${p.id}: ${slides} cords for the glass's slide`);
   const shakes = (p.settings.sceneMappings ?? []).filter(isShakeCord).length;
   if (shakes > 1) missing28i.push(`${p.id}: ${shakes} cords for the music's shake`);
+  /*
+    And no deeper than 0.5: a full bass then shakes the dish at 1 g (Shake's travel is 2 g),
+    twelve times the water's threshold at 30 Hz, where the lattice already stands near the
+    steepness it breaks at (src/gpu/faraday.ts S0). Night Sea's is 0.15.
+  */
+  if (musicShakeOf(p.settings.sceneMappings) > 0.5) missing28i.push(`${p.id}: the music's shake at ${musicShakeOf(p.settings.sceneMappings)}, over 0.5`);
   const sm = answers(p).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
   const platePatches = sm.filter((m) => !isAreaCord(m) && isFastReading(m) && !FRAME_MOTION.has(m.setting));
   const areaCords = sm.filter((m) => isAreaCord(m) && Boolean(areas?.[m.area]) && isFastReading(m));

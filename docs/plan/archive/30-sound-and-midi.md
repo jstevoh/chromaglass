@@ -21,8 +21,8 @@ plays it through them. Not yet seen on the Mac (`docs/judging.md` §145). Three 
 named in the code and each is an item:
 - ~~**48c-5. A look made for the glow.**~~ (shipped 2026-11-27, `npm run glow`, `npm run plate`)
   Night Sea (src/presetsGlow.ts): dark water and a few drops of dye, the lamp off, Glow 1.4 at
-  Glow Shear 20 (0.02 Pa in seawater, Latz's low end), the dish on a 30 Hz shaker at 0.06 g
-  (under the water's 0.084 g threshold), Music Shake 0.15 on the bass and the kick on the glass. The owner judges
+  Glow Shear 20 (0.02 Pa in seawater, Latz's low end), the dish on a 30 Hz shaker at 0.03 g
+  (a third of the water's 0.084 g threshold), Music Shake 0.15 on the bass and the kick on the glass. The owner judges
   it on the Mac (judging §145, step 6).
 - ~~**48c-6. The music's shake lights the sea.**~~ (shipped 2026-11-27, `npm run glow` section 6)
   A Faraday wave is a flow inside the water, and its strain is what lights a shaken flask of
