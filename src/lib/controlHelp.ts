@@ -255,6 +255,8 @@ export const CONTROL_HELP: Record<string, string> = {
   projLampB: 'The back projector\'s lamp on its variac (with Two Projectors): dims and warms as a real lamp does.',
   projShutterA: 'A vane over the front projector\'s lens: closes in 80 ms and dims the whole picture evenly, the lamp staying lit.',
   projShutterB: 'A vane over the back projector\'s lens (with Two Projectors).',
+  projFocusA: 'Racks the front projector\'s head out of focus: sharp at the middle, either way a soft glow the lamp\'s shape, past halfway a melt.',
+  projFocusB: 'Racks the back projector\'s head out of focus (with Two Projectors), so one layer can go soft while the other stays sharp.',
   projCross: 'Fades the wall from projector A to projector B, linear in light so the middle is no brighter than the ends (with Two Projectors).',
   layerCount: 'How many plates are stacked, one or two.',
   rotationSpeed: 'How fast the dish turns.',

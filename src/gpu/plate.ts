@@ -32,6 +32,7 @@ import type { BeadField } from '../lib/beads';
 import { BEAD_FLOATS } from '../lib/beadPack';
 import { soapFilmLut } from '../lib/soapFilm';
 import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
+import { FOCUS_SCENE_FORMAT, FOCUS_SHARE_FORMAT, PlateFocus } from './focus';
 import { drawTank } from './tankDraw';
 import type { TankPlateField } from './tankPlate';
 import type { FaradayField } from './faraday';
@@ -107,8 +108,8 @@ function deriveRecipe(device: GPUDevice): RenderRecipe {
   });
 }
 
-function displayName(format: GPUTextureFormat, toTexture: boolean, aux = false, mask = WHOLE_DISPLAY): string {
-  return `display ${format}${toTexture ? ' flipped' : ''}${aux ? ' aux' : ''}${mask === WHOLE_DISPLAY ? '' : ` lean ${(mask >>> 0).toString(36)}`}`;
+function displayName(format: GPUTextureFormat, toTexture: boolean, aux = false, mask = WHOLE_DISPLAY, share = false): string {
+  return `display ${format}${toTexture ? ' flipped' : ''}${aux ? ' aux' : ''}${share ? ' share' : ''}${mask === WHOLE_DISPLAY ? '' : ` lean ${(mask >>> 0).toString(36)}`}`;
 }
 
 /*
@@ -117,7 +118,10 @@ function displayName(format: GPUTextureFormat, toTexture: boolean, aux = false, 
   Only into the canvas: the flipped displays (the camera's, the film stock's,
   the lens pass's scene) are built behind the show, whole, as before.
 */
-function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean, aux = false, mask = WHOLE_DISPLAY): RenderRecipe {
+/** The display under the focus pass: half floats, flipped, the aux, and B's share. */
+const focusDisplay = displayName(FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true);
+
+function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean, aux = false, mask = WHOLE_DISPLAY, share = false): RenderRecipe {
   return (module) => {
     const code = leanDisplayWgsl(plateWgsl(DISPLAY_MAIN), mask);
     return {
@@ -129,7 +133,8 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
         // The fragment stage needs to know too: an override is set per stage,
         // and without it the fragment read FLIP_Y as 1 on both paths.
         module: module(code), entryPoint: 'fs', constants: toTexture ? { FLIP_Y: -1 } : undefined,
-        targets: aux ? [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }] : [{ format }],
+        // The focus pass's (gpu/focus.ts) has a third, B's share of the wall.
+        targets: [{ format }, ...(aux ? [{ format: 'rgba8unorm' as GPUTextureFormat }] : []), ...(share ? [{ format: FOCUS_SHARE_FORMAT }] : [])],
       },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     };
@@ -181,6 +186,8 @@ export class WebGPUPlate {
   readonly beads: BeadMask;
   /** Glitter in the liquid, the lens photographing it, the side lamp (PLAN 47e, 47d, 47b-side): a pass after the display, when asked for. */
   readonly glint: PlateGlint;
+  /** Each projector's focus (PLAN 51b): a pass after the display while a projector is soft. */
+  readonly focus: PlateFocus;
 
   private layers: LayerTargets[] = [];
   private sources = new Map<string, Source>();
@@ -258,6 +265,9 @@ export class WebGPUPlate {
       // The lens pass reads the aux, so this one keeps its second target (H2c-6).
       ...(format === GLINT_SCENE_FORMAT ? []
         : [cache.renderPrep(displayName(GLINT_SCENE_FORMAT, true, true), displayRecipe(device, GLINT_SCENE_FORMAT, true, true), true)]),
+      // Each projector's focus (PLAN 51b), and the display it draws under, with B's share: behind the show too.
+      ...PlateFocus.prepare(cache, device, format, picture),
+      cache.renderPrep(focusDisplay, displayRecipe(device, FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true), true),
       // Into a texture rather than the canvas: the film stock's picture (and
       // the projector's) with one target, the camera's with two (H2c-6: the
       // camera pass alone reads the second, so the opening builds the variant
@@ -274,6 +284,7 @@ export class WebGPUPlate {
     this.drop = new FerroDrop(device, this.pipelines, this.disposer);
     this.beads = new BeadMask(device, this.pipelines, this.disposer);
     this.glint = new PlateGlint(device, this.pipelines, this.disposer);
+    this.focus = new PlateFocus(device, this.pipelines, this.disposer);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
@@ -441,10 +452,20 @@ export class WebGPUPlate {
       && !!this.pipelines.renderPipeline(displayName(GLINT_SCENE_FORMAT, true, true), displayRecipe(this.device, GLINT_SCENE_FORMAT, true, true));
     // Both dials back at 0: the pass's pictures and flakes go (a 4K frame's two are about 100 MB).
     if (!wanted && this.glint.holding) this.glint.release();
+    /*
+      Each projector's focus (gpu/focus.ts, PLAN 51b), when one is soft and
+      the lens pass and the tank are not drawing: the display draws into the
+      pass's pictures without its finish, and the pass lays it.
+    */
+    const two = this.pack.get('projA')[3] > 0.5;
+    const soft = PlateFocus.wanted(this.pack);
+    const focusOn = soft && !lensOn && !fields[0]?.tank && this.focus.ready(format, toTexture, two)
+      && !!this.pipelines.renderPipeline(focusDisplay, displayRecipe(this.device, FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true));
+    if (!soft && this.focus.holding) this.focus.release();
     const finish = this.pack.get('finishInMain')[0];
-    if (lensOn) this.pack.set('finishInMain', 0);
+    if (lensOn || focusOn) this.pack.set('finishInMain', 0);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
-    if (lensOn) this.pack.set('finishInMain', finish);
+    if (lensOn || focusOn) this.pack.set('finishInMain', finish);
     // The pack's grid and l_c per gap unit, which change with a rung and not
     // with a frame: written when it does, not sixty times a second (14ab-5).
     if (grid !== this.packGrid) {
@@ -529,7 +550,7 @@ export class WebGPUPlate {
       plate's own uniform, which LiquidVisualizer fills with `!!cam`.
     */
     const tank = fields[0]?.tank;
-    this.keepAux(size, this.pack.get('cameraOn')[0] > 0.5 || lensOn || !!tank);
+    this.keepAux(size, this.pack.get('cameraOn')[0] > 0.5 || lensOn || focusOn || !!tank);
     const aux = this.aux ? viewOf(this.aux) : null;
 
     // The tank's side view (PLAN 47n) draws in the plate's place when its look is up.
@@ -537,6 +558,12 @@ export class WebGPUPlate {
     if (lensOn && aux && this.aux) {
       this.display(encoder, this.glint.sceneView(size.width, size.height), aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, true, GLINT_SCENE_FORMAT);
       this.glint.run(encoder, target, toTexture, format, this.pack, this.uniformBuffer, this.sampler, this.aux, this.layers[0].vel, this.source('mark'));
+      return;
+    }
+    if (focusOn && aux) {
+      const into = this.focus.targets(size.width, size.height, two);
+      this.display(encoder, into.scene, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, true, FOCUS_SCENE_FORMAT, into.share);
+      this.focus.run(encoder, target, toTexture, format, this.uniformBuffer, this.sampler, this.source('mark'), two);
       return;
     }
     this.display(encoder, target, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, toTexture, format);
@@ -623,9 +650,11 @@ export class WebGPUPlate {
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
+    /** B's share of the wall, for the focus pass: the display with a third target. */
+    shareView?: GPUTextureView,
   ): void {
     const aux = auxView !== null;
-    const display = this.displayFor(bytes, toTexture, format, aux);
+    const display = shareView ? this.pipelines.renderPipeline(focusDisplay, displayRecipe(this.device, format, true, true, WHOLE_DISPLAY, true)) : this.displayFor(bytes, toTexture, format, aux);
     if (!display) return;
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
@@ -651,6 +680,7 @@ export class WebGPUPlate {
     if (auxView) {
       colorAttachments.push({ view: auxView, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } });
     }
+    if (shareView) colorAttachments.push({ view: shareView, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } });
     const pass = encoder.beginRenderPass({
       label: 'plate',
       colorAttachments,

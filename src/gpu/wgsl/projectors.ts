@@ -32,12 +32,20 @@
  * Built into SAMPLING beside `lampBg`, so every shader that has `onGround`
  * has these.
  *
+ * - `noteShare(c)`: once both plates are on the wall, B's share of its light,
+ *   channel by channel, linear (`wallShare`, the display's third output).
+ *   The focus pass (gpu/focus.ts, PLAN 51b) splits the finished picture by
+ *   it, so each projector's light is blurred by its own lens. It is taken
+ *   before the mixer's rows and the grades over both plates, which the pass
+ *   then shares out by the same split.
+ *
  * With one projector its gain is laid on the finished plates before the film
  * projector's row (the film is its own projector), as `outColor * U.projA.rgb`
  * in the display pass; at the default it is 1, 1, 1 and multiplies nothing.
  */
 export const PROJECTOR_WGSL = /* wgsl */ `
 var<private> wallB: vec3f = vec3f(0.0);
+var<private> wallShare: vec3f = vec3f(0.0);
 
 fn projectorLamps() -> vec3f {
   let back = lampBg * U.projB.rgb;
@@ -47,6 +55,10 @@ fn projectorLamps() -> vec3f {
 
 fn wallAdd(a: vec3f, b: vec3f) -> vec3f {
   return pow(pow(max(a, vec3f(0.0)), vec3f(2.2)) + pow(max(b, vec3f(0.0)), vec3f(2.2)), vec3f(1.0 / 2.2));
+}
+
+fn noteShare(c: vec3f) {
+  wallShare = clamp(pow(max(wallB, vec3f(0.0)), vec3f(2.2)) / max(pow(max(c, vec3f(0.0)), vec3f(2.2)), vec3f(1e-6)), vec3f(0.0), vec3f(1.0));
 }
 
 fn onWall(c: vec3f) -> vec3f {
