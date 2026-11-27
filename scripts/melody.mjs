@@ -255,7 +255,11 @@ console.log('\nThe plate');
 */
 // The loop wherever it lives, the component and src/engine/ (scripts/frameloop-source.mjs, PLAN 50c).
 const vis = frameLoopSource();
-const lay = vis.slice(vis.indexOf('const layMelodyDrop'), vis.indexOf('/** Pour into an area'));
+const layAt = vis.indexOf('const layMelodyDrop'), layEnd = vis.indexOf('/** Pour into an area', layAt);
+// Both markers, in order, or the slice is not the drop's code: an end not found
+// would slice to the end of the whole loop and let its patterns match anywhere.
+if (layAt < 0 || layEnd <= layAt) throw new Error(`melody: layMelodyDrop's markers not found in order (${layAt}, ${layEnd})`);
+const lay = vis.slice(layAt, layEnd);
 check('the walk hears every reading and queues only while Melody Walk is up',
   /melodyWalkRef\.current\.update\(heard, melodyLineRef\.current\)/.test(vis) && /\(currentSettings\.melodyWalk \?\? 0\) > 0/.test(vis));
 check('a drop is laid on the active plate as a dropper drop, its dye held under the look\'s fill and sized by the dial and the note',

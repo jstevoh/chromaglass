@@ -10,9 +10,13 @@
   So a check of the loop reads this instead: the component, then every
   `src/engine/` file in name order, joined. The patterns stay exactly as they
   were; a pattern that matched before a pure move still matches after it,
-  and one that counts matches still counts across the whole loop. Comments
-  and order are kept, so a check that slices between two markers in the
-  component still finds both there while they have not moved.
+  and one that counts matches still counts across the whole loop. The
+  component comes first and whole, as the checks always read it, so a check
+  that slices between two markers in it still finds both there while they
+  have not moved. The engine's files come with their comments taken out: a
+  file there that only names a call in prose (pointer.ts's header names the
+  block it came from) must not be read as the loop making that call, and a
+  count of a statement must count statements, not their mentions.
 */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -26,7 +30,7 @@ function engineFiles(dir) {
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...engineFiles(p));
-    else if (/\.tsx?$/.test(name)) out.push(p);
+    else if (/\.tsx?$/.test(name) && !name.endsWith('.d.ts')) out.push(p);
   }
   return out;
 }
@@ -34,6 +38,8 @@ function engineFiles(dir) {
 /** The visualizer component's text followed by every file under src/engine/. */
 export function frameLoopSource() {
   const parts = [readFileSync(join(ROOT, 'src/components/LiquidVisualizer.tsx'), 'utf8')];
-  for (const f of engineFiles(join(ROOT, 'src/engine'))) parts.push(readFileSync(f, 'utf8'));
+  for (const f of engineFiles(join(ROOT, 'src/engine'))) {
+    parts.push(readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1'));
+  }
   return parts.join('\n');
 }
