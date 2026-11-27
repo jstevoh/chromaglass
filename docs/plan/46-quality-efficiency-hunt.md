@@ -59,7 +59,7 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   could in principle cost more to compile than the two it replaced; the 46a PR quotes
   startup's first step on CI's Mac before and after, and startup's "no later than the old
   way" line comes back from quarantine on 2026-11-15.
-- **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, ~~H2c-6~~ (shipped, 2026-11-13), H2c-9
+- **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, ~~H2c-6~~ (shipped, 2026-11-13), ~~H2c-9~~ (shipped, 2026-11-27)
   (briefs of 2026-11-07), ~~H2c-8 and H2c-5~~ (**shipped**: `encode` cleared `h2c5` and `h2c8`, `samelook` passed), then H2c-2 once H2c-3 and H2c-1 merge. Each
   takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
   a physics trade and ships only if `samelook` stays green.

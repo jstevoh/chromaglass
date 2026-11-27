@@ -87,6 +87,7 @@ import { stepPlateBubbles, syncBubblesGpu } from '../sim/speciesPoll';
 import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../sim/noteVoicesStep';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 import { recolourHandoff, type Handoff } from './paletteRecolour';
+import { plateLayers } from './plateLayers';
 
 interface LiquidVisualizerProps {
   /** The sound as a prop; the app's own plates are handed null (46f). */
@@ -6035,9 +6036,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // Every layer whose solver is the WebGPU one. A field still on
           // the CPU has nothing for the compositor to sample, so it sits
           // this frame out rather than drawing a stale plate.
-          const fields = fluids
-            .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
-            .filter((f): f is NonNullable<typeof f> => !!f);
+          const fields = plateLayers(fluids);
           if (fields.length && stage) {
             // The three pictures the page hands over, on the frames they
             // change: the beads when they moved, the mark on the
@@ -6189,9 +6188,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 run that had a machine slow enough to change rung while a
                 harness was photographing the plate.
               */
-              const live = fluidsRef.current
-                .map((f) => (f.gpu instanceof WebGPUFluid ? f.gpu.fields : null))
-                .filter((f): f is NonNullable<typeof f> => !!f);
+              const live = plateLayers(fluidsRef.current);
               /*
                 Nothing to draw from: a rung change disposed the solver and
                 the next one is not up yet. Say so rather than returning

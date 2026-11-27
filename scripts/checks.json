@@ -1588,7 +1588,7 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads -- --owed=h2c9",
+      "run": "npm run framereads",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",

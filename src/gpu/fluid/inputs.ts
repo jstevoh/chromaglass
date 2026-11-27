@@ -645,7 +645,10 @@ export class FluidInputs extends FluidPasses {
    * takes it, so the print covers what the reaction is fed.
    */
   depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0, wetOnly = 0): void {
-    if (amount <= 0 && print <= 0) { this.printLive = false; return; }
+    if (amount <= 0 && print <= 0) {
+      if (this.printLive) { this.printLive = false; this.reads.wroteOne(); }
+      return;
+    }
     const log = dyeAbsorbances(...colour);
     const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
     const pass = enc.beginComputePass({ label: 'chemistry deposit' });

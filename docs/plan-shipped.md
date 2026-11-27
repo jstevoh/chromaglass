@@ -16184,6 +16184,29 @@ grid so a texture at the frame's size can only be a frame target. Main 2 display
 frame-size texture alive in both off stretches; now 1 and 0 in both, with the camera-on control
 at 2 targets, 1 alive and `auxTarget` there. Not done (left in section 40): the tank's draw and
 the projector sources' `aux (sources)` keep their second target.
+
+## H2c-9. Pack only after a step (2026-11-27)
+
+`WebGPUPlate.draw` (`src/gpu/plate.ts`) ran `packVel` (and `packDyeBodies` when Oil Bodies is up)
+for every layer on every frame, so at 120 Hz against sixty solver steps half the frames re-packed
+fields that had not been written since the previous draw. `ReadGate` (`src/gpu/readGate.ts`) now
+exposes `writes` (`FluidCore.fieldWrites` in `src/gpu/fluid/core.ts`, typed on `PlateSolver` in
+`src/gpu/solverTypes.ts`), and `endPrint` / `depositChemistry` / `speciesShare` also increment
+it when toggling `printLive` or `speciesLive` without a submit. `plateLayers`
+(`src/components/plateLayers.ts`, keeping `LiquidVisualizer.tsx` under its size ceiling) attaches
+`writes: f.gpu.fieldWrites` to each WebGPU layer. `WebGPUPlate.draw` tracks `packedWrites` (plus
+packed texture references and Oil Bodies state) per layer in `LayerTargets`: a layer is packed
+only when `writes` is absent (keeping `lab.render` and other unkeyed callers packing every frame)
+or differs from its last packed value, and every layer repacks when the grid size or layer count
+changes or when `packVelDrop` turns on or off.
+
+Measured by `scripts/framereads-owed.mjs` (with `h2c9` removed from `--owed` in
+`scripts/checks.json`): 60 frames on a kept plate of two layers (a frozen copy, then the live
+solver) with 30 steps on gaps of 1, 2 and 3 frames: main 60 frames packed with 240 dispatches,
+now 30 frames packed with 30 dispatches (bar at most 31 and 64); controls 0 pixels differing from
+a fresh plate after steps, with no step, and after a pour without a step (moving 2317 pixels).
+`npm run samelook` against `origin/main` (`1af2e785`): all 6 looks 0.00% of pixels past 2 and
+0.000% past 24 after 5 and 20 steps, and colour 0.00, detail 0.0%, histogram 0.000 after 60.
 ### P7-cpu (step 3.1): Delete the CPU solver's stepping
 
 Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and
