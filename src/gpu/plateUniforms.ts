@@ -24,7 +24,7 @@ import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
-import { projectorGains } from '../lib/projectorBank';
+import { bankHasTwo, projectorGains } from '../lib/projectorBank';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 import { BIREF_NM_PER_STRAIN } from '../lib/polar';
@@ -395,8 +395,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const lampGround = !photo ? ground + (1 - ground) * videoLamp : 0;
     pack.set('lampGround', lampGround);
     // The projector bank (PLAN 51a, lib/projectorBank.ts): two projectors only
-    // where the shader adds them, on a lamp ground with a back plate.
-    const two = (s.twoProjectors ?? 0) > 0.5 && fluids.length > 1 && lampGround > 0.001;
+    // where the shader adds them (bankHasTwo says where that is).
+    const two = bankHasTwo(s, fluids.length, lampGround);
     projectorGains(bankGains, s, two, view.shutters);
     pack.set('projA', bankGains[0], bankGains[1], bankGains[2], bankGains[3]);
     pack.set('projB', bankGains[4], bankGains[5], bankGains[6], bankGains[7]);

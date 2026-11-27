@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { Slider, LIT } from './ui';
 import { PIN_RANGE } from '../lib/deskPins';
 import { readSetting } from '../lib/readout';
+import { bankHasTwo } from '../lib/projectorBank';
 
 /**
  * The projector bank, drawn (PLAN 51a, lib/projectorBank.ts): each
@@ -13,8 +14,9 @@ import { readSetting } from '../lib/readout';
  * The lamp is a slider, the variac's knob; the shutter is a button, because
  * a vane is swung in or out (the frame walks it there in 80 ms), and a fader
  * learned to it on a controller holds it part way. B and the crossfade are
- * drawn only when there is a B: Two Projectors on, with a back plate. A row
- * that would do nothing is worse than none (a control that lies).
+ * drawn only when there is a B (`bankHasTwo`: Two Projectors, a back plate on
+ * its own blend, the lamp ground). A row that would do nothing is worse than
+ * none (a control that lies).
  */
 export interface ProjectorBankProps {
   settings: VisualizerSettings;
@@ -32,7 +34,8 @@ const valueOf = (s: VisualizerSettings, k: BankKey): number => {
 };
 
 export function ProjectorBank({ settings, onSetting, touch = false, chips, testId = 'bank' }: ProjectorBankProps) {
-  const two = (settings.twoProjectors ?? 0) > 0.5 && Math.round(settings.layerCount ?? 1) > 1;
+  // The plate's own question (lib/projectorBank.ts), on the look's Lamp Ground: a film in the lamp raises the plate's, which the panel cannot see.
+  const two = bankHasTwo(settings, Math.round(settings.layerCount ?? 1), settings.renderStyle === 'photo' ? 0 : settings.lampGround ?? 0);
   const slider = (k: BankKey, label: string) => {
     const spec = PIN_RANGE.get(k) ?? { min: 0, max: 1 };
     const v = valueOf(settings, k);
@@ -72,7 +75,7 @@ export function ProjectorBank({ settings, onSetting, touch = false, chips, testI
         </>
       ) : (
         <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} pb-1 leading-snug text-muted`}>
-          A second projector, its own lamp and an A/B crossfade come with Two Projectors and a back plate.
+          A second projector, its own lamp and an A/B crossfade come with Two Projectors, a back plate on its own blend, and the lamp ground.
         </p>
       )}
     </div>

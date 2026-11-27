@@ -193,6 +193,7 @@ fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t
 var<private> lampBg: vec3f = vec3f(1.0);
 var<private> milkScatter: f32 = 0.0;
 var<private> milkGap: f32 = 1.0;
+${PROJECTOR_WGSL}
 
 /**
  * Milky liquids scatter light (Mie / Kubelka-Munk, PLAN 18j).
@@ -231,13 +232,13 @@ fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
     painted = mix(effBg, f.rgb, f.a);
   }
   if (U.lampGround <= 0.001) { return painted; }
-  return mix(painted, lampBg * through, U.lampGround);
+  return onWall(mix(painted, lampBg * through, U.lampGround));
 }
 
 /* The bare ground, where no plate is: the black one, the lamp, or between. */
 fn groundOf(bg: vec3f) -> vec3f {
   if (U.lampGround <= 0.001) { return bg; }
-  return mix(bg, lampBg, U.lampGround);
+  return onWall(mix(bg, lampBg, U.lampGround));
 }
 
 /*
@@ -1886,7 +1887,6 @@ fn lumiaLight(uv: vec2f) -> vec3f {
 
 ${FILM_FRAME_WGSL}
 ${LAMP_MIX_WGSL}
-${PROJECTOR_WGSL}
 
 /** Light laid over light: screened, so it adds and cannot clip past white. */
 fn screenOver(c: vec3f, light: vec3f) -> vec3f {
@@ -2936,11 +2936,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
         On a lamp ground with Two Projectors (PLAN 18b-10, 51a) the plates are
-        two projectors: each filtered by its own plate from its own lamp
-        (lampScreen, kept before the front plate's contact shadow), their light
-        added on the wall in linear light (projectors.ts). Outside the back
-        plate's disc its filter is 1 (dish1.x times the grain's factor, PLAN
-        18e), so the second projector still lights the screen there.
+        two projectors, each through its own plate from its own lamp, added in
+        linear light (projectors.ts). Outside the back plate's disc its filter
+        is 1 (PLAN 18e), so the second projector still lights the screen there.
         For other looks, they are stacked dishes on one lamp: a second filter in the
         light's path. A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
         The grain is pigment, T^grain, as on the front plate (PLAN 38h-4): this
@@ -2952,7 +2950,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let filt1 = throughScaled(t1, dish1.x * lampGrain1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         var lit1 = outColor * filt1;
         if (U.twoProjectors > 0.5 && U.layerCount > 1) {
-          lit1 = wallAdd(outColor, lampScreen * filt1);
+          wallB = lampScreen * filt1;
+          lit1 = wallAdd(outColor, wallB);
         }
         outColor = mix(painted1, lit1, U.lampGround);
       } else {

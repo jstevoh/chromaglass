@@ -23,6 +23,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { bankDrawn } from './panelBank.mjs';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, DEFAULT_RIDES, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { THEMES, moveTargets } from '../src/lib/drift.ts';
@@ -142,15 +143,13 @@ const chipped = [...panel.matchAll(/<PinChips settingKey="([A-Za-z0-9_]+)"/g)].m
 /*
   And the mixer's, which are drawn from a list.
 
-  The Mixer (lib/mixer.ts) is one component in three places, the Perform
-  desk, this sheet and the phone, so its twenty-three sliders are not typed
-  out here: \`MixerPanel\` draws one per source for the level and one per grade,
-  from \`MIX_CONTROLS\`, at the registry's range. A reader of this file's
-  markup would call all of them invisible. So they count as drawn only when
-  each link in that chain is there to read: the sheet renders the panel in the
-  Mixer section with its pin chips, and the panel draws the level and every
-  grade through one slider that takes its range from the registry and offers
-  the chips.
+  The Mixer (lib/mixer.ts) is one component on the Perform desk, this sheet
+  and the phone, so its sliders are not typed out here: \`MixerPanel\` draws
+  one per source's level and one per grade from \`MIX_CONTROLS\` (the bank:
+  panelBank.mjs), at the registry's range. They count as
+  drawn only when each link of that chain is there to read: the sheet renders
+  the panel in the Mixer section with its pin chips, and the panel draws each
+  through one slider that takes the registry's range and offers the chips.
 */
 const mixerSrc = readFileSync(join(root, 'src/components/MixerPanel.tsx'), 'utf8');
 const mixerSection = panel.match(/<section id="settings-mixer"[\s\S]*?<\/section>/)?.[0] ?? '';
@@ -172,25 +171,8 @@ const mixerOff = [...MIX_CONTROLS, ...FADE_CONTROLS].filter(c => {
 });
 check('and every one of them is in the registry at its own range, in the Mixer section', mixerOff.length === 0,
   mixerOff.map(c => String(c.key)).join(', '));
-/*
-  And the projector bank at the Mixer's top (PLAN 51a, components/ProjectorBank.tsx):
-  each lamp and the crossfade a slider, each shutter a button, drawn by the
-  Mixer wherever it is, so they count as drawn only when the Mixer's own
-  chain holds and the bank is in it, takes its range from the registry and
-  offers the chips; the keys are the ones the bank's file names.
-*/
-const bankSrc = readFileSync(join(root, 'src/components/ProjectorBank.tsx'), 'utf8');
-const bankLinks = {
-  'the Mixer draws the bank, with its chips': /<ProjectorBank\b[^>]*chips=\{chips\}/.test(mixerSrc),
-  'at the registry\'s range': /PIN_RANGE\.get\(k\)/.test(bankSrc) && /min=\{spec\.min\}/.test(bankSrc) && /max=\{spec\.max\}/.test(bankSrc),
-  'offering the chips beside each': /chips\(k\)/.test(bankSrc),
-};
-const bankKeys = [...bankSrc.matchAll(/(?:slider|shutter)\('(proj[A-Za-z]+)'/g)].map(m => m[1]);
-const bankBroken = Object.entries(bankLinks).filter(([, ok]) => !ok).map(([k]) => k);
-check('and the projector bank at its top, from the registry', bankBroken.length === 0 && brokenLinks.length === 0 && bankKeys.length === 5,
-  bankBroken.length ? `missing: ${bankBroken.join('; ')}` : bankKeys.join(', '));
 const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : [...MIX_CONTROLS, ...FADE_CONTROLS].map(c => String(c.key))),
-  ...(bankBroken.length || brokenLinks.length ? [] : bankKeys)]);
+  ...bankDrawn(root, mixerSrc, !brokenLinks.length, check)]);
 const ghosts = PINNABLE.filter(s => !drawn.has(String(s.key)));
 check('and nothing in the registry is invisible in the panel', ghosts.length === 0,
   ghosts.length ? ghosts.map(s => `${s.label} (${String(s.key)})`).join(', ') : 'all of them have a slider');

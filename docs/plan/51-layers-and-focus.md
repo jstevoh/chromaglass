@@ -71,13 +71,18 @@ Check first: a lab render with two projectors at known lamp levels, the wall's l
 within 1% of the two alone added, the crossfade's mean light flat within 2% across its
 travel, and a dimmed lamp's white point moving warm by the law's amount.
 
-What shipped, measured (`npm run projectors`, 6 of 6, on the lab's software WebGPU): the
-defaults multiply nothing, to the byte, one projector and two; a lamp at 0.6 is the law's
+What shipped, measured (`npm run projectors`, 9 of 9, on the lab's software WebGPU): the
+defaults multiply nothing, to the byte, one projector and two, written out or left out, where
+a lamp at 99.5% moves 3 levels (and one projector's gains are exactly 1, 1, 1); a lamp at 0.6 is the law's
 colour on clear glass to 0.005 per channel (0.506/0.448/0.338 of the lamp in display values);
 a shutter half across dims every lit pixel to 0.730 (0.5 to 1/2.2) within 0.008, the frame's
 edge as its middle; the crossfade's centre is half of each projector alone in linear light,
 worst 1.32 levels of 255, where the old display-value sum is off by 5.8 on average; the wall's
-mean light across the crossfade is linear to 0.02%, and a bare lamp flat to 0.00%. The old
+mean light across the crossfade is linear to 0.02%, and a bare lamp flat to 0.00%; with the back
+plate on a blend of its own there is no B and the crossfade moves nothing (it blacked the wall
+out before the pre-push review: `bankHasTwo` is the one question the plate and the Mixer ask);
+a front-plate bubble is no black disc at the crossfade's B end. Evolve never wanders the bank
+(drift's NOT_THE_LOOK; it did, the pre-push review found). The old
 `npm run lamp` line 5 now asks for the linear sum (9 of 9). No shipped look had Two Projectors
 on, so moving the add into linear light moved no saved look.
 
@@ -95,6 +100,11 @@ Found while building it, not done:
 - **51a-4 · The film and LED rows on a side of the crossfade** (S). The film projector and the
   LED ring are projectors too; each could be put on A, B or neither, so one fader takes the
   plate down and a film up.
+- **51a-6 · A projector's own output and the shutter's light** (S). The per-surface sources
+  (`lib/plateSources.ts`, a projector cast its own plate) take the crossfade's weight for the
+  back plate, and still lay A's bare lamp under it, as before 51a; a surface for each projector
+  should carry that projector's light alone. And the shutter button does not light when a
+  controller learned to it moves it (it has no `midiKey`, as the Mixer's take buttons have none).
 - **51a-5 · A lamp has thermal lag** (S). A tungsten filament takes about 0.1 to 0.3 s to heat
   and cool (its heat capacity over the power it radiates), so a variac yanked to zero glows
   down rather than cuts, and an overdriven lamp rises slower than it falls. The fader is

@@ -61,6 +61,7 @@
  */
 
 import { HALOGEN_KELVIN, blackbodyLinear } from './lampKelvin';
+import { mixBlendIndex } from './mixer';
 
 /** The variac's top: 160 V on a 120 V lamp. The fader runs 0 to this; 1 is the lamp's rated voltage. */
 export const VARIAC_MAX = 4 / 3;
@@ -78,7 +79,8 @@ const DISPLAY_GAMMA = 2.2;
 const LAMP_DARK = 0.04;
 
 const clampVariac = (v: number | undefined) => Math.max(0, Math.min(VARIAC_MAX, Number.isFinite(v) ? v as number : 1));
-const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+// A value that is not a number is the vane open and the crossfade centred, never NaN carried into a uniform or a vane's walk.
+const clamp01 = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
 const luminance = (c: readonly number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 
 /** The lamp's light at fader v, against its rated light. */
@@ -119,6 +121,19 @@ export function lampColour(v: number): [number, number, number] {
 export function vaneOpen(travel: number): number {
   const e = 2 * clamp01(travel) - 1;
   return (Math.acos(e) - e * Math.sqrt(Math.max(0, 1 - e * e))) / Math.PI;
+}
+
+/**
+ * Whether the wall has two projectors: Two Projectors on, a back plate, on a
+ * lamp ground (`lampGround`, the one the plate is told, which a video in the
+ * lamp raises), and the back plate's Mixer row on its own blend. Anywhere
+ * else the plate shader stacks the back plate on the one lamp, or lays it by
+ * the row's blend, and never adds a second beam, so there is no B to fade to
+ * (the pre-push review: a crossfade toward B there blacked the wall out).
+ * The plate's uniforms and the Mixer's bank ask this one question.
+ */
+export function bankHasTwo(s: { twoProjectors?: number; backBlend?: unknown }, plates: number, lampGround: number): boolean {
+  return (s.twoProjectors ?? 0) > 0.5 && plates > 1 && lampGround > 0.001 && mixBlendIndex(s.backBlend) === 0;
 }
 
 /** The crossfade's two weights, linear in light: A at (1 − x), B at x. */

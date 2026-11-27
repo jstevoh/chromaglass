@@ -55,11 +55,12 @@ const f3 = (v) => v.toFixed(3), f2 = (v) => v.toFixed(2);
 
 const out = 'node_modules/.cache/projector-bank.mjs';
 await build({
-  stdin: { contents: "export * from './src/lib/projectorBank.ts'; export { stageClocks, turnClocks } from './src/lib/stageClocks.ts';", resolveDir: '.', loader: 'ts' },
+  stdin: { contents: "export * from './src/lib/projectorBank.ts'; export { stageClocks, turnClocks } from './src/lib/stageClocks.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { DRIFTABLE } from './src/lib/drift.ts'; export { RIG_KEYS } from './src/lib/lookFade.ts';", resolveDir: '.', loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
 const bank = await import(`../${out}`);
-const { lampFlux, lampKelvinAt, lampColour, vaneOpen, crossfadeWeights, walkShutters, SHUTTER_SECONDS, stageClocks, turnClocks } = bank;
+const { lampFlux, lampKelvinAt, lampColour, vaneOpen, crossfadeWeights, walkShutters, SHUTTER_SECONDS, stageClocks, turnClocks, projectorGains, bankHasTwo, DEFAULT_SETTINGS, DRIFTABLE, RIG_KEYS } = bank;
+const BANK_KEYS = ['projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross'];
 const lumOf = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 
 // ── 0. The laws, from outside their file ─────────────────────────────
@@ -96,6 +97,31 @@ const lumOf = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
     `flux off ${flux.map(f3).join('/')}; kelvin off ${f2(kelvin)}; at 0.6 r/b ${f2(dim[0] / dim[2])}, at 1.25 ${f2(over[0] / over[2])}; vane worst ${worstVane.toFixed(4)}; walk ${f3(half)} at 40 ms, ${shut} at 80, the stage clock's B ${f3(clocks.shutters[1])} at 20 ms`);
 }
 
+// ── 1a. The defaults, in numbers, and the bank is the rig's ──────────
+/*
+  Why one projector at the defaults is today's plate: the gains it hands the
+  shader are exactly 1, 1, 1 (and B's 1, unused), so the display's multiply
+  by projA changes no bit. With two projectors each is 0.5 to 1/2.2, the
+  crossfade's centre. And the bank is the operator's: a look change leaves it
+  (RIG_KEYS) and Evolve never wanders it (a wandered lamp is the wall amber or
+  overdriven: the pre-push review found it driftable).
+*/
+{
+  const one = new Float32Array(8), two = new Float32Array(8);
+  projectorGains(one, DEFAULT_SETTINGS, false);
+  projectorGains(two, DEFAULT_SETTINGS, true);
+  const exact = [1, 1, 1, 0, 1, 1, 1, 0].every((v, i) => one[i] === v);
+  const half = Math.pow(0.5, 1 / 2.2);
+  const centre = [0, 1, 2, 4, 5, 6].every(i => Math.abs(two[i] - half) < 1e-6) && two[3] === 1;
+  const wandered = BANK_KEYS.filter(k => DRIFTABLE.includes(k));
+  const rig = BANK_KEYS.filter(k => !RIG_KEYS.has(k));
+  const asks = bankHasTwo({ twoProjectors: 1, backBlend: 'own' }, 2, 1) && !bankHasTwo({ twoProjectors: 1, backBlend: 'screen' }, 2, 1)
+    && !bankHasTwo({ twoProjectors: 1 }, 1, 1) && !bankHasTwo({ twoProjectors: 1 }, 2, 0) && !bankHasTwo({ twoProjectors: 0 }, 2, 1);
+  check('at the defaults one projector\'s gains are exactly 1, two are each at half; the bank is the rig\'s, never wandered; two only where the shader adds them',
+    exact && centre && wandered.length === 0 && rig.length === 0 && asks,
+    `one ${Array.from(one).join(',')}; two ${Array.from(two).map(f3).join(',')}; driftable ${wandered.join(',') || 'none'}; not rig ${rig.join(',') || 'none'}; bankHasTwo ${asks ? 'as the shader' : 'wrong'}`);
+}
+
 // ── The plates ───────────────────────────────────────────────────────
 const S = 128;
 const NEUTRAL = { saturationBoost: 1, granulation: 0, boundaryContrast: 0, edgeRelief: 0, beads: 0, lacing: 0, cells: 0, glossiness: 0,
@@ -114,11 +140,32 @@ try {
     await lab.create(128); lab.dye(0.38, 0.5, 0.17, BLUE, 0.6); lab.dye(0.62, 0.36, 0.1, TEAL, 0.8); lab.flush(); await lab.step(1);
     o.one = await r({});
     o.oneDefaults = await r({ ...D });
+    // Truly left out: undefined survives the spread here, so the plate's own fallbacks (?? 1) run.
+    o.oneUnset = await r(Object.fromEntries(Object.keys(D).map(k => [k, undefined])));
+    // The positive control: a lamp a half percent down must move a level, or byte-equality above proves nothing.
+    o.oneNudge = await r({ projLampA: 0.995 });
     o.oneDim = await r({ projLampA: 0.6 });
     o.oneShut = await r({ projShutterA: 0.5 });
     o.two = await r({ ...TWO }, BACK);
     o.twoDefaults = await r({ ...TWO, ...D }, BACK);
     for (const x of [0, 0.25, 0.5, 0.75, 1]) o[`cross${x}`] = await r({ ...TWO, projCross: x }, BACK);
+    // The back plate on a blend of its own: the shader lays it by that blend and adds no second beam, so the crossfade must do nothing.
+    o.screen0 = await r({ ...TWO, backBlend: 'screen', projCross: 0 }, BACK);
+    o.screen1 = await r({ ...TWO, backBlend: 'screen', projCross: 1 }, BACK);
+    // A bubble on the front plate, the crossfade at B: the bubble passes B's light, which never met the front plate.
+    {
+      const N = 128, x = 0.3, y = 0.5;
+      await lab.create(N); lab.flush(); await lab.step(2);
+      lab.solver().setBubbles(new Float32Array([x, y, 14 / N, 1]), 1, 0.05, new Float32Array(4));
+      await lab.step(2);
+      const cam = { ...BACK, bubbles: 1, cx: x, cy: y, zoom: 1, macroAmount: 0 };
+      o.bubbleB = await r({ ...TWO, projCross: 1 }, cam);
+      o.bubbleA = await r({ ...TWO, projCross: 0 }, cam);
+      o.bubbleDark = await r({ ...TWO, projCross: 1, projShutterB: 1 }, cam);
+      // The same frame with the bubble's drawing off: that the bubble is drawn at all (its rim, in the plate's own band).
+      o.bubbleOff = await r({ ...TWO, projCross: 1 }, { ...cam, bubbles: 0, airField: true });
+      o.bubbleOffA = await r({ ...TWO, projCross: 0 }, { ...cam, bubbles: 0, airField: true });
+    }
     await lab.create(128); lab.flush(); await lab.step(1);
     for (const x of [0, 0.5, 1]) o[`bare${x}`] = await r({ ...TWO, projCross: x }, BACK);
     return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.from(v)]));
@@ -132,12 +179,13 @@ const meanLin = (img) => { let s = 0, n = 0; each(img, k => { for (let c = 0; c 
 // ── 1. The defaults multiply nothing ─────────────────────────────────
 {
   let worst = 0;
-  for (const [a, b] of [['one', 'oneDefaults'], ['two', 'twoDefaults'], ['two', 'cross0.5']]) {
+  for (const [a, b] of [['one', 'oneDefaults'], ['one', 'oneUnset'], ['two', 'twoDefaults'], ['two', 'cross0.5']]) {
     for (let k = 0; k < shots[a].length; k++) worst = Math.max(worst, Math.abs(shots[a][k] - shots[b][k]));
   }
+  let nudged = 0; for (let k = 0; k < shots.one.length; k++) nudged = Math.max(nudged, Math.abs(shots.one[k] - shots.oneNudge[k]));
   let lit = 0; each(shots.one, k => { if (shots.one[k] > 200) lit++; });
-  check('at its defaults the bank multiplies nothing: written out or left out, the same plate to the byte, one projector and two',
-    worst === 0 && lit > S * S / 4, `worst ${worst} levels; ${lit} clear-glass pixels`);
+  check('at its defaults the bank multiplies nothing: written out, left out (the fallbacks) or the default, the same plate to the byte, one projector and two; a lamp at 99.5% moves it',
+    worst === 0 && nudged >= 1 && lit > S * S / 4, `worst ${worst} levels; at 99.5% ${nudged} levels; ${lit} clear-glass pixels`);
 }
 
 // ── 2. A dimmed lamp ─────────────────────────────────────────────────
@@ -201,6 +249,39 @@ const meanLin = (img) => { let s = 0, n = 0; each(img, k => { for (let c = 0; c 
   const equalPower = 2 * Math.cos(Math.PI / 4);   // cos + sin at the centre, against 1 at an end
   check('the crossfade is linear in light: the wall\'s mean is (1 − x) of A plus x of B within 2%, and a bare lamp stays flat within 2% (equal power would lift the middle 41%)',
     worst < 0.02 && flat < 0.02 && a > 0.05 && b > 0.05, `worst ${(100 * worst).toFixed(2)}%; bare lamp ${bare.map(f3).join('/')} (${(100 * flat).toFixed(2)}% spread); equal power ${f2(equalPower)}×`);
+}
+
+// ── 6. No B, no crossfade; and a bubble passes B's light ─────────────
+{
+  let worst = 0; for (let k = 0; k < shots.screen0.length; k++) worst = Math.max(worst, Math.abs(shots.screen0[k] - shots.screen1[k]));
+  const lit = meanLin(shots.screen1);
+  check('with the back plate on a blend of its own there is no B: the crossfade moves nothing and the wall stays lit',
+    worst === 0 && lit > 0.2, `worst ${worst} levels between A and B; the wall's mean ${f3(lit)}`);
+}
+{
+  // The bubble is at the frame's centre (the camera is on it); its middle against a ring round it at twice its radius.
+  const at = (img, i, j) => { const k = (j * S + i) * 4; return (lin(img[k]) + lin(img[k + 1]) + lin(img[k + 2])) / 3; };
+  const mid = (img) => { let v = 0, n = 0; for (let j = S / 2 - 3; j < S / 2 + 3; j++) for (let i = S / 2 - 3; i < S / 2 + 3; i++) { v += at(img, i, j); n++; } return v / n; };
+  const ring = (img) => { let v = 0, n = 0; for (let a = 0; a < 64; a++) { const t = a / 64 * 2 * Math.PI; const i = Math.round(S / 2 + Math.cos(t) * S * 0.2), j = Math.round(S / 2 + Math.sin(t) * S * 0.2); v += at(img, i, j); n++; } return v / n; };
+  const b = mid(shots.bubbleB) / Math.max(1e-6, ring(shots.bubbleB)), a = mid(shots.bubbleA) / Math.max(1e-6, ring(shots.bubbleA));
+  const dark = Math.max(mid(shots.bubbleDark), ring(shots.bubbleDark));
+  // A bubble belongs to the front plate: with the front projector faded out it is not on the wall at all, and with it in, it is.
+  const diff = (p, q) => { let m = 0, sum = 0, n = 0; for (let k = 0; k < p.length; k++) { if (k % 4 === 3) continue; const d = Math.abs(p[k] - q[k]); m = Math.max(m, d); sum += d; n++; } return { m, mean: sum / n }; };
+  const atB = diff(shots.bubbleB, shots.bubbleOff), atA = diff(shots.bubbleA, shots.bubbleOffA);
+  const drawn = atA.m;
+  /*
+    What the owner would see: no black disc where a bubble is, at either end
+    of the crossfade (the pre-push review's worry, for a bubble lit by A's
+    lamp alone over B's picture). On the lab's projector view the bubble is
+    drawn the same at both ends, its middle as bright as the wall round it.
+    This line holds that outcome; it does not single out onWall (with onWall
+    returning its input the line still passes on this view, measured
+    2026-11-27), which is there for the paths that do light by lampBg after
+    the back plate (the closeup's pocket, camBounce).
+  */
+  check('a bubble on the front plate is no black disc at the crossfade\'s B end: its middle as bright as the wall round it, drawn as at A; with B shut, dark',
+    b > 0.85 && a > 0.85 && dark < 0.01 && ring(shots.bubbleB) > 0.3 && drawn >= 20 && Math.abs(atB.mean - atA.mean) < 1,
+    `middle over the wall ${f3(b)} at B, ${f3(a)} at A; B shut ${f3(dark)}; drawn ${drawn} levels at most against it off, mean ${f2(atA.mean)} at A and ${f2(atB.mean)} at B`);
 }
 
 const failed = checks.filter(c => !c.ok).length;
