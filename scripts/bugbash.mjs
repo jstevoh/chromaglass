@@ -12,6 +12,7 @@
  *   BUGBASH_LOOKS=classic,galaxy                  just these looks (the looks part), or the looks the desk is swept on
  *   BUGBASH_TABS=1,2                              just these of the seeded desk tabs (seven of six panels each)
  *   BUGBASH_LIMIT=5                               at most this many controls a tab or a sheet (a smoke run)
+ *   BUGBASH_DIST=../other/dist                    serve another tree's build with this tree's sweep (`npm run parity`)
  *
  * Asked for (the owner, 2026-11-26): "an automated bug bash". The checks we
  * have each ask one thing of one part: `controls` asks whether the settings
@@ -74,6 +75,7 @@ const LIMIT = Number(process.env.BUGBASH_LIMIT ?? Infinity);
 const list = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null);
 const LOOKS = list(process.env.BUGBASH_LOOKS);
 const TABS = list(process.env.BUGBASH_TABS)?.map(Number);
+const DIST = process.env.BUGBASH_DIST ? path.resolve(process.env.BUGBASH_DIST) : null;
 fs.mkdirSync(path.join(OUT, 'films'), { recursive: true });
 
 /*
@@ -96,7 +98,7 @@ const FLOOR = { luma: 0.02, colours: 0.03, flat: 0.03, motion: 0.003, detail: 0.
 
 let server = null;
 async function serve() {
-  server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
+  server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort', ...(DIST ? ['--outDir', DIST] : [])],
     { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
   server.on('exit', (code) => { if (server) { console.error(`preview server exited (${code})`); process.exit(2); } });
   await new Promise((r) => setTimeout(r, 2500));
@@ -122,6 +124,12 @@ const seededTabs = () => JSON.stringify({ v: 1, tabs: TAB_PANELS.map((ids, i) =>
 
 const findings = [];
 const coverage = [];
+/*
+  The numbers behind every line, kept whether or not they made a finding, so
+  two runs can be compared number for number (`npm run parity`, PLAN 50i):
+  a look's frame rate and plate, a control's settings, page and plate moved.
+*/
+const readings = [];
 let seq = 0;
 
 async function openApp(browser, { look, phone = false, tabs = false, video = null }) {
@@ -375,6 +383,7 @@ async function sweepOne(app, c, base, area, look, layout) {
     }
   }
   note(area, label, look, layout, faults, { replay, settings: did.settings.slice(0, 8) });
+  readings.push({ area, control: label, look, settings: did.settings.length, dom: did.dom, plate: did.read ? did.plate : null, faults: faults.map((f) => f.kind) });
   // Put the look back as it was, so the next control starts from the same plate.
   await loc.evaluate((el) => el.removeAttribute('data-bb-active')).catch(() => {});
   await page.keyboard.press('Escape').catch(() => {});
@@ -423,6 +432,7 @@ async function partLooks(browser) {
     const r = base.reading;
     console.log(`  ${look}: ${base.fps} fps, luma ${r?.luma.toFixed(3)} flat ${r ? (r.flat * 100).toFixed(0) : '?'}% motion ${r?.motion.toFixed(4)}`);
     note('Looks', look, look, 'desk', faults, { replay: { look: true } });
+    readings.push({ area: 'Looks', control: look, look, fps: base.fps, reading: base.reading, later: later.reading, noise: base.noise, faults: faults.map((f) => f.kind) });
     coverage.push({ area: 'Looks', control: look, note: 'opened' });
     await app.ctx.close();
   }
@@ -445,6 +455,7 @@ async function partDesk(browser) {
       let base = await baseline(app.page);
       const controls = (await enumerate(app.page, '[data-panel]', false).catch(() => []));
       let live = controls.filter((c) => !c.skipped).slice(0, LIMIT);
+      readings.push({ area: 'Desk', control: `tab ${t + 1}`, look, fps: base.fps, reading: base.reading, noise: base.noise });
       console.log(`\n  desk tab ${t + 1} on ${look}: ${TAB_PANELS[t].join(', ')}; ${live.length} controls (${controls.filter((c) => c.skipped).length} on the deny list), ${base.fps} fps`);
       for (const c of controls.filter((x) => x.skipped)) coverage.push({ area: `Desk › ${names.get(c.panel) ?? c.panel}`, control: c.name, note: 'not pressed (deny list)' });
       for (let i = 0; i < live.length; i++) {
@@ -618,7 +629,7 @@ const parts = PART === 'all' ? ['looks', 'desk', 'phone', 'film', 'report'] : [P
 for (const p of parts) {
   if (p === 'report') { partReport(); continue; }
   if (!['looks', 'desk', 'phone', 'film'].includes(p)) { console.error(`BUGBASH_PART=${p}? looks, desk, phone, film or report`); process.exit(2); }
-  findings.length = 0; coverage.length = 0;
+  findings.length = 0; coverage.length = 0; readings.length = 0;
   await serve();
   const browser = await launchChromium(chromium);
   try {
@@ -632,7 +643,7 @@ for (const p of parts) {
   }
   if (p !== 'film') {
     const tag = `${p}${LOOKS ? `-${LOOKS.join('+')}` : ''}${TABS ? `-tabs${TABS.join('+')}` : ''}`;
-    fs.writeFileSync(path.join(OUT, `findings-${tag}.json`), JSON.stringify({ part: p, at: new Date().toISOString(), findings, coverage }, null, 1));
+    fs.writeFileSync(path.join(OUT, `findings-${tag}.json`), JSON.stringify({ part: p, at: new Date().toISOString(), dist: DIST, findings, coverage, readings }, null, 1));
     console.log(`\n  ${findings.length} findings → ${path.join(OUT, `findings-${tag}.json`)}`);
   }
 }

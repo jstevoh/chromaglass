@@ -383,6 +383,21 @@
       ]
     },
     {
+      "name": "The parity run compares numbers, not noise",
+      "shard": "logic",
+      "run": "npm run parity -- --selftest",
+      "why": [
+        "The nightly main-against-branch comparison (scripts/parity.mjs, PLAN.md 50i)",
+        "on made-up sweeps, no browser: the same numbers give nothing, a change the",
+        "size of noise gives nothing, a look darker at one moment only gives nothing,",
+        "and each regression a merge could make gives its line (a look darker at both",
+        "moments, half its frame rate, a dial that stopped moving its setting or",
+        "reaching the plate, a look gone, a new finding); a noisy night raises only",
+        "the floor it is noisy on, and the launchd agent runs main's script from its",
+        "own clone. The run itself is a report on the owner's Mac, never a gate."
+      ]
+    },
+    {
       "name": "Two runners on one Mac never share a harness port",
       "shard": "logic",
       "run": "npm run ports",
