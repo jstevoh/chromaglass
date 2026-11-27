@@ -3126,7 +3126,7 @@ Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just
 
 Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
 1. Open **Macro Bead**, **Roy, 1963**, **Poster, 1969**, **Milk Marbling** and **Lens Pools**, the
-   five looks that had Polarity highest. Good: each still reads as itself, and where two colours
+   five looks that had Polarity highest, and your own **Soapy Mess**, saved with it at 0.83. Good: each still reads as itself, and where two colours
    meet they blend across the edge as two inks in water do. Bad: a look that has gone to one
    muddy colour within a minute where it used to keep its colours for the whole song.
 2. On any look with a few colours, Settings → Chemistry → Oil & Soap → **Hold Apart** to 1.
