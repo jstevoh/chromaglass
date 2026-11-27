@@ -5,7 +5,6 @@ import { Info } from '../Info';
 import { LIT } from '../ui';
 import { StrobeRing } from '../ui/Playful';
 import { TipPad } from '../ui/TipPad';
-import { SPIN_AUTO_NAMES } from '../../lib/turntable';
 import { Slider, PinChips } from './controls';
 import { AUDIO_FEATURES } from './patchLists';
 import type { SectionCtx } from './props';
@@ -306,7 +305,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           </p>
         </div>
         <Slider
-          label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
+          label="Auto Spin"
           value={settings.spinAuto ?? 0}
           min={0}
           max={2}
@@ -315,7 +314,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           settingKey="spinAuto"
         />
         <Slider
-          label={`Spin Rate — ${(settings.spinRpm ?? 6).toFixed(1)} rpm`}
+          label="Spin Rate"
           value={settings.spinRpm ?? 6}
           min={-45}
           max={45}
@@ -324,7 +323,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           settingKey="spinRpm"
         />
         <Slider
-          label={`Beats a Turn — ${Math.round(settings.spinBeats ?? 16)}`}
+          label="Beats a Turn"
           value={settings.spinBeats ?? 16}
           min={1}
           max={64}
@@ -356,10 +355,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           is the default and is what every look did before there was a choice.
         */}
         <Slider
-          label={`Spin Direction — ${
-            (settings.spinDirection ?? 0) > 0.5 ? 'all clockwise'
-              : (settings.spinDirection ?? 0) < -0.5 ? 'all anticlockwise'
-              : 'plates opposed'}`}
+          label="Spin Direction"
           value={settings.spinDirection ?? 0}
           min={-1}
           max={1}

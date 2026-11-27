@@ -97,6 +97,8 @@ export interface GpuStepParams {
   /** Oil Bodies: the oil and the water each keep their own colour (see bodyPartition). */
   /** Oil Weight, −1..1: the oil's density against the water cold (constants.ts OIL_RHO; left out, −0.05, the mineral oil's lightness). PLAN 27f-9c. */
   oilWeight?: number;
+  /** Oil Thickness, 0..1 on the Thickness scale: the oil's own viscosity (constants.ts oilNuOf; left out, the 50 mm²/s mineral oil). PLAN 38w-31. */
+  oilThickness?: number;
   oilBodies?: number;
   /** Film Hold: the water film between two drops of oil pushes back as it thins, so drops crowd without merging (FILM_WGSL). */
   filmHold?: number;
@@ -200,6 +202,12 @@ export interface GpuStepParams {
   soapFilmRate?: number;
   /** The frame's tilt from flat, degrees (default 90, hanging; PLAN 32h): gravity along the film is g sin of it. */
   soapFilmTilt?: number;
+  /** Glow (0 off, else the light's brightness, 1 a fully charged sea at the stage's strength): the water's dinoflagellates flash where the flow shears them (PLAN 48c, gpu/glow.ts). The front plate's only. */
+  glow?: number;
+  /** The shear rate that fires them, per second (default 30, 0.03 Pa in seawater). */
+  glowShear?: number;
+  /** The seconds a fired cell takes to recharge (default 8). */
+  glowRecharge?: number;
   /** The tank's side view (PLAN 47n, gpu/tankPlate.ts): Tank (0 off, else its glow), Feed cm/s, Dye Weight % heavier than water, Nozzle 0..1 across, Drain 0..1, Glow Hue degrees. The front plate's only. */
   tank?: number;
   tankFeed?: number;
@@ -368,6 +376,13 @@ export interface PlateSolver {
    * (lib/squish.ts). Optional because only the WebGPU solver has one.
    */
   readonly thinGapLive?: boolean;
+  /**
+   * A press's bowl in the glass on a thin gap, at the solver's own cells
+   * (PLAN 18a-14): centre and radius in logical cells, unrounded, the bowl
+   * (1 − d²/r²)² deep 3·amount, folded at the next flush. Laid on the CPU's
+   * 192² grid it came up through the bilinear upsample as facets.
+   */
+  pressBowl?(x: number, y: number, radius: number, amount: number): void;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */

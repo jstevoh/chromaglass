@@ -173,3 +173,15 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   (#897, 8-draw-a-7). Left: `deploygate.sh`'s rule 6 finds the live commit by a run's
   green conclusion, so a deploy whose checks went red reads as not live and the next
   docs-only merge publishes again (the safe way to be wrong; a few minutes).
+- **19ak-23. Shipped 2026-11-22: one film at a time on the owner's Mac, in a real queue (`scripts/maclock.mjs`).**
+  Several agent sessions driving Chrome or the ChromaGlass app at once overloaded the owner's Mac
+  (16 GB MacBook Air). Replaced the manual `~/cg-scratch/film.lock` rule with `scripts/maclock.mjs`
+  (atomic `wx` lock, FIFO `~/cg-scratch/film.queue/`, dead-pid and over-timeout stale recovery with
+  atomic rename-compare race protection, deploy-shard priority via `macdeploy.mjs`, `CG_FILM_LOCK_HELD`
+  nesting, `run`/`status`/`--selftest` CLI and `npm run maclock`), wired it into `chromium.mjs`,
+  `desktop.mjs` and the standalone browser launchers (`caption.mjs`, `codecblip.mjs`, `detail.mjs`,
+  `webgpu-smoke.mjs`), updated `scripts/macbusy.sh` to treat a live `film.lock` as busy via
+  `status --json`, and added the check to `scripts/checks.json`.
+- **19aj-3. Shipped: the pouring tools are held for the plate's steps, not the wall's
+  milliseconds** (2026-11-21, found when `npm run tools` "and spreads it out from where it
+  lands" went red on both of #897's hosted-Mac runs). Story in `docs/plan-shipped.md` §19aj-3.

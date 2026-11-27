@@ -111,8 +111,8 @@
  *      biggest of the three channels) is under MAX_GLOW levels. A mean of
  *      the size of the deviation, not the signed mean, so the lit side's
  *      pale ring and the opposite dark one do not cancel. Pixels near another
- *      hole are left out. The control (CONTROL_AIR: the shader with airNear's
- *      call taken out of the lead layer's normal) must find the glow: over CONTROL_GLOW
+ *      hole are left out. The control (CONTROL_AIR: plateSlope.ts with
+ *      AIR_HELD at 0, so the air is read as dye at zero again) must find the glow: over CONTROL_GLOW
  *      on every hole of 5 cells or more (a hole of 3 or 1.8 cells is smaller
  *      than the relief's own tap, so what the glow is there is printed)
  *   5. the pool's rim into clear liquid keeps its relief: what Edge Relief
@@ -137,20 +137,21 @@ const SIZES = [1.8, 3, 5, 8, 14];
 const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
 
 /*
-  The 33b control: wgsl/plate.ts with the air's mask taken off the lead layer's
-  normal, so the dye's relief is drawn at a hole as it was. As above, the edit
-  is found once or it throws.
+  The 33b control: wgsl/plateSlope.ts with AIR_HELD at 0, so the slope reads a
+  bubble's air as dye fallen to zero and the dye's relief is drawn at a hole as
+  it was before 33b (PLAN 31s-8 moved the air from a mask on the display's
+  normal into the slope itself). As above, the edit is found once or it throws.
 */
 const CONTROL_AIR = {
   name: 'no-air-mask',
   setup(b) {
-    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plate\.ts$/ }, async (a) => {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plateSlope\.ts$/ }, async (a) => {
       const { readFileSync } = await import('node:fs');
       let s = readFileSync(a.path, 'utf8');
-      const cut = 'vec3f(0.0, 0.0, 1.0), airNear(fuv0)';
+      const cut = 'const AIR_HELD: f32 = 1.0;';
       const found = s.split(cut).length - 1;
-      if (found !== 1) throw new Error(`holeline: the air control found ${found} of 1 "${cut}" in wgsl/plate.ts`);
-      s = s.replace(cut, 'vec3f(0.0, 0.0, 1.0), 0.0');
+      if (found !== 1) throw new Error(`holeline: the air control found ${found} of 1 "${cut}" in wgsl/plateSlope.ts`);
+      s = s.replace(cut, 'const AIR_HELD: f32 = 0.0;');
       return { contents: s, loader: 'ts' };
     });
   },

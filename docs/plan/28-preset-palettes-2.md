@@ -188,6 +188,13 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       took the beads' grain out of proportion: `npm run grainedge` line 2 read body texture
       0.124 and 0.234 at twice the grain, under the 2x it asks (WebGPU macOS, open shard),
       so it came out. A second dye under the beads wants a way that keeps the grain's depth.
+    - **28i-7i, open. Ferro Paint photographs dim since its warm neighbours.** Shot for the
+      webpage's grid (34a-2, `npm run landinglooks`, 1235 frames, Metal) on yellow, amber,
+      coral, hot pink and magenta, the card's luminance spread over a 32 × 32 view was 13.9
+      to 16.6, under `landinghero` 3's bar of 20, where the other twelve cards read 30 to 78:
+      a dark red dish, the ferrofluid's black on dye too thin to light it. The grid now
+      carries Magnet Garden in its place. The look wants its dye budget or its lamp looked
+      at on the Mac (filmed, since its gallery still passes), not a brighter photograph.
 - **28j. Changing looks without a jump** (the owner, 2026-10-19: "transitions between
   presets are also a little jumpy here and there"). `blendLooks` fades every number and
   colour but switches lists, steps and booleans at the midpoint, and the handoff in

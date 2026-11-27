@@ -60,7 +60,7 @@ export class BeadMask {
 
   /** The kernels, built before they are first needed (the plate's opening, `WebGPUPlate.prepare`). */
   static prepare(cache: PipelineCache) {
-    return Object.entries(BEAD_KERNELS).map(([name, code]) => cache.computePrep(name, code));
+    return Object.entries(BEAD_KERNELS).map(([name, code]) => cache.computePrep(name, code, name !== 'beadRings'));
   }
 
   /**

@@ -3,7 +3,7 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE } from '../constants';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import { publishPalette, setPaletteDoor } from './deskNow';
 import {
-  PICTURE_DYES, PICTURE_LOCK, PICTURE_PALETTE_NAME, hexOf, lockHarmony, paletteOfFile, readPictureDyes, setPictureDyes, type Rgb,
+  PALETTE_RECOLOUR_SECONDS, PICTURE_DYES, PICTURE_LOCK, PICTURE_PALETTE_NAME, hexOf, lockHarmony, paletteOfFile, readPictureDyes, setPictureDyes, type Rgb,
 } from '../lib/picturePalette';
 
 /**
@@ -52,7 +52,9 @@ export function usePaletteLock({
       else localStorage.setItem('chromaglass-palette-lock', String(index));
     } catch { /* private mode */ }
     // The lock is the room's, like the mark: the wall's engine and, in Preview, the desk's copy (PLAN.md 8b).
-    for (const v of bothEngines()) v.setHarmonyLock(lockHarmony(index));
+    // Chosen by hand, so the plate already lit takes the colours too, not only
+    // the pours to come (PLAN 43d-6); the re-assert below passes no seconds.
+    for (const v of bothEngines()) v.setHarmonyLock(lockHarmony(index), PALETTE_RECOLOUR_SECONDS);
   }, []);
   useEffect(() => {
     // Re-assert a persisted lock once the visualizer is mounted

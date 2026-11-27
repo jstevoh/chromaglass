@@ -801,45 +801,73 @@ const clusterStats = (fld, withColour) => {
     taken.every((t) => t.startsWith('0 of')), `pixels of the neighbour's circle the oval took, drawn first and second: ${taken.join(', ')}`);
 }
 
-// ── The closeup lays its beads larger (PLAN 33g-2a) ──────────────────
+// ── The dial is oil, and the closeup lays that oil in larger beads ──
 /*
-  The owner asked for "a couple really cool macro 3d looking views", and the
-  beads, each a lens that turns the plate upside down, are the closeup's
-  strongest cue to depth. At the plate's size they are grain in a frame that
-  magnifies a few of them, so in the closeup `beadPopulation` hands populate()
-  a larger size scale. Three claims, none of which a pixel can make from here:
-  the plate's population is exactly what it was (the dial's two numbers,
-  untouched by the closeup's factor), the closeup's scale is the plate's times
-  MACRO_BEAD_SCALE, and a field populated at it holds larger beads and still
-  most of the count, so the crowding step has not left a bare plate. The mean
-  radius grows by less than the scale (the crowding step turns the big ones
-  away): a scale of 1.6 read 1.31 to 1.35 times on three seeds, which is
-  why the factor is 2.0, 1.46 to 1.49 times, and the bar is 1.4 to 1.8. The last is measured on populated fields, seed 4242, in
-  the app's way (repopulate every thirtieth frame), on the same plate for
-  both; with the factor at 1 the ratio reads 1.00 and the line fails, which is
-  its control.
+  PLAN 33g-2a, then 33q-1. The owner: "generally there's too many bubbles in
+  looks". The Beads dial held a head count, 60 + 360·dial, so the faintest
+  touch of oil put 60 rings on the glass, the default 0.18 put 125, a look at
+  0.7 put 312, and every merge was answered by a new bead at the next
+  repopulate: a field that real oil coarsens (drops run together into fewer,
+  bigger ones) stayed the same carpet forever. Now the dial is how much oil is
+  on the glass, BEAD_COVER of it at full, and the field holds that oil.
+
+  Five claims, each its own line. The law goes through zero and its count is
+  the cover over one bead's area at the dial's size (the mean r² of the draw,
+  measured here from 4000 draws of populate() itself, not taken from the
+  constant the law uses, so a law and a draw that drift apart fail). The
+  closeup's beads are MACRO_BEAD_SCALE wider and a MACRO_BEAD_SCALE² fewer:
+  the same oil. A field populated by oil holds the dial's oil, measured as
+  Σr², within a tenth. And, the point of it, a field held by oil coarsens: on
+  the crowd's current, which gathers beads into three sinks, 1200 frames of
+  merging leave fewer beads than the count law kept, and the oil is still
+  the dial's; held by count (the harnesses' call, which they keep), the count
+  is the count and the oil grows with every merge refilled (that is the
+  control, and what the plate did). Last, the closeup's beads are larger by
+  about the scale (crowding turns the biggest away, so a little less) and
+  hold the same oil.
 */
 {
-  const { beadPopulation, MACRO_BEAD_SCALE } = beadsMod;
-  const OLD_COUNT = (a) => Math.round(60 + 360 * a), OLD_SCALE = (a) => 0.8 + 0.4 * a;
-  const dials = [0.1, 0.35, 0.8, 1];
-  const plateSame = dials.every((a) => { const p = beadPopulation(a, false); return p[0] === OLD_COUNT(a) && p[1] === OLD_SCALE(a); });
-  check('out of the closeup the plate holds the beads it always held, the dial\'s count and size to the bit',
-    plateSame, `Beads ${dials.join(', ')}: ${dials.map((a) => { const p = beadPopulation(a, false); return `${p[0]} at ${p[1].toFixed(3)}`; }).join(', ')}`);
-  const macroOk = dials.every((a) => { const p = beadPopulation(a, true), q = beadPopulation(a, false); return p[0] === q[0] && Math.abs(p[1] / q[1] - MACRO_BEAD_SCALE) < 1e-12; });
-  check(`in the closeup the count is the same and each bead's size is ${MACRO_BEAD_SCALE} times larger`, macroOk && MACRO_BEAD_SCALE > 1.3);
-  const filled = (macro) => {
+  const { beadPopulation, MACRO_BEAD_SCALE, BEAD_COVER } = beadsMod;
+  const dials = [0.02, 0.18, 0.35, 0.8, 1];
+  check('no oil, no beads', beadPopulation(0, false)[0] === 0 && beadPopulation(0, true)[0] === 0,
+    `Beads 0: ${beadPopulation(0, false)[0]} on the plate, ${beadPopulation(0, true)[0]} in the closeup`);
+  // The draw's own mean area, from populate() on an empty field with no crowding to speak of.
+  seed(77);
+  const probe = new BeadField(N);
+  let r2 = 0, n2 = 0;
+  for (let k = 0; k < 40; k++) { probe.clear(); probe.populate(100, 1); for (const b of probe.beads) { r2 += b.r * b.r; n2++; } }
+  const meanR2 = r2 / n2;
+  const cover = (a) => { const [n, sc] = beadPopulation(a, false); return n * Math.PI * meanR2 * sc * sc / (N * N); };
+  const coverOk = dials.every((a) => Math.abs(cover(a) - a * BEAD_COVER) < 0.15 * a * BEAD_COVER + 0.0005);
+  check(`the plate's beads cover the dial's share of the glass, ${BEAD_COVER} of it at full`,
+    coverOk, `mean r² of the draw ${meanR2.toFixed(2)} cells² (${n2} beads); Beads ${dials.map((a) => `${a}: ${beadPopulation(a, false)[0]} beads, ${(100 * cover(a)).toFixed(2)}% (law ${(100 * a * BEAD_COVER).toFixed(2)}%)`).join('; ')}`);
+  const macroOk = dials.every((a) => {
+    const p = beadPopulation(a, true), q = beadPopulation(a, false);
+    return Math.abs(p[1] / q[1] - MACRO_BEAD_SCALE) < 1e-12 && Math.abs(p[0] * p[1] ** 2 - q[0] * q[1] ** 2) <= 0.6 * p[1] ** 2 + 1e-9;
+  });
+  check(`in the closeup each bead is ${MACRO_BEAD_SCALE} times wider and there are ${MACRO_BEAD_SCALE ** 2} times fewer: the same oil`, macroOk && MACRO_BEAD_SCALE > 1.3,
+    dials.map((a) => `${beadPopulation(a, false)[0]} -> ${beadPopulation(a, true)[0]}`).join(', '));
+  const run = (macro, byOil, frames) => {
     seed(4242);
     const f = new BeadField(N);
     const pop = beadPopulation(0.8, macro);
-    for (let i = 0; i < 600; i++) { if (i % 30 === 0) f.populate(...pop); f.step(1 / 60, current, 0, 0); }
+    for (let i = 0; i < frames; i++) { if (i % 30 === 0) f.populate(pop[0], pop[1], undefined, byOil); f.step(1 / 60, current, 0, 0); }
     const rs = f.beads.map((b) => b.r);
-    return { n: rs.length, mean: rs.reduce((a, b) => a + b, 0) / Math.max(1, rs.length) };
+    const unit = meanR2 * (pop[1] * N / 192) ** 2;
+    return { n: rs.length, mean: rs.reduce((a, b) => a + b, 0) / Math.max(1, rs.length), oil: rs.reduce((a, r) => a + r * r, 0) / (pop[0] * unit), count: pop[0] };
   };
-  const pl = filled(false), mc = filled(true);
-  check('and a field populated that way holds beads larger by about that factor, and most of the count',
-    mc.mean / pl.mean > 1.4 && mc.mean / pl.mean < 1.8 && mc.n >= 0.6 * pl.n,
-    `mean radius ${pl.mean.toFixed(3)} -> ${mc.mean.toFixed(3)} cells (${(mc.mean / pl.mean).toFixed(2)}x, bar 1.4 to 1.8), beads ${pl.n} -> ${mc.n} (bar at least 60%)`);
+  const held = run(false, true, 60);
+  check('a field populated by oil holds the dial\'s oil (0.9 to 1.25 of it: the last bead in overshoots)', held.oil > 0.9 && held.oil < 1.25,
+    `${held.n} beads hold ${held.oil.toFixed(2)} of the oil the dial asks for (law count ${held.count})`);
+  const counted = run(false, false, 1200), oiled = run(false, true, 1200);
+  check('and held by oil it coarsens: merging leaves fewer, bigger beads and the same oil; held by count it does not',
+    oiled.n < 0.85 * counted.n && oiled.oil > 0.9 && oiled.oil < 1.25 && counted.n === counted.count && counted.oil > 1.3,
+    `after 1200 frames on the sinks' current: by count ${counted.n} beads holding ${counted.oil.toFixed(2)} of the dial's oil (each merge refilled), by oil ${oiled.n} holding ${oiled.oil.toFixed(2)}`);
+  // Sizes compared fresh (two populates), before the plate's larger crowd has merged more than the closeup's.
+  const pl = run(false, true, 31), mc = run(true, true, 31);
+  check('and the closeup\'s beads are larger by about the scale, holding the same oil',
+    mc.mean / pl.mean > 1.4 && mc.mean / pl.mean < 2.3 && mc.oil > 0.9 && mc.oil < 1.25,
+    `mean radius ${pl.mean.toFixed(3)} -> ${mc.mean.toFixed(3)} cells (${(mc.mean / pl.mean).toFixed(2)}x, bar 1.4 to 2.3), beads ${pl.n} -> ${mc.n}, oil ${pl.oil.toFixed(2)} -> ${mc.oil.toFixed(2)} of the dial's`);
 }
 
 /*

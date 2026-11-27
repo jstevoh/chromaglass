@@ -3031,3 +3031,50 @@ a clear film drop looks on a projected plate is judged here.
 2. With **Lamp** on a video row under the front plate, a clear drop over a patterned video
    refracts the picture consistently with a higher-index lens (`lampDepthAt` uses the same
    gap height).
+
+## 144. A pinch on the cover glass (PLAN 38r-16, G1)
+
+The check (`npm run gap`, lines 15–16 and 19–23) proves the cover ledger's puddle area (`h · wet = plate`), Stefan settle/lift RK4 integration, `pinchHand(scale)`, `playHand` span threshold, and the ctrl-wheel/touch wiring. How the pinch feels on the plate and on a phone at sixty frames is only seen here:
+
+1. **Desk (trackpad pinch over the plate, outside the closeup):** Pinch fingers together over a full film (63 mL). Good: the squeeze should push liquid toward the rim/bead gently at first and firmly by half-span without zooming the browser page, and lifting off (200 ms after the last ctrl-wheel event) lets the glass rest or settle back as weight/suction dictate. Bad: the page zooms, a small pinch jolts the glass violently, or `coverHand` stays stuck after stopping.
+2. **Desk (pinch apart past bead + suction):** Pull fingers apart on the trackpad until `coverHand` lifts past weight + `2σ cosθ / h`. Good: once air clears the bead, the gap rises smoothly toward 4 mm as the puddle draws inward (`wet = V / h`), then settles back to `V / A` when let go. Inside **Macro Zoom > 1.05**, trackpad wheel still drives the closeup camera rather than the cover glass.
+3. **Phone (Play with Dropper picked):** Put two fingers down on `#liquid-canvas` and move them together (blow), then spread them or squeeze them past `1.2×` / `1/1.2` span (`PINCH_SPAN`). Good: moving together blows; crossing the span switch drops blowing and engages the glass pinch smoothly without dropping dye; lifting all fingers resets `coverHand` to 0 and returns to `'dropper'`. With **Blow** or **Press** picked on the tray, two fingers spreading stay Blow/Press. Bad: dye drops during a pinch, or closeup two-finger zoom fights the cover pinch.
+4. **Liquid dial down to 1 mL:** Turn Liquid from 63 mL down to 5 mL or 1 mL. Good: the liquid leaves the rim without snapping the glass instantaneously, then settles toward its floor puddle (`1–8 mL`) or widens back to the rim when Liquid is turned back up.
+
+## 145. The water's glow (PLAN 48c)
+
+The check (`npm run glow`) proves on the lab's software WebGPU that a still plate is dark and
+keeps its charge, that a stroke lights its own path and nothing far from it, that a drift
+under the threshold lights nothing, that a second stroke within the recharge glows less and a
+path stroked five times tires, that a rest gives it back, and that the plate draws it blue.
+Whether it looks like a wake at sixty frames is only seen here.
+
+1. Any look (Lamp Ground at 0, as they ship, draws the bare water black), Settings → Camera →
+   **Glow** to 1, and work where the dye is thin. Good: nothing until a finger crosses the plate, then a blue line along the finger that
+   trails behind it and fades in a breath. Bad: a glow on still water, a flat blue tint,
+   blue where nothing moved, or a hard square grid in the light.
+2. Stroke the same path three times quickly: each fainter. Wait ten seconds and stroke it
+   again: bright as the first.
+3. **Glow Shear** to 100: only a quick stroke lights. To 10: a slow drift lights.
+4. Turn the music on with a stirring cord in Patches: the hits light wakes, the quiet
+   lets them come back.
+5. Glow at 0 on any look: the look exactly as before.
+
+## 146. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
+
+The check (`npm run polar`) proves the two-retarder law against Jones matrices, that each
+ring of a still dish is the law's colour at its radius, the dark cross between plane sheets,
+and that crossed plus parallel still add up with the dish in, on the lab's software WebGPU.
+How the rings read with a moving liquid at sixty frames is only seen here.
+
+1. Any look on a lamp ground, Settings → Lamp & Light → **Polarisers** 1, then **Dish
+   Stress** up from 0. Good: coloured rings round the plate's middle, tight near the middle
+   and broad toward the rim, a thin pale rim at the dish's wall, like the photograph's dishes.
+   Bad: a flat tint, rings that slide with the liquid, a hard edge at the gate.
+2. **Quarter Wave** to 0: a dark four-armed cross along the screen's axes, the rings lit on
+   the diagonals (the photograph's pinwheel); back to 1, the cross goes and the rings stay.
+3. Stir the liquid (Turbulence or the music): the rings wobble and change colour where the
+   liquid flows, and stay put where it is calm. Bad: rings that do not react, or that move
+   with still liquid.
+4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
+5. Dish Stress at 0: the look exactly as before.

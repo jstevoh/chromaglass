@@ -520,6 +520,11 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
   plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
   (`npm run microscope` read 0.00 at every zoom).
+- **19aj-4. Open, found 2026-11-21: Measure · lab9 runs out of its 25 minutes on a slow
+  runner.** It takes 14 to 19 minutes on a normal one (deploy 854: moiré 3:28, leandisplay
+  7:14, glitter 2:58) and was cancelled at 25:00 on #878's run 44884668374 with leandisplay
+  alone at 12:56. Move "Glitter, the lens and the side lamp" (about 3 minutes) to lab8 or
+  lab5 (two checks each), so a runner at two thirds of the usual speed still finishes.
 - **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
   saves 13%; what still runs every Mac check is the solver and the libraries the lab's
   one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
@@ -567,7 +572,7 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   its entry out. *Found 2026-11-21 (PR #679's run 44927401897): 9c's entry never held,
   because `scripts/intro.mjs` printed "1 of 14 FAILED" and never the "13/14 checks
   passed" tally that `quarantined()` in `scripts/checks.mjs` needs before it honours a
-  line; the films PR adds the tally line (the drawwall harness already printed one).*
+  line; the films PR adds the tally line (the drawwall harness already printed one).* *9c's entry came out with #897 (14v-12's loading line holding its count until the render compiles are all asked), the fix it named; the drawwall entry stays until 8-draw-a-7.*
 - **19ak-10. Decided: a deploy still trusts a PR run that was green through a
   quarantine.** `deploygate.sh` rules 4 and 5 trust a PR's green `Checks` run, and a run a
   quarantine held green is green, so a line red on the merged tree can go live on the PR's
@@ -632,4 +637,32 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   calm moves on its own (then the allowance should read the plate's own motion without the
   drop, as the drift column does) or whether a drop's reach grew. Never a looser bar.
   Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes
-  the entries out.
+  the entries out.- **19ak-24. Open, found on main's deploy 967 (f3414ffd, 2026-11-26), after the day's
+  fifteen-PR merge sweep: 27 lines red, 21 of them green at deploy 931 (d8949fe).** Sorted
+  by the PR that broke each and briefed to Antigravity in six PRs (labelled `fixes-main`):
+  - 19ak-24a, the opening and the step's counts: `openingtime` 74 pipelines against 52,
+    `startup` 3 built on a frame, `framereads --owed=h2c9`, and `encode`'s 46g and H2c-5
+    lines (one carry a step missing; bisected to 46a, #862, be69025).
+  - 19ak-24b, `looksgrid --owed=preview` (four flat stills) and `benday` (after 43d-6, #913).
+  - 19ak-24c, `tools` (Press on the old plate "and keeps it", 225 → 173), `drawwall --app`,
+    `wall`, `oillift` (after 15g-18, #914, and 18a-13n, #955).
+  - 19ak-24d, `rimhold`, `dropcolour`, `airlens`, `spikes`, `thick`, `airblow`.
+  - 19ak-24e, `live --codec aac`, `liveshow --stack`, `videolamp`, a show night: each run
+    alone three times first (load on deploy 967, or real).
+  - 19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
+    `lavaround` (after 27f-9q, #866, met 38w-31, #954).
+  - ~~19ak-24g, `filmlook`'s two camera lines~~ **shipped**: 38h-6 (#750) rightly took the
+    camera's rainbow away at every Film Physics, and the lines still measured Film Physics 1
+    against it (0.3 against 0.3); re-read on the film's own footprint (9/9).
+  - ~~19ak-24h, `heldpress --owed=presstwist`~~ **shipped**: it passes since 15g-18, so the
+    owed id is out.
+  - 19ak-24i, `nolight` 9, open: the camera's bead rims read 4 levels over the plate under
+    them at every commit from d8949fe to f3414ff; the bar is the ball's gain of the
+    projector's brightest pixel, which the dye's grain lifted to about 170 until 38u-8
+    (#889) made the dye smooth by default, so the bar fell from 4.0 to 3.87 with no rim
+    pixel moving. Read against the camera's own plate it is 3.3 over a pixel's own
+    gathering and 2.2 over the brightest the plate is under that drop. The shader's gain
+    (`focus` in plate.ts) multiplies the plate under the same pixel, so either the line's
+    ring (0.8 to 1.1 of the nominal radius) sits inside the drawn drop's 0.8, where the
+    gain is larger, or the drop draws a few levels of light. Measure the drawn radius in
+    `beadTex` against CAM_BEADS first. Never a looser bar.

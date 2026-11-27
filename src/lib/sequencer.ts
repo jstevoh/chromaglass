@@ -129,6 +129,9 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['soapFilmRate', 0.25],
   ['soapFilmAngle', 1],
   ['soapFilmTilt', 1],
+  ['glow', 0.05],
+  ['glowShear', 1],
+  ['glowRecharge', 0.5],
   ['glitter', 0.05],
   ['lensStop', 0.5],
   ['sideLight', 0.05],
@@ -138,6 +141,7 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['analyserAngle', 5],
   ['quarterWave', 0.05],
   ['birefringence', 0.05],
+  ['dishStress', 0.05],
   ['tank', 0.05],
   ['tankFeed', 0.1],
   ['tankWeight', 0.05],
@@ -373,7 +377,8 @@ export function stageAtOffset(stages: readonly Pick<ShowStage, 'seconds'>[], off
 export function duplicateSequence(seq: ShowSequence, name?: string): ShowSequence {
   return {
     ...seq,
-    id: `seq-${Date.now().toString(36)}`,
+    // The counter too: two copies made in one millisecond (the assistant's, PLAN 44k-16a) shared an id, and the second replaced the first.
+    id: `seq-${Date.now().toString(36)}-${(idCounter++).toString(36)}`,
     name: name ?? `${seq.name} copy`,
     builtIn: false,
     stages: seq.stages.map(st => ({ ...st, id: stageId(), settings: st.settings ? { ...st.settings } : undefined })),

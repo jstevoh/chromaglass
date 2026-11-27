@@ -14,6 +14,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flow, and at a hard shake breaks up and re-forms as a new pattern. **Strength** (`faradayGain`, 1–8):
   the lens's throw past real water, so a bass pulse reads on the wall. Settings → Tilt & Rock,
   MIDI, the desks, the remote, the phone's Sound sheet. `npm run faraday`.
+### Fixed — a picture palette recolours the plate (PLAN 43d-6)
+
+- **Palette from a picture or video** now changes the colours on the plate, not only the dyes
+  still to come: the plate takes the picture's colours over eight seconds, as does any palette
+  picked by hand. A look opened while a palette is locked is laid in that palette's dyes.
+### Added — Dish Stress: moulded dishes between the polarisers (PLAN 31p-3)
+
+- **Dish Stress** (under Polarisers in Settings → Lamp & Light, MIDI, the desks and the
+  phone): the plastic dish's own frozen moulding stress between the sheets, in series with
+  the liquid. Coloured rings round the middle and a pale rim; with Quarter Wave down, the dark
+  cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
+  to the dish's and the rings shift. 0 leaves the look as it was.
+### Changed — the glass still and the dye smooth unless someone moves them (PLAN 38u-8, 38u-11)
+
+- **Granulation** rests at 0 in every look (it was 0.5): a dye in solution has no grain. The
+  dial stays, on the sheet, the desks and MIDI.
+- **Glass Smear** rests at 0 (it was 0.3): the cover glass is still until a hand or a cord
+  moves it. The 19 looks that slid it all the time carry the slide as a cord, LFO 1 on Glass
+  Smear, whose top is the look's old speed; the phone's Sound sheet has a **Glass Slide**
+  slider for it, and Glass Smear is now MIDI-learnable.
+### Changed — The liquid moves what floats in it (PLAN 15g-17, 15g-18, 18c-14)
+
+- **Bubbles and beads ride the liquid.** A stroke or a drop no longer kicks the bubbles and
+  oil beads round it away from the hand; they move only as the liquid under them moves (a
+  pocket at the Taylor–Saffman speed, a bead at 2/(1+λ)), and liquid laid on a bubble
+  takes it. A pop no longer pushes and turns the liquid: the gap closing over the air
+  draws it in from all round.
+- **A press squeezes, and turns nothing.** The pointer's press no longer lays a swirl round
+  its disc; it pushes the liquid straight out from under the glass, as the remote press
+  always did.
+- **A plate left alone stays as it is.** The hidden seeding that laid colour and heat from
+  three orbits on every frame is gone, so a quiet passage settles; a plate that is
+  entirely empty is still woken by its emergency seed.
+### Added — the water's glow (PLAN 48c)
+
+- **Glow** (Settings → Camera, MIDI, the desks, the remote and the phone's Sound sheet): the
+  plate's water holds plankton that flash blue where the flow shears it, so a finger, a pour
+  or a stirring cord draws a glowing wake on a dark plate, and still water stays dark.
+- **Glow Shear** is the shear it takes to light (seawater's measured threshold by default);
+  **Glow Recharge** the seconds a spent cell takes to refill, so a path stroked again soon
+  glows less and a quiet passage lets it come back.
 
 ### Added — Soap Film's big swirls and Frame Tilt (PLAN 32k, 32h, 32d-1)
 
@@ -199,6 +240,12 @@ frame's mean, 0 now; the ground beside a pool was 20% darker on one side, 0.004%
   thickness (Beer–Lambert), so the lace takes the colour, deeper where the film is thick,
   and the holes show the water's. On the desk, the phone's Dye sheet, the remote and MIDI.
   0 in every look, which leaves the plate exactly as it was (`npm run lace` 8).
+### Added — Bubble Melt, the bubbles' air dissolving away (PLAN 38b-2)
+
+- A new dial under Bubbles (Settings → Look, the desks, MIDI, the phone): how fast a
+  bubble's air dissolves into the liquid, by Henry's law with air's diffusivity scaled past
+  nature. Off is nature's rate, where a bubble stays all night; up, the small ones melt
+  first, from minutes at the bottom of the dial to seconds at the top. Every look keeps it off.
 
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 

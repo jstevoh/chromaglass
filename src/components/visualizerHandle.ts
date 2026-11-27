@@ -89,8 +89,12 @@ export interface LiquidVisualizerHandle {
   setPlateLiquids: (ids: string[]) => void;
   /** Pin the color harmony to a specific palette-index set (music intelligence). */
   setHarmony: (indices: number[]) => void;
-  /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
-  setHarmonyLock: (indices: number[] | null) => void;
+  /**
+   * User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock.
+   * With `recolourSeconds`, the plate already lit is recoloured over that long too
+   * (PLAN 43d-6: a palette chosen by hand); without, only the dye still to come is.
+   */
+  setHarmonyLock: (indices: number[] | null, recolourSeconds?: number) => void;
   /**
    * Evolve turns the palette for the dye still to come (lib/slowEvolve.ts: at a
    * drop or a breakdown, or every few minutes with no music). Nothing already

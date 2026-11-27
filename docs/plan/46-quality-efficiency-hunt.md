@@ -59,15 +59,8 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   could in principle cost more to compile than the two it replaced; the 46a PR quotes
   startup's first step on CI's Mac before and after, and startup's "no later than the old
   way" line comes back from quarantine on 2026-11-15.
-- **46a · A faster opening** (Antigravity, after the queue): Classic's opening at most 52
-  pipelines (`openingtime --bar`, owed `count`), by fusing kernels that run back to back on
-  the same cells and by building behind the show what the first steps never draw with, never
-  by dropping what a look draws. Held by `samelook` (every look the same), `startup` (no stop
-  in the opening; every look opens on only what it waited for; nothing a first step asks for
-  left out) and `physics`/`thingap` for any fused kernel. The owner's Mac's number to beat:
-  first step 15.48 s cold, read from main's deploy after merge.
-- **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, H2c-6, H2c-9
-  (briefs of 2026-11-07), then H2c-8 and H2c-5, then H2c-2 once H2c-3 and H2c-1 merge. Each
+- **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, ~~H2c-6~~ (shipped, 2026-11-13), H2c-9
+  (briefs of 2026-11-07), ~~H2c-8 and H2c-5~~ (**shipped**: `encode` cleared `h2c5` and `h2c8`, `samelook` passed), then H2c-2 once H2c-3 and H2c-1 merge. Each
   takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
   a physics trade and ships only if `samelook` stays green.
 - **46c · Smooth on every look, on the owner's Mac** (Antigravity, by hand): `npm run stutter`
@@ -159,11 +152,6 @@ again ten times a second for three meters and a percentage.
     1. `BubbleField.step` (`src/lib/bubbles.ts:498`, called from `stepPlateBubbles` in `src/sim/speciesPoll.ts:93`): `stepPlateBubbles` allocates a `(bx, by) => [vx, vy]` closure each step, and `BubbleField.step` calls `velocity(x, y)` 8 times on the ring (`b.r + 1.5`) per bubble plus 4 strain taps per large bubble (`tau2 > 1e-3`), allocating a 2-number tuple each call.
     2. `squishDisc` under the bass hand (`src/sim/fluidSimulation.ts:2190` `pressBass` → `BassPress.follow` in `src/lib/squish.ts:710` → `squishDisc` in `src/lib/squish.ts:180` → `FluidSimulation.squishCell` in `src/sim/fluidSimulation.ts:2199`): `spokesAt` allocates `{ count: 0, phase: 0, seed: 0 }`, `BassPress.follow` allocates `{ x, y, r: radius, thin }`, and `squishDisc`'s inner loop calls `cell(idx, -3 * amount * q * q, 0, 0, 1)` per disc cell.
     3. The tempo `estimate` (`BarGrid.estimate` / `estimatePeriod` / `median` in `src/lib/barGrid.ts:144,229,378`, called from `BarGrid.step` at `src/lib/barGrid.ts:360`, and `BeatClock.step` in `src/lib/beatClock.ts:212`, called every frame at `src/components/LiquidVisualizer.tsx:2601`): `BarGrid.estimate` allocates `all`, `gaps` of `{ dt, w }` objects, a `score` closure, `.filter`/`.map` arrays, and `a.slice().sort((x, y) => x - y)` in `median`; `BeatClock.step` allocates `ivs: number[] = []` and runs `ivs.sort((a, b) => a - b)` on every frame once `onsets.length >= 4` even when no onset arrived or expired.
-- **46k · `dyeDisperse` runs as an exact no-op where diffusion is zero** (S; Classic and
-  thirteen other looks): its gate passes whenever the plate moves, and with `dm = 0` and
-  `kappaT = 0` every flux is ±0. One full-grid dispatch a step, 25 loads of the rgba32f dye
-  a cell; the file's own comment puts it near 0.4 ms. Skip it for that case (not oil bodies
-  until read); `samelook`, `physics`, `encode`.
 - **46l · Taps the display takes and throws away** (S each): the milk's five taps a layer
   where the lamp ground is off (ten a pixel on Classic); the ferrofluid dome's curvature
   loading again the four neighbours it holds; the projector's `scene` sample overwritten
@@ -220,3 +208,12 @@ again ten times a second for three meters and a percentage.
   the open plate) is stepped by no count. (4) `renders`' work counter does not count a
   mount, so a leaf that remounted on every reading would cost work and count as none.
 
+- **46u · The lean display is one byte off the whole one for two looks on the owner's Mac**
+  (S; found 2026-11-21 by the 48c PR): `npm run leandisplay` on an M-series Mac reads
+  `comet (plate)` and `saffron-lace (plate)` 1 of 102400 bytes from the whole display, on
+  `origin/main` itself as well as on the 48c branch, so it is not that branch's. One byte in
+  a 160² rgba8 picture is a rounding step: the lean shader, with its gates folded to
+  constants, lets Metal's compiler order or fuse a sum differently. Find which effect's
+  folding moves it (take out one kept gate at a time), then either keep that expression's
+  order in both shaders or let the check allow one 8-bit step where a gate was folded, with
+  a control that a real dropped effect (hundreds of bytes) still fails.

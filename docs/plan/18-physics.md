@@ -271,18 +271,50 @@ its frame rate live. "Free" means no new passes or texture reads.
       remote on a tipped plate before changing the sign, and fold it into 18a-13e's turn
       into the dish's frame. (The Tilt knobs, 18a-13m, already turn theirs into the dish:
       `stepHandTilt`'s `angle`, the place to turn the phone's too once its sign is checked.)
-    - **18a-13m. Tilt the plate from two knobs: shipped** (2026-11-15; the owner: "control
-      the tilt of the plate from my midi controller. Maybe two knobs?"). Tilt Left/Right
-      and Tilt Up/Down (`plateTiltX`, `plateTiltY`): the flat plate tipped by a hand, the
-      remote phone's rock path, eased and turned into the dish (`lib/handTilt.ts`); MIDI,
-      Tilt & Rock, the desks, the remote and the phone's Motion sheet. `npm run handtilt`.
-      Story in `docs/plan-shipped.md` §18a-13m. Open: 18a-13n.
-    - **18a-13n. How far a full knob tips.** Full is the phone's full tip, sinθ about 0.27
-      (rock 1.1 × CUR_ROCK plus the hold), which on a thin gap slides a pool of heavy dye
-      about 6% of the plate a second at the default Speed (ROCK_FALL's own measure). If
-      the owner finds two knobs at full too gentle for a show, the knob's reach can go past
-      the phone's toward Plate Rock's strong-kick swing (rock about 2), still on the same
-      law; judge it on the Mac first (docs/judging.md).
+    - **18a-13o. The dish's slop past the phone's tip.** A named shortcut: past the phone's
+      reach the knobs' tip no longer adds to the slosh dish's held tilt (`extTiltX`,
+      limited to √2 in `tipPlate`; `sloshAccel` clamps it to a unit an axis), because the
+      dish's step keeps its Courant limit only to the Slosh dial's own lean (lib/slosh.ts
+      rockAccel's note). The real answer is a dish step that substeps past that lean, so a
+      steep hand slops the dish as far as it tips it; then lift the limit.
+  - **18a-14, a light press looked pixelated: shipped** (2026-11-22; the owner: "when I use
+    the press tool on a small size, the pressed area becomes pixelated", with Press Amount
+    low on its slider). The thin-gap press laid its bowl, a clamped plate's deflection
+    −3·amount·(1 − d²/R²)², on the 192² CPU grid at a rounded centre and radius, and the
+    bilinear upsample carried it to the 384²/512² solver as flat facets with creases. The
+    film's closing (Stefan's law in `squeezeUpdate`) changes rate at each crease, so the
+    liquid driven out of the gap left in a polygon. At a full Amount the middle reaches the
+    gap's floor and hides it; at a low one every crease shows. The press is now one GPU
+    record (`PlateSolver.pressBowl`, falloff `plate`) with an unrounded centre and radius,
+    evaluated at every solver cell inside the same upsample pass (`upsampleDeltaPress`),
+    so the step folds once and the Reynolds source sees a smooth dh/dt. Desk and phone
+    share `applySquish`. `npm run pressfacets` (gpu=high, 512²): crease score of the
+    bowl's curvature 0.70–0.73 on main, 0.01–0.05 now; at gpu=mid (an even 2×, where the
+    relaxation rounds most of it) 0.04–0.10 against 0.01–0.05. Open: 18a-15.
+  - **18a-15, the rest of the thin gap's laying at solver cells.** The lift's spokes
+    (`liftStep`), the kick's release (`kickRelease`), the bass press and the rhythm sheet
+    still lay the gap on the 192² grid and reach the solver through the bilinear. None was
+    reported, but each has the same facets at a low enough amount. Move each to records
+    like 18a-14's, or lay the sheet at N, and measure the crease energy before and after.
+  - **18a-16, the draught slid the dish out over its rim: shipped** (2026-11-26; reported as
+    Solar Flare, filmed to Hymn to the Dawn, fading to an empty dish by 2:40). On the owner's
+    Mac with no music every build since 11-21 drained Solar Flare to 5–7% of its dye in 150 s;
+    PLAN 38v-1 took away the treble's white sparks, which had been pouring 1200–3900 of dye a
+    ten seconds back in and hid it (Hymn: 0.26–0.35 held before 38v-1, 0.01 after). On a thin
+    gap dye leaves only over the open rim, and Air's uniform −y shear went straight into the
+    gap's solve (p = 0 past the rim), a through-flow. A closed dish answers a uniform stress
+    with its own pressure; what a draught moves is its curl. hsBody lays the gusts as ∇⊥χ, χ a
+    noise held to zero over the dish's outer tenth (`AIR_GUST`). `npm run draught` (lab, 128²,
+    Air 0.35, 600 steps): dye kept 0% → 100%, the gusts' rms 1.73e-2 → 1.69e-2, mean flow
+    6.9e-2 → 5e-8. Open: 18a-17.
+  - **18a-17, the other pushes through the open rim.** Rain Drip on a standing plate and Plate
+    Rock's colour weight with no oil (hsBody, `S.up * A.a.x * w`, `A.b.xy * w`) still lay a
+    body force into the open-rim solve, so the dish's heavy colour leaves over the downhill rim
+    (`npm run draught` line 4: Rain Drip 0.5 upright keeps 1.8%). The oil's lift already goes
+    through the closed circulation (hsLiftRelax); lay these through it too, and replace
+    18a-16's new gust noise with the Hodge projection of a draught's stress onto closed flows
+    through the same solve (with 15e-12, a heavy bottle's weight, the same fix). A Blow's breath
+    is local and stays open: its liquid comes back.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

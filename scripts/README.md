@@ -1,6 +1,6 @@
 # scripts
 
-The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `watchwords.mjs`, `watchoverall.mjs`, `watchpair.mjs`, `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`).
+The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `watchwords.mjs`, `watchoverall.mjs`, `watchpair.mjs`, `watchfootage.mjs`, `watchcard.mjs`, `watchsettings.mjs`, `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`).
 
 ## Start here
 
@@ -29,7 +29,8 @@ A check that reads source as text reads App and its hooks through `appSource.mjs
 
 - `lookOrLamp.mjs`: `readsAsLamp`, whether a line quoting a retired look's id that is also a setting or Mixer row (Lumia) names the lamp; `plate` 5b's rule (PLAN 28i-5).
 - Shared by several checks: `judge.mjs` (a frame as numbers), `layoutProbe.mjs`, `liquidStandIn.mjs`, `arrangement.mjs` and `band.mjs` (synthesised songs and band), `media-read.mjs` (render containers), `rtmpListener.mjs`, `pagehold.mjs`, `compilestop.mjs` and `startupbehind.mjs` (beside `startup.mjs`, at its size ceiling), `recorder.mjs`.
-- CI and the Mac runner: `deploygate.sh`, `mainhold.mjs` (main held red: the status `hold.yml` posts on every open PR), `macrunner.mjs`, `macrunner-hook.sh`, `macrunner-setup.sh`, `macports.sh`, `macbusy.sh`, `macdeploy.mjs` (a deploy shard's hold on the Mac, which `launchChromium` and `npm run desktop` wait for), `debcache.sh`, `chromiumlibs.mjs`, `checkguard-api.mjs`, `measured.mjs`.
+- CI and the Mac runner: `deploygate.sh`, `mainhold.mjs` (main held red: the status `hold.yml` posts on every open PR), `macrunner.mjs`, `macrunner-hook.sh`, `macrunner-setup.sh`, `macports.sh`, `macbusy.sh`, `macdeploy.mjs` (a deploy shard's hold on the Mac, which `launchChromium` and `npm run desktop` wait for), `maclock.mjs` (one film at a time on the owner's Mac via `~/cg-scratch/film.lock` and `~/cg-scratch/film.queue/`: `acquireFilmLock`, `filmLockStatus`, `withFilmLock`), `debcache.sh`, `chromiumlibs.mjs`, `checkguard-api.mjs`, `measured.mjs`.
+- Reports, not checks: `bugbash.mjs` (`npm run bugbash`, PLAN QA-33): every look, every desk panel's controls and the phone's sheets turned end to end, a findings list grouped by area and a film of each serious one; never in `checks.json`, never a gate.
 - Data: `sizes.json` (the size baseline, which only shrinks), `fixtures/`, `brand/`.
 - Rules sync: `syncrules.mjs` (`npm run rules`) generates `.agents/rules/` from `.claude/rules/`, and `--check` holds them in sync and under 24,000 bytes per file.
 

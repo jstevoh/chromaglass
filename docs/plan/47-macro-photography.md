@@ -98,28 +98,54 @@ phone version in the same PR.
 
 ## 47a. Detail at the closeup's own scale: a fine window, with the dye finer than the flow (L)
 
-*Seen:* sharp structure down to a few hundredths of a millimetre inside a reaction a few
-centimetres across. *Physics:* a dye in water diffuses about a thousand times more slowly
-than momentum (Schmidt number Sc = ν/D ≈ 10³), so stirring folds it into filaments far
-finer than the smallest eddy: the Batchelor scale, η_B = η·Sc^(-1/2), about thirty times
-finer than the flow's own smallest scale. Fine dye over coarse flow is therefore not a
-cheat but what a real dish does. *Today:* the closeup is a crop of the whole plate's grid,
-magnified 1x to 16x; the particles of H1 (`wgsl/particles.ts`) carry finer structure than
-the grid, but at zoom they are drawn at the plate's scale, not the screen's. *Build:* in the
-closeup only, a second dye field covering the camera's window at screen resolution (about
-0.1 mm a cell at 6x), advected by the plate's velocity interpolated smoothly (one-way
-nesting, as a weather model nests a fine grid in a coarse one), seeded from the coarse dye
-when the window moves and fed back to nothing. Molecular diffusion at its real D (so a
-filament keeps its edge for seconds, not frames), and the window's own velocity correction
-where surface tension acts at that scale (capillary and Marangoni forces grow as the scale
-shrinks, so the fine window is where they belong). *Shortcut, named:* the fine window does
-not feed back into the coarse flow. *Measure:* in the lab at zoom 6, structure at 4 to 8
-screen pixels (the H1 measure) at least three times today's, and the edge's ripple at the
-cell's pitch gone (`macroview` gains both lines). Frame cost held by `npm run stages`.
-- **47a-1. First, the particles and the dye's edge at screen scale in the closeup** (S–M).
-  Draw H1's particles as screen-sized discs when `macroMode` is on, and cut the dye's edge
-  by its interpolated level set rather than its cells (with 38h-9, which names the same
-  grain). Closes the serrated edge in the photograph cheaply before 47a's window.
+- **47a-2. The rest of the fine window's physics** (M). Molecular diffusion at the dye's real D
+  in the fine fields (today none: a filament keeps its edge for the field's whole life, where a
+  real one blurs by √(Dt), a tenth of a millimetre in ten seconds, about a texel at 6x), and
+  capillary and Marangoni forces at the window's scale (they grow as the scale shrinks). The back
+  plate gets no fine dye (it is drawn through its own zoom and offset, `layer1`); give it its own
+  window.
+- **47a-3. A sharp interface carried** (M). A real dye's edge is sharp at the closeup's scale
+  (its diffusion length over ten seconds is an eighth of a cell here), the grid's is a cell or
+  two of numerical blur, and the fine fields only sharpen what the flow squeezes. Sharpening the
+  seed (one backward heat step, clamped) was tried and taken out: it turned the grid's edge,
+  a staircase at its cells softened by the Catmull-Rom read, into a row of teeth on a still
+  poured column (filmed on the owner's Mac, 2026-11-13). Carry the edge instead: a level set
+  or VOF fraction per dye body in the fine field, so an edge is never rebuilt from a blur.
+- **47a-5. Bars after a camera whip** (S). Filmed on the owner's Mac, Macro Bead, 2026-11-13:
+  for about half a second after the auto camera whips to a new bead, straight horizontal smear
+  bars at the top of the frame with Fine Detail at 1. Not reproduced in the lab; suspect the
+  window's margin reaching past the plate's edge (the fine fields clamp to the edge row there)
+  or the fields' remap across a jump. Film it again after the per-frame step and find it.
+- **47a-6. The fine fields resampled every step** (S, a shortcut named). Each step reads the
+  fields back through a clamped Catmull-Rom and stores them again, so three seconds of steps are
+  a few hundred resamplings, each a little blur and a little rounding (32-bit now, after 16-bit's
+  rounding drew a grid of squares on still pools). The physics is a characteristic map: carry
+  each texel's back-trace to where its dye was at the field's birth (a displacement field,
+  advected) and read the birth snapshot once, through the plate's own read, so a field resamples
+  its dye once in its life whatever the steps. Measure against finedye's lines 1 and 4.
+- **47a-7, closed by PR 842 and PR 807, not built here. Scalloped drop edges in macro** (M, reported by the owner 2026-11-13: "the drops in
+  macro still have jagged edges"). Not the fine window's: photographed on the owner's Mac (Macro
+  Bead, 6x, the same frame drawn four ways in one page), the bead outline is scalloped with Fine
+  Detail at 0 as at 1, a regular row of bumps about 12 to 13 screen pixels apart with a dark dot
+  in each. Edge Detail (`macroEdge`, `macroWarpOffset` in `wgsl/plate.ts`) adds an fbm
+  "silhouette crinkle" on top, visibly rougher at 0.75 than at 0. Two parts. (a) Retire the
+  crinkle: surface tension makes a drop's edge a smooth curve at this scale, so a drawn wobble
+  breaks the physics rule; whatever real roughness an edge has (capillary ripples, 47a-3's carried
+  interface) should come from the solver. It is a setting four presets lean on (0.75, 0.9), so
+  it needs the setting auditor and a film. (b) Find what draws the scallops at Edge Detail 0:
+  check whether their spacing is the grid's cell at 6x (a bilinear read of the phase or the
+  bead mask, `wgsl/beadMask.ts`, kinks at each cell), and read that field through the plate's
+  bicubic or carry it as a level set.
+  Closed 2026-11-13: PR 842 (38u) deletes Edge Detail, which is part (a), and PR 807
+  (38h-15, 38h-17) draws bubbles and beads at the screen's resolution rather than the bead
+  mask's grid, which is part (b). Judge the bead rims on the owner's Mac once both are on main;
+  if scallops remain, reopen this with the spacing measured.
+- **47a-4. Where the films' fine structure comes from** (finding, 2026-11-13). On the lab's
+  stirred swirl the fine dye raises fine over coarse from 1.08 to 1.11, where the films read 2.2
+  to 3.1: the thin gap's drag stops a free vortex in nine steps, so the plate's flow is slow and
+  smooth and folds little below a cell in the fine field's few-second life. More detail needs
+  more folding: a stir bar (47f), chaotic stirring, reactions and Marangoni cells (47g, the
+  owner's call). Measure each against `npm run finedye`'s line 1 on the owner's Mac.
 
 ## 47j. Caustics: the light focused into a network by a rippled or mixing layer (M)
 
@@ -422,12 +448,6 @@ an unsteady measure says "may vary from take to take", and every word names its 
   take of a moving fluid: run two takes of one look through it and find which of its sentences
   hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
   check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
-- ~~**47x-10**~~ the flow read aliased (shipped, this PR). The words check's drifting
-  stripes (a 64-pixel period moving a pixel a frame) move almost half their period in the
-  second the physics read pairs over, so the backward shift matched as well as the true one:
-  one ffmpeg read the drift 7.1 and 6.9 % a second backwards, Ubuntu's split the two takes by
-  two steps, the truth being 9.4 forwards. `flowField` now follows the motion through time,
-  one sample then lags of 3, 8 and 10, each seeded from the last.
 - **47x-11** two takes of one look still read as changed on Ubuntu. On main's deploy of
   2026-11-22 (f825ee6b, Measure sound, after 47x-10 shipped) "drift → drift2 (the same look,
   another phase): no steady change past a step" failed with show/turnover and show/own flow
@@ -437,6 +457,10 @@ an unsteady measure says "may vary from take to take", and every word names its 
   not the bar. Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the
   check now closes on the "n/m checks passed" tally a quarantine counts against, where its old
   "watchwords: 1 of 58 FAIL" line read as a second FAIL and no quarantine could match.
+- **47x-15** refit the card's bands from the owner's ratings once there are enough.
+- **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
+  references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
+  five canons per row; today three rows leave each film outside one or two peers' bands.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 

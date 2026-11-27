@@ -14,6 +14,8 @@ import { StandingFilm } from '../standing';
 import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, GAP_METRES, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
 import { FluidCore } from './core';
 import { WARM_FIT } from '../wgsl/thinWarm';
+import { FineDye } from '../fineDye';
+import type { CloseupWindow } from '../closeupWindow';
 
 export class FluidFields extends FluidCore {
   /** The same, for the hands (PlateSolver.thinGapLive). */
@@ -231,6 +233,16 @@ export class FluidFields extends FluidCore {
     return this.scratchR;
   }
 
+  protected ensureVelScratch(): GPUTexture {
+    if (!this.velScratch) {
+      this.velScratch = this.disposer.track(this.device.createTexture({
+        label: 'velocity scratch', size: [this.N, this.N], format: VEL,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+    }
+    return this.velScratch;
+  }
+
   protected ensureReach(): PingPong {
     if (!this.oilReach) this.oilReach = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'oil reach');
     return this.oilReach;
@@ -256,9 +268,20 @@ export class FluidFields extends FluidCore {
   }
 
 
-  setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
+  /** Whether the layer holds an allocated air field (bubbles or boil). */
+  get airLive(): boolean { return this.air !== null; }
+
+  /** The air field, allocated only once the layer carries a bubble or boil. */
+  protected ensureAir(): WebGPUAir {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
-    this.air.setBubbles(packed, count, soft, finger);
+    return this.air;
+  }
+
+  setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
+    if (count <= 0 && !this.air) return;
+    const air = this.ensureAir();
+    if (count > 0) this.airQuietSeconds = 0;
+    air.setBubbles(packed, count, soft, finger);
   }
 
   /**
@@ -269,6 +292,22 @@ export class FluidFields extends FluidCore {
   splatParticles(enc: GPUCommandEncoder, timing?: (label: string) => GPURenderPassTimestampWrites | undefined): void {
     this.particles?.splat(enc, timing);
   }
+
+  /** The closeup's fine dye (PLAN 47a-1, fineDye.ts), made when the closeup first asks for it. */
+  protected fine: FineDye | null = null;
+
+  /** Where the closeup looks and how much fine dye it shows, for the next step (plateUniforms.ts); null stops it. */
+  setCloseupWindow(w: CloseupWindow | null, amount: number): void {
+    if (w && !this.fine) this.fine = new FineDye(this.device);
+    this.fine?.setWindow(w, amount);
+  }
+
+  /** The window the fine detail is in, and how much the plate adds; null and 0 when there is none. */
+  get fineWindow(): CloseupWindow | null { return this.fine?.window ?? null; }
+  get fineStrength(): number { return this.fine?.strength ?? 0; }
+
+  /** The fine detail the plate adds in the closeup, or null when there is none. */
+  get fineDetail(): GPUTexture | null { return this.fine?.detail ?? null; }
 
   /** As dispatchBuf, over the grid in 8 × 8 tiles, with no args of its own. */
   protected dispatchBuf2(pass: GPUComputePassEncoder, name: string, key: string, resources: (GPUBuffer | GPUTexture)[]): void {
@@ -346,14 +385,14 @@ export class FluidFields extends FluidCore {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
       this.hsMob = buf('thin gap mobility', this.N);
-      // The oil's lift (PLAN 27f-5, hsBody): the water's colour's mean, and the circulation's Ψ and its right-hand side.
-      this.hsOilMean = buf('thin gap oil mean', 1);
+      // The tipped dish's closed circulation (PLAN 27f-5, hsBody): its Ψ, its right-hand side and the oil's drag.
       this.liftN = liftGrid(this.N);
       this.hsLiftSrc = this.disposer.track(this.device.createBuffer({ label: 'oil lift source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
-      this.hsLiftPsi = this.disposer.track(this.device.createBuffer({ label: 'oil lift psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      this.hsLiftPsi = this.disposer.track(this.device.createBuffer({ label: 'oil lift psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+      this.hsLiftB = this.disposer.track(this.device.createBuffer({ label: 'oil lift drag', size: this.liftN * this.liftN * 4, usage: GPUBufferUsage.STORAGE }));
       // The sealed bottle's (PLAN 27f-9, wgsl/fluid/seal.ts): the same grid, a weight of its own.
       this.hsSealSrc = this.disposer.track(this.device.createBuffer({ label: 'seal source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
-      this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
       // The thin solve's own P, packed as the old solver's pressure is. The thin
       // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
       // in that one (wgsl/thinGap.ts, hsGradient).
@@ -426,8 +465,8 @@ export class FluidFields extends FluidCore {
       vel: this.vel.read,
       velForced: this.velForced,
       grain: this.grain?.read ?? null,
-      /** The particle splat, or null when the amount is 0 and none exist. */
-      particles: this.particles && !this.particles.idle ? this.particles.target : null,
+      /** The particle splat, or in the closeup the fine detail in its place (PLAN 47a-1); null with neither. */
+      particles: this.fineDetail ?? (this.particles && !this.particles.idle ? this.particles.target : null),
       /** The air field (H6), or null when no bubble is on this plate. */
       air: this.air?.any ? this.air.field : null,
       /** The bubbles as that field was stamped from them, for the plate to draw each from its own disc (38h-15). */
@@ -458,6 +497,8 @@ export class FluidFields extends FluidCore {
       coverMetres: this.coverGap * GAP_METRES,
       /** The shaken dish's standing wave (PLAN 48f), or null with no shaker. */
       faraday: this.faradayPlate?.field ?? null,
+      /** The water's glow (PLAN 48c), or null when Glow is off. */
+      glow: this.glowPlate?.field ?? null,
     };
   }
 
@@ -466,6 +507,8 @@ export class FluidFields extends FluidCore {
     this.disposed = true;
     this.particles?.dispose();
     this.particles = null;
+    this.fine?.dispose();
+    this.fine = null;
     this.air?.dispose();
     this.air = null;
     this.slosh?.dispose();
@@ -474,6 +517,8 @@ export class FluidFields extends FluidCore {
     this.tankPlate = null;
     this.faradayPlate?.dispose();
     this.faradayPlate = null;
+    this.glowPlate?.dispose();
+    this.glowPlate = null;
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();
