@@ -69,6 +69,14 @@ function holds(dose) {
   dose(run, 0, T * KEEP_FULL_HIGH, T, 1e9);            // back to full: it stops
   if (dose(run, 0, mid, T, 1e9) > 0) bad.push('topping carried on after the dish was full again');
   // 4. Nothing to keep.
+  // The pace holds until full (the Mac, 2026-11-27): an emptied dish nearly
+  // back still gets a full drop at the fast pace. Following the dish down to
+  // small slow drops near the top only matched what the dish loses on its
+  // own, and Lava Pop sat at 0.43 of 0.80 with the dropper never stopping.
+  const back = t();
+  dose(back, 0, 0, T, 1e9);
+  const nearly = dose(back, 0, T * (KEEP_FULL_HIGH - 0.03), T, KEEP_FULL_FAST_S * 1.1);
+  if (!(nearly >= 0.9)) bad.push(`an emptied dish nearly back got ${nearly.toFixed(2)} of a drop at the fast pace`);
   if (dose(t(), 0, 0, 0, 1e9) > 0) bad.push('a look with no target got a drop');
   if (dose(t(), 0, NaN, T, 1e9) > 0) bad.push('a NaN measure got a drop');
   return bad;

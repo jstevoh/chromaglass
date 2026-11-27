@@ -31,8 +31,18 @@
   person does not fuss over a dish that is nearly right: without it, each drop
   that took the dish over the line and each pale minute after it would
   alternate at the line, a drip every few seconds for ever. The emptier the
-  dish, the sooner the next drop (KEEP_FULL_SLOW_S just under the line to
-  KEEP_FULL_FAST_S on an empty one), and the bigger, up to a hand's hardest drop.
+  dish was when the topping up began, the sooner the next drop
+  (KEEP_FULL_SLOW_S for a dish just under the line to KEEP_FULL_FAST_S for an
+  empty one), and the bigger, up to a hand's hardest drop; and that pace holds
+  until the dish is full. It used to follow the dish as it filled, slowing and
+  shrinking the drops as it came back, and the Mac measured why that is wrong
+  (`npm run keepfullapp`, 2026-11-27): an emptied Lava Pop came back to 0.43
+  of its 0.80 in 90 s and sat there, because near the top the small slow drops
+  only matched what the dish loses on its own (about 5% in two minutes, PLAN
+  18a-23), so it never read full and the dropper never stopped. A person
+  refilling an emptied dish does not slow down as it comes back; they keep the
+  rhythm they started with until it looks right, and only a dish that has
+  just gone a little thin gets the odd unhurried drop.
   The interval is in seconds of the wall, not steps: a person's hand keeps the
   room's time, and the measure it reads comes back from the GPU every few
   frames, so a drop never goes in before the last one has been seen.
@@ -61,7 +71,9 @@ export const KEEP_FULL_LOW = 0.8;
 export const KEEP_FULL_HIGH = 0.95;
 /** Seconds between drops on a dish just under the line, and on an empty one. */
 export const KEEP_FULL_SLOW_S = 6;
-export const KEEP_FULL_FAST_S = 0.6;
+export const KEEP_FULL_FAST_S = 0.4;
+/** How steeply the run's pace rises with how short the dish was: full speed at 1 / KEEP_FULL_PACE short. */
+export const KEEP_FULL_PACE = 2.5;
 /**
  * A drop's amount at full: the hand's own Drop with the pen pressed all the
  * way (LiquidVisualizer's remote `drop`, 5 × amount, amount 2 at a full
@@ -81,7 +93,12 @@ const LAYERS = 8;
 export interface KeepFullState {
   /** Wall-clock seconds of each layer's last drop. */
   lastAt: Float64Array;
-  /** 1 while a layer is being topped up (between LOW and HIGH). */
+  /**
+   * 0 while a layer is left alone; while it is being topped up (from under LOW
+   * until HIGH), 1 + 254 × the most it was short of HIGH in this run, the
+   * emptiness that sets the run's pace. A byte, so the state stays the one
+   * array `npm run keepfull` hands the dose.
+   */
   topping: Uint8Array;
   /** Drops laid since the show opened, for the harness. */
   drops: number;
@@ -104,13 +121,16 @@ export function keepFullDose(topping: Uint8Array, layer: number, mean: number, t
   if (!(target > 0.01) || !Number.isFinite(mean)) { topping[layer] = 0; return 0; }
   const full = mean / target;
   if (full >= KEEP_FULL_HIGH) { topping[layer] = 0; return 0; }
-  if (full < KEEP_FULL_LOW) topping[layer] = 1;
+  const shortNow = Math.max(0, Math.min(1, 1 - full / KEEP_FULL_HIGH));
+  if (full < KEEP_FULL_LOW) topping[layer] = Math.max(topping[layer], 1 + Math.round(shortNow * 254));
   if (!topping[layer]) return 0;
-  // How short of the line it is, 0 just under it to 1 on an empty dish.
-  const short = Math.max(0, Math.min(1, 1 - full / KEEP_FULL_HIGH));
-  const every = KEEP_FULL_SLOW_S - (KEEP_FULL_SLOW_S - KEEP_FULL_FAST_S) * Math.min(1, short * 1.6);
+  // The pace of the run, from the emptiest the dish was in it: full speed
+  // from 60% short of full, so a dish found half empty is refilled as an empty
+  // one is; one just under the line (about 18% short) gets a drop in 3.5 s.
+  const pace = Math.min(1, ((topping[layer] - 1) / 254) * KEEP_FULL_PACE);
+  const every = KEEP_FULL_SLOW_S - (KEEP_FULL_SLOW_S - KEEP_FULL_FAST_S) * pace;
   if (since < every) return 0;
-  return 0.35 + 0.65 * Math.min(1, short * 1.6);
+  return 0.35 + 0.65 * pace;
 }
 
 /** Where a top-up lands and what falls: the component fills it in (its look's areas, harmony and bench). */

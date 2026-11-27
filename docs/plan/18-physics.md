@@ -364,8 +364,11 @@ its frame rate live. "Free" means no new passes or texture reads.
     Random Evolve on both desk rows, the settings sheet, the phone and the phone remote) is
     the hand on the dropper and nothing else: below 80% of the look's own amount it lets a
     real drop of the look's own bottle, in the look's colours, fall where the dish is
-    palest (the hand's own Drop, with its volume on the thin gap), every 6 s just under the
-    line to 0.6 s on an empty dish, until 95%. sim/keepFull.ts; the hue journey moved to
+    palest (the hand's own Drop, with its volume on the thin gap), until 95%, at a pace set
+    by how empty the dish was when it began (a drop every 3.5 s just under the line to 0.4 s
+    on an emptied dish) and held until full: following the dish as it filled stalled an
+    emptied Lava Pop at 0.43 of 0.80 on the Mac, its small slow drops near the top only
+    matching what it loses on its own (18a-23). sim/keepFull.ts; the hue journey moved to
     sim/hueJourney.ts beside it to keep the visualizer's size. `npm run keepfull` (node: the
     sums, the wiring, every surface), `npm run keepfullapp` (the Mac: Lava Pop's leak, an
     emptied dish refilled and the hand stopping).
