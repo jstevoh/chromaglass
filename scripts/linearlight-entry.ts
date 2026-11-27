@@ -21,6 +21,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   if (op == 0) { r = mixLight(a, b, t); }
   if (op == 1) { r = addLight(a, b); }
   if (op == 2) { r = spectralThrough(a, t); }
+  if (op == 3) { r = vec3f(levelShare(t)); }
   outs[i] = vec4f(r, 0.0);
 }
 `;

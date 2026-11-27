@@ -29,7 +29,8 @@
  *   and the lit plate (onGround, groundOf, the chemistry's colours, the
  *   closeup's depth), the mixer's levels (mixLevelled), and every mixer row
  *   laid by its own mix. Exact at both ends, so the 24 looks at Lamp Ground 1
- *   and every row at level 1 are the same picture to the bit.
+ *   and every row at level 1 are the same picture to the bit. A mixer level
+ *   is a dimmer, its share of the light the level to the 2.2 (`levelShare`).
  * - `addLight`, a beam over the plate or a source into the lamp: the LED ring
  *   and the lumia above the glass (screenOver), the lumia under it (in the
  *   lamp, plateLamp.ts), a mixer row's Add. The display clips where the sum
@@ -41,9 +42,6 @@
  *   pixel is the average of the light round it, and bloom is light the lens
  *   spreads, added. The bloom's threshold moves with it (0.55 in display
  *   values is 0.268 of the light) so the same highlights bloom.
- * - The ferro drop in the closeup (wgsl/ferroDrop.ts): Fresnel's reflectance
- *   is a share of the light, so it scales the light, and what the drop
- *   reflects is added to what its edge passes as light (38v's site, RS-35).
  *
  * The curve is the 2.2 power, the one the projectors' add (projectors.ts)
  * and the lens pass (glint.ts) already use, not the piecewise sRGB curve the
@@ -55,7 +53,8 @@
  * projector pass's beams, laid by the GPU's blend into an encoded canvas)
  * and 38p-2 (highlights drawn at a size in display values: the ferro glints
  * and dome rays, the photo style's speculars, the thin film's sheen, a
- * bead's glow; and the second plate's named blends on the black ground,
+ * bead's glow, the closeup ferro drop's reflection (with 29a-6's switch);
+ * and the second plate's named blends on the black ground,
  * which are the Blend picker's choice of operation rather than two lights).
  * `npm run linearlight` measures every site here.
  */
@@ -71,6 +70,19 @@ fn mixLight(a: vec3f, b: vec3f, t: f32) -> vec3f {
   if (t >= 1.0) { return b; }
   return displayOf(mix(lightOf(a), lightOf(b), t));
 }
+
+/*
+  A dial's level as its share of light: a dimmer's curve. A fader or a beam's
+  level is how bright the row looks, so its share of the light is the level
+  to the 2.2 (half a fader is a fifth of the light, and looks half as
+  bright); a share linear in the level put 0.2% of a lamp at 15 of 255 over
+  black, a fader at next to nothing that still showed (\`npm run mixer\`, the
+  near-zero line). The sum it scales is still of light. Lamp Ground is not a
+  dial of one row's brightness but a crossfade between two grounds, which is
+  linear in light as the projectors' crossfade is (51a), so it does not take
+  this.
+*/
+fn levelShare(level: f32) -> f32 { return pow(max(level, 0.0), 2.2); }
 
 /* Light l added to c. */
 fn addLight(c: vec3f, l: vec3f) -> vec3f {

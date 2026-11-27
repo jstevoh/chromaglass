@@ -1389,15 +1389,16 @@ fn mixBlendOf(v: f32) -> i32 { return i32(v + 0.5); }
 
 const MIX_KEY_LO = 0.18;
 
-// Each row's blend on light (38p): screen and multiply as named, add as light, the fades as light.
+// Each row's blend on light (38p): screen and multiply as named, add as light, the fades as light; its level a dimmer's.
 fn blendRowKeyed(c: vec3f, s: vec3f, a: f32, mode: i32, keyLo: f32) -> vec3f {
+  let w = levelShare(a);
   let cl = lightOf(c);
   let sl = lightOf(clamp(s, vec3f(0.0), vec3f(1.0)));
-  if (mode == 1) { return mixLight(c, displayOf(1.0 - (1.0 - min(cl, vec3f(1.0))) * (1.0 - sl)), a); }
-  if (mode == 2) { return displayOf(cl + lightOf(s) * a); }
-  if (mode == 3) { return mixLight(c, c * s, a); }
-  if (mode == 4) { return mixLight(c, s, a * smoothstep(keyLo, keyLo + 0.18, dot(s, vec3f(0.299, 0.587, 0.114)))); }
-  return mixLight(c, s, a);
+  if (mode == 1) { return mixLight(c, displayOf(1.0 - (1.0 - min(cl, vec3f(1.0))) * (1.0 - sl)), w); }
+  if (mode == 2) { return displayOf(cl + lightOf(s) * w); }
+  if (mode == 3) { return mixLight(c, c * s, w); }
+  if (mode == 4) { return mixLight(c, s, w * smoothstep(keyLo, keyLo + 0.18, dot(s, vec3f(0.299, 0.587, 0.114)))); }
+  return mixLight(c, s, w);
 }
 
 fn blendRow(c: vec3f, s: vec3f, a: f32, mode: i32) -> vec3f { return blendRowKeyed(c, s, a, mode, MIX_KEY_LO); }
@@ -1817,9 +1818,10 @@ struct FsOut {
   the picture does not change.
 */
 fn mixLevelled(under: vec3f, over: vec3f, level: f32) -> vec3f {
-  // A fader of light, exact at both ends (plateLight.ts): mix(a, b, 1) may
-  // be written a + (b - a) * 1, which is not b in the last bit.
-  return mixLight(under, over, level);
+  // A fader of light, its level a dimmer's (levelShare), exact at both ends
+  // (plateLight.ts): mix(a, b, 1) may be written a + (b - a) * 1, which is
+  // not b in the last bit.
+  return mixLight(under, over, levelShare(level));
 }
 
 /** The LED platform's light at uv: its wheel of colour, graded, and the bevel toward its rim. */
@@ -1865,7 +1867,7 @@ ${FILM_FRAME_WGSL}
 ${LAMP_MIX_WGSL}
 
 /** A beam over the plate, k of its light: it adds, as light (plateLight.ts). */
-fn screenOver(c: vec3f, light: vec3f, k: f32) -> vec3f { return displayOf(lightOf(c) + lightOf(light) * k); }
+fn screenOver(c: vec3f, light: vec3f, k: f32) -> vec3f { return displayOf(lightOf(c) + lightOf(light) * levelShare(k)); }
 
 /**
  * The movers whose place is in [lo, hi), laid over color bottom first. Only
@@ -2593,7 +2595,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         if (drop3d > 0.001) {
           let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
           let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005));
-          pc = mixLight(pc, displayOf(lightOf(edgeLit) + lightOf(seen) * (0.4 + 0.6 * amt)), drop3d);
+          pc = mix(pc, edgeLit + seen * (0.4 + 0.6 * amt), drop3d);
         }
 
         /*

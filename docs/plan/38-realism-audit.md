@@ -436,8 +436,9 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   (onGround, groundOf, chemOnGround, the closeup's liquidPart), the mixer's faders
   (mixLevelled) and rows (blendRowKeyed: Screen and Multiply computed on light, Add as light),
   the LED ring and lumia as beams (screenOver) and the lumia in the lamp, the camera's depth of
-  field and bloom (its knee 0.55 of display values, 0.268 of light), the ferro drop's Fresnel
-  share and the studio light added to `edgeLit` take them. The two projectors' add had
+  field and bloom (its knee 0.55 of display values, 0.268 of light) take them. A mixer level
+  is a dimmer: its share of the light is the level to the 2.2 (`levelShare`), so half a
+  fader looks half and a fader at next to nothing lays next to nothing (`npm run mixer`). The two projectors' add had
   shipped with 51a (#1012, `wallAdd`). `npm run linearlight` 6/6 (halfway 0.730 where
   display values read 0.5; two half lights 0.685 where they read white); `npm run lamp`
   line 6 asks for half of each light. Saved looks are at Lamp Ground 0 or 1 and every row
@@ -453,7 +454,11 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     drawn at a size in display values: the ferro glint and the domes' rays (the `pc +=`
     lines in `plate.ts`'s phase branch), the photo style's speculars, the thin film's sheen
     (`plateThinFilm.ts`, 0.08), a bead's glow (`glowC`), the bubbles' six-sample rim
-    average, the film projector's row (`plateFilm.ts`). Each is a highlight whose strength
+    average, the film projector's row (`plateFilm.ts`), and the closeup ferro drop's
+    reflection (Fresnel's F scaling display values, and the studio light added to `edgeLit`,
+    38v's site): taken to light it moved the drop's brightest 60 pixels off the key's side
+    (`npm run ferrodrop`, -0.07, -0.93 radii), so it goes with 29a-6's switch and that
+    look's pictures. Each is a highlight whose strength
     was set by eye on display values, so moving it re-tunes every look that has it: do each
     with that look's pictures. The second plate's blends on the black ground (screen,
     lighter, multiply, exclusion) stay display-value operations: they are the Blend

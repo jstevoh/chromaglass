@@ -24,7 +24,9 @@
  *      say on three bands (the encode commutes with a power), and a deep
  *      yellow, which the band sum changes most, matches the sum done on light
  *      and is measurably off the sum done on display values
- *   5. the shaders that sum light take these functions: the plate's shader
+ *   5. a mixer level is a dimmer's curve: its share of the light is the
+ *      level to the 2.2, so a fader at next to nothing lays next to nothing
+ *   6. the shaders that sum light take these functions: the plate's shader
  *      has one spectralThrough and it is plateLight's, the camera's blur
  *      and bloom decode what they average, the mixer's rows and faders go
  *      through mixLight. A read of the source, so it says only that the
@@ -66,6 +68,8 @@ const cases = [
   [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0, 1],
   [...GREY, 0, 0, 0, 1.7, 2],
   [...YELLOW, 0, 0, 0, 2.5, 2],
+  [0, 0, 0, 0, 0, 0, 0.5, 3],
+  [0, 0, 0, 0, 0, 0, 0.002, 3],
 ];
 
 const { page, close } = await openLab({ entry: 'scripts/linearlight-entry.ts' });
@@ -118,7 +122,13 @@ const base = 2 * n;
     errLight < 5e-4 && gap > 0.02,
     `${y.map(f3).join(' ')} (as light ${asLight.map(f3).join(' ')}; as display values ${asDisplay.map(f3).join(' ')})`);
 }
-// ── 5. Wired ─────────────────────────────────────────────────────────
+// ── 5. A dial is a dimmer ────────────────────────────────────────────
+{
+  const half = got[base + 4][0], tiny = got[base + 5][0];
+  check("a mixer level is a dimmer's: half a fader is 0.218 of the light (looks half), and 0.002 next to none",
+    Math.abs(half - 0.5 ** 2.2) < 2e-4 && tiny < 1e-5, `${f3(half)}, ${tiny.toExponential(1)}`);
+}
+// ── 6. Wired ─────────────────────────────────────────────────────────
 {
   const plate = readFileSync('src/gpu/wgsl/plate.ts', 'utf8');
   const camera = readFileSync('src/gpu/wgsl/camera.ts', 'utf8');
@@ -130,7 +140,7 @@ const base = 2 * n;
   if (!/mixLight\(painted, lampBg \* through, U\.lampGround\)/.test(fn(plate, 'onGround'))) miss.push('onGround');
   if (!/mixLight\(bg, lampBg, U\.lampGround\)/.test(fn(plate, 'groundOf'))) miss.push('groundOf');
   if (!/mixLight\(/.test(fn(plate, 'chemOnGround'))) miss.push('chemOnGround');
-  if (!/mixLight\(under, over, level\)/.test(fn(plate, 'mixLevelled'))) miss.push('mixLevelled');
+  if (!/mixLight\(under, over, levelShare\(level\)\)/.test(fn(plate, 'mixLevelled'))) miss.push('mixLevelled');
   if (!/lightOf\(c\) \+ lightOf\(light\)/.test(plate)) miss.push('screenOver');
   if (/return mix\(c, s, a\)/.test(fn(plate, 'blendRowKeyed'))) miss.push('blendRowKeyed');
   if (/c \+= lumiaLight/.test(lamp)) miss.push('the lumia in the lamp');
