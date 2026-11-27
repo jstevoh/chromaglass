@@ -474,10 +474,17 @@ const oldPush = (strength) => ({
       const src = readFileSync(args.path, 'utf8');
       const at = '  /*\n    There was a fingering push here, and it is gone on purpose.';
       if (!src.includes(at)) throw new Error('grating: the control could not find where the fingering push was in wgsl/fluid/forces.ts');
-      // The push as it shipped until it was taken out.
-      const push = `  if (d >= 0.05) {
-    let gx = (bilerpN(dye, uv + eL, S.n).a - bilerpN(dye, uv - eL, S.n).a) * 0.5;
-    let gy = (bilerpN(dye, uv + eL.yx, S.n).a - bilerpN(dye, uv - eL.yx, S.n).a) * 0.5;
+      /*
+        The push as it shipped until it was taken out. Its one-cell step is its
+        own (eP): forcesB's \`eL\` went with the tension's gradient in 18d-6
+        (#1016), and with it missing this kernel did not compile, so both
+        controls stepped no force at all and read their laid pools (52 at five
+        seconds and at ten) while the as-is plate moved.
+      */
+      const push = `  let eP = vec2f(1.0 / S.l, 0.0);
+  if (d >= 0.05) {
+    let gx = (bilerpN(dye, uv + eP, S.n).a - bilerpN(dye, uv - eP, S.n).a) * 0.5;
+    let gy = (bilerpN(dye, uv + eP.yx, S.n).a - bilerpN(dye, uv - eP.yx, S.n).a) * 0.5;
     let g2 = gx * gx + gy * gy;
     if (g2 > 0.005) {
       let g = sqrt(g2);
