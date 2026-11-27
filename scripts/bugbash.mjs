@@ -267,6 +267,18 @@ const enumerate = (page, scopeSel, skipTagged) => ask(page, ([scope, skip, denyS
   const sel = 'input[type=range], select, input[type=checkbox], [role=switch], [aria-pressed], [role=checkbox], [role=radio], [role=tab], button';
   const out = [];
   const seen = new Map();
+  /*
+    A row of aria-pressed buttons of which exactly one is pressed is a
+    pick-one-of-many (the phone's look picker, a tool row), not a set of
+    switches: pressing the chosen one again keeps it chosen, which is right.
+    The 2026-11-26 run judged 41 look buttons and the phone's Drop as "no way
+    back" for that reason (QA-33b-5 gives those rows radio roles; this keeps
+    any row still marked aria-pressed from reading as broken until then).
+  */
+  const pickOne = (el) => {
+    const row = [...(el.parentElement?.children ?? [])].filter((x) => x.hasAttribute('aria-pressed'));
+    return row.length >= 3 && row.filter((x) => x.getAttribute('aria-pressed') === 'true').length === 1;
+  };
   for (const root of roots) {
     for (const el of root.querySelectorAll(sel)) {
       if (skip && el.hasAttribute('data-bb')) continue;
@@ -282,7 +294,7 @@ const enumerate = (page, scopeSel, skipTagged) => ask(page, ([scope, skip, denyS
       const role = el.getAttribute('role');
       const kind = tag === 'input' && el.type === 'range' ? 'range'
         : tag === 'select' ? 'select'
-        : (tag === 'input' && el.type === 'checkbox') || role === 'switch' || role === 'checkbox' || el.hasAttribute('aria-pressed') ? 'toggle'
+        : (tag === 'input' && el.type === 'checkbox') || role === 'switch' || role === 'checkbox' || (el.hasAttribute('aria-pressed') && !pickOne(el)) ? 'toggle'
         : role === 'radio' || role === 'tab' ? 'choice' : 'button';
       // The desk's own tab strip is how the sweep moves; a tab inside a panel is the panel's.
       if (role === 'tab' && !panelEl) continue;
@@ -368,6 +380,20 @@ async function sweepOne(app, c, base, area, look, layout) {
   await page.keyboard.press('Escape').catch(() => {});
   if (before.settings) await ask(page, (s) => window.chromaglassSettings?.(s), before.settings).catch(() => {});
   if (faults.some((f) => f.kind === 'crash' || f.kind === 'hung')) return 'dead page';
+  /*
+    Putting the settings back does not put the liquid back. Rides' Drain (and
+    any Clear or Empty) takes the dye off the plate, and on 2026-11-26 every
+    control after Drain on its tab was judged against the drained plate:
+    about fifty "flat 19%→97%" findings across Dyes, Bottles, Recipe and the
+    Mixer, all one number, none of them those controls' fault. So when the
+    plate still reads black or flat against the tab's baseline once the
+    settings are back, the page is opened again before the next control.
+  */
+  if (did.read) {
+    await page.waitForTimeout(300);
+    const after = await snap(page, { fps: false });
+    if (faultsOf(after, base, { errors: [] }, 0).some((f) => f.kind === 'black' || f.kind === 'flat')) return 'emptied the plate';
+  }
   return did.read ? 'ok' : 'ok, plate not read';
 }
 
@@ -409,19 +435,20 @@ async function partDesk(browser) {
     for (let t = 0; t < TAB_PANELS.length; t++) {
       if (TABS && !TABS.includes(t + 1)) continue;
       await untilMacDeployDone('the bug bash');
-      const app = await openApp(browser, { look, tabs: true });
+      let app = await openApp(browser, { look, tabs: true });
       const tab = app.page.getByRole('tab', { name: `Bash ${t + 1}` }).first();
       if (t > 0) { await tab.click({ timeout: 5000 }).catch(() => {}); await app.page.waitForTimeout(2500); }
       const mounted = await ask(app.page, () => [...document.querySelectorAll('[data-panel]')].map((e) => e.getAttribute('data-panel'))).catch(() => []);
       for (const id of TAB_PANELS[t]) if (!mounted.includes(id)) {
         note(`Desk › ${names.get(id)}`, '(the panel)', look, 'desk', [{ kind: 'missing', sev: 'med', detail: `seeded on tab ${t + 1}, not drawn` }]);
       }
-      const base = await baseline(app.page);
+      let base = await baseline(app.page);
       const controls = (await enumerate(app.page, '[data-panel]', false).catch(() => []));
-      const live = controls.filter((c) => !c.skipped).slice(0, LIMIT);
+      let live = controls.filter((c) => !c.skipped).slice(0, LIMIT);
       console.log(`\n  desk tab ${t + 1} on ${look}: ${TAB_PANELS[t].join(', ')}; ${live.length} controls (${controls.filter((c) => c.skipped).length} on the deny list), ${base.fps} fps`);
       for (const c of controls.filter((x) => x.skipped)) coverage.push({ area: `Desk › ${names.get(c.panel) ?? c.panel}`, control: c.name, note: 'not pressed (deny list)' });
-      for (const c of live) {
+      for (let i = 0; i < live.length; i++) {
+        const c = live[i];
         const area = `Desk › ${names.get(c.panel) ?? (c.panel || 'desk')}`;
         let r = await sweepOne(app, c, base, area, look, `desk tab ${t + 1}`);
         /*
@@ -436,6 +463,20 @@ async function partDesk(browser) {
         }
         coverage.push({ area, control: `${c.name} (${c.kind})`, note: r });
         if (r === 'dead page') break;
+        /*
+          The plate is still empty with the settings back (a Drain): a fresh
+          page on the same tab, a fresh baseline, and the controls not yet
+          swept found again on it by panel, name, kind and place.
+        */
+        if (r === 'emptied the plate') {
+          await app.ctx.close();
+          app = await openApp(browser, { look, tabs: true });
+          if (t > 0) { await app.page.getByRole('tab', { name: `Bash ${t + 1}` }).first().click({ timeout: 5000 }).catch(() => {}); await app.page.waitForTimeout(2500); }
+          base = await baseline(app.page);
+          const fresh = (await enumerate(app.page, '[data-panel]', false).catch(() => [])).filter((x) => !x.skipped);
+          live = [...live.slice(0, i + 1), ...live.slice(i + 1).map((x) => fresh.find((y) => y.panel === x.panel && y.name === x.name && y.kind === x.kind && y.nth === x.nth) ?? x)];
+          console.log(`    (${c.name} left the plate empty: the tab is opened again, ${base.fps} fps)`);
+        }
         // A press that took the page somewhere else: back, and the next control is found again.
         if (!app.page.url().startsWith(`http://localhost:${PORT}/`)) { await app.page.goto(app.url).catch(() => {}); await app.page.waitForTimeout(SETTLE); }
       }
