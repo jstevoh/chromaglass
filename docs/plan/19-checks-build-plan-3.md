@@ -662,7 +662,18 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
     - `qa` ("no section is more than three screens deep — deepest is 3.1 screens"): bisected to `#889` (`3bb0899b`, `38u-11` adding `glassSlide` cord to `Crowd Plate`, growing `Patches` from `2205/758 = 2.91` to `2327/758 = 3.07`); fixed in `PatchesSection.tsx` (2×2 LFOs and 2×1 Envelopes in the sheet). Full `npm run qa` remains blocked at `origin/main` on `49c-2` (`#963` unhooking `overlayUp` at `<1024px`).
     - `videolamp` (0/3 alone, 9/11): bisected to `#755` (`6d11ce66`, `18e-2`, `19.57/3.57/3.91, flat 0.00` → `17.36/5.05/4.58, flat 8.68`); open for Claude Code (`scripts/videolamp.mjs` measures screen `(0.72, 0.5)` r=`0.12` where `uvToFluid` maps fluid `(0.72, 0.5)` r=`0.12` to screen `(0.83, 0.5)` r=`0.18` — `0.00` middle/far at true coords — and its `rim > 3 * flatRim` control predates `18e-2`'s real `|∇OPL|` pupil loss, which darkens the flat rim by `30.19` vs `58.27` on stripes).
   - 19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
-    `lavaround` (after 27f-9q, #866, met 38w-31, #954).
+    `lavaround` (after 27f-9q, #866, met 38w-31, #954) (**part shipped**: `lavacycle`
+    7/7 via `lava-lamp` `oilWeight` `0.6 → 0.5` in `src/presets.ts`, `no cool glass`
+    `0.87 → 0.79` → `0.86 → 0.84`; bisected `lavacycle` `4/7` at `d8949fec` after `#946`,
+    `7/7` at `#954` `60c2a325` and `1c70d51a^`, `6/7` at `#866` `1c70d51a` `SEALED_TENSION = 4`,
+    `5/7` at `f3414ffd`, `6/7` at `b07b8eda` after `#980`; `lavaround` check-side omission
+    owed to Claude Code: `#866` `1c70d51a` was written before `#946`/`#954` and omits
+    `oilThickness: look.oilThickness` in `scripts/lavaround.mjs`'s `window.__lamp`, so it
+    runs 50 mm²/s `OIL_THICKNESS` instead of `lava-lamp`'s 9.12 mm²/s `0.32` paraffin —
+    `2/5` without it (`lip 0.21%`, `guard 0.01%`, `roundness 0.587 vs 0.505` at `oilWeight`
+    `0.5`; `0.29% / 0.27% / 0.600 vs 0.325` at `0.6`), `5/5` with `oilThickness` passed
+    (`lip 12.13%`, `guard 27.19%`, `roundness 0.828 vs 0.561` at `0.5`; `32.57% / 18.23% /
+    0.769 vs 0.577` at `0.6`)).
   - ~~19ak-24g, `filmlook`'s two camera lines~~ **shipped**: 38h-6 (#750) rightly took the
     camera's rainbow away at every Film Physics, and the lines still measured Film Physics 1
     against it (0.3 against 0.3); re-read on the film's own footprint (9/9).
