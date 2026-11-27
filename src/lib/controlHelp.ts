@@ -232,7 +232,7 @@ export const CONTROL_HELP: Record<string, string> = {
   spectralOptics: 'Mixes dyes across six bands of the spectrum rather than three, for cleaner mixtures.',
   evaporationRate: 'How fast the liquid dries off the plate.',
   heatDecay: 'How quickly heat on the plate dies away. Near one it lingers.',
-  airVelocity: 'A steady draught across the whole plate. Separate from the Blow tool.',
+  airVelocity: 'A draught across the whole plate: its gusts turn the liquid in eddies that stay in the dish. Separate from the Blow tool.',
   vibrationFrequency: 'A steady shaking of the dish that keeps the surface restless.',
   dropHeight: 'How far a dropped liquid falls. Zero lays it on the plate, one splashes.',
   diffusionRate: 'How fast dye spreads into its surroundings. It costs speed, so it stays small.',
