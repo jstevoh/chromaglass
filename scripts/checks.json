@@ -896,6 +896,14 @@
       ]
     },
     {
+      "name": "Which looks carry trapped air",
+      "shard": "logic",
+      "run": "npm run lookair",
+      "why": [
+        "Air on by default only in the looks made for it, the clock-glass sandwich (PLAN 33q-4, scripts/lookair.mjs)."
+      ]
+    },
+    {
       "name": "The set list file",
       "shard": "logic",
       "run": "npm run setlist",
