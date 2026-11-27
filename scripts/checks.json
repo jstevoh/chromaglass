@@ -3417,7 +3417,6 @@
       "shard": "plate",
       "run": "npm run spikes",
       "quarantine": [
-        { "line": "held close under a pool, the magnet parts it into domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" },
         { "line": "the plate lights a point on the domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" }
       ],
       "why": [
