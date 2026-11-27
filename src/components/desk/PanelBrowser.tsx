@@ -86,7 +86,7 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onReveal,
   return createPortal(
     <div
       ref={boxRef}
-      className="fixed z-[61] flex max-h-[min(640px,80vh)] w-[380px] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface shadow-[0_20px_60px_rgba(0,0,0,.6)]"
+      className="fixed z-[61] flex max-h-[min(640px,80vh)] w-[min(380px,calc(100vw-16px))] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface shadow-[0_20px_60px_rgba(0,0,0,.6)]"
       style={{ top: at.top, right: at.right }}
       data-testid="panel-browser"
       onKeyDown={e => {
