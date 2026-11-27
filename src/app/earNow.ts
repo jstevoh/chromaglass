@@ -2,8 +2,8 @@
  * The ear's three presses, for the remote link to report and the owner's
  * assistant to make (PLAN 44k-10): the room's calibration (the Sound panel's
  * Recalibrate room), the song detector (Song Detection, on or off) and Listen
- * (the Songs panel's, with its Name it for a song the song ID could not
- * name).
+ * (the Songs panel's, with its Name it: since automatic song identification
+ * was retired, 2026-11-27, the only way Listen learns the song's name).
  *
  * Why a holder here rather than props, as app/musicNow.ts: the calibration's
  * press is useBench's (`calibrateNonce`, which restarts the analyser and the

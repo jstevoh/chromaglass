@@ -26,9 +26,9 @@ name: Deploy to Firebase Hosting
 #      workflow started on a branch can reach it. No required reviewers: a
 #      merge deploys without anyone waiting (the owner, 2026-09-27).
 #
-# Optional: set VITE_FINGERPRINT_PROXY_URL as a second secret to enable
-# automatic song identification. Left unset, the build still succeeds and the
-# Track panel falls back to manual tagging.
+# VITE_FINGERPRINT_PROXY_URL, which turned on automatic song identification,
+# is no longer passed: that was retired on 2026-11-27 (archive/song-id/). The
+# repository secret was left as it was, for the day it comes back.
 #
 # Optional: set VITE_CRASH_REPORT_URL (https://<the report Worker>/report) to
 # give the crash report sheet its Send button. Left unset, the build still
@@ -243,7 +243,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
           VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
           VITE_FEEDBACK_URL: ${{ secrets.VITE_FEEDBACK_URL }}
           VITE_BUILD_SHA: ${{ github.sha }}

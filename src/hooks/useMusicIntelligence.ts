@@ -474,11 +474,27 @@ export function useMusicIntelligence(
   }, [music.enabled, track, trackState, replayListenNumber, section, songMap, positionSec, baseSettings]);
 
   // ── Actions ─────────────────────────────────────────────────────────
+  /*
+    A song named by hand is keyed by a pseudo-ISRC made from its artist and
+    title. A song the song ID named before it was retired (2026-11-27) is
+    stored under its real ISRC, with its map, its listens and its takes; the
+    local matcher used to carry a hand-named song back to that key within
+    seconds. Nothing does now, so the name is looked up among the songs
+    already known first: the same artist and title, ignoring case and the
+    spaces around them, keep their own key, rather than starting over as a
+    first listen with a new map and a listen count of one.
+  */
+  const allTracksRef = useRef<TrackEvolutionState[]>([]);
+  allTracksRef.current = allTracks;
   const manualTag = useCallback((artist: string, title: string) => {
     if (!artist.trim() || !title.trim()) return;
+    const key = (s?: string) => (s ?? '').trim().toLowerCase();
+    const known = allTracksRef.current.find((t) => key(t.artist) === key(artist) && key(t.title) === key(title));
+    const identity = manualIdentity(artist, title);
+    if (known) identity.isrc = known.isrc;
     (async () => {
       await finalizeListen('trackChange');
-      await adoptTrack(manualIdentity(artist, title), stream);
+      await adoptTrack(identity, stream);
     })();
   }, [adoptTrack, finalizeListen, stream]);
 

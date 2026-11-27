@@ -1,3 +1,48 @@
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+index 7f13e6d..a45dcdb 100644
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -26,9 +26,9 @@ name: Deploy to Firebase Hosting
+ #      workflow started on a branch can reach it. No required reviewers: a
+ #      merge deploys without anyone waiting (the owner, 2026-09-27).
+ #
+-# Optional: set VITE_FINGERPRINT_PROXY_URL as a second secret to enable
+-# automatic song identification. Left unset, the build still succeeds and the
+-# Track panel falls back to manual tagging.
++# VITE_FINGERPRINT_PROXY_URL, which turned on automatic song identification,
++# is no longer passed: that was retired on 2026-11-27 (archive/song-id/). The
++# repository secret was left as it was, for the day it comes back.
+ #
+ # Optional: set VITE_CRASH_REPORT_URL (https://<the report Worker>/report) to
+ # give the crash report sheet its Send button. Left unset, the build still
+@@ -243,7 +243,6 @@ jobs:
+       - name: Build
+         run: npm run build
+         env:
+-          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+           VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
+           VITE_FEEDBACK_URL: ${{ secrets.VITE_FEEDBACK_URL }}
+           VITE_BUILD_SHA: ${{ github.sha }}
+diff --git a/.github/workflows/desktop.yml b/.github/workflows/desktop.yml
+index a7e2ead..7a974ee 100644
+--- a/.github/workflows/desktop.yml
++++ b/.github/workflows/desktop.yml
+@@ -171,7 +171,6 @@ jobs:
+           # Home's song ID and the crash sheet's Send (PLAN 23.17e): both Workers
+           # answer the app's http://localhost:<port> origin, which `npm run desktop`
+           # asks them before it trusts the build.
+-          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+           VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
+           VITE_FEEDBACK_URL: ${{ secrets.VITE_FEEDBACK_URL }}
+           VITE_BUILD_SHA: ${{ github.sha }}
+@@ -243,7 +242,6 @@ jobs:
+           VITE_MAC_APP: '1'
+           # The addresses the build above carries, so the check can look for them
+           # in the app's bundles and ask each Worker (PLAN 23.17e).
+-          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+           VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
+           VITE_FEEDBACK_URL: ${{ secrets.VITE_FEEDBACK_URL }}
+           VITE_BUILD_SHA: ${{ github.sha }}
 diff --git a/package.json b/package.json
 index 457a1f6..7541215 100644
 --- a/package.json
@@ -121,6 +166,73 @@ index 2596526..b1f3208 100644
      {
        "name": "The licence-key Worker",
        "shard": "logic",
+diff --git a/scripts/desktop.mjs b/scripts/desktop.mjs
+index bf54fb9..ef0795d 100644
+--- a/scripts/desktop.mjs
++++ b/scripts/desktop.mjs
+@@ -844,7 +844,8 @@ try {
+       `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}, and was told ${pushes?.length ? pushes.join(' → ') : 'nothing'}`);
+   }
+ 
+-  // ── the two Workers the app's site is built to reach (PLAN 23.17e) ──
++  // ── the Worker the app's site is built to reach (PLAN 23.17e) ──
++  // (There were two until the song ID's was retired, 2026-11-27; the history:)
+   // desktop.yml built the app's site without VITE_FINGERPRINT_PROXY_URL or
+   // VITE_CRASH_REPORT_URL until 23.17e, so Home's song ID (sold as "in the
+   // ChromaGlass app") could not run in the app and its crash sheet had only
+@@ -857,9 +858,12 @@ try {
+   // line says so in its row rather than naming it a pass); a run with neither
+   // (a fork's, or a session's) skips.
+   {
+-    const want = { song: process.env.VITE_FINGERPRINT_PROXY_URL, crash: process.env.VITE_CRASH_REPORT_URL };
+-    if (!want.song && !want.crash) {
+-      skip("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", 'this run has neither VITE_FINGERPRINT_PROXY_URL nor VITE_CRASH_REPORT_URL (desktop.yml passes both from the repository secrets)');
++    // The song ID's address was checked here too until automatic song
++    // identification was retired (2026-11-27, archive/song-id/): nothing reads
++    // VITE_FINGERPRINT_PROXY_URL now, so the build carries no address to find.
++    const want = { crash: process.env.VITE_CRASH_REPORT_URL };
++    if (!want.crash) {
++      skip("workers: each address this run was given (crash report) is in the app's build, and its Worker answers the app's origin", 'this run has no VITE_CRASH_REPORT_URL (desktop.yml passes it from the repository secret)');
+     } else {
+       const bundles = await page.evaluate(async () => {
+         const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => /\.js(\?|$)/.test(u));
+@@ -870,9 +874,8 @@ try {
+       const origin = `http://localhost:${PORT}`;
+       const rows = [];
+       let all = bundles.length > 0;
+-      // What each request really sends: the song ID's is FormData with the key
+-      // in X-ChromaGlass-Key (fingerprint.ts), the crash report's is JSON.
+-      const asks = { song: 'x-chromaglass-key', crash: 'content-type' };
++      // What each request really sends: the crash report's is JSON.
++      const asks = { crash: 'content-type' };
+       for (const [name, url] of Object.entries(want)) {
+         if (!url) { rows.push(`${name}: no address in this run (its repository secret is unset), so nothing to look for`); continue; }
+         const carried = bundles.some((t) => t.includes(url));
+@@ -882,18 +885,17 @@ try {
+         rows.push(`${name}: ${carried ? 'in the build' : 'MISSING from the build'}, preflight from ${origin} ${reply ? `${reply.status}, allows ${allowed ?? 'nothing'}` : 'got no answer'}`);
+         all = all && carried && answers;
+       }
+-      check("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", all,
++      check("workers: each address this run was given (crash report) is in the app's build, and its Worker answers the app's origin", all,
+         `${bundles.length} bundles read; ${rows.join('; ')}`);
+     }
+   }
+ 
+   // ── network off, the whole run ────────────────────────────────────
+-  // The two Workers (23.17e) are the app's deliberate online features: with the
+-  // song ID's address in the build, the System audio phase's tone is heard by the
+-  // music intelligence, which asks the Worker what is playing, and the guard
+-  // refuses it. That refusal is the guard doing its job and the page carrying on
+-  // without a name, so it is not something the show "had to" fetch.
+-  const workerHosts = [process.env.VITE_FINGERPRINT_PROXY_URL, process.env.VITE_CRASH_REPORT_URL].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return null; } }).filter(Boolean);
++  // The crash report Worker (23.17e) is the app's deliberate online feature: a
++  // refusal of it is the guard doing its job, so it is not something the show
++  // "had to" fetch. (The song ID's Worker was the other, until automatic song
++  // identification was retired on 2026-11-27.)
++  const workerHosts = [process.env.VITE_CRASH_REPORT_URL].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return null; } }).filter(Boolean);
+   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe') && !workerHosts.some((h) => { try { return new URL(b.url).host === h; } catch { return false; } }));
+   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
+     !probeSeen ? 'the guard never refused the probe, so it saw nothing' : outside.length ? outside.slice(0, 6).map((b) => `${b.type} ${b.url}`).join(', ') : 'every request the pages made was to the app itself');
 diff --git a/src/app/useListen.ts b/src/app/useListen.ts
 index b103265..315773a 100644
 --- a/src/app/useListen.ts
@@ -275,7 +387,7 @@ index 3767454..32c8a7f 100644
            {state.analyzing && <span className="flex items-center gap-1 text-yellow-300"><FileAudio size={10} /> analyzing structure…</span>}
          </div>
 diff --git a/src/hooks/useMusicIntelligence.ts b/src/hooks/useMusicIntelligence.ts
-index 684c2e3..fed5f3f 100644
+index 684c2e3..009717b 100644
 --- a/src/hooks/useMusicIntelligence.ts
 +++ b/src/hooks/useMusicIntelligence.ts
 @@ -1,5 +1,8 @@
@@ -570,7 +682,33 @@ index 684c2e3..fed5f3f 100644
  
    // ── Derived: section, line, sentiment ───────────────────────────────
    const section = useMemo(() => readSection(songMap?.sections, { positionSec, sure: follow?.sure ?? false, confidence: follow?.confidence ?? null }), [songMap, positionSec, follow]);
-@@ -625,7 +483,6 @@ export function useMusicIntelligence(
+@@ -616,16 +474,31 @@ export function useMusicIntelligence(
+   }, [music.enabled, track, trackState, replayListenNumber, section, songMap, positionSec, baseSettings]);
+ 
+   // ── Actions ─────────────────────────────────────────────────────────
++  /*
++    A song named by hand is keyed by a pseudo-ISRC made from its artist and
++    title. A song the song ID named before it was retired (2026-11-27) is
++    stored under its real ISRC, with its map, its listens and its takes; the
++    local matcher used to carry a hand-named song back to that key within
++    seconds. Nothing does now, so the name is looked up among the songs
++    already known first: the same artist and title, ignoring case and the
++    spaces around them, keep their own key, rather than starting over as a
++    first listen with a new map and a listen count of one.
++  */
++  const allTracksRef = useRef<TrackEvolutionState[]>([]);
++  allTracksRef.current = allTracks;
+   const manualTag = useCallback((artist: string, title: string) => {
+     if (!artist.trim() || !title.trim()) return;
++    const key = (s?: string) => (s ?? '').trim().toLowerCase();
++    const known = allTracksRef.current.find((t) => key(t.artist) === key(artist) && key(t.title) === key(title));
++    const identity = manualIdentity(artist, title);
++    if (known) identity.isrc = known.isrc;
+     (async () => {
+       await finalizeListen('trackChange');
+-      await adoptTrack(manualIdentity(artist, title), stream);
++      await adoptTrack(identity, stream);
+     })();
    }, [adoptTrack, finalizeListen, stream]);
  
    const clearTrack = useCallback(() => { finalizeListen('manual'); }, [finalizeListen]);
@@ -578,7 +716,7 @@ index 684c2e3..fed5f3f 100644
  
    /*
      A nudge is a seek, not playback: what lies between the old position and
-@@ -796,12 +653,12 @@ export function useMusicIntelligence(
+@@ -796,12 +669,12 @@ export function useMusicIntelligence(
    return {
      state: {
        track, songMap, lyrics, trackState, positionSec, nudgeSec, follow, section, line,

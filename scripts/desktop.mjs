@@ -844,7 +844,8 @@ try {
       `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}, and was told ${pushes?.length ? pushes.join(' → ') : 'nothing'}`);
   }
 
-  // ── the two Workers the app's site is built to reach (PLAN 23.17e) ──
+  // ── the Worker the app's site is built to reach (PLAN 23.17e) ──
+  // (There were two until the song ID's was retired, 2026-11-27; the history:)
   // desktop.yml built the app's site without VITE_FINGERPRINT_PROXY_URL or
   // VITE_CRASH_REPORT_URL until 23.17e, so Home's song ID (sold as "in the
   // ChromaGlass app") could not run in the app and its crash sheet had only
@@ -857,9 +858,12 @@ try {
   // line says so in its row rather than naming it a pass); a run with neither
   // (a fork's, or a session's) skips.
   {
-    const want = { song: process.env.VITE_FINGERPRINT_PROXY_URL, crash: process.env.VITE_CRASH_REPORT_URL };
-    if (!want.song && !want.crash) {
-      skip("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", 'this run has neither VITE_FINGERPRINT_PROXY_URL nor VITE_CRASH_REPORT_URL (desktop.yml passes both from the repository secrets)');
+    // The song ID's address was checked here too until automatic song
+    // identification was retired (2026-11-27, archive/song-id/): nothing reads
+    // VITE_FINGERPRINT_PROXY_URL now, so the build carries no address to find.
+    const want = { crash: process.env.VITE_CRASH_REPORT_URL };
+    if (!want.crash) {
+      skip("workers: each address this run was given (crash report) is in the app's build, and its Worker answers the app's origin", 'this run has no VITE_CRASH_REPORT_URL (desktop.yml passes it from the repository secret)');
     } else {
       const bundles = await page.evaluate(async () => {
         const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => /\.js(\?|$)/.test(u));
@@ -870,9 +874,8 @@ try {
       const origin = `http://localhost:${PORT}`;
       const rows = [];
       let all = bundles.length > 0;
-      // What each request really sends: the song ID's is FormData with the key
-      // in X-ChromaGlass-Key (fingerprint.ts), the crash report's is JSON.
-      const asks = { song: 'x-chromaglass-key', crash: 'content-type' };
+      // What each request really sends: the crash report's is JSON.
+      const asks = { crash: 'content-type' };
       for (const [name, url] of Object.entries(want)) {
         if (!url) { rows.push(`${name}: no address in this run (its repository secret is unset), so nothing to look for`); continue; }
         const carried = bundles.some((t) => t.includes(url));
@@ -882,18 +885,17 @@ try {
         rows.push(`${name}: ${carried ? 'in the build' : 'MISSING from the build'}, preflight from ${origin} ${reply ? `${reply.status}, allows ${allowed ?? 'nothing'}` : 'got no answer'}`);
         all = all && carried && answers;
       }
-      check("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", all,
+      check("workers: each address this run was given (crash report) is in the app's build, and its Worker answers the app's origin", all,
         `${bundles.length} bundles read; ${rows.join('; ')}`);
     }
   }
 
   // ── network off, the whole run ────────────────────────────────────
-  // The two Workers (23.17e) are the app's deliberate online features: with the
-  // song ID's address in the build, the System audio phase's tone is heard by the
-  // music intelligence, which asks the Worker what is playing, and the guard
-  // refuses it. That refusal is the guard doing its job and the page carrying on
-  // without a name, so it is not something the show "had to" fetch.
-  const workerHosts = [process.env.VITE_FINGERPRINT_PROXY_URL, process.env.VITE_CRASH_REPORT_URL].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return null; } }).filter(Boolean);
+  // The crash report Worker (23.17e) is the app's deliberate online feature: a
+  // refusal of it is the guard doing its job, so it is not something the show
+  // "had to" fetch. (The song ID's Worker was the other, until automatic song
+  // identification was retired on 2026-11-27.)
+  const workerHosts = [process.env.VITE_CRASH_REPORT_URL].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return null; } }).filter(Boolean);
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe') && !workerHosts.some((h) => { try { return new URL(b.url).host === h; } catch { return false; } }));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
     !probeSeen ? 'the guard never refused the probe, so it saw nothing' : outside.length ? outside.slice(0, 6).map((b) => `${b.type} ${b.url}`).join(', ') : 'every request the pages made was to the app itself');

@@ -171,7 +171,6 @@ jobs:
           # Home's song ID and the crash sheet's Send (PLAN 23.17e): both Workers
           # answer the app's http://localhost:<port> origin, which `npm run desktop`
           # asks them before it trusts the build.
-          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
           VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
           VITE_FEEDBACK_URL: ${{ secrets.VITE_FEEDBACK_URL }}
           VITE_BUILD_SHA: ${{ github.sha }}
@@ -243,7 +242,6 @@ jobs:
           VITE_MAC_APP: '1'
           # The addresses the build above carries, so the check can look for them
           # in the app's bundles and ask each Worker (PLAN 23.17e).
-          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
           VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
           VITE_FEEDBACK_URL: ${{ secrets.VITE_FEEDBACK_URL }}
           VITE_BUILD_SHA: ${{ github.sha }}
