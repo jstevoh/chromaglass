@@ -1,6 +1,7 @@
 import { Palette, Microscope, Film, Clapperboard, Lightbulb, Aperture } from 'lucide-react';
 import { VisualizerSettings } from '../../types';
 import { groupOf } from '../../lib/settingsMap';
+import { settingDisabledReason } from '../../lib/settingGate';
 import { Info } from '../Info';
 import { Segmented, LIT } from '../ui';
 import { Slider } from './controls';
@@ -39,6 +40,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Turbulence Detail"
+          disabled={settingDisabledReason('turbulenceDetail', settings)}
           value={settings.turbulenceDetail}
           min={1}
           max={4}
@@ -73,7 +75,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Particle Colour"
-          disabled={(settings.particles ?? 0) <= 0.001 && 'needs Dye Particles above 0'}
+          disabled={settingDisabledReason('particleMix', settings)}
           value={settings.particleMix ?? 0.6}
           min={0}
           max={1}
@@ -94,7 +96,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
             plate, so up is finer grain, not bigger. */}
         <Slider
           label="Grain Fineness"
-          disabled={(settings.granulation ?? 0) <= 0.002 && 'needs Granulation above 0'}
+          disabled={settingDisabledReason('grainScale', settings)}
           value={settings.grainScale ?? 320}
           min={20}
           max={1200}
@@ -190,7 +192,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Layer Scale Variety"
-          disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
+          disabled={settingDisabledReason('layerScaleVariety', settings, { backLook: !!backLook })}
           value={settings.layerScaleVariety ?? 0.5}
           min={0}
           max={2}
@@ -200,6 +202,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Boundary Glow"
+          disabled={settingDisabledReason('boundaryContrast', settings, { backLook: !!backLook })}
           value={settings.boundaryContrast}
           min={0}
           max={1.0}
@@ -238,6 +241,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Glossiness"
+          disabled={settingDisabledReason('glossiness', settings)}
           value={settings.glossiness}
           min={0}
           max={1.0}
@@ -247,6 +251,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Post Blur"
+          disabled={settingDisabledReason('postBlurRadius', settings)}
           value={settings.postBlurRadius}
           min={0}
           max={1.5}
@@ -370,7 +375,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Background Loop"
-          disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
+          disabled={settingDisabledReason('backgroundLoop', settings, { backLook: !!backLook })}
           value={settings.backgroundLoop ?? 0}
           min={0}
           max={1.4}
@@ -598,18 +603,24 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ stock: v })}
           settingKey="stock"
         />
-        <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[12px] uppercase tracking-widest font-bold text-muted">Stock</span>
+        <div className={`flex flex-col gap-2 mb-4 ${(settings.stock ?? 0) <= 0.001 ? 'opacity-65' : ''}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] uppercase tracking-widest font-bold text-muted">Stock</span>
+            {(settings.stock ?? 0) <= 0.001 && (
+              <span className="text-[12px] text-text-2" data-disabled-reason="">needs Film Stock above 0</span>
+            )}
+          </div>
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
                 aria-pressed={(settings.stockType ?? 0) === i}
+                disabled={(settings.stock ?? 0) <= 0.001}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
-                className={`py-2 rounded-lg text-[12px] uppercase tracking-wider font-bold border transition-colors ${
+                className={`py-2 rounded-lg text-[12px] uppercase tracking-wider font-bold border transition-colors disabled:cursor-not-allowed ${
                   (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
-                title={[
+                title={(settings.stock ?? 0) <= 0.001 ? 'needs Film Stock above 0' : [
                   '16mm reversal: cool and saturated, with a hard shoulder',
                   'A slide stock: warm, deep blacks, a long shoulder',
                   'Faded sixties negative: magenta cast and lifted blacks',
@@ -624,6 +635,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
         </div>
         <Slider
           label="Grain"
+          disabled={settingDisabledReason('stockGrain', settings)}
           value={settings.stockGrain ?? 0}
           min={0}
           max={3}
@@ -633,6 +645,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Grain Size"
+          disabled={settingDisabledReason('stockGrainSize', settings)}
           value={settings.stockGrainSize ?? 2}
           min={1}
           max={16}
@@ -642,6 +655,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Gate Weave"
+          disabled={settingDisabledReason('stockWeave', settings)}
           value={settings.stockWeave ?? 0}
           min={0}
           max={12}
@@ -651,6 +665,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Gate Edge"
+          disabled={settingDisabledReason('stockGate', settings)}
           value={settings.stockGate ?? 0}
           min={0}
           max={1.0}
