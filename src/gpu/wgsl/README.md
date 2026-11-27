@@ -6,6 +6,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 - `fluid.ts` (12 KB): `KERNELS`, `kernel(name, format)`, `SIM_STRUCT`, `NOISE_WGSL`: the solver. An index: each pass's kernels are in `fluid/` (see its README), and this file joins them into the one table a pass is asked for by name.
 - `thinGap.ts` (52 KB, grep it): `thinGapKernels`, the flow between two glasses (Hele-Shaw), and `LIFT_GRID`, where the oil lift's and the sealed bottle's Ψ is solved (`fluid/seal.ts`).
+- `thinFlow.ts`: `FACE_STAR`, used by `hsDivergence`: what each face of the thin solve would carry before the pressure turns it, predicted from the face's own last velocity (the faces are the flow's state since PLAN 18a-8; hsGradient keeps them in the solver's `hsFlow` buffer, a vec4 a cell: east, north, the solve's P).
 - `thinWarm.ts`: `thinWarmKernels(HEAD, COMMON, ROWS0)`, spread into `thinGapKernels`: the thin solve's warm start fitted to each step (`hsWarmDot`, `hsWarmFit`, `hsWarmScale`; PLAN 38r-12), and `WARM_GROUPS`, `WARM_FIT` for the solver's buffer.
 - `plate.ts` (194 KB, grep it): `DISPLAY_MAIN`, `DERIVE_WGSL`, `FINISH_WGSL`, `plateWgsl`: the composite.
 - `plateFields.ts`: `PLATE_FIELDS`, `PLATE_STRUCT`, the composite's uniforms.

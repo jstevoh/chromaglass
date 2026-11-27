@@ -507,6 +507,13 @@ export class WebGPUFluid extends FluidCover {
     if (maze <= 0.001 && !spikes) this.mazeReady = false;
     const thin = this.thinGapOn(p);
     if (!thin) this.hsPrimed = false;
+    /*
+      The thin solve's faces are its flow's state (PLAN 18a-8): a plate coming
+      back to Thin Gap starts them from its cells, not from whatever flowed
+      when it was last on (the faces' own part, which no cell shows, would
+      come back with them).
+    */
+    const flowStale = thin && !this.thinLive && !!this.hsFlow;
     if (!this.phaseLive) this.phaseGapPrimed = false;
     this.thinLive = thin;
     this.coverAdvance(p);
@@ -516,6 +523,7 @@ export class WebGPUFluid extends FluidCover {
       this.device.queue.writeBuffer(this.sim, 0, this.simData);
     }
     const enc = this.device.createCommandEncoder({ label: 'step' });
+    if (flowStale) enc.clearBuffer(this.hsFlow!);
 
     this.stepAhead(enc, p);
     // Air render pass before compute passes: lazy-allocated, cleared on pop, freed after 60s quiet (H2c-8).

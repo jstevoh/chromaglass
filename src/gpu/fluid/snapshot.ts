@@ -88,6 +88,7 @@ export interface SnapshotTargets {
   hsGap: GPUBuffer | null;
   hsP: GPUBuffer | null;
   hsP2: GPUBuffer | null;
+  hsFlow: GPUBuffer | null;
   ensureThinGap: () => GPUTexture;
   scalars: SnapshotScalars;
 }
@@ -118,6 +119,8 @@ export interface FieldSnapshot extends SolverSnapshot {
   readonly hsGap: GPUBuffer | null;
   readonly hsP: GPUBuffer | null;
   readonly hsP2: GPUBuffer | null;
+  /** The solve's faces, the thin flow's state (PLAN 18a-8): without them the restored cells' flow is rebuilt from the faces of the moment before. */
+  readonly hsFlow: GPUBuffer | null;
 }
 
 /** Capture live GPU fields onto off-screen textures and buffers owned by this snapshot. */
@@ -187,6 +190,7 @@ export function captureFluidSnapshot(t: SnapshotTargets): FieldSnapshot | null {
     hsGap: s.thinLive && s.hsPrimed ? copyBuf(t.hsGap) : null,
     hsP: s.thinLive && s.hsPrimed ? copyBuf(t.hsP) : null,
     hsP2: s.thinLive && s.hsPrimed ? copyBuf(t.hsP2) : null,
+    hsFlow: s.thinLive && s.hsPrimed ? copyBuf(t.hsFlow) : null,
     destroy: () => {
       for (const tex of texs.splice(0)) tex.destroy();
       for (const b of bufs.splice(0)) b.destroy();
@@ -241,6 +245,9 @@ export function restoreFluidSnapshot(t: SnapshotTargets, snap: FieldSnapshot): b
     putBuf(snap.hsP, t.hsP);
     putBuf(snap.hsP2, t.hsP2);
   }
+  // The faces are the thin flow's state: the snapshot's, or none, so the next step lays them from the cells restored.
+  if (snap.hsFlow) putBuf(snap.hsFlow, t.hsFlow);
+  else if (t.hsFlow) enc.clearBuffer(t.hsFlow);
 
   t.submit(enc);
   return true;

@@ -493,7 +493,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   carryCourant: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var<storage, read> pr: array<f32>;
+@group(0) @binding(3) var<storage, read> flow: array<vec4f>;
 @group(0) @binding(4) var<storage, read_write> most: array<atomic<u32>>;
 @group(0) @binding(5) var sq: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read> mob: array<f32>;

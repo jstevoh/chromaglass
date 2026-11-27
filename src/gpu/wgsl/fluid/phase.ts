@@ -7,7 +7,7 @@
  * the one table every pass is asked for by name.
  */
 
-import { HEAD, PACKED, PHASE_MEAN3, STAND_ASIDE, W } from './shared';
+import { HEAD, PACKED, PHASE_MEAN3, STAND_ASIDE, W, thinFaceWith } from './shared';
 
 export const PHASE_KERNELS: Record<string, string> = {
   /*
@@ -84,13 +84,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     was. And a full pool stays full only if what leaves a cell is what the
     glass pushed out of it, so the face's volume flux has to be the one the
     thin solve made conserve liquid (wgsl/thinGap.ts), not a flux rebuilt
-    from the cells' velocities: its face is the mean of the two cells' M·u*
-    less n·M_f·ΔP, and the cells' fluxes h·u it left (hsGradient) are each
-    the mean of their two faces' M_f·ΔP. So the face is the mean of the
-    two cells' h·u plus n/4 times the second difference of M_f·ΔP along
-    the axis (the same Rhie–Chow swap as above, on the solve's own P and
-    mobility, which is exact here where c·P is exact only where the drag
-    is even). Two cuts on the way, measured on a pool pressed to a sixth
+    from the cells' velocities: since PLAN 18a-8 the solve keeps its faces
+    as the flow's state (\`flow\`, hsGradient), and this reads them as the
+    carries do (THIN_FACE), the face's velocity times its gap. (Before, it
+    rebuilt the face from the two cells' h·u and the second difference of
+    the solve's M_f·ΔP, which was exact only because each cell's h·u was
+    the mean of its faces' as the solve left it.) Two cuts on the way, measured on a pool pressed to a sixth
     of the gap and let go: putting the glass's part back as c times the
     gap's change along the liquid's path kept the pool full but grew it 7%
     each press and lift (the flux and the correction were not one flux);
@@ -115,7 +114,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(5) var<storage, read> pr: array<f32>;
 @group(0) @binding(6) var sq: texture_2d<f32>;
 @group(0) @binding(7) var<storage, read> gapSeen: array<f32>;
-@group(0) @binding(8) var<storage, read> thinP: array<f32>;
+@group(0) @binding(8) var<storage, read> flow: array<vec4f>;
 @group(0) @binding(9) var<storage, read> mob: array<f32>;
 @group(0) @binding(10) var stand: texture_2d<f32>;
 ${PACKED}
@@ -202,30 +201,13 @@ fn gapAt(p: vec2i, n: i32, t: f32) -> f32 {
   let q = clamp(p, vec2i(0), vec2i(n - 1));
   return mix(max(gapSeen[q.x + q.y * n], 0.004), max(textureLoad(sq, q, 0).r, 0.004), t) / A.a.w;
 }
-// The thin solve's pressure at a cell, zero past the rim (hsGradient's pAt).
-fn thinPAt(q: vec2i, n: i32) -> f32 {
-  if (mob[q.x + q.y * n] < 0.0) { return 0.0; }
-  let half = n / 2;
-  return thinP[((q.x + q.y) & 1) * n * half + q.y * half + (q.x >> 1)];
-}
-// The solve's M_f·ΔP through the face a → a + e; nothing through the grid's wall.
-fn thinFace(a: vec2i, e: vec2i, n: i32) -> f32 {
-  let b = a + e;
-  if (!inside(a, n) || !inside(b, n)) { return 0.0; }
-  let ma = abs(mob[a.x + a.y * n]);
-  let mb = abs(mob[b.x + b.y * n]);
-  return 2.0 * ma * mb / max(ma + mb, 1e-20) * (thinPAt(b, n) - thinPAt(a, n));
-}
-// The cell's volume flux h·u, in rest gaps, as hsGradient left it.
-fn cellFlux(a: vec2i, e: vec2i, n: i32) -> f32 {
-  return dot(textureLoad(vel, a, 0).xy, vec2f(e)) * max(textureLoad(sq, a, 0).r, 0.004) / A.a.w;
-}
+${thinFaceWith('A.a.w')}
 // The volume across the face a → a + e this substep, in rest gaps of a cell.
 fn volumeFlux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let b = a + e;
   if (!inside(a, n) || !inside(b, n)) { return 0.0; }
-  let face = 0.5 * (cellFlux(a, e, n) + cellFlux(b, e, n))
-           + 0.25 * f32(n) * (thinFace(a - e, e, n) - 2.0 * thinFace(a, e, n) + thinFace(b, e, n));
+  // The solve's volume flux through the face (THIN_FACE), in rest gaps: its velocity over the face's gap now.
+  let face = thinFaceVel(a, e, n) * 0.5 * (tfGap(a) + tfGap(b));
   // As a Courant number, bounded as the flux form's is, then back to a volume.
   let h = 0.5 * (gapAt(a, n, A.a.y) + gapAt(b, n, A.a.y));
   let c = clamp(face * A.b.y * f32(n) / h, -0.45, 0.45);

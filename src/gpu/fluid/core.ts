@@ -239,6 +239,12 @@ export class FluidCore {
   protected hsSealPsi: GPUBuffer | null = null;
   protected liftN = 2;
   protected hsP: GPUBuffer | null = null;
+  /**
+   * The thin solve's faces as the flow's state (PLAN 18a-8, wgsl/thinFlow.ts): each cell's east and
+   * north face velocity as hsGradient left them, and what the step's u* would carry through each.
+   */
+  protected hsFlow: GPUBuffer | null = null;
+  protected hsFlowStar: GPUBuffer | null = null;
   /** The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12). */
   protected hsWarm: GPUBuffer | null = null;
   protected hsP2: GPUBuffer | null = null;
@@ -847,6 +853,8 @@ export class FluidCore {
     if (this.hsLiftPsi) enc.clearBuffer(this.hsLiftPsi);
     // And the sealed bottle's, the last wax's.
     if (this.hsSealPsi) enc.clearBuffer(this.hsSealPsi);
+    // And the thin solve's faces, the flow's state (PLAN 18a-8): a wiped plate is still.
+    if (this.hsFlow) enc.clearBuffer(this.hsFlow);
     this.submit(enc);
     this.grainAge = 0;
   }

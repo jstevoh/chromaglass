@@ -219,17 +219,22 @@ its frame rate live. "Free" means no new passes or texture reads.
     keeps its faces. `npm run gridiso` (lab, 128², a thin ring turned by a solid swirl):
     the fourfold part of the width it gained 0.331 → 0.218, the width gained 0.353 →
     0.273 cells, colour +0.088% from the half-float floor on that fast ring (0.000% at
-    `dyeedge`'s speed). *Open:* the first, the checkerboard. The cell keeps its own
-    predicted velocity (hsGradient writes c·u*_cell − M∇p/h), and the faces see only the
-    mean of two cells' u*, so a checkerboard in u* is a null mode the solve never sees.
-    Rebuilding the cell from its two faces' whole flux takes it out, but filters every
-    step's state [1 2 1] (a damping of 0.85 a step at eight cells), too much for water's
-    inertia. The real one: keep the face fluxes as the state (a texture hsGradient
-    writes), predict each face from its last flux plus the mean of the step's force
-    increments at its two cells, and read the cell as the mean of its faces; then
-    `thinFaceVel` is one load, not a dozen. Measure with a checkerboard laid in u* and
-    the rim of a floored dent (`npm run grating`-style), and the remaining fourfold
-    part in `gridiso`.
+    `dyeedge`'s speed). **The first, the checkerboard, shipped** (2026-11-27): the cell
+    kept its own predicted velocity (hsGradient wrote c·u*_cell − M∇p/h) and the faces saw
+    only the mean of two cells' u*, so a checkerboard in the flow was a mode the solve
+    never saw. The thin solve's faces are now the flow's state (Harlow and Welch's
+    staggered grid, `wgsl/thinFlow.ts`): hsGradient keeps each face's velocity in
+    `hsFlow`, hsDivergence predicts each face from its own last velocity plus the mean of
+    what the step's forces asked of its two cells, a cell's velocity is the mean of its
+    faces, and `thinFaceVel` reads the face (with the ridden flow's slosh, drift and
+    ferrofluid drop laid on as the cells' change). `npm run gridnull` (lab, 128²): a
+    checkerboard laid in water kept 0.93 of itself after a step on main (0.46 in the oil),
+    4e-8 now; an eight-cell wave keeps its inertia (0.983 of a long wave's, main 0.981);
+    a floored dent's rim under a push 0.0303 → 0.0108 sharp in the oil, 0.0115 → 0.0083
+    in water; `gridiso`'s drop window rounder (0.0092 → 0.0061). The [1 2 1] rebuild (tried first) damped
+    the eight-cell wave 0.85 a step. *Open:* 18a-8b, the dye's own grid filter
+    (`dampGrid`), which the plan named this item's to retire: measure whether the
+    thin gap's colour still grows a checkerboard without it, now that the flow has none.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
