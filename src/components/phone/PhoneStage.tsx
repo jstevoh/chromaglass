@@ -4,12 +4,13 @@ import type { MixTakes } from '../../lib/mixFade';
 import {
   Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
-  Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
+  Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus, Keyboard,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
   Crosshair, LayoutGrid, Plus, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
+import { makesText } from '../../lib/recordChoice';
 import { ToolGlyph } from '../ui/ToolGlyph';
 import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
@@ -155,6 +156,9 @@ export interface PhoneStageProps {
    * on the phone. It lands under Yours in this same sheet.
    */
   onSaveLook?: (name: string) => void;
+  /** Existing saved looks, so saving a duplicate name offers Replace or Keep both (PLAN 49a). */
+  existingLooks?: { id: string; name: string }[];
+  onReplaceLook?: (id: string, name: string) => void;
   /** The name the save field starts with. */
   saveSuggestion?: string;
   /**
@@ -377,6 +381,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
+  onShortcuts?: () => void;
   recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void; shape: ClipShape; onShape: (s: ClipShape) => void; take: { blob: Blob; filename: string; url: string } | null };
   onHide: () => void;
   onFullLayout: () => void;
@@ -458,13 +463,30 @@ export function PhoneStage(p: PhoneStageProps) {
   const [lookTo, setLookTo] = useState<'all' | 'back'>('all');
   /** The Looks sheet's name field, while a save is being named; null when it is not. */
   const [saveName, setSaveName] = useState<string | null>(null);
-  const saveNamed = () => {
+  const [saveDup, setSaveDup] = useState<{ id: string; name: string } | null>(null);
+  const keepSave = () => {
     const name = saveName?.trim();
     if (!name || !p.onSaveLook) return;
     p.onSaveLook(name);
+    setSaveDup(null);
     setSaveName(null);
   };
-  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
+  const replaceSave = () => {
+    const name = saveName?.trim();
+    if (!name || !saveDup) return;
+    if (p.onReplaceLook) p.onReplaceLook(saveDup.id, name);
+    else p.onSaveLook?.(name);
+    setSaveDup(null);
+    setSaveName(null);
+  };
+  const saveNamed = () => {
+    const name = saveName?.trim();
+    if (!name || !p.onSaveLook) return;
+    const hit = (p.existingLooks ?? []).find(l => l.name.trim().toLowerCase() === name.toLowerCase());
+    if (hit && !saveDup) { setSaveDup(hit); return; }
+    keepSave();
+  };
+  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); setSaveDup(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
   /*
@@ -936,15 +958,16 @@ export function PhoneStage(p: PhoneStageProps) {
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
             {/* The desk's Save, here: a new preset from what is on the plate,
                 under a name, listed under Yours below as soon as it is saved. */}
-            {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} testId="phone-save-look" />}
+            {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => { setSaveDup(null); setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null)); }} testId="phone-save-look" />}
           </div>
           {saveName !== null && (
+            <>
             <form className="mt-2 flex gap-1.5" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="phone-save-form">
               <input
                 autoFocus
                 onFocus={e => e.currentTarget.select()}
                 value={saveName}
-                onChange={e => setSaveName(e.target.value)}
+                onChange={e => { setSaveName(e.target.value); setSaveDup(null); }}
                 aria-label="Name for the new preset"
                 // 16 px: under it, iOS zooms the page in on focus.
                 className="h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none focus:border-accent"
@@ -954,6 +977,16 @@ export function PhoneStage(p: PhoneStageProps) {
                 Save
               </button>
             </form>
+            {saveDup && (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="phone-save-duplicate">
+                <span>“{saveDup.name}” already exists.</span>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={keepSave} className="h-10 rounded-lg border border-border bg-elevated px-3 text-[13px] font-medium text-text" data-testid="phone-save-keep-both">Keep both</button>
+                  <button type="button" onClick={replaceSave} className="h-10 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary" data-testid="phone-save-replace">Replace</button>
+                </div>
+              </div>
+            )}
+            </>
           )}
           <div className="mt-3">
             <Slider label="Lamp Ground" value={p.lampGround} {...pinSlider('lampGround', p.lampGround)} step={0.05} onChange={p.onLampGround}
@@ -1223,6 +1256,12 @@ export function PhoneStage(p: PhoneStageProps) {
                   <Slider label="Shake" value={p.mixer.settings.faraday ?? 0} {...pinSlider('faraday', p.mixer.settings.faraday ?? 0)} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ faraday: v })}
                     touch testId="phone-shake" />
+                  <Slider label="Rock" value={p.mixer.settings.faradayRock ?? 0} {...pinSlider('faradayRock', p.mixer.settings.faradayRock ?? 0)} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ faradayRock: v })}
+                    touch testId="phone-rock" />
+                  <Slider label="Wave Strength" value={p.mixer.settings.faradayGain ?? 1} {...pinSlider('faradayGain', p.mixer.settings.faradayGain ?? 1)} step={0.05}
+                    onChange={(v) => p.mixer!.onSetting({ faradayGain: v })}
+                    touch testId="phone-wave-strength" />
                   <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
                     display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />
@@ -1435,7 +1474,7 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
-              label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
+              label={p.recording.on ? `${makesText(p.recording.choice)} · ${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
               on={p.recording.on}
               tone="live"
               onPress={p.recording.onToggle}
@@ -1446,6 +1485,7 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
+            {p.onShortcuts && <Tile icon={Keyboard} label="Shortcuts" onPress={() => { close(); p.onShortcuts?.(); }} testId="phone-shortcuts" />}
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
             {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}

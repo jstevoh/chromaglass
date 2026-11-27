@@ -72,6 +72,11 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
               />
             </label>
           )}
+          {state && !state.signed && state.status !== 'off' && (
+            <p className={note} data-cg-mac-update-auto-off="">
+              Automatic updates require a signed release build; updates open as .dmg downloads.
+            </p>
+          )}
           {row.button && (
             <button
               type="button"

@@ -54,7 +54,7 @@ const ENV_ON_NAMES: Record<typeof ENVELOPE_TRIGGERS[number], string> = {
 export const PatchesSection = ({ c }: { c: SectionCtx }) => {
   const {
     settings, onUpdate, readEar, focusSection, lookAreas, areaColours, pins, keep, shown, goTo, listens,
-    CARD, GRID, TITLE,
+    embed, CARD, GRID, TITLE,
   } = c;
   // The music's cords folded until opened (HandControls.tsx MusicHandsFold says why).
   const [handsOpen, setHandsOpen] = React.useState(false);
@@ -419,8 +419,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
           attack, decay and trigger source (any, kick, snare, note, pad).
           Defaults match the fixed rates and shapes looks were built against.
         */}
+        {/* LFOs pair 2×2 and Envelopes 2×1 in the sheet (like SECTION_GRID) so Patches stays under three screens deep when a look has several cords (`npm run qa`); desk panels (`embed`) and phones stay one column. */}
         <div className="mt-6 mb-2 text-[13px] font-medium text-text" data-testid="patch-lfos">LFOs</div>
-        <div className="flex flex-col gap-2 mb-4">
+        <div className={`${embed ? 'flex flex-col' : 'grid grid-cols-1 md:grid-cols-2'} gap-2 mb-4`}>
           <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="lfo-row-1">
             <div className="flex items-center justify-between gap-1 mb-1.5">
               <span className="text-[12px] font-medium text-text">LFO 1</span>
@@ -615,7 +616,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
         </div>
 
         <div className="mt-4 mb-2 text-[13px] font-medium text-text" data-testid="patch-envelopes">Envelopes</div>
-        <div className="flex flex-col gap-2 mb-4">
+        <div className={`${embed ? 'flex flex-col' : 'grid grid-cols-1 md:grid-cols-2'} gap-2 mb-4`}>
           <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="env-row-1">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-[12px] font-medium text-text">Envelope 1 Trigger</span>

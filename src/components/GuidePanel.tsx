@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { LIT } from './ui';
+import { useEscape } from '../hooks/useEscape';
 import { APP_VERSION } from '../lib/appVersion';
 import {
   X, BookOpen, Play, Layers, Droplets, Palette, Activity, Aperture,
@@ -739,6 +740,7 @@ const SECTIONS: Section[] = [
 ];
 
 export function GuidePanel({ focus = null, onClose }: GuidePanelProps) {
+  useEscape(onClose);
   // Opened at a topic when something sent you here to read one thing — the
   // Phone dot, for instance. The guide is fifteen sections long and landing at
   // the top of it is landing nowhere.

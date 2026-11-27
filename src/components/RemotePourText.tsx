@@ -48,7 +48,7 @@ export function RemotePourText({ send, connected, trackName }: {
           <button
             onClick={() => setText(trackName)}
             disabled={!connected}
-            className="rounded-full border border-white/10 px-2.5 py-1 text-[12px] font-bold uppercase tracking-widest text-white/60 disabled:opacity-65"
+            className="min-h-11 min-w-11 rounded-full border border-white/10 px-3.5 text-[12px] font-bold uppercase tracking-widest text-text-2 disabled:opacity-65"
             data-testid="remote-pour-text-track"
           >
             This song

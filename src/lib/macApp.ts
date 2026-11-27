@@ -93,7 +93,7 @@ export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState
     const s = update;
     const current = s?.current ?? '';
     if (!s) return { kind: 'in-app', current, line: '…', button: null };
-    if (s.status === 'off') return { kind: 'in-app', current, line: 'Updates are off in this copy.', button: null };
+    if (s.status === 'off') return { kind: 'in-app', current, line: `Updates are off in this copy${s.error ? ` (${s.error})` : ''}.`, button: null };
     const auto = s.auto !== false;
     if (s.status === 'available' && s.inPlace) {
       return { kind: 'in-app', current, line: auto ? `ChromaGlass ${s.version} is available. It downloads by itself after the show.` : `ChromaGlass ${s.version} is available. Nothing installs until you choose.`, button: `Install ${s.version}` };

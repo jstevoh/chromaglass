@@ -20,12 +20,21 @@
  * so it belongs to looks with the lamp low or off; under a full lamp it is
  * there and faint, as a wake is at noon.
  *
+ * And the dish on a shaker (PLAN 48c-6): with Shaker on, the Faraday wave
+ * the music's bass stands up (gpu/faraday.ts) is a flow inside the water
+ * too, and its strain lights the cells as a stroke's does, so the lattice
+ * glows on the bass and goes dark as the note dies and the sea recharges.
+ * The step reads the wave's amplitude field where the plate does; it hears
+ * nothing.
+ *
  * Off (Glow at 0, every look but the one that sets it) nothing here is made
  * or run, and the plate binds a 4-float stand-in.
  */
 import { Disposer, PipelineCache, bindGroup, type Prep } from './kit';
 import type { Opening } from './opening';
 import { GLOW_KERNELS, type GlowKernel } from './wgsl/glow';
+import { faradayHzOf, type FaradayField } from './faraday';
+import { FARADAY_DEPTH, FARADAY_NU, faradayK, faradayOmega } from '../lib/faraday';
 
 /** The glow's grid, square over the plate: 256 resolves a finger's wake (a few millimetres) on a 20 cm plate. */
 export const GLOW_GRID = 256;
@@ -70,9 +79,15 @@ export class GlowPlate {
     one or the ridden one, so there are at most four pairs, and they are made
     once each rather than every step (no new objects in the frame).
   */
-  private readonly groups: { vel: GPUTexture; gap: GPUTexture; bg: [GPUBindGroup, GPUBindGroup] }[] = [];
+  private readonly groups: { vel: GPUTexture; gap: GPUTexture; wave: GPUBuffer; bg: [GPUBindGroup, GPUBindGroup] }[] = [];
   private flip = 0;
-  private readonly args = new ArrayBuffer(48);
+  /** The wave's stand-in with no shaker: four floats, which the kernel reads as no wave. */
+  private readonly still: GPUBuffer;
+  /* The wave's k and ω, worked out again only when the drive's frequency changes (faradayK is a bisection). */
+  private hz = -1;
+  private waveK = 0;
+  private waveOmega = 0;
+  private readonly args = new ArrayBuffer(64);
   private readonly u32 = new Uint32Array(this.args);
   private readonly f32 = new Float32Array(this.args);
 
@@ -84,7 +99,8 @@ export class GlowPlate {
 
   constructor(private readonly device: GPUDevice, readonly n = GLOW_GRID) {
     const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
-    this.uni = this.disposer.track(device.createBuffer({ label: 'glow args', size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    this.uni = this.disposer.track(device.createBuffer({ label: 'glow args', size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    this.still = this.disposer.track(device.createBuffer({ label: 'glow no wave', size: 16, usage: GPUBufferUsage.STORAGE }));
     const cells = n * n;
     this.state = [
       this.disposer.track(device.createBuffer({ label: 'glow state a', size: cells * 8, usage })),
@@ -110,9 +126,13 @@ export class GlowPlate {
    * One step of the glow on `enc`: `seconds` of the show's clock, `vel` the
    * flow the dye rides and `travel` the uv a unit of it moves the dye this
    * step, `gap` the squeeze film's gap (gap units, gpu/fluid/constants.ts
-   * GAP_METRES), and the two dials.
+   * GAP_METRES), and the two dials; `wave` the shaken dish's Faraday field
+   * and `hz` its drive (Shaker), or null and 0 with no shaker.
    */
-  step(enc: GPUCommandEncoder, seconds: number, vel: GPUTexture, gap: GPUTexture, travel: number, shear: number, recharge: number): void {
+  step(
+    enc: GPUCommandEncoder, seconds: number, vel: GPUTexture, gap: GPUTexture, travel: number, shear: number, recharge: number,
+    wave: FaradayField | null = null, hz = 0,
+  ): void {
     const dt = Math.min(MAX_STEP, seconds);
     if (!(dt > 0)) return;
     this.u32[0] = this.n;
@@ -128,21 +148,37 @@ export class GlowPlate {
     // The step's own seconds, for the flow's speed: a hitch clamps the cells' clocks, never how fast the water went.
     this.f32[10] = seconds;
     this.f32[11] = 0;
+    const shaken = wave !== null && hz > 0;
+    if (shaken) {
+      const f = faradayHzOf(hz);
+      if (f !== this.hz) {
+        this.hz = f;
+        // The pattern's wavenumber and the wave's own ω, half the drive: the dispersion relation's, as the wave's step uses.
+        this.waveK = faradayK(f);
+        this.waveOmega = faradayOmega(this.waveK);
+      }
+    }
+    this.f32[12] = shaken ? this.waveK : 0;
+    this.f32[13] = this.waveOmega;
+    this.f32[14] = FARADAY_DEPTH;
+    this.f32[15] = FARADAY_NU;
     this.device.queue.writeBuffer(this.uni, 0, this.args);
+    const w8 = shaken ? wave.h : this.still;
     // A plain loop, not find(): no closure made each step.
     let g: (typeof this.groups)[number] | undefined;
-    for (const e of this.groups) if (e.vel === vel && e.gap === gap) { g = e; break; }
+    for (const e of this.groups) if (e.vel === vel && e.gap === gap && e.wave === w8) { g = e; break; }
     if (!g) {
       const [a, b] = this.state;
       g = {
         vel,
         gap,
+        wave: w8,
         bg: [
-          bindGroup(this.device, this.pipe, [this.uni, vel, gap, a, b, this.lightBuf]),
-          bindGroup(this.device, this.pipe, [this.uni, vel, gap, b, a, this.lightBuf]),
+          bindGroup(this.device, this.pipe, [this.uni, vel, gap, a, b, this.lightBuf, w8]),
+          bindGroup(this.device, this.pipe, [this.uni, vel, gap, b, a, this.lightBuf, w8]),
         ],
       };
-      // Never more than a handful; a texture remade (a new grid) leaves its old pair to fall out.
+      // Never more than a handful; a texture remade (a new grid) or a shaker made again leaves its old pair to fall out.
       if (this.groups.length >= 8) this.groups.shift();
       this.groups.push(g);
     }
@@ -159,8 +195,8 @@ export class GlowPlate {
     return { light: this.lightBuf, n: this.n };
   }
 
-  /** For checks: the charge and the light, read back (never in the show). */
-  async read(): Promise<{ charge: Float32Array; light: Float32Array }> {
+  /** For checks: the charge, the light the plate draws, and the cells' own light before the depth weighs it (lit), read back (never in the show). */
+  async read(): Promise<{ charge: Float32Array; light: Float32Array; lit: Float32Array }> {
     const cells = this.n * this.n;
     const out = this.device.createBuffer({ size: cells * 12, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     const enc = this.device.createCommandEncoder();
@@ -173,8 +209,9 @@ export class GlowPlate {
     out.unmap();
     out.destroy();
     const charge = new Float32Array(cells);
-    for (let k = 0; k < cells; k++) charge[k] = all[k * 2];
-    return { charge, light: all.slice(cells * 2) };
+    const lit = new Float32Array(cells);
+    for (let k = 0; k < cells; k++) { charge[k] = all[k * 2]; lit[k] = all[k * 2 + 1]; }
+    return { charge, light: all.slice(cells * 2), lit };
   }
 
   dispose(): void {

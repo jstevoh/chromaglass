@@ -53,7 +53,7 @@ export function Slider({ label, field, step, format, value, connected, onDrag, o
           if (curve === 1) { onChange(field, raw); return; }
           onChange(field, handValueAt(raw, min, max, curve));
         }}
-        className="remote-slider h-10 w-full cursor-pointer disabled:opacity-65 md:h-12"
+        className="remote-slider h-11 w-full cursor-pointer disabled:opacity-65 md:h-12"
         style={{ ['--fill' as string]: `${(curve === 1 ? (current - min) / (max - min) : at) * 100}%` }}
       />
     </div>

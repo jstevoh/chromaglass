@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ListMusic, Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
+import { ListMusic, Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
@@ -17,12 +17,12 @@ import { LiveRemoteChip } from './LiveRemoteChip';
 import { RemotePourText } from './RemotePourText';
 import { PhoneInkTitle } from './phone/PhoneInkTitle';
 import { Slider } from './RemoteSlider';
-import { LOCKUP_URL } from '../brand';
-import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
 import { RemoteSongs } from './RemoteSongs';
+import { AppToast } from './ui/AppToast';
+import { REMOTE_SECTIONS, RemoteLinkBanner, RemoteNav, RemoteSectionJumper, type RemoteSectionId, type RemoteView } from './RemoteChrome';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -110,7 +110,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
 
   /** Draw's painter for the wall's picture, when Draw is up: handed each one without a render here. */
   const pictureSink = useRef<((m: PadPictureMessage) => void) | null>(null);
-  const { status, send } = useRemoteLink({
+  const { status, send, retry } = useRemoteLink({
     role: 'controller',
     onMessage: (message) => {
       if (message.type === 'picture') { pictureSink.current?.(message); return; }
@@ -200,7 +200,33 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   }, [patchThrottled]);
   useEffect(() => () => { if (mixerHoldRef.current) clearTimeout(mixerHoldRef.current); }, []);
 
-  const action = useCallback((a: RemoteAction) => send({ type: 'action', action: a }), [send]);
+  const [localUndo, setLocalUndo] = useState<{ id: number; title: string } | null>(null);
+  const prevServerUndoRef = useRef<RemoteState['undo']>(null);
+  useEffect(() => {
+    const srv = state?.undo ?? null;
+    if (srv) setLocalUndo(null);
+    else if (prevServerUndoRef.current && !srv) setLocalUndo(null);
+    prevServerUndoRef.current = srv;
+  }, [state?.undo]);
+  useEffect(() => {
+    if (!localUndo) return;
+    const t = setTimeout(() => setLocalUndo(null), 8000);
+    return () => clearTimeout(t);
+  }, [localUndo]);
+
+  const action = useCallback((a: RemoteAction) => {
+    send({ type: 'action', action: a });
+    if (a === 'lucky' || a === 'drain' || a === 'clear') {
+      const title = a === 'lucky' ? 'Look randomised' : a === 'drain' ? 'Plate drained' : 'Plate cleared';
+      setLocalUndo({ id: Date.now(), title });
+    } else if (a === 'undo-reset') {
+      setLocalUndo(null);
+    }
+  }, [send]);
+  const activeUndo = state?.undo ?? localUndo;
+  const undoToast = activeUndo
+    ? { id: activeUndo.id, title: activeUndo.title, actionLabel: 'Undo', durationMs: 8000 }
+    : null;
 
   // The laptop's own preset list when it sends one (the user's files included); the built-ins until then.
   const presetGroups = useMemo(() => {
@@ -238,9 +264,46 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   const [view, setView] = useState<'draw' | 'controls' | 'songs'>(() => {
     try { const v = localStorage.getItem(REMOTE_VIEW_KEY); return v === 'controls' || v === 'songs' ? v : 'draw'; } catch { return 'draw'; }
   });
-  // Where Songs' Back goes: the screen it was opened from (PLAN 12-ctl-1).
-  const [songsFrom, setSongsFrom] = useState<'draw' | 'controls'>('draw');
   useEffect(() => { try { localStorage.setItem(REMOTE_VIEW_KEY, view); } catch { /* private mode */ } }, [view]);
+  const [activeSection, setActiveSection] = useState<RemoteSectionId>('pad');
+  const headerRef = useRef<HTMLElement>(null);
+  const sectionRefs = useRef<Record<RemoteSectionId, HTMLElement | null>>({
+    pad: null,
+    bottles: null,
+    dyes: null,
+    sliders: null,
+    looks: null,
+  });
+  const jumpTo = useCallback((id: RemoteSectionId) => {
+    setActiveSection(id);
+    const el = sectionRefs.current[id];
+    if (!el) return;
+    const headerH = headerRef.current?.getBoundingClientRect().height ?? 0;
+    const stickyParent = el.closest('section');
+    const isSticky = stickyParent && getComputedStyle(stickyParent).position === 'sticky';
+    if (isSticky && window.scrollY > headerH) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    const top = window.scrollY + el.getBoundingClientRect().top - headerH - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+  }, []);
+  useEffect(() => {
+    if (view !== 'controls') return;
+    const onScroll = () => {
+      const headerH = headerRef.current?.getBoundingClientRect().height ?? 0;
+      const cutoff = headerH + 40;
+      let current: RemoteSectionId = 'pad';
+      for (const { id } of REMOTE_SECTIONS) {
+        const el = sectionRefs.current[id];
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= cutoff) current = id;
+      }
+      setActiveSection(prev => (prev === current ? prev : current));
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [view]);
   /*
     Draw's Amount, a multiple of how much a touch lays (1× is today's). The
     display reads a pad's amount as 0.05–1 with 0.5 for a finger, and doubles
@@ -398,11 +461,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     setView('controls');
     try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
   };
-  const openSongs = async (from: 'draw' | 'controls') => {
+  const openSongs = async () => {
     letGo();
-    setSongsFrom(from);
     setView('songs');
     try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
+  };
+  const selectView = (next: RemoteView) => {
+    if (next === 'draw') void openDraw();
+    else if (next === 'controls') void openControls();
+    else void openSongs();
   };
 
   // ── Tilt ─────────────────────────────────────────────────────────
@@ -478,7 +545,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={i}
               onClick={() => setPadLayer(i)}
               disabled={!connected}
-              className={`h-9 w-9 rounded-full border text-[12px] font-bold disabled:opacity-65 ${padLayer === i ? LIT : 'border-white/10 text-muted'}`}
+              className={`h-11 w-11 rounded-full border text-[12px] font-bold disabled:opacity-65 ${padLayer === i ? LIT : 'border-white/10 text-muted'}`}
               title={`This device works plate ${i + 1}`}
             >
               {i + 1}
@@ -498,7 +565,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={t}
               onClick={() => setPadTool(t)}
               disabled={!connected}
-              className={`rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${padTool === t ? LIT : 'border-white/10 text-muted'}`}
+              className={`min-h-11 min-w-11 rounded-full border px-3.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${padTool === t ? LIT : 'border-white/10 text-muted'}`}
               data-testid={`remote-tool-${t}`}
             >
               {t}
@@ -508,7 +575,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={tiltOn}
             onClick={toggleTilt}
             disabled={!connected}
-            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${tiltOn ? LIT : 'border-white/10 text-text-2'}`}
+            className={`flex min-h-11 min-w-11 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${tiltOn ? LIT : 'border-white/10 text-text-2'}`}
             title="Tilting the device tilts the plate"
           >
             <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
@@ -522,8 +589,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         which meant the most performable gesture in the app — a drop of soap
         on a full plate — was reachable from the laptop and nowhere else.
       */}
-      <div className="mt-3" data-testid="remote-liquids">
-        <div className="text-[12px] uppercase tracking-widest font-bold text-dim mb-1.5">Bottle</div>
+      <div className="mt-4" ref={(el) => { sectionRefs.current.bottles = el; }} id="remote-sec-bottles" data-testid="remote-liquids">
+        <div className="text-[12px] uppercase tracking-widest font-bold text-dim mb-2">Bottle</div>
         <div className="flex flex-wrap gap-1.5">
           {DEFAULT_LIQUID_TYPES.map((liq) => {
             const on = padLiquid === liq.id;
@@ -533,7 +600,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 key={liq.id}
                 onClick={() => chooseLiquid(liq.id)}
                 disabled={!connected}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-65 ${
+                className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-65 ${
                   on ? LIT : 'border-white/10 text-muted'
                 }`}
                 title={liq.description}
@@ -548,14 +615,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         </div>
       </div>
       {/* Dye colours: a tap picks the colour this pad drops and the laptop's dropper with it */}
-      <div className="mt-3 flex flex-wrap gap-1.5" data-testid="remote-dyes">
+      <div className="mt-4 flex flex-wrap gap-2" ref={(el) => { sectionRefs.current.dyes = el; }} id="remote-sec-dyes" data-testid="remote-dyes">
         {/* The bottle as it is, with no dye in it: its own colour, or clear. */}
         {padBottle?.own && (
           <button
             aria-pressed={padColor?.toLowerCase() === padBottle.own.toLowerCase()}
             onClick={() => chooseColor(padBottle.own!)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-65 md:h-8 md:w-8 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/40'}`}
+            className={`h-11 w-11 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-65 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/40'}`}
             style={isClearLiquid(padBottle) ? { backgroundColor: 'transparent' } : { backgroundColor: padBottle.own }}
             title={`Natural: ${padBottle.name.toLowerCase()} with no dye`}
             aria-label={`Natural ${padBottle.name}`}
@@ -568,7 +635,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             key={c.hex}
             onClick={() => chooseColor(c.hex)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-65 md:h-8 md:w-8 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'}`}
+            className={`h-11 w-11 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-65 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'}`}
             style={{ backgroundColor: c.hex }}
             title={c.name}
             aria-label={c.name}
@@ -578,24 +645,32 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     </>
   );
 
+  const linkDetail = status === 'denied'
+    ? (inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key: open the address the show server printed, key included')
+    : status === 'locked'
+      ? LOCKED_WORDS
+      : status === 'connecting'
+        ? 'Finding laptop…'
+        : 'Waiting for the laptop. Make sure the show is open there and both devices are on the same network.';
+  const changeLaptopAction = inApp && !connected ? (
+    <a href="/?remote=1" className="inline-flex min-h-11 min-w-11 items-center rounded-full border border-white/20 px-3.5 text-[12px] font-medium text-text" data-testid="app-change-laptop">Change laptop</a>
+  ) : null;
+
   if (view === 'draw') {
     const look = state?.activePresetId ? presetGroups.flatMap(g => g.presets).find(pr => pr.id === state.activePresetId)?.name : null;
     return (
       <DrawScreen
         connected={connected}
-        waiting={status === 'denied'
-          ? (inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key: open the address the show server printed, key included')
-          : status === 'locked' ? LOCKED_WORDS
-          : status === 'connecting' ? 'Finding laptop' : 'Offline: is the show open on the laptop, on this network?'}
+        status={status}
+        onRetry={retry}
+        waiting={linkDetail}
         /*
           In the app the way out of a wrong key or a laptop that is not there
           is Change laptop, which lives in Controls' app bar; a remote that
           opens on Draw would otherwise make the fix two screens away from
           the words that ask for it (`npm run applink`, "wrong key").
         */
-        waitingAction={inApp && !connected ? (
-          <a href="/?remote=1" className="rounded-full border border-white/20 px-4 py-2 text-[13px] font-medium text-text" data-testid="app-change-laptop">Change laptop</a>
-        ) : null}
+        waitingAction={changeLaptopAction}
         state={state}
         lookName={look ?? 'Your look'}
         tool={padTool}
@@ -616,8 +691,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         onPadMove={onPadMove}
         onPadUp={onPadUp}
         action={action}
+        undoToast={undoToast}
+        onUndoToast={() => action('undo-reset')}
+        onDraw={openDraw}
         onControls={openControls}
-        onSongs={() => openSongs('draw')}
+        onSongs={openSongs}
       />
     );
   }
@@ -628,8 +706,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         state={state}
         send={send}
         connected={connected}
-        onBack={songsFrom === 'controls' ? openControls : openDraw}
-        backLabel={songsFrom === 'controls' ? 'Controls' : 'Draw'}
+        status={status}
+        onRetry={retry}
+        onSelectView={selectView}
+        linkDetail={!connected ? linkDetail : null}
+        linkAction={changeLaptopAction}
+        inApp={inApp}
       />
     );
   }
@@ -647,43 +729,34 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       }}
     >
       {inApp && <AppModeBar />}
-      {/* Status */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0a0a0a]/95 px-5 py-4 backdrop-blur">
-        <div>
-          <h1>
-            <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-8 w-auto" draggable={false} />
-          </h1>
-          {/* The Alpha label on the line under the name, not beside it: beside
-              it, on a 390 phone it crowded the connection status on the right. */}
-          <div className="mt-1 flex items-center gap-2">
-            <p className="text-[12px] uppercase tracking-[0.25em] text-dim">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
-            <AlphaBadge />
-          </div>
+      {/* Shared top nav, link banner, and section jumper */}
+      <header ref={headerRef} className="sticky top-0 z-20 flex flex-col gap-2 border-b border-white/10 bg-[#0a0a0a]/95 px-4 py-2.5 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <RemoteNav view="controls" onSelect={selectView} compact />
+          {state?.trackName && (
+            <span className="hidden truncate text-[12px] text-dim md:inline">{state.trackName}</span>
+          )}
         </div>
-        <div className={`flex items-center gap-2 text-[12px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400' : 'text-amber-300'}`}>
-          {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-          {status === 'denied' && <span className="ml-2 text-red-300">{inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key — open the address the show server printed, key included'}</span>}
-          {status === 'locked' && <span className="ml-2 text-red-300">{LOCKED_WORDS}</span>}
-          {connected ? 'Linked' : status === 'connecting' ? 'Finding laptop' : 'Offline'}
-        </div>
+        <RemoteLinkBanner
+          connected={connected}
+          status={status}
+          onRetry={retry}
+          detail={!connected ? linkDetail : null}
+          action={changeLaptopAction}
+        />
+        <RemoteSectionJumper active={activeSection} onJump={jumpTo} />
       </header>
 
-      {!connected && (
-        <p className="px-5 py-3 text-xs leading-relaxed text-dim">
-          Waiting for the laptop. Make sure the show is open there and both devices are on the
-          same network.
-        </p>
-      )}
 
       <main className="px-5 pt-5 md:grid md:grid-cols-2 md:gap-8 md:px-8" data-testid="remote-main">
         {/* Left on a tablet: the pad, kept in view while the right column scrolls */}
-        <section className="md:sticky md:top-20 md:self-start">
-          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-projectionist">
+        <section className="md:sticky md:top-44 md:self-start">
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" ref={(el) => { sectionRefs.current.pad = el; }} id="remote-sec-pad" data-testid="remote-projectionist">
             <div className="mb-3 flex items-center justify-between">
               <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-dim" />}
               </span>
-              <button onClick={openDraw} className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[12px] font-bold uppercase tracking-widest text-text-2" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
+              <button onClick={openDraw} className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-full border border-white/10 px-3.5 text-[12px] font-bold uppercase tracking-widest text-text-2" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
                 <Maximize2 size={12} /> Draw
               </button>
             </div>
@@ -723,9 +796,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
 
           {/* The set list and the song shows (PLAN 12-ctl-1), their own screen */}
           <button
-            onClick={() => openSongs('controls')}
+            onClick={openSongs}
             className="mb-6 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 text-left active:scale-[0.99]"
-            data-testid="remote-to-songs"
+            data-testid="remote-songs-card"
           >
             <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
               <ListMusic size={15} /> Set list &amp; songs
@@ -739,6 +812,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
 
           {/* The dials that change the mood most */}
+          <div ref={(el) => { sectionRefs.current.sliders = el; }} id="remote-sec-sliders" data-testid="remote-sliders">
           <Slider label="Sound Drive" field="audioImpact" step={0.01} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Speed" field="globalSpeed" step={0.005} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Evolve Speed" field="automateRate" step={0.01} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
@@ -828,7 +902,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* The dish on a speaker (PLAN 48f): Shaker's frequency, and while it is on, how hard it shakes. */}
           <Slider label="Shaker" field="faradayHz" step={1} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.faradayHz ?? 0) > 0 && (
-            <Slider label="Shake" field="faraday" step={0.01} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+            <>
+              <Slider label="Shake" field="faraday" step={0.01} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Rock" field="faradayRock" step={0.01} value={value('faradayRock') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Wave Strength" field="faradayGain" step={0.05} value={value('faradayGain') as number | undefined} {...sliderProps} connected={connected} />
+            </>
           )}
           {/* Polarised light (PLAN 31p-1), and while the sheets are in the analyser's turn and the liquid's strength, as on the desk. */}
           <Slider label="Polarisers" field="polariser" step={0.05} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
@@ -992,14 +1070,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 </div>
               )}
               <div className="flex gap-2">
-                <button onClick={() => action('seq-prev')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Previous stage" data-testid="remote-seq-prev">
+                <button onClick={() => action('seq-prev')} disabled={!connected || !state.sequencer.name} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Previous stage" data-testid="remote-seq-prev">
                   <SkipBack size={16} className="mx-auto" />
                 </button>
                 <button
                   aria-pressed={!!state.sequencer.running}
                   onClick={() => action(state.sequencer?.running ? 'seq-pause' : 'seq-play')}
                   disabled={!connected}
-                  className={`flex-[2] flex items-center justify-center gap-2 rounded-xl border py-3 text-[12px] font-bold uppercase tracking-[0.2em] disabled:opacity-65 active:scale-95 ${
+                  className={`flex min-h-11 flex-[2] items-center justify-center gap-2 rounded-xl border py-3 text-[12px] font-bold uppercase tracking-[0.2em] disabled:opacity-65 active:scale-95 ${
                     state.sequencer.running ? LIT : 'border-white/10 bg-white/5 text-text'
                   }`}
                   data-testid="remote-seq-toggle"
@@ -1007,10 +1085,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                   {state.sequencer.running ? <Pause size={16} /> : <Play size={16} />}
                   {state.sequencer.running ? 'Pause' : state.sequencer.name ? 'Resume' : 'Play'}
                 </button>
-                <button onClick={() => action('seq-next')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Next stage" data-testid="remote-seq-next">
+                <button onClick={() => action('seq-next')} disabled={!connected || !state.sequencer.name} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Next stage" data-testid="remote-seq-next">
                   <SkipForward size={16} className="mx-auto" />
                 </button>
-                <button onClick={() => action('seq-stop')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Stop sequencer" data-testid="remote-seq-stop">
+                <button onClick={() => action('seq-stop')} disabled={!connected || !state.sequencer.name} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Stop sequencer" data-testid="remote-seq-stop">
                   <Square size={16} className="mx-auto" />
                 </button>
               </div>
@@ -1036,7 +1114,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {settings && (
             <details className="mb-7 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2" data-testid="remote-mixer">
-              <summary className="cursor-pointer py-2 text-[12px] font-bold uppercase tracking-[0.2em] text-text-2">Mixer</summary>
+              <summary className="flex min-h-11 cursor-pointer items-center py-2 text-[12px] font-bold uppercase tracking-[0.2em] text-text-2">Mixer</summary>
               <div className="pb-2 pt-1">
                 <MixerPanel
                   settings={{ ...settings, ...localValues } as VisualizerSettings}
@@ -1051,6 +1129,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               </div>
             </details>
           )}
+          </div>
 
           {/* One-shot gestures */}
           <div className="mb-7 flex gap-3">
@@ -1061,11 +1140,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
 
           {/* Presets */}
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[12px] uppercase tracking-[0.3em] text-dim">Preset palettes — tap to arm, Go sends</h2>
+          <div ref={(el) => { sectionRefs.current.looks = el; }} id="remote-sec-looks" className="mb-3 flex items-center justify-between">
+            <h2 className="text-[12px] uppercase tracking-[0.25em] text-dim">Preset palettes — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
-              <button onClick={() => action('preset-prev')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-65 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={14} /></button>
-              <button onClick={() => action('preset-next')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-65 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={14} /></button>
+              <button onClick={() => action('preset-prev')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-65 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={16} /></button>
+              <button onClick={() => action('preset-next')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-65 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={16} /></button>
             </div>
           </div>
           {presetGroups.map(({ label, presets }) => (
@@ -1199,6 +1278,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </button>
         </div>
       </div>
+      <AppToast toast={undoToast} onAction={() => action('undo-reset')} phone bottomClass="bottom-24" />
     </div>
   );
 }

@@ -69,6 +69,15 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
     ipcRenderer.on('chromaglass:link', listener);
     return () => ipcRenderer.removeListener('chromaglass:link', listener);
   },
+  // The Show menu's Pro upgrade link opens the Account sheet inside the app.
+  onOpenAccount(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const listener = () => {
+      try { fn(); } catch { /* ignore */ }
+    };
+    ipcRenderer.on('chromaglass:open-account', listener);
+    return () => ipcRenderer.removeListener('chromaglass:open-account', listener);
+  },
   setAmbient(on) {
     ipcRenderer.send('chromaglass:set-ambient', Boolean(on));
   },
