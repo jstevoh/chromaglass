@@ -91,6 +91,9 @@ export interface PhonePlayProps {
   onShuffle: () => void;
   /** Save the plate as a new look under a name, asked for every time (QA-18), as the desks' Save. */
   onSave?: (name: string) => void;
+  /** Existing saved looks, so saving a duplicate name offers Replace or Keep both (PLAN 49a). */
+  existingLooks?: { id: string; name: string }[];
+  onReplaceLook?: (id: string, name: string) => void;
   /** The name the field starts with. */
   saveSuggestion?: string;
   dyes: readonly string[];
@@ -299,12 +302,30 @@ export function PhonePlay(p: PhonePlayProps) {
   const s = p.settings;
   const zoom = zoomOf(s);
   const showHint = !sheet && !touched && picked === 'dropper' && visits < HINT_VISITS && accountShows.length === 0;
-  const saveNamed = () => {
+  const [saveDup, setSaveDup] = useState<{ id: string; name: string } | null>(null);
+  const keepSave = () => {
     const name = saveName?.trim();
     if (!name || !p.onSave) return;
     p.onSave(name);
+    setSaveDup(null);
     setSaveName(null);
     setSaved(true);
+  };
+  const replaceSave = () => {
+    const name = saveName?.trim();
+    if (!name || !saveDup) return;
+    if (p.onReplaceLook) p.onReplaceLook(saveDup.id, name);
+    else p.onSave?.(name);
+    setSaveDup(null);
+    setSaveName(null);
+    setSaved(true);
+  };
+  const saveNamed = () => {
+    const name = saveName?.trim();
+    if (!name || !p.onSave) return;
+    const hit = (p.existingLooks ?? []).find(l => l.name.trim().toLowerCase() === name.toLowerCase());
+    if (hit && !saveDup) { setSaveDup(hit); return; }
+    keepSave();
   };
 
   return (
@@ -342,7 +363,7 @@ export function PhonePlay(p: PhonePlayProps) {
           )}
           {sheet ? (
             p.onSave && (
-              <Pill onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} label="Save this look" testId="play-save" pressed={saveName !== null}>
+              <Pill onPress={() => { setSaveDup(null); setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null)); }} label="Save this look" testId="play-save" pressed={saveName !== null}>
                 {saved ? 'Saved' : 'Save'}
               </Pill>
             )
@@ -442,12 +463,13 @@ export function PhonePlay(p: PhonePlayProps) {
               the plate and the buttons a scroll below it.
             */}
             {saveName !== null && (
+              <>
               <form className="flex gap-2 px-4 pb-2" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="play-save-form">
                 <input
                   autoFocus
                   onFocus={e => e.currentTarget.select()}
                   value={saveName}
-                  onChange={e => setSaveName(e.target.value)}
+                  onChange={e => { setSaveName(e.target.value); setSaveDup(null); }}
                   aria-label="Name for the new look"
                   // 16 px: under it, iOS zooms the page in on focus.
                   className="h-12 min-w-0 flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-3 text-[16px] text-text outline-none focus:border-accent"
@@ -456,6 +478,16 @@ export function PhonePlay(p: PhonePlayProps) {
                 <button type="submit" disabled={!saveName.trim()} data-testid="play-save-confirm"
                   className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-40">Save</button>
               </form>
+              {saveDup && (
+                <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="play-save-duplicate">
+                  <span>“{saveDup.name}” already exists.</span>
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={keepSave} className="h-10 rounded-lg border border-white/15 bg-white/10 px-3 text-[13px] font-medium text-text" data-testid="play-save-keep-both">Keep both</button>
+                    <button type="button" onClick={replaceSave} className="h-10 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary" data-testid="play-save-replace">Replace</button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1 landscape:grid landscape:grid-cols-2 landscape:content-start landscape:gap-x-6">
               <div>
