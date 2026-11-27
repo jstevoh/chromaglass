@@ -208,6 +208,7 @@ export default function App() {
     musicInputRef, musicCtxRef,
   } = useSoundState();
   const [showControls, setShowControls] = useState(true);
+  const [phoneMoreOpen, setPhoneMoreOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   /** Which section the panel should open at, when it was opened from a ⌘K row. */
   const [settingsSection, setSettingsSection] = useState<string | null>(null);
@@ -3152,6 +3153,7 @@ export default function App() {
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
             onOpenAccount={openAccount}
+            onMoreOpen={setPhoneMoreOpen}
           />
           </PanelGuard>
           )}
@@ -3483,9 +3485,6 @@ export default function App() {
               </div>
             )}
           </div>
-          <PanelGuard name="The crash report">
-          <CrashReportButton />
-          </PanelGuard>
           <button
             aria-pressed={showHelp}
             onClick={() => setShowHelp(!showHelp)}
@@ -3681,10 +3680,8 @@ export default function App() {
           <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
         </>
       )}
-      {/* The crash report, under a desk: its header has no room for a
-          button that is idle nearly always, so the chip says when there is
-          news and ⌘K opens the sheet. */}
-      {(deskUp || phone) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
+      {/* Floating chip + sheet when no button is mounted. */}
+      {((deskUp && !overlaysVisible) || (phone && !(showControls && phoneScreenUp === 'stage' && phoneMoreOpen))) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
       {overlaysVisible && <PanelGuard name="The report dot"><QuickReportDot /></PanelGuard>}
 

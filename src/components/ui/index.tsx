@@ -1008,7 +1008,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
 
 const NOOP = () => {};
 
-export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right', embed = false }: {
+export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right', embed = false, zIndex = 'z-50' }: {
   title: ReactNode; onClose: () => void; children: ReactNode; width?: number; height?: number; testId?: string;
   /**
    * Drawn inside a desk panel rather than over the window: no scrim, no
@@ -1030,6 +1030,8 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
    * which is ridden while the desk around it is still being played.
    */
   docked?: boolean;
+  /** Override the modal backdrop z-index when a sheet opens above PhoneSheet (`z-[55]`). */
+  zIndex?: string;
 }) {
   // Listened for once: an effect keyed on onClose could drop the key (useEscape).
   // An embedded one is a panel, which Escape does not close.
@@ -1047,7 +1049,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
         // Between the desk's 48 px header and its 28 px status bar, so the
         // header's buttons and lights stay in reach and in view beside it.
         ? `pointer-events-none fixed bottom-7 top-12 z-50 flex items-stretch p-2 ${dockSide === 'left' ? 'left-0 justify-start' : 'right-0 justify-end'}`
-        : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6'}
+        : `fixed inset-0 ${zIndex} flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6`}
       onClick={docked ? undefined : onClose}
       data-testid={testId ? `${testId}-scrim` : undefined}
     >
