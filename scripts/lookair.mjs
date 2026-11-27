@@ -23,13 +23,19 @@
  *   1. the base a look is laid on has no air (DEFAULT_SETTINGS and LOOK_BASE)
  *   2. every look outside AIR_LOOKS lays Bubbles 0 over a plate at 1, so
  *      going from Lava Pop to Galaxy takes the air away rather than keeping it
- *   3. every look in AIR_LOOKS still lays air, at no more than it had (0.2):
- *      the owner judged 33q-1's count at that amount, and this item is which
- *      looks, not how many
+ *   3. every look in AIR_LOOKS, and every moiré look over one, still lays
+ *      air, at no more than it had (0.2): the owner judged 33q-1's count at
+ *      that amount, and this item is which looks, not how many. It is what a
+ *      look lays; Evolve may still wander a look's air to twice that and back
+ *      (dialWindow in lib/drift.ts), as before
  *   4. the dial is still there to turn air on in a look without it: Bubbles
  *      is pinnable and on the Recipe strip the desk and the phone draw
  *   5. Feeling Lucky rolls air about one look in five, never past 0.3
- *      (it was four in five, at 0.2 to 1)
+ *      (it was four in five, at 0.2 to 1), with and without the moiré pack
+ *
+ * Not measured here: a look the owner saved keeps the air it was saved with
+ * (the owner's own file), and a designed show's stages (songDesign.ts, the
+ * built-in sequences) still set air over any look, PLAN 33q-5.
  *
  * Printed: how many looks lay air, which, and Lucky's share.
  */
@@ -62,7 +68,8 @@ check('2. every other look lays no air over a plate full of it', stray.length ==
   stray.map((l) => `${l.name} ${l.air}`).join(', ') || `${laid.filter((l) => !madeForAir(l.id)).length} looks at 0`);
 
 const air = laid.filter((l) => madeForAir(l.id));
-check('3. the sandwich looks still lay air, no more than before', air.length >= AIR_LOOKS.length && air.every((l) => l.air > 0 && l.air <= BEFORE),
+const want = AIR_LOOKS.length + MOIRE_LOOKS.filter((m) => AIR_LOOKS.includes(m.from)).length;
+check('3. the sandwich looks still lay air, no more than before', air.length === want && air.every((l) => l.air > 0 && l.air <= BEFORE),
   air.map((l) => `${l.name} ${l.air}`).join(', '));
 
 {
@@ -72,19 +79,19 @@ check('3. the sandwich looks still lay air, no more than before', air.length >= 
     `Galaxy lays ${targetLook(full, galaxy.settings).bubbles}; Bubbles pinnable ${PIN_RANGE.has('bubbles')}, on the Recipe ${DEFAULT_RECIPE.includes('bubbles')}`);
 }
 
-{
+for (const pack of [false, true]) {
   // A seeded roll, so the share is the same number every run.
   let s = 0x9e3779b9;
   const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; };
   const N = 4000;
   let withAir = 0, most = 0;
   for (let i = 0; i < N; i++) {
-    const b = luckyLook(DEFAULT_SETTINGS, ['#ff0000'], rand).bubbles;
+    const b = luckyLook(DEFAULT_SETTINGS, ['#ff0000'], rand, pack).bubbles;
     if (b > 0) withAir++;
     most = Math.max(most, b);
   }
   const share = withAir / N;
-  check('5. Feeling Lucky rolls air about one look in five, a few bubbles', share > 0.15 && share < 0.25 && most <= 0.3,
+  check(`5. Feeling Lucky rolls air about one look in five, a few bubbles (${pack ? 'with' : 'without'} the moiré pack)`, share > 0.15 && share < 0.25 && most <= 0.3,
     `${(share * 100).toFixed(1)}% of ${N} rolls, at most ${most.toFixed(2)}`);
 }
 

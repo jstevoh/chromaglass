@@ -33,4 +33,4 @@ Left from it, so none of it is lost:
   Water, Clock Glass and Splodascope at 0.2 (the amount 33q-1 was judged at), and the moiré
   looks laid over two of them. Feeling Lucky rolls air one look in five at 0.1 to 0.3 (was
   four in five at 0.2 to 1). The dial still turns it on anywhere. `npm run lookair`: looks
-  laying air 34 of 42 on main, 7 of 42 here; 2/6 on main, 6/6 here.
+  laying air 34 of 42 on main, 7 of 42 here; 2/7 on main, 7/7 here.
