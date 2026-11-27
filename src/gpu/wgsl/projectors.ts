@@ -32,12 +32,24 @@
  * Built into SAMPLING beside `lampBg`, so every shader that has `onGround`
  * has these.
  *
+ * - `wallShare`: B's share of the light, channel by channel, linear, kept by
+ *   `wallAdd` where the two are added (the back plate's, then the front
+ *   plate's over it through `onWall`), the display's third output. The
+ *   focus pass (gpu/focus.ts, PLAN 51b) splits the finished picture by it,
+ *   so each projector's light is blurred by its own lens. What multiplies
+ *   the wall after the add (the lamp's hot-spot, the dish's rims, a bubble's
+ *   shadow, the grades) multiplies both lights and leaves the share; the
+ *   mixer's rows laid over both plates are shared out by it too. Taken later,
+ *   against the finished wall (the first build), a corner the hot-spot dims
+ *   to 0.6 read B's share 3.1 times too big (the pre-push review).
+ *
  * With one projector its gain is laid on the finished plates before the film
  * projector's row (the film is its own projector), as `outColor * U.projA.rgb`
  * in the display pass; at the default it is 1, 1, 1 and multiplies nothing.
  */
 export const PROJECTOR_WGSL = /* wgsl */ `
 var<private> wallB: vec3f = vec3f(0.0);
+var<private> wallShare: vec3f = vec3f(0.0);
 
 fn projectorLamps() -> vec3f {
   let back = lampBg * U.projB.rgb;
@@ -46,7 +58,10 @@ fn projectorLamps() -> vec3f {
 }
 
 fn wallAdd(a: vec3f, b: vec3f) -> vec3f {
-  return pow(pow(max(a, vec3f(0.0)), vec3f(2.2)) + pow(max(b, vec3f(0.0)), vec3f(2.2)), vec3f(1.0 / 2.2));
+  let la = pow(max(a, vec3f(0.0)), vec3f(2.2));
+  let lb = pow(max(b, vec3f(0.0)), vec3f(2.2));
+  wallShare = lb / max(la + lb, vec3f(1e-6));
+  return pow(la + lb, vec3f(1.0 / 2.2));
 }
 
 fn onWall(c: vec3f) -> vec3f {

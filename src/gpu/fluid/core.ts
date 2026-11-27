@@ -430,6 +430,10 @@ export class FluidCore {
   */
   protected layer: StandingFilm | null = null;
   protected stand: GPUTexture | null = null;
+  /** Hold Apart's blurred dye on its own grid (PLAN 18d-6, fields.ts ensureHoldApart), made the first time the dial is up. */
+  protected holdSoft: GPUTexture | null = null;
+  /** Hold Apart's stress's divergence on the same grid, which forcesB adds (holdStress writes it); the blur's passes go between the two. */
+  protected holdForce: GPUTexture | null = null;
   protected standOn = false;
   protected filmHeld = false;
   /**

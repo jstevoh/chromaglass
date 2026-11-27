@@ -6,6 +6,7 @@ import { layGlowLooks } from './presetsGlow';
 import { layStirCords } from './lib/stir';
 import { laySlideCords } from './lib/glassSlide';
 import { layMusicCords } from './lib/musicCords';
+import { layOwnerLooks } from './presetsOwner';
 
 /*
   What is laid over the built-in looks once they are written, in this order:
@@ -17,7 +18,8 @@ import { layMusicCords } from './lib/musicCords';
   `layStirCords`, PLAN 38u-5); then the glass's slide on the looks that slid it
   (lib/glassSlide.ts `laySlideCords`, PLAN 38u-11, from the old 0.3 default);
   then the music's hands as cords on every look, from its own wiring and areas
-  (lib/musicCords.ts, PLAN 38v-1).
+  (lib/musicCords.ts, PLAN 38v-1); last, the owner's saved looks, which carry
+  their cords already (presetsOwner.ts, PLAN 34b-7).
 
   A file beside presets.ts because that one is at the 100 KB line
   (`npm run sizes`) and each of these is a pass over every look, not a look.
@@ -29,4 +31,5 @@ export function layLooks(presets: Preset[]): void {
   layStirCords(presets, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
   laySlideCords(presets, 0.3);
   layMusicCords(presets);
+  layOwnerLooks(presets);
 }
