@@ -16,7 +16,8 @@ const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); r
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
 import { shareClip } from '../../lib/shareClip';
-import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
+import { SlideTray, TapeReels } from '../ui/Playful';
+import { LookPicture } from '../ui/LookChip';
 
 /**
  * Play: ChromaGlass on a phone for someone listening, not performing.
@@ -516,8 +517,8 @@ export function PhonePlay(p: PhonePlayProps) {
                   return (
                     <button key={l.id} onClick={() => (isPackLocked(findPreset(l.id)?.pack) ? openAccountSheet() : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
                       className="flex w-[76px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
-                      {/* Lit like every other chosen thing (PLAN 35a): the slide's own film cannot change colour, so its name takes the lit chip and the mount a lit ring (on a wrapper, since the mount's clipped corner would cut a ring drawn on it). A slide a flick, snapping one at a time (35g). */}
-                      <span className={`flex w-full justify-center rounded-[4px] py-1 ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><SlideMount swatch={l.swatch} size={60} /></span>
+                      {/* Lit like every other chosen thing (PLAN 35a): the picture takes a lit ring and its name the lit chip. The picture is the look on the plate (PLAN 34b-6, lib/lookThumbs.ts), round as the desk's and the Looks sheet's chips are; a slide a flick, snapping one at a time (35g). */}
+                      <span className="flex w-full justify-center py-1"><span className={`rounded-full ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><LookPicture lookId={l.id} swatch={l.swatch} size={60} /></span></span>
                       <span className={`w-full truncate rounded-[6px] px-1.5 text-[12px] ${on ? `${LIT} font-medium` : 'text-text-2'}`}>{l.name}</span>
                     </button>
                   );

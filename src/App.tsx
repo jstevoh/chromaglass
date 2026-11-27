@@ -9,7 +9,6 @@ import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
 import { RailZoom } from './components/RailZoom';
-import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
 import { CommandAndShortcuts } from './components/ShortcutSheet';
@@ -36,14 +35,16 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
 import { clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS, findPreset, livePresetId, NEW_LOOK } from './presets';
+import { PRESETS, findPreset, NEW_LOOK } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
 import { BenchOverlay } from './components/BenchOverlay';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { ProjectorFillChip } from './components/ProjectorFillChip';
-import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
+import { PhoneStage } from './components/phone/PhoneStage';
+import { useLookLists } from './app/useLookLists';
+import { useLookThumbCapture } from './app/useLookThumbCapture';
 import { PhonePlay } from './components/phone/PhonePlay';
 import { PHONE_OFF_KEY } from './lib/phone';
 import { useDeviceTilt } from './hooks/useDeviceTilt';
@@ -1362,50 +1363,9 @@ export default function App() {
     return typeof v === 'number' ? v : undefined;
   }, [lookValues]);
 
-  /**
-   * The cue list: the looks, in order, each carrying two of its own dyes so a
-   * row is recognisable without reading it. The live one is what is on the
-   * wall; the next one is whatever is armed.
-   */
-  const swatchOf = useCallback((presetId: string | undefined): string => {
-    const contract = !presetId ? null : isUserPresetId(presetId)
-      ? userPresetsRef.current.find(u => u.id === presetId)?.contract
-      : PRESET_CONTRACTS[presetId];
-    const [a, b] = contract && contract.length
-      ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
-      : ['#52525B', '#27272A'];
-    return `linear-gradient(135deg, ${a}, ${b})`;
-  }, []);
-  /*
-    The phone's list of looks: the preset menu's groups (the projected show,
-    the photographs, the closeups) and then the ones saved here, each with
-    the two colours the desks' cue rows show for it.
-  */
-  const phoneLooks = useMemo<PhoneLook[]>(() => {
-    const groupOf = (p: { id: string; settings: Partial<VisualizerSettings> }) =>
-      isUserPresetId(p.id) ? 'Yours' : p.settings.macroMode ? 'Closeup' : p.settings.renderStyle === 'photo' ? 'Photograph' : 'Light show';
-    const order = ['Light show', 'Photograph', 'Closeup', 'Yours'];
-    return allPresets
-      .map(p => ({ id: p.id, name: p.name, description: p.description, group: groupOf(p), swatch: swatchOf(p.id) }))
-      .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
-  }, [allPresets, swatchOf]);
+  const { swatchOf, phoneLooks, cues } = useLookLists({ allPresets, userPresetsRef, setList, fadeSeconds, sequences: () => sequencerRef.current?.sequences });
+  useLookThumbCapture(activePresetId);
   const setActive = setList.items.length > 0;
-  const cues = useMemo<Cue[]>(() => {
-    return setList.items.map(item => {
-      const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
-      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
-      const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
-      return {
-        id: item.id,
-        name,
-        swatch: swatchOf(look?.id ?? seq?.stages[0]?.presetId),
-        fade: item.fade ?? fadeSeconds,
-        song: item.song ? songLabel(item.song) : undefined,
-        kind: item.kind,
-        missing: item.kind === 'sequence' ? !seq : !look,
-      };
-    });
-  }, [allPresets, fadeSeconds, setList, swatchOf]);
   cuesRef.current = cues;
 
   /**

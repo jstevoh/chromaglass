@@ -778,7 +778,8 @@ try {
       const target = await page.evaluate(() => {
         const rows = [...document.querySelectorAll('[data-testid^="phone-look-"]')].filter(el => el.getAttribute('aria-pressed') === 'false');
         const el = rows[3];
-        return el ? { id: el.dataset.testid, name: el.querySelector('span span')?.textContent ?? '' } : null;
+        // A round chip since 34b-6: its name is its own text (drawn on a hold), not a row's first line.
+        return el ? { id: el.dataset.testid, name: el.textContent?.trim() ?? '' } : null;
       });
       if (target) await tap(page, target.id);
       // Asked twice: during the crossfade (two seconds by default), when the

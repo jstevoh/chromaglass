@@ -37,7 +37,7 @@ import { MixerPanel } from '../MixerPanel';
 import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
-import { lookStill } from '../../lib/lookStills';
+import { LookChip, LookPicture } from '../ui/LookChip';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
@@ -57,7 +57,7 @@ import type { TabEdit } from '../../hooks/useDeskLayout';
 import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
 import { SiteLink } from '../SiteLink';
-import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { Bottle, LiveBottle, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 import { PicturePaletteButton } from '../PicturePaletteButton';
 
 /**
@@ -534,7 +534,7 @@ export function PhoneStage(p: PhoneStageProps) {
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
-          <SlideMount swatch={p.lookSwatch} size={36} />
+          <LookPicture lookId={p.activeLookId} swatch={p.lookSwatch} size={36} />
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
           <span className="shrink-0 text-muted"><SlideTray at={p.lookSlot ?? null} size={20} /></span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
@@ -1038,12 +1038,26 @@ export function PhoneStage(p: PhoneStageProps) {
           {groups.map(g => (
             <div key={g}>
               <SectionLabel>{g}</SectionLabel>
-              <div className="flex flex-col gap-1">
+              {/*
+                Round chips, a picture of each look (PLAN 34b-6, the phone's
+                half of the desk's chips): a long press tells its name, as a
+                phone's home screen does, and a tap sends it. 56 px, past the
+                44 px a finger needs, five to a row on a 390 px phone where the
+                rows of name and description were one look to 56 px.
+              */}
+              <div className="flex flex-wrap gap-3 px-1 py-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
                   return (
-                    <button
+                    <LookChip
                       key={l.id}
+                      lookId={l.id}
+                      name={l.name}
+                      swatch={l.swatch}
+                      size={56}
+                      state={on ? 'live' : 'idle'}
+                      pressed={on}
+                      title={l.description ? `${l.name}: ${l.description}` : l.name}
                       onClick={() => {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
@@ -1054,16 +1068,8 @@ export function PhoneStage(p: PhoneStageProps) {
                         else p.onLook(l.id);
                         close();
                       }}
-                      aria-pressed={on}
-                      data-testid={`phone-look-${l.id}`}
-                      className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
-                    >
-                      <SlideMount swatch={l.swatch} still={lookStill(l.id)} size={44} />
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[14px] ${on ? 'text-on-lit' : 'text-text'}`}>{l.name}</span>
-                        {l.description && <span className={`block truncate text-[12px] ${on ? 'text-on-lit' : 'text-dim'}`}>{l.description}</span>}
-                      </span>
-                    </button>
+                      testId={`phone-look-${l.id}`}
+                    />
                   );
                 })}
               </div>

@@ -5,7 +5,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 ## Start here
 
 - `Desk.tsx` (44 KB, grep it): `Desk`, the layout, its slots and panels.
-- `deskProps.ts`: `DeskProps`, `Cue`, `SetAction`, `SetItemAction`: everything `App.tsx` passes in.
+- `deskProps.ts`: `DeskProps`, `Cue`, `SetAction`, `SetItemAction`: everything `App.tsx` passes in. `Cue.lookId` is the look an item's chip pictures (PLAN 34b-6); the Cues panel draws the set and the saved looks as `LookChip`s (`../ui/LookChip.tsx`), shared with the phone.
 - `DeskPanels.tsx` (54 KB, grep it): `PanelBody`, `panelMeta`: what each panel draws.
 - `DeskHeader.tsx`: `DeskHeader`, `DeskDots`, the top bar and status dots.
 - `TabStrip.tsx`: `TabStrip`, the tabs and their editor.

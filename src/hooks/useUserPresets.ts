@@ -7,6 +7,7 @@ import {
   saveUserPresets, serializePreset, USER_PRESETS_KEY,
 } from '../lib/userPresets';
 import { useCloudSyncReload } from '../lib/cloudSyncApp';
+import { forgetThumb } from '../lib/lookThumbs';
 
 /**
  * The projectionist's own presets: kept in the browser so they are there next
@@ -61,6 +62,8 @@ export function useUserPresets() {
       liquids: liquids ?? undefined,
     };
     upsert(p);
+    // Saved over, it looks different: photograph it again (lib/lookThumbs.ts).
+    forgetThumb(id);
     return p;
   }, [upsert]);
 
@@ -74,6 +77,7 @@ export function useUserPresets() {
 
   const remove = useCallback((id: string) => {
     setPresets((prev) => { const next = prev.filter((p) => p.id !== id); saveUserPresets(next); return next; });
+    forgetThumb(id);
   }, []);
 
   return { presets, upsert, saveCurrent, saveOver, exportPreset, importFile, remove, persist };

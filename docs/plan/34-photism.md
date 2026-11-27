@@ -176,6 +176,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
   Perform desk's new Looks grid (`LooksGrid`, opened from `looks-grid-open` in the desk breadcrumb),
   the narrow window's `PresetMenu` (`preset-menu-<id>`) and the phone's Looks sheet (`phone-look-<id>`),
   with `<img loading="lazy">` inside `SlideMount` on the narrow menu and phone cards; `npm run looksgrid -- --owed=preview` green (39 looks on 3 surfaces, 240 px, 2936–16754 bytes, closest pair 26.9 apart). Left: 34b-2 (live preview on hover/hold).
+  *34b-6 shipped* (2026-11-27, the owner: "the presets take up a ton of room with the colored icons
+  next to them ... maybe a round chip that shows a sample from each look"): the Cues panel's set and
+  Your preset palettes, the phone's Looks sheet and its Play strip draw each look as a round chip of
+  its still (`components/ui/LookChip.tsx`), the name on hover or a long press. Shipped looks use
+  their 34b-1 stills; a saved look is photographed off the plate once, six seconds after it goes up,
+  when the browser is idle (`app/useLookThumbCapture.ts`, `lib/lookThumbs.ts`, a 96 px WebP kept in
+  the browser), never live, so the frame loop pays one readback per look per machine. The set's
+  44 rows of 48 px became chips 40 px across, many to a row. The live preview (34b-2) stays open.
+  *34b-7 shipped* (2026-11-27, the owner: "add those to the pre saved ones we can share"): the
+  owner's saved Classical Vibe, Mushy Mushy and Soapy Mess ship as house looks (`src/presetsOwner.ts`,
+  laid last in `presetsLay.ts` since they carry their cords), read from the Mac app's show server as
+  each played. Changed from the saved look: Soapy Mess's trapped air off (33q-4) and its two music
+  hands wired to nothing taken out; Mushy Mushy's Turbulence 0.99 to 0.8 so its music stir has
+  room to move (`npm run soundpatch` found both), its name capitalised. Their dyes are picks (44k-19 says why); the owner judges them.
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the
