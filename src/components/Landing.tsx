@@ -98,7 +98,7 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
     price: 'In your browser',
     lines: [
       'Every look, tool and liquid',
-      'Sound, MIDI and the Design desk',
+      'Sound, MIDI and the live desk',
       'One projector',
       'Clips up to 15 seconds, with a small corner mark',
     ],
@@ -157,12 +157,12 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       className="fixed inset-0 z-40 overflow-y-auto overflow-x-hidden bg-bg font-sans text-text"
     >
       {/* Hero */}
-      <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
+      <section className="relative isolate flex min-h-[62svh] sm:min-h-[68svh] flex-col overflow-hidden">
         <HeroLoop />
         <div
           aria-hidden="true"
           className="absolute inset-0 -z-10"
-          style={{ background: 'linear-gradient(to bottom, rgba(10,10,11,0.55) 0%, rgba(10,10,11,0.2) 35%, rgba(10,10,11,0.75) 80%, #0a0a0b 100%)' }}
+          style={{ background: 'linear-gradient(to bottom, rgba(10,10,11,0.35) 0%, rgba(10,10,11,0.22) 40%, rgba(10,10,11,0.72) 82%, #0a0a0b 100%)' }}
         />
 
         <header className="mx-auto flex w-full max-w-[1120px] items-center justify-between px-4 pb-2 pt-[max(16px,env(safe-area-inset-top))] sm:px-8">
@@ -193,7 +193,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           </div>
         </header>
 
-        <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col justify-end px-4 pb-[max(32px,env(safe-area-inset-bottom))] pt-16 sm:px-8 sm:pb-16">
+        <div className="mx-auto my-auto flex w-full max-w-[1120px] flex-col px-4 py-12 sm:px-8 sm:py-16">
           <h1 className="max-w-[16ch] text-[clamp(38px,9vw,72px)] font-semibold leading-[1.04] tracking-[-0.025em]">
             A liquid light show you play to your music.
           </h1>
