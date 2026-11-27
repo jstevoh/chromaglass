@@ -1030,6 +1030,7 @@ export function PhoneStage(p: PhoneStageProps) {
                   return (
                     <div key={l.id} className="flex items-center gap-1">
                     <LookChip
+                      key={l.id}
                       lookId={l.id}
                       name={l.name}
                       swatch={l.swatch}
