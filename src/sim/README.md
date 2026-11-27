@@ -13,6 +13,7 @@ the component.
   `dropGpu`, `syncFromGpu`). `oilPending` (`wait.pending` via `mixWait.ts` or `owed.pending` via `solverLay.ts`) says whether a look's oil waits for that solver, which the show asks before it builds its pipelines (`gpu/opening.ts`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
+  `FrameView.shutters` (optional) carries the projectors' shutter vanes from the stage clocks (PLAN 51a).
 - `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom (`macroZoomOf`, the Macro Zoom alone since PLAN QA-32c: `macroMode` no longer floors it at 4x; `MACRO_PRESET_ZOOM`, what a flag-only saved look or stage is given), Turing's rates, the currents.
 
 ## Contracts

@@ -211,6 +211,25 @@ its frame rate live. "Free" means no new passes or texture reads.
     the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
     radial flow (the pressed rings in the picture). A staggered grid takes all three,
     and `dampGrid`'s job.
+    **The third, shipped** (2026-11-27): the squaring was the carry's corner, not the
+    grid's storage. The faces moved each axis's share from the same old colour at once,
+    so a diagonal flow spread colour across itself as well as along (½|u_x|Δx along x
+    plus ½|u_y|Δx along y). The thin gap's carries now take Colella's corner transport
+    (`ACROSS` in `wgsl/fluid/carry.ts`, `cornered` in `wgsl/fluid.ts`); the old plate
+    keeps its faces. `npm run gridiso` (lab, 128², a thin ring turned by a solid swirl):
+    the fourfold part of the width it gained 0.331 → 0.218, the width gained 0.353 →
+    0.273 cells, colour +0.088% from the half-float floor on that fast ring (0.000% at
+    `dyeedge`'s speed). *Open:* the first, the checkerboard. The cell keeps its own
+    predicted velocity (hsGradient writes c·u*_cell − M∇p/h), and the faces see only the
+    mean of two cells' u*, so a checkerboard in u* is a null mode the solve never sees.
+    Rebuilding the cell from its two faces' whole flux takes it out, but filters every
+    step's state [1 2 1] (a damping of 0.85 a step at eight cells), too much for water's
+    inertia. The real one: keep the face fluxes as the state (a texture hsGradient
+    writes), predict each face from its last flux plus the mean of the step's force
+    increments at its two cells, and read the cell as the mean of its faces; then
+    `thinFaceVel` is one load, not a dozen. Measure with a checkerboard laid in u* and
+    the rim of a floored dent (`npm run grating`-style), and the remaining fourfold
+    part in `gridiso`.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
