@@ -102,7 +102,7 @@ export function LookChip({ lookId, name, swatch, size = 40, state = 'idle', titl
         className={`block h-full w-full overflow-hidden rounded-full transition-shadow duration-[120ms] [-webkit-touch-callout:none] select-none ${ring} ${hit ? MIDI_HIT : ''} ${dim ? 'opacity-40' : ''}`}
         style={{ background: swatch }}
       >
-        {still && <img src={still} loading="lazy" alt="" draggable={false} className="block h-full w-full object-cover" />}
+        {still && <ChipImage src={still} />}
         {/* The name in the chip's own text, for a screen reader and for anything that reads the list (the checks, the remote's DOM): drawn only on hover or a hold. */}
         <span className="sr-only">{name}</span>
       </button>
@@ -123,7 +123,18 @@ export function LookPicture({ lookId, swatch, size = 36 }: { lookId: string | nu
   const still = useLookThumb(lookId);
   return (
     <span aria-hidden className="inline-block shrink-0 overflow-hidden rounded-full ring-1 ring-white/10" style={{ width: size, height: size, background: swatch }}>
-      {still && <img src={still} loading="lazy" alt="" draggable={false} className="block h-full w-full object-cover" />}
+      {still && <ChipImage src={still} />}
     </span>
   );
+}
+
+/**
+ * The picture itself, gone if it will not load, so the swatch behind it shows
+ * instead of a broken-image mark: a look shipped before its still is rendered
+ * (`npm run lookstills`), or a build served without `public/looks/`.
+ */
+function ChipImage({ src }: { src: string }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (failed === src) return null;
+  return <img src={src} loading="lazy" alt="" draggable={false} onError={() => setFailed(src)} className="block h-full w-full object-cover" />;
 }
