@@ -36,7 +36,9 @@
  * Asked:
  *   1. the ring turned and kept its colour: total within KEPT (a flux makes
  *      and loses nothing; the floor for a half float's rounding is all that
- *      can add), and it widened at all (else 2 measures nothing);
+ *      can add), and it gained over GAIN_LEAST cells² of variance (about half
+ *      of the 1.08 the corner leaves; main 1.43), so a swirl that barely
+ *      turned it, which would widen it evenly by doing nothing, fails here;
  *   2. the ring widened evenly: the fourfold part of its gained variance
  *      under RING4 (between main's 0.331 and the corner's 0.218);
  *   3. the ring stayed sharp: its mean width grew by under WIDEN cells (main
@@ -44,10 +46,13 @@
  *      blur);
  *   4. the window is round and its collar even: both fourfold parts under
  *      ROUND (a guard on 18c-8: a carry that squares a source shows here).
+ *      A guard, not a fix's proof: main reads under it too, and it has not
+ *      been seen red; the ring is what the corner transport moved.
  */
 import { openLab } from './lab.mjs';
 
 const KEPT = 0.002;
+const GAIN_LEAST = 0.5;
 const RING4 = 0.27;
 const WIDEN = 0.33;
 const ROUND = 0.02;
@@ -66,12 +71,15 @@ try {
     const harm = (v, k) => {
       let c = 0, s = 0, m = 0;
       for (let i = 0; i < v.length; i++) { const a = (2 * Math.PI * i) / v.length; c += v[i] * Math.cos(k * a); s += v[i] * Math.sin(k * a); m += v[i]; }
+      // A part over a mean of nothing (a ring that sharpened, a channel read wrong) is no reading.
+      if (!(m > 0)) throw new Error(`no mean to measure a fourfold part against (${m})`);
       return (Math.hypot(c, s) * 2) / m;
     };
     const out = {};
     {
       const N = 128, STEPS = 200, OMEGA = 6, R0 = 0.25, HALF = 0.025, B = 32;
       const look = lab.look('galaxy').settings;
+      for (const key of ['globalSpeed', 'advection', 'diffusionRate']) if (typeof look[key] !== 'number') throw new Error(`Galaxy has no ${key}`);
       const DT = look.globalSpeed * 0.2;
       const over = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, dt: DT, advection: look.advection, diff: look.diffusionRate };
       await lab.create(N, N);
@@ -136,7 +144,7 @@ try {
   const f = (v, d = 3) => v.toFixed(d);
   console.log(`   ring: variance gained ${f(ring.gain)} cells², width +${f(ring.widen)} cells, fourfold part ${f(ring.four)}, colour ${f(100 * ring.kept, 3)}%`);
   console.log(`   window: radius ${f(win.R, 1)} cells, fourfold part of its radius ${f(win.rad4, 4)}, of its collar ${f(win.col4, 4)}`);
-  check(`1. the ring turned and kept its colour to ${KEPT * 100}%, and widened`, Math.abs(ring.kept) < KEPT && ring.gain > 0.05, `${f(100 * ring.kept, 3)}%, ${f(ring.gain)} cells²`);
+  check(`1. the ring turned and kept its colour to ${KEPT * 100}%, and widened`, Math.abs(ring.kept) < KEPT && ring.gain > GAIN_LEAST, `${f(100 * ring.kept, 3)}%, ${f(ring.gain)} cells²`);
   check(`2. the ring widened evenly: the fourfold part of its gain under ${RING4}`, ring.four < RING4, f(ring.four));
   check(`3. the ring stayed sharp: its width grew under ${WIDEN} cells`, ring.widen < WIDEN, f(ring.widen));
   check(`4. the window opened round, its radius's and its collar's fourfold parts under ${ROUND}`, win.opened && win.rad4 < ROUND && win.col4 < ROUND, `${f(win.rad4, 4)}, ${f(win.col4, 4)}`);

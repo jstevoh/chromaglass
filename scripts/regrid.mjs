@@ -45,11 +45,14 @@
  *   5. the two reactions (the BZ waves, the Liesegang gel) come across as
  *      they were, value for value: their grids are the same size on every
  *      solver
- *   7. the poured liquids (PLAN 18d-10): a bottle of glycerine's species
- *      and a nonpolar oil's drop (its sign in liquids1.b, 15e-13) come
- *      across a move down a rung in the same amounts, each channel to 1%,
- *      after five thin-gap steps that keep nine tenths of the oil's
- *      nonpolar sign (the carries' floor took all of it before the split);
+ *   7. the poured liquids (PLAN 18d-10): a bottle of glycerine's species,
+ *      a nonpolar oil's drop (its sign in liquids1.b, 15e-13) and a drop of
+ *      soap, body, repel and weight come across a move down a rung (192² to
+ *      128²) in the same amounts, each channel to 1% and its middle within a
+ *      coarse cell, after three thin-gap steps that keep nine tenths of the
+ *      oil's nonpolar sign (the carries' floor took all of it before the
+ *      split), with the last bottle's tension and density, and the new
+ *      solver carries them on three steps;
  *      the same move with nothing handed over loses them (the control: what
  *      the governor did to every poured liquid before)
  *   6. a carry offered to a solver on another device (as after a lost one)
@@ -258,36 +261,62 @@ try {
     + `the gel ${li0?.n}², ${sameAs(li0, li1) ? 'identical' : 'changed'}; live on the new solver: BZ ${chemLive.rxn}, gel ${chemLive.lies}`);
 
   // ── 7. The poured liquids (PLAN 18d-10) ──────────────────────────────
-  // A bottle of glycerine into the species and a nonpolar, light oil's drop
-  // into the forces' fields (its polarity in liquids1.b and its lightness in
-  // .g, 15e-13), then the governor's move down a rung. Read at the lab's own
-  // grid (L), so both sides are summed over the same cells.
+  // A bottle of glycerine into the species, a nonpolar, light oil's drop
+  // (its polarity in liquids1.b and its lightness in .g, 15e-13) and a drop
+  // of soap, body, repel and weight (liquids0's four) into the forces'
+  // fields, each off both axes, so a field laid back transposed or shifted
+  // moves its middle. Three thin-gap steps carry them first, then the
+  // governor's move down a rung, then three more on the new solver. Read at
+  // the lab's own grid (L), so both sides are summed over the same cells.
+  // At 192² and 128², where SwiftShader steps a thin gap in seconds.
+  const THIN = { thinGap: 1, gapThickness: 0.45 };
   const pourLiquids = () => page.evaluate(async () => {
-    lab.addSpecies(0.45, 0.5, 0.08, 1, 'glycerine');
-    lab.solver().addLiquidDrop(0.58, 0.5, 0.06, { polarity: -0.9, weight: -0.2 }, 1);
+    lab.addSpecies(0.42, 0.38, 0.08, 1, 'glycerine');
+    lab.solver().addLiquidDrop(0.6, 0.63, 0.06, { polarity: -0.9, weight: -0.2 }, 1);
+    lab.solver().addLiquidDrop(0.36, 0.66, 0.06, { soap: 0.5, body: 1, repel: 0.4, weight: 0.3 }, 1);
   });
-  const sums = (d) => { const t = [0, 0, 0, 0]; for (let i = 0; i < d.length; i += 4) for (let c = 0; c < 4; c++) t[c] += d[i + c]; return t; };
-  const liquids = async () => ({ sp: sums(await page.evaluate(() => lab.field('species'))), l1: sums(await page.evaluate(() => lab.field('liquids1'))) });
-  await page.evaluate(() => lab.create(384));
+  // Each channel's total and its middle (x, y in cells of L).
+  const sums = (d) => {
+    const L = Math.round(Math.sqrt(d.length / 4)), t = [0, 0, 0, 0], mx = [0, 0, 0, 0], my = [0, 0, 0, 0];
+    for (let k = 0; k < L * L; k++) for (let c = 0; c < 4; c++) { const v = d[k * 4 + c]; t[c] += v; mx[c] += v * (k % L); my[c] += v * Math.floor(k / L); }
+    return { t, at: t.map((w, c) => (w > 0 ? [mx[c] / w, my[c] / w] : null)), L };
+  };
+  const liquids = async () => ({
+    sp: sums(await page.evaluate(() => lab.field('species'))),
+    l0: sums(await page.evaluate(() => lab.field('liquids0'))),
+    l1: sums(await page.evaluate(() => lab.field('liquids1'))),
+    poured: await page.evaluate(() => lab.solver()['speciesPoured']),
+  });
+  await page.evaluate(() => lab.create(192));
   await pourLiquids();
   const lq0 = await liquids();
-  await page.evaluate(() => lab.regrid(256, false));
+  await page.evaluate(() => lab.regrid(128, false));
   const lqCtl = await liquids();
-  await page.evaluate(() => lab.create(384));
+  await page.evaluate(() => lab.create(192));
   await pourLiquids();
   const lqLaid = await liquids();
-  // Carried a few thin-gap steps first: the carries floor every field at zero (15e-13).
-  await page.evaluate(() => lab.step(5, { thinGap: 1, gapThickness: 0.45 }));
+  await page.evaluate((t) => lab.step(3, t), THIN);
   const lqA = await liquids();
-  await page.evaluate(() => lab.regrid(256));
+  await page.evaluate(() => lab.regrid(128));
   const lqB = await liquids();
-  const kept = (a, b) => a > 1e-3 && Math.abs(b / a - 1) < 0.01;
-  check('the poured liquids come across: the species\' share and viscosity, the oil\'s lightness and its nonpolar sign, each to 1%; the control loses them',
-    kept(lqA.sp[0], lqB.sp[0]) && kept(lqA.sp[1], lqB.sp[1]) && kept(lqA.l1[1], lqB.l1[1]) && kept(lqA.l1[2], lqB.l1[2])
-      && lqA.l1[2] > 0.9 * lqLaid.l1[2] && lqLaid.l1[2] > 1e-3
-      && Math.abs(lq0.sp[0] / lqLaid.sp[0] - 1) < 1e-3 && lqCtl.sp[0] < 1e-3 * lq0.sp[0] && lqCtl.l1[2] < 1e-3 * lq0.l1[2],
-    `species share ${lqA.sp[0].toFixed(2)} → ${lqB.sp[0].toFixed(2)}, its Σ share·lnν ${lqA.sp[1].toFixed(2)} → ${lqB.sp[1].toFixed(2)}; `
-      + `lightness ${lqA.l1[1].toFixed(2)} → ${lqB.l1[1].toFixed(2)}, nonpolar ${lqLaid.l1[2].toFixed(2)} laid, ${lqA.l1[2].toFixed(2)} after five carried steps, ${lqB.l1[2].toFixed(2)} moved; with nothing handed over ${lqCtl.sp[0].toFixed(3)} and ${lqCtl.l1[2].toFixed(3)}`);
+  await page.evaluate((t) => lab.step(3, t), THIN);
+  const lqC = await liquids();
+  // Each channel named: its total to 1% and its middle within a coarse cell (L/128 lab cells) across the move.
+  const named = [['sp', 0], ['sp', 1], ['l0', 0], ['l0', 1], ['l0', 2], ['l0', 3], ['l1', 1], ['l1', 2]];
+  const coarse = lqA.sp.L / 128;
+  const keptAll = named.every(([f, c]) => {
+    const a = lqA[f], b = lqB[f];
+    return a.t[c] > 1e-3 && Math.abs(b.t[c] / a.t[c] - 1) < 0.01 && Math.hypot(b.at[c][0] - a.at[c][0], b.at[c][1] - a.at[c][1]) < coarse;
+  });
+  const worst = Math.max(...named.map(([f, c]) => Math.abs(lqB[f].t[c] / lqA[f].t[c] - 1)));
+  const playsOn = named.every(([f, c]) => lqC[f].t[c] > 0.9 * lqB[f].t[c]);
+  const pouredKept = !!lqA.poured && !!lqB.poured && lqB.poured.sigma === lqA.poured.sigma && lqB.poured.rho === lqA.poured.rho;
+  const lost = lqCtl.sp.t[0] < 1e-3 * lq0.sp.t[0] && lqCtl.l0.t[1] < 1e-3 * lq0.l0.t[1] && lqCtl.l1.t[2] < 1e-3 * lq0.l1.t[2];
+  check('the poured liquids come across: the species, all four of liquids0\'s and the oil\'s lightness and nonpolar sign, each to 1% and within a coarse cell of where they were, the last bottle\'s tension and density, and they play on; the control loses them',
+    keptAll && playsOn && pouredKept && lost && lqA.l1.t[2] > 0.9 * lqLaid.l1.t[2] && lqLaid.l1.t[2] > 1e-3,
+    `species share ${lqA.sp.t[0].toFixed(2)} → ${lqB.sp.t[0].toFixed(2)}, body ${lqA.l0.t[1].toFixed(2)} → ${lqB.l0.t[1].toFixed(2)}, worst channel off by ${(100 * worst).toFixed(3)}%; `
+      + `nonpolar ${lqLaid.l1.t[2].toFixed(2)} laid, ${lqA.l1.t[2].toFixed(2)} after three carried steps, ${lqB.l1.t[2].toFixed(2)} moved, ${lqC.l1.t[2].toFixed(2)} three steps on; `
+      + `tension ${lqA.poured?.sigma ?? 'none'} → ${lqB.poured?.sigma ?? 'none'}; with nothing handed over ${lqCtl.sp.t[0].toFixed(3)}, ${lqCtl.l0.t[1].toFixed(3)} and ${lqCtl.l1.t[2].toFixed(3)}`);
 
   // ── 6. Another device's carry ────────────────────────────────────────
   await page.evaluate(() => lab.create(384));
