@@ -456,7 +456,11 @@ export class FluidFields extends FluidCore {
   get grainTexture(): GPUTexture | null { return this.grain?.read ?? null; }
 
   /** The print stops: the plate shows the solver's dye alone again (no reaction on the plate, or a look that does not print). */
-  endPrint(): void { this.printLive = false; }
+  endPrint(): void {
+    if (!this.printLive) return;
+    this.printLive = false;
+    this.reads.wroteOne();
+  }
 
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {

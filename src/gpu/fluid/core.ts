@@ -886,6 +886,9 @@ export class FluidCore {
 
   protected readonly reads = new ReadGate();
 
+  /** Count of submits that may have changed a field (`ReadGate`), for `WebGPUPlate.draw` to skip unchanged layers (H2c-9). */
+  get fieldWrites(): number { return this.reads.writes; }
+
   /** A submit that may change a field: counted, so the next readback reads it. */
   protected submit(enc: GPUCommandEncoder): void {
     this.device.queue.submit([enc.finish()]);

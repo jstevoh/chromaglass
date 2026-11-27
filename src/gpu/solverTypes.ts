@@ -470,6 +470,8 @@ export interface PlateSolver {
   readonly rbDyeIssued: number;
   readonly rbDyeLanded: number;
   readonly rbVelView: Float32Array;
+  /** Count of submits that may have changed a field (`ReadGate`), for `WebGPUPlate.draw` to skip packing unchanged layers (H2c-9). */
+  readonly fieldWrites?: number;
   /** The fields as the CPU last saw them, for carrying state across a change. */
   readback(): { dye: Float32Array; vel: Float32Array };
   drainStep(t: number): void;

@@ -42,6 +42,34 @@ interface LayerTargets {
   dye: GPUTexture;
   vel: GPUTexture;
   derived: GPUTexture;
+  /** The `writes` count last packed into `dye`/`vel`, or undefined when unpacked or unkeyed. */
+  packedWrites?: number;
+  /** The source textures and Oil Bodies mode last packed, so a swapped solver or mode still repacks. */
+  packedDye?: GPUTexture;
+  packedVel?: GPUTexture;
+  packedSpecies?: GPUTexture | null;
+  packedBodies?: boolean;
+}
+
+/** One layer's fields passed to `WebGPUPlate.draw`, `drawSource`, and `display`. */
+export interface PlateFieldEntry {
+  dye: GPUTexture;
+  velForced: GPUTexture;
+  grain: GPUTexture | null;
+  particles: GPUTexture | null;
+  air: GPUTexture | null;
+  airGeo?: AirGeo | null;
+  view: GPUTexture | null;
+  species?: GPUTexture | null;
+  soapFilm?: { h: GPUBuffer } | null;
+  tank?: TankPlateField | null;
+  faraday?: FaradayField | null;
+  glow?: { light: GPUBuffer } | null;
+  oilDye?: GPUTexture | null;
+  mix?: GPUTexture | null;
+  coverMetres?: number;
+  /** Caller's write count (`WebGPUFluid.fieldWrites`); absent packs every frame. */
+  writes?: number;
 }
 
 /** A picture the plate is given each frame: the mark, the film, the beads. */
@@ -183,6 +211,8 @@ export class WebGPUPlate {
   readonly glint: PlateGlint;
 
   private layers: LayerTargets[] = [];
+  /** Whether layer 0's `vel` was last packed by `packVelDrop`, so toggling it on or off repacks. */
+  private packedDrop = false;
   private sources = new Map<string, Source>();
   private aux: GPUTexture | null = null;
   private auxSize = [0, 0];
@@ -312,6 +342,8 @@ export class WebGPUPlate {
 
   /** Targets for `count` layers at grid `size`, reallocated when either changes. */
   private ensureLayers(count: number, size: number): void {
+    const countChanged = this.layers.length !== count;
+    let sizeChanged = false;
     while (this.layers.length > count) {
       const l = this.layers.pop()!;
       for (const t of [l.dye, l.vel, l.derived]) this.disposer.release(t);
@@ -319,6 +351,7 @@ export class WebGPUPlate {
     for (let i = 0; i < count; i++) {
       const have = this.layers[i];
       if (have && have.size === size) continue;
+      sizeChanged = true;
       if (have) for (const t of [have.dye, have.vel, have.derived]) this.disposer.release(t);
       const tex = (label: string, format: GPUTextureFormat, usage: number) => this.disposer.track(this.device.createTexture({
         label: `${label} ${i}`, size: [size, size], format, usage,
@@ -330,6 +363,9 @@ export class WebGPUPlate {
         // COPY_SRC so npm run derive can read where the slopes were found.
         derived: tex('derived', 'rgba16float', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
       };
+    }
+    if (countChanged || sizeChanged) {
+      for (const l of this.layers) l.packedWrites = undefined;
     }
   }
 
@@ -412,7 +448,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: PlateFieldEntry[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -453,7 +489,6 @@ export class WebGPUPlate {
     }
 
     // ── Pack ────────────────────────────────────────────────────────
-    const packPass = encoder.beginComputePass({ label: 'pack' });
     const groups = Math.ceil(grid / 8);
     /*
       The ferrofluid drop's surface (PLAN §29a), on the lead plate only (the
@@ -464,42 +499,84 @@ export class WebGPUPlate {
     const leadView = fields[0].view;
     const dropWanted = !!leadView && leadView.width === grid
       && FerroDrop.wanted(this.pack.get('macroOn')[0], this.pack.get('macroRelief')[0], this.pack.get('phaseAmount')[0]);
-    const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres) : null;
     if (!dropWanted) this.drop.cool();
+    const dropPipe = dropWanted ? this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop) : null;
+
+    // Pack a layer only when its `writes` differs from the one last packed
+    // into its targets, or is absent (unkeyed callers such as lab.render pack
+    // every frame). Rebuilding layer targets or toggling `packVelDrop` clears
+    // `packedWrites` so every layer repacks.
+    const needsPack = (i: number): boolean => {
+      const f = fields[i];
+      const l = this.layers[i];
+      if (f.writes === undefined) return true;
+      const bodies = !!(f.oilDye && f.mix && f.oilDye.width === f.dye.width && f.mix.width === f.dye.width);
+      return f.writes !== l.packedWrites
+        || f.dye !== l.packedDye
+        || f.velForced !== l.packedVel
+        || (f.species ?? null) !== l.packedSpecies
+        || bodies !== l.packedBodies;
+    };
+    let anyNeedsPack = false;
     for (let i = 0; i < fields.length; i++) {
-      const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
-      if (pipeVel) {
-        packPass.setPipeline(pipeVel);
-        packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].dye, this.layers[i].dye, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
-        packPass.dispatchWorkgroups(groups, groups);
+      if (needsPack(i)) { anyNeedsPack = true; break; }
+    }
+
+    if (dropWanted || this.packedDrop || anyNeedsPack) {
+      const packPass = encoder.beginComputePass({ label: 'pack' });
+      const height = dropWanted
+        ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres)
+        : null;
+      const dropActive = !!(height && dropPipe);
+      if (dropActive !== this.packedDrop) {
+        for (const l of this.layers) l.packedWrites = undefined;
+        this.packedDrop = dropActive;
       }
-      /*
-        Where the oil carries its own colour (Oil Bodies), a cell part oil
-        and part water lets through the two liquids' light side by side, not
-        one through the other (packDyeBodies, PLAN 47z-1). The oil's share
-        and the mix are on the dye's grid (bodyPartition reads all three).
-      */
-      const { oilDye, mix } = fields[i];
-      const bodies = !!oilDye && !!mix && oilDye.width === fields[i].dye.width && mix.width === fields[i].dye.width;
-      if (bodies) {
-        const pipeDye = this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies);
-        if (pipeDye) {
-          packPass.setPipeline(pipeDye);
-          packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, oilDye!, mix!, this.layers[i].dye]));
+      for (let i = 0; i < fields.length; i++) {
+        if (!needsPack(i)) continue;
+        const f = fields[i];
+        const l = this.layers[i];
+        const { oilDye, mix } = f;
+        const bodies = !!(oilDye && mix && oilDye.width === f.dye.width && mix.width === f.dye.width);
+        const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
+        if (pipeVel) {
+          packPass.setPipeline(pipeVel);
+          packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, f.dye, l.dye, f.velForced, l.vel, f.species ?? this.blankSpecies]));
           packPass.dispatchWorkgroups(groups, groups);
         }
+        /*
+          Where the oil carries its own colour (Oil Bodies), a cell part oil
+          and part water lets through the two liquids' light side by side, not
+          one through the other (packDyeBodies, PLAN 47z-1). The oil's share
+          and the mix are on the dye's grid (bodyPartition reads all three).
+        */
+        let pipeDye: GPUComputePipeline | null = null;
+        if (bodies) {
+          pipeDye = this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies);
+          if (pipeDye) {
+            packPass.setPipeline(pipeDye);
+            packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, f.dye, oilDye!, mix!, l.dye]));
+            packPass.dispatchWorkgroups(groups, groups);
+          }
+        }
+        if (pipeVel && (!bodies || pipeDye)) {
+          l.packedWrites = f.writes;
+          l.packedDye = f.dye;
+          l.packedVel = f.velForced;
+          l.packedSpecies = f.species ?? null;
+          l.packedBodies = bodies;
+        } else {
+          l.packedWrites = undefined;
+        }
       }
-    }
-    if (height) {
-      const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
-      if (pipe) {
-        packPass.setPipeline(pipe);
-        packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
+      if (dropActive) {
+        packPass.setPipeline(dropPipe!);
+        packPass.setBindGroup(0, groupOf(this.device, dropPipe!, [this.packArgs, fields[0].velForced, height!, leadView!, this.layers[0].vel]));
         packPass.dispatchWorkgroups(groups, groups);
         this.drop.notePackedVel(this.layers[0].vel);
       }
+      packPass.end();
     }
-    packPass.end();
 
     // ── Derive ──────────────────────────────────────────────────────
     const derive = this.pipelines.renderPipeline('derive', deriveRecipe(this.device));
@@ -584,7 +661,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: PlateFieldEntry[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -619,7 +696,7 @@ export class WebGPUPlate {
     uniforms: GPUBuffer,
     /** What `uniforms` was written from: which of the display's effects this draw turns on. */
     bytes: ArrayBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: PlateFieldEntry[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -705,5 +782,6 @@ export class WebGPUPlate {
     this.disposer.dispose();
     this.sources.clear();
     this.layers = [];
+    this.packedDrop = false;
   }
 }

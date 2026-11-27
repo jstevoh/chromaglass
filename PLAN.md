@@ -255,9 +255,8 @@ The owner's hunt (2026-11-09) takes this wave's written items to Antigravity und
   `docs/plan-shipped.md` §14aa.
 - **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
-- **4.3** **14j with H2c-9** and ~~**14b-120**~~ (M): a draw cap, readbacks only after a step, pack only
-  after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa; **14b-120** shipped, `npm run rungs`: 60.0 to 60.0/s over ten phases; story in `docs/plan-shipped.md`.)
-  H2c-9's owed line is in `npm run framereads` (2026-11-07): Antigravity-ready on its own.
+- **4.3** **14j** with ~~**H2c-9**~~ (shipped) and ~~**14b-120**~~ (M): a draw cap, readbacks only after a step, ~~pack only
+  after a step~~ (shipped: `npm run framereads` 30 of 60 frames packed with 30 dispatches on 30 steps against main's 60 and 240; story in `docs/plan-shipped.md`), a heat-aware governor. (The governor's doubling retry shipped with 14aa; **14b-120** shipped, `npm run rungs`: 60.0 to 60.0/s over ten phases; story in `docs/plan-shipped.md`.)
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
   video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
@@ -449,7 +448,7 @@ and to mark shipped, and the others now point to it.
 | Source maps, `CRASH_GPU` | 19d, 19c | `docs/crash-plan.md` |
 | The song-ID Worker | 14o | `docs/crash-plan.md` |
 | The show kit | rig R5 (R5-kit) | §13 |
-| Draw cap, pack and read back after a step | 14j | 14b, H2c-9 |
+| Draw cap, pack and read back after a step | 14j | 14b, ~~H2c-9~~ |
 | Probe pixels and timestamp labels | 14r, H2c-labels | |
 | Mixed versions at the projector | 14p | 14k |
 | The checks red on trees they do not measure | Wave 0's list | §0, §11, 19h |
@@ -568,7 +567,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 12 |
 | 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 33 |
 | 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 8 |
-| 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46a **shipped**; 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46r, one args name one value a step, **shipped** (`npm run argnames`); 46b H2c-5, H2c-8 **shipped**; 46b-46e builds to Antigravity after its queue; the audit of 2026-11-13: 46f (the ear's view and the clock out of the shell), 46g (liquids carried only once poured) and 46k (`dyeDisperse` gated on its own coefficients) **shipped**, 46h-46j, 46l-46q, 46s and 46t written | 17 |
+| 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46a **shipped**; 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46r, one args name one value a step, **shipped** (`npm run argnames`); 46b H2c-5, H2c-6, H2c-7, H2c-8, H2c-9 **shipped**; 46b-46e builds to Antigravity after its queue; the audit of 2026-11-13: 46f (the ear's view and the clock out of the shell), 46g (liquids carried only once poured) and 46k (`dyeDisperse` gated on its own coefficients) **shipped**, 46h-46j, 46l-46q, 46s and 46t written | 17 |
 | 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 44 |
 | 48 | Ideas: more compelling visuals from real phenomena (brainstormed 2026-11-21) | [`48-ideas-visuals.md`](docs/plan/48-ideas-visuals.md) |  | 15 |
 | 49 | Usability against Nielsen's ten heuristics: undo, fit, one name for one thing (asked 2026-11-26) | [`49-usability-review.md`](docs/plan/49-usability-review.md) | 49a–49l (~~49a~~ **shipped (#964)**, 49c **shipped (#963)**, 49g **shipped (#970)**, 49k **shipped (#982)**) | 24 |

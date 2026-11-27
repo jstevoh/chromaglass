@@ -36,7 +36,7 @@ export class FluidReads extends FluidInputs {
       pass.end();
     });
     if (clears !== this.speciesClears) { this.speciesSnap = null; return 0; }
-    if (share < 1e-6 && pours === this.speciesQuiet) { this.speciesLive = false; this.speciesSnap = null; return share; }
+    if (share < 1e-6 && pours === this.speciesQuiet) { this.speciesLive = false; this.speciesSnap = null; this.reads.wroteOne(); return share; }
     const data = this.shareRead.data;
     this.speciesSnap = data && this.speciesPoured ? { L: this.L, data, poured: this.speciesPoured } : null;
     return share;
