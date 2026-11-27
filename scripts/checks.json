@@ -3173,6 +3173,18 @@
       ]
     },
     {
+      "name": "Lava Pop's colour stays in its dish",
+      "shard": "lab",
+      "run": "npm run rimdye",
+      "timeout": 15,
+      "why": [
+        "Lava Pop left running (PLAN 18a-23): Oil Bodies' colour levelling read",
+        "the cells past the open rim as neighbours, and they are cleared every",
+        "step, so the water's colour seeped over the rim and was wiped there;",
+        "it now stops at the rim, as the dye's dispersion and the oil's do."
+      ]
+    },
+    {
       "name": "The rock lifts the oil, not the frame",
       "shard": "plate",
       "run": "npm run oillift",

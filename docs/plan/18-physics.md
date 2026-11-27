@@ -353,6 +353,34 @@ its frame rate live. "Free" means no new passes or texture reads.
     look's first seconds, until hsLiftSource and hsLiftRelax are built, still lay the weight
     into the open rim; widen the wait if `npm run startup` has the slack. A Blow's breath is local
     and stays open: its liquid comes back.
+  - **18a-23, Lava Pop's dye leaks out with nothing driving it: shipped** (2026-11-27; the
+    owner: "I left it going and the plate just emptied eventually"). Measured on the owner's
+    Mac on main: 4–5% of the dish's dye every 120 s, the same with Evaporation, Air and Plate
+    Rock each at 0. In the lab (Lava Pop's own step from the app's deriveStep, the app's own
+    lay of its oil cells and water, 128²) the press, centre gravity, vibration and buoyancy
+    each changed nothing; the oil did (0.36% gone in 400 steps with Oil Tension on, 0.02%
+    off). Liquid crossing the rim was not it: a trial pool past the rim that counted and gave
+    back every colour the step's carry moved over it took in 0.11 while the dish lost 121 in
+    600 steps. It was Oil Bodies' bodyPartition (each liquid's colour evened out across the
+    oil's edge, and colour astray drifting back to its own liquid down the oil's blur), which
+    read the cells past the rim as neighbours: they hold no oil and no colour, decayDye clears
+    them every step, and the water's colour at the rim levelled and drifted into them. Its
+    faces now stop at the rim, as dyeDisperse's and the oil's relaxation (18g-7) already did.
+    `npm run rimdye`: kept 98.851% → 99.967% in 600 steps (lost 121.0 → 3.4), Oil Bodies off
+    3.0; over 2400 lab steps 89.78% → 99.62%. Open: 18a-24.
+  - **18a-24, the rest of a still dish's loss, and the rim's exchange.** (a) With Oil Bodies
+    off, Lava Pop's lay still loses 0.03% in 600 lab steps (3 of 10534), not yet traced. A
+    candidate: gridFilter's three `pastRim` and slump's rim test count the radius only, so the
+    grid's own edge cells at the four compass points (inside r 0.5, cleared by decayDye as
+    `pastOpenRim` counts them) are still dish to those passes. (b)
+    The oil's surface tension drives a slow back and forth of liquid over the open rim (0.50
+    out against 0.54 in round the ring, lab units), whose colour is cleared going out and comes
+    back clear; it carries little now (the trial pool above), but a free meniscus would resist
+    it (the gap closing outward raises its suction), and the liquid round the cover glass is
+    the dish's own, so what comes back should carry what went out. A pool past the rim that
+    keeps it (tried here: a mixed ring of the meniscus's volume, π h / 4R of the dish) is the
+    model if it ever matters; Oil Bodies' own share past the rim (oilDye, never cleared there)
+    would have to be cleared with it, or bodyUnspread raises the dye to it.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
