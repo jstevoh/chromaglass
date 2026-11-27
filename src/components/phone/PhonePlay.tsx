@@ -101,7 +101,7 @@ export interface PhonePlayProps {
   onDye: (hex: string) => void;
   /** The app's hand: Play sets it from the tray and from the touch itself. */
   onTool: (t: PhoneTool) => void;
-  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'>;
+  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'> & Partial<Pick<VisualizerSettings, 'keepFull'>>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
@@ -538,6 +538,14 @@ export function PhonePlay(p: PhonePlayProps) {
                   }`}>
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.wandering ? 'bg-accent' : 'bg-muted'}`} />
                   <span className="truncate">Evolve</span>
+                </button>
+                {/* Keep full (PLAN 18a-22), the desk's switch beside Evolve: the dropper tops up a dish left running. */}
+                <button onClick={() => p.onSetting({ keepFull: !s.keepFull })} aria-pressed={!!s.keepFull} data-testid="play-keepfull"
+                  className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
+                    s.keepFull ? LIT : 'border-white/10 text-text-2'
+                  }`}>
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${s.keepFull ? 'bg-accent' : 'bg-muted'}`} />
+                  <span className="truncate">Keep full</span>
                 </button>
               </div>
               <div className="mt-3 flex gap-2 pb-1">

@@ -3086,3 +3086,18 @@ How the rings read with a moving liquid at sixty frames is only seen here.
    with still liquid.
 4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
 5. Dish Stress at 0: the look exactly as before.
+
+## 147. The video coming in: the camera's row, the LED ring, the camera poured (PLAN 14ag-9)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. On the desk, click the **Video** dot in the header. Good: the Video panel opens beside the
+   plate (not the Settings sheet), its source row on top.
+2. **Camera**. Good: right under the sources, a row with a small live picture of what the camera
+   sees, the camera's name, and "over the plate"; Plate lit. Bad: a file's name there, or no picture.
+3. **Lamp**, then **LED ring**. Good: Lamp puts the camera under the dish, filtered by the dye;
+   LED ring turns it round the plate's centre like the LED platform, at LED Rotation Speed
+   (Lamp & Light). Bad: the picture both over and under the glass, or a ring that does not turn.
+4. **Pour**. Good: the camera's picture laid into the dish as dye, its motion stirring the liquid,
+   the camera still on the plate; Stop ends only the pour; Off ends both.
+5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
+

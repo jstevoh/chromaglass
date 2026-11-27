@@ -252,7 +252,10 @@ export function luckyLook(
     saturationBoost: 1.0 + rand() * 0.8,
     dyeBudget: 0.4 + rand() * 0.6,
     edgeRelief: rand() * 0.8,
-    bubbles: rand() < 0.2 ? 0 : 0.2 + rand() * 0.8,
+    // Air one roll in five, and a few bubbles when it comes, not the plate
+    // full: a roll is not a look made for air (PLAN 33q-4). It was four in
+    // five at 0.2 to 1.
+    bubbles: rand() < 0.8 ? 0 : 0.1 + rand() * 0.2,
     plateRock: rand() * 0.9,
     layerScaleVariety: rand(),
     macroSync: rand(),
@@ -305,6 +308,7 @@ export function luckyLook(
     filmZoom: current.filmZoom,
     filmX: current.filmX,
     filmY: current.filmY,
+    filmRing: current.filmRing,
     glossiness: rand() < 0.8 ? 0 : rand() * 0.4,
     postBlurRadius: rand() * 0.7,
     // One roll in four goes closeup — a magnified chase is its own happy

@@ -381,6 +381,15 @@ export interface VisualizerSettings {
     until it melts into the show's first colour. Off keeps today's films.
   */
   logoMelt: boolean;
+  /*
+    Keep the dish full when it is left running (PLAN 18a-22, sim/keepFull.ts):
+    when the dish runs below the amount its look is made with, a hand tops it
+    up with the dropper, a real drop of the look's own bottle at a time where
+    it has gone pale, until it reads full. The room's switch, not a look's
+    (lookFade.ts RIG_KEYS), so a look change leaves it as it was. Off keeps
+    today's plate.
+  */
+  keepFull: boolean;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -876,6 +885,7 @@ export interface VisualizerSettings {
   filmZoom: number;           // the film's frame on the plate: 1 fills it (cover-fit), above crops in, below shows it smaller with black round it
   filmX: number;              // the film's frame slid across, in plate widths (0 centred)
   filmY: number;              // the film's frame slid up, in plate heights (0 centred)
+  filmRing: number;           // 1: the video is the spinning LED platform under the dish, turning with LED Rotation Speed (PLAN 14ag-9); 0 off
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -1118,6 +1128,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
   logoMelt: false,
+  keepFull: false,
   beatPrediction: 0.7,
   beatLead: 80,
   /*
@@ -1283,7 +1294,20 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   crispEdges: 0,            // off: the oil's edge drawn as the solver's band, as every look had it
   projectorFocus: 0.5,
   lacing: 0,
-  bubbles: 0.2,
+  /*
+    No trapped air unless the look asks for it (PLAN 33q-4, the owner's
+    choice, 2026-11-27: "too many bubbles in the looks"). Air is trapped
+    when a second glass is laid or pressed onto the liquid: the clock-glass
+    sandwich of a 1960s wet show, where the top glass closes over the water
+    and a press or a kick shuts pockets under it. An open dish, a gel, a
+    film in a frame or a reaction has no glass to close over the air, so
+    those looks carried 0.2 here by inheritance, not by choice. So the base
+    every look is laid on (LOOK_BASE in lib/lookFade.ts) has none, and the
+    four looks that are the sandwich ask for their own: Lava Pop, Oil &
+    Water, Clock Glass and Splodascope. The dial still turns it on in any
+    look, on the desk, the phone and MIDI. `npm run lookair` counts them.
+  */
+  bubbles: 0,
   bubbleMelt: 0,            // nature's rate: a pocket between the glasses stays (PLAN 38b)
   plateRock: 0.45,
   frameSway: 0,             // the frame holds still; the music moves the liquid (lib/plateRock.ts)
@@ -1372,6 +1396,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmZoom: 1,
   filmX: 0,
   filmY: 0,
+  // The video is not on the LED ring until someone puts it there (PLAN 14ag-9).
+  filmRing: 0,
   lampWarmth: 0,
   transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,

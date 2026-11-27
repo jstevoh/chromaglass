@@ -41,6 +41,9 @@ real, and the plate shader draws only what the solver makes.
 3. **Video as the lamp** (**14ag-3**, PR #899): any footage under the dish, seen through
    the liquid, refracted and coloured by the oil. A new source for every look. Shipped
    by PR #899; filmed on the owner's Mac 2026-11-14 (`docs/judging.md` §141).
+   **14ag-9** shipped (asked 2026-11-27): the camera's or window's own row with a live
+   preview, Plate / Lamp / LED ring / Pour for any input (the camera pours too), the video
+   on the spinning LED ring (`filmRing`), the Video dot opening the desk's panel (§147).
 4. **The liquid looks at a real show's pace** (**48q**): 25 of 33 liquid looks turn over
    several times slower than real shows, and the cause is the forcing, not the camera.
    The widest change on the list, since it touches most looks: work the liquid harder by
@@ -104,8 +107,13 @@ up (38w-27 and the bead and foam items); the ferrofluid (9aa, 9t, 38j); the new 
 the rest, one PR each. **Later**: the chemical clock (48a), air fingers and ferns (38r-16 G2,
 48d, 48u), thin-film rainbows (48e, §32), bubbles (38g-2, §33), tilt and spin (18a-13, §22),
 pressing the glass (38l, 38r-18), lace (§20), polarised extras (31p), the lens (38q, 31a), the
-tank (47n, 48k, 48l) and the other ideas (48m, 48o, 15h, 15k). The owner's open questions
-marked next (18d-5, 18d-6, 18d-7, 38m, linear light, 22l, 33q-4) are with the owner; the rest
+tank (47n, 48k, 48l) and the other ideas (48m, 48o, 15h, 15k). The owner's answers, 2026-11-27
+(decision cards): **18d-6** dyes in water mix as real dyes do, with a Hold Apart dial past real;
+**18d-7** milk blends like milk, no held edge; **18d-5** Surfactant Flow scales soap's real
+spreading strength (1 is real); **38m**, **38n-2** bubble films show their true interference
+colours, Iridescence a boost past real; **38p**, **18k** every look re-baselined for light added
+in linear light; **22l** the middle glass turned against the dish is built as a control;
+**33q-4** air bubbles are on by default only in looks made for them. The other open questions
 wait on their themes.
 
 **Parked this week, kept in the plan.** The launch, the stores and the money (§12, §23,
@@ -524,7 +532,7 @@ Where each batch stands, as of 2026-09-27:
 | 47 | The closeup as a macro photographer films liquid | Asked 2026-11-11 from a macro artist's site: the closeup magnifies a coarse grid where a macro camera films a small dish finely, so a fine window with the dye finer than the flow (47a, first its cheap half 47a-1), dark-field and Rheinberg lighting (47b), caustics past the linear shadowgraph (47j), threads that bead (47k), fluorescent dyes under a UV lamp (47c), depth of field from the gap's depth (47d), microbubble and mica sparkle (47e), a stir bar's vortex (47f), Marangoni drops on a thin layer (47g, the owner's call), time-lapse (47h), point lights through the beads (47i), a side view through a tank (47n, the owner's call; 47n-1 the tank shipped 2026-11-13), and a reference kit (47m), all proposed; the Microlab films themselves watched in the page 2026-11-13; **47e's glitter, 47d-1 the lens's discs and stars, 47b-1 a side lamp shipped** 2026-11-13 (`npm run glint`), 47b-2, 47b-3, 47d-2, 47e-1, 47e-2 found |
 | 48 | Visuals the music itself moves | 48f, Faraday waves (Shaker, Shake, the bass cord on it), **shipped** 2026-11-21 (`npm run faraday`, lab), written in §30 beside the cords; on the Mac not yet seen (judging §140); 48f-6 (Rock) and 48f-9 (the pattern moves: riding the flow, its mean flow, breaking, Strength) **shipped** 2026-11-21; 48f-2 to 48f-5, 48f-7, 48f-8, 48f-10 to 48f-12 open in §30. 48c, bioluminescent trails (Glow, Glow Shear, Glow Recharge: the water lights blue where a stroke shears it and tires), **shipped** 2026-11-21 (`npm run glow`, lab), written in §30 beside the cords; on the Mac not yet seen (judging §145). 48c-5, Night Sea, the look made for it, and 48c-6, the shaken dish's standing waves light the sea (the bass on Music Shake stands up the lattice, its strain fires the cells), **shipped** 2026-11-27 (`npm run glow` section 6; judging §145 step 6); 48c-1 to 48c-4, 48c-7, 48c-8 open in §30 |
 | 49 | Usability against Nielsen's ten heuristics | Review done 2026-11-26 (67 findings, Antigravity on the owner's Mac); ~~49a~~ **shipped (#964)** (8 s GPU/CPU Undo toast on resets & panel close, 3 s MIDI Clear confirm, Cues `Back`, duplicate save `Replace`/`Keep both`); **49b shipped (#962)** (`npm run layout`, `npm run phone`, `npm run panelkinds`, `npm run desk`, `npm run desklayout`, `npm run panel`); **49c shipped (#963)** (`npm run lint`, `npm run sizes`, `npm run desk`, `npm run desklayout`, `npm run panel`, `npm run panelkinds`); **49c-3 shipped (#981)** (non-touch windows keep folded desk down to 360 px, stacked below 768 px; `npm run layout` 86/86, `npm run phone` 389/392 with the 3 Claude-owned checks later fixed by 49c-4 #986); **49e shipped (#967)** (`npm run lint`, `npm run sizes`, `npm run panel`, `npm run desk`, `npm run panelkinds`, `npm run desklayout`, `npm run checks`, `npm run clearleft -- --owed=pace,spin,tray,dimmed`, `npm run layout` 86/86, `npm run phone` 391/392 with 49e-2 open); **49f shipped (#969)** (Escape/backdrop close across menus, sheets, and sign-in; `⌘K` & `⌘P` panel/section search; `RecordPanel` from palette & Rec mode label; `?` `ShortcutSheet` from shared bindings; visible tool/menu triggers; `npm run lint`, `npm run sizes`, `npm run panelkinds`, `npm run record`, `npm run desklayout`, `npm run panel`, `npm run desk`, `npm run switches`); **49g shipped (#970)**; **49k shipped (#982)** (Mac Pro menu tier locks, `https://` Network display in Server Details, visual `pickSource` window picker, unsigned auto-update explanation; `npm run lint`, `npm run sizes`, `npm run updates`, `npm run checks`, `npm run panel`, `npm run panelkinds`, `npm run desk`, `npm run assistant -- --no-mutants`, `npm run tiers`, `npm run desktop` 20/22 matching main baseline); **49l shipped (#974)** (`docs/guide.md`, `GuidePanel`, and `Landing` hero/tier copy updated for today's controls; `npm run lint`, `npm run sizes`, `npm run checkguard`, `npm run panel`, `npm run panelkinds`, `npm run desk`, `npm run desklayout`, `npm run landinghero`, `npm run presskit`, `49l-guard` opened); **49i shipped (#972)** (`npm run lint`, `npm run sizes`, `npm run states`, `npm run panelkinds` 21/21, `npm run switches` 1108/1108, `npm run panel` 273/273, `npm run desk` 48/48, `npm run desklayout` 72/72, 12 px / 60% opacity floor across desk/phone/remote; `49i-guard` open for permanent check); 49c-2 (delete the unhooked old overlay and update stale `< 1024px` checks), 49e-2 (update `scripts/phone.mjs:1246` to read numerical Speed instead of `Number('34%')`), 49l-guard (guide staleness check), and 49d, 49h, 49j open in §49, ranked by show risk |
-| 50 | Better code, a cleaner engine and a smoother plate, built by the agents (asked 2026-11-27) | [`50-agent-workflow.md`](docs/plan/50-agent-workflow.md) | 50a–50h proposed; 50j-1 and 50k (the foreman's fingerprints and receipts) shipped, 50j-2 open | 7 |
+| 50 | Better code, a cleaner engine and a smoother plate, built by the agents (asked 2026-11-27) | [`50-agent-workflow.md`](docs/plan/50-agent-workflow.md) | 50a–50h proposed; 50i (nightly parity run), 50j-1 and 50k (the foreman's fingerprints and receipts) shipped, 50i-2–4 and 50j-2 open | 7 |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -580,7 +588,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 12 |
 | 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s); ~~31s-8~~ the flower's second life (each tap its cell's mean, films refuse a flower build) shipped (`npm run flower`), 31s-9, 31s-10, 31s-11 (the gate calls a vite server old) and 31s-12 (the gate times out in a busy film queue) open | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 17 |
 | 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 15 |
-| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33q-1 (the Beads dial is oil) **shipped**; 33c, 33d, 33f-2..4, 33q-2, 33q-3, 33q-4 open | 12 |
+| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33q-1 (the Beads dial is oil) **shipped**; 33q-4 (air only in looks made for it) **shipped** (`npm run lookair` 7/7); 33c, 33d, 33f-2..4, 33q-2, 33q-3, 33q-5 open | 12 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 19 |
 | 35 | Clear controls: on reads on, one name for one thing (asked 2026-10-24) | [`35-clear-controls.md`](docs/plan/35-clear-controls.md) |  | 10 |
 | 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 13 |
@@ -598,7 +606,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 44 |
 | 48 | Ideas: more compelling visuals from real phenomena (brainstormed 2026-11-21; second pass 2026-11-27, 48s–48z) | [`48-ideas-visuals.md`](docs/plan/48-ideas-visuals.md) |  | 23 |
 | 49 | Usability against Nielsen's ten heuristics: undo, fit, one name for one thing (asked 2026-11-26) | [`49-usability-review.md`](docs/plan/49-usability-review.md) | 49a–49l (~~49a~~ **shipped (#964)**, 49c **shipped (#963)**, 49g **shipped (#970)**, 49k **shipped (#982)**) | 24 |
-| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 3 |
+| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | QA-33b-2 **shipped (this PR)** | 3 |
 
 ## Not doing
 

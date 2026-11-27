@@ -103,6 +103,19 @@ const shots = await page.evaluate(async () => {
     stripesBefore: await shot({ lampGround: 0, mixOrder: LAMP }, stripes),
     flatBefore: null,
   };
+  /*
+    The video as the spinning LED platform (PLAN 14ag-9): a film dark on its
+    top half and light on its bottom, so a turn of the ring shows as the two
+    halves trading places. The ring's angle is the clock's (time 1 here) times
+    LED Rotation Speed: at 0 it has not turned, at 2π it has turned half way.
+  */
+  const halves = mk((g) => { g.fillStyle = 'rgb(30,30,30)'; g.fillRect(0, 0, 128, 64); g.fillStyle = 'rgb(230,230,230)'; g.fillRect(0, 64, 128, 64); });
+  out.ringStill = await shot({ lampGround: 0, mixOrder: LAMP, filmRing: 1, ledSpeed: 0 }, halves);
+  out.ringHalf = await shot({ lampGround: 0, mixOrder: LAMP, filmRing: 1, ledSpeed: 2 * Math.PI }, halves);
+  out.ringOverRow = await shot({ lampGround: 0, filmRing: 1, ledSpeed: 0 }, halves);
+  // The LED row moved above the glass as a beam: the ring's picture stays at the bottom of the lamp.
+  out.ringLedAbove = await shot({ lampGround: 0, mixOrder: 'gel lumia film front back led mark', filmRing: 1, ledSpeed: 0 }, halves);
+  out.ringMix0 = await shot({ lampGround: 0, mixOrder: LAMP, filmRing: 1, ledSpeed: 0, filmMix: 0 }, halves);
   out.flatBefore = out.flatLamp;
   // A pool of glycerine on the clear right half, as though poured long ago:
   // its index in the column at the water's depth (PLAN 18d-9).
@@ -190,6 +203,36 @@ const clearW = (x, y) => x / S > 0.5 && Math.hypot(x / S - 0.72, y / S - 0.5) > 
     `mean change ${f2(rim)} on the rim, ${f2(middle)} in the middle, ${f2(far)} away`);
   check('and over a flat film the same rim changes far less, so what moved is the picture (the control)',
     rim > 3 * Math.max(0.5, flatRim), `${f2(flatRim)} on the rim over a flat film`);
+}
+
+// 6. The video on the LED ring (PLAN 14ag-9).
+{
+  // Clear water's top and bottom bands on the right, away from the pool's rim lens and the dye.
+  const band = (img, top) => {
+    let sum = 0, n = 0;
+    for (let y = top ? 4 : S - 28; y < (top ? 28 : S - 4); y++) for (let x = Math.round(S * 0.55); x < S - 4; x++) {
+      if (Math.hypot((x + 0.5) / S - 0.72, (y + 0.5) / S - 0.5) < 0.2) continue;
+      sum += (at(img, x, y, 0) + at(img, x, y, 1) + at(img, x, y, 2)) / 3; n++;
+    }
+    return n ? sum / n : NaN;
+  };
+  const still = band(shots.ringStill, true) - band(shots.ringStill, false);
+  const half = band(shots.ringHalf, true) - band(shots.ringHalf, false);
+  check('on the LED ring the video is the lamp: its two halves light clear water a long way apart',
+    Math.abs(still) > 80, `top band ${f2(band(shots.ringStill, true))}, bottom ${f2(band(shots.ringStill, false))}`);
+  check('and the ring turns it: half a turn on, the halves have traded places',
+    Math.abs(half) > 80 && Math.sign(half) === -Math.sign(still), `top minus bottom ${f2(still)} unturned, ${f2(half)} half a turn on`);
+  let differ = 0, mix0 = 0;
+  for (let k = 0; k < shots.ringStill.length; k++) {
+    if (Math.abs(shots.ringStill[k] - shots.ringOverRow[k]) > 1) differ++;
+    if (shots.plain[k] !== shots.ringMix0[k]) mix0++;
+  }
+  check('the ring is under the glass wherever the mixer left the film\'s row, and never laid over the plate as well',
+    differ === 0, `${differ} bytes differ between the film's row in the lamp and over the plate`);
+  check('Film Mix 0 on the ring is the look as it was, to the byte', mix0 === 0, `${mix0} bytes differ`);
+  const above = band(shots.ringLedAbove, true) - band(shots.ringLedAbove, false);
+  check('with the LED row moved above the glass, the ring\'s picture is still the lamp, at its bottom',
+    Math.abs(above) > 80 && Math.sign(above) === Math.sign(still), `top minus bottom ${f2(above)}`);
 }
 
 const failed = checks.filter(c => !c.ok).length;
