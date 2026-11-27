@@ -45,9 +45,13 @@
   RIG_KEYS), so a look change leaves it as it was.
 */
 import type { FluidSimulation } from './fluidSimulation';
-import type { LiquidType } from '../types';
+import type { LiquidType, VisualizerSettings } from '../types';
 import { lookTarget } from '../lib/dyeTarget';
-import { GRID_SCALE } from './constants';
+import { GRID_SCALE, GRID_SIZE } from './constants';
+import { DICE } from './dice';
+import { harmonyColor } from '../constants';
+import { LIQUIDS_BY_ID } from '../presetPlate';
+import { pickArea, pointInArea, type PlateArea } from '../lib/plateAreas';
 import { dropBottle } from './dropSplash';
 import { bottleDye } from './tools';
 
@@ -74,9 +78,13 @@ export interface KeepFullState {
   topping: Uint8Array;
   /** Drops laid since the show opened, for the harness. */
   drops: number;
+  /** Where a drop lands and what falls (`keepFullHands`). */
+  hands: KeepFullHands;
 }
 
-export const keepFullState = (): KeepFullState => ({ lastAt: new Float64Array(LAYERS).fill(-1e9), topping: new Uint8Array(LAYERS), drops: 0 });
+/** A visualizer's Keep Full: its clocks and its hand, made once from what the look lends it. */
+export const keepFullState = (look: KeepFullLook): KeepFullState =>
+  ({ lastAt: new Float64Array(LAYERS).fill(-1e9), topping: new Uint8Array(LAYERS), drops: 0, hands: keepFullHands(look) });
 
 /**
  * The size of the next top-up drop on a layer, 0..1 of a hand's full drop, or
@@ -115,17 +123,58 @@ export interface KeepFullHands {
   aim(layer: number, fluid: FluidSimulation, out: KeepFullAim): void;
 }
 
+/** What the visualizer lends the hand: a layer's areas, an area's dye, the working harmony and the bench. */
+export interface KeepFullLook {
+  areasOf(layer: number): PlateArea[] | null;
+  areaColor(layer: number, a: PlateArea): { r: number; g: number; b: number };
+  harmonyOf(layer: number): number[];
+  liquidsOf(layer: number): string[];
+}
+
+/**
+ * The visualizer's hand for Keep Full, as Evolve's drop aims: in one of the
+ * look's areas, in that area's dye and from its bottle, when the look has
+ * areas; else anywhere in the dish inside its rim (KEEP_FULL_REACH), in the
+ * working harmony, from one of the look's bottles. Its own dice (DICE.keep),
+ * so keeping the dish full draws nothing from Evolve's stream.
+ */
+export function keepFullHands(look: KeepFullLook): KeepFullHands {
+  return {
+    aim: (layer, _fluid, out) => {
+      const areas = look.areasOf(layer);
+      if (areas && areas.length > 0) {
+        const a = pickArea(areas, DICE.keep);
+        const at = pointInArea(a, GRID_SIZE, DICE.keep);
+        const c = look.areaColor(layer, a);
+        out.x = at.x; out.y = at.y; out.r = c.r; out.g = c.g; out.b = c.b;
+        out.liquid = LIQUIDS_BY_ID.get(a.liquid);
+        return;
+      }
+      const ang = DICE.keep.float() * Math.PI * 2;
+      const d = Math.sqrt(DICE.keep.float()) * KEEP_FULL_REACH * GRID_SIZE;
+      out.x = GRID_SIZE / 2 + Math.cos(ang) * d;
+      out.y = GRID_SIZE / 2 + Math.sin(ang) * d;
+      const c = harmonyColor(look.harmonyOf(layer), DICE.keep);
+      out.r = c.r; out.g = c.g; out.b = c.b;
+      const ids = look.liquidsOf(layer);
+      out.liquid = ids.length > 0 ? LIQUIDS_BY_ID.get(DICE.keep.pick(ids)) : undefined;
+    },
+  };
+}
+
 const tryAim: KeepFullAim = { x: 0, y: 0, r: 0, g: 0, b: 0, liquid: undefined };
 const bestAim: KeepFullAim = { x: 0, y: 0, r: 0, g: 0, b: 0, liquid: undefined };
 
 /**
  * One frame of the hand that keeps the dish full: for each layer, a drop when
- * `keepFullDose` asks for one. `now` in seconds of the wall clock, `dyeBudget`
- * the look's Dye Budget, `phaseAmount` its Phase Amount (a layer seeded with
- * no dye and a phase on it is a clear-phase look, as Evolve reads it, whose
- * dye stays clear). Returns the drops laid this frame.
+ * `keepFullDose` asks for one. `now` in seconds of the wall clock; from the
+ * settings, the look's Dye Budget and its Phase Amount (a layer seeded with no
+ * dye and a phase on it is a clear-phase look, as Evolve reads it, whose dye
+ * stays clear). The caller asks `keepFull` and whether the plate is playing.
+ * Returns the drops laid this frame.
  */
-export function stepKeepFull(k: KeepFullState, fluids: readonly (FluidSimulation | null | undefined)[], now: number, dyeBudget: number, phaseAmount: number, hands: KeepFullHands): number {
+export function stepKeepFull(k: KeepFullState, fluids: readonly (FluidSimulation | null | undefined)[], now: number, settings: Pick<VisualizerSettings, 'dyeBudget' | 'phaseAmount'>): number {
+  const dyeBudget = settings.dyeBudget ?? 0.85, phaseAmount = settings.phaseAmount ?? 0, hands = k.hands;
   let laid = 0;
   const n = Math.min(fluids.length, LAYERS);
   for (let li = 0; li < n; li++) {

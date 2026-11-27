@@ -81,11 +81,12 @@ check('control: a dose that always pours, and one that never does, both fail', a
 
 // 5. The wiring.
 const viz = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
-const gate = /if \(currentSettings\.keepFull && isActiveRef\.current && drainFrameRef\.current === 0\) \{\s*autoEventsRef\.current\.kept \+= stepKeepFull\(/;
-check('the visualizer steps it only with Keep Full on, playing and not draining', gate.test(viz));
-check('its hand aims with its own dice (DICE.keep), never Evolve\'s', /keepHandsRef = useRef<KeepFullHands>\(\{[\s\S]{0,1400}DICE\.keep[\s\S]{0,200}\}\);/.test(viz)
-  && !/keepHandsRef = useRef<KeepFullHands>\(\{[\s\S]{0,1400}DICE\.evolve/.test(viz));
+const gate = /if \(isActiveRef\.current && drainFrameRef\.current === 0\) \{[^}]*\}\s*if \(currentSettings\.keepFull\) autoEventsRef\.current\.kept \+= stepKeepFull\(/;
+check('the visualizer steps it only with Keep Full on, playing and not draining', gate.test(viz) && (viz.match(/stepKeepFull\(/g) ?? []).length === 1);
 const mod = readFileSync('src/sim/keepFull.ts', 'utf8');
+const hands = mod.slice(mod.indexOf('export function keepFullHands'), mod.indexOf('const tryAim'));
+check('its hand aims with its own dice (DICE.keep), never Evolve\'s', hands.length > 200 && /DICE\.keep/.test(hands) && !/DICE\.(evolve|hands|music|lay)/.test(hands)
+  && /keepFullRef = useRef\(keepFullState\(\{/.test(viz) && /hands: keepFullHands\(look\)/.test(mod));
 check('a top-up is the hand\'s own Drop (dropBottle), not a stamp or a fade', /dropBottle\(af, x, y, KEEP_FULL_DROP \* dose/.test(mod) && !/addDensity|autoInject/.test(mod.replace(/\/\*[\s\S]*?\*\//g, '')));
 check('it is the room\'s switch: off by default, kept over a Go and a Back', DEFAULT_SETTINGS.keepFull === false && RIG_KEYS.has('keepFull') && SETUP_KEYS.has('keepFull'));
 
