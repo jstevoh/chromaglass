@@ -169,6 +169,9 @@ export class WebGPUFluid extends FluidCover {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      // The ouzo's phase change and its cloud for the plate (PLAN 48s), behind the show as the species' are.
+      ['ouzoCloud', [RGBA32], false],
+      ['ouzoView', [RGBA32], false],
       // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
       ['inkSpecies', [RGBA32], false],
       // The layered seed's oil share (38w-15, `layShare`): waited for when oil waits (Lava Pop).
@@ -1096,6 +1099,7 @@ export class WebGPUFluid extends FluidCover {
         speciesCarried = !!rider;
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
       if (!bodiesOn) { 
@@ -1142,6 +1146,7 @@ export class WebGPUFluid extends FluidCover {
         if (split) { this.run(pass, 'bodyJoin', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);

@@ -41,6 +41,8 @@ export interface FieldCarry extends SolverCarry {
   readonly liquids0: GPUTexture | null;
   readonly liquids1: GPUTexture | null;
   readonly speciesPoured: { sigma: number; rho: number } | null;
+  /** The ouzo's ethanol and oil (PLAN 48s), which go wherever the species goes: null with no Ouzo on the plate. */
+  readonly solvent: GPUTexture | null;
 }
 
 /** What the app used to scan the whole field for (see `measure`). */

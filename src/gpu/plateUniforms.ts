@@ -25,6 +25,7 @@ import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 import { bankHasTwo, projectorGains } from '../lib/projectorBank';
+import { focusBoxPx } from '../lib/projectorFocus';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 import { BIREF_NM_PER_STRAIN } from '../lib/polar';
@@ -170,6 +171,7 @@ export interface PlateContext {
  */
 /** The bank's gains, filled each frame (no per-frame array). */
 const bankGains = new Float32Array(8);
+const focusBox = new Float32Array(4);
 
 export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   const { view, fluids, width, height } = ctx;
@@ -400,6 +402,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     projectorGains(bankGains, s, two, view.shutters);
     pack.set('projA', bankGains[0], bankGains[1], bankGains[2], bankGains[3]);
     pack.set('projB', bankGains[4], bankGains[5], bankGains[6], bankGains[7]);
+    // Each projector's focus (PLAN 51b): the box its defocus spreads a point into, in this frame's pixels (gpu/focus.ts).
+    focusBoxPx(focusBox, s, two, Math.max(width, height), view.shot.zoom);
+    pack.set('projFocus', focusBox[0], focusBox[1], focusBox[2], focusBox[3]);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     // The clear film's dye (PLAN 20b-13): the colour one unit lets through, and the dial.

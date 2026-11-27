@@ -1785,6 +1785,7 @@ export const DISPLAY_MAIN = /* wgsl */ `
 struct FsOut {
   @location(0) color: vec4f,
   @location(1) aux: vec4f,     // for the camera: normal.xy (biased), dye height, bubble mask
+  @location(2) share: vec4f,   // B's share (gpu/focus.ts)
 };
 
 /*
@@ -3282,14 +3283,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     outColor *= mix(1.0, anyIn, U.dishSpread);
     var rims = dish0.y;
     if (U.layerCount > 1) { rims += dish1.y; }
-    // The dish's glass wall throws no light of its own: it was a warm glow
-    // added along the rim (PLAN 38h). Its steep faces bend the lamp out of
-    // the pupil, as a drop's meniscus does, so it is a dark line taking the
-    // drop band's 0.85.
+    // The dish's glass wall throws no light of its own (it was a warm glow,
+    // PLAN 38h): its steep faces bend the lamp out of the pupil, as a drop's
+    // meniscus does, a dark line at the drop band's 0.85.
     outColor *= 1.0 - 0.85 * clamp(rims, 0.0, 1.0) * U.dishSpread;
   }
 
-  // ── Over both plates: the film projector, and whatever else the mixer put there ──
+  // ── Over both plates: the film projector, and the mixer's other rows ──
   if (U.projA.w < 0.5) { outColor *= U.projA.rgb; }
   outColor = mixSourcesAt(polar(outColor, fuv0), U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
 
@@ -3297,11 +3297,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.lampWarmth > 0.001) {
     let vc = (uv - 0.5) * vec2f(aspect, 1.0);
     let vig = 1.0 - smoothstep(0.45, 1.05, length(vc) * 1.25) * 0.45;
-    // The tint is the lamp's own colour (the blackbody at the temperature the slider names), already
-    // the whole grade at this setting. The vignette is the dish's and is blended as it always was,
+    // The tint is the lamp's own colour (the blackbody at the slider's temperature), the whole grade
+    // at this setting. The vignette is the dish's and is blended as it always was,
     // 1 - w + w*g*vig, which is tint - (tint - (1 - w)) * (1 - vig); past the old end of the travel
-    // (w above 1) it stays full, tint * vig. Multiplying the tint by a separately blended vignette
-    // was 4 to 6% too dark in the corners at the shipped looks (the pre-push review).
+    // (w above 1) it stays full, tint * vig. A separately blended vignette was 4 to 6% too dark in
+    // the corners at the shipped looks (the pre-push review).
     let tint = vec3f(U.lampTintR, U.lampTintG, U.lampTintB);
     outColor = outColor * (tint - (tint - vec3f(1.0 - min(U.lampWarmth, 1.0))) * (1.0 - vig));
   }
@@ -3327,11 +3327,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   /*
-    No film grain here. A noise of 3% of the picture was added on the plate
-    every frame when no camera was on (PLAN 38h): a lamp through liquid onto
-    a wall has none. Grain is the camera's or the film stock's, and the post
-    chain draws it when either is on (post.ts); the dither in the finish is
-    what keeps the 8-bit steps apart.
+    No film grain here. A noise of 3% was added on the plate every frame with
+    no camera (PLAN 38h): a lamp through liquid onto a wall has none. Grain is the camera's or the film stock's, and the post
+    chain draws it when either is on (post.ts); the finish's dither keeps
+    the 8-bit steps apart.
   */
 
   var result: FsOut;
@@ -3339,6 +3338,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   else if (U.finishInMain == 2) { result.color = ditherOut(outColor, fragGl); }
   else { result.color = vec4f(outColor, 1.0); }
   result.aux = vec4f(clamp(auxN, vec2f(-1.0), vec2f(1.0)) * 0.5 + 0.5, auxH, auxB);
+  result.share = vec4f(wallShare, 1.0);
   return result;
 }
 `;

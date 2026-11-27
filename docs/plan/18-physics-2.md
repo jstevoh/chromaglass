@@ -114,9 +114,13 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   a sixth as fast as between the glasses (2.50 to 2.42 against 1.99). Move it before the first
   projection with the old plate's other forces if the old plate is kept. (S; Low.)
 - **18d-6c** The five looks that set Polarity highest (Macro Bead, Roy 1963, Poster 1969, Milk
-  Marbling, Lens Pools) open with Hold Apart 0 like the rest. Judge them on the Mac when
-  filming is allowed again (judging §149) and give `holdApart` to any that should keep its
-  colours to bodies. (S; the owner's eyes.)
+  Marbling, Lens Pools) open with Hold Apart 0 like the rest, and so does the owner's own Soapy
+  Mess, saved with Polarity 0.83 (its old push 0.036, between the default look's 0.015 and Macro
+  Bead's 0.051, which moved a stirred plate by 0.39% and 1.34% in ten seconds). None was given
+  Hold Apart to stand for it: the old push was that small and no tension, and the dial's 1 rounds
+  a pool from 2.50 to 1.99 in five seconds, so it would add a force these looks never had. Judge
+  them on the Mac when filming is allowed again (judging §149) and give `holdApart` to any that
+  should keep its colours to bodies. (S; the owner's eyes.)
 - **18d-7** Milk's `repel`. Milk is a miscible emulsion, so this goes to 18j (scattering).
 - **18d-8** Retire the CPU fields (soap, body, repel at 192²) and their pass once 18d-2 to
   18d-7 have moved each to the GPU.

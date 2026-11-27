@@ -38,6 +38,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'sideLamp', type: 'vec4f', note: "the side lamp's foot (cos, sin of its angle round the dish), its distance and height, metres (PLAN 47b-side, glint.ts)" },
   { name: 'projA', type: 'vec4f', note: "the front projector's gain on the wall, display values (PLAN 51a, lib/projectorBank.ts); w 1 when the two plates are two projectors" },
   { name: 'projB', type: 'vec4f', note: "the back projector's gain" },
+  { name: 'projFocus', type: 'vec4f', note: "each projector's defocus box, half-widths in pixels: A's x, y, B's x, y (PLAN 51b, lib/projectorFocus.ts; gpu/focus.ts)" },
   { name: 'gel0', type: 'vec3f' },
   { name: 'gel1', type: 'vec3f' },
   { name: 'gel2', type: 'vec3f' },

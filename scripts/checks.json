@@ -3718,6 +3718,20 @@
       ]
     },
     {
+      "name": "Each projector's focus",
+      "shard": "open",
+      "run": "npm run focus",
+      "why": [
+        "A projector racked out of focus (PLAN 51b): the thin lens's law with the",
+        "lamp's image as the pupil (a 32 by 16 mm bar), in linear light. Racked,",
+        "the plate is the sharp plate through the law's box within 2 levels at",
+        "three settings, its edges within 10% along each axis, the light kept",
+        "within 1%; with two projectors B goes soft while A stays sharp, and the",
+        "crossfade's middle is half of each in light. Sharp is the plate to the",
+        "byte. Beside `projectors` in the open shard, about a minute."
+      ]
+    },
+    {
       "name": "The heat",
       "shard": "open",
       "run": "npm run heat",
