@@ -100,8 +100,10 @@ both pages still show; restored, `npm run presskit` 58/61 → 61/61). Still owed
 own thread: `looksgrid --owed=preview` (velvet-underground and a moiré card flat, spread
 under 20), `nolight` 9 (Beads 0.8 rims brighter than the wash), `benday` (dot coverage
 28.1%/33.0% against 28.3%), the open-rim oil meter on WebGPU · fifth, `heldpress
---owed=presstwist` (after 15g-18), `openingtime` (3 pipelines built on a frame:
-fluid/upsampleDelta, fluid/scaleDye, plate/packDyeBodies, after 46a and 47a), and the Lava
+--owed=presstwist` (after 15g-18), `openingtime` (`startup`'s 3 frame builds,
+`framereads` H2c-9, and `encode`'s grain carry fixed under 19ak-24a; `openingtime`'s 52 bar
+remains at 74 / ledger 72 for the owner since Classic became Lava Pop under 38w-1 and 27f-9m),
+and the Lava
 Lamp wax cycle on WebGPU · show (after 27f-9q and 38w-31 met). `holeline` on lab4 was red
 before the sweep.
 

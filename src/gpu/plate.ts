@@ -183,6 +183,8 @@ export class WebGPUPlate {
   readonly glint: PlateGlint;
 
   private layers: LayerTargets[] = [];
+  /** Per-layer state last packed, so unchanged layers skip `pack` when `writes` is passed (PLAN H2c-9). */
+  private packedState: ({ writes: number; bodies: boolean; drop: boolean } | null)[] = [];
   private sources = new Map<string, Source>();
   private aux: GPUTexture | null = null;
   private auxSize = [0, 0];
@@ -249,7 +251,7 @@ export class WebGPUPlate {
           cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true),
         ]),
       cache.computePrep('packVel', PACK_KERNELS.packVel),
-      cache.computePrep('packDyeBodies', PACK_KERNELS.packDyeBodies, true),
+      cache.computePrep('packDyeBodies', PACK_KERNELS.packDyeBodies, !open.oilBodies),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
       // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
@@ -315,11 +317,13 @@ export class WebGPUPlate {
     while (this.layers.length > count) {
       const l = this.layers.pop()!;
       for (const t of [l.dye, l.vel, l.derived]) this.disposer.release(t);
+      this.packedState.pop();
     }
     for (let i = 0; i < count; i++) {
       const have = this.layers[i];
       if (have && have.size === size) continue;
       if (have) for (const t of [have.dye, have.vel, have.derived]) this.disposer.release(t);
+      this.packedState[i] = null;
       const tex = (label: string, format: GPUTextureFormat, usage: number) => this.disposer.track(this.device.createTexture({
         label: `${label} ${i}`, size: [size, size], format, usage,
       }));
@@ -412,7 +416,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number; writes?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -453,8 +457,6 @@ export class WebGPUPlate {
     }
 
     // ── Pack ────────────────────────────────────────────────────────
-    const packPass = encoder.beginComputePass({ label: 'pack' });
-    const groups = Math.ceil(grid / 8);
     /*
       The ferrofluid drop's surface (PLAN §29a), on the lead plate only (the
       display draws the ferrofluid from its view alone), and only while the
@@ -464,42 +466,61 @@ export class WebGPUPlate {
     const leadView = fields[0].view;
     const dropWanted = !!leadView && leadView.width === grid
       && FerroDrop.wanted(this.pack.get('macroOn')[0], this.pack.get('macroRelief')[0], this.pack.get('phaseAmount')[0]);
-    const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres) : null;
     if (!dropWanted) this.drop.cool();
-    for (let i = 0; i < fields.length; i++) {
-      const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
-      if (pipeVel) {
-        packPass.setPipeline(pipeVel);
-        packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].dye, this.layers[i].dye, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
-        packPass.dispatchWorkgroups(groups, groups);
-      }
-      /*
-        Where the oil carries its own colour (Oil Bodies), a cell part oil
-        and part water lets through the two liquids' light side by side, not
-        one through the other (packDyeBodies, PLAN 47z-1). The oil's share
-        and the mix are on the dye's grid (bodyPartition reads all three).
-      */
-      const { oilDye, mix } = fields[i];
-      const bodies = !!oilDye && !!mix && oilDye.width === fields[i].dye.width && mix.width === fields[i].dye.width;
-      if (bodies) {
-        const pipeDye = this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies);
-        if (pipeDye) {
-          packPass.setPipeline(pipeDye);
-          packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, oilDye!, mix!, this.layers[i].dye]));
+    const bodiesOf = fields.map((f) => {
+      const { oilDye, mix } = f;
+      return !!oilDye && !!mix && oilDye.width === f.dye.width && mix.width === f.dye.width;
+    });
+    const packLayer = fields.map((f, i) => {
+      const prev = this.packedState[i];
+      if (f.writes === undefined || !prev) return true;
+      if (prev.writes !== f.writes || prev.bodies !== bodiesOf[i]) return true;
+      return i === 0 && (dropWanted || prev.drop);
+    });
+    if (dropWanted || packLayer.some(Boolean)) {
+      const packPass = encoder.beginComputePass({ label: 'pack' });
+      const groups = Math.ceil(grid / 8);
+      const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres) : null;
+      for (let i = 0; i < fields.length; i++) {
+        if (!packLayer[i]) continue;
+        const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
+        if (pipeVel) {
+          packPass.setPipeline(pipeVel);
+          packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].dye, this.layers[i].dye, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
           packPass.dispatchWorkgroups(groups, groups);
         }
+        /*
+          Where the oil carries its own colour (Oil Bodies), a cell part oil
+          and part water lets through the two liquids' light side by side, not
+          one through the other (packDyeBodies, PLAN 47z-1). The oil's share
+          and the mix are on the dye's grid (bodyPartition reads all three).
+        */
+        const bodies = bodiesOf[i];
+        let pipeDye: GPUComputePipeline | null = null;
+        if (bodies) {
+          pipeDye = this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies);
+          if (pipeDye) {
+            packPass.setPipeline(pipeDye);
+            packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, fields[i].oilDye!, fields[i].mix!, this.layers[i].dye]));
+            packPass.dispatchWorkgroups(groups, groups);
+          }
+        }
+        const writes = fields[i].writes;
+        this.packedState[i] = writes !== undefined && pipeVel && (!bodies || pipeDye)
+          ? { writes, bodies, drop: i === 0 && !!height }
+          : null;
       }
-    }
-    if (height) {
-      const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
-      if (pipe) {
-        packPass.setPipeline(pipe);
-        packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
-        packPass.dispatchWorkgroups(groups, groups);
-        this.drop.notePackedVel(this.layers[0].vel);
+      if (height) {
+        const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
+        if (pipe) {
+          packPass.setPipeline(pipe);
+          packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
+          packPass.dispatchWorkgroups(groups, groups);
+          this.drop.notePackedVel(this.layers[0].vel);
+        }
       }
+      packPass.end();
     }
-    packPass.end();
 
     // ── Derive ──────────────────────────────────────────────────────
     const derive = this.pipelines.renderPipeline('derive', deriveRecipe(this.device));
@@ -584,7 +605,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number; writes?: number }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -619,7 +640,7 @@ export class WebGPUPlate {
     uniforms: GPUBuffer,
     /** What `uniforms` was written from: which of the display's effects this draw turns on. */
     bytes: ArrayBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; airGeo?: AirGeo | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; faraday?: FaradayField | null; glow?: { light: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null; coverMetres?: number; writes?: number }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -705,5 +726,6 @@ export class WebGPUPlate {
     this.disposer.dispose();
     this.sources.clear();
     this.layers = [];
+    this.packedState = [];
   }
 }

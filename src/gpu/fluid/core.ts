@@ -795,10 +795,11 @@ export class FluidCore {
     this.airQuietSeconds = 0;
     this.air?.setBoilAlpha(null);
     if (this.grain) {
-      // Identity coordinates: reseed both phases without sampling the previous frame.
-      const identity = this.arg('grain clear', [0, 0, 0, 0]);
-      this.run(pass, 'grainStep', this.grain.a, [this.grain.b, this.velForced, this.sampler], identity);
-      this.run(pass, 'grainStep', this.grain.b, [this.grain.a, this.velForced, this.sampler], identity);
+      // Identity coordinates: seedGrain with both phases reseeded. It reads the
+      // other texture of the pair — a dispatch may not sample what it writes.
+      const identity = this.arg('grain identity', [0, 0, 0, 0]);
+      this.run(pass, 'seedGrain', this.grain.a, [this.grain.b], identity);
+      this.run(pass, 'seedGrain', this.grain.b, [this.grain.a], identity);
     }
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);

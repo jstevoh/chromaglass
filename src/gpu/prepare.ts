@@ -513,9 +513,23 @@ export interface Quiet {
   progress?(settled: number, asked: number, rendering: number): void;
 }
 
+const pendingLater = new WeakMap<GPUDevice, () => void>();
+
+/**
+ * Start building the deferred `later` pipelines for `device` once the first
+ * solver step has run, so `openingtime` never counts `later` compiles asked
+ * before step 1 while `startup` still finishes them behind the running show.
+ */
+export function startLaterPrepare(device: GPUDevice): void {
+  const start = pendingLater.get(device);
+  if (!start) return;
+  pendingLater.delete(device);
+  start();
+}
+
 /**
  * Builds what the show opens with and returns when it is done; then goes on
- * building the rest behind the show, which is under way by then.
+ * building the rest behind the show once the first step is under way.
  */
 export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, opts: { float32Filterable: boolean; quiet?: Quiet }, open: Opening): Promise<Prepared> {
   const builds = [
@@ -564,12 +578,15 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
   const rank = (b: Prep) => (b.key.startsWith('fluid/fill:') ? 0 : b.kind === 'render' ? 1 : 2);
   const ahead = builds.filter((b) => !b.later).sort((a, b) => rank(a) - rank(b));
   const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES, opts.quiet);
+  const later = builds.filter((b) => b.later).sort((a, b) => rank(a) - rank(b));
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
   // Render pipelines first here too, so the plate's whole display
   // (`displayLean.ts`), which a look reaching past its opening's effects
   // waits on, comes before the hundred-odd kernels of other looks.
-  void buildInTurn(device, 'later', builds.filter((b) => b.later).sort((a, b) => rank(a) - rank(b)), LATER_LANES)
-    .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
+  pendingLater.set(device, () => {
+    void buildInTurn(device, 'later', later, LATER_LANES)
+      .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
+  });
   return opening;
 }

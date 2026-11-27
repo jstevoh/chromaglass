@@ -458,9 +458,13 @@ export class FluidFields extends FluidCore {
   /** The print stops: the plate shows the solver's dye alone again (no reaction on the plate, or a look that does not print). */
   endPrint(): void { this.printLive = false; }
 
+  /** Submit count of writes to this solver's fields, so `WebGPUPlate.draw` packs only after a write (PLAN H2c-9). */
+  get fieldWrites(): number { return this.reads.count; }
+
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {
     return {
+      writes: this.reads.count,
       dye: this.printLive && this.printDye ? this.printDye : this.dye.read,
       vel: this.vel.read,
       velForced: this.velForced,

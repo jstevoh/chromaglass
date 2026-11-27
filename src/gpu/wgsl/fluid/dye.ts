@@ -129,23 +129,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
-  // Pigment coordinates: advects `src` by A.a.x (disp), then keeps/reseeds phases (A.a.yz).
-  grainStep: `${HEAD}
+  // Pigment coordinates: A.a.xy says which phase to keep and which to reseed.
+  seedGrain: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var vel: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(5) var lin: sampler;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let uv = uvOf(id);
-  var g = vec4f(0.0);
-  if (A.a.y > 0.5 || A.a.z > 0.5) {
-    let v = textureSampleLevel(vel, lin, uv, 0.0).xy;
-    let pos = clamp(uv - v * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
-    let o = textureSampleLevel(src, lin, pos, 0.0);
-    g = select(vec4f(0.0), o, finite4(o));
-  }
-  textureStore(dst, vec2i(id.xy), vec4f(select(uv, g.rg, A.a.y > 0.5), select(uv, vec2f(g.b, g.a), A.a.z > 0.5)));
+  let g = textureLoad(src, vec2i(id.xy), 0);
+  textureStore(dst, vec2i(id.xy), vec4f(mix(uv, g.rg, A.a.x), mix(uv, vec2f(g.b, g.a), A.a.y)));
 }`,
 
   sharpenDye: `${HEAD}

@@ -640,9 +640,7 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   the entries out.- **19ak-24. Open, found on main's deploy 967 (f3414ffd, 2026-11-26), after the day's
   fifteen-PR merge sweep: 27 lines red, 21 of them green at deploy 931 (d8949fe).** Sorted
   by the PR that broke each and briefed to Antigravity in six PRs (labelled `fixes-main`):
-  - 19ak-24a, the opening and the step's counts: `openingtime` 74 pipelines against 52,
-    `startup` 3 built on a frame, `framereads --owed=h2c9`, and `encode`'s 46g and H2c-5
-    lines (one carry a step missing; bisected to 46a, #862, be69025).
+  - 19ak-24a (partial — `startup` 0 built on a frame across 33 looks, `framereads` 18/18 with H2c-9 shipped and `h2c9` out of `--owed`, `encode` grain carry restored to 19/19; `openingtime --bar` still 74 asked / ledger 72 against `OPENING_MOST = 52`, left for the owner because Classic became Lava Pop under 38w-1 / 27f-9m and executes all 72 in its opening steps): the opening and the step's counts after 46a (#862, be69025).
   - 19ak-24b, `looksgrid --owed=preview` (four flat stills) and `benday` (after 43d-6, #913).
   - 19ak-24c, `tools` (Press on the old plate "and keeps it", 225 → 173), `drawwall --app`,
     `wall`, `oillift` (after 15g-18, #914, and 18a-13n, #955).

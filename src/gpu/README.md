@@ -5,8 +5,8 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 ## Start here
 
 - `stage.ts`: `WebGPUStage`: canvas, device, frame.
-- `fluid.ts` (99 KB, grep it): `WebGPUFluid`, the solver's `step` and the pipelines built ahead. The rest of the class is in `fluid/`, and the map is in this file's header; `fluid/README.md` has the order.
-- `plate.ts`: `WebGPUPlate`; `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms. Its `PlateFluid.gpu` may take `setCloseupWindow(w, amount)` and give `fineWindow` and `fineStrength` (the closeup's fine dye, PLAN 47a).
+- `fluid.ts` (99 KB, grep it): `WebGPUFluid`, the solver's `step` and the pipelines built ahead (`fieldWrites` exposes the submit count for `WebGPUPlate.draw`, PLAN H2c-9). The rest of the class is in `fluid/`, and the map is in this file's header; `fluid/README.md` has the order.
+- `plate.ts`: `WebGPUPlate` (`draw` accepts per-layer `writes` so unchanged layers skip packing, PLAN H2c-9); `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms. Its `PlateFluid.gpu` may take `setCloseupWindow(w, amount)` and give `fineWindow` and `fineStrength` (the closeup's fine dye, PLAN 47a).
 - `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (`GpuStepParams` carries the tank's six settings, PLAN 47n; including `speciesShare` and `speciesSnapshot`, and `pourInk`, a title's mask added to the dye at the solver's own grid, PLAN 37x-10, with an optional `carrier` laid into the species field under it, the thick ink's pad, PLAN 37x-10g; and `layOil`, the oil laid cell for cell at the solver's grid, Foam Cells' pressed drops, PLAN 47z-5; and `layDye` with `layShare`, a look's dye laid at the solver's grid and added a share at a time, Classic's cells, PLAN 38w-8; and the optional `pourReady`, PLAN 18c-2).
 - `kit.ts` (48 KB, grep it): `PipelineCache` (`hasRender(name, ask)` says whether a render pipeline is built without building it), `PingPong`, `Disposer`, `bindGroup`, `ReadbackRing` (`hasFree`, `reserve`, `copyFrom`, `collect`), `GpuProfiler`.
 
@@ -35,7 +35,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `particles.ts`: dye carried by particles.
 - `closeupWindow.ts`: where the closeup looks (`CloseupWindow`, `closeupWindowOf`, `closeupFine`, `WINDOW_*`). `fineDye.ts`: `FineDye` (`setWindow`, `step`, `window`, `strength`, `detail`, `prepare(device, open)`: before the show opens when the look opens in the closeup, `Opening.closeup`), `FINE_LIFE`, `FINE_TICK`: the dye finer than the grid over that window (PLAN 47a).
 - `post.ts`: post-effects chain and finish.
-- `prepare.ts`: `prepareShow`, pipelines built before opening (three at a time) and behind it (two); `prepareLog` (each prepare once done), `prepareProgress` (each while it runs: builds settled, the last settle, the cap on one build) and `pipelinesSeen` (both and the ledger, for `chromaglassDebug().pipelines()`).
+- `prepare.ts`: `prepareShow`, pipelines built before opening (three at a time) and `startLaterPrepare` for the rest behind it once the first step runs; `prepareLog` (each prepare once done), `prepareProgress` (each while it runs: builds settled, the last settle, the cap on one build) and `pipelinesSeen` (both and the ledger, for `chromaglassDebug().pipelines()`).
 - `probe.ts`: delivered brightness for the flash guard.
 - `readGate.ts`: `ReadGate`, when a readback is worth taking.
 - `rimRead.ts`: `RimRead`, the mean inside the dish's rim and the unpadded `data` read back with it.

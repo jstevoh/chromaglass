@@ -38,6 +38,7 @@
  */
 
 import { PingPong, PipelineCache, bindGroup, type Prep } from './kit';
+import { startLaterPrepare } from './prepare';
 import type { Opening } from './opening';
 import { kernel } from './wgsl/fluid';
 import { SPIKE_ONSET, fieldOnAxis, spikesOnAxis } from './wgsl/spikes';
@@ -118,7 +119,8 @@ export class WebGPUFluid extends FluidCover {
       ['gapReshape', [RGBA32], false],
       ['deltaFold', [dye], true],
       ['squeezeUpdate', [RGBA32], true],
-      ['scaleDye', [dye], false],
+      // disperseDye copies oilDye into scratchB via scaleDye:dye when Oil Bodies runs.
+      ['scaleDye', [dye], open.oilBodies],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
       ['addSlosh', [VEL], open.slosh],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
@@ -139,7 +141,11 @@ export class WebGPUFluid extends FluidCover {
       ['decay', [dye], true],
       ['packView', ['rgba32uint'], true],
       ['downsample', [RGBA32], true],
-      ...(opts.float32Filterable ? [['grainStep', [RGBA32], true] as [string, GPUTextureFormat[], boolean]] : []),
+      // Pigment coordinates ride along via advect:rgba32float (counted by encode) and reseed via seedGrain.
+      ...(opts.float32Filterable ? [
+        ['advect', [RGBA32], true] as [string, GPUTextureFormat[], boolean],
+        ['seedGrain', [RGBA32], true] as [string, GPUTextureFormat[], boolean],
+      ] : []),
       // Vorticity (galaxy): the curl into a single-channel scratch.
       ['curl', [R32], open.vorticity],
       ['confine', [VEL], open.vorticity],
@@ -279,7 +285,7 @@ export class WebGPUFluid extends FluidCover {
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's lift up a rocked plate (PLAN 27f-5): waited for where a look's own oil opens on one (Opening.oilLift), else behind the show.
-      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.oilLift && name.startsWith('hs'));
+      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.oilLift && (name === 'hsLiftSource' || name === 'hsLiftRelaxOil'));
       // The sealed bottle's (PLAN 27f-9): waited for where the look opens stood up, whose first step is sealed (opening.ts).
       for (const name of SEAL_KERNEL_NAMES) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.sealed);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
@@ -298,9 +304,9 @@ export class WebGPUFluid extends FluidCover {
       */
       for (const [key, code] of WebGPUFluid.oldPlateBuilds(dye)) add(key, code, true);
     }
-    // Dye and velocity deltas brought up to the grid every step; cpuMulTex samples directly via deltaFold until bodyLand needs deltaMulTex.
+    // Dye and velocity deltas brought up to the grid every step; cpuMulTex also upsamples when bodyMul is needed (Oil Bodies).
     add(`upsampleDelta:${RGBA32}`, splatKernel('upsampleDelta', RGBA32), true);
-    add(`upsampleDelta:${R32}`, splatKernel('upsampleDelta', R32), false);
+    add(`upsampleDelta:${R32}`, splatKernel('upsampleDelta', R32), open.oilBodies);
     // A tool, a pour: the splats, always into the full-float deltas. And the
     // plate measured (`measure`), keyed by name as `statsRun` asks. Neither
     // was asked for in any look's first forty steps, nor in the classic
@@ -1551,13 +1557,17 @@ export class WebGPUFluid extends FluidCover {
     // 9.6. Pigment coordinates ride along with the dye
     if (this.grain) {
       stage('grain', (pass) => {
+        this.run(pass, 'advect', this.grain!.write, [this.grain!.read, this.velForced, this.sampler], this.arg('advect grain', [disp, 0, 0, 0]));
+        this.grain!.swap();
         const before = this.grainAge;
         this.grainAge = (this.grainAge + p.dt) % GRAIN_PERIOD;
         const crossed = (from: number, to: number, at: number) => (from < at && to >= at) || to < from;
         const keepA = crossed(before, this.grainAge, 0) && this.grainAge < GRAIN_PERIOD * 0.5 ? 0 : 1;
         const keepB = before < GRAIN_PERIOD * 0.5 && this.grainAge >= GRAIN_PERIOD * 0.5 ? 0 : 1;
-        this.run(pass, 'grainStep', this.grain!.write, [this.grain!.read, this.velForced, this.sampler], this.arg('grain step', [disp, keepA, keepB, 0]));
-        this.grain!.swap();
+        if (keepA === 0 || keepB === 0) {
+          this.run(pass, 'seedGrain', this.grain!.write, [this.grain!.read], this.arg('grain keep', [keepA, keepB, 0, 0]));
+          this.grain!.swap();
+        }
       });
     }
 
@@ -1607,6 +1617,7 @@ export class WebGPUFluid extends FluidCover {
     this.profiler.resolveInto(enc);
     this.submit(enc);
     this.profiler.afterSubmit();
+    startLaterPrepare(this.device);
   }
 
   /**
