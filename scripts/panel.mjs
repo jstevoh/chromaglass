@@ -2040,14 +2040,11 @@ check('and neither starts over the limit',
 
 // ── Looks as slides in a tray (PLAN 35g) ───────────────────────────────
 //
-// A look is a 35 mm slide and the stage takes one at a time from a round tray
-// that clicks one slot. Held to the real mount (2 x 2 in, a 24 x 36 mm frame
-// shown through a 22.5 x 34 mm aperture), to the changer's one slot a push
-// whatever the distance, and to every place a look is shown.
+// A look is a 35 mm slide from a round tray that clicks one slot: held to the
+// real mount (24 x 36 mm frame, 22.5 x 34 mm aperture) and one slot a push.
 {
   const read = (f) => readFileSync(join(root, f), 'utf8');
   const ui = read('src/components/ui/Playful.tsx');
-  const uiIndex = read('src/components/ui/index.tsx');
   const css = read('src/index.css');
   const cueSrc = read('src/components/CueBar.tsx');
   const menuSrc = read('src/components/PresetMenu.tsx');
@@ -2072,10 +2069,11 @@ check('and neither starts over the limit',
   check('the drum is the sum of its pushes: out and back leaves it home, three forward leaves it three slots on',
     drum === 0 && trayDeg(drum) === 0 && drum2 === 3 && trayDeg(drum2) === 3 * SLOT_DEG, `net ${drum}, then ${drum2}`);
 
-  check('a look is a slide on the set list rows, the cue bar, the preset menu, the performer\'s saved list and both phone surfaces',
-    /<SlideMount swatch=\{swatch\}/.test(uiIndex) && /<SlideMount swatch=\{liveSwatch\}/.test(cueSrc) && /<SlideMount swatch=\{cuedSwatch\}/.test(cueSrc) &&
-    (menuSrc.match(/<SlideMount swatch=\{swatchOf\(p\.id\)\}/g) ?? []).length === 2 && /<SlideMount swatch=\{l\.swatch\}/.test(deskPanelsSrc) &&
-    /<SlideMount swatch=\{p\.lookSwatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\} size=\{60\}/.test(playSrc));
+  const chip = (who) => new RegExp(`<LookChip\\s+key=\\{${who}\\.id\\}\\s+lookId=\\{${who}\\.(lookId|id)\\}[^>]*swatch=\\{${who}\\.swatch\\}`);
+  check('a look is a slide on the cue bar and preset menu, a chip of its picture on the Cues panel and the phone (34b-6)',
+    /<SlideMount swatch=\{liveSwatch\}/.test(cueSrc) && /<SlideMount swatch=\{cuedSwatch\}/.test(cueSrc) && (menuSrc.match(/<SlideMount swatch=\{swatchOf\(p\.id\)\}/g) ?? []).length === 2 &&
+    chip('c').test(deskPanelsSrc) && chip('l').test(deskPanelsSrc) && chip('l').test(stageSrc) && /<LookPicture lookId=\{p\.activeLookId\} swatch=\{p\.lookSwatch\}/.test(stageSrc) &&
+    /<LookPicture lookId=\{l\.id\} swatch=\{l\.swatch\} size=\{60\}/.test(playSrc) && !/SlideMount/.test(deskPanelsSrc + stageSrc + playSrc));
   check('the tray is on the cue bar and the phone\'s look button and Looks strip, each given the look\'s place in its own list',
     /<SlideTray at=\{liveAt\}/.test(cueSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(stageSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(playSrc) &&
     /liveAt=\{deskLookSlot\}/.test(panel0app) && (panel0app.match(/lookSlot=\{phoneLookSlot\}/g) ?? []).length === 2);

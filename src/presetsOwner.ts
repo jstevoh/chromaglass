@@ -1,4 +1,6 @@
 import type { Preset } from './presets';
+import { DEFAULT_SETTINGS } from './types';
+import { stirCordDepth, withMusicStir } from './lib/stir';
 
 /**
  * The owner's three saved looks, shipped to everyone (PLAN 34b-7).
@@ -420,5 +422,40 @@ export function layOwnerLooks(looks: Preset[]): void {
   const fresh = OWNER_LOOKS.filter(o => !looks.some(p => p.id === o.id));
   if (!fresh.length) return;
   const at = looks.findIndex(p => p.pack === 'moire');
-  looks.splice(at < 0 ? looks.length : at, 0, ...fresh.map(o => ({ ...o, settings: { ...o.settings } })));
+  looks.splice(at < 0 ? looks.length : at, 0, ...fresh.map(o => ({ ...o, settings: houseRules({ ...o.settings }) })));
+}
+
+/*
+  The house rules every shipped look keeps, put on the owner's three as they
+  are laid. They were saved on a desk that let a saved look keep what a
+  shipped one may not, and PR CI's logic shard said so on all three:
+
+    - The frame holds still (`npm run framesway`, the owner's rule that sound
+      never moves the whole picture): each had the music on the plate's
+      rotation (complexity or treble). Taken off; the rotation's own motor,
+      rotationSpeed, still turns each as it did in silence.
+    - The glass is still and the dye smooth unless someone moves them
+      (`npm run glassstill`, PLAN 38u-8, 38u-11): Glass Smear and
+      Granulation (grain painted over the dye) rest at 0. Not handed to a
+      slide cord as the nineteen older looks' slides were: that cord is
+      what those looks kept of a constant slide they were built around, the
+      check holds it to them alone, and a new look's glass moves when
+      someone moves it (Glass Smear on the desk, or an LFO cord on it).
+    - The music stirs only through a cord (`npm run musicstir`, PLAN 38u-5):
+      the stir cord's depth is the one the look's own Turbulence and Sound
+      Drive call for (lib/stir.ts `stirCordDepth`). Saved, each carried 0.33,
+      the depth for the dial it was saved beside, not the one it has now.
+
+  Done here, from the rules' own functions, rather than by editing the
+  numbers above: the looks stay as they were read off the Mac, and a look
+  whose Turbulence is retuned keeps the right stir without anyone
+  remembering to.
+*/
+function houseRules(s: Preset['settings']): Preset['settings'] {
+  if (s.audioMappings) s.audioMappings = { ...s.audioMappings, rotation: 'none' };
+  s.glassSmear = 0;
+  s.granulation = 0;
+  s.sceneMappings = withMusicStir(s.sceneMappings, stirCordDepth(
+    s.turbulenceScale ?? DEFAULT_SETTINGS.turbulenceScale, s.audioImpact ?? DEFAULT_SETTINGS.audioImpact));
+  return s;
 }

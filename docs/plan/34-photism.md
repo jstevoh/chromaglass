@@ -189,7 +189,7 @@ a grid of generic stock thumbnails: ours are the plate itself.
   laid last in `presetsLay.ts` since they carry their cords), read from the Mac app's show server as
   each played. Changed from the saved look: Soapy Mess's trapped air off (33q-4) and its two music
   hands wired to nothing taken out; Mushy Mushy's Turbulence 0.99 to 0.8 so its music stir has
-  room to move (`npm run soundpatch` found both), its name capitalised. Their dyes are picks (44k-19 says why); the owner judges them.
+  room to move (`npm run soundpatch` found both), its name capitalised. All three keep the house rules as they are laid (`houseRules`): no sound on the frame's rotation (`framesway`), Glass Smear and Granulation at rest (`glassstill`), the stir cord at its Turbulence's depth (`musicstir`). Their dyes are picks (44k-19 says why); the owner judges them.
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the
