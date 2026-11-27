@@ -373,9 +373,11 @@ export interface SliderProps extends Keyed {
    * where the 48 px rule needs the full row.
    */
   dense?: boolean;
+  /** Disable the slider when a parent mode is off (e.g. phone's Show, Evolve, Spin). */
+  disabled?: boolean;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense, disabled = false }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -423,9 +425,10 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   const line = help ?? helpFor(midiKey);
   const tip = useControlTip({
-    name: label, help: line, value: display,
-    hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
+    name: label, help: line, value: disabled ? undefined : display, disabled,
+    hint: !touch && !disabled && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
+  const labelDisplay = disabled ? 'Off' : display;
   const track = (
     <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
       <input
@@ -433,14 +436,15 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
         min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
         step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
         value={curve === 1 ? value : at}
+        disabled={disabled}
         onChange={e => {
           const raw = Number(e.target.value);
           if (curve === 1) { onChange(raw); return; }
           onChange(handValueAt(raw, min, max, curve));
         }}
         aria-label={label}
-        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''}`}
+        onDoubleClick={disabled || resetTo === undefined ? undefined : () => onChange(resetTo)}
+        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''} ${disabled ? 'cursor-not-allowed' : ''}`}
         style={{ '--fill': `${pct}%` } as CSSProperties}
       />
     </PaceTrack>
@@ -457,7 +461,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   if (dense && !touch) {
     return (
-      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
+      <div className={`mb-px flex h-6 items-center gap-2 ${disabled ? 'opacity-65' : ''}`} ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" data-disabled={disabled ? 'true' : undefined} {...tip.bind}>
         {tip.card}
         <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
         <div className="min-w-0 flex-1">{track}</div>
@@ -466,12 +470,12 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             hit ? 'bg-text text-bg' : 'text-faint'
           }`}>{cc}</span>
         )}
-        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[12px] font-medium text-text-2">{display}</span>
+        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[12px] font-medium text-text-2">{labelDisplay}</span>
       </div>
     );
   }
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
+    <div className={`mb-5 ${disabled ? 'opacity-65' : ''}`} ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-disabled={disabled ? 'true' : undefined} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (
@@ -494,7 +498,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
               hit ? 'bg-text text-bg' : 'text-faint'
             }`}>CC {cc}</span>
           )}
-          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
+          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{labelDisplay}</span>
         </span>
       </div>
       {track}
