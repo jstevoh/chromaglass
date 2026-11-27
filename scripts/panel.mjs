@@ -1278,8 +1278,8 @@ check('and neither starts over the limit',
 // which it hands to the params object as `p.surfaceTension`. An audit looking
 // for `.surfaceTension` finds those and calls the setting live. It was not:
 // the presets' own comments for it describe what `blobSurfaceTension` does,
-// and each preset that set both said the same thing twice. The local is now
-// called `immiscibility` so the name cannot lie again, and this check is here
+// and each preset that set both said the same thing twice. The local went
+// with both dials (Hold Apart, PLAN 18d-6), and this check is here
 // so the next one does not need the name to be honest.
 //
 // Two things this had to learn the hard way, both of them the same rule —

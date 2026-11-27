@@ -8,6 +8,7 @@
  */
 
 import { BILERP_N, HEAD, NOISE_WGSL, W } from './shared';
+import { OPEN_RIM } from '../../../lib/turntable';
 import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../lib/turntable';
 import { BOIL_PROPERTIES_WGSL } from '../lampBoil';
 
@@ -155,6 +156,118 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, safeVel(vec4f(v.xy + A.a.xy * w, v.z, v.w)));
 }`,
 
+  /*
+    Hold Apart's copy of the dye (PLAN 18d-6): the three bands blurred, for
+    holdStress, below; forcesB says why the stress is not read from the dye
+    itself. One pass of a five-tap binomial (1 4 6 4 1) along A.a.xy, which
+    is its step in cells of the field it writes: run along x and along y a
+    cell apart, then both again HOLD_APART_WIDER cells apart, which between
+    them are a blur √(1 + WIDER²) of those cells wide (HOLD_APART_BLUR). The
+    field is HOLD_APART_FINE cells to the logical cell, so its width on the
+    plate does not go with the solver's grid, and the first pass reads the
+    dye bilinearly, which at a cell's centre on a grid up to twice as fine
+    is the mean of the cells under it and not a point of them.
+
+    The textures are 32-bit (fields.ts ensureHoldApart), and that was
+    measured: kept in the 16-bit format the solver's other fields use, the
+    blurred dye came in steps of one in two thousand, the stress is the
+    small difference of squares of its differences, and a straight edge at
+    rest shook cell against cell at 5% of the speed of the flow that rounds
+    a pool, however wide the edge was laid.
+
+    On a thin gap only the taps inside the open rim count, and the weights
+    are made up among them: past the rim the plate has no dye, and blurred
+    in, that nothing reads as an edge all the way round the dish. Run only
+    while the dial is up.
+  */
+  holdSoft: `${HEAD}${BILERP_N}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let m = f32(textureDimensions(dst).x);
+  if (id.x >= u32(m) || id.y >= u32(m)) { return; }
+  let uv = (vec2f(id.xy) + 0.5) / m;
+  let n = f32(textureDimensions(src).x);
+  let most = ${OPEN_RIM.toFixed(2)} - 1.5 / S.n;
+  var binom = array<f32, 3>(6.0, 4.0, 1.0);
+  var sum = vec3f(0.0);
+  var weight = 0.0;
+  for (var i = -2; i <= 2; i++) {
+    let at = uv + A.a.xy * (f32(i) / m);
+    if (S.thinGap > 0.5 && length(at - vec2f(0.5)) > most) { continue; }
+    let w = binom[abs(i)];
+    sum += w * bilerpN(src, at, n).rgb;
+    weight += w;
+  }
+  textureStore(dst, vec2i(id.xy), vec4f(sum / max(weight, 1.0), 1.0));
+}`,
+
+  /*
+    Hold Apart's stress (PLAN 18d-6; forcesB has the law): ∇·T over K in
+    the cells of holdSoft's blurred dye, T = |∇ã|² I − ∇ã⊗∇ã summed over
+    its three bands, for forcesB to scale and add.
+
+    Both the gradient and the divergence are the nine-point differences
+    whose first error is the same in every direction, (h²/6)∇(∇²·): a
+    third of the weight on the row itself and a twelfth on each
+    neighbouring row, [1 4 1]/12. The plain central difference's error is
+    (h²/6)∂³/∂x³ along x and ∂³/∂y³ along y, which for a straight edge
+    leaning across the grid do not add up to a vector across the edge: the
+    gradient comes out turned a little, by an amount that changes sign
+    through the edge, the tension with it, and what should be nothing is a
+    shear along the edge, one way on one side and the other way on the
+    other (the lab's leaning edge, one and a half times a rounding pool's
+    flow even on the blurred dye). With the error isotropic the gradient
+    of a straight edge is across it at any angle to the next order, and
+    what is left falls fast with the blur's width in cells: 27% of the
+    pool's flow at one cell, 9.5% at one and a half, and under 1% at the
+    three or so the finer field and the second blur give it.
+
+    Near a thin gap's open rim there is no stress: none in any cell whose
+    stencil or whose blur (A.a.x cells of this field, and two of the
+    grid's) touches the rim. Past the rim the plate keeps no dye (decayDye
+    takes it off), so a cell that read out there read an edge that ends,
+    and an edge that ends has its tension pulling on the end with nothing
+    to hold it: a straight boundary across the whole dish drew a flow in
+    from both its ends, 6.7% of the flow about a rounding pool after five
+    seconds. Left out, the ring of cells at the rim holds an edge's end as
+    a wall would.
+  */
+  holdStress: `${HEAD}
+@group(0) @binding(2) var soft: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn softAt(p: vec2i, m: f32) -> vec3f { return textureLoad(soft, clampP(p, m), 0).rgb; }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let m = f32(textureDimensions(dst).x);
+  if (id.x >= u32(m) || id.y >= u32(m)) { return; }
+  let p = vec2i(id.xy);
+  let uv = (vec2f(id.xy) + 0.5) / m;
+  if (S.thinGap > 0.5 && length(uv - vec2f(0.5)) + A.a.x / m + 2.0 / S.n >= ${OPEN_RIM.toFixed(2)}) {
+    textureStore(dst, p, vec4f(0.0));
+    return;
+  }
+  // The blurred dye two cells round, then T at the nine cells in the middle of them.
+  var a: array<vec3f, 25>;
+  for (var j = 0; j < 5; j++) { for (var i = 0; i < 5; i++) { a[i + j * 5] = softAt(p + vec2i(i - 2, j - 2), m); } }
+  var txx: array<f32, 9>;
+  var txy: array<f32, 9>;
+  var tyy: array<f32, 9>;
+  for (var j = 0; j < 3; j++) { for (var i = 0; i < 3; i++) {
+    let c = (i + 1) + (j + 1) * 5;
+    let gx = (4.0 * (a[c + 1] - a[c - 1]) + (a[c + 6] - a[c + 4]) + (a[c - 4] - a[c - 6])) / 12.0;
+    let gy = (4.0 * (a[c + 5] - a[c - 5]) + (a[c + 6] - a[c - 4]) + (a[c + 4] - a[c - 6])) / 12.0;
+    txx[i + j * 3] = dot(gy, gy);
+    txy[i + j * 3] = -dot(gx, gy);
+    tyy[i + j * 3] = dot(gx, gx);
+  } }
+  // ∂x and ∂y of each, the same nine-point way: index 4 is this cell, ±1 along x, ±3 along y.
+  let dxXX = (4.0 * (txx[5] - txx[3]) + (txx[8] - txx[6]) + (txx[2] - txx[0])) / 12.0;
+  let dyXY = (4.0 * (txy[7] - txy[1]) + (txy[8] - txy[2]) + (txy[6] - txy[0])) / 12.0;
+  let dxXY = (4.0 * (txy[5] - txy[3]) + (txy[8] - txy[6]) + (txy[2] - txy[0])) / 12.0;
+  let dyYY = (4.0 * (tyy[7] - tyy[1]) + (tyy[8] - tyy[2]) + (tyy[6] - tyy[0])) / 12.0;
+  textureStore(dst, p, vec4f(dxXX + dyXY, dxXY + dyYY, 0.0, 1.0));
+}`,
+
   // Everything the CPU applies after the projection, fused with addCurrent.
   forcesB: `${HEAD}${NOISE_WGSL}${BILERP_N}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -162,17 +275,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var cur: texture_2d<f32>;
 @group(0) @binding(5) var sq: texture_2d<f32>;
 @group(0) @binding(6) var sw: texture_2d<f32>;
-@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(8) var dstForced: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(7) var holdT: texture_2d<f32>;
+@group(0) @binding(8) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(9) var dstForced: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
   let uv = uvOf(id);
   var v = textureLoad(vel, q, 0);
   let dyeC = textureLoad(dye, q, 0);
+  let thinRim = S.thinGap > 0.5;
   let d = dyeC.a;
   let p = uv * S.l;
-  let eL = vec2f(1.0 / S.l, 0.0);
 
   if (S.turbScale > 0.005) {
     var cur = vec2f(0.0);
@@ -197,35 +311,78 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     onto Turbulence above (lib/stir.ts); npm run musicstir holds it.
   */
 
-  if (S.tension > 0.0 && d >= 0.01) {
-    let col = dyeC.rgb / d;
-    let cR = bilerpN(dye, uv + eL, S.n);
-    let cL = bilerpN(dye, uv - eL, S.n);
-    let cT = bilerpN(dye, uv + eL.yx, S.n);
-    let cB = bilerpN(dye, uv - eL.yx, S.n);
-    var cdx = 0.0;
-    var cdy = 0.0;
-    if (cR.a > 0.01 && cL.a > 0.01) {
-      let dr = length(cR.rgb / cR.a - col);
-      let dl = length(cL.rgb / cL.a - col);
-      cdx = dr * dr - dl * dl;
-    }
-    if (cT.a > 0.01 && cB.a > 0.01) {
-      let dt_ = length(cT.rgb / cT.a - col);
-      let db = length(cB.rgb / cB.a - col);
-      cdy = dt_ * dt_ - db * db;
-    }
+  /*
+    Hold Apart (PLAN 18d-6): the stress an edge of composition carries.
+
+    What was here: a push between unlike colours, −∇(|Δcolour|²) times the
+    dye there, sized by Polarity and Blob Surface Tension together and on in
+    every look. It stood for "two colours hold apart", and two dyes in the
+    same water do not: they are one liquid, with no interface, and they mix
+    (the dye's diffusion and the flow's folding, absorbance adding band by
+    band). Nor was the push a tension. A gradient of anything is taken up by
+    the pressure between two glasses, so along a straight boundary all it
+    did was lean on it, the same along every row (\`npm run forces\` 6 held it
+    to that), and what moved the plate was only where the amount of dye
+    varied across it. A real tension does nothing at all to a straight
+    boundary and rounds a curved one.
+
+    So at the dial's 0, the real number and every look's default, there is
+    no force here. Past it the dial scales the one stress a difference in
+    composition does carry inside a single liquid, Korteweg's:
+
+      T = K (|∇a|² I − ∇a⊗∇a),   f = ∇·T,
+
+    summed over the dye's three bands of absorbance, which are its
+    composition here. It is a tension along the edge and nothing across it:
+    T's only entry on a straight edge is along the edge and constant along
+    it, so f is zero there to the bit, with no pressure needed to make it
+    so; round a pool it is the Laplace jump K∫|∇a|²dn times the curvature,
+    toward the inside; and it falls as the edge blurs, which is how the
+    real one relaxes. Written as the divergence of the stress (Lafaurie et
+    al. 1994) and not as K∇²a∇a so that it sums to nothing over any patch:
+    a tension moves no liquid on the whole.
+
+    Worked out on a grid of its own (half a millimetre a cell, twice the
+    logical one) from a blurred copy of the dye, by holdSoft and
+    holdStress above, and only added here: holdT is ∇·T over K, in that
+    grid's cells. Four things were measured wrong on the way to that, each
+    by \`npm run forces\` 6. Taken from the dye's own cells, the tension
+    went with the grid: an edge carries one over its width, and the width
+    the grid holds is a few of its cells whatever their size, so the same
+    dial laid three times the tension on a 768 grid as on a 256. Taken at
+    a fixed reach but still from the dye, an edge a cell or two wide is
+    too sharp to difference, and a straight boundary leaning across the
+    grid, which a tension leaves alone, got a shear along it twice as fast
+    as the flow that rounds a pool (202%). Blurred first but differenced
+    the plain way, that shear was still one and a half times the pool's
+    flow: a central difference's error leans toward the grid's axes, so on
+    a leaning edge the gradient it gives is not quite across the edge, and
+    the tension not quite along it. And blurred into a 16-bit texture, the
+    blurred dye's own rounding shook every straight edge. holdSoft and
+    holdStress say what each uses instead; the leaning edge's flow is now
+    under 1% of the pool's.
+
+    S.tension is K for this step and S.holdCap the most it may add
+    (constants.ts, holdApartPull and HOLD_APART_CELLS).
+  */
+  if (S.tension > 0.0) {
     /*
-      The push is the same sign everywhere. It was multiplied by 1 + 2n, n a
-      slow noise on the plate, and where n fell under -0.5 that factor was
-      negative: there the force pulled unlike colours together, the backward
-      diffusion that the removed fingering push was taken out for (below).
-      Polarity 0.5 in every look, so a third of the plate's patches did it
-      (npm run forces, 6). The noise stood for nothing physical: a tension
-      between two liquids does not depend on where on the glass they meet.
-      The force itself is still a stand-in for the mixing law (18d-6).
+      Between two glasses what is added is a speed: the gap's drag settles
+      the liquid to it within the step (hsPrep). The old plate has no gap
+      and no drag of that kind, and this pass comes after its projections,
+      so the same number laid whole went straight into the flow that
+      carries the dye: in the lab a pool of one colour in another lost 88%
+      of its dye in five seconds, at the solver's top speed. Laid as the
+      share Momentum takes off a step (1 − S.damping) it is tame there: the
+      same pool keeps 99.6% and rounds from an aspect of 2.50 to 2.42 in
+      those five seconds, against 1.99 between the glasses. Slower than
+      the gap's, and PLAN 18d-6b is to lay it before that plate's
+      projections with its other forces.
     */
-    v = vec4f(v.xy - vec2f(cdx, cdy) * (S.tension * 0.8) * d, v.z, v.w);
+    var hold = S.tension * bilerpN(holdT, uv, f32(textureDimensions(holdT).x)).xy * select(clamp(1.0 - S.damping, 0.0, 1.0), 1.0, thinRim);
+    let hl = length(hold);
+    if (hl > S.holdCap) { hold *= S.holdCap / hl; }
+    v = vec4f(v.xy + hold, v.z, v.w);
   }
 
   /*

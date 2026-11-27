@@ -191,8 +191,9 @@ function stirWas(dial, energy, mid, treble, drive) {
 // What deriveStep reads off the layer: its place, its clock, its glass, its hands, the magnets, the dish.
 const STEP_READS = ['boilHolds', 'coverHand', 'coverX', 'coverY', 'dishSpin', 'downhill', 'dt', 'dtSeconds', 'extraMagnets', 'gpu', 'layerIndex',
   'liquidSpin', 'magnetRadius', 'meanDensity', 'rockGain', 'rockX', 'rockY', 'seedBudget', 'seedMean', 'sparseDarkLook', 'stepHandBank', 'thinGap', 'tiltX', 'tiltY'];
-// The uniforms the forces pass reads (main's, less spin).
-const FORCE_READS = ['air', 'curBuoy', 'curDamp', 'curGrav', 'drip', 'dt', 'l', 'maxCur', 'meanD', 'n', 'rock', 'smear', 'tension', 'time', 'turbDetail', 'turbScale', 'up', 'vibF', 'vibI'];
+// The uniforms the forces pass reads (main's, less spin). Hold Apart (PLAN 18d-6) added three, none the sound's: thinGap is the
+// plate's kind, damping the Momentum setting as deriveStep hands it on, and holdCap a constant over the step's displacement, as maxCur is.
+const FORCE_READS = ['air', 'curBuoy', 'curDamp', 'curGrav', 'damping', 'drip', 'dt', 'holdCap', 'l', 'maxCur', 'meanD', 'n', 'rock', 'smear', 'tension', 'thinGap', 'time', 'turbDetail', 'turbScale', 'up', 'vibF', 'vibI'];
 
 // ── 1. No sound reaches the step ────────────────────────────────────────────
 

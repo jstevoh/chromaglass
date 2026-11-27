@@ -12,7 +12,7 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST, HOLD_APART_FINE, HOLD_APART_WIDER } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -1273,6 +1273,26 @@ export class FluidPasses extends FluidFields {
    * cell with both above zero computes `(dye - od) + od` in float32, which is
    * not bit-identical to `dye` across different exponents.
    */
+  /**
+   * Hold Apart's stress for this step's forcesB (PLAN 18d-6): the dye blurred onto the stress's own grid (four passes
+   * of holdSoft, along x and y a cell apart and again `HOLD_APART_WIDER` apart, between the two textures) and the
+   * stress's divergence taken there, while the dial is up. With the dial at 0 the dye itself, which fills the binding
+   * and is not read (S.tension is 0 there).
+   */
+  protected holdSoftStep(pass: GPUComputePassEncoder, p: GpuStepParams): GPUTexture {
+    if (!((p.holdApart ?? 0) > 0)) return this.dye.read;
+    this.ensureHoldApart();
+    const m = this.L * HOLD_APART_FINE;
+    const w = HOLD_APART_WIDER;
+    this.run(pass, 'holdSoft', this.holdForce!, [this.dye.read], this.arg('hold x', [1, 0, 0, 0]), m);
+    this.run(pass, 'holdSoft', this.holdSoft!, [this.holdForce!], this.arg('hold y', [0, 1, 0, 0]), m);
+    this.run(pass, 'holdSoft', this.holdForce!, [this.holdSoft!], this.arg('hold wide x', [w, 0, 0, 0]), m);
+    this.run(pass, 'holdSoft', this.holdSoft!, [this.holdForce!], this.arg('hold wide y', [0, w, 0, 0]), m);
+    // A.a.x: how far from the open rim the stress starts, in these cells: the blur's reach (2 + 2w), the two differences' (2) and one over.
+    this.run(pass, 'holdStress', this.holdForce!, [this.holdSoft!], this.arg('hold stress', [5 + 2 * w, 0, 0, 0]), m);
+    return this.holdForce!;
+  }
+
   protected disperseWanted(dm: number, kappaT: number, dispCells: number, bodies: boolean): boolean {
     return bodies || dm > 0 || (kappaT > 0 && dispCells > 0);
   }

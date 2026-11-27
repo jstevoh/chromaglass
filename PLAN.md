@@ -108,7 +108,8 @@ the rest, one PR each. **Later**: the chemical clock (48a), air fingers and fern
 48d, 48u), thin-film rainbows (48e, §32), bubbles (38g-2, §33), tilt and spin (18a-13, §22),
 pressing the glass (38l, 38r-18), lace (§20), polarised extras (31p), the lens (38q, 31a), the
 tank (47n, 48k, 48l) and the other ideas (48m, 48o, 15h, 15k). The owner's answers, 2026-11-27
-(decision cards): **18d-6** dyes in water mix as real dyes do, with a Hold Apart dial past real;
+(decision cards): ~~**18d-6**~~ dyes in water mix as real dyes do, with a Hold Apart dial past real
+(shipped 2026-11-27; **18d-6a** to **18d-6c** are what it left);
 **18d-7** milk blends like milk, no held edge; **18d-5** Surfactant Flow scales soap's real
 spreading strength (1 is real); **38m**, **38n-2** bubble films show their true interference
 colours, Iridescence a boost past real; **38p**, **18k** every look re-baselined for light added
@@ -363,7 +364,7 @@ style (§31).
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses
   (31f-1 one lens model, then 31f-2 projector types, 31f-3 camera types, 31f-4 the picker on desks and phone, 31f-5 Pro's own lens types).
   ~~**31p-1** polarised light~~ (shipped; `npm run polar`), then **31p-2** colour that lingers after the stir, ~~**31p-3** stressed dishes~~ (shipped; `npm run polar`), **31p-3a** a dish that warms, **31p-3b** cellophane, 31p-4 to 31p-7 (§31).
-- **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
+- **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, ~~**18d-6**~~ dyes that mix with Hold Apart past real, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, ~~**18m-5a**~~ slump check with grid filter on, ~~**18m-5b**~~ its cost, ~~**18m-5c**~~ the filter's edge reshaping), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12, 20b-14 to 20b-16; ~~20b-13~~ the film's dye).

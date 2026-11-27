@@ -137,3 +137,14 @@ and a stream held on the plate, lay their colour with their own volume; story in
 ## 18e. Edges come from refraction (replaces the painted rims and highlights)
 
 - ~~**18e-2. A clear pour's edge, and the deflection from the optical path.**~~ **Shipped, this PR** (the derive pass writes `|∇OPL|` in `.z`, the closeup keeps its dye-path Laplacian in `camLap` via `TRANSMIT_WGSL`, and `oplPupilLoss` deflects the front plate's light by `|∇OPL| · DISH_REST_GAP · logicalGrid` against `DROP_NA = 0.25` beside `defocusShadow`; `npm run derive` 5/5, `npm run nolight -- --owed=film` 15/15; story in `docs/plan-shipped.md` §18e).
+
+## 18d. Each liquid has its real properties (replaces the property scalars)
+
+- ~~**18d-6**~~ (shipped 2026-11-27) Dyes in water mix as real dyes do, with a Hold Apart dial past
+  real (the owner's answer, 2026-11-27). The colour-difference push (Polarity times Blob Surface
+  Tension, on in every look) is gone with both settings: two dyes in one water are one liquid, no
+  force between them, mixing by the dye's diffusion and the flow, absorbance adding band by
+  band. `holdApart` (0 in every look) scales Korteweg's stress, K(|∇a|² I − ∇a⊗∇a), up to a
+  cooking oil's tension (0.025 N/m) across a sharp unit step at 1, read from a blurred 32-bit
+  copy of the dye on a grid of its own (half a logical cell) so it is the same on every solver
+  grid and leaves a straight edge alone at any angle. `npm run forces` line 6.

@@ -3101,3 +3101,19 @@ Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just
    the camera still on the plate; Stop ends only the pour; Off ends both.
 5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
 
+
+## 148. Dyes mix as real dyes do, and Hold Apart (PLAN 18d-6)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Open **Macro Bead**, **Roy, 1963**, **Poster, 1969**, **Milk Marbling** and **Lens Pools**, the
+   five looks that had Polarity highest. Good: each still reads as itself, and where two colours
+   meet they blend across the edge as two inks in water do. Bad: a look that has gone to one
+   muddy colour within a minute where it used to keep its colours for the whole song.
+2. On any look with a few colours, Settings → Chemistry → Oil & Soap → **Hold Apart** to 1.
+   Good: over ten or twenty seconds long streaks draw back, small pools round up and the
+   colours keep to bodies, like oil paint in water; a long straight edge between two colours
+   stays put. Bad: speckle, a comb along the edges, or colour pushed off into the clear water.
+3. Back to 0. Good: the colours go back to running into each other.
+4. The same slider on the phone, in Settings under Oil & Soap, where Polarity was.
+To put it back: a look that should keep its colours apart gets `holdApart` in `src/presets.ts`
+(0.3 to 1); the old push itself is not coming back, it was not a tension (`npm run forces` 6).
