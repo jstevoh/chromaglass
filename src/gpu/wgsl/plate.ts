@@ -1389,18 +1389,20 @@ fn mixBlendOf(v: f32) -> i32 { return i32(v + 0.5); }
 
 const MIX_KEY_LO = 0.18;
 
-// Each row's blend on light (38p): screen and multiply as named, add as light, the fades as light; its level a dimmer's.
+/*
+  A row's named blend (the Mixer's Blend picker: Screen, Add, Multiply, Key)
+  stays the operation it is named, on display values, as the second plate's
+  Blend Mode does (PLAN 38p-2): it is a chosen operation, not two lights.
+  A row's own way (mode 0, in mixSourcesAt and mixLamp) is the physics, and
+  that is done on light (plateLight.ts).
+*/
 fn blendRowKeyed(c: vec3f, s: vec3f, a: f32, mode: i32, keyLo: f32) -> vec3f {
-  let w = levelShare(a);
-  let cl = lightOf(c);
-  let sl = lightOf(clamp(s, vec3f(0.0), vec3f(1.0)));
-  if (mode == 1) { return mixLight(c, displayOf(1.0 - (1.0 - min(cl, vec3f(1.0))) * (1.0 - sl)), w); }
-  if (mode == 2) { return displayOf(cl + lightOf(s) * w); }
-  if (mode == 3) { return mixLight(c, c * s, w); }
-  if (mode == 4) { return mixLight(c, s, w * smoothstep(keyLo, keyLo + 0.18, dot(s, vec3f(0.299, 0.587, 0.114)))); }
-  return mixLight(c, s, w);
+  if (mode == 1) { return mix(c, 1.0 - (1.0 - c) * (1.0 - clamp(s, vec3f(0.0), vec3f(1.0))), a); }
+  if (mode == 2) { return c + s * a; }
+  if (mode == 3) { return mix(c, c * s, a); }
+  if (mode == 4) { return mix(c, s, a * smoothstep(keyLo, keyLo + 0.18, dot(s, vec3f(0.299, 0.587, 0.114)))); }
+  return mix(c, s, a);
 }
-
 fn blendRow(c: vec3f, s: vec3f, a: f32, mode: i32) -> vec3f { return blendRowKeyed(c, s, a, mode, MIX_KEY_LO); }
 
 /*

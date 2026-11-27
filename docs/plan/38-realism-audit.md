@@ -434,8 +434,7 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   Shipped 2026-11-27: `wgsl/plateLight.ts` (lightOf, displayOf, mixLight exact at both ends,
   addLight, and the six bands of Spectral Mix summed on light). Lamp Ground's fades
   (onGround, groundOf, chemOnGround, the closeup's liquidPart), the mixer's faders
-  (mixLevelled) and rows (blendRowKeyed: Screen and Multiply computed on light, Add as light),
-  the LED ring and lumia as beams (screenOver) and the lumia in the lamp, the camera's depth of
+  (mixLevelled), the LED ring and lumia as beams (screenOver) and the lumia in the lamp, the camera's depth of
   field and bloom (its knee 0.55 of display values, 0.268 of light) take them. A mixer level
   is a dimmer: its share of the light is the level to the 2.2 (`levelShare`), so half a
   fader looks half and a fader at next to nothing lays next to nothing (`npm run mixer`). The two projectors' add had
@@ -461,8 +460,9 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     look's pictures. Each is a highlight whose strength
     was set by eye on display values, so moving it re-tunes every look that has it: do each
     with that look's pictures. The second plate's blends on the black ground (screen,
-    lighter, multiply, exclusion) stay display-value operations: they are the Blend
-    picker's named operation, not two lights, and on the lamp ground the second plate is
+    lighter, multiply, exclusion) and a mixer row's Blend picker (Screen, Add, Multiply,
+    Key) stay display-value operations: they are a named operation, not two lights
+    (taken to light, `npm run mixer` could no longer tell Screen from Add on its plate), and on the lamp ground the second plate is
     already a filter (a product).
 
 - **38q. The camera's lens, not a grade** (S–M; Medium on the camera looks). Sharpens

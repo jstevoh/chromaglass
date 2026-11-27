@@ -28,8 +28,10 @@
  *      level to the 2.2, so a fader at next to nothing lays next to nothing
  *   6. the shaders that sum light take these functions: the plate's shader
  *      has one spectralThrough and it is plateLight's, the camera's blur
- *      and bloom decode what they average, the mixer's rows and faders go
- *      through mixLight. A read of the source, so it says only that the
+ *      and bloom decode what they average, the mixer's faders and its rows'
+ *      own ways (beams, the lumia in the lamp) go through plateLight. A
+ *      row's named Blend (Screen, Add, Multiply, Key) stays the display-value
+ *      operation `npm run mixer` checks formula by formula (PLAN 38p-2). A read of the source, so it says only that the
  *      sums are wired; lines 1 to 4 say what they compute, and `npm run lamp`
  *      line 6 reads the fade off the real plate, pixel by pixel.
  */
@@ -142,11 +144,10 @@ const base = 2 * n;
   if (!/mixLight\(/.test(fn(plate, 'chemOnGround'))) miss.push('chemOnGround');
   if (!/mixLight\(under, over, levelShare\(level\)\)/.test(fn(plate, 'mixLevelled'))) miss.push('mixLevelled');
   if (!/lightOf\(c\) \+ lightOf\(light\)/.test(plate)) miss.push('screenOver');
-  if (/return mix\(c, s, a\)/.test(fn(plate, 'blendRowKeyed'))) miss.push('blendRowKeyed');
   if (/c \+= lumiaLight/.test(lamp)) miss.push('the lumia in the lamp');
   if (!/col \+= lightOf\(/.test(camera) || !/displayOf\(col \/ 12\.0\)/.test(camera)) miss.push("the camera's depth of field");
   if (!/let s1 = lightOf\(/.test(camera) || !/displayOf\(lightOf\(col\) \+ glow/.test(camera)) miss.push("the camera's bloom");
-  check('the shaders that add or fade light do it through plateLight (a read of the source)', miss.length === 0, miss.join(' · ') || 'eleven sites');
+  check('the shaders that add or fade light do it through plateLight (a read of the source)', miss.length === 0, miss.join(' · ') || 'ten sites');
 }
 
 const failed = checks.filter((c) => !c.ok).length;

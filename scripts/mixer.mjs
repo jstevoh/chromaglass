@@ -731,12 +731,6 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
       multiply  c·(1 − L + L·s)            (rows with no alpha of their own)
       key       mix(c, s, L·smoothstep(0.18, 0.36, luma(s)))   (Film Key's default, and every other row's)
 
-    Since PLAN 38p each is a formula of light: c and sa are the light of the
-    picture and of the row (the display values to the 2.2), the prediction is
-    encoded back, and L is the level's share of the light, 0.6 to the 2.2
-    (wgsl/plateLight.ts levelShare, a dimmer's curve); the key's smoothstep
-    still reads the row's luma in display values, as the shader does.
-
     and the picture drawn with that blend must be its own prediction, and not
     the other three's. The back plate's dye has a coverage of its own which
     add at full level cannot tell from its colour, so only the two that need
@@ -744,16 +738,14 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
     out where anything is at white, where the frame's clip makes every
     prediction the same number.
   */
-  const L = 0.6 ** 2.2;
-  const lin = (v) => Math.max(0, v) ** 2.2, enc = (v) => Math.max(0, v) ** (1 / 2.2);
+  const L = 0.6;
   const luma = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
   const sstep = (e0, e1, x) => { const u = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return u * u * (3 - 2 * u); };
-  // c and s here are light; each prediction is encoded back to display values.
   const predict = {
-    screen: (c, s) => c.map((v, i) => enc(v + L * s[i] * (1 - v))),
-    add: (c, s) => c.map((v, i) => enc(v + L * s[i])),
-    multiply: (c, s) => c.map((v, i) => enc(v * (1 - L + L * s[i]))),
-    key: (c, s) => { const k = L * sstep(0.18, 0.36, luma(...s.map(enc))); return c.map((v, i) => enc(v + (s[i] - v) * k)); },
+    screen: (c, s) => c.map((v, i) => v + L * s[i] * (1 - v)),
+    add: (c, s) => c.map((v, i) => v + L * s[i]),
+    multiply: (c, s) => c.map((v, i) => v * (1 - L + L * s[i])),
+    key: (c, s) => { const k = L * sstep(0.18, 0.36, luma(...s)); return c.map((v, i) => v + (s[i] - v) * k); },
   };
   const MODES = Object.keys(predict);
   /** Mean error of each prediction against the picture drawn with blend `m`, in 8-bit steps, and how many pixels. */
@@ -762,13 +754,11 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
     let n = 0;
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
       if (!where(x, y)) continue;
-      const cd = px(b.c, x, y).map(v => v / 255), full = px(b.full, x, y), got = px(b[m], x, y);
+      const c = px(b.c, x, y).map(v => v / 255), full = px(b.full, x, y), got = px(b[m], x, y);
       if (Math.max(...full, ...got) >= 250) continue;
-      const sd = full.map((v, i) => Math.max(0, v / 255 - cd[i]));
+      const s = full.map((v, i) => Math.max(0, v / 255 - c[i]));
       // Where either is dark every blend but multiply is the same number.
-      if (Math.max(...cd) < 40 / 255 || Math.max(...sd) < 40 / 255) continue;
-      // The row at full level is added as light, so its light is the difference of the lights.
-      const c = cd.map(lin), s = full.map((v, i) => Math.max(0, lin(v / 255) - c[i]));
+      if (Math.max(...c) < 40 / 255 || Math.max(...s) < 40 / 255) continue;
       const preds = MODES.map(k => predict[k](c, s));
       if (Math.max(...preds.flat()) >= 250 / 255) continue;
       preds.forEach((p, j) => { err[MODES[j]] += p.reduce((acc, v, i) => acc + Math.abs(v * 255 - got[i]), 0) / 3; });

@@ -27,17 +27,14 @@
  *   band sum is done on the light's transmissions and encoded once.
  * - `mixLight`, a fade between two pictures: Lamp Ground between the painted
  *   and the lit plate (onGround, groundOf, the chemistry's colours, the
- *   closeup's depth), the mixer's levels (mixLevelled), and every mixer row
- *   laid by its own mix. Exact at both ends, so the 24 looks at Lamp Ground 1
+ *   closeup's depth) and the mixer's levels (mixLevelled). Exact at both ends, so the 24 looks at Lamp Ground 1
  *   and every row at level 1 are the same picture to the bit. A mixer level
  *   is a dimmer, its share of the light the level to the 2.2 (`levelShare`).
  * - `addLight`, a beam over the plate or a source into the lamp: the LED ring
  *   and the lumia above the glass (screenOver), the lumia under it (in the
- *   lamp, plateLamp.ts), a mixer row's Add. The display clips where the sum
+ *   lamp, plateLamp.ts). The display clips where the sum
  *   passes white, as a projector's beam over a bright picture washes it out;
  *   the old screen formula could never reach white, which no light does.
- * - A mixer row's Screen and Multiply blends stay the blends they are named,
- *   computed on light (`blendLight`), and its key mix fades as light.
  * - The camera's depth of field and bloom (wgsl/camera.ts): a defocused
  *   pixel is the average of the light round it, and bloom is light the lens
  *   spreads, added. The bloom's threshold moves with it (0.55 in display
@@ -54,7 +51,8 @@
  * and 38p-2 (highlights drawn at a size in display values: the ferro glints
  * and dome rays, the photo style's speculars, the thin film's sheen, a
  * bead's glow, the closeup ferro drop's reflection (with 29a-6's switch);
- * and the second plate's named blends on the black ground,
+ * and the named blends, the second plate's Blend Mode on the black ground
+ * and a mixer row's Blend picker,
  * which are the Blend picker's choice of operation rather than two lights).
  * `npm run linearlight` measures every site here.
  */
