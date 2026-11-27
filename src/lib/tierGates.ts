@@ -32,6 +32,7 @@ interface NativeBridgeWindow {
     platform?: string;
     requireSignIn?: boolean;
     license?: NativeLicenseBridge;
+    onOpenAccount?: (fn: () => void) => () => void;
   };
 }
 
@@ -45,6 +46,10 @@ export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cg-open-account'));
   }
+}
+
+if (typeof window !== 'undefined') {
+  (window as unknown as NativeBridgeWindow).__CHROMAGLASS_NATIVE__?.onOpenAccount?.(openAccountSheet);
 }
 
 const MARKETING_OPTIN_KEY = 'chromaglass-marketing-optin';
