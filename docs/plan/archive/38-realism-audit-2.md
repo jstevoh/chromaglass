@@ -106,3 +106,20 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   was) reaches hsPrep through the Sim struct's slot 55, the lift and the spin; Lava Lamp sets
   0.32. Measured: lavacycle 7/7 (peaks 0.63 at 18 s, down to 0.15 by 40 s, round again to
   0.62), lavawax 3/3 (25% of the cold wax stays up).
+- ~~**38w-32. The oil's colour rides the oil with air on the plate and on the old plate**~~ (S–M;
+  Medium, after 38w-29). The split carry runs only on a thin gap with no air: the air's
+  carries (bodyAdvectSubAir, airLiquid) are built for the one MC limiter, and the old
+  plate's single carry (bodyAdvect, runPressed) still carries the oil's share with MC. Give
+  bodyAdvectSharp an Air variant and the pressed path the same split, and run oilride with
+  a bubble down and with Thin Gap off. Fusing bodyWater into the dye's first substep and
+  bodyJoin into its last would also save the two passes.
+  *Shipped 2026-11-27:* bodyAdvectSharpSubAir (airLiquid on the oil's carry) and the old
+  plate's split (bodyWater, bodyAdvectSharp through runPressed, bodyJoin); each path waits
+  for its kernels (splitReady) and carries the old way until they are built. `npm run
+  oilride -- --plate=air` (a bubble drifting through the oil under the same hand): the
+  oil's share 99.35% → 100.03% kept, inside the oil 98.1% → 98.8%, the split run on every
+  step with a bubble down and the bubble on oil in 22 of 24 reads; `--plate=old`: 98.79% →
+  100.11%, inside 97.8% → 99.0%. The thin plate unchanged (100.01%, 99.3%). The fusion is
+  38w-33. Found on the way: on a thin gap the hand carries about a quarter of the dye over
+  the open rim in these five seconds (31,222 → 23,889, the same with air and before the
+  split), the water's colour laid to the corners; the old plate's walls keep all of it.

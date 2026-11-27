@@ -503,6 +503,14 @@ KERNELS.bodyAdvectSharp = KERNELS.bodyAdvect.replace(MC_SLOPE, `fn sb1(a: f32, b
 }
 fn mm(a: vec4f, b: vec4f) -> vec4f { return vec4f(sb1(a.x, b.x), sb1(a.y, b.y), sb1(a.z, b.z), sb1(a.w, b.w)); }`);
 KERNELS.bodyAdvectSharpSub = thinFaced(substepped('bodyAdvectSharp'), 'bodyAdvectSharpSub');
+/*
+  And taking the air (PLAN 38w-32): the oil's colour with a bubble on the
+  plate, the same room the water's colour is carried in (airLiquid), so the
+  split carry runs whether or not there is air. Where either cell of a face
+  has air the face is first order in both carries, so the limiter only
+  differs away from the bubble, which is where the oil's edge is.
+*/
+KERNELS.bodyAdvectSharpSubAir = airLiquid(KERNELS.bodyAdvectSharpSub, 'bodyAdvectSharpSubAir', 'A.a.x * sub[0]');
 
 KERNELS.bodyAdvectThin = cornered(thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin'), 'bodyAdvectThin');
 KERNELS.bodyAdvectThinAir = airLiquid(KERNELS.bodyAdvectThin, 'bodyAdvectThinAir', 'A.a.x');

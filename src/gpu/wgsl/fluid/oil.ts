@@ -359,7 +359,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    Oil Bodies on a thin gap: the plate's dye split into its two liquids'
+    Oil Bodies (the thin gap's carry and the old plate's, PLAN 38w-32): the plate's dye split into its two liquids'
     shares for the carry, and joined again after it (PLAN 38w-29, the
     advect dye stage says why). bodyWater writes the water's share, the
     dye less the oil's (never more of the oil's than the dye holds, as
