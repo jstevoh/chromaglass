@@ -135,6 +135,20 @@ const OWED = {
   'silicone, every step: as strong as the stand-in': '15e-2',
   'silicone, every step: moves the dye rather than erasing it': '15e-5',
   'milk, every step: as strong as the stand-in': '15e-4',
+  /*
+    Owed since 2026-11-27 (PLAN 18a-8's corner transport; the owner's call on
+    PR #1005): milk's held edge had shrunk to 0.0002 of its spread on main
+    (1.000 of bare dye's, a fiftieth of the stand-in's), smaller than the
+    carry's own error, and the corner's sharper carry moved bare dye's spread
+    by 0.5% and milk's by 0.45%, so the ratio reads 1.0008 and the effect
+    -0.0008. The force is a shortcut (repel takes the outward flow off at the
+    pool's edge, and the projection puts most of it back), and milk is a
+    miscible emulsion that holds no edge at all (18d-7): what these lines are
+    owed is 15e-4, milk's edge as a real one.
+  */
+  'milk, a still plate: keeps its pool tighter than bare dye': '15e-4',
+  'milk, every step: keeps its pool tighter than bare dye': '15e-4',
+  'milk, a still plate: holds its pool as much as with a fold every step': '15e-4',
   'glycerine on the old plate, every step: crawls where the plate flows': '15e-3',
 };
 
