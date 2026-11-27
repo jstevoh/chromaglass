@@ -90,7 +90,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 47z-1: cobalt filmed on the Mac 2026-11-13 read darker, colourfulness 62 against 131, the frame 0.40 near black: vivid colour wants a bright ground)
   'foam-cells':         [12, 7, 17, 23],           // rust water (sienna) in the films; pale icy blue, amber and lavender cells (47z-5)
   'night-sea':          [18, 17, 16],              // a few ultramarine, amber and teal drops in the dark water, the glow's cyan the brightest thing (48c-5)
-  'louche':             [18, 16, 10],              // a few ultramarine, teal and purple drops in the dark water, deep enough that the cloud's white is the brightest thing (48s)
+  'louche':             [18, 16, 10],              // three small ultramarine, teal and purple drops in the dark water (plainSeed), deep enough that the cloud's white is the brightest thing (48s, 48s-6)
   // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
   // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
   // under a yellow film laid an olive-black blot in the lab.
@@ -124,6 +124,31 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'mushy-mushy':        [23, 9, 19, 20, 18],    // lavender, cobalt, jade, magenta, ultramarine
   'soapy-mess':         [17, 8, 20, 16, 7],     // amber, blue, magenta, teal, ice: a soap film's own orders of colour
 };
+
+/*
+  The dye a look with no seed of its own opens on (fluidSimulation.ts
+  layLook's last case): so many soft discs, of this radius in the plate's
+  cells and this much dye at the middle, at seeded places, one of the look's
+  dyes each. Every look but those named here keeps the five wide pools it
+  always opened on (the discs are drawn from the plate's dice in the same
+  order, so those looks' plates are what they were).
+
+  Louche (PLAN 48s-6): its look is the ouzo's white, and the Mac's first film
+  of it (2026-11-27) found the five pools spread over 40 to 60% of the dish
+  in cyan, blue and violet, with the cloud a tenth of the frame beside them.
+  Because the automation holds a look's dye at what its seed laid (lib/
+  dyeTarget.ts lookTarget: the target is the seed's own mean below the
+  look's budget), a smaller seed is also less dye poured for the rest of the
+  show. Three small deep drops, one of each of its dyes, give the white
+  something to lie over without being the picture.
+*/
+const PLAIN_SEED: Record<string, readonly [number, number, number]> = {
+  'louche': [3, 6, 1.4],
+};
+const PLAIN_SEED_DEFAULT = [5, 15, 2.0] as const;
+
+/** How a look with no seed of its own lays its dye: [discs, radius in cells, dye at the middle]. */
+export const plainSeed = (id: string): readonly [number, number, number] => PLAIN_SEED[id] ?? PLAIN_SEED_DEFAULT;
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'classic':            ['drop'],
@@ -269,7 +294,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'night-sea':          ['water', 'water'],
   // A third of the drops are Ouzo, which bloom white in the water; a third Alcohol, which thins a
   // bloom it lands on and clears it at the second drop (presetsOuzo.ts has the sums; PLAN 48s).
-  'louche':             ['water', 'ouzo', 'alcohol'],
+  'louche':             ['ouzo', 'ouzo', 'water', 'alcohol'],  // half the drops Ouzo, so the cloud leads (48s-6)
   // Oil poured onto a clear film joins it (it thickens where it lands, and tears again);
   // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
   // is the lavender wash's body, which holds its place under the film.

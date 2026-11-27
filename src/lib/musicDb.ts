@@ -2,8 +2,7 @@
 // Everything is keyed by ISRC (or pseudo-ISRC for manually tagged tracks),
 // so repeat listens need no server round-trip.
 
-import { SavedPerformance, SongMap, TrackEvolutionState } from './musicTypes';
-import { TrackFingerprint } from './localFingerprint';
+import { SavedPerformance, SongMap, TrackEvolutionState, TrackFingerprint } from './musicTypes';
 
 const DB_NAME = 'chromaglass-music';
 const DB_VERSION = 3;
