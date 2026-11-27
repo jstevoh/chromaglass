@@ -39,6 +39,9 @@ export const PALETTE_COUNT = PALETTE.length;
     chem     where a reaction is seeded: the BZ waves and Boyle's chemistry.
     pour     where a paced scene's flood lands (`pour` on the handle), so a
              sequence's pours cannot move the automation's own draws.
+    keep     where Keep Full's top-up drops land and which colour and bottle
+             fall (sim/keepFull.ts), so a dish kept full draws nothing from
+             Evolve's stream.
 
   All of them are `plate.` streams, so laying a look restarts them from
   (seed, name, look) — see "Restarting, rather than continuing" in rng.ts.
@@ -53,6 +56,7 @@ export const DICE = {
   palette: stream('plate.palette'),
   chem: stream('plate.chemistry'),
   pour: stream('plate.pour'),
+  keep: stream('plate.keep'),
 };
 
 /** A working harmony drawn from inside a contract: the whole set when small, else WORKING_DYES of it. */

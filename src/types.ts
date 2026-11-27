@@ -381,6 +381,15 @@ export interface VisualizerSettings {
     until it melts into the show's first colour. Off keeps today's films.
   */
   logoMelt: boolean;
+  /*
+    Keep the dish full when it is left running (PLAN 18a-22, sim/keepFull.ts):
+    when the dish runs below the amount its look is made with, a hand tops it
+    up with the dropper, a real drop of the look's own bottle at a time where
+    it has gone pale, until it reads full. The room's switch, not a look's
+    (lookFade.ts RIG_KEYS), so a look change leaves it as it was. Off keeps
+    today's plate.
+  */
+  keepFull: boolean;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -1119,6 +1128,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
   logoMelt: false,
+  keepFull: false,
   beatPrediction: 0.7,
   beatLead: 80,
   /*

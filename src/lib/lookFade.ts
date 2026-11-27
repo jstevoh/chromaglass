@@ -54,6 +54,8 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   'inkTitle', 'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   // The logo melted at the start of a film (PLAN 37x-11): the show's too.
   'logoMelt',
+  // Keep full (PLAN 18a-22): the operator's hand on the dropper, left running, not a look's.
+  'keepFull',
   'filmMix', 'filmKey',
   // How the video is framed for this wall (PLAN 14ag): the operator's, as the logo's place is.
   'filmZoom', 'filmX', 'filmY',
