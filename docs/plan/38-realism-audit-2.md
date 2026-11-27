@@ -276,6 +276,20 @@ is in the project's files).
   2,360 to about 5,070. Eight Cahn–Hilliard substeps gained a little more but were left out
   (less of the oil's colour kept, and a half-built 15g-8e mix line in `npm run bubbleair`).
   Still open: threads that pinch into beads (Rayleigh–Plateau) want a sharper interface.
+  *Beads part shipped 2026-11-27 (`npm run beads`):* not a sharper interface after all. A strip
+  whose tension is only its outline in the plane cannot bead in any model (a varicose wave
+  lengthens the outline), so the edge's curvature now gains the thread's own across the gap,
+  2/w − 2/h, where the oil is narrower than the gap (w read across the oil along the edge's
+  normal; a ribbon wider than the gap is flat against both glasses and gains nothing, which is
+  confinement holding it, Humphry et al. 2009). THREAD in `wgsl/fluid/capillary.ts`, the local
+  gap from the squeeze, so a pressed ribbon holds and beads as the glass lets it go. Lab, 512²
+  (the gap 5.1 cells), a thread 3.5 cells wide with a 2.5% wobble, the plate level, 120 steps:
+  main one body, its width ± 10% (36% by 360 steps, the ends drawing in); now 11 bodies,
+  ± 59% (12–14 by 360 steps, 6.6 widths a bead); a ribbon 8 cells wide stays one at 180. No
+  effect at 192² (the 2 mm gap is 1.9 cells, under the narrowest thread the field draws,
+  THREAD_CELLS). Still open: Classic under a hand in the app at 512² judged (judging 151), and
+  the band's width against the strain rate, which a press thins into threads only once 38w-28
+  gives the water its shear.
 - **38w-28. Classic's water moves at the 1969 speed** (M; High, after 38w-27). The round-five
   motion read (`npm run watch`): flow median 0.7 %/s against Liquid Loops' 6.9, turnover 10.7 s
   against 1.8, curl ±0.01 against ±0.13, and 80% of the motion is the whole picture sliding
