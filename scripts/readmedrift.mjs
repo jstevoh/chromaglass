@@ -276,12 +276,16 @@ const tryGit = (...a) => { try { return git(...a); } catch { return null; } };
 
 function baseRef() {
   if (opt('--base')) return git('merge-base', opt('--base'), 'HEAD').trim();
-  const parents = (tryGit('rev-list', '--parents', '-n', '1', 'HEAD') ?? '').trim().split(' ');
-  if (parents.length > 2) return parents[1]; // a PR's merge commit: main is its first parent
+  // Where origin/main is known (a session's checkout), the branch's own work
+  // is what it adds to main: the merge-base. A merge of main into the branch
+  // has the branch as its first parent, so its parents would judge main's day.
   const mb = tryGit('merge-base', 'origin/main', 'HEAD')?.trim();
   const head = tryGit('rev-parse', 'HEAD')?.trim();
   if (mb && mb !== head) return mb;
-  return parents[1] ?? null; // on main itself: the commit before
+  // CI's checkout knows no origin/main: a PR is its merge commit, main the
+  // first parent; on main itself, the commit before.
+  const parents = (tryGit('rev-list', '--parents', '-n', '1', 'HEAD') ?? '').trim().split(' ');
+  return parents[1] ?? null;
 }
 
 function codeFiles(dir, out = []) {
