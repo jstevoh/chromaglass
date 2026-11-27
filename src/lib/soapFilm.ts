@@ -799,3 +799,35 @@ export function soapFilmRgb(f: SoapFilm, opts: SoapFilmRgbOptions = {}): Float64
   }
   return out;
 }
+
+/** The thickest film soapFilmLut reaches, nm of d_eff = h cos θ_t (a fresh film is drawn at up to about 1.5 µm, PLAN 32d). */
+export const SOAP_LUT_MAX_NM = 2000;
+/** Its step, nm: the eye's bands are tens of nm wide, so the plate's linear read between entries is exact to the eye. */
+export const SOAP_LUT_STEP_NM = 2;
+
+/**
+ * The reflected colour of the frame's film as a table for the plate (PLAN
+ * 32d): rgba per SOAP_LUT_STEP_NM of effective thickness d_eff = h cos θ_t,
+ * from 0 to SOAP_LUT_MAX_NM, in *linear* sRGB at reflectance gain 1, so the
+ * plate applies its own gain and encodes (sRGB's curve is not linear, and a
+ * table of encoded colours could not be scaled). It is soapFilmRgb's own
+ * soft-box colour (the 4-point path spread, the dark ground and shortcut
+ * (f)'s grade, 32b-1), so the plate draws the film the checks judge.
+ */
+export function soapFilmLut(opts: Omit<SoapFilmRgbOptions, 'cosI' | 'gain' | 'softBox'> = {}): Float32Array {
+  const spread = opts.spread ?? 0.025;
+  const ground = opts.ground ?? 0.0004;
+  const notchFloor = opts.notchFloor ?? 0.0725;
+  const chromaRetention = opts.chromaRetention ?? 0.67;
+  const decode = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const count = Math.round(SOAP_LUT_MAX_NM / SOAP_LUT_STEP_NM) + 1;
+  const out = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) {
+    const rgb = evalSoftBoxRgb(i * SOAP_LUT_STEP_NM, 1, spread, ground, notchFloor, chromaRetention);
+    out[4 * i] = decode(rgb[0]);
+    out[4 * i + 1] = decode(rgb[1]);
+    out[4 * i + 2] = decode(rgb[2]);
+    out[4 * i + 3] = 1;
+  }
+  return out;
+}

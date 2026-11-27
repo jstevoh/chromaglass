@@ -31,6 +31,12 @@ the code's entry points, the checks to add and the scenes to match, in
   - **29a-3.** The picture's drop is taller than the solver's layer (0.3 l_c a full
     cell); carry the drop's volume in the solver as the bead's thickness, so the drop the
     flow moves is the drop the picture draws.
+    38v (2026-11-21): the drop's height was also clipped at a fixed gap and its excess lost
+    (~~29a-11~~, shipped): `FerroDrop` now reads the live squeeze field (`view.w`), spreads
+    excess above `0.95 · gap` out to neighbours via a conservative Baiocchi obstacle pass
+    ($h = h_0 + \Delta\phi$, FMG Red-Black SOR) and `packVelDrop` clamps `z = min(h + domes, gap)`.
+    `dropRelax` still bounds the unsqueezed plateau at `0.95 · GAP_LC` until 29a-3 carries the
+    drop's volume in the solver itself.
   - **29a-4.** The magnet's volume shift is held to its mean over all the ferrofluid on
     the plate, not drop by drop.
   - **29a-5.** The magnets' radius is the default Magnet Size's in the solve (the plate's
@@ -39,6 +45,11 @@ the code's entry points, the checks to add and the scenes to match, in
     and the exit losses through the glass are left out, as a photographer's flag and
     polariser would leave them; the reflected plate past total reflection is the plate
     decoded plainly, without the closeup's cells or lacing.
+    38v (2026-11-21): the reflected plate switches hard at total reflection
+    (`ferroDrop.ts:363-374`, sinθ·1.333 = 1, about a 24° slope), and `plate.ts:2755` sums the
+    linear studio light with the encoded `edgeLit`. Blend by Schlick's R_top and sum in linear
+    light. Check: adjacent pixels across slopes of 20–28° differ by no more than 3 levels. The
+    film-stock half of the look is an art grade, not physics. With 38p. (S; Low; from RS-35.)
   - **29a-7.** Its cost read on the Mac (`npm run stages` with the closeup in over a
     drop): about 18 million texel reads a frame on 384², 24 sweeps warm and 200 from cold.
   - **29a-8.** The drops' mask is 512 px across the plate (`beads.ts`), and at 6x the
@@ -49,13 +60,24 @@ the code's entry points, the checks to add and the scenes to match, in
   - **29a-9.** A drop reads the flow from its nearest cell (`beads.ts`), so its speed
     steps as it crosses a cell's edge; sample the velocity bilinearly, as the solver's
     advection does.
-  - ~~**29a-10. The Magnet's domes were one black in the closeup.**~~ **Shipped** (the owner,
+  - **29a-10.** (S; High, a live bug) Every ferrofluid closeup draws the plate through white
+    milk. `packVelDrop` (`ferroDrop.ts:167-191`) writes 2 into the packed velocity's w, but
+    since 18j that channel is the milk's scatter (`pack.ts:168-178`); `plate.ts:440-490` skips
+    `packVel` on layer 0 when the drop has a height, and the plate shader reads it as
+    `milkScatter` (`sc0`, `wgsl/plate.ts:2558-2565`). A scatter of 2 is a reflectance R =
+    12/13 = 0.923: the ground goes white and the lamp's light through it falls to 16–27%, at
+    the default Relief 0.7 (`types.ts:1338`). A merge collision: #365 (29a) wrote w as
+    "solved" before #353 (18j) took the channel. Keep w as the scatter and carry "solved" as a
+    uniform (`dropSolved`, `ferroDrop.ts:266-267`). Check: a ferro closeup's ground matches
+    Relief 0's within a few levels, and milk outside a ferro domain keeps `dropSolved` 0.
+    (38v, from RS-25.)
+  - ~~**29a-13. The Magnet's domes were one black in the closeup.**~~ **Shipped** (the owner,
     2026-11-01: "Let's make sure we have 3d in the macro view"; `npm run ferrodrop` 11-13).
     The drop's reflection is worked in light and encoded as a camera records it, so a dome's
     steep sides show the lit liquid round them as a dark gloss. Story in
-    `docs/plan-shipped.md` §29a-10.
-  - **29a-11. The domes' ridges and their star, in the closeup** (M, nil; found doing
-    29a-10). The references (Colored I) show each dome's sides ridged from the point down,
+    `docs/plan-shipped.md` §29a-13.
+  - **29a-14. The domes' ridges and their star, in the closeup** (M, nil; found doing
+    29a-13). The references (Colored I) show each dome's sides ridged from the point down,
     the finer spikes a big one carries, and the reflection broken into a star round its top.
     The plate at 1x paints that star (the rays term in the display's ferrofluid block); the
     closeup's surface is the drop solve plus the film's own height, smooth at the grid, so
@@ -63,8 +85,8 @@ the code's entry points, the checks to add and the scenes to match, in
     under a cell on 384²: it needs the surface at a finer scale than the solver's grid (a
     sub-cell height, or the drop solve on its own finer grid), not a pattern laid on top.
     *Measure:* the number of light-dark turns round a dome's top in the closeup at 6x.
-  - **29a-12. The dye over a dome's foot in the closeup is the macro's film contrast, not
-    the column's** (S, nil; found doing 29a-10). `dyeColumnAt` takes its amount from the
+  - **29a-15. The dye over a dome's foot in the closeup is the macro's film contrast, not
+    the column's** (S, nil; found doing 29a-13). `dyeColumnAt` takes its amount from the
     closeup's Film Level and Film Gain (a contrast for the dye's own picture) when the
     camera is in, so how strongly the dye tints a dome's reflection is a display setting's,
     and a dome's foot, under nearly the whole column twice, reads a deep red-brown. Take the
@@ -151,10 +173,6 @@ the code's entry points, the checks to add and the scenes to match, in
     coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law, with
     the rim's own factor `share·(ν_clear/ν_ff)^(1−φ)` applied per cell as the shader applies it,
     and a bar of 20% (the weak drop reads about -6% on software WebGPU, the strong one about +4%).
-  - ~~**29c-7. A resting drop dissolves into its halo.**~~ **Shipped** (#373; `npm run ferrorest` 4/4; the deep plate's `phaseCH` stays as on `main`, under **29c-1**). Story in `docs/plan-shipped.md` §29c-7 (moved 2026-10-29, 19m-2).
-  - ~~**29c-8. A dragged drop loses its trailing rim to the oil's return flow.**~~ **Shipped** (#495; two-phase carry, `phaseVelocity` in `src/gpu/wgsl/fluid.ts`; `npm run ferrodrag` 3/3 on the Mac GPU). Story in `docs/plan-shipped.md` §29c-8 (moved 2026-10-29, 19m-2).
-  - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (`npm run ferrodrag` on the show shard, `ferrohold` 5/5 on Metal). Story in `docs/plan-shipped.md` §29c-10 (moved 2026-10-29, 19m-2).
-  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~ **Shipped** (`npm run ferrodrag -- --thinoff` in CI, Metal 5/5). Story in `docs/plan-shipped.md` §29c-11 (moved 2026-10-29, 19m-2).
   - **29c-12. Key `phaseVel()`'s default off `thinLive` before `phaseCompress` reaches the deep plate.**
     `runPhaseCompress` and `runPhasePlanned` call `phaseVel()` with `thin = true`, which today runs only
     on a thin step. Once `phaseCompress` moves onto the deep plate (29c-1), that default must be keyed

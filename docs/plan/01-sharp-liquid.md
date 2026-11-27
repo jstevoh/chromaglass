@@ -1,16 +1,18 @@
 # 1. Sharp liquid, and pigment in it
 
-**Shipped**: sharpening retired, granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**: the measured verdict retired sharpening (the pass itself still runs behind the Sharpness slider and MIDI CC15, default 0: 1k; corrected 2026-11-21, 38v), granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ## 1a. The grain at the dye's edge made the plate look digital (shipped)
-
-**Shipped.** Story in `docs/plan-shipped.md` §1a (moved 2026-10-29, 19m).
-
 - **1b. Agate's Liesegang rings are dots on a 128² lattice** (lane C, `liesStep` in
   wgsl/fluid.ts, `LIES_GRID`). The precipitate nucleates once per cell of its own grid, so
   at a laptop's size Agate shows a regular grid of dots where real Liesegang bands are
   continuous rings. Measure: the `lock` of `npm run pixels` on Agate at the lattice's pitch
   rather than the solver's.
+  38v (2026-11-21): the rings step by steps, not seconds: `fluid.ts:1596-1621` and
+  `reactions.ts:87-111` run on `LIES_GRID` 128 with no Δx, while BZ already uses
+  `magnetSeconds`. Liesegang bands grow with D of 1–2e-9 m²/s; take Δx =
+  `PLATE_METRES`/`LIES_GRID` and the step's seconds. Check: the ring radii within 2% at 30, 60
+  and 120 Hz, and at the dial's 0.25 against 1. (From RS-4.)
 - **1c. A Retina laptop on the website opens at one device pixel per CSS pixel**
   (`platform.ts`: the hosted ladder starts on `{512, 1}`, tops out at 1.5x). The plate is
   drawn at a quarter of the panel's pixels and upscaled until the governor climbs, and
@@ -63,8 +65,6 @@
   Measure with `npm run map` (the lab, `PW_WEBGPU=1`): a pinned surface at a half and a
   quarter of its size, a fixed picture panned a fraction of a texel a frame, and how
   much each wall pixel flickers beyond the pan itself (shimmer) before and after, and the outline's width in wall pixels. Unbuilt; nothing to judge yet.
-- **1i. Thin Film's fringes were faceted at the grid's cells** (shipped 2026-10-31). Story in
-  `docs/plan-shipped.md` §1i; `npm run filmrings`.
 - **1j. The gooey blur reads the dye bilinear, so the dye's own edge has a corner at every
   texel** (found 2026-10-31 building 1i). `blurAlpha` takes plain bilinear taps a fraction of
   a cell apart, and the gooey edge's contrast (1.2 + 4 × Gooey) steepens the result two to
@@ -77,3 +77,48 @@
   Post Blur 0.6). The edge itself, the relief and the boundary line read the same opacity. Fix: the same B-spline in `blurAlpha`'s narrow form
   (under a cell it is the blur anyway), measured with 1i's probe on `fluid0.a` and a `look`
   crop of a dye edge at zoom 3; the cost is on every dye pixel, so time it on the Mac first.
+- **1k. Sharpening is still a live dial** (S; Low). `dye.ts:143-169` runs the sharpen pass
+  with `SHARP_FLOOR` 0.08, `fluid.ts:1624-1629` calls it, `LookSections.tsx:50-57` shows the
+  Sharpness slider and `midi.ts:1130` maps CC15, though the verdict in `docs/plan-shipped.md`
+  (§1) retired it; Evolve never raises it. Remove the pass, the slider and the CC with a
+  settings migration that drops the key. Check: `npm run panel` and `npm run desk` pass and a
+  saved look with Sharpness loads. (38v, from RS-9.)
+- **1l. The thin gap's dye carry rounded every edge it moved** (asked 2026-11-22: Galaxy
+  looked like a blurry lens, not a sharp Hubble picture of a galaxy). `bodyAdvect`'s MUSCL
+  flux limited its slope with minmod, which falls back to first-order upwind at every edge
+  of colour; its numerical diffusion (about 1e-7 m²/s at a look's speeds) is some three
+  hundred times dye's own in water, so the carry, not the liquid, made every edge a ramp.
+  **Shipped** with the monotonized central limiter (still TVD, second order in smooth
+  colour). `npm run dyeedge`: part-full cells per full cell 0.713 → 0.541 (an exact carry
+  is about 0.29), colour kept to 0.000%, no overshoot.
+- **1m. mixAdvect and the phase field still limit with minmod** (found building 1l).
+  `mixAdvect` (the oil's fraction, `carry.ts`) and the phase step (`phase.ts`) carry an
+  interface profile that their relaxation holds to a set width, so MC may fight it rather
+  than sharpen anything real. Try MC on each in the lab and keep it only if the profile's
+  width holds and `oilmass`-style totals stay put; unbuilt.
+- **1n. Galaxy still read as a soft lens after 1l** (the same ask). Two causes the limiter
+  cannot reach. The dye lives on the flow's grid and is resampled every step, so its edge
+  spreads to about four cells, where real dye (Schmidt number near 10³) folds into threads
+  far finer than the flow. And Galaxy inherited Edge Relief 0.4, which shades the dye's
+  slope as a meniscus, though it is dye in thin water with no interface to bend light: a
+  grey smoke round every arm. **Shipped** in the preset: particles 0.5 (mix 0.6), which
+  carry dye as points that are never resampled, and Edge Relief 0, as Classic has it
+  (38w-23). Same seeded frame, `sharp.mjs` hard-edge share: 8.0% before, 15.0% with
+  particles 0.5 (20.6% at 0.8, which drew dark speckled rims, so not that); Edge Relief 0
+  alone 9.2% to 13.2%. Before/after beside a Hubble picture went to the owner to judge.
+  `src/presets.ts` is now 48 bytes under the 100 KB bar: the next preset change splits it first.
+- **1o. Particles are drawn on top of the dye, not as the dye, and the governor does not
+  count them** (found building 1n). H1's particles splat their colour additively over the
+  grid's dye, so a thread is drawn twice (once soft from the grid, once sharp from the
+  points) and dye mass is not conserved between the two: a shortcut for speed. The real
+  phenomenon is one dye carried at sub-grid scale; replace it with particles that own their
+  share of the dye (deposit on birth, return on death) or a sub-grid scalar. Galaxy at
+  particles 0.5 measured about 10 ms more per frame headless under load, which the governor
+  does not see, so a phone may drop frames before it sheds anything. Unbuilt.
+- **1p. The sealed meter's control read 85.1% after 1l, against a bar of under 85%**
+  (main's report, 2026-11-23). Shipped. `npm run sealed` line 1 holds the seal off on purpose
+  to prove the meter sees a drain. On the Mac GPU the open plate kept 84.7% with minmod and
+  85.1% with MC; the sealed plate (99.7%), the lone drop (95.6%) and the lamp passed both
+  ways. What the open plate loses is the dye that reaches the rim, and minmod's smear carried
+  each drop's lower edge there early, so the higher number is the right one. The bar moved
+  to under 90% (twenty times the sealed line's 0.5% allowance) with the owner's OK, 2026-11-26.

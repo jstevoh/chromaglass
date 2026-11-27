@@ -19,12 +19,12 @@
  * question and not a regression.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { installFrameReader, frameOf } from './frame.mjs';
 import { readFileSync } from 'node:fs';
 
-const PORT = 4346;
+const PORT = port(4346);
 const IMM = process.env.WASH_IMM;
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });

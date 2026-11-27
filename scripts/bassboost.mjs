@@ -52,12 +52,12 @@ const f2 = (x) => (Number.isFinite(x) ? x.toFixed(2) : String(x));
 const out = 'node_modules/.cache/bassboost-lib.mjs';
 await build({
   stdin: {
-    contents: `export * from './src/lib/squish.ts'; export { songAudioTrack } from './src/lib/songTrack.ts'; export { setShowSeed } from './src/lib/rng.ts'; export { renderBand } from './scripts/band.mjs';`,
+    contents: `export * from './src/lib/squish.ts'; export { cordReading } from './src/lib/sceneMap.ts'; export { PRESETS } from './src/presets.ts'; export { songAudioTrack } from './src/lib/songTrack.ts'; export { setShowSeed } from './src/lib/rng.ts'; export { renderBand } from './scripts/band.mjs';`,
     resolveDir: '.', loader: 'ts',
   },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
-const { BassPress, bassPressDepth, bassPressFor, bassPressLevel, bassBoostGain, bassRouteValue, BASS_PRESS, songAudioTrack, setShowSeed, renderBand } = await import(`../${out}`);
+const { BassPress, bassPressDepth, bassPressFor, bassPressLevel, bassBoostGain, bassRouteValue, BASS_PRESS, songAudioTrack, setShowSeed, renderBand, cordReading, PRESETS } = await import(`../${out}`);
 setShowSeed(7);
 
 const SR = 48000, FPS = 30, IMPACT = 0.55;
@@ -109,17 +109,27 @@ check('and so does its change a second, the kicks still press and let go', rows[
 check('the kick detector hears the same kicks at every setting', rows[1].kicks > 10 && rows[2].kicks === rows[1].kicks && rows[3].kicks === rows[1].kicks,
   `${rows[1].kicks}, ${rows[2].kicks}, ${rows[3].kicks} kicks`);
 
-// ── The frame loop, from the source ──────────────────────────────────
+// ── The music's cords, and the loop that hands them the slider ──────
+/*
+  Since PLAN 38v-1 the music's hands are cords (lib/musicCords.ts), and the
+  press, the pulse and the kick's dye read the bass through the patch bay. So
+  the gain is the bay's: a cord on the bass is read with the boost taken off
+  (bassRouteValue) and the boost laid on its master (bassBoostGain), and the
+  frame loop hands the bay the slider. Played here on the real cordReading:
+  at 2x and 3x the reading of a bass of 85 is what it is at 1x (not pinned),
+  and the cord's impact is 2x and 3x; and the classic look's press cord reads
+  the bass.
+*/
 {
+  const read = (bass, boost) => cordReading({ sound: { bass: bass * (boost ?? 1), mid: 0, treble: 0, volume: 50, energy: 0.3, timbre: 0, complexity: 0 }, shape: null, room: null, film: null,
+    roomImpact: 0, filmImpact: 0, soundImpact: 1, shapeImpact: 1, bassBoost: boost }, { source: 'sound', feature: 'bass', setting: 'areaPress', depth: 0.5 }, 0);
+  const one = read(60, 1), two = read(60, 2), three = read(60, 3);
+  const press = (PRESETS.find(p => p.id === 'classic').settings.sceneMappings ?? []).find(m => m.role === 'press');
   const src = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
-  const has = (s) => src.includes(s);
-  check('the frame loop: the bass route is read through bassRouteValue and only when it is the bass; the press, the burst and the kick\'s dye take the gain',
-    has("const bassGain = velRoute === 'bass' ? boostGain : 1;")
-    && has("velRoute === 'bass' ? bassRouteValue(currentAudioData.bass, boostGain) : getAudioValue(currentAudioData, velRoute)")
-    && has("currentAudioData.passage, bassGain),")
-    && has('const bassStr = (vel01 - 0.25) * autoAmp * bassGain;')
-    && has('bass01 * boostGain * (0.33 + 1.17 * DICE.music.float()) * autoAmp')
-    && has('* bass01 * boostGain * bloomGain;'));
+  check('a cord on the bass takes Bass Boost as a gain: its level unpinned at 2x and 3x, its impact the boost; the loop hands the bay the slider',
+    Math.abs(two / one - 2) < 1e-9 && Math.abs(three / one - 3) < 1e-9 && read(60, undefined) === 0.6
+      && press?.feature === 'bass' && src.includes('bassBoost: settingsRef.current.bassBoost,'),
+    `${f2(one)}, ${f2(two)}, ${f2(three)} at 1x, 2x, 3x; the press reads ${press?.feature}`);
 }
 
 // ── The plate, in the lab ─────────────────────────────────────────────

@@ -95,7 +95,12 @@ export function useGamepad(host: GamepadHost, enabled = true) {
     // Polled on a timer rather than requestAnimationFrame: the laptop's own
     // window may be behind the projector's, and a hidden tab stops animating
     // while the show, and the hand on the controller, carry on.
+    // Armed only while at least one pad is connected (PLAN.md 14j-gamepad):
+    // a machine with no controller plugged in arms no 16 ms timer at all, a
+    // pad already present at load starts it at once, and the last
+    // `gamepaddisconnected` clears it.
     let last = performance.now();
+    let timer: ReturnType<typeof setInterval> | null = null;
     const named = (id: string | null) => {
       if (id === connectedRef.current) return;
       connectedRef.current = id;
@@ -106,14 +111,6 @@ export function useGamepad(host: GamepadHost, enabled = true) {
       for (let i = 0; i < pads.length; i++) { const p = pads[i]; if (p && p.connected) return p; }
       return undefined;
     };
-    const onConnect = (e: GamepadEvent) => named(e.gamepad.id.replace(/\s*\(.*$/, ''));
-    const onDisconnect = () => {
-      const still = firstPad();
-      named(still ? still.id.replace(/\s*\(.*$/, '') : null);
-      if (!still) cursor.set({ ...cursor.get(), visible: false });
-    };
-    window.addEventListener('gamepadconnected', onConnect);
-    window.addEventListener('gamepaddisconnected', onDisconnect);
 
     const tick = () => {
       const now = performance.now();
@@ -163,7 +160,6 @@ export function useGamepad(host: GamepadHost, enabled = true) {
       if (rose(8)) h.action('automate-toggle');
       if (rose(9)) h.action('play-toggle');
       if (rose(10)) { c.x = 0.5; c.y = 0.5; }
-      if (rose(11)) h.action('macro-toggle');
       if (rose(12)) h.cycleLayer(1);
       if (rose(13)) h.cycleLayer(-1);
       if (rose(14)) h.action('preset-prev');
@@ -180,9 +176,38 @@ export function useGamepad(host: GamepadHost, enabled = true) {
         cursor.set({ x: c.x, y: c.y, visible, pressing });
       }
     };
-    const timer = setInterval(tick, 16);
-    return () => {
+    const startPoll = () => {
+      if (timer !== null) return;
+      last = performance.now();
+      timer = setInterval(tick, 16);
+    };
+    const stopPoll = () => {
+      if (timer === null) return;
       clearInterval(timer);
+      timer = null;
+    };
+    const onConnect = (e: GamepadEvent) => {
+      named(e.gamepad.id.replace(/\s*\(.*$/, ''));
+      startPoll();
+    };
+    const onDisconnect = () => {
+      const still = firstPad();
+      named(still ? still.id.replace(/\s*\(.*$/, '') : null);
+      if (!still) {
+        stopPoll();
+        prevButtons.current.length = 0;
+        cursor.set({ ...cursor.get(), visible: false });
+      }
+    };
+    window.addEventListener('gamepadconnected', onConnect);
+    window.addEventListener('gamepaddisconnected', onDisconnect);
+    const initial = firstPad();
+    if (initial) {
+      named(initial.id.replace(/\s*\(.*$/, ''));
+      startPoll();
+    }
+    return () => {
+      stopPoll();
       window.removeEventListener('gamepadconnected', onConnect);
       window.removeEventListener('gamepaddisconnected', onDisconnect);
     };

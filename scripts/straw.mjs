@@ -4,12 +4,17 @@
  *
  *   npm run straw      (the list in node, the air field in the lab: any adapter that computes and renders)
  *
- * Held still, the Blow is a straw: one bubble on the end of it, growing while
- * the breath goes on, its rim breaking into fingers the faster it grows and
- * shedding a ring of small bubbles, and rounding off once let go. The list
- * is checked on its own (bubbles.ts); the fingers are checked where they
- * have to land, in the air field the solver takes the liquid out of and the
- * plate draws the bubble from.
+ * Held still and never moved, the Blow is a straw: one bubble on the end of
+ * it, growing while the breath goes on. It is round and it sheds nothing
+ * (PLAN.md 15g-12): it used to break into six to eighteen fingers and throw
+ * a ring of small bubbles off its rim, the "flower like things around the
+ * floating bubbles" the owner reported (2026-11-13), with a finger count
+ * that put a gap a twenty-first of the plate's into Paterson's formula. At
+ * the plate's own gap the count is under one, and a front that does not
+ * finger pinches nothing off (src/lib/bubbles.ts, blow). The count is still
+ * Paterson's, so a liquid thick enough does finger, and that is held here
+ * too, on the list and where the fingers have to land: in the air field the
+ * solver takes the liquid out of and the plate draws the bubble from.
  */
 import { build } from 'esbuild';
 import { openLab } from './lab.mjs';
@@ -20,33 +25,81 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/*
+  Owed lines: each printed as owed while what it asks for is absent (its
+  last argument says whether it is), and the PR that builds it takes its id
+  out of --owed in scripts/checks.json. A build that is there and misses is
+  red, owed or not.
+*/
+const IDS = ['area'];
+const owedFlag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(owedFlag ? owedFlag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknownOwed = [...owed].filter((id) => !IDS.includes(id));
+if (unknownOwed.length) check('every id in --owed is a line of this check', false, `unknown: ${unknownOwed.join(', ')} (known: ${IDS.join(', ')})`);
+const owedCheck = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
+
 // ── The list ────────────────────────────────────────────────────────
 {
   const out = 'node_modules/.cache/straw-bubbles.mjs';
   await build({ entryPoints: ['src/lib/bubbles.ts'], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-  const { BubbleField } = await import(`../${out}`);
+  const { BubbleField, strawFingers, DISH_METRES } = await import(`../${out}`);
   const N = 192, dt = 1 / 60;
-  const f = new BubbleField(N);
   const still = () => [0, 0];
-  let growingFing = 0, sats = 0;
   const at = { x: 110, y: 80 };
-  for (let t = 0; t < 180; t++) {           // three seconds of breath
-    f.blow(at.x, at.y, dt, 1);
-    f.step(dt, still, 0, 0, 0);
-    const b = f.bubbles.find((q) => q.straw);
-    if (t === 60) growingFing = b?.fing ?? 0;
-  }
+  /*
+    Three seconds of breath on a fresh plate whose liquid is `thick` times
+    the default oil's viscosity: the most its rim fingered, Paterson's count
+    at its fastest and at its end, and what is on the plate after.
+  */
+  const breathe = (liquid) => {
+    const f = new BubbleField(N);
+    f.liquid(liquid);
+    const mu = f.liquidMu;
+    let fing = 0, count = 0, last = 0, r0 = 0;
+    for (let t = 0; t < 180; t++) {           // three seconds of breath
+      f.liquid(liquid);
+      f.blow(at.x, at.y, dt, 1);
+      f.step(dt, still, 0, 0, 0);
+      const b = f.bubbles.find((q) => q.straw);
+      if (!b) continue;
+      fing = Math.max(fing, b.fing);
+      const speed = (b.r - r0) / dt; r0 = b.r;
+      if (t > 0) { last = strawFingers(mu * speed * (DISH_METRES / N) / f.liquidSigma, b.r * (DISH_METRES / N) / f.gapMetres); count = Math.max(count, last); }
+    }
+    return { f, fing, count, last, mu };
+  };
+  const oil = breathe({});
+  const f = oil.f;
   const blown = f.bubbles.filter((q) => q.straw);
   const big = blown.reduce((m, q) => (q.r > (m?.r ?? 0) ? q : m), null);
-  sats = f.bubbles.length - blown.length;
+  const sats = f.bubbles.length - blown.length;
   check('held still, one bubble grows on the end of the straw', blown.length === 1 && big && big.r > N * 0.05,
     big ? `${blown.length} blown, radius ${(big.r / N).toFixed(3)} of the plate` : 'none');
   check('and stays at the straw', big && Math.hypot(big.x - at.x, big.y - at.y) < 1, big ? `${Math.hypot(big.x - at.x, big.y - at.y).toFixed(2)} cells off` : '');
-  check('its rim breaks into fingers while it grows fast', growingFing > 0.25, `fingering ${growingFing.toFixed(2)} a second in`);
-  check('and it sheds a ring of small ones', sats >= 3, `${sats} satellites`);
+  check('it stays round while it grows: in the plate\'s oil at the plate\'s gap Paterson\'s count never reaches two fingers',
+    oil.fing === 0 && oil.count > 0.5 && oil.count < 2, `fingering ${oil.fing.toFixed(3)} at most, ${oil.count.toFixed(2)} fingers at its fastest (μ ${oil.mu.toFixed(3)} Pa·s)`);
+  check('and it sheds nothing: the one bubble is all there is on the plate', sats === 0 && f.bubbles.length === 1, `${sats} others after three seconds of breath (it shed about five a second)`);
+  /*
+    The count is alive, not a constant: with the Thickness dial at its top
+    (a liquid the app can have; the first version of this line took one 300
+    times as thick as the default, about 5.8 Pa·s, which no dial reaches)
+    the same breath's front does finger. And the bubble is drawn with the
+    count's own number of lobes, not the number it was laid with (a
+    bubble is laid with 10 to 14, so a range would pass on any bubble).
+  */
+  const thick = breathe({ thinGap: 1, gapThickness: 1 });
+  const tb = thick.f.bubbles.find((q) => q.straw);
+  check('with Thickness at its top the same breath does finger, and the bubble is drawn with as many lobes as the count gives',
+    thick.count >= 2 && thick.fing > 0.2 && thick.last >= 2 && tb && tb.lobes === Math.min(18, Math.round(thick.last)) && thick.f.bubbles.length === 1,
+    `${thick.count.toFixed(1)} fingers at its fastest, fingering ${thick.fing.toFixed(2)}, ${thick.last.toFixed(1)} at the last step and drawn with ${tb?.lobes} lobes (μ ${thick.mu.toFixed(3)} Pa·s)`);
   for (let t = 0; t < 240; t++) f.step(dt, still, 0, 0, 0);   // let go for four seconds
   const after = f.bubbles.find((q) => q.straw && q.r > N * 0.04);
-  check('let go, it stays on the plate and rounds off', after && after.fing < 0.1, after ? `fingering ${after.fing.toFixed(3)}` : 'gone');
+  check('let go, it stays on the plate, round', after && after.fing < 0.1, after ? `fingering ${after.fing.toFixed(3)}` : 'gone');
   f.clearLooks();
   check('a look with no bubbles of its own keeps it', f.bubbles.some((q) => q.straw) && f.anyBlown);
   f.blow(40, 150, dt, 1); f.step(dt, still, 0, 0, 0);
@@ -74,13 +127,30 @@ const check = (name, ok, detail = '') => {
         const qx = Math.round((cx + Math.cos(a) * r * 0.6) * n - 0.5), qy = Math.round((cy + Math.sin(a) * r * 0.6) * n - 0.5);
         inside += air.data[qx + qy * n] > 0.5 ? 1 : 0; inN++;
       }
-      return { out: out / outN, inside: inside / inN };
+      // All the air in the field, in cells: the bubble's area as drawn (PLAN 15g-19).
+      let area = 0;
+      for (let i = 0; i < n * n; i++) area += air.data[i] > 0.5 ? 1 : 0;
+      return { out: out / outN, inside: inside / inN, area };
     }, fing);
     const round = await ring(0), fingered = await ring(1);
     check('a round bubble is round in the air field', round.inside > 0.95 && round.out < 0.02,
       `${(100 * round.inside).toFixed(0)}% air inside, ${(100 * round.out).toFixed(0)}% at 1.35 of its radius`);
     check('a fingered one reaches out in fingers, not a bigger disc', fingered.inside > 0.95 && fingered.out > 0.08 && fingered.out < 0.6,
       `${(100 * fingered.out).toFixed(0)}% of the circle at 1.35 of its radius is air`);
+    /*
+      PLAN 15g-19, written before the build. Air between two glasses keeps
+      its volume: a bubble of air V in a gap b covers A = V/b whatever its
+      rim does, so fingers are a zero-mean change of the rim, lobes out and
+      the liquid between them in. On main the rim only reaches out (rimAt
+      never dips below 1), so the same bubble covers more of the plate the
+      more it fingers, the air made from nothing. Held here against the same
+      bubble round, which is V/b by construction. The PR that builds it takes
+      "area" out of --owed in scripts/checks.json and changes nothing here.
+    */
+    owedCheck('area', 'a fingered bubble covers the area its air does: within 3% of the same bubble round (A = V/b)',
+      Math.abs(fingered.area / round.area - 1) < 0.03,
+      `${fingered.area} cells of air fingered, ${round.area} round (${(fingered.area / round.area).toFixed(3)}x; bar 0.97 to 1.03)`,
+      fingered.area > round.area * 1.03);
   } finally { await close(); }
 }
 

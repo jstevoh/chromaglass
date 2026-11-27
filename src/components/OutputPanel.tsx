@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
-import { Knob, LIT } from './ui';
+import { LIT } from './ui';
 import {
   DEFAULT_OUTPUT, IDENTIFY_MS, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
@@ -196,7 +196,7 @@ function SurfacePad({ surfaces, selected, onSelect, onChange, aspect }: {
         </button>
       ))}
       {surfaces.length === 0 && (
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[12px] text-white/30">
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[12px] text-dim">
           No shapes — the whole frame is the picture
         </span>
       )}
@@ -310,18 +310,25 @@ function CornerPad({ value, onChange, flipX, flipY, aspect }: {
   );
 }
 
-const Row = ({ label, value, min, max, step, onChange, format }: {
+/*
+  A slider row, the Wall panel's one kind of control (`data-slider`, which
+  `npm run panelkinds` counts). `resetTo` is the knob's double-click it took
+  over from Gain and Gamma; `help` its tip, as the title.
+*/
+const Row = ({ label, value, min, max, step, onChange, format, resetTo, help, testId }: {
   label: string; value: number; min: number; max: number; step: number;
   onChange: (v: number) => void; format?: (v: number) => string;
+  resetTo?: number; help?: string; testId?: string;
 }) => (
-  <div className="mb-3 flex flex-col gap-1.5">
+  <div className="mb-3 flex flex-col gap-1.5" data-slider data-testid={testId} title={help}>
     <div className="flex items-center justify-between">
       <span className="text-xs font-bold uppercase tracking-widest opacity-70">{label}</span>
-      <span className="font-mono text-[10px] opacity-50">{format ? format(value) : value.toFixed(2)}</span>
+      <span className="font-mono text-[12px] text-dim">{format ? format(value) : value.toFixed(2)}</span>
     </div>
     <input
       type="range" min={min} max={max} step={step} value={value} aria-label={label}
       onChange={e => onChange(parseFloat(e.target.value))}
+      onDoubleClick={resetTo != null ? () => onChange(resetTo) : undefined}
       // The settings' own rail (index.css): this was a 4px bar, which on a
       // desk panel is a control you cannot find in the dark (`npm run layout`).
       className="set-range"
@@ -377,7 +384,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
           disabled={identity}
           data-testid="output-reset"
           className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all ${
-            identity ? 'cursor-not-allowed border-white/5 opacity-30' : 'border-white/15 hover:bg-white/10'
+            identity ? 'cursor-not-allowed border-white/5 opacity-65' : 'border-white/15 hover:bg-white/10'
           }`}
         >
           Reset
@@ -451,21 +458,22 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
       <Row label="Mask Edge"   value={output.maskFeather} min={0} max={0.25} step={0.005} onChange={v => set({ maskFeather: v })} />
 
       {/*
-        Gain and Gamma as knobs (the design's Wall pane, PLAN.md 8e): set once
-        for a room, not ridden, which is what the desk draws a knob for. At
-        56, the size the design keeps for Load-in and the Stage sheet. A
-        double-click puts each back at 1, untouched.
+        Gain and Gamma were the panel's two knobs (the design's Wall pane,
+        PLAN.md 8e), among its slider rows. One panel, one kind of control
+        (PLAN 8d-3, the owner, 2026-11-22: a panel that mixes sliders and knobs
+        reads as broken), so they are rows like the rest, and keep the knob's
+        double-click back to 1.
       */}
-      <div className="mb-3 flex gap-3" data-testid="output-grade">
-        <Knob label="Output gain" help="Overall brightness of what goes to the projector. One leaves the picture as drawn." value={output.gain} min={0.2} max={3} step={0.05} display={`${output.gain.toFixed(2)}×`}
-          onChange={v => set({ gain: v })} resetTo={1} size={56} testId="output-gain" />
-        <Knob label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05} display={output.gamma.toFixed(2)}
-          onChange={v => set({ gamma: v })} resetTo={1} size={56} testId="output-gamma" />
+      <div className="mb-3" data-testid="output-grade">
+        <Row label="Output gain" help="Overall brightness of what goes to the projector. One leaves the picture as drawn." value={output.gain} min={0.2} max={3} step={0.05} format={v => `${v.toFixed(2)}×`}
+          onChange={v => set({ gain: v })} resetTo={1} testId="output-gain" />
+        <Row label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05}
+          onChange={v => set({ gamma: v })} resetTo={1} testId="output-gamma" />
       </div>
 
       {/* Not a switch: the one Flash Limit switch is in Master. A state line only,
           because the wall is where someone checking the safety is standing. */}
-      <p className={`mb-3 mt-1 text-[12px] ${output.flashGuard ? 'text-white/50' : 'text-amber-200/90'}`} data-testid="output-flash-guard-state">
+      <p className={`mb-3 mt-1 text-[12px] ${output.flashGuard ? 'text-muted' : 'text-amber-200/90'}`} data-testid="output-flash-guard-state">
         {output.flashGuard ? 'Flash Limit is on.' : 'Flash Limit is off.'} Its switch is in Master.
       </p>
 
@@ -521,7 +529,7 @@ export function MappingPanel({ output, onChange }: {
 
   return (
     <div className="mb-6 flex flex-col gap-2" data-testid="mapping-panel">
-      <p className="mb-3 text-[12px] leading-relaxed text-white/40">
+      <p className="mb-3 text-[12px] leading-relaxed text-dim">
         Cut the picture into shapes on the wall, with the dark left dark between them.
         Add a shape, then drag its corners onto whatever the projector is pointed at —
         a panel, a pillar, a stack of boxes. With no shapes the whole frame is the picture.
@@ -541,7 +549,7 @@ export function MappingPanel({ output, onChange }: {
             key={shape}
             onClick={() => addSurfaces([makeSurface(shape, surfaces.length)])}
             disabled={surfaces.length >= MAX_SURFACES}
-            className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+            className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-65"
             data-testid={`add-surface-${shape}`}
           >
             + {SHAPE_LABELS[shape]}
@@ -550,7 +558,7 @@ export function MappingPanel({ output, onChange }: {
         <button
           onClick={() => addSurfaces(makeCube())}
           disabled={surfaces.length + 3 > MAX_SURFACES}
-          className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+          className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-65"
           title="Three faces, arranged as a box. Each is an ordinary shape afterwards."
           data-testid="add-surface-cube"
         >
@@ -559,7 +567,7 @@ export function MappingPanel({ output, onChange }: {
         {surfaces.length > 0 && (
           <button
             onClick={() => { setSurfaces([]); setSelected(null); }}
-            className="ml-auto text-[12px] text-white/35 hover:text-white/70"
+            className="ml-auto text-[12px] text-dim hover:text-white/70"
             data-testid="surfaces-clear"
           >
             Clear all
@@ -588,7 +596,7 @@ export function MappingPanel({ output, onChange }: {
             <button
               onClick={() => addSurfaces([{ ...active, id: `${active.id}-copy-${surfaces.length}` }])}
               disabled={surfaces.length >= MAX_SURFACES}
-              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10 disabled:opacity-65"
               data-testid="surface-duplicate"
             >
               Duplicate
@@ -608,7 +616,7 @@ export function MappingPanel({ output, onChange }: {
               the rest of this editor is laid out for a mouse, but the source
               is the one choice here someone at a gig makes from a phone. */}
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-[12px] text-white/40">Source</span>
+            <span className="text-[12px] text-dim">Source</span>
             <div className="flex flex-1 gap-1" role="radiogroup" aria-label="What this surface shows" data-testid="surface-source">
               {SURFACE_SOURCES.map(k => (
                 <button
@@ -627,7 +635,7 @@ export function MappingPanel({ output, onChange }: {
           </div>
           {/* How its light meets the wall (§16c): over, or added as a beam. */}
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-[12px] text-white/40">Light</span>
+            <span className="text-[12px] text-dim">Light</span>
             <div className="flex flex-1 gap-1" role="radiogroup" aria-label="How this surface's light meets the wall" data-testid="surface-blend">
               {SURFACE_BLENDS.map(k => (
                 <button
@@ -649,10 +657,10 @@ export function MappingPanel({ output, onChange }: {
           <Row label="Edge" value={active.feather} min={0} max={0.5} step={0.005}
             onChange={v => patchSurface(active.id, { feather: v })} />
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-[12px] text-white/40">Shows</span>
+            <span className="text-[12px] text-dim">Shows</span>
             <button
               onClick={() => patchSurface(active.id, { src: [0, 0, 1, 1] })}
-              className="rounded border border-white/20 px-2 py-1 text-[11px] hover:bg-white/10"
+              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10"
               data-testid="surface-src-all"
             >
               Whole picture
@@ -665,7 +673,7 @@ export function MappingPanel({ output, onChange }: {
                 const i = surfaces.findIndex(s => s.id === active.id);
                 patchSurface(active.id, { src: [i / n, 0, 1 / n, 1] });
               }}
-              className="rounded border border-white/20 px-2 py-1 text-[11px] hover:bg-white/10"
+              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10"
               title="Give each shape its own vertical slice of the plate"
               data-testid="surface-src-slice"
             >
@@ -687,9 +695,9 @@ export function MappingPanel({ output, onChange }: {
               }`}
               data-testid={`surface-row-${i}`}
             >
-              <span className="w-4 text-white/30">{i + 1}</span>
-              <span className={s.enabled ? '' : 'text-white/30 line-through'}>{SHAPE_LABELS[s.shape]}</span>
-              {s.opacity < 1 && <span className="text-white/30">{Math.round(s.opacity * 100)}%</span>}
+              <span className="w-4 text-dim">{i + 1}</span>
+              <span className={s.enabled ? '' : 'text-dim line-through'}>{SHAPE_LABELS[s.shape]}</span>
+              {s.opacity < 1 && <span className="text-dim">{Math.round(s.opacity * 100)}%</span>}
             </button>
           ))}
         </div>

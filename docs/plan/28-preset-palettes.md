@@ -11,9 +11,6 @@ standing domes (9t), Blow's air (15g), the controls sweep (§27) and layers on e
 look (#273). The ferrofluid and Turing shader palettes are the "Palette for ferro and
 Turing Print" work (#331), which also made the reaction grow at all.
 
-- **28a. Keep, improve, new, retire** (**shipped**, #330): named "Preset palettes", three looks retired through `RETIRED_PRESETS`, several improved, Lava Lamp new. Story in `docs/plan-shipped.md` §28a (moved 2026-10-29, 19m-2).
-- **28b. Colour palettes for the lamp** (**shipped**, #330). Story in `docs/plan-shipped.md`
-  §28b (moved 2026-10-29, 19m).
 - **28c. Open from 28a.**
   - The retired looks' cases in `seedPreset` (LiquidVisualizer.tsx) are dead; delete
     them when lane G is free (#307 held it), and drop the file's exemption in `npm run
@@ -78,9 +75,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
       luminance 133 against 40, 4/9). Doing it means a new setting or a redefined Film
       Physics, with `filmlook` rewritten to the new contract (the check-skeptic on it), the
       desk and the phone. Not in this PR.
-- **28e. A breakdown is quieter on the plate, and Classic is blobs again** (**shipped**,
-  #368; the showreel's first two findings). Story in `docs/plan-shipped.md` §28e (moved
-  2026-10-29, 19m).
 - **28e-2. Open from 28e.**
   - The sound mappings (a look's `sceneMappings` with source `sound`, sound learn's
     triggers) and Evolve's automation read the levels, which are ranged against ceilings
@@ -120,8 +114,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
     band in a box) are still owed, and 27 of the 28 changed looks still miss one or more of
     the 28i film bars (`2–3.5 swells a minute`, `at least 6 colour changes a minute`, `r1 in
     [−0.13, 0.22]`; per-look numbers under 28i-3).
-  - ~~**28f-3.** Ten looks still sway the dish's turn with the music through the old
-    `audioMappings.rotation` slot (27a-8).~~ **Shipped** (with 28i-3, #473). Story in `docs/plan-shipped.md` §28f-3 (moved 2026-10-29, 19m-2).
   - **28f-4, open.** Pitch is mostly the bass line on a band (72% of the showreel song's
     frames in the octave above C1): a patch on it walks with the bass, not the melody. A
     lead's pitch needs the analyser to find the strongest note above the bass.
@@ -144,9 +136,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
   the show knows the chorus is next and can lean into the build before it is heard, where
   the live song shape hears a section bars late. Not a preset patch source (28f: patches
   use fast readings only).
-  - **28g-1. The follower and its check** (**shipped**, #378; the story in
-    `docs/plan-shipped.md` §28). `chroma.ts`, `songFollow.ts`, `npm run songfollow`.
-  - **28g-2. Use it live, with the fallback** (**shipped**; `followedPlace.ts`, `npm run songfollow`, `npm run followview`). Story in `docs/plan-shipped.md` §28g-2 (moved 2026-10-29, 19m-2).
   - **28g-3. The show leans into what the map says is next** (Pacing/sequencer), and a map
     made from a file (the band's rehearsal, last night's set, the likeliest source; §17
     "hear the set ahead").
@@ -174,16 +163,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (the sequencer runs a section stage on its own clock), but a show's "at the second
     chorus" still fires on the guess. Decide whether a show's section actions wait for the
     place to be sure, and say so on the Songs panel.
-  - **28g-8. The score's nudge** (**shipped**, #375; story in `docs/plan-shipped.md` §28h).
-    A nudge (`useMusicIntelligence`'s `seekBy`) moves the followed place itself:
-    `FollowedPlace.resync(mapSec, now)` starts the clock there and anchors the follower,
-    called directly, not through the identification effect (which leaves a sure place
-    alone). The clock keeps the nudge too, so an identification while the follower is
-    unsure resyncs to `offsetSec + nudge`. Open from it: the steering closes a nudged
-    place back toward what the follower hears, so a nudge of a section's edge on a sure
-    follower is corrected within a second (right when the follower is right, and a nudge
-    that will not stay when the follower is wrong); decide whether a nudge holds the
-    follower off for a few bars.
   - **28g-9. Found along the way: an intro on one held chord.** For as long as one chord
     is held (the check's intro, four bars of A minor into a verse that opens on it), no
     place in it sounds different from another, and the follower slid 1.4 bars behind into
@@ -216,8 +195,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
     and this replay (`/mnt/project-files/handoff/followview-replay/`, the owner's files).
 - **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
   this PR; the story is in `docs/plan-shipped.md` §28h). Open from it:
-  - **28h-1.** (**shipped** with 28g-8.) The nudge re-anchors the follower rather than
-    adding an offset to it; position stays in the map's own seconds.
   - **28h-2.** Correct the score, not just the clock: drag a section's edge and save
     the map, so the next play of the song is right without a nudge. Today the nudge
     is an offset for the whole song, which fixes one late edge and moves the rest.
@@ -237,3 +214,12 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - **28h-6.** A repeated section in a live take (the band plays the chorus twice)
     maps back to the same section index, so a cue on it fires once; decide with 28g
     whether a repeat should fire its cue again.
+  - **28h-11.** Maps made before 28h-9 are still early by their song's ID offset, and
+    nothing kept says by how much. Offer "hear it again" on a song in the Songs panel
+    (forget its map and fingerprint so the next play maps it afresh), or re-anchor an
+    old map from its fingerprint the next time the song is matched locally (the match's
+    offset against the API's says the lead).
+  - **28h-10.** Judge Listen on the owner's Mac (docs/judging.md): press it over a
+    record, watch the song fill in, play it through, and judge the designed stages and
+    cues on the second play. Then decide whether a heard song should be designed from
+    its live song shape (28h-3) before the map exists, so its first play has a show.

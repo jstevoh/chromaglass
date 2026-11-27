@@ -1,0 +1,158 @@
+import { Play, Square } from 'lucide-react';
+import { SwitchPill, Tag } from './ui';
+import type { RemoteMessage, RemoteState } from '../lib/remoteProtocol';
+import type { RemoteStatus } from '../hooks/useRemoteLink';
+import { AppModeBar } from './LaptopLink';
+import { RemoteLinkBanner, RemoteNav, type RemoteView } from './RemoteChrome';
+
+/**
+ * The remote's Songs screen (PLAN 12-ctl-1): the laptop's set list and its
+ * song shows, one tap from Draw and from Controls.
+ *
+ * What a performer reaches for between songs is not a dial but the next
+ * thing: the next item of the set armed for the Go, the song's show started
+ * or stopped when the band goes off the plan, Follow songs off for a jam.
+ * Those live on the Perform desk's Set list and Songs panels, and here they
+ * are the same calls (app/setNow.ts, app/songShowNow.ts), sent by id.
+ *
+ * Every mark on this screen is the laptop's: the live item, the armed one, the
+ * show running and the Follow switch are read from the state the laptop sends
+ * back, never set by the tap. A tap the laptop refused (the item gone from the
+ * set, the show deleted) would otherwise show a cue the Go will not play, and
+ * the performer would find out on the wall. The cost is a frame of latency on
+ * the mark, which on a show network is a few tens of milliseconds.
+ *
+ * Rows are 56 points, a thumb, and the names wrap rather than truncate: "Dark
+ * Star (Live at Fillmore East)" cut at "Dark St…" is no help at arm's length.
+ * On an iPad the two lists sit side by side, so a whole set and its shows are
+ * in view at once.
+ */
+export function RemoteSongs({ state, send, connected, status, onRetry, onSelectView, linkDetail, linkAction, inApp }: {
+  state: RemoteState | null;
+  send: (m: RemoteMessage) => void;
+  connected: boolean;
+  status: RemoteStatus;
+  onRetry: () => void;
+  onSelectView: (view: RemoteView) => void;
+  linkDetail?: string | null;
+  linkAction?: React.ReactNode;
+  inApp?: boolean;
+}) {
+  const set = state?.setList;
+  const songs = state?.songs;
+  const row = 'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-65';
+  return (
+    <div
+      className="min-h-screen bg-[#0a0a0a] text-white"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+        touchAction: 'manipulation',
+        overscrollBehavior: 'none',
+      }}
+      data-testid="remote-songs"
+    >
+      {inApp && <AppModeBar />}
+      <header className="sticky top-0 z-10 flex flex-col gap-2 border-b border-white/10 bg-[#0a0a0a]/95 px-4 py-2.5 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <RemoteNav view="songs" onSelect={onSelectView} compact />
+        </div>
+        <RemoteLinkBanner
+          connected={connected}
+          status={status}
+          onRetry={onRetry}
+          detail={linkDetail}
+          action={linkAction}
+        />
+      </header>
+
+      <main className="px-4 pt-4 md:grid md:grid-cols-2 md:gap-8 md:px-8">
+        <section className="mb-8" data-testid="remote-set">
+          <h2 className="mb-1 text-[12px] font-bold uppercase tracking-[0.2em] text-muted">Set list{set?.name ? ` · ${set.name}` : ''}</h2>
+          <p className="mb-3 text-[12px] text-dim">Tap to arm for the next Go.</p>
+          {!set?.items.length && <p className="text-[13px] text-dim" data-testid="remote-set-empty">The set list on the laptop is empty.</p>}
+          <div className="flex flex-col gap-2">
+            {set?.items.map((item, i) => {
+              const live = set.liveId === item.id;
+              const cued = set.cuedId === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => send({ type: 'cue-set-item', id: item.id })}
+                  disabled={!connected}
+                  data-testid={`remote-set-item-${item.id}`}
+                  data-live={live ? 'true' : 'false'}
+                  data-cued={cued ? 'true' : 'false'}
+                  aria-pressed={cued}
+                  className={`${row} ${live ? 'border-live-border bg-live-bg' : cued ? 'border-accent-border bg-elevated' : 'border-white/10 bg-white/5'}`}
+                >
+                  <span className="w-6 shrink-0 font-mono text-[12px] text-dim">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="flex-1 text-[15px] font-medium text-text">{item.name}</span>
+                  {live && <Tag tone="live">Live</Tag>}
+                  {cued && <Tag tone="next">Next</Tag>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mb-8" data-testid="remote-song-shows">
+          <h2 className="mb-1 text-[12px] font-bold uppercase tracking-[0.2em] text-muted">Song shows</h2>
+          {/* The desk's Follow songs switch (the Songs panel's songs-follow), not the songFollow dial. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!songs?.follow}
+            onClick={() => send({ type: 'song-follow', on: !songs?.follow })}
+            disabled={!connected || !songs}
+            data-testid="remote-song-follow"
+            className="mb-3 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 disabled:opacity-65"
+          >
+            <span className="text-left">
+              <span className="block text-[14px] font-medium text-text">Follow songs</span>
+              <span className="block text-[12px] text-dim">Start a song&apos;s show when its song plays</span>
+            </span>
+            <SwitchPill on={!!songs?.follow} />
+          </button>
+          {!songs?.shows.length && <p className="text-[13px] text-dim" data-testid="remote-songs-empty">No song shows saved on the laptop.</p>}
+          <div className="flex flex-col gap-2">
+            {songs?.shows.map((show) => {
+              const running = songs.runningId === show.id;
+              return (
+                <div
+                  key={show.id}
+                  data-testid={`remote-song-${show.id}`}
+                  data-running={running ? 'true' : 'false'}
+                  className={`${row} ${running ? 'border-live-border bg-live-bg' : 'border-white/10 bg-white/5'}`}
+                >
+                  <span className="flex-1 text-[15px] font-medium text-text">{show.title}</span>
+                  {running ? (
+                    <button
+                      onClick={() => send({ type: 'song-stop' })}
+                      disabled={!connected}
+                      data-testid="remote-song-stop"
+                      className="flex h-11 items-center gap-1.5 rounded-full border border-live px-4 text-[13px] font-semibold text-live disabled:opacity-65"
+                    >
+                      <Square size={13} fill="currentColor" /> Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => send({ type: 'song-run', id: show.id })}
+                      disabled={!connected}
+                      data-testid={`remote-song-run-${show.id}`}
+                      className="flex h-11 items-center gap-1.5 rounded-full border border-white/15 px-4 text-[13px] font-semibold text-text disabled:opacity-65"
+                    >
+                      <Play size={13} fill="currentColor" /> Run
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}

@@ -290,6 +290,7 @@ const EMPTY: readonly SceneMapping[] = [];
 export interface TriggerHost {
   action: (action: MidiAction) => void;
   preset: (presetId: string) => void;
+  setlist?: (index: number) => void;
   /** The selected liquid takes this palette colour. The tool is not touched. */
   dye: (paletteIndex: number) => void;
 }
@@ -303,7 +304,7 @@ export interface TriggerHost {
  * (the patch bay folds it), so it does nothing here. Returns what it did, for
  * `npm run learn` to read.
  */
-export function runTrigger(b: SoundBinding, host: TriggerHost): 'action' | 'preset' | 'dye' | null {
+export function runTrigger(b: SoundBinding, host: TriggerHost): 'action' | 'preset' | 'setlist' | 'dye' | null {
   const t = b.target;
   switch (t.kind) {
     case 'action':
@@ -311,6 +312,7 @@ export function runTrigger(b: SoundBinding, host: TriggerHost): 'action' | 'pres
       host.action(t.action);
       return 'action';
     case 'preset': host.preset(t.presetId); return 'preset';
+    case 'setlist': host.setlist?.(t.index); return 'setlist';
     case 'dye': host.dye(t.paletteIndex); return 'dye';
     default: return null;
   }

@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
-import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
-import { Sheet, LIT } from './ui';
+import React, { useRef, type ReactNode } from 'react';
+import { Mic, Monitor, FileAudio, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
+import { LIT } from './ui';
 import { VuMeter } from './ui/Playful';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
@@ -18,6 +18,19 @@ import { isDesktopApp } from '../lib/platform';
  *
  * So sound is a tab, beside Perform, Design and Songs, because that is what it
  * is — one of the things you set up before a room fills.
+ *
+ * And then it was two places again (PLAN 35c-7, the owner 2026-11-10: "I
+ * don't understand why there are two sound settings pages"). This sheet held
+ * where the sound comes from, the shelf, the player and the drone; Settings →
+ * Sound held how hard it drives the plate, the device, the calibration, the
+ * tempo and the songs; and the Setup tab put both on screen side by side, as
+ * "Sound" and "Music & Drone", each sending you to the other for half of a
+ * job (the Mic's button to the device there, its link back here). Now this is the
+ * top of Settings → Sound, drawn inside that section (`SoundSection.tsx`):
+ * one page, read from the top, where the sound comes from first and what it
+ * does to the plate after. Every door that opened the sheet opens that
+ * section, and a desk layout saved with the "Music & Drone" panel opens with
+ * Sound in its place (`MERGED_SECTIONS`).
  */
 
 export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
@@ -40,18 +53,16 @@ const SOURCES: ReadonlyArray<{
 ];
 
 export function SoundPanel({
-  source, onSource, inputs, inputId, onPickMic,
+  source, onSource, inputPicker,
   playing, time, loop, onLoop, onToggle, onSeek,
   nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle,
-  ambientMode = false, onAmbientMode, onClose, embed = false,
+  ambientMode = false, onAmbientMode,
   readLevel, deaf = false,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
-  inputs: { id: string; label: string }[];
-  inputId: string;
-  /** Opens Settings at Sound's Input, where the microphone is picked (PLAN 35c-5). */
-  onPickMic: () => void;
+  /** The section's microphone or interface picker, drawn under the sources while the Mic is the source (PLAN 35c-7). */
+  inputPicker?: ReactNode;
   playing: boolean;
   time: { t: number; d: number };
   loop: boolean;
@@ -68,9 +79,6 @@ export function SoundPanel({
   onDroneToggle: () => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
-  onClose: () => void;
-  /** Drawn in a desk panel rather than as a sheet (`Sheet embed`). */
-  embed?: boolean;
   /** The plate's volume right now, 0 to 100, or null with no ear: what the VU needle is moved by. */
   readLevel: () => number | null;
   /** Listening, but nothing is arriving: the needle rests on its stop and the dial says so. */
@@ -90,8 +98,8 @@ export function SoundPanel({
   const chosen = sources.find(s => s.id === source) ?? sources[0];
 
   return (
-    <Sheet embed={embed} title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
-      <div className="flex-1 overflow-y-auto p-5">
+    <div className="@container mb-0" data-testid="sound-panel-box">
+      <div>
         <input
           ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="sound-file-input"
           onChange={e => { const f = e.target.files?.[0]; if (f) onPickFile(f); e.target.value = ''; }}
@@ -102,11 +110,11 @@ export function SoundPanel({
           rise (PLAN 35f). Today's dot only says listening or deaf; a needle
           that moves with the kick says the band is getting in.
         */}
-        <div className="mb-2 flex items-end justify-between gap-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
+        <div className="mb-1.5 flex items-end justify-between gap-3">
+          <p className="text-[12px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
           <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
         </div>
-        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-1.5 @lg:grid-cols-3 @4xl:grid-cols-6">
           {sources.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
@@ -115,31 +123,31 @@ export function SoundPanel({
                 aria-pressed={on}
                 key={s.id}
                 onClick={() => (s.id === 'file' ? fileRef.current?.click() : onSource(s.id))}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors ${
+                className={`flex flex-col items-center gap-1 rounded-xl border px-2.5 py-2 transition-colors ${
                   on ? LIT : 'border-border text-muted hover:bg-hover hover:text-text'
                 }`}
                 data-testid={`sound-source-${s.id}`}
               >
                 <Icon size={16} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{s.label}</span>
+                <span className="text-[12px] font-bold uppercase tracking-wider">{s.label}</span>
               </button>
             );
           })}
         </div>
-        <p className="mt-2 min-h-[32px] text-[12px] leading-relaxed text-muted">{chosen.blurb}</p>
+        <p className="mt-1.5 min-h-[28px] text-[12px] leading-snug text-muted">{chosen.blurb}</p>
 
         {onAmbientMode && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border px-3.5 py-2.5" data-testid="sound-ambient-row">
+          <div className="mt-1.5 flex items-center justify-between gap-2.5 rounded-xl border border-border px-3 py-1.5" data-testid="sound-ambient-row">
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-text">Ambient TV mode (cool &amp; quiet)</p>
-              <p className="text-[11px] text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
+              <p className="text-[12px] leading-tight text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
             </div>
             <button
               type="button"
               onClick={() => onAmbientMode(!ambientMode)}
               aria-pressed={ambientMode}
               data-testid="sound-ambient-toggle"
-              className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors ${
+              className={`shrink-0 rounded-full border px-3 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${
                 ambientMode
                   ? LIT
                   : 'border-border text-muted hover:bg-hover hover:text-text'
@@ -168,8 +176,8 @@ export function SoundPanel({
                 {droneRunning ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                 {droneRunning ? 'Stop' : 'Play'}
               </button>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-muted">The instrument</p>
-              <span className="ml-auto text-[11px] text-faint">{droneRunning ? 'playing the plate' : 'stopped'}</span>
+              <p className="text-[12px] font-bold uppercase tracking-widest text-muted">The instrument</p>
+              <span className="ml-auto text-[12px] text-faint">{droneRunning ? 'playing the plate' : 'stopped'}</span>
             </div>
             <div className="grid gap-3 @lg:grid-cols-2">
               <label className="flex items-center gap-2 text-[12px] text-muted">
@@ -227,7 +235,7 @@ export function SoundPanel({
                     className="h-6 flex-1 accent-white"
                     data-testid={`drone-${key}`}
                   />
-                  <span className="w-14 text-right font-mono text-[10px] text-faint">{fmt(drone[key] as number)}</span>
+                  <span className="w-14 text-right font-mono text-[12px] text-faint">{fmt(drone[key] as number)}</span>
                 </label>
               ))}
             </div>
@@ -235,7 +243,7 @@ export function SoundPanel({
               Said out loud, because it is the one surprising thing about this
               source: it listens to the plate it is driving.
             */}
-            <p className="mt-3 text-[11px] leading-relaxed text-faint">
+            <p className="mt-3 text-[12px] leading-relaxed text-faint">
               Four parts, all played by the plate: a pad keyed by the colour on the glass, a bass
               that pulses faster as the plate is stirred, bells rung wherever fresh dye arrives round
               the ring, and air that breathes with the flow. The plate voices this and this drives the
@@ -246,34 +254,21 @@ export function SoundPanel({
         )}
 
         {/*
-          Which microphone, said and not picked. A select here was the second
-          picker for the one device, beside Settings' Input (where the Mic
-          light lands, and where the advice about a USB feed from the desk
-          is): on the Setup tab both stood on screen at once, and one could
-          be changed while the other was read (PLAN 35c-5). The sheet keeps
-          the source, which is its own; the device is Settings', one click on.
+          Which microphone or interface, picked right under the Mic that hears
+          it (PLAN 35c-7). It was said here and picked in Settings → Sound,
+          one click on (35c-5), because two pickers for one device could be
+          changed one while the other was read. With the sheet folded into
+          that section there is one picker again, the section's, and this is
+          where it is drawn: under the source it belongs to, not after the
+          shelf.
         */}
-        {source === 'microphone' && (
-          <div className="mt-3 flex items-center gap-2" data-testid="sound-input-state">
-            <p className="min-w-0 flex-1 truncate text-[12px] text-muted">
-              Hearing <span className="text-text">{inputs.find(i => i.id === inputId)?.label || 'the default microphone'}</span>
-            </p>
-            <button
-              onClick={() => { if (!embed) onClose(); onPickMic(); }}
-              className="h-8 shrink-0 rounded-lg border border-border bg-black/30 px-3 text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
-              title="Pick the microphone or audio interface in Settings → Sound"
-              data-testid="sound-input-open"
-            >
-              Change…
-            </button>
-          </div>
-        )}
+        {source === 'microphone' && inputPicker}
 
         <div className="my-5 border-t border-border" />
 
         <div className="mb-2 flex items-baseline justify-between">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-muted">The shelf</p>
-          <span className="font-mono text-[10px] text-faint">{clock(librarySeconds())} · plays from this tab</span>
+          <p className="text-[12px] font-bold uppercase tracking-widest text-muted">The shelf</p>
+          <span className="font-mono text-[12px] text-faint">{clock(librarySeconds())} · plays from this tab</span>
         </div>
         <div className="rounded-xl border border-border">
           {LIBRARY.map((t, i) => {
@@ -291,8 +286,8 @@ export function SoundPanel({
                 {on && playing ? <Pause size={13} /> : <Play size={13} />}
                 <span className="text-[13px] font-medium">{t.title}</span>
                 <span className="text-[12px] text-faint">{t.artist}</span>
-                <span className="ml-auto font-mono text-[10px] text-faint">{clock(t.seconds)}</span>
-                <span className="w-24 text-right font-mono text-[10px] text-faint">{t.licence}</span>
+                <span className="ml-auto font-mono text-[12px] text-faint">{clock(t.seconds)}</span>
+                <span className="w-24 text-right font-mono text-[12px] text-faint">{t.licence}</span>
               </button>
             );
           })}
@@ -301,7 +296,7 @@ export function SoundPanel({
           The credit is on screen because the licence asks for it where the work
           is used, and a projector in a room full of people is where it is used.
         */}
-        <p className="mt-2 text-[11px] leading-relaxed text-faint">
+        <p className="mt-2 text-[12px] leading-relaxed text-faint">
           Music by {credits()}, and public-domain pieces by Thomas Park. Re-encoded and level-matched
           for a room. Sources on <a href="https://archive.org/details/netlabels" target="_blank" rel="noreferrer" className="inline-flex min-h-6 items-center underline hover:text-muted">archive.org</a>.
           Nothing here carries a non-commercial or no-derivatives restriction.
@@ -317,23 +312,23 @@ export function SoundPanel({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] text-text">{nowPlaying.name}</p>
                 {nowPlaying.track?.mustCredit && (
-                  <p className="truncate text-[11px] text-faint" data-testid="sound-credit">
+                  <p className="truncate text-[12px] text-faint" data-testid="sound-credit">
                     {nowPlaying.track.artist} · {nowPlaying.track.licence}
                   </p>
                 )}
               </div>
-              <span className="font-mono text-[10px] text-faint">{clock(time.t)}</span>
+              <span className="font-mono text-[12px] text-faint">{clock(time.t)}</span>
               <input
                 type="range" min={0} max={Math.max(1, time.d)} step={0.1}
                 value={Math.min(time.t, time.d || 0)}
                 onChange={e => onSeek(parseFloat(e.target.value))}
                 className="h-6 w-48 accent-white" aria-label="Seek" data-testid="sound-seek"
               />
-              <span className="font-mono text-[10px] text-faint">{clock(time.d)}</span>
+              <span className="font-mono text-[12px] text-faint">{clock(time.d)}</span>
               <button
                 aria-pressed={loop}
                 onClick={() => onLoop(!loop)}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-bold uppercase tracking-wider ${
                   loop ? LIT : 'border-border text-faint hover:text-muted'
                 }`}
                 title={nowPlaying.track
@@ -348,6 +343,6 @@ export function SoundPanel({
           </>
         )}
       </div>
-    </Sheet>
+    </div>
   );
 }

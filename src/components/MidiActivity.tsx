@@ -49,10 +49,12 @@ function labelFor(key: string, presets: { id: string; name: string }[]): { name:
   if (kind === 'setting') return { name: PIN_RANGE.get(id)?.label ?? id };
   if (kind === 'action') return { name: ACTION_LABELS[id as MidiAction] ?? id };
   if (kind === 'preset') return { name: presets.find(p => p.id === livePresetId(id))?.name ?? id };
+  if (kind === 'setlist') return { name: `Set list #${Number(id) + 1}` };
   if (kind === 'dye') {
     const c = PALETTE[Number(id)];
     return { name: c?.name ?? `Dye ${id}`, swatch: c?.hex };
   }
+  if (kind === 'voices') return { name: `Notes as voices (${id || 'dropper'})` };
   return { name: key };
 }
 

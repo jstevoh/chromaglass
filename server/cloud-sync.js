@@ -67,6 +67,7 @@ export const SYNC_STORES = [
   'toolAmounts',
   'musicSettings',
   'followSongs',
+  'deskTabs',
 ];
 
 export function emptyDoc() {

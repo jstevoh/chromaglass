@@ -82,18 +82,10 @@ colleagues 2020.
 
 **The check: `npm run soapfilm`** (`scripts/soapfilm.mjs`, node only, 7 groups C1–C7, 23 lines; its rationale and the three look-alikes it must fail are in the script's header). Open from it: C7 has no upper bound on saturation (`sat > 0.10` only), for a check session to add that bar (32b-1). Story in `docs/plan-shipped.md` §32a (moved 2026-10-29, 19m-2).
 
-## ~~32a. The CPU reference~~ — **Shipped, #403** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a)
-
 ## ~~32b. The reflected view~~ — **Shipped, #469** (`soapFilmRgb` in `src/lib/soapFilm.ts`; the colour grade is 32b-1 below)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32b (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
-
 - **32b-1. Replace the colour grade with the soft box's solid-angle integral and camera gamut mapping.** In 32b, the 4-point path spread (`spread = 0.025`) and dark ground (`ground = 0.0004`) move C7's `t = 120` s saturation by two points (79% → 77%), while the colour grade (`notchFloor = 0.0725`, `chromaRetention = 0.67`) accounts for the rest of the drop from 77% to 13% against the photograph's 15%. Replace that grade with the real phenomenon: integrate the film's Airy reflectance over the soft box's solid angle as a quadrature in `cosI` with s and p Fresnel reflection terms at each angle and the thickness's phase `4π n d cos θ_t / λ` at each angle (which also retires the Fresnel half of shortcut (f)), then map the integrated CIE XYZ tristimulus into the camera's sRGB gamut instead of clamping negative linear channels to zero. *Measure:* the same saturation and hue numbers `npm run soapfilm` C7 prints, with the grade removed (`notchFloor = 0`, `chromaRetention = 1`), showing how much of the 77% → 15% saturation drop the solid-angle integral and camera gamut mapping recover. Also note that check C7 in `scripts/soapfilm.mjs` has no upper bound on saturation (`sat > 0.10` only, so it would pass a film far more saturated than the photograph, such as main's 79% or the ungraded 77%), for a check session to add that bar.
 
 ## ~~32c. The GPU solver~~ — **Shipped, #505** (`src/gpu/soapFilm.ts`, `src/gpu/wgsl/soapFilm.ts`; `npm run soapgpu` 29/29 on Metal)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32c (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
-
 - **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
   it on the drain, where measured, the reference with its rupture marks removed refills no cell
   either (thick film never presses on black there), so that line in `npm run soapfilm` would pass
@@ -106,9 +98,6 @@ colleagues 2020.
   `soapgpu.mjs` steps the `--selftest` control in Node without a browser.
 
 ## ~~32f. The frame drains the film (shortcut c)~~ — **Shipped** (`drainToBorder` in `src/lib/soapFilm.ts`, the border pass in `src/gpu/wgsl/soapFilm.ts`'s `soapTransport`; `npm run soapfilm` C8, five lines; `npm run soapgpu` 32f)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32f (2026-10-30).
-
 - **32f-1. The border's exchange speed is the buoyant Darcy speed at the tuned ζ.** It inherits
   32i's time compression: at a real ζ the fresh film would be thicker and slower. Re-measure C8
   when 32i lands.
@@ -116,22 +105,51 @@ colleagues 2020.
   with the liquid the borders take). `f.drained` is that liquid; r0 from it is the next step.
 
 ## ~~32g. Black spots on Vrij's clock (shortcut d)~~ — **Shipped** (`blackSpots` in `src/lib/soapFilm.ts`, the same in `soapTransport`; `npm run soapfilm` C9, four lines; `npm run soapgpu` 32g, two)
-
-**Shipped.** Story in `docs/plan-shipped.md` §32g (2026-10-30).
-
 - **32g-1. The black front moves one cell a step.** Its speed is the grid's (2 cm/s at 1 mm and
   dt 0.05), not the spot's. Real black spots grow at a speed set by the black film's lower
   tension against the rim's drag (Mysels); that law is the next step.
 - **32g-2. Vrij's clock sits on the grid.** It does not travel with the film. It matters only
   under about 60 nm, where the film barely moves, but advecting it with h is the honest form.
+- **32g-2b. The black film's thickness is a constant, and its age is on the grid** (S–M;
+  Medium). `soapFilm.ts:394-399`, `:419-422` and `:449`, and `wgsl/soapFilm.ts:393, 415`, set
+  the black film's thickness and keep its age in place. A common black film settles at 4–8 nm
+  where the disjoining pressure balances drainage. Take the thickness from that balance and
+  advect the age with the film; buoyancy stays. Check: the black film's thickness holds within
+  1 nm over 60 s while it moves. (38v, from RS-12.)
 - **32g-3. Only van der Waals.** The double-layer repulsion that sets a common black film's
   thickness (DLVO) is left out: every spot goes straight to Newton black.
 
-## 32h. Gravity in the plane (shortcut a)
+## ~~32h. Gravity in the plane (shortcut a)~~ — **Shipped 2026-11-13** (Frame Tilt, `soapFilmTilt`, g sin θ along the film and in the fresh film's profile; the look Soap Film at 12°; `npm run soapplate` 7; story in `docs/plan-shipped.md` under 32k)
 
-The film hangs because g is applied along the picture's y on a plate that lies flat. The honest
-form is a tilt: in-plane gravity g sin θ for a film tilted θ from flat, θ a setting (90° a hanging
-film, 0 a level one with no sort), which is the real law at every angle. 32d's setting.
+- **32h-1. The tilt is in the plane only.** A frame near flat would also have the film's weight
+  across it (a sag, a few microns), which the model leaves out; and the frame drains toward its
+  picture-bottom edge at any tilt, never sideways.
+
+## ~~32k. The film's big swirls (a Brinkman film)~~ — **Shipped 2026-11-13** (gpu/soapAir.ts; `npm run soapplate` 7 and 8; story in `docs/plan-shipped.md`)
+
+- **32k-1. The air is carried whole.** The film's surface viscosity resists its own plumes'
+  small scales (the Brinkman solve) but takes the air's push at every scale whole (the 32d law,
+  ζ_air = ζ), so a small gust moves it as a big one does. Honest: the air's push inside the same
+  solve. Tried: it cut the stir under `soapplate` 4 to 0.6 nm; it needs 32d-1's own stir first.
+- **32k-2. η is fitted to the tuned ζ.** η = ζ / k² at the 6 mm patches (1.4e-6 Pa·s·m), so
+  the patches keep 32i's pace. Measured soap films run 1e-8 to 1e-6; at 2e-7 the film was much
+  quicker and blurred into level bands within a cycle (the transport's own diffusion: 32k-3).
+  Settle it with 32i.
+- **32k-3. The transport blurs the marbling.** Minmod upwinding at 1 mm smears a filament a
+  cell or two wide within seconds, and a real film keeps its edges sharp (it has no diffusion
+  of its own): measured, the marbled phase after a dip lasts about half a cycle and the rest is
+  soft bands. A sharper scheme (a high-order limiter, or a finer film grid where the swirls
+  fold it) would keep the folds.
+- **32k-4. The solve is warm-started.** 40 Jacobi sweeps a step on the air's grid: the big
+  swirls follow a change in the film over a few steps, slower than the film's real spin-up
+  (ρ h / ζ_air, under a tenth of a second).
+
+## 32m. The lamp's heat stirs the air (tried, open)
+
+A projector's lamp warms the air the frame hangs in, and warm air rises in plumes. Tried
+2026-11-13 as a warm, uneven strip at the frame's foot (1.5 K, g β T on the air): the air moved
+at a millimetre a second and the film not visibly. Worth a second look once the frame lies near
+flat over a lamp (the heat then rises across the film, and stirs it from below in cells).
 
 ## 32i. Real drag, and time as its own dial (shortcut b)
 
@@ -146,22 +164,36 @@ Marangoni plug flow: transport the surfactant's surface concentration Γ and let
 push the film, which is what makes the film inextensible in the first place. Stiff (wave speed
 about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carries it.
 
-## 32d. On the plate
+## ~~32d. On the plate~~ — **Shipped** (the look Soap Film, settings `soapFilm`, `soapFilmRate`, `soapFilmAngle`; `src/gpu/soapFilmPlate.ts`, `src/gpu/soapFrame.ts`, `src/gpu/wgsl/soapFilmPlate.ts`, `soapFilmOver` in `src/gpu/wgsl/plateThinFilm.ts`; `npm run soapplate` 13/13; story in `docs/plan-shipped.md` §32d)
 
-A "Soap Film" look: the film's reflected colour on a dark ground, a time-compression rate
-(named shortcut b) and a viewing angle, all settings with MIDI and the desks, default off
-so every existing preset looks as it did today (`setting-auditor`). The film hangs under
-its own gravity only: the sound may brighten or push it by its fast readings (hits, bands,
-onsets) but never move it as a whole (frameSway stays 0), and the preset's sound patch uses
-no song shape. *Measure:* `panel`, `desk`, `lampzero`, a `look` render against the
-photograph, and a new lab check that the setting at 0 is the plate to the bit.
-
-## 32e. The phone
-
-Every feature ships its phone version in the same PR as the feature: 32d's controls on the
-phone and the iPad, the film on the wall through Send to wall. *Measure:* `phone`,
-`draftwall`, `layout`.
-
-*Not doing now:* a thickness that follows the dye (the film is its own medium; mixing it
-with the pigment's opacity is 18k's old shortcut, and the reason for this section), Marangoni
-plug flow (named above), and any recorded footage as a texture.
+- **32d-1. The air's stir is the plate's flow (named shortcut).** *The air layer shipped
+  2026-11-13* (gpu/soapAir.ts: inertia, the film's plumes drag it, the room takes its momentum
+  back; story in `docs/plan-shipped.md` under 32k). What is left: the air is pushed by the plate's
+  flow at a constant 6 a second (`SOAP_AIR_K_STIR`, sized so a short stir carries the film about
+  as far as the old copy did), not by a stir of its own. The honest form is Blow, the hands and
+  the sound pushing the air directly. *Measure:* `soapplate` 4 with the air's own stir.
+- **32d-2. The re-dip lays a profile, not a pull.** A drained film (mean under 160 nm) is
+  drawn again top first over two seconds with Mysels' √z profile from 350 to 750 nm and
+  patches 12 mm across at 50% (2026-11-13, a hand-drawn film's sheets; was 6 mm at 25%). A real dip bursts the old film first, and the fresh film's thickness is
+  Frankel's at the speed the frame is pulled (1.34 ℓ_c Ca^(2/3)), thinning by gravity as it
+  rises. Make the pull speed the dial and the profile its result; a burst (the black film's
+  rupture opening from a spot, Culick's rim at √(2σ/ρh)) before it. *Measure:* `soapplate`'s
+  re-dip lines, and the profile against Frankel at two pull speeds.
+- **32d-3. The sound reaches the film only through the plate's flow.** Kicks open soap on the
+  plate (the look's `surfactantFlow` patch), whose Marangoni flow is the film's air. A drop of
+  solution landing on the film (thickening it where it lands, the way soap-film painters
+  work) would be the film's own answer to a hit. *Measure:* a kick thickens the film where it
+  lands, and the film's total grows by the drop.
+- **32d-4. The film's cost on Metal.** The solver's setup, projection and transport are single
+  workgroups over the film's 128² (2.4 ms a step at 256² on Metal, 32c); one film step per
+  solver step. Measure it on the Mac (`npm run soapplate` prints nothing of the Mac's) and,
+  if it shows in the frame, split those passes across workgroups (H2c's pattern).
+- **32d-7. The film's transmission over dye is not measured in linear light** (S; Low; a check).
+  `npm run soapplate` section 7 reads T over a clean lit plate (32d-6): over dye the plate lays dye
+  on the LED ground in sRGB (`onGround` in `wgsl/plate.ts`) and dye does not scale with the lamp,
+  so lit − dark there is not the film's transmission. Measure T over dye by inverting the dye's own
+  response (or rendering the dye as a lit layer), so a film that dims dye more than Airy allows is red.
+- **32d-5. The plate's dye under the film is the old look's.** Soap Film still seeds and pours
+  a faint dye (Dye Budget 0.3) that shows through the film's black and its thin orders. A real
+  frame has nothing behind it but the dark ground; decide with the owner whether the dye stays
+  as a colour under the film or goes.
