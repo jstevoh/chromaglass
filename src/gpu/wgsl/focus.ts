@@ -32,8 +32,8 @@
  * passes read 128 taps a pixel at full size for a picture with nothing in it
  * finer than its box. So once every soft projector's box is wide enough
  * (`focusScale`, lib/projectorFocus.ts: its short side at least LOW_MIN_PX
- * pixels of the smaller picture), the light is first taken down to a half or
- * a quarter of the frame's size by `down`, each small pixel the mean of the
+ * pixels of the smaller picture), the light is first taken down to a half, a
+ * quarter, an eighth or a sixteenth of the frame's size by `down`, each small pixel the mean of the
  * light of the d × d it covers, in linear light and split by B's share, so
  * nothing is lost or mixed; `lowRows` and `lowCols` box it there, A's and B's
  * added; and `compose` draws it back at full size through one bilinear tap
@@ -43,7 +43,8 @@
  * taken down (that would soften it by the small pixel): `compose` adds its
  * light straight from the full-size picture. The taps stay under two small
  * pixels apart up to a half-width of FOCUS_TAPS − 1 of them, so a melt of a
- * tenth of a 2560-wide frame (128 pixels, 32 at a quarter) is whole.
+ * tenth of a 2560-wide frame (128 pixels, 32 at a quarter) is whole, and a
+ * dissolve's glow there (320 pixels, 20 at a sixteenth).
  */
 
 import { PLATE_STRUCT } from './plateFields';
@@ -140,7 +141,7 @@ fn col(t: texture_2d<f32>, uv: vec2f, h: f32) -> vec3f {
 }
 `;
 
-/* Down to a d-th of the frame's size (SCALE, 2 or 4): each small pixel the mean light of the d × d it covers, A's and B's apart. */
+/* Down to a d-th of the frame's size (SCALE, 2, 4, 8 or 16): each small pixel the mean light of the d × d it covers, A's and B's apart. */
 export const DOWN_WGSL = /* wgsl */ `${HEAD}
 override SCALE: f32 = 2.0;
 @group(0) @binding(2) var scene: texture_2d<f32>;

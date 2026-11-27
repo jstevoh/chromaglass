@@ -28,14 +28,20 @@
  * bytes a pixel more (A's and B's rows, B's only with two projectors). A melt
  * past the rack is capped at FOCUS_TAPS a row and a column.
  *
- * A melt is boxed at a half or a quarter of the frame's size (PLAN 51b-3,
- * wgsl/focus.ts's header): once every soft projector's box is wide enough
- * (`focusScale`), `down` takes the light to the smaller picture, the rows and
- * columns run there, and `compose` draws it back with the finish. Two
- * projectors melted on a 1600-square frame cost 19.6 ms a draw on the Air at
- * full size, where the frame has 16.7. The small pictures are four of
- * them a sixteenth or a quarter of the frame's, made when first wanted and
- * let go with the rest.
+ * A melt is boxed at a half, a quarter, an eighth or a sixteenth of the
+ * frame's size (PLAN 51b-3, wgsl/focus.ts's header): once every soft
+ * projector's box is wide enough (`focusScale`), `down` takes the light to
+ * the smaller picture, the rows and columns run there, and `compose` draws it
+ * back with the finish. Two projectors melted on a 1600-square frame cost
+ * 19.6 ms a draw on the Air at full size, where the frame has 16.7. Each
+ * scale's four small pictures are made when first wanted and kept until every
+ * projector is sharp again, so a dissolve that walks its rack through the
+ * scales and back, or a box that sits on a threshold while the closeup's
+ * camera breathes, allocates nothing past the first time (the pre-push
+ * review); a half's are a sixteenth of the frame's bytes, the rest less. The
+ * full-size rows, once made, are kept too while any projector is soft: a box
+ * on the threshold between full size and a half would otherwise make and drop
+ * them frame by frame.
  *
  * Not drawn with it, for now (PLAN 51b-3): the lens pass (glitter or the side
  * lamp up) draws the plate sharp, as does the tank's side view, and a
@@ -102,17 +108,21 @@ function colsRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: bool
 }
 
 type Pictures = { scene: GPUTexture; share: GPUTexture; rowsA: GPUTexture | null; rowsB: GPUTexture | null };
-/** The small pictures of a melt (A's and B's light, then their rows; the wall back into `a`), and the scale they were made at. */
-type Low = { scale: number; a: GPUTexture; b: GPUTexture; rowsA: GPUTexture; rowsB: GPUTexture };
+/** The small pictures of a melt at one scale (A's and B's light, then their rows; the wall back into `a`), and their targets, one and two projectors. */
+type Low = { a: GPUTexture; b: GPUTexture; rowsA: GPUTexture; rowsB: GPUTexture; ab: GPUTextureView[][]; rows: GPUTextureView[][]; wall: GPUTextureView[] };
 
 /** Each projector's focus: see the file's header. */
 export class PlateFocus {
   private pics: Pictures | null = null;
-  private low: Low | null = null;
+  private readonly low = new Map<number, Low>();
+  private readonly target: GPUTextureView[] = [];
+  private readonly pipes = {} as { down: GPURenderPipeline; rows: GPURenderPipeline; cols: GPURenderPipeline; compose: GPURenderPipeline };
+  /** Each pass's recipe, made once: the frame asks the cache by name and hands it the recipe on a miss. */
+  private readonly recipes = new Map<string, RenderRecipe>();
   /** The scale the last run drew at (1 the full frame): the lab reads it, `npm run focus`. */
   scale = 1;
   /** The most a melt is taken down by; the lab sets 1 or 2 to draw the same melt larger, the check's control. */
-  maxScale = 8;
+  maxScale = 16;
   private size = [0, 0];
   private readonly blank: GPUTexture;
 
@@ -123,7 +133,7 @@ export class PlateFocus {
       cache.renderPrep(rowsName(true), rowsRecipe(device, true), true),
       ...[...new Set([format, picture])].flatMap((f) => [false, true].map((t) => cache.renderPrep(colsName(f, t), colsRecipe(device, f, t), true))),
       // A melt's smaller pictures (PLAN 51b-3): built behind the show too, and until they are the melt draws at full size.
-      ...[false, true].flatMap((two) => [2, 4, 8].map((k) => cache.renderPrep(downName(two, k), downRecipe(device, two, k), true))),
+      ...[false, true].flatMap((two) => [2, 4, 8, 16].map((k) => cache.renderPrep(downName(two, k), downRecipe(device, two, k), true))),
       ...[false, true].map((two) => cache.renderPrep(lowRowsName(two), lowRowsRecipe(device, two), true)),
       cache.renderPrep(LOW_COLS, lowColsRecipe(device), true),
       ...[...new Set([format, picture])].flatMap((f) => [false, true].map((t) => cache.renderPrep(composeName(f, t), composeRecipe(device, f, t), true))),
@@ -175,9 +185,27 @@ export class PlateFocus {
   }
 
   private releaseLow(): void {
-    if (!this.low) return;
-    for (const t of [this.low.a, this.low.b, this.low.rowsA, this.low.rowsB]) this.disposer.release(t);
-    this.low = null;
+    for (const L of this.low.values()) for (const t of [L.a, L.b, L.rowsA, L.rowsB]) this.disposer.release(t);
+    this.low.clear();
+  }
+
+  private lowAt(scale: number): Low {
+    let L = this.low.get(scale);
+    if (!L) {
+      const at = [Math.ceil(this.size[0] / scale), Math.ceil(this.size[1] / scale)];
+      const pic = (label: string) => this.picture(`focus low ${label} ${scale}`, FOCUS_SCENE_FORMAT, at);
+      const a = pic('A'), b = pic('B'), rowsA = pic('rows A'), rowsB = pic('rows B');
+      const [va, vb, vra, vrb] = [a, b, rowsA, rowsB].map((t) => viewOf(t));
+      L = { a, b, rowsA, rowsB, ab: [[va], [va, vb]], rows: [[vra], [vra, vrb]], wall: [va] };
+      this.low.set(scale, L);
+    }
+    return L;
+  }
+
+  private recipe(name: string, make: () => RenderRecipe): RenderRecipe {
+    let r = this.recipes.get(name);
+    if (!r) { r = make(); this.recipes.set(name, r); }
+    return r;
   }
 
   get holding(): boolean { return !!this.pics; }
@@ -185,11 +213,15 @@ export class PlateFocus {
   /** The melt's pipelines at `scale`, or null while one is still building (then the melt draws at full size). */
   private lowPipes(format: GPUTextureFormat, toTexture: boolean, two: boolean, scale: number) {
     const p = this.pipelines, d = this.device;
-    const down = p.renderPipeline(downName(two, scale), downRecipe(d, two, scale));
-    const rows = p.renderPipeline(lowRowsName(two), lowRowsRecipe(d, two));
-    const cols = p.renderPipeline(LOW_COLS, lowColsRecipe(d));
-    const compose = p.renderPipeline(composeName(format, toTexture), composeRecipe(d, format, toTexture));
-    return down && rows && cols && compose ? { down, rows, cols, compose } : null;
+    const get = (name: string, make: () => RenderRecipe) => p.renderPipeline(name, this.recipe(name, make));
+    const down = get(downName(two, scale), () => downRecipe(d, two, scale));
+    const rows = get(lowRowsName(two), () => lowRowsRecipe(d, two));
+    const cols = get(LOW_COLS, () => lowColsRecipe(d));
+    const compose = get(composeName(format, toTexture), () => composeRecipe(d, format, toTexture));
+    if (!down || !rows || !cols || !compose) return null;
+    const out = this.pipes;
+    out.down = down; out.rows = rows; out.cols = cols; out.compose = compose;
+    return out;
   }
 
   private pass(encoder: GPUCommandEncoder, label: string, pipe: GPURenderPipeline, targets: GPUTextureView[], bind: Parameters<typeof groupOf>[2]): void {
@@ -215,24 +247,16 @@ export class PlateFocus {
     const low = want > 1 ? this.lowPipes(format, toTexture, two, want) : null;
     this.scale = low ? want : 1;
     if (low) {
-      const [w, h] = this.size;
-      if (!this.low || this.low.scale !== want) {
-        this.releaseLow();
-        const at = [Math.ceil(w / want), Math.ceil(h / want)];
-        this.low = { scale: want, a: this.picture('focus low A', FOCUS_SCENE_FORMAT, at), b: this.picture('focus low B', FOCUS_SCENE_FORMAT, at), rowsA: this.picture('focus low rows A', FOCUS_SCENE_FORMAT, at), rowsB: this.picture('focus low rows B', FOCUS_SCENE_FORMAT, at) };
-      }
-      const L = this.low;
-      const ab = two ? [viewOf(L.a), viewOf(L.b)] : [viewOf(L.a)];
-      const rowsAB = two ? [viewOf(L.rowsA), viewOf(L.rowsB)] : [viewOf(L.rowsA)];
-      this.pass(encoder, 'focus down', low.down, ab, [uniforms, sampler, pics.scene, pics.share]);
-      this.pass(encoder, 'focus low rows', low.rows, rowsAB, [uniforms, sampler, L.a, L.b]);
+      const L = this.lowAt(want);
+      const n = two ? 1 : 0;
+      this.target[0] = target;
+      this.pass(encoder, 'focus down', low.down, L.ab[n], [uniforms, sampler, pics.scene, pics.share]);
+      this.pass(encoder, 'focus low rows', low.rows, L.rows[n], [uniforms, sampler, L.a, L.b]);
       // The wall, A's and B's added, back into A's small picture: its light is in the rows now.
-      this.pass(encoder, 'focus low cols', low.cols, [viewOf(L.a)], [uniforms, sampler, L.rowsA, L.rowsB]);
-      this.pass(encoder, 'focus compose', low.compose, [target], [uniforms, sampler, L.a, pics.scene, pics.share, mark]);
+      this.pass(encoder, 'focus low cols', low.cols, L.wall, [uniforms, sampler, L.rowsA, L.rowsB]);
+      this.pass(encoder, 'focus compose', low.compose, this.target, [uniforms, sampler, L.a, pics.scene, pics.share, mark]);
       return;
     }
-    // Back at full size from a melt (racked in past the scale): its small pictures go.
-    this.releaseLow();
     const rows = this.pipelines.renderPipeline(rowsName(two), rowsRecipe(this.device, two));
     const cols = this.pipelines.renderPipeline(colsName(format, toTexture), colsRecipe(this.device, format, toTexture));
     if (!rows || !cols) return;

@@ -53,6 +53,8 @@
  * the shadowgraph too.
  */
 
+import { glintWanted } from './glint';
+
 /** The overhead's lens above its stage, metres. */
 export const LENS_HEIGHT_M = 0.36;
 /** The lamp's image in the lens, metres: the pupil a defocused point takes the shape of (long, along the frame's width; short). */
@@ -131,6 +133,16 @@ export function focusBoxPx(out: Float32Array | number[], s: FocusSettings, two: 
   out[2] = b * PUPIL_LONG_M * scale; out[3] = b * PUPIL_SHORT_M * scale;
 }
 
+/**
+ * Whether the plate draws the focus pass at all with these settings: not
+ * under the lens pass (Glitter or the side lamp up, lib/glint.ts) nor in the
+ * tank's side view (PLAN 51b-3), where a projector is drawn sharp whatever
+ * its focus. A focus dissolve there would only delay a Go and hurry its fade
+ * in full view, so it is a plain fade (app/useLookFades.ts).
+ */
+export const focusDraws = (s: { glitter?: number; sideLight?: number; tank?: number }): boolean =>
+  !glintWanted(s.glitter ?? 0, s.sideLight ?? 0) && !((s.tank ?? 0) > 0);
+
 /** Whether either projector is soft enough that the pass runs. */
 export const focusWanted = (box: ArrayLike<number>): boolean => Math.max(box[0], box[2]) >= SHARP_PX;
 
@@ -144,7 +156,9 @@ export const LOW_MIN_PX = 6;
 
 /**
  * The scale the focus pass works a frame at: 1 the frame's own size, 2 a
- * half, 4 a quarter, 8 an eighth (a dissolve's glow, lib/focusDissolve.ts). Set by the soft projector with the narrowest box (along
+ * half, 4 a quarter, 8 an eighth, 16 a sixteenth (a dissolve's glow,
+ * lib/focusDissolve.ts, on a frame 2560 wide or more, where at an eighth
+ * its 32 taps a row would lie more than two small pixels apart). Set by the soft projector with the narrowest box (along
  * its short side, the lamp's bar across), so no soft projector is boxed
  * coarser than it is wide; a projector sharp beside it (under SHARP_PX) does
  * not count, being drawn at full size untouched (wgsl/focus.ts compose).
@@ -155,7 +169,8 @@ export function focusScale(box: ArrayLike<number>, two: boolean): number {
   if (box[0] >= SHARP_PX) h = box[1];
   if (two && box[2] >= SHARP_PX) h = Math.min(h, box[3]);
   if (!Number.isFinite(h)) return 1;
-  return h >= 8 * LOW_MIN_PX ? 8 : h >= 4 * LOW_MIN_PX ? 4 : h >= 2 * LOW_MIN_PX ? 2 : 1;
+  for (const k of [16, 8, 4, 2]) if (h >= k * LOW_MIN_PX) return k;
+  return 1;
 }
 
 /** The knob as the panel reads it: Sharp, or how far the head is racked. */

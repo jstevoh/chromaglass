@@ -13,6 +13,7 @@ import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { MixSource } from '../lib/mixer';
 import { setGoDoor } from './setNow';
 import { bankHasTwo } from '../lib/projectorBank';
+import { focusDraws } from '../lib/projectorFocus';
 
 /**
  * Taking a look to the stage over a fade, without a clear: Go on the armed
@@ -94,6 +95,9 @@ export function useLookFades({
     A Go's look change waiting inside a focus dissolve's rack (PLAN 51c), the
     front plate's and the back's: any later look change on that plate (a Go,
     a Back, a new song's fade) cancels it, so a look pressed later always wins.
+    The Go's cue and live row were taken at the press, as a Go's always are;
+    a song's fade landing in the first quarter of the rack is later, and its
+    look is the one that stays.
   */
   const frontWait = useRef<ShowIntervalHandle | null>(null);
   const backWait = useRef<ShowIntervalHandle | null>(null);
@@ -103,13 +107,16 @@ export function useLookFades({
     fade to hide it in, inside a rack of the projectors it changes (the
     visualizer's `rack`, lib/focusDissolve.ts): the rack runs the whole fade
     and the look change its middle half, so the look fade's own middle, where
-    what cannot be halfway switches, lands on the widest blur. A cut is a cut.
+    what cannot be halfway switches, lands on the widest blur. A cut is a cut,
+    and so is a look on either side that the focus pass cannot blur (Glitter,
+    the side lamp, the tank: `focusDraws`): there it is the plain fade.
   */
-  const dissolve = (w: RefObject<ShowIntervalHandle | null>, seconds: number, back: boolean, change: (seconds: number) => void) => {
+  const dissolve = (w: RefObject<ShowIntervalHandle | null>, seconds: number, back: boolean, to: Partial<VisualizerSettings>, change: (seconds: number) => void) => {
     stopWait(w);
     const s = settingsRef.current;
     const two = bankHasTwo(s, Math.round(s.layerCount ?? 1), s.renderStyle === 'photo' ? 0 : s.lampGround ?? 0);
-    const plan = (s.projRack ?? 0) > 0.005 && seconds > 0 ? visualizerRef.current?.rack(seconds, back, two) : null;
+    const blurs = focusDraws(s) && focusDraws({ ...s, ...to });
+    const plan = (s.projRack ?? 0) > 0.005 && seconds > 0 && blurs ? visualizerRef.current?.rack(seconds, back, two) : null;
     if (!plan || !(plan.delayMs > 0)) { change(plan ? plan.seconds : seconds); return; }
     const at = showNow() + plan.delayMs;
     w.current = showInterval(() => { if (showNow() < at) return; stopWait(w); change(plan.seconds); }, 33, 'look-dissolve');
@@ -167,7 +174,7 @@ export function useLookFades({
     // colours with it, handed over across the fade rather than left to
     // evaporate for minutes under the new ones. A cut still gets a second.
     // Inside a focus dissolve's rack, from the plate as it is when the change goes in.
-    dissolve(frontWait, seconds, false, (fade) => {
+    dissolve(frontWait, seconds, false, next.settings, (fade) => {
       adoptPreset(next.id);
       const target = targetLook(settingsRef.current, next.settings);
       visualizerRef.current?.handoff(Math.max(1, fade), lookPhase(target));
@@ -253,7 +260,7 @@ export function useLookFades({
     }
     if (next.sequence) return;
     const up = isUserPresetId(next.id) ? userPresetsRef.current.find(p => p.id === next.id) : null;
-    dissolve(backWait, seconds, true, (fade) => visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), fade, next.name, up
+    dissolve(backWait, seconds, true, next.settings, (fade) => visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), fade, next.name, up
       ? { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null }
       : undefined));
     setBackLook({ id: next.id, name: next.name });
@@ -277,6 +284,7 @@ export function useLookFades({
   /** The visualizer let go of the back look on its own (a render began or ended). */
   const backLookCleared = useCallback(() => {
     if (backLeavingTimer.current) { clearTimeout(backLeavingTimer.current); backLeavingTimer.current = null; }
+    stopWait(backWait);
     setBackLook(null);
   }, []);
   useEffect(() => () => { if (backLeavingTimer.current) clearTimeout(backLeavingTimer.current); }, []);
