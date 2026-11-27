@@ -306,7 +306,9 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Clear Film, which pours over the whole dish: the same list again.
 // Nor Two Projectors, which switches the rig between one lamp and two.
 // Nor Video on LED Ring, which moves the picture under the dish (PLAN 14ag-9).
+// Nor the projector bank's lamps, shutters and crossfade, the operator's hands (PLAN 51a).
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
@@ -534,6 +536,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3, curve: 3 },
   { key: 'twoProjectors',   label: 'Two Projectors',   min: 0, max: 1, step: 1 },
+  // The projector bank (PLAN 51a): each lamp its variac to 160 V, each shutter its vane, the A/B crossfade linear in light.
+  { key: 'projLampA',       label: 'Lamp A',           min: 0, max: 4 / 3 },
+  { key: 'projLampB',       label: 'Lamp B',           min: 0, max: 4 / 3 },
+  { key: 'projShutterA',    label: 'Shutter A',        min: 0, max: 1 },
+  { key: 'projShutterB',    label: 'Shutter B',        min: 0, max: 1 },
+  { key: 'projCross',       label: 'A/B Crossfade',    min: 0, max: 1 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },

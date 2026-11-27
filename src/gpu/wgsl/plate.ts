@@ -38,6 +38,7 @@ import { BEAD_SHAPE_WGSL } from './beadShape';
 import { FILM_DYE_WGSL } from './filmDye';
 import { FILM_FRAME_WGSL } from './plateFilm';
 import { LAMP_MIX_WGSL } from './plateLamp';
+import { PROJECTOR_WGSL } from './projectors';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 import { FINE_WINDOW_WGSL } from './fineWindow';
 import { SLOPE_WGSL } from './plateSlope';
@@ -192,6 +193,7 @@ fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t
 var<private> lampBg: vec3f = vec3f(1.0);
 var<private> milkScatter: f32 = 0.0;
 var<private> milkGap: f32 = 1.0;
+${PROJECTOR_WGSL}
 
 /**
  * Milky liquids scatter light (Mie / Kubelka-Munk, PLAN 18j).
@@ -230,13 +232,13 @@ fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
     painted = mix(effBg, f.rgb, f.a);
   }
   if (U.lampGround <= 0.001) { return painted; }
-  return mix(painted, lampBg * through, U.lampGround);
+  return onWall(mix(painted, lampBg * through, U.lampGround));
 }
 
 /* The bare ground, where no plate is: the black one, the lamp, or between. */
 fn groundOf(bg: vec3f) -> vec3f {
   if (U.lampGround <= 0.001) { return bg; }
-  return mix(bg, lampBg, U.lampGround);
+  return onWall(mix(bg, lampBg, U.lampGround));
 }
 
 /*
@@ -2377,7 +2379,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // One line each, as scripts/lampcontrol.mjs finds them (a video in the lamp
   // always has a lamp ground, plateUniforms.ts, so its bend needs no test of it).
   if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5 && U.dishSpread <= 0.001) { lampBend = lampBendAt(fuv0, c0, s0); }
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); }
   /*
     No substrate grain and no contact shadow (PLAN 38u-2). Until 2026-11-13
     the closeup laid a paper's fibre over the ground (value noise at 230
@@ -2395,9 +2397,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     Depth up close is the camera's own: its depth of field (Depth / Focus,
     still) and the shadowgraph of the liquid's curvature (Relief / 3D).
     The screen's lamp is kept apart for the second projector's beam, which
-    meets the screen and never the front plate (PLAN 18b-10).
+    meets the screen and never the front plate (PLAN 18b-10); each lamp has
+    its projector's gain (PLAN 51a, projectors.ts).
   */
-  let lampScreen = lampBg;
+  let lampScreen = projectorLamps();
 
   var outColor = bgColor;
   if (U.photo > 0.5) {
@@ -2932,14 +2935,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
-        On a lamp ground, when Two Projectors is on (PLAN 18b-10), the plates are
-        separate projectors: their light adds on the screen, each filtered by its
-        own plate from a lamp dimmed to half (lampScreen, kept before the front
-        plate's contact shadow). Halving each lamp is an exposure normalisation
-        shortcut so clear glass stays at one lamp's level; outside the back plate's
-        disc its share of the lamp's path (dish1.x times the grain's factor, what
-        lampMore1 held before PLAN 18e) is 0, so the second projector still lights
-        the screen there.
+        On a lamp ground with Two Projectors (PLAN 18b-10, 51a) the plates are
+        two projectors, each through its own plate from its own lamp, added in
+        linear light (projectors.ts). Outside the back plate's disc its filter
+        is 1 (PLAN 18e), so the second projector still lights the screen there.
         For other looks, they are stacked dishes on one lamp: a second filter in the
         light's path. A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
         The grain is pigment, T^grain, as on the front plate (PLAN 38h-4): this
@@ -2951,7 +2950,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let filt1 = throughScaled(t1, dish1.x * lampGrain1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         var lit1 = outColor * filt1;
         if (U.twoProjectors > 0.5 && U.layerCount > 1) {
-          lit1 = outColor + lampScreen * filt1;
+          wallB = lampScreen * filt1;
+          lit1 = wallAdd(outColor, wallB);
         }
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
@@ -3317,6 +3317,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Over both plates: the film projector, and whatever else the mixer put there ──
+  if (U.projA.w < 0.5) { outColor *= U.projA.rgb; }
   outColor = mixSourcesAt(polar(outColor, fuv0), U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
 
   // ── Lamp warmth ──────────────────────────────────────────────────
