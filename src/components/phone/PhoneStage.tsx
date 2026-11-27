@@ -1256,6 +1256,12 @@ export function PhoneStage(p: PhoneStageProps) {
                   <Slider label="Shake" value={p.mixer.settings.faraday ?? 0} {...pinSlider('faraday', p.mixer.settings.faraday ?? 0)} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ faraday: v })}
                     touch testId="phone-shake" />
+                  <Slider label="Rock" value={p.mixer.settings.faradayRock ?? 0} {...pinSlider('faradayRock', p.mixer.settings.faradayRock ?? 0)} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ faradayRock: v })}
+                    touch testId="phone-rock" />
+                  <Slider label="Wave Strength" value={p.mixer.settings.faradayGain ?? 1} {...pinSlider('faradayGain', p.mixer.settings.faradayGain ?? 1)} step={0.05}
+                    onChange={(v) => p.mixer!.onSetting({ faradayGain: v })}
+                    touch testId="phone-wave-strength" />
                   <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
                     display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />

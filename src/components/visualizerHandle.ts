@@ -121,9 +121,11 @@ export interface LiquidVisualizerHandle {
    * point under it, through the camera: the plate is wider than the wall,
    * turns with the dish and is magnified by the closeup. `turned` false
    * leaves the dish's turn out, for a hand on the dish (Spin reads its
-   * angle as the room sees it). The point itself, until the canvas is up.
+   * angle as the room sees it). `reach` carries a pouring hand in the
+   * wall's edge band onto the dish past the wall (lib/pointerPlate.ts,
+   * PLAN 18a-18). The point itself, until the canvas is up.
    */
-  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean) => { x: number; y: number };
+  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean, reach?: boolean) => { x: number; y: number };
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */

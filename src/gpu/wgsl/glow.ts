@@ -43,6 +43,32 @@
  * flow each step (semi-Lagrangian, as the dye is), so a lit wake drifts and
  * a spent one stays spent where the water took it.
  *
+ *   3. The dish shaken (PLAN 48c-6, with Shaker on, 48f). A Faraday wave is
+ *      a real flow inside the water, ringing at half the drive's frequency,
+ *      and its strain is what makes a flask of dinoflagellates glow when it
+ *      is shaken: the music's bass on the dish's speaker (the Music Shake
+ *      cord) stands up a lattice, and the lattice lights. The wave's own
+ *      solver (wgsl/faraday.ts) steps its amplitude u(x, y), the surface
+ *      η = u cos ωt with ω half the drive; the linear wave under it, in a
+ *      layer d deep with wavenumber k, has the potential
+ *        φ = (ω / k) u cosh(k ζ) / sinh(k d) · sin ωt,  ζ the height off the floor,
+ *      and the strain rate's amplitude at ζ is that potential's Hessian,
+ *        S(ζ)² = (a cosh²(kζ) + b sinh²(kζ)) / sinh²(kd),
+ *        a = 2 ((ω/k)² (uxx² + uyy² + 2 uxy²) + (ω k u)²),  b = 4 ω² |∇u|²,
+ *      strongest under the surface and weakest on the floor. The share of
+ *      the depth that passes the threshold is then exact: S(ζ*) = γth gives
+ *      cosh²(kζ*) = (γth² sinh²(kd) + b) / (a + b), and everything above ζ*
+ *      fires. And the floor: the wave's water slides over it at
+ *      U = (ω / k) |∇u| / sinh(kd), and no-slip brings that to rest in a
+ *      Stokes layer δ = √(2ν/ω) thick, sheared at U √(ω/ν) on the glass and
+ *      falling as e^(−z/δ), so a share δ ln(γ/γth) / d of the depth fires
+ *      there too (Stokes's second problem; tiny below 40 Hz, the bulk's
+ *      strain is most of it). A cell fires on the strain's peak each cycle,
+ *      so the amplitude is what is compared, and the share joins the flow's
+ *      as the larger of the two: the stroke's shear is in the gap's glass
+ *      and the wave's in the open dish's depth, two geometries the plate
+ *      already keeps side by side (48f's layer is 3 mm of open water).
+ *
  * Named shortcuts (PLAN 48c-1, 48c-2): the organisms are spread evenly
  * through the water (a real bloom is patchy, and a dye channel could carry
  * them); the threshold is a shear rate, which for seawater's viscosity is
@@ -58,6 +84,8 @@ struct GlowArgs {
   a: vec4f,
   // spend τs (s), fade τf (s), the step's seconds unclamped (for the flow's speed), 0
   b: vec4f,
+  // the shaken dish's wave (48c-6): its wavenumber k (1/m, 0 with no shaker), ω half the drive (rad/s), the layer's depth d (m), ν (m²/s)
+  c: vec4f,
 };
 @group(0) @binding(0) var<uniform> A: GlowArgs;
 const PLATE_METRES: f32 = ${PLATE_METRES};
@@ -71,6 +99,51 @@ const STEP = /* wgsl */ `${ARGS}
 @group(0) @binding(3) var<storage, read> src: array<vec2f>;
 @group(0) @binding(4) var<storage, read_write> dst: array<vec2f>;
 @group(0) @binding(5) var<storage, read_write> light: array<f32>;
+// The Faraday wave's amplitude, metres, n × n over the plate (gpu/faraday.ts); a 4-float stand-in with no shaker.
+@group(0) @binding(6) var<storage, read> wave: array<f32>;
+
+fn waveAt(i: i32, j: i32, n: i32) -> f32 {
+  // Periodic, as the wave's own grid is (wgsl/faraday.ts).
+  return wave[u32(((j % n) + n) % n) * u32(n) + u32(((i % n) + n) % n)];
+}
+
+// The share of the shaken layer's depth whose strain passes th (the header's part 3).
+fn waveShare(uv: vec2f, th: f32) -> f32 {
+  let kc = A.c.x;
+  let n = i32(round(sqrt(f32(arrayLength(&wave)))));
+  if (!(kc > 0.0) || n < 4) { return 0.0; }
+  let om = A.c.y;
+  let d = A.c.z;
+  let i = i32(floor(uv.x * f32(n)));
+  let j = i32(floor(uv.y * f32(n)));
+  let dx = PLATE_METRES / f32(n);
+  let u = waveAt(i, j, n);
+  let e = waveAt(i + 1, j, n); let w = waveAt(i - 1, j, n);
+  let s = waveAt(i, j + 1, n); let q = waveAt(i, j - 1, n);
+  let uxx = (e - 2.0 * u + w) / (dx * dx);
+  let uyy = (s - 2.0 * u + q) / (dx * dx);
+  let uxy = (waveAt(i + 1, j + 1, n) - waveAt(i + 1, j - 1, n) - waveAt(i - 1, j + 1, n) + waveAt(i - 1, j - 1, n)) / (4.0 * dx * dx);
+  let g2 = ((e - w) * (e - w) + (s - q) * (s - q)) / (4.0 * dx * dx);
+  let ok = om / kc;
+  let a = 2.0 * (ok * ok * (uxx * uxx + uyy * uyy + 2.0 * uxy * uxy) + (om * kc * u) * (om * kc * u));
+  let b = 4.0 * om * om * g2;
+  let sh = sinh(min(kc * d, 40.0));
+  let ch = cosh(min(kc * d, 40.0));
+  var share = 0.0;
+  // The bulk: fires above ζ*, if the surface itself passes.
+  if ((a + b) * ch * ch - b > th * th * sh * sh) {
+    let c2 = (th * th * sh * sh + b) / max(a + b, 1e-30);
+    let z = acosh(sqrt(max(1.0, c2))) / kc;
+    share = 1.0 - clamp(z / d, 0.0, 1.0);
+  }
+  // The floor's Stokes layer.
+  let nu = A.c.w;
+  let wallShear = ok * sqrt(g2) / sh * sqrt(om / nu);
+  if (wallShear > th) {
+    share += sqrt(2.0 * nu / om) * log(wallShear / th) / d;
+  }
+  return clamp(share, 0.0, 1.0);
+}
 
 // The plate's velocity at a uv, between texels: the dye's own sampling.
 fn velAt(uv: vec2f) -> vec2f {
@@ -129,6 +202,7 @@ fn stateBack(uv: vec2f, n: i32) -> vec2f {
   } else if (wall > 0.0) {
     g = clamp(1.0 - sqrt(th * th - strain * strain) / wall, 0.0, 1.0);
   }
+  g = max(g, waveShare(uv, th));
   // The charge, spent by the firing share and refilled, exactly over the step.
   let rate = 1.0 / max(A.a.w, 1e-3) + g / max(A.b.x, 1e-3);
   let full = (1.0 / max(A.a.w, 1e-3)) / rate;

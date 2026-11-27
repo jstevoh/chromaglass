@@ -215,9 +215,10 @@ export interface GpuStepParams {
   tankNozzle?: number;
   tankDrain?: number;
   tankHue?: number;
-  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), and Shake, its peak acceleration in g. The front plate's only. */
+  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), Shake, its peak acceleration in g, and Rock, the strobe's slip in Hz (48f-6). The front plate's only. */
   faradayHz?: number;
   faraday?: number;
+  faradayRock?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
