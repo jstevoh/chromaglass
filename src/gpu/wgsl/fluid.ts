@@ -391,7 +391,8 @@ KERNELS.bodyAdvectPairSub = `${HEAD}
 @group(0) @binding(10) var dst2: texture_storage_2d<rgba32float, write>;
 ${THIN_FACE}
 fn mm(a: vec4f, b: vec4f) -> vec4f {
-  return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));
+  let l = min(min(2.0 * abs(a), 2.0 * abs(b)), 0.5 * abs(a + b));
+  return select(vec4f(0.0), sign(a) * l, a * b > vec4f(0.0));
 }
 // The share of a cell crossing the face a → a + e this substep; nothing through the grid's wall.
 fn courant(a: vec2i, e: vec2i, n: i32) -> f32 {
