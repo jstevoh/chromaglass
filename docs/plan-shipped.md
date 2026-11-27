@@ -13656,6 +13656,50 @@ Measured, Lava Lamp in the lab at 6 s (`lavasplit`, quartic against deep): 192²
 4/4: clear 79%, colour in the bodies 67% (31% Oil Bodies off), centre 0.608 (0.129 no heat,
 0.468 no swelling).
 
+## 38d-1. The ferrofluid labyrinth's period from the magnetic Bond number (2026-11-13)
+
+*Asked:* the owner, 2026-11-13, "Go ahead" on the looks-against-references fixes: Ferro
+Paint's forms spanned 1.6% of the width against 5 to 11 in Colored I and II (64 forms a
+frame against 21), Magnet Garden's 2.8% against 6 in the thin-cell film and 15 in the
+labyrinth photo (31 forms against 3). The maze's period was one constant, 0.045 of the
+plate, at every field and gap, and Maze Detail could only make it finer.
+
+*Built:* `src/gpu/fluid/mazeBond.ts`. Straight stripes in a layer of thickness h cost
+2σh/λ for their interfaces and save the Fourier magnetisation's demagnetising energy
+(μ0/2)h Σ|Mₙ|²(1 − f(kₙh)); the minimum, worked numerically, is λ/h = 1.906·e^{4π/N} − 0.5
+with N = μ0M²h/σ (within 4% for N 2–20). M is EFH1's Langevin curve of the inner field
+B0/μ0 − M, σ the spikes' 3.3 mN/m, h the 2 mm gap. Labyrinth is the coil (7.5 mT at 1,
+where the period is the old 0.042, so `npm run maze` is unchanged); under about 0.47 the
+layer is below the critical Bond number and a pool stays a pool. The period is read from
+the field's mean square over 4 s (`mazeFelt`), because the frame loop plays the coil on
+every kick and α ∝ k⁴ would have jumped two-thousandfold a beat; the frame loop's swing is
+centred on the setting (0.75 + 0.35·energy + 0.45·kick, was 0.55), so music and silence ask
+for the same width. The first cut also moved the looks toward the onset (Magnet Garden's
+Labyrinth 0.8 → 0.58, period 0.27; Ferro Paint's 0.9 → 0.65 with Maze Detail 0.5 → 0,
+0.15; magnets eased to 0.35 and 0.25, since at the wide period the walking magnet
+gathered the maze into one blob in 40 s).
+
+*Measured* on the Mac (`npm run film`, seed 1, 60 s; `npm run watch -- <take> --vs <ref>`,
+form scale across / forms a frame): Ferro Paint 1.6% / 64 → 3.2% / 55 (Colored I 10.9 / 21,
+Colored II 5.3 / 30: from 6.8× and 3.3× finer to 3.4× and 1.6×); Magnet Garden 2.8% / 31 →
+5.3% / 3 (the labyrinth photo 15.2 / 40, the thin-cell film 3 forms). In the lab (256², the
+look's pour, Labyrinth and walking magnet, 20 s; the black's correlation length and its
+separate forms): Ferro Paint 1.83% / 55 → 2.4% / 14, Magnet Garden 2.36% / 27 → 5.8% / 4.
+`npm run bondmaze` 5/5. Left: luminance (Ferro Paint 0.14 against 0.51–0.56) is 9ag;
+Magnet Garden's black now stands in wide pools on a joined gold sheet rather than
+stripes, the near-onset look of the thin cell rather than the labyrinth photo, which is
+the owner's call (judging).
+
+*The owner's call* (2026-11-13, on those pictures): "The reference images have much thinner
+and more complex fingers." Near onset the instability gives a few fat blobs; the photos'
+thin, branched fingers are the same instability far above it, over pools much wider than
+the period. So the physics shipped and the wide retune did not: both looks at Labyrinth 1
+(N 14, period 0.042 against the old 0.045; Ferro Paint over √3 by Maze Detail 0.5, 0.024
+against 0.026), their magnets as before (0.9 and 0.6: the blob was the wide period's, and
+on main's period those magnets were fine). `npm run bondmaze` check 4 now asks the looks
+for periods no wider than the old ones. The thin, branched look (38d-1b, big pools, high N;
+38d-3) is open.
+
 ## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
 
 *Asked:* the owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." The rest gap had

@@ -3112,3 +3112,14 @@ in the lab; only the Mac shows whether it reads as ferrofluid.
 3. Bad: domes that sit on a grid, flicker, or stand up under a look with no magnet.
 4. Not this change (9t-12): a wide pool dragged by the Magnet turns to worms and creeps,
    the same before and after.
+
+## 149. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
+
+The labyrinth's period now follows Labyrinth (the coil's field) through the magnetic Bond
+number. Magnet Garden and Ferro Paint sit at the top of the dial, where the period is 0.042
+of the plate (was a fixed 0.045), so their fingers should be as thin as before or a touch
+thinner, never the wide blobs of this item's first cut. Judge on both looks, with music:
+the maze no wider than on the previous deploy, through quiet passages too (the coil swings
+about the setting, 0.75 + the music, and the period follows its 4 s mean). Then drag
+Labyrinth down on Ferro Paint: past about 0.6 the stripes should widen fast, and under about
+0.47 the pools stay pools. The thin, branched fingers of the photos are still open (38d-1b).

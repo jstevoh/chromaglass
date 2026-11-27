@@ -249,7 +249,7 @@ Open, from building 9i:
   |B| is still high. (38v, from RS-20.)
 
 - **9af. The magnet's strength and walk ride the music outside the cords** (S; Medium).
-  `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.55 +
+  `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.75 +
   0.35·energy + 0.45·env)) and speeds its walk on the music whatever the patch says (no
   built-in look takes the stale path). An electromagnet's field is B = μ0 n I with an L/R lag
   on the current, and a permanent magnet moves only with a hand. Make the music's share a
@@ -267,3 +267,11 @@ Open, from building 9i:
   wavelength the solver resolves sits near the grid's pitch so a pool either breaks into
   pieces or stays joined by thin necks. Don't lower the bar: those two lines are quarantined on
   PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes them out.
+
+- **9ag. The ferrofluid looks lit from the front, in the photos' colours** (S-M). Held
+  against the owner's photos (2026-11-12, the looks-against-references read), Ferro Paint
+  reads luminance 0.14 against 0.56 and colourfulness 62 against 129, all warm, where
+  Colored I and II run blue to orange with bright dye between glossy black channels; Magnet
+  Garden is dark on dark gold (0.15) where the labyrinth photo is black on near-white (0.74).
+  38d-1 set the maze's period and left the light: a lamp from above (the dish's reflection, 38h)
+  and the looks' dye contracts. Measure with `npm run watch -- <take> --vs <ref>`.

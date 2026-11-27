@@ -113,6 +113,31 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   standing film's FFT (`wgsl/standing.ts`) can apply the kernel. *Measure:* the period
   against N_B at three gaps and three fields, within 15% of the law; stripes, not dots, at
   the fill where the theory says stripes.
+  - ~~**38d-1. The period from the Bond number, for the coil**~~ — **Shipped** (`npm run
+    bondmaze`; story in `docs/plan-shipped.md`). Labyrinth is the coil's field (7.5 mT at 1)
+    and the maze's period is λ/h = 1.906·e^{4π/N} − 0.5 from the stripe energy, read from the
+    field's mean square over 4 s; the frame loop swings the coil about the setting (0.75 +
+    music, was 0.55 +). The physics shipped; the first cut's look retune did not: it moved
+    Ferro Paint and Magnet Garden toward the onset (0.65 and 0.58, periods 0.15 and 0.27),
+    and the owner, seeing it (2026-11-13): "The reference images have much thinner and more
+    complex fingers." Both looks ship at Labyrinth 1 (N 14, period 0.042, Ferro Paint over
+    √3 by Maze Detail 0.5) with their magnets as before: no wider than on main.
+  - **38d-1b. Thin, branched fingers** (M, open). The photos' long, wavy, branched black
+    fingers are the labyrinthine instability far above onset (high N) over a pool much
+    wider than the period; our pours are small drops or a ring, which give beads and worms.
+    Pour bigger pools, let their edges finger, less ferrofluid per area for thin black;
+    38d-3 if the screened kernel will not branch. Bar: `photism-morphogen`.
+  - **38d-2. One period at each point, from the field there** (M). 38d-1 reads one period
+    for the plate from the coil; the hand's magnet and a phone's fingers still draw finer
+    only through their stronger push, and the gap's dome (38r-5) does not reach it. The
+    Ohta–Kawasaki solve takes one m² and one α; a per-cell k* means α and m² as fields
+    (`labyrinth.ts`, screenJacobi and phaseMu read them from a texture).
+  - **38d-3. The dipoles' own kernel, not a screened stand-in** (M-L). The repulsion is still
+    α/(k² + m²), set so its fastest wavelength is 38d-1's period; the real one is
+    (μ0M²/2)·h·(1 − f(kh)) on the layer's Fourier modes, through the standing film's FFT.
+    With it the model's surface stiffness has to be σ in real units too, which is also what
+    the look's magnet against the coil needs (38d-1's first cut, at the wide period, saw the
+    grid-unit capillarity let an 18 mT magnet gather the maze into one blob in 40 s).
 
 - **38e. Oil's surface tension in newtons a metre, and no cap at the moment it matters**
   (S, nil; Medium-High: every oil look's rounding and break-up). Sharpens **18c-4** and
