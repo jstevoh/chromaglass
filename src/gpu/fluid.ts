@@ -1091,6 +1091,7 @@ export class WebGPUFluid extends FluidCover {
         speciesCarried = !!rider;
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
       if (!bodiesOn) { 
@@ -1127,6 +1128,7 @@ export class WebGPUFluid extends FluidCover {
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv, undefined, thinAt);
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);

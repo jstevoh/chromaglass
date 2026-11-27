@@ -307,6 +307,13 @@ export class FluidInputs extends FluidPasses {
       s.swap();
       this.speciesLive = true;
       this.speciesQuiet++;
+      // With ouzo on the plate (PLAN 48s): the ink takes the column's place, so the same share of the ethanol and the oil goes with what it replaced.
+      if (this.solventLive && this.solvent) {
+        const v = this.solvent;
+        this.run(pass, 'inkSpecies', v.write, [v.read, pad, this.sampler], this.arg('ink solvent', [Math.min(1, carrier.share), 0, 0, 0]));
+        v.swap();
+        if (this.cloudFresh) this.writeCloudView(pass);
+      }
     }
     pass.end();
     this.submit(enc);
@@ -781,16 +788,21 @@ export class FluidInputs extends FluidPasses {
         nothing, and a plate with no anise on it carries nothing for it (an
         alcohol pour made before any anise is therefore not remembered, PLAN
         48s-2). Once it is there, alcohol poured on a cloud is ethanol the
-        cloud dissolves in.
+        cloud dissolves in, and a liquid with neither that is laid in a
+        column's place (no push: speciesSplat replaces that share of the
+        column) takes the same share of the ethanol and the oil out with it.
+        The plate's view is then made again, so a pour onto a stopped plate
+        is not drawn with the species as it was before it.
       */
       const ethanol = sp.ethanol ?? 0, anise = sp.anise ?? 0;
-      if (anise > 0 || (ethanol > 0 && this.solventLive)) {
+      if (anise > 0 || (this.solventLive && (ethanol > 0 || !push))) {
         const v = (this.solvent ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'solvent'));
         if (!this.solventLive) for (const t of [v.a, v.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
         this.run(pass, 'speciesSplat', v.write, [v.read, this.squeeze.read], this.arg('solvent splat', [x, y, radius, take, ethanol, anise, 0, push ? 1 : 0]));
         v.swap();
         this.solventLive = true;
       }
+      if (this.solventLive && this.cloudFresh) this.writeCloudView(pass);
     }
     if (push) {
       this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
