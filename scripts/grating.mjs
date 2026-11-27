@@ -179,20 +179,34 @@ try {
     the frequencies within it. What a real edge puts there is the same in
     both runs; what differs is what the grid grew.
   */
-  const pressed = (gridDamp, extra = {}) => page.evaluate(async ([N, over]) => {
+  /*
+    Each run also says whether its steps ran as a thin gap (`lab.thinLive`)
+    and how far the dye moved: the mean change of its density from the first
+    ten steps to the last, against its mean, so section 7 can tell a thin
+    plate whose presses moved its dye from one that sat still.
+  */
+  const pressed = async (gridDamp, extra = {}) => {
+    const r = await pressRun(gridDamp, extra);
+    return Object.assign(r.band, { thin: r.thin, moved: r.moved });
+  };
+  const pressRun = (gridDamp, extra) => page.evaluate(async ([N, over]) => {
     await lab.create(N, N);
     let s = 7; const r = () => (s = s * 16807 % 2147483647) / 2147483647;
     for (let i = 0; i < 14; i++) lab.dye(0.2 + 0.6 * r(), 0.2 + 0.6 * r(), 0.05 + 0.08 * r(), [0.4, 1.0, 0.3], 1.2);
     lab.flush();
+    let first;
     for (let k = 0; k < 60; k++) {
       lab.vel(0.2 + 0.6 * r(), 0.2 + 0.6 * r(), 0.08, [(r() - 0.5) * 0.4, (r() - 0.5) * 0.4, 0, 0]);
       const x = 0.25 + 0.5 * r(), y = 0.25 + 0.5 * r();
       for (const rr of [0.1, 0.07, 0.04]) lab.vel(x, y, rr, [0, 0, 0, -0.3]);
       lab.flush(); await lab.step(10, over);
+      if (k === 0) first = await lab.field('dye');
     }
     const d = await lab.field('dye');
     const M = Math.floor(0.1 * N);
-    return [0, 1, 2, 3].map((c) => {
+    let change = 0, held = 0;
+    for (let k = 3; k < d.length; k += 4) { change += Math.abs(d[k] - first[k]); held += first[k]; }
+    const band = [0, 1, 2, 3].map((c) => {
       let mean = 0;
       const g = new Float64Array(N * N);
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = d[(y * N + x) * 4 + c]; mean += v; g[y * N + x] = (x + y) & 1 ? -v : v; }
@@ -217,6 +231,7 @@ try {
       }
       return Math.sqrt(2 * e) / (N * N) / mean;
     });
+    return { band, thin: lab.thinLive(), moved: change / held };
   }, [N, { ...STILL, platePressure: 0.35, gridDamp, ...extra }]);
   /*
     Held under 0.68, not the third it was written with (re-baselined
@@ -362,14 +377,26 @@ try {
         what says `gridDamp` reaches a thin step at all, so the first line is
         not two runs of the same thing.
 
+    Around them: the runs say they stepped as a thin gap (and section 2's as
+    the old plate), the thin plate's dye moved at least THIN_MOVED as far as
+    the old plate's (a still plate grows nothing in the band and would pass
+    the rest), and the band measure itself moves past THIN_SAME where the
+    pass has a grating to take (section 2's plate, off against on, 1/0.64).
+
     A pass that came back on the thin gap fails the second line; a flow mode
     that came back fails the first (it grows the band with the pass off, which
     the forced pass would hold down).
   */
   const PASS = 0.05; // GRID_DAMP, the old plate's strength
   const THIN = { thinGap: 1 };
-  const THIN_SAME = 1.15, THIN_CLEANER = 0.75, THIN_KEEP = 0.95, THIN_FORCED = 0.9;
+  const THIN_SAME = 1.15, THIN_CLEANER = 0.75, THIN_KEEP = 0.95, THIN_FORCED = 0.9, THIN_MOVED = 0.5;
   const thinShip = await pressed(undefined, THIN), thinForced = await pressed(PASS, THIN);
+  check('the thin runs stepped as a thin gap and section 2\'s as the old plate', thinShip.thin && thinForced.thin && !off.thin && !on.thin,
+    `thin ${thinShip.thin}/${thinForced.thin}, old ${off.thin}/${on.thin}`);
+  check(`and the thin plate's pushes and presses moved its dye at least ${THIN_MOVED} as far as the old plate's`, thinShip.moved >= THIN_MOVED * off.moved,
+    `${thinShip.moved.toFixed(3)} of its mean against ${off.moved.toFixed(3)}`);
+  const graded = Math.min(...off.map((v, c) => v / on[c]));
+  check(`the band tells a grating from none: on the old plate it reads over ${THIN_SAME} of itself with the pass off`, graded > THIN_SAME, `${graded.toFixed(2)}, worst channel`);
   const same = Math.max(...thinShip.map((v, c) => v / thinForced[c]));
   const cleaner = Math.max(...thinShip.map((v, c) => v / off[c]));
   check('on a thin gap, the pressed plate grows no more grid-scale ripple with no pass than with one', same < THIN_SAME,
