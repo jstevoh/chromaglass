@@ -319,6 +319,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       <div className="flex min-h-0 w-full flex-1 flex-col sm:flex-row">
 
         {/* ── Where you are ─────────────────────────────────── */}
+        {/* Stacked vertically on <640 px so groups and section pills wrap cleanly inside 390 px without horizontal clipping (H8-02). */}
         <nav
           className="flex max-h-[38%] shrink-0 flex-col border-b border-white/10 bg-black/20 sm:max-h-none sm:w-[220px] sm:border-b-0 sm:border-r"
           aria-label="Settings sections"
@@ -326,7 +327,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         >
           <div
             ref={railScroll.ref}
-            className="flex min-h-0 flex-1 gap-1 overflow-x-auto overflow-y-auto cg-scroll p-2 sm:flex-col sm:px-3 sm:py-2.5"
+            className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden cg-scroll p-2.5 sm:gap-1 sm:px-3 sm:py-2.5"
           >
             {railGroups.length === 0 && (
               <p className="p-2 text-[12px] text-dim">Nothing matches.</p>
@@ -334,20 +335,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             {railGroups.map(group => (
               <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
                 {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
-                <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-dim sm:pb-1 sm:pt-2.5" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                <div className="whitespace-nowrap px-2 pb-1 pt-0.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-dim sm:px-3 sm:pb-1 sm:pt-2.5" title={group.hint} data-testid={`rail-heading-${group.id}`}>
                   <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
                   {group.name}
                 </div>
-                <div className="flex gap-0.5 sm:flex-col">
+                <div className="flex flex-wrap gap-1.5 sm:flex-col sm:flex-nowrap sm:gap-0.5">
                   {group.rows.map(row => (
                     <button
                       key={row.id}
                       onClick={() => { setSection(row.id); setQuery(''); }}
                       aria-current={!q && section === row.id ? 'page' : undefined}
-                      className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[5px] text-left text-[13px] transition-colors sm:w-full sm:whitespace-normal ${
+                      className={`min-h-[44px] sm:min-h-0 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] transition-colors sm:w-full sm:py-[5px] sm:whitespace-normal ${
                         !q && section === row.id
                           ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
-                          : 'text-text-2 hover:bg-white/[0.05] hover:text-white'
+                          : 'bg-white/[0.03] sm:bg-transparent text-text-2 hover:bg-white/[0.05] hover:text-white'
                       }`}
                       data-testid={`settings-nav-${row.id}`}
                     >
@@ -366,11 +367,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               has turned the rail into a result list.
             */}
             {scope !== 'stage' && !q && (
-              <div className="shrink-0 sm:mt-auto sm:border-t sm:border-white/[0.06] sm:pt-2" data-testid="rail-feedback">
+              <div className="shrink-0 border-t border-white/[0.06] pt-2 sm:mt-auto" data-testid="rail-feedback">
                 <button
                   onClick={() => setSection(FEEDBACK_PANE)}
                   aria-current={section === FEEDBACK_PANE ? 'page' : undefined}
-                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[5px] text-left text-[13px] transition-colors sm:w-full ${
+                  className={`min-h-[44px] sm:min-h-0 w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] transition-colors sm:py-[5px] ${
                     section === FEEDBACK_PANE
                       ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
                       : 'text-text-2 hover:bg-white/[0.05] hover:text-white'
@@ -395,7 +396,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </nav>
 
         {/* ── What is in it ─────────────────────────────────── */}
-        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto cg-scroll px-7 py-6">
+        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto cg-scroll px-4 py-4 sm:px-7 sm:py-6">
 
       {/*
         A box to type into.

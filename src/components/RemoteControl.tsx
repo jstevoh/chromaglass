@@ -565,7 +565,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={t}
               onClick={() => setPadTool(t)}
               disabled={!connected}
-              className={`min-h-11 min-w-11 rounded-full border px-3.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${padTool === t ? LIT : 'border-white/10 text-muted'}`}
+              className={`min-h-11 min-w-11 rounded-full border px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${padTool === t ? LIT : 'border-white/10 text-muted'}`}
               data-testid={`remote-tool-${t}`}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -575,10 +575,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={tiltOn}
             onClick={toggleTilt}
             disabled={!connected}
-            className={`flex min-h-11 min-w-11 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${tiltOn ? LIT : 'border-white/10 text-text-2'}`}
+            className={`flex min-h-11 min-w-11 items-center gap-2 rounded-full border px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${tiltOn ? LIT : 'border-white/10 text-text-2'}`}
             title="Tilting the device tilts the plate"
           >
-            <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
+            <Compass size={14} /> {tiltOn ? 'Tilt live' : 'Tilt'}
           </button>
         </div>
       </div>
@@ -600,15 +600,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 key={liq.id}
                 onClick={() => chooseLiquid(liq.id)}
                 disabled={!connected}
-                className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-65 ${
+                className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-65 ${
                   on ? LIT : 'border-white/10 text-muted'
                 }`}
                 title={liq.description}
               >
-                <span className="h-2.5 w-2.5 rounded-full border border-white/30" style={bottleSwatch(liq)} />
+                <span className="h-3 w-3 rounded-full border border-white/30" style={bottleSwatch(liq)} />
                 {liq.name}
                 {/* A dot for the four that do something the dye cannot. */}
-                {liq.behaviour && <span className="h-1 w-1 rounded-full bg-amber-300/80" />}
+                {liq.behaviour && <span className="h-1.5 w-1.5 rounded-full bg-amber-300/80" />}
               </button>
             );
           })}
@@ -756,8 +756,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-dim" />}
               </span>
-              <button onClick={openDraw} className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-full border border-white/10 px-3.5 text-[12px] font-bold uppercase tracking-widest text-text-2" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
-                <Maximize2 size={12} /> Draw
+              <button onClick={openDraw} className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-full border border-white/10 px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest text-text-2" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
+                <Maximize2 size={14} /> Draw
               </button>
             </div>
             {padSurface}

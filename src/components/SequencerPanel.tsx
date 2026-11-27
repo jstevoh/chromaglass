@@ -60,7 +60,7 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </label>
 );
 
-const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40';
+const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 pointer-coarse:min-h-11 pointer-coarse:text-[16px] text-xs text-white outline-none focus:border-white/40';
 
 export const SequencerPanel: React.FC<SequencerPanelProps> = ({
   sequences, selectedId, onSelect, status, onPlay, onPause, onStop, onNext, onPrev, onGoTo, onSave, onRemove, hasSections, onClose, embed = false,
@@ -124,7 +124,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
   // over the cue list it is about to drive.
   return (
     <Sheet embed={embed} title={<><Clapperboard size={16} /> Sequence</>} onClose={onClose} testId="sequencer-panel">
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
+      <div className={`min-h-0 flex-1 overflow-y-auto scrollbar-hide ${embed ? 'p-1' : 'p-6'}`}>
       <p className="text-[12px] leading-relaxed text-dim mb-5">
         A script for the show instead of dice: stages that change the plate over a song or a set, each gliding into the next on a clock or when the song moves to a new section.
       </p>
@@ -186,17 +186,17 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
       {/* Transport: while idle, only the one Play button rather than greyed Prev/Next/Stop. */}
       <div className="flex items-center gap-2 mb-4" data-testid="seq-transport">
         {isRunningThis && (
-          <button onClick={onPrev} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Previous stage" data-testid="seq-prev"><SkipBack size={14} /></button>
+          <button onClick={onPrev} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Previous stage" data-testid="seq-prev"><SkipBack size={14} /></button>
         )}
         {isRunningThis && status.running ? (
-          <button onClick={onPause} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-pause"><Pause size={14} /> Pause</button>
+          <button onClick={onPause} className="flex-1 flex items-center justify-center gap-2 py-2 pointer-coarse:min-h-11 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-pause"><Pause size={14} /> Pause</button>
         ) : (
-          <button onClick={() => onPlay(selected.id)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
+          <button onClick={() => onPlay(selected.id)} className="flex-1 flex items-center justify-center gap-2 py-2 pointer-coarse:min-h-11 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
         )}
         {isRunningThis && (
           <>
-            <button onClick={onNext} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Next stage" data-testid="seq-next"><SkipForward size={14} /></button>
-            <button onClick={onStop} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Stop the sequencer and hand the show back" data-testid="seq-stop"><Square size={14} /></button>
+            <button onClick={onNext} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Next stage" data-testid="seq-next"><SkipForward size={14} /></button>
+            <button onClick={onStop} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Stop the sequencer and hand the show back" data-testid="seq-stop"><Square size={14} /></button>
           </>
         )}
       </div>
@@ -250,8 +250,8 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
 
       {/* Files: a sequence is a JSON file you can keep and share */}
       <div className="flex gap-2 mb-2">
-        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium disabled:opacity-65" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
-        <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
+        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium disabled:opacity-65" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
+        <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
         <input
           ref={fileRef}
           type="file"
@@ -270,10 +270,10 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
 
       {/* Sequence actions */}
       <div className="flex gap-2 mb-3">
-        <button onClick={makeCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Copy this sequence so you can edit it"><Copy size={12} /> Copy</button>
-        <button onClick={makeNew} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Start a new sequence"><Plus size={12} /> New</button>
+        <button onClick={makeCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Copy this sequence so you can edit it"><Copy size={12} /> Copy</button>
+        <button onClick={makeNew} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Start a new sequence"><Plus size={12} /> New</button>
         {editable && (
-          <button onClick={() => { onRemove(selected.id); setEditIndex(null); }} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-400/40" title="Delete this sequence"><Trash2 size={12} /></button>
+          <button onClick={() => { onRemove(selected.id); setEditIndex(null); }} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-400/40" title="Delete this sequence"><Trash2 size={12} /></button>
         )}
       </div>
       {selected.builtIn && (
@@ -307,16 +307,16 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <p className="text-[12px] text-dim">Identify a song (the Track panel) and you can make this sequence for it: it will start with the song and stop when it ends.</p>
             )}
           </div>
-          <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"><Plus size={12} /> Add stage</button>
+          <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"><Plus size={12} /> Add stage</button>
           {!stage && selected.stages.length > 0 && <p className="text-[12px] text-dim">Tap a stage above to edit it.</p>}
           {stage && editIndex !== null && (
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold">Stage {editIndex + 1}</span>
                 <span className="flex gap-1">
-                  <button onClick={() => moveStage(editIndex, -1)} className="p-1 rounded hover:bg-white/10" title="Move up"><ChevronUp size={12} /></button>
-                  <button onClick={() => moveStage(editIndex, 1)} className="p-1 rounded hover:bg-white/10" title="Move down"><ChevronDown size={12} /></button>
-                  <button onClick={() => removeStage(editIndex)} className="p-1 rounded hover:bg-red-500/20" title="Remove stage"><Trash2 size={12} /></button>
+                  <button onClick={() => moveStage(editIndex, -1)} className="flex items-center justify-center p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded hover:bg-white/10" title="Move up"><ChevronUp size={12} /></button>
+                  <button onClick={() => moveStage(editIndex, 1)} className="flex items-center justify-center p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded hover:bg-white/10" title="Move down"><ChevronDown size={12} /></button>
+                  <button onClick={() => removeStage(editIndex)} className="flex items-center justify-center p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded hover:bg-red-500/20" title="Remove stage"><Trash2 size={12} /></button>
                 </span>
               </div>
               <Field label="Name">
