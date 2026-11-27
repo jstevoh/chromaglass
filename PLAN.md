@@ -92,6 +92,19 @@ first, because every line above lands through it. The order of work below is unc
 is the order again after this week; this week draws from its Wave 6 (the physics) and §47
 (the closeup), and its Waves 0, 1, 3, 4, 5 and 7 are parked.
 
+**Main's slow checks after the 2026-11-26 merge sweep (19ak-22).** Fifteen PRs merged
+that day; deploy 967 (main at f3414ffd) went live green, and its slow checks came back red
+on lines that were green or cancelled before. ~~`presskit`: `/press` and `/pro` showed a
+broken Ferro Paint picture~~ (34a-2 removed `public/landing/looks/ferro-paint.webp`, which
+both pages still show; restored, `npm run presskit` 58/61 → 61/61). Still owed, each to its
+own thread: `looksgrid --owed=preview` (velvet-underground and a moiré card flat, spread
+under 20), `nolight` 9 (Beads 0.8 rims brighter than the wash), `benday` (dot coverage
+28.1%/33.0% against 28.3%), the open-rim oil meter on WebGPU · fifth, `heldpress
+--owed=presstwist` (after 15g-18), `openingtime` (3 pipelines built on a frame:
+fluid/upsampleDelta, fluid/scaleDye, plate/packDyeBodies, after 46a and 47a), and the Lava
+Lamp wax cycle on WebGPU · show (after 27f-9q and 38w-31 met). `holeline` on lab4 was red
+before the sweep.
+
 ## Order of work
 
 *Ids with no text of their own before 2026-11-01 (H2c-2 to H2c-10, 10.2-*, 10.3-*, 16a-*, 14a-timers and the rest) are written, each with a pass mark and its check, in §40 and §41; the table at the end of §41 says where every other thin id's text lives.*
@@ -483,7 +496,7 @@ Where each batch stands, as of 2026-09-27:
 | 45 | The moiré pack | Asked 2026-11-03 from a shop's moiré transparency sets: two printed sheets on the stage as real optics (the product of two gratings, the lens's defocus, the lower sheet bent by the liquid), ten designs (four film cannot print), seven looks; **45a shipped** (`npm run moire`), **45a-11** Moiré Waves shipped, **45a-2** sells it to Home ($15 once, Pro includes it), the Waves clip on the site 45a-12, **45a-13** shipped (random looks weigh the pack as one choice, owned only; Randomise takes the sheets off, and with the pack lays a pair one roll in sixteen, 45a-14). |
 | 47 | The closeup as a macro photographer films liquid | Asked 2026-11-11 from a macro artist's site: the closeup magnifies a coarse grid where a macro camera films a small dish finely, so a fine window with the dye finer than the flow (47a, first its cheap half 47a-1), dark-field and Rheinberg lighting (47b), caustics past the linear shadowgraph (47j), threads that bead (47k), fluorescent dyes under a UV lamp (47c), depth of field from the gap's depth (47d), microbubble and mica sparkle (47e), a stir bar's vortex (47f), Marangoni drops on a thin layer (47g, the owner's call), time-lapse (47h), point lights through the beads (47i), a side view through a tank (47n, the owner's call; 47n-1 the tank shipped 2026-11-13), and a reference kit (47m), all proposed; the Microlab films themselves watched in the page 2026-11-13; **47e's glitter, 47d-1 the lens's discs and stars, 47b-1 a side lamp shipped** 2026-11-13 (`npm run glint`), 47b-2, 47b-3, 47d-2, 47e-1, 47e-2 found |
 | 48 | Visuals the music itself moves | 48f, Faraday waves (Shaker, Shake, the bass cord on it), **shipped** 2026-11-21 (`npm run faraday`, lab), written in §30 beside the cords; on the Mac not yet seen (judging §140); 48f-2 to 48f-7 open in §30. 48c, bioluminescent trails (Glow, Glow Shear, Glow Recharge: the water lights blue where a stroke shears it and tires), **shipped** 2026-11-21 (`npm run glow`, lab), written in §30 beside the cords; on the Mac not yet seen (judging §145); 48c-1 to 48c-5 open in §30 |
-| 49 | Usability against Nielsen's ten heuristics | Review done 2026-11-26 (67 findings, Antigravity on the owner's Mac); **49b shipped (#960)** (`npm run layout`, `npm run phone`, `npm run panelkinds`); 49a and 49c–49l open in §49, ranked by show risk |
+| 49 | Usability against Nielsen's ten heuristics | Review done 2026-11-26 (67 findings, Antigravity on the owner's Mac); **49b shipped (#962)** (`npm run layout`, `npm run phone`, `npm run panelkinds`, `npm run desk`, `npm run desklayout`, `npm run panel`); **49c shipped (#963)** (`npm run lint`, `npm run sizes`, `npm run desk`, `npm run desklayout`, `npm run panel`, `npm run panelkinds`); **49e shipped (#967)** (`npm run lint`, `npm run sizes`, `npm run panel`, `npm run desk`, `npm run panelkinds`, `npm run desklayout`, `npm run checks`, `npm run clearleft -- --owed=pace,spin,tray,dimmed`, `npm run layout` 86/86, `npm run phone` 391/392 with 49e-2 open); 49c-2 (delete the unhooked old overlay and update stale `< 1024px` checks), 49e-2 (update `scripts/phone.mjs:1246` to read numerical Speed instead of `Number('34%')`), and 49a, 49d, 49f–49l open in §49, ranked by show risk |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -522,7 +535,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 28 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-22 | 51 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-24 | 51 |
 |  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19ao-1 | 8 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 19 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
@@ -539,7 +552,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 12 |
 | 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s); ~~31s-8~~ the flower's second life (each tap its cell's mean, films refuse a flower build) shipped (`npm run flower`), 31s-9, 31s-10, 31s-11 (the gate calls a vite server old) and 31s-12 (the gate times out in a busy film queue) open | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 17 |
 | 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 15 |
-| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33c, 33d, 33f-2..4 open | 12 |
+| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33q-1 (the Beads dial is oil) **shipped**; 33c, 33d, 33f-2..4, 33q-2, 33q-3, 33q-4 open | 12 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 19 |
 | 35 | Clear controls: on reads on, one name for one thing (asked 2026-10-24) | [`35-clear-controls.md`](docs/plan/35-clear-controls.md) |  | 10 |
 | 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 13 |

@@ -74,7 +74,6 @@ are 5.3 s, at 174 BPM 2.8 s.
 - **17b. Sections on the beat, the drums' entrance seen, the drop named.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* **17b-2** (chorus/verse labels by recurrence) remains open; `songMapWorker.ts` keeps today's segmenter.
 - **17c. A lead on a *when*.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* `beatsAhead`, `last-beat`, `SongClock.ahead`, `aheadMoments` in `src/lib/songShows.ts` and `src/lib/songScore.ts`. **17c-2** (cached live song maps without a grid) remains open.
 - **17d. The song's loudness, from the file.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* `songLoudness` in `src/lib/hearAhead.ts`.
-- **17e. The show plays the set, and knows where it is.** `setPosition` arithmetic *(shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md))*. The Web Audio set player (`AudioContext`, scheduled `AudioBufferSourceNode`s, gain into the analyser, `positionNow`, standing down `fingerprint.ts` and `songBoundary.ts`) ships with **17g**.
 - **17f. The file's own tags.** *(Shipped 2026-11-14; see [`docs/plan-shipped.md`](../plan-shipped.md).)* `readSongTags` in `src/lib/hearAhead.ts`. **17f-2** (MP4/M4A `covr` and ISRC atom) remains open.
 - **17g. Load a set on the desk and the phone.** Drop a folder or files on the
   Perform desk (and the Mac app's window): the set list (`setList.ts`) gains an item

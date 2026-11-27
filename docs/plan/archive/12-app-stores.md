@@ -31,3 +31,4 @@ What route 2 still needs, found while building 12-tv-1:
 **~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
 `/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
 §12-tv-signin.** Open from it:
+- ~~**12-ctl-2**~~ *(shipped 2026-11-12)*: Scan on the Laptop remote form, in both apps; its story is in `docs/plan-shipped.md`.

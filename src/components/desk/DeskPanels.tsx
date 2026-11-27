@@ -383,7 +383,7 @@ export const RIDES_WIDTH = 312;
 /** The left column's width (the cue list's, in Gig). */
 export const LEFT_WIDTH = 272;
 
-function RidesBody({ p }: { p: DeskProps }) {
+function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
   const portalBody = usePortalBody();
   const [picking, setPicking] = useState(false);
   const [mixerOpen, setMixerOpen] = useState(false);
@@ -391,10 +391,12 @@ function RidesBody({ p }: { p: DeskProps }) {
     The Mixer sheet lies over the rides, on whichever side they are, at that
     column's width, so it covers none of the plate. With the Mixer out as a
     panel of its own the button goes: one Mixer on screen, not two.
+    When the desk folds into one column below 1024 px, that column is on the
+    right, so a Rides panel from `left` docks its Mixer on the right too.
   */
   const where = whereIs(p.layout, 'rides');
   const mixerOut = whereIs(p.layout, 'mixer') !== null;
-  const side = where === 'left' ? 'left' : 'right';
+  const side = !narrow && where === 'left' ? 'left' : 'right';
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="rides">
       {picking ? (
@@ -1094,10 +1096,10 @@ function QrCodeImage({ text, maxPx = 168 }: { text: string; maxPx?: number }) {
 
 // ── Which body ───────────────────────────────────────────────────────
 
-export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
+export function PanelBody({ id, p, narrow = false }: { id: string; p: DeskProps; narrow?: boolean }): ReactNode {
   switch (id) {
     case 'cues': return <CuesBody p={p} />;
-    case 'rides': return <RidesBody p={p} />;
+    case 'rides': return <RidesBody p={p} narrow={narrow} />;
     case 'recipe': return <RecipeBody p={p} />;
     case 'bottles': return <BottlesBody p={p} />;
     case 'dyes': return <DyesBody p={p} />;

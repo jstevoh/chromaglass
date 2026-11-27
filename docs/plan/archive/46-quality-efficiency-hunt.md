@@ -51,3 +51,12 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   `later` before step 1 — flagged for `46-3`); `samelook` 0.00% diff across all 6 looks,
   `physics` 20/20, `thingap` 16/16, `argnames` 9/9, `liquidpush` 9/9, `dropcolour` 4/4, `videoflow` 24/24.
   Main's deploy open shard startup first-step time (was 15.48 s) to be recorded after merge.
+
+## The audit of 2026-11-13: where a frame's CPU and GPU go, measured and read
+
+- ~~**46k · `dyeDisperse` runs as an exact no-op where diffusion is zero**~~ (**shipped**,
+  `disperseDye` and `disperseWanted` in `src/gpu/fluid/passes.ts`: gated on `bodies || dm > 0
+  || (kappaT > 0 && dispCells > 0)` so Classic and the other looks with Diffusion Rate at 0
+  and no Oil Bodies skip the full-grid dispatch; Oil Bodies stays outside the gate because
+  `bodyUnspread` clamps `dye` against `oilDye` after `slump` and `decayDye`; `samelook`,
+  `physics`, `encode`; story in `docs/plan-shipped.md`).

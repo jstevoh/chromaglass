@@ -466,7 +466,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             hit ? 'bg-text text-bg' : 'text-faint'
           }`}>{cc}</span>
         )}
-        <span className="w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
+        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
       </div>
     );
   }

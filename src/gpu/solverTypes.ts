@@ -375,6 +375,13 @@ export interface PlateSolver {
    * (lib/squish.ts). Optional because only the WebGPU solver has one.
    */
   readonly thinGapLive?: boolean;
+  /**
+   * A press's bowl in the glass on a thin gap, at the solver's own cells
+   * (PLAN 18a-14): centre and radius in logical cells, unrounded, the bowl
+   * (1 − d²/r²)² deep 3·amount, folded at the next flush. Laid on the CPU's
+   * 192² grid it came up through the bilinear upsample as facets.
+   */
+  pressBowl?(x: number, y: number, radius: number, amount: number): void;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */
