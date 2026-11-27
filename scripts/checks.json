@@ -385,9 +385,9 @@
     {
       "name": "The parity run compares numbers, not noise",
       "shard": "logic",
-      "run": "npm run parity -- --selftest",
+      "run": "npm run sameapp -- --selftest",
       "why": [
-        "The nightly main-against-branch comparison (scripts/parity.mjs, PLAN.md 50i)",
+        "The nightly main-against-branch comparison (scripts/sameapp.mjs, PLAN.md 50i)",
         "on made-up sweeps, no browser: the same numbers give nothing, a change the",
         "size of noise gives nothing, a look darker at one moment only gives nothing,",
         "and each regression a merge could make gives its line (a look darker at both",

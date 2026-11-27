@@ -12,7 +12,7 @@
  *   BUGBASH_LOOKS=classic,galaxy                  just these looks (the looks part), or the looks the desk is swept on
  *   BUGBASH_TABS=1,2                              just these of the seeded desk tabs (seven of six panels each)
  *   BUGBASH_LIMIT=5                               at most this many controls a tab or a sheet (a smoke run)
- *   BUGBASH_DIST=../other/dist                    serve another tree's build with this tree's sweep (`npm run parity`)
+ *   BUGBASH_DIST=../other/dist                    serve another tree's build with this tree's sweep (`npm run sameapp`)
  *
  * Asked for (the owner, 2026-11-26): "an automated bug bash". The checks we
  * have each ask one thing of one part: `controls` asks whether the settings
@@ -126,7 +126,7 @@ const findings = [];
 const coverage = [];
 /*
   The numbers behind every line, kept whether or not they made a finding, so
-  two runs can be compared number for number (`npm run parity`, PLAN 50i):
+  two runs can be compared number for number (`npm run sameapp`, PLAN 50i):
   a look's frame rate and plate, a control's settings, page and plate moved.
 */
 const readings = [];

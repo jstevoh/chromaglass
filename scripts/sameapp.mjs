@@ -2,14 +2,19 @@
  * The parity run: main against a branch, every look and the bug bash's
  * sweep, compared number for number (PLAN.md 50i).
  *
- *   npm run parity                                  this tree against origin/main: every look, desk tabs 1 and 2
- *   npm run parity -- --base <ref> --head <ref>     any two commits (the head is swept in a worktree too)
- *   npm run parity -- --looks classic,roy --tabs 3 --phone
- *   npm run parity -- --tabs none --hours 2         only the looks, and stop starting work after two hours
- *   npm run parity -- --nightly                     what the Mac's nightly job runs (scripts/parity-nightly.sh)
- *   npm run parity -- install-agent                 on the owner's Mac: the nightly job, 11:30 PM local
- *   npm run parity -- uninstall-agent
- *   npm run parity -- --selftest                    the comparison on made-up runs (no browser)
+ *   npm run sameapp                                  this tree against origin/main: every look, desk tabs 1 and 2
+ *   npm run sameapp -- --base <ref> --head <ref>     any two commits (the head is swept in a worktree too)
+ *   npm run sameapp -- --looks classic,roy --tabs 3 --phone
+ *   npm run sameapp -- --tabs none --hours 2         only the looks, and stop starting work after two hours
+ *   npm run sameapp -- --nightly                     what the Mac's nightly job runs (scripts/sameapp-nightly.sh)
+ *   npm run sameapp -- install-agent                 on the owner's Mac: the nightly job, 11:30 PM local
+ *   npm run sameapp -- uninstall-agent
+ *   npm run sameapp -- --selftest                    the comparison on made-up runs (no browser)
+ *
+ * Named beside `samelook` (the look did not change) for what it asks: the
+ * app does what it did. Not `parity`: that name was the CPU-against-GPU
+ * solver gate retired at P7, and `panel` keeps it listed as retired so the
+ * old comments that cite it stay history.
  *
  * Asked for (the owner, 2026-11-27, PLAN §50: "Let's get all of these
  * going"). Thirty and more pull requests a day reach main, most of them
@@ -82,7 +87,7 @@
  * wide meets every quirk of every panel, and a person (or the session that
  * reads the night's report) decides which differences are the change a
  * pull request meant and which are a regression. On the Mac the nightly
- * folder is `~/cg-scratch/parity/<date>/`, and `~/cg-scratch/parity/latest.md`
+ * folder is `~/cg-scratch/sameapp/<date>/`, and `~/cg-scratch/sameapp/latest.md`
  * is the last night's report.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -100,7 +105,7 @@ const arg = (name, fallback) => {
 };
 const list = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
-const HOME_DIR = path.join(os.homedir(), 'cg-scratch', 'parity');
+const HOME_DIR = path.join(os.homedir(), 'cg-scratch', 'sameapp');
 
 // ---------------------------------------------------------------- tolerances
 
@@ -456,12 +461,12 @@ async function run() {
 
 // ---------------------------------------------------------------- the Mac's nightly job
 
-const LABEL = 'art.chromaglass.parity';
+const LABEL = 'art.chromaglass.sameapp';
 const plistPath = () => path.join(os.homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`);
 
 /**
- * The launchd agent. It runs `parity-nightly.sh` from its own clone
- * (`~/cg-scratch/parity/clone`), never from the owner's checkout, so the
+ * The launchd agent. It runs `sameapp-nightly.sh` from its own clone
+ * (`~/cg-scratch/sameapp/clone`), never from the owner's checkout, so the
  * nightly job never moves the branch a session is working on, and the
  * script it runs is always main's. 11:30 PM local: after the evening's
  * merges, before the morning's. A Mac asleep at 11:30 runs it when it wakes.
@@ -473,7 +478,7 @@ export function plistText({ clone, node, hour = 23, minute = 30 }) {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>${LABEL}</string>
-<key>ProgramArguments</key><array><string>/bin/bash</string><string>-lc</string><string>${esc(`cd '${clone}' && git fetch -q origin main && git checkout -q --detach origin/main && exec bash scripts/parity-nightly.sh`)}</string></array>
+<key>ProgramArguments</key><array><string>/bin/bash</string><string>-lc</string><string>${esc(`cd '${clone}' && git fetch -q origin main && git checkout -q --detach origin/main && exec bash scripts/sameapp-nightly.sh`)}</string></array>
 <key>EnvironmentVariables</key><dict><key>PATH</key><string>${esc(pathEnv)}</string></dict>
 <key>StartCalendarInterval</key><dict><key>Hour</key><integer>${hour}</integer><key>Minute</key><integer>${minute}</integer></dict>
 <key>StandardOutPath</key><string>${esc(path.join(HOME_DIR, 'nightly.log'))}</string>
@@ -586,8 +591,8 @@ function selftest() {
   const p = piecesFor({ looks: Array.from({ length: 41 }, (_, i) => `l${i}`), tabs: [1, 2], phone: true });
   ok(p.length === 7 + 2 + 1 && p[6].looks.length === 5, 'pieces: 41 looks in seven, two tabs, the phone', p.map((x) => x.name).join(' '));
   ok(new Set(NIGHTS.flatMap((n) => n.tabs)).size === 7 && NIGHTS.some((n) => n.phone), 'four nights cover all seven desk tabs and the phone');
-  const pl = plistText({ clone: '/Users/x/cg-scratch/parity/clone', node: '/opt/homebrew/bin/node' });
-  ok(pl.includes('<key>Hour</key><integer>23</integer>') && pl.includes('parity-nightly.sh') && pl.includes('git checkout -q --detach origin/main'),
+  const pl = plistText({ clone: '/Users/x/cg-scratch/sameapp/clone', node: '/opt/homebrew/bin/node' });
+  ok(pl.includes('<key>Hour</key><integer>23</integer>') && pl.includes('sameapp-nightly.sh') && pl.includes('git checkout -q --detach origin/main'),
     'the agent runs main\'s nightly script from its own clone at 11:30 PM');
   const md = report({ baseRef: 'a', headRef: 'b', merged: ['abc 49a: x (#1)'], rows: one((h) => { h.readings[1].fps = 30; }), night: t, covered: ['looks-1'], skipped: [], started: Date.now() });
   ok(/## Medium \(1\)/.test(md) && /\| roy \| roy \| slower \| 60 \| 30 \|/.test(md), 'the report lists the difference with both numbers');
