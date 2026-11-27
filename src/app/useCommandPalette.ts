@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import type { Command } from '../components/desk/CommandPalette';
 import { DESK_TOOLS } from '../components/desk/tools';
 import { isUserPresetId, type UserPreset } from '../lib/userPresets';
@@ -46,6 +46,8 @@ interface CommandPaletteDeps {
   setSeedCount: Dispatch<SetStateAction<number>>;
   setClearTrigger: Dispatch<SetStateAction<number>>;
   setDrainTrigger: Dispatch<SetStateAction<number>>;
+  clearPlate?: () => void;
+  drainPlate?: () => void;
   isActive: boolean;
   setIsActive: Dispatch<SetStateAction<boolean>>;
   isAutomated: boolean;
@@ -85,7 +87,7 @@ interface CommandPaletteDeps {
 export function useCommandPalette({
   allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
   blackout, toggleBlackout, newLook, saveLook, docId, docName, replaceLook, setSeedCount,
-  setClearTrigger, setDrainTrigger, isActive, setIsActive, isAutomated, setIsAutomated, settings,
+  setClearTrigger, setDrainTrigger, clearPlate, drainPlate, isActive, setIsActive, isAutomated, setIsAutomated, settings,
   updateSettings, recordingAny, recordChoice, toggleRecording, perfLive, togglePerformance,
   setShowRecordPanel, triggerLucky, hideOverlays, setSettingsSection, setShowSettings, setShowHelp,
   openAllSettings, setShowMidi, setShowSequencer, showActivity, setShowActivity, setShowSongs,
@@ -106,6 +108,15 @@ export function useCommandPalette({
   const [showPalette, setShowPalette] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  /*
+    A panel opened on the tab in view, or brought forward and unfolded where
+    it is already: ⌘K's panel commands, and the desk's Video dot (PLAN
+    14ag-9). The dot opened the Settings sheet at Video, over the plate; the
+    owner, with the camera on (2026-11-27): "I would also like to more fully
+    control the video inputs on the main app vs just in settings. I want to be
+    able to see things on the canvas as I change them." The panel is the same
+    section the sheet draws, beside the plate, so nothing is lost.
+  */
   const openDeskPanel = (id: string) => {
     deskTabs.update(deskTabs.tab, (l) => {
       const next = whereIs(l, id) ? l : openPanel(l, id, 'deck');
@@ -119,6 +130,11 @@ export function useCommandPalette({
     });
   };
 
+  /** openDeskPanel for a handler kept across renders (App's Video dot): one identity, today's tab. */
+  const openDeskPanelRef = useRef(openDeskPanel);
+  openDeskPanelRef.current = openDeskPanel;
+  const openPanelNow = useCallback((id: string) => openDeskPanelRef.current(id), []);
+
   const paletteCommands = useMemo<Command[]>(() => {
     const looks: Command[] = allPresets.map(pr => {
       const contract = isUserPresetId(pr.id)
@@ -130,7 +146,7 @@ export function useCommandPalette({
       return {
         id: `look-${pr.id}`,
         name: pr.name,
-        kind: 'Preset palettes',
+        kind: 'Looks',
         look: true,
         hint: (contract ?? []).map(i => PALETTE[i]?.name ?? '').join(' '),
         swatch: `linear-gradient(135deg, ${a}, ${b})`,
@@ -147,13 +163,13 @@ export function useCommandPalette({
       { id: 'back',      name: 'Back — undo the last look', kind: 'Actions', kbd: SHORTCUT_KBD.back,     run: () => revertLook() },
       { id: 'blackout',  name: blackout ? 'Lights up' : 'Blackout', kind: 'Actions', kbd: SHORTCUT_KBD.blackout, run: toggleBlackout },
       { id: 'new',       name: 'New — an empty plate',      kind: 'Actions', run: newLook },
-      { id: 'save',      name: 'Save as a new preset…',     kind: 'Actions', kbd: SHORTCUT_KBD.save,     run: saveLook },
+      { id: 'save',      name: 'Save as a new look…',       kind: 'Actions', kbd: SHORTCUT_KBD.save,     run: saveLook },
       ...(docId ? [{ id: 'save-over', name: `Save over “${docName}”`, kind: 'Actions' as const, run: replaceLook }] : []),
       { id: 'seed',      name: 'Seed the plate',            kind: 'Actions', run: () => setSeedCount(v => v + 1) },
-      { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => setClearTrigger(v => v + 1) },
-      { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
+      { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => (clearPlate ?? (() => setClearTrigger(v => v + 1)))() },
+      { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => (drainPlate ?? (() => setDrainTrigger(v => v + 1)))() },
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: SHORTCUT_KBD.freeze, run: () => setIsActive(v => !v) },
-      { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
+      { id: 'evolve',    name: isAutomated ? 'Stop Evolve' : 'Evolve — wander the look on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'record-video',       name: recordingAny ? `Stop recording (${runningWhat})` : `Record: ${makesText(recordChoice)}`, kind: 'Actions', kbd: SHORTCUT_KBD.record, run: toggleRecording },
       // Opening "Record a take" from the palette opens the Record panel so the performer sees what is captured instead of starting live at once (H5-02).
       { id: 'record-performance', name: perfLive ? 'Stop the take' : 'Record a take (your strokes and drops, replayable)', kind: 'Actions', run: perfLive ? togglePerformance : () => setShowRecordPanel(true) },
@@ -294,6 +310,6 @@ export function useCommandPalette({
   }, [performing, designing, deskUp, goLook, revertLook, cueAny, toggleBlackout, togglePerformance, toggleRecording]);
 
   return {
-    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands,
+    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands, openPanelNow,
   };
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { Info as InfoIcon } from 'lucide-react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { useEscape } from '../../hooks/useEscape';
 import { curveOf, handValueAt, travelOf } from '../../lib/midi';
@@ -66,7 +67,7 @@ export const LIVE = 'border-live bg-live text-bg';
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="rounded-xs bg-active px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted">
+    <kbd className="rounded-xs bg-active px-1.5 py-0.5 font-mono text-[12px] font-medium text-muted">
       {children}
     </kbd>
   );
@@ -129,7 +130,7 @@ export function Button({
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       style={{ height }}
-      className={`inline-flex items-center justify-center gap-2 rounded-md px-4 transition-colors duration-[120ms] disabled:opacity-40 ${
+      className={`inline-flex items-center justify-center gap-2 rounded-md px-4 transition-colors duration-[120ms] disabled:opacity-65 ${
         full ? 'w-full' : ''
       } ${pressed ? (live ? BUTTON_LIVE : BUTTON_PRESSED) : BUTTON_VARIANT[variant]} ${hit ? MIDI_HIT : ''}`}
     >
@@ -213,7 +214,7 @@ export function Tag({ children, tone = 'neutral' }: { children: ReactNode; tone?
   const cls = tone === 'live' ? 'bg-live-bg text-live'
     : tone === 'next' ? 'bg-accent-bg text-accent-text'
     : 'bg-active text-muted';
-  return <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
+  return <span className={`rounded-xs px-1.5 py-0.5 text-[12px] font-medium ${cls}`}>{children}</span>;
 }
 
 // ── Touched by the controller ────────────────────────────────────────
@@ -309,10 +310,10 @@ export function StatusDot({ on, label, short, tone = 'ok', testId, onClick, titl
         style={{ background: on ? (tone === 'live' ? 'var(--color-live)' : 'var(--color-ok)') : 'var(--color-knob-off)' }}
       />
       {tight ? (
-        <span className={`text-[10px] leading-none ${colour}`}>{small}</span>
+        <span className={`text-[12px] leading-none ${colour}`}>{small}</span>
       ) : (
         <>
-          <span className={`text-[10px] leading-none min-[1100px]:hidden ${colour}`}>{small}</span>
+          <span className={`text-[12px] leading-none min-[1100px]:hidden ${colour}`}>{small}</span>
           <span className={`hidden text-[12px] min-[1100px]:inline ${colour}`}>{label}</span>
         </>
       )}
@@ -373,9 +374,11 @@ export interface SliderProps extends Keyed {
    * where the 48 px rule needs the full row.
    */
   dense?: boolean;
+  /** Disable the slider when a parent mode is off (e.g. phone's Show, Evolve, Spin). */
+  disabled?: boolean;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense, disabled = false }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -423,9 +426,10 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   const line = help ?? helpFor(midiKey);
   const tip = useControlTip({
-    name: label, help: line, value: display,
-    hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
+    name: label, help: line, value: disabled ? undefined : display, disabled,
+    hint: !touch && !disabled && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
+  const labelDisplay = disabled ? 'Off' : display;
   const track = (
     <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
       <input
@@ -433,14 +437,15 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
         min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
         step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
         value={curve === 1 ? value : at}
+        disabled={disabled}
         onChange={e => {
           const raw = Number(e.target.value);
           if (curve === 1) { onChange(raw); return; }
           onChange(handValueAt(raw, min, max, curve));
         }}
         aria-label={label}
-        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''}`}
+        onDoubleClick={disabled || resetTo === undefined ? undefined : () => onChange(resetTo)}
+        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''} ${disabled ? 'cursor-not-allowed' : ''}`}
         style={{ '--fill': `${pct}%` } as CSSProperties}
       />
     </PaceTrack>
@@ -457,21 +462,21 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   if (dense && !touch) {
     return (
-      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
+      <div className={`mb-px flex h-6 items-center gap-2 ${disabled ? 'opacity-65' : ''}`} ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" data-disabled={disabled ? 'true' : undefined} {...tip.bind}>
         {tip.card}
         <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
         <div className="min-w-0 flex-1">{track}</div>
         {cc != null && (
-          <span className={`shrink-0 rounded-xs px-1 font-mono text-[11px] transition-colors duration-[120ms] ${
+          <span className={`shrink-0 rounded-xs px-1 font-mono text-[12px] transition-colors duration-[120ms] ${
             hit ? 'bg-text text-bg' : 'text-faint'
           }`}>{cc}</span>
         )}
-        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
+        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[12px] font-medium text-text-2">{labelDisplay}</span>
       </div>
     );
   }
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
+    <div className={`mb-5 ${disabled ? 'opacity-65' : ''}`} ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-disabled={disabled ? 'true' : undefined} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (
@@ -482,19 +487,22 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             aria-expanded={tip.open}
             aria-describedby={tip.open ? tip.id : undefined}
             data-info="name"
-            /* 48 px each way, the touch rule, taken from the margins so the row keeps its height; the slider below sits over the overlap. */
-            className="-mx-3 -my-[14px] select-none px-3 py-[14px] text-left [-webkit-touch-callout:none] text-[13px] font-medium text-text underline decoration-dotted decoration-white/25 underline-offset-4"
-          >{label}</button>
+            /* 44 px minimum touch target without inflating the row above. */
+            className="-mx-2 -my-2.5 inline-flex min-h-[44px] select-none items-center gap-1.5 px-2 py-2.5 text-left text-[13px] font-medium text-text [-webkit-touch-callout:none]"
+          >
+            <span>{label}</span>
+            <InfoIcon size={13} className="shrink-0 text-dim" aria-hidden />
+          </button>
         ) : (
           <span className="text-[13px] font-medium text-text">{label}</span>
         )}
         <span className="flex items-center gap-2">
           {cc != null && (
-            <span className={`rounded-xs px-1 font-mono text-[11px] transition-colors duration-[120ms] ${
+            <span className={`rounded-xs px-1 font-mono text-[12px] transition-colors duration-[120ms] ${
               hit ? 'bg-text text-bg' : 'text-faint'
             }`}>CC {cc}</span>
           )}
-          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
+          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{labelDisplay}</span>
         </span>
       </div>
       {track}
@@ -544,8 +552,8 @@ export function Toggle({ label, on, onChange, testId, title, disabled }: {
       aria-checked={on}
       data-testid={testId}
       title={title}
-      className={`flex min-h-[36px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
-        disabled ? 'opacity-50 cursor-not-allowed' : ''
+      className={`flex min-h-[36px] pointer-coarse:min-h-[44px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
+        disabled ? 'opacity-65 cursor-not-allowed' : ''
       }`}
     >
       <span className="text-[13px] text-text-2">{label}</span>
@@ -632,9 +640,10 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
     hand was on the knob, and a chip over the row above hid the next one, so
     a hand could not tell which knob it had.
   */
+  const knobHelp = help ?? helpFor(midiKey);
   const tip = useControlTip({
     name: label,
-    help: help ?? helpFor(midiKey),
+    help: knobHelp,
     value: disabled ? 'off' : display,
     held: !!drag,
     disabled,
@@ -694,7 +703,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   return (
     <div
       ref={el => { tip.anchor.current = el; }}
-      className={`relative flex w-full max-w-[72px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
+      className={`relative flex w-full max-w-[72px] flex-col items-center ${disabled ? 'opacity-65' : ''}`}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
@@ -789,12 +798,15 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           className="absolute inset-0 h-full w-full cursor-ns-resize touch-none appearance-none rounded-full opacity-0"
         />
       </span>
-      {/* A finger has no hover: the name is the button there, marked like the phone's sliders. */}
+      {/* A finger has no hover: the name is the button there, with an info mark on touch. */}
       <span
         onClick={tip.toggle}
-        className={`mt-1 w-full text-center text-[11px] font-medium leading-[1.15] line-clamp-2 break-words [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
-      >{label}</span>
-      <span className="max-w-full truncate font-mono text-[10px] leading-tight">
+        className={`mt-1 inline-flex w-full items-center justify-center gap-0.5 text-center text-[12px] font-medium leading-[1.15] ${drag ? 'text-text' : 'text-text-2'}`}
+      >
+        <span className="line-clamp-2 break-words">{label}</span>
+        {knobHelp && <InfoIcon size={12} className="hidden shrink-0 text-dim pointer-coarse:inline" aria-hidden />}
+      </span>
+      <span className="max-w-full truncate font-mono text-[12px] leading-tight">
         <span className={drag ? 'text-text-2' : 'text-dim'}>{disabled ? 'off' : display}</span>
         {mapping && <span className="text-faint"> {mapping}</span>}
       </span>
@@ -884,8 +896,8 @@ export function PanelFrame({
         )}
         {group && <span className="h-3 w-[3px] shrink-0 rounded-full" style={{ background: 'var(--cap)' }} data-group-tick aria-hidden />}
         <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
-        {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
-        {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
+        {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[12px] font-medium text-accent-text">floating</span>}
+        {meta && <span className="min-w-0 shrink truncate font-mono text-[12px] text-faint">{meta}</span>}
         {!popped && onTitleMenu && (
           <button
             className={icon}
@@ -925,7 +937,7 @@ export function PanelFrame({
         </button>
         )}
         {!popped && (
-          <button className={icon} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
+          <button className={`${icon} ml-1.5`} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden><path d="M3 3l6 6M9 3l-6 6" /></svg>
           </button>
         )}
@@ -968,6 +980,8 @@ export interface Keyed { key?: string | number }
 export interface CueRowProps extends Keyed {
   index: number;
   name: string;
+  /** Optional performer note ("What it is for" from saving a look). */
+  note?: string;
   /** A two-colour smear standing in for the look, from its palette contract. */
   swatch: string;
   state: 'live' | 'next' | 'idle';
@@ -981,7 +995,7 @@ export interface CueRowProps extends Keyed {
   midiKey?: string | null;
 }
 
-export function CueRow({ index, name, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId, midiKey }: CueRowProps) {
+export function CueRow({ index, name, note, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId, midiKey }: CueRowProps) {
   const hit = useMidiTouch(midiKey ?? null);
   const shell = state === 'live' ? 'bg-live-bg border-live-border'
     : state === 'next' ? 'bg-elevated border-accent-border'
@@ -991,6 +1005,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
+      title={note || undefined}
       data-testid={testId}
       data-state={state}
       data-midi-hit={hit ? 'true' : undefined}
@@ -998,7 +1013,10 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
       <SlideMount swatch={swatch} size={28} />
-      <span className={`flex-1 truncate text-[13px] font-medium ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-[13px] font-medium leading-tight ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
+        {note && <span className="block truncate text-[11px] leading-tight text-muted">{note}</span>}
+      </span>
       {trailing}
     </button>
   );
@@ -1008,7 +1026,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
 
 const NOOP = () => {};
 
-export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right', embed = false }: {
+export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right', embed = false, zIndex = 'z-50' }: {
   title: ReactNode; onClose: () => void; children: ReactNode; width?: number; height?: number; testId?: string;
   /**
    * Drawn inside a desk panel rather than over the window: no scrim, no
@@ -1030,6 +1048,8 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
    * which is ridden while the desk around it is still being played.
    */
   docked?: boolean;
+  /** Override the modal backdrop z-index when a sheet opens above PhoneSheet (`z-[55]`). */
+  zIndex?: string;
 }) {
   // Listened for once: an effect keyed on onClose could drop the key (useEscape).
   // An embedded one is a panel, which Escape does not close.
@@ -1047,7 +1067,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
         // Between the desk's 48 px header and its 28 px status bar, so the
         // header's buttons and lights stay in reach and in view beside it.
         ? `pointer-events-none fixed bottom-7 top-12 z-50 flex items-stretch p-2 ${dockSide === 'left' ? 'left-0 justify-start' : 'right-0 justify-end'}`
-        : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6'}
+        : `fixed inset-0 ${zIndex} flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6`}
       onClick={docked ? undefined : onClose}
       data-testid={testId ? `${testId}-scrim` : undefined}
     >
@@ -1059,7 +1079,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
       >
         <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-2 text-[16px] font-medium text-text">{title}</div>
-          <button onClick={onClose} className="rounded-md p-2 text-muted transition-colors hover:bg-hover hover:text-text" aria-label="Close">
+          <button onClick={onClose} className="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text" aria-label="Close">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         </div>

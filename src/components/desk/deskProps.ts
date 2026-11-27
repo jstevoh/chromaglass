@@ -14,6 +14,10 @@ import type { EngineStatus } from '../../lib/platform';
 export interface Cue {
   id: string;
   name: string;
+  /** Performer note ("What it is for" when saving a look). */
+  note?: string;
+  /** The look the item's chip pictures (a sequence's first stage's); absent when it is gone. */
+  lookId?: string;
   /** Two of the look's own dyes, so a row is recognisable at a glance. */
   swatch: string;
   /** Seconds, or 0 for a cut. */
@@ -104,7 +108,7 @@ export interface DeskProps {
   onSave: () => void;
   onSaveOver?: () => void;
   onNew: () => void;
-  savedLooks: { id: string; name: string; swatch: string }[];
+  savedLooks: { id: string; name: string; swatch: string; description?: string }[];
   openLookId: string | null;
   onOpenSaved: (id: string) => void;
   onDeleteSaved: (id: string) => void;
@@ -138,6 +142,9 @@ export interface DeskProps {
   onCue: (id: string) => void;
   onCueNow: (id: string) => void;
   onGo: () => void;
+  /** Undo the last look fade from the Cues panel (PLAN 49a / H3-07). */
+  onBack?: () => void;
+  canBack?: boolean;
   onGoBackPlate?: () => void;
   backLook?: string | null;
   onBackFollowsFront?: () => void;
@@ -170,7 +177,8 @@ export interface DeskProps {
   recipeKeys: (keyof VisualizerSettings)[];
   onRecipeKeys: (keys: (keyof VisualizerSettings)[]) => void;
   onRandomise: () => void;
-  randomiseArmed: boolean;
+  /** Show an Undo toast when a panel is closed with × (PLAN 49a / H5-04). */
+  onPanelClosed?: (panelTitle: string, restore: () => void) => void;
   hasFilm: boolean;
   hasMark: boolean;
   takes?: MixTakes;

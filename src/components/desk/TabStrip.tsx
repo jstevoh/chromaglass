@@ -41,8 +41,8 @@ export function TabStrip({ tabs, tab, onTab, onEdit, onAddPanel, height = 32, to
   };
   return (
     <div className="flex min-w-0 items-center gap-1" data-testid="desk-tabs">
-      {/* Half the header at most on the desk, where it is centred between two clusters; the sheet's width on the phone. */}
-      <div className={`min-w-0 overflow-x-auto scrollbar-hide ${touch ? 'flex-1' : 'max-w-[min(52vw,720px)]'}`}>
+      {/* Half the header at most on the desk, where it is centred between two clusters; the sheet's width on the phone or when wrapped below 768 px. */}
+      <div className={`min-w-0 overflow-x-auto scrollbar-hide ${touch ? 'flex-1' : 'max-w-full md:max-w-[min(52vw,720px)]'}`}>
         <Segmented
           value={tab}
           options={tabs.map(t => [t.id, t.name] as const)}
@@ -110,20 +110,20 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, pencilRef, touc
     return () => window.removeEventListener('pointerdown', away);
   }, [at, onClose, pencilRef]);
   const row = touch ? 48 : 32;
-  const btn = `inline-flex shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-30 disabled:hover:bg-transparent`;
+  const btn = `inline-flex shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-65 disabled:hover:bg-transparent`;
   const full = tabs.length >= TABS_MAX;
   return (
     <>
       {!at && <div className="fixed inset-0 z-[60] bg-black/30" onClick={onClose} data-testid="tabs-editor-scrim" />}
       <div
         ref={editorRef}
-        className={`fixed z-[61] flex flex-col gap-1 border border-border-strong bg-elevated p-2 shadow-[0_20px_60px_rgba(0,0,0,.6)] ${at ? 'w-[320px] rounded-lg' : 'inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl pb-6'}`}
+        className={`fixed z-[61] flex flex-col gap-1 border border-border-strong bg-elevated p-2 shadow-[0_20px_60px_rgba(0,0,0,.6)] ${at ? 'w-[min(320px,calc(100vw-16px))] rounded-lg' : 'inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl pb-6'}`}
         style={at ? { top: at.top, left: at.left } : undefined}
         role="dialog"
         aria-label="The tabs"
         data-testid="tabs-editor"
       >
-        <p className="px-1 pb-1 text-[11px] font-bold uppercase tracking-widest text-muted">Tabs</p>
+        <p className="px-1 pb-1 text-[12px] font-bold uppercase tracking-widest text-muted">Tabs</p>
         {tabs.map((t, i) => (
           <div key={t.id} className="flex items-center gap-1" data-testid={`tabs-row-${t.id}`}>
             <NameField id={t.id} name={t.name} lit={t.id === tab} height={row} onRename={(name) => onEdit({ op: 'rename', id: t.id, name })} />
@@ -157,7 +157,7 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, pencilRef, touc
             </button>
           )}
         </div>
-        <p className="px-1 pt-1 text-[11px] leading-snug text-dim">
+        <p className="px-1 pt-1 text-[12px] leading-snug text-dim">
           A tab is a set of panels. Put one on the tab that is up with + Panel (⌘P); a panel taken off a tab is still in the browser. ⌘1 to ⌘9 go to the tabs in order.
         </p>
         {armReset ? (

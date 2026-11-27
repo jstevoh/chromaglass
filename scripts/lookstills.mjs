@@ -50,9 +50,9 @@ try {
   let maxBytes = 0;
   for (const id of targets) {
     const res = await page.evaluate(
-      ({ id, width, height, maxBytes }) =>
-        window.lookStills.renderLook(id, { width, height, maxBytes: maxBytes - 500 }),
-      { id, width: WIDTH, height: HEIGHT, maxBytes },
+      ({ id, width, height, cap }) =>
+        window.lookStills.renderLook(id, { width, height, maxBytes: cap - 500 }),
+      { id, width: WIDTH, height: HEIGHT, cap: MAX_BYTES },
     );
     const buf = Buffer.from(res.bytes, 'base64');
     if (buf.length > MAX_BYTES) {

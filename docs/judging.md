@@ -2971,6 +2971,15 @@ standing waves at half the Shaker's frequency, drawn by the lamp's light through
    read on the wall; the light is the real lens of the water's surface, and a stronger
    default depth is a dial away.
 5. Watch for flicker: the pattern must hold still while it grows and fades, never strobe.
+6. The waves move (48f-6, 48f-9). Shaker 20 Hz, Shake 0.4, Rock 0.5: do the crests and
+   troughs trade places about once every two seconds, smoothly, with no flicker? Rock 0
+   holds them still again.
+7. Pour and swirl with the lattice up: does the pattern drift with the liquid's flow? Then
+   Shake to the top (2 g at 20 Hz): as it grows, does the lattice break up and move for some
+   seconds, then re-form as a new pattern (it settles; a real dish that hard keeps churning,
+   48f-12)? Does the break read as the water's, not a glitch?
+8. Wave strength (the phone's Sound sheet, Strength on the desk) 1 to 4 to 8, with a bass
+   cord on Shake: from what strength does a bass pulse read on the wall? Too harsh at 8?
 
 ## 141. The video as the lamp under the dish (PLAN 14ag-3)
 
@@ -3050,6 +3059,14 @@ Whether it looks like a wake at sixty frames is only seen here.
 4. Turn the music on with a stirring cord in Patches: the hits light wakes, the quiet
    lets them come back.
 5. Glow at 0 on any look: the look exactly as before.
+6. **Night Sea** (PLAN 48c-5, 48c-6) with a song that has a real bass line: still and dark
+   while the bass is quiet; on a strong bass note a lattice of waves about 14 mm across
+   stands up within a second and glows blue in its own pattern (brightest under the crests
+   and troughs, the strain's), then fades as the note dies; each kick flashes a ring round
+   the pressed glass. A long held bass dims (the sea tires) and the first notes after a quiet
+   passage are the brightest. Bad: a glow with the bass quiet, a flat blue wash with no
+   lattice in it, a lattice that never goes dark between notes, or the whole plate pulsing
+   with the level as a shader would.
 
 ## 146. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
 
@@ -3069,3 +3086,94 @@ How the rings read with a moving liquid at sixty frames is only seen here.
    with still liquid.
 4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
 5. Dish Stress at 0: the look exactly as before.
+
+## 147. The video coming in: the camera's row, the LED ring, the camera poured (PLAN 14ag-9)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. On the desk, click the **Video** dot in the header. Good: the Video panel opens beside the
+   plate (not the Settings sheet), its source row on top.
+2. **Camera**. Good: right under the sources, a row with a small live picture of what the camera
+   sees, the camera's name, and "over the plate"; Plate lit. Bad: a file's name there, or no picture.
+3. **Lamp**, then **LED ring**. Good: Lamp puts the camera under the dish, filtered by the dye;
+   LED ring turns it round the plate's centre like the LED platform, at LED Rotation Speed
+   (Lamp & Light). Bad: the picture both over and under the glass, or a ring that does not turn.
+4. **Pour**. Good: the camera's picture laid into the dish as dye, its motion stirring the liquid,
+   the camera still on the plate; Stop ends only the pour; Off ends both.
+5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
+
+
+## 148. The APC40's pads play the liquid (PLAN 30c)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Settings → Feed → Controller, **Set up the APC40 mkII** (again, to take the new strips).
+   Good: the grid lights as rows of colours, the bottom row dim white (Press); **Grid layout**
+   shows Tools × Colours lit.
+2. Hold a pad on the top row (Drip). Good: a drop on the hit, more while held, none after you let
+   go, landing in the pad's column of the picture. Hold a Pour or Spray pad: it pours until let go.
+   Hold Press: the glass stays pressed until let go. Tap Splatter and hold another: the held one
+   flicks again, smaller each time.
+3. Track Select 4 (Syrup), hold the same Drip pad. Good: far slower drops; Pour slower too.
+4. Turn the top-left device knob (Drip's size). Good: bigger drops at the right, smaller at the left.
+5. **Bank ▶** over the device knobs. Good: the grid relights as Liquids × Colours, then Liquids ×
+   Tools, then the looks, then round; the faders keep their jobs. Bad: Bank ◀ ▶ do nothing (PLAN
+   30c-3: they may send on another channel; Learn shows what they send).
+6. The faders and the knob over each: Dye Budget/Saturation, Speed/Turbulence, Sound
+   Drive/Beat Squeeze, Plate Rock/Slosh, Bubbles/Bubble Melt, Oil Beads/Bead Drops,
+   Iridescence/Edge Relief, Evolve Speed/Hue Journey. The crossfader tips the plate side to side.
+7. On the phone: Motion → Pads. Good: the same grid, held pads keep going.
+
+## 149. Dyes mix as real dyes do, and Hold Apart (PLAN 18d-6)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Open **Macro Bead**, **Roy, 1963**, **Poster, 1969**, **Milk Marbling** and **Lens Pools**, the
+   five looks that had Polarity highest, and your own **Soapy Mess**, saved with it at 0.83. Good: each still reads as itself, and where two colours
+   meet they blend across the edge as two inks in water do. Bad: a look that has gone to one
+   muddy colour within a minute where it used to keep its colours for the whole song.
+2. On any look with a few colours, Settings → Chemistry → Oil & Soap → **Hold Apart** to 1.
+   Good: over ten or twenty seconds long streaks draw back, small pools round up and the
+   colours keep to bodies, like oil paint in water; a long straight edge between two colours
+   stays put. Bad: speckle, a comb along the edges, or colour pushed off into the clear water.
+3. Back to 0. Good: the colours go back to running into each other.
+4. The same slider on the phone, in Settings under Oil & Soap, where Polarity was.
+To put it back: a look that should keep its colours apart gets `holdApart` in `src/presets.ts`
+(0.3 to 1); the old push itself is not coming back, it was not a tension (`npm run forces` 6).
+
+## 150. The ouzo's cloud (PLAN 48s)
+
+The Ouzo bottle is anise oil in alcohol, clear in the bottle; where water mixes into it the
+oil comes out as a white cloud. Measured in the lab (the cloud sits only where the mix
+crosses the solubility curve, the oil is conserved); how it looks in a show is the owner's.
+
+1. Any look with colour on the plate, on a black ground. Pick **Ouzo** on the shelf and hold
+   the Dropper in one place. Good: the first second is milky (the drops are mostly water),
+   then the middle clears as the bottle's own liquid fills it and an opal white ring stands
+   where it meets the plate's water, soft-edged, moving out with the pour. Bad: a white disc
+   with no clear middle, a ring that flickers or is stepped along the grid, white where
+   nothing was poured.
+2. Pour **Water** into the middle of the clear pool. Good: a second white front where the
+   water meets the ouzo, moving out. Stir with the Finger: the white follows the folds.
+3. Pour **Alcohol** on part of the ring. Good: the white there fades to clear and stays
+   clear while the alcohol is there. Bad: no change, or the whole ring going at once.
+4. On a lamp ground the cloud is a warm grey shadow, as milk's is, not white.
+5. A plate that never sees the bottle looks exactly as before.
+6. The look **Louche** (the bottle's own, added because `npm run plate` holds that every
+   bottle with physics is poured by some look). Good: a dark dish; about one drop in three
+   blooms white as it lands and drifts with the flow, some blooms thin or open a clear
+   window where a later drop of Alcohol lands, the blues of the other drops stay deep. Bad:
+   the whole plate white inside a few minutes, blooms that are hard-edged discs for as long
+   as they last, a grey veil over the dark ground.
+
+## 151. Oil threads pinch into beads (PLAN 38w-27)
+
+Asked 2026-11-27. On the Mac (the app's 512² or 768² grid; a 192² plate has no thread narrow
+enough to bead, by design).
+1. Open **Classic**, press with a hand (Beat Squeeze 0.6, Plate Rock 1.6) so the oil is pushed
+   into long thin strands, then let go. Good: within a second or two of letting go a strand
+   thinner than the glass gap (about a fifth of a millimetre on screen at 512², a few pixels)
+   breaks into a row of round beads, evenly spaced, like a string of pearls; a wide band of oil
+   stays a band. Bad: oil that crumbles into speckle while still pressed, every edge of a big
+   body going lumpy, or beads that shimmer or jitter cell to cell.
+2. Any oil look poured fine (**Oil & Water**, **Clock Glass**): good, small drops and the edges
+   of big bodies look as they did.
+To put it back: THREAD in `src/gpu/wgsl/fluid/capillary.ts` returns 0 from threadCurve
+(`npm run beads` then reads one body, as main did).

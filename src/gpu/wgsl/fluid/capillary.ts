@@ -8,7 +8,7 @@
  * the one table every pass is asked for by name.
  */
 
-import { OPEN_RIM } from '../../../lib/turntable';
+import { OPEN_RIM, DISH_GAP_FIELD_UV } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
 import { RIM_SIDE } from './oil';
 import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FROM, LAMP_GLASS } from '../../fluid/constants';
@@ -23,6 +23,10 @@ import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FR
 const RIM_BAND = 8;
 /** The most samples rimLaplace takes round the ring (its workgroup arrays' length; fluid.ts sizes the ring). */
 export const RIM_SAMPLES = 1024;
+/** The narrowest thread the oil's field draws, in cells: its edge's own width (THREAD, PLAN 38w-27). */
+export const THREAD_CELLS = 2.0;
+/** How far THREAD reads across the oil each way, in cells: past a 768² grid's rest gap (7.7 cells) and its blur; a walk that runs out of it is across a wide body. */
+export const THREAD_REACH = 12;
 /*
   The oil's capillary force, σ κ ∇c̃, at one cell (mixForce has the physics),
   shared by mixForce and rimLaplace so the rim reads the very force the flow
@@ -64,22 +68,99 @@ fn grad(p: vec2i, n: f32) -> vec2f {
 }
 // The edge's unit normal, fading to nothing where there is no edge to have one.
 fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g) + 0.0004); }
-// σ κ ∇c̃. The normal's divergence by central differences of the normals
-// themselves, not a second derivative of c: that is the step that keeps the
-// grid out of it.
-fn capillaryAt(p: vec2i, n: f32) -> vec2f {
-  let g = grad(p, n);
-  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
-  var f = A.a.x * kappa * g;
-  let l = length(f);
-  if (l > A.a.y) { f *= A.a.y / l; }
-  return f;
-}
 // The ring rimLaplace integrates along: two cells inside the rim, inside
 // every cell the solve holds (the rim's and the grid's edge, hsPrep).
 fn rimRing(n: f32) -> f32 { return ${OPEN_RIM.toFixed(2)} - 2.0 / n; }
 // w(r): nothing short of the band, one from a cell and a half inside the rim outward.
 fn rimRamp(r: f32, n: f32) -> f32 { return smoothstep(${OPEN_RIM.toFixed(2)} - (1.5 + ${RIM_BAND.toFixed(1)}) / n, ${OPEN_RIM.toFixed(2)} - 1.5 / n, r); }
+`;
+/*
+  A thread's curvature across the gap (PLAN 38w-27), and the capillary force
+  σ κ ∇c̃ with it, for mixForce and rimLaplace, which bind the gap (the
+  squeeze's red, \`sq\`) beside the oil's blur.
+
+  Reported in the owner's round five: a press stretches Classic's oil into
+  threads that stay threads, where the 1969 footage strings them into beads.
+  The plate's oil is a field in the plane, and its tension the curvature of
+  the outline it draws there. A straight thread drawn that way cannot bead,
+  in any model: a varicose wave along it only lengthens its outline, so the
+  in-plane tension smooths the wave away. A real thread beads because it is
+  round. Its section is a disc of diameter w, whose rim is curved 2/w across
+  the thread, out of the plane, so the oil in a neck is at σ(2/w) more than
+  the water and the oil in a bulge at less, and the neck empties into the
+  bulges until it pinches (Plateau 1873, Rayleigh 1878). That only holds
+  while the thread is narrower than the gap. A wider one touches both glasses
+  and is a ribbon, its edge a meniscus across the gap whose curvature is
+  2/h wherever the gap is the same, so its pressure does not change along
+  it and nothing drives a neck: confinement holds a ribbon whole, as Humphry,
+  Ajdari, Fernández-Nieves, Stone and Weitz measured in microchannels (Phys.
+  Rev. E 79, 056310, 2009). So a pressed thread is a ribbon and holds; let
+  the glass up off it, or stretch it thinner than the gap, and it beads.
+
+  So the edge's curvature gains 2/w − 2/h where the oil there is narrower
+  than the gap (the 2/h is a ribbon's own, the same everywhere along it, and
+  taken off so a ribbon and every wide body read exactly what they did). The
+  width is read across the oil along the edge's own normal: from the cell,
+  the blurred oil summed a cell at a time both ways until it gives out,
+  which across a thread is its width (the blur keeps the sum) and across a
+  small drop its diameter, where the same 2/w is the drop's own
+  out-of-plane curvature: a drop narrower than the gap is a sphere, 4/D, the
+  in-plane outline's 2/D and this one's 2/D. Past the gap the sum stops, as
+  only the gap matters, and a walk still in the oil at THREAD_REACH is
+  across a wide body (a lifted gap on a 1024² grid is 20 cells).
+
+  The grid sets the floor. The field draws no thread narrower than its own
+  edge, two cells or so (THREAD_CELLS), so a gap no wider than that on the
+  grid (a 2 mm gap at 192² is 1.9 cells: the CPU mirror and the 192 labs)
+  has no thread to bead and nothing changes there; at the app's 512² the
+  gap is 5.1 cells and at 768² 7.7.
+*/
+const THREAD = /* wgsl */ `
+// The oil's blur between its four cells round g, in cells. (Not mix(): mixForce's oil texture has that name.)
+fn csAt(g: vec2f, n: f32) -> f32 {
+  let c0 = vec2i(floor(g));
+  let f = g - floor(g);
+  let a = cs(c0, n) + (cs(c0 + vec2i(1, 0), n) - cs(c0, n)) * f.x;
+  let b = cs(c0 + vec2i(0, 1), n) + (cs(c0 + vec2i(1, 1), n) - cs(c0 + vec2i(0, 1), n)) * f.x;
+  return a + (b - a) * f.y;
+}
+fn threadCurve(p: vec2i, g: vec2f, n: f32) -> f32 {
+  if (S.thinGap < 0.5) { return 0.0; }
+  let h = max(textureLoad(sq, clampP(p, n), 0).r, 0.0) * ${DISH_GAP_FIELD_UV.toFixed(6)} * n;
+  let gl = length(g);
+  if (h <= ${THREAD_CELLS.toFixed(1)} || gl < 0.004) { return 0.0; }
+  let u = g / gl;
+  let o = vec2f(p);
+  var w = cs(p, n);
+  // A walk that runs out of reach still in the oil is across a wide body
+  // (a lifted gap on a fine grid is wider than the reach), and reads as one.
+  var out = 0;
+  for (var k = 1; k <= ${THREAD_REACH}; k++) {
+    let s = csAt(o + u * f32(k), n);
+    if (s < 0.02) { out++; break; }
+    w += s;
+    if (w >= h) { return 0.0; }
+  }
+  for (var k = 1; k <= ${THREAD_REACH}; k++) {
+    let s = csAt(o - u * f32(k), n);
+    if (s < 0.02) { out++; break; }
+    w += s;
+    if (w >= h) { return 0.0; }
+  }
+  if (out < 2) { return 0.0; }
+  return 2.0 / max(w, ${THREAD_CELLS.toFixed(1)}) - 2.0 / h;
+}
+// σ κ ∇c̃. The normal's divergence by central differences of the normals
+// themselves, not a second derivative of c: that is the step that keeps the
+// grid out of it. And the thread's own curvature across the gap (above).
+fn capillaryAt(p: vec2i, n: f32) -> vec2f {
+  let g = grad(p, n);
+  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
+  var f = A.a.x * (kappa + threadCurve(p, g, n)) * g;
+  let l = length(f);
+  if (l > A.a.y) { f *= A.a.y / l; }
+  return f;
+}
 `;
 /*
   Film Hold: the water film between two drops of oil, and why it holds.
@@ -240,9 +321,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     A.a = mixForce's (σ, the most a cell may add).
   */
-  rimLaplace: `${HEAD}${CAPILLARY}
+  rimLaplace: `${HEAD}${CAPILLARY}${THREAD}
 @group(0) @binding(2) var soft: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(3) var sq: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
 var<workgroup> ring: array<f32, ${RIM_SAMPLES}>;
 var<workgroup> oilOn: array<f32, ${RIM_SAMPLES}>;
 var<workgroup> part: array<vec2f, 64>;
@@ -353,13 +435,14 @@ fn sampleAt(g: vec2f, n: f32) -> vec3f {
     from the centre, downhill, where a standing plate goes out of view; or,
     where the wax is the oil, the warm glass floor (LAMP_GLASS) it lies on.
   */
-  mixForce: `${HEAD}${CAPILLARY}
+  mixForce: `${HEAD}${CAPILLARY}${THREAD}${RIM_SIDE}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
 @group(0) @binding(5) var soft: texture_2d<f32>;
 @group(0) @binding(6) var rimPhi: texture_2d<f32>;
-@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(7) var sq: texture_2d<f32>;
+@group(0) @binding(8) var dst: texture_storage_2d<rgba16float, write>;
 // Φ = w(r)·φ(θ) at a cell (CAPILLARY): φ read round the ring, between its samples.
 fn rimHeld(q: vec2i, n: f32) -> f32 {
   let d = (vec2f(q) + 0.5) / n - vec2f(0.5);
@@ -380,8 +463,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var v = textureLoad(vel, p, 0);
   var capillary = capillaryAt(p, n);
   // On a thin gap, the rim held at the oil's own pressure (CAPILLARY says why).
+  // Past the open rim there is no cover glass and no pressure solve (hsPrep
+  // holds p = 0 there): a body straddling the rim must not feed an unopposed
+  // trough capillary force into hsDivergence, which raised pressure inside the
+  // rim and pumped an unpoured lens out over it (PLAN 19ak-24d).
   if (S.thinGap > 0.5) {
-    capillary -= 0.5 * vec2f(rimHeld(p + vec2i(1, 0), n) - rimHeld(p - vec2i(1, 0), n), rimHeld(p + vec2i(0, 1), n) - rimHeld(p - vec2i(0, 1), n));
+    if (rimSide(p, n)) {
+      capillary = vec2f(0.0);
+    } else {
+      capillary -= 0.5 * vec2f(rimHeld(p + vec2i(1, 0), n) - rimHeld(p - vec2i(1, 0), n), rimHeld(p + vec2i(0, 1), n) - rimHeld(p - vec2i(0, 1), n));
+    }
   }
   let wax = textureLoad(dye, p, 0).a;
   let oil = textureLoad(mix, p, 0).r;

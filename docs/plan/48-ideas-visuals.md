@@ -252,3 +252,154 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   pattern), a chord change to 48a's light. Check: a sweep from a sine to a sawtooth at one
   pitch raises the timbre source and leaves `pitch` alone; a chord change moves the harmony
   source and a held chord does not.
+
+## Second pass: the real phenomena still missing (2026-11-27)
+
+*Asked 2026-11-27: "Are there any liquid physics we're missing that could make things even
+more realistic and visually awesome?" Research only, nothing built. Checked against §18, §20,
+§31, §32, §38 (all passes), §47, the ideas above and the solver's own kernels, so each line
+below is something no item already holds. The owner's priorities that day weigh the ranking:
+beautiful pictures with as little jitter as possible, and clean code, so GPU cost counts and a
+phenomenon that grows smoothly from a field beats one that needs random nucleation or
+sub-cell droplets. Ranked by what a person watching the wall would see against what it costs.*
+
+| Rank | Item | On the wall | GPU cost | Build |
+|---|---|---|---|---|
+| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; its check is 48s-1) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built; Claude's check owed |
+| 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
+| 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
+| 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |
+| 5 | 48w Marangoni bursting | an alcohol drop explodes into a firework of droplets | medium, short bursts | Claude |
+| 6 | 48x dancing droplets | food-colour drops on dry glass chase and flee each other | low: one coarse vapour field | Claude |
+| 7 | 48y thermocapillary drift | drops creep slowly into the lamp's hot spot | low: a term in a force pass | Claude's check, then AG |
+| 8 | 48z partial coalescence | a drop merges in steps, shrinking by half each time (closeup) | medium, closeup only | Claude |
+
+Looked at and left out, so a later pass does not raise them again: von Kármán vortex streets
+(the gap's Reynolds number is far below shedding, so a street there would be a fake);
+Rayleigh–Taylor fingers on a tilted plate (the Boussinesq density force in `forces.ts` already
+makes them when the dish tilts); dispersion of the oil's index (§31, per band in 18e's
+shadowgraph); the Cheerios effect (needs a free surface the sandwiched gap does not have; the
+bubbles' crowding is 38g); the coffee ring (in §18 with evaporation as solvent loss); Bénard
+cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
+
+- **48s. Ouzo clouding: a clear pour turns milky where it mixes** (shipped #1007, 2026-11-27;
+  builds on **18j** milk's scattering). A fifteenth bottle, **Ouzo**: anise oil in alcohol at a
+  kitchen extract's strength (3% oil in 75% alcohol; the drink's 0.2% is only a haze in a
+  2 mm dish). The solver carries its ethanol and its oil in a field of their own (`solvent`,
+  made at the first pour of the bottle, laid by the species' pour and moved by the species'
+  carry), and once a step each cell is put on the measured binodal of water / ethanol /
+  trans-anethole (53 cloud points, arXiv:2404.18524, fitted as ln s = −9.38 + 6.23 f + 4.93 f²
+  in the solvent's ethanol volume fraction f): the oil over what the cell's solvent holds is
+  droplets, the rest dissolved, the two always summing to the oil carried there
+  (`ouzoCloud`, `src/lib/ouzo.ts`). The droplets' scattering (μs′ = 209 per mm for each unit
+  of their volume fraction: one-micron droplets, Mie) is added to the channel milk's rides in
+  and the plate draws it as it draws milk, unchanged. No seed, noise or timer. The Alcohol
+  bottle is now ethanol to the solver, so poured on a cloud it dissolves it. Off for every
+  look that was there: none of them pours the bottle, and without it no field is made and no
+  pass runs. The bottle's own look, Louche, pours it (48s-5 has why it came with the bottle).
+  Measured in the lab with a scratch script (in the PR): the cloud agrees with `ouzoDrops`
+  cell for cell, none appears in an unmixed cell or on the clear side of the curve, and the
+  oil is the same to seven figures through a water pour and an alcohol pour.
+- **48s-1. The ouzo's check** (S; owed by 48s, which shipped measured by a scratch script).
+  A lab check, `npm run ouzo`: a water pour into a laid ouzo layer gives droplets only in
+  cells on the two-phase side of `OUZO_BINODAL` at their own gap, to float precision against
+  `ouzoDrops`; none in a cell with no oil or at the bottle's own strength; Σ(dissolved +
+  droplets) unchanged while nothing has reached the rim; Alcohol poured on the cloud lowers
+  the droplets there and leaves the oil; the plate handed for the species is the species
+  plus 209 times the droplets in b; a plate with milk or glycerine and no Ouzo makes no
+  `solvent` field and renders byte for byte as before; and the oil and the cloud come
+  across a governor's move (`lab.regrid`) as the species does since 18d-10 (the field is
+  handed over beside it: a scratch run at 192 → 128 read the oil 25.01537 before and
+  25.01725 after, the droplets 14.867 and 14.861, where without the hand-over both were 0).
+- **48s-2. Alcohol poured before any Ouzo is not remembered** (S; a shortcut 48s took for
+  cost). The `solvent` field starts at the first pour that brings anise oil, so a plate that
+  only ever sees Alcohol carries nothing new; ethanol poured before that first Ouzo is
+  therefore not in the field, and an Ouzo poured into a pool of Alcohol clouds as though the
+  pool were water. Real: the alcohol there would hold the oil. Either start the field at any
+  ethanol pour (one more carry a step while Alcohol is on the plate; measure its cost on the
+  Mac first), or lay the field from the species at its start when Alcohol is the only poured
+  liquid so far.
+- **48s-3. The ouzo's droplets ripen** (S–M; with **48n**). The droplets are taken at the one
+  micron they form at; real ones grow to three over hours by Ostwald ripening, faster in
+  less alcohol (Sitnikova and others 2005), and μs′ per unit of oil falls from 209 to 108
+  per mm as they do, with the blue-to-red ratio going from 1.20 to 1.09. Carry the droplets'
+  number beside their volume (the field's first channel is free for it) so the mean size is
+  volume over number, and give 48n's Tyndall colours the size.
+- **48s-4. The ouzo's front is as thin as the plate's mixing** (M; waits on **48w** and
+  **18d-5**). On the thin gap a pour pushes the liquid before it aside more than it mixes
+  with it, so the cloud is a ring a few cells wide at the pour's edge and wherever water is
+  poured back in. In a real dish alcohol meeting water spreads and stirs itself (its lower
+  surface tension pulls it out over the water, and it is lighter), which is what makes a
+  louche billow. When the plate has that flow the cloud will follow it with no change here.
+- **48s-5. A bottle's ethanol and anise oil as Liquid Designer dials** (S). The two numbers
+  are a bottle's behaviour (`ethanol`, `anise` in `LiquidBehaviour`) and the Designer does
+  not show them yet: with them a performer could make a stronger or weaker louche (past
+  real: more oil than alcohol can hold is already cloudy in the bottle). The look this item
+  also asked for shipped with 48s after all, as **Louche** (`src/presetsOuzo.ts`): the pull
+  request's `npm run plate` was red on "every liquid with physics in it is used by some
+  preset — ouzo", and the check is right that a bottle no look pours is never seen on Go.
+  A new look, not a new bottle in an old look's dish, so every look that was there is as it
+  was. Its dish is water, Ouzo and Alcohol by thirds; in the lab on its own settings a bloom
+  reads 228 of 255 on a ground of 0, 208 after one drop of Alcohol and 0 after two. How it
+  looks over a show is the owner's (docs/judging.md 150, step 6).
+- **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
+  `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
+  membrane of precipitate at the front, and the front's speed against its reaction sets the
+  shape: spirals, flowers, worms and filaments (Haudin, Cartwright, Brau and De Wit 2014,
+  confined chemical gardens). The precipitate becomes solid: the cell's permeability falls to
+  zero and the liquid flows around what it grew, so the picture builds coral the flow then
+  works around. Slow and continuous, so no jitter. *Check:* the same pour at two injection
+  rates gives the paper's two regimes (spirals at low, filaments at high), no liquid crosses a
+  grown wall, and the reactants are conserved.
+- **48u. A shear-thinning gum: fingers that crack** (M; sharpens **37x-10h**, which names the
+  gum, and **48d**, the glass lifted). A polymer or clay in the liquid thins where it is
+  sheared, so the viscous fingers of a pour or a lift narrow from round tulips into sharp,
+  branched cracks, and at strong thinning the pattern looks like fracture (Lemaire, Levitz,
+  Daccord and Van Damme 1991; Lindner, Bonn and Meunier 2000). In the gap it is a viscosity
+  per cell from the local shear rate (a power law with an index n set by the dial), which the
+  Hele-Shaw drag already takes cell by cell. *Check:* the same lift with n = 1 and n = 0.5,
+  the finger width falls as the papers measure and the branch count rises; n = 1 is today's
+  plate to the bit.
+- **48v. An electric field on the oil** (M; builds on the ferrofluid's magnetic stress,
+  **38d**, **38k**). Electrodes at the dish's rim and a voltage: a leaky dielectric drop
+  stretches along the field (or flattens across it, by the ratio of its charge-relaxation
+  time to the oil's), and past a threshold tip-streams fine jets from its ends; under DC some
+  drops spin by Quincke rotation (G. I. Taylor 1966; the leaky dielectric model of Melcher and
+  Taylor; in a Hele-Shaw cell, Mirzadeh and Bazant 2017 on electric control of fingering). The
+  maths is the magnet's with permittivity for permeability, so the stress kernel is shared. A
+  new instrument for any oil look, a knob or a cord, the way the magnet is for ferrofluid.
+  *Check:* a drop's aspect ratio against Taylor's small-deformation law at three fields, and
+  the sign flips with the conductivity ratio as the theory says.
+- **48w. Marangoni bursting: a drop explodes into droplets** (M; builds on the oil's
+  Cahn–Hilliard field, the Marangoni stress and evaporation). A water and alcohol drop laid
+  on an oil layer spreads, the alcohol evaporates fastest at its rim, the surface tension
+  gradient pulls the rim outward, and the rim breaks into hundreds of droplets that fly out
+  in a ring (Keiser, Bense, Colinet, Bico and Reyssat 2017). A firework on every drop; a cord
+  can lay one on a kick. The droplets are near the cell size, so it wants the closeup's finer
+  grid or the fine dye; on the wall at 1x it reads as a radial spray. *Check:* the burst's
+  radius grows as the paper's law in time, the number of droplets rises with the alcohol
+  fraction, and the oil and water are conserved.
+- **48x. Dancing droplets on dry glass** (S–M; builds on the dewetting of **20b** and the
+  Marangoni stress). Two-component drops of water and propylene glycol with food colouring,
+  on clean glass, sense each other through the vapour they give off: a neighbour's vapour
+  slows evaporation on a drop's near side, which raises its surface tension there and pulls
+  it closer, so drops pair, line up, and (of unequal mix) chase and flee, all on their own
+  and slowly (Cira, Benusiglio and Prakash 2015). One vapour field on a coarse grid
+  (one diffusion pass) and the Marangoni force at the drop's rim. A plate that is alive
+  without any noise, and calm enough for a quiet look. *Check:* two drops of equal mix
+  attract, two of unequal mix chase in the direction the paper measured, and with the
+  vapour turned off nothing moves.
+- **48y. Drops drift towards the lamp's heat** (S; sharpens **18f-2** and **38f**). A drop
+  in a temperature gradient moves to the hot side, because the surface tension is lower
+  there and its surface flows to the cold (Young, Goldstein and Block 1959). 18f-2 puts the
+  thermal Marangoni stress inside a layer; this is the same stress on every oil drop's rim,
+  so drops gather slowly round the lamp's hot spot and wander as it moves. A term in a force
+  pass the plate already runs. *Check:* a drop's drift speed against the Young–Goldstein–Block
+  law at two gradients, and none on a uniform plate.
+- **48z. Partial coalescence: a drop merges in steps** (M; closeup and tank only, **§47**,
+  builds on **33f** and **38r**). A drop resting on a layer of its own liquid across a thin
+  film of the other merges only partly: the neck pinches and a daughter about half its size
+  springs back, rests, and merges again, four to six times (Thoroddsen and Takehara 2000;
+  Blanchette and Bigioni 2006). A rhythmic shrinking blink, small on the wall, striking in
+  the macro view. *Check:* the daughter's radius ratio near 0.5 over the cascade and the
+  cascade stops at the Ohnesorge number the papers give.

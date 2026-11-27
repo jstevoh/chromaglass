@@ -49,6 +49,24 @@ as before: the shader editor and imports, the feedback layer, and anything that 
 the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
 analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
 
+## ~~30c. The controller's pads play the liquid~~ (shipped 2026-11-27)
+- **30c-1** (S) The laptop remote's phone (useRemote, remoteProtocol) has no pads: the
+  phone stage's Pads play the phone's own plate only. A `pad-hold` message, with its
+  lift, would put the grid on the remote too.
+- **30c-2** (S, named shortcut) A held drip of a viscous liquid waits at most 3 s
+  (`DRIP_MAX_S`); syrup really drips about every 29 s at the same squeeze. Replace with the
+  real wait, shown (the pad's LED, or the plate, swelling with the drop forming at the
+  tip) so a long wait does not read as a dead pad.
+- **30c-3** (S, needs the board) The device-control buttons Bank ◀ ▶ are bound as notes
+  0x3C and 0x3D on channel 1 from Akai's protocol; on the owner's APC40 mkII, check they
+  arrive there (learn shows it) and that Track Select's LEDs light the pick.
+- **30c-4** (M) The tool rows lay where they land and stay: a Pour held while the pad's
+  lane is pressed again at another height could move the stream (a hand carrying the
+  bottle), and Splatter's direction could follow the hit's column (a flick across).
+- **30c-5** (S) A layout that claims more than the grid (51h's projector layout wants the
+  crossfader and the Activator, Solo and A|B rows): `isGridBinding` is one set for every
+  layout; give each layout the sources it lays, so switching away gives them back.
+
 ## ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
 - **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
   on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the
@@ -125,14 +143,43 @@ story is in `docs/plan-shipped.md` under 48f. Open:
 - **48f-5. Two frequencies** (M). A real speaker playing music shakes at many at once;
   two drive frequencies make quasi-crystal patterns (Edwards and Fauve 1993). The step
   takes one.
-- **48f-6. The strobe's phase** (S). The light is drawn as a camera locked to the wave at
-  its crest (wgsl/plateFaraday.ts), so it holds still; a dial that detunes that lock
-  slowly would let the crests and troughs trade places over seconds, as a detuned strobe
-  shows them, without ever flickering.
+- **48f-6. The strobe's phase** (S). *Shipped 2026-11-21 as Rock; story in `docs/plan-shipped.md` under 48f-6.*
 - **48f-7. A look that opens shaken** (S). No look sits on the shaker yet, so every look
   opens as it did; a look built for it (Shaker on, Music Shake set) would show the
   feature without a hand on the desk. Needs the owner's judging first (docs/judging.md
   §140).
+- **48f-8. The mean flow, derived** (M). The waves' own mean flow (wgsl/faraday.ts,
+  faradayForce) is the streaming push −Γ ∇²u ∇u, projected and held by the floor's friction,
+  with Γ a scale set so a wave's push matches ω k u² at the critical ring: the shape is the
+  one the theory gives (a pure gradient on the ring, so only defects, modulation and a
+  square's off-ring harmonics stream)
+  but the size is not derived. Replace Γ with the Vega, Knobloch and Martel (2001) mean-flow
+  coefficients for the layer, and hold `npm run faraday`'s 350 and 830 µm/s (4× and 12×) to
+  them. Measured 2026-11-21: at real strength the mean flow barely changes how the pattern
+  breaks (corr over 4 s 0.61 with it, 0.64 without, at 12×); the breaking is the
+  amplitude equation's own. It does carry the pattern: the dish with it differs from the
+  dish without it by 8.6% of the r.m.s. at 4× and 40% at 12×.
+- **48f-9. The pattern moves** (M). *Shipped 2026-11-21: it rides the plate's flow, streams
+  its own mean flow, breaks up and re-forms at high drive, and Strength throws its light past
+  real; story in `docs/plan-shipped.md` under 48f-9.*
+- **48f-10. The streaming carries the dye** (M). The waves ride the plate's flow, but their
+  own mean flow moves only the waves: a real dish's streaming drifts what floats on it too.
+  Add the mean flow (scaled to the plate's units) to the solver's velocity as a force, so the
+  dye follows the pattern's defects. Needs 48f-8's size first, or a dial past real.
+- **48f-12. Lasting defect chaos** (M). Far past threshold a real dish never settles: its
+  pattern goes over to defect chaos, defects born, gliding and dying for as long as it is
+  shaken (Kudrolli and Gollub 1996). Ours breaks up and moves for some seconds as it grows,
+  then locks into a new pattern: ten seconds on the correlation is 0.99 at 12× and 0.9997
+  at the dial's top, 2 g (`npm run faraday`, 2026-11-21), so lasting motion today is the
+  Rock's and the plate's flow. The cubic that picks the pattern is the place to look (a
+  shortcut, PLAN 48f-2): the real coefficients for the layer, and the mean flow's feedback at
+  its derived size (48f-8), are what keep a real one moving. Hold it as a late window that
+  still decorrelates.
+- **48f-11. Folds drawn as caustics** (S). Where the waves are steep enough to fold the
+  light (det(I + D′H) below nought) the plate draws dark (wgsl/plateFaraday.ts); a real
+  caustic is the sum of the sheets that land there, brighter not darker. At Strength 4 the
+  mean brightness falls 3.5% (`npm run faraday`), part the aperture's real loss and part
+  this. Sum the folded sheets' light instead of zeroing it.
 
 ## ~~48c. Bioluminescent trails: the water glows where it is sheared~~ (shipped 2026-11-21)
 - **48c-1. The plankton are spread evenly.** Every cell of the plate's water holds the same
@@ -157,7 +204,14 @@ story is in `docs/plan-shipped.md` under 48f. Open:
   48f's surface (binding 25): the eight every device gives without asking (`gpu/device.ts`
   asks for no more). The next field the plate draws must pack into a buffer already bound
   (the glow's light and the Faraday surface fit one array) or be a texture.
-- **48c-5. A look made for the glow.** Every look ships with Glow at 0. A look of dark water,
-  sparse dye and a cord that stirs on the kick (the music lights a wake on each hit and the
-  quiet lets the water recharge) would show it on Go; the owner picks it from Mac films.
+- **48c-7. The wave's strain and the flow's are two, taken as the larger** (S). The stroke's
+  shear is the gap's (two glasses 2 mm apart) and the wave's the open layer's (48f's 3 mm of
+  water with a free surface), and a cell's share is the larger of the two rather than one
+  strain from both flows together. One geometry for both (the open dish's layer with the
+  stroke's flow in it, or the wave in the gap, 48f-3) would let them add as one tensor.
+- **48c-8. The wave does not carry the plankton** (S–M). A standing Faraday wave drives a
+  steady streaming (Stokes drift and the boundary layers' own), which over seconds gathers
+  floating matter under the lattice's nodes; the glow's state is carried by the plate's flow
+  alone. Add the streaming velocity of the amplitude field to the carry, so a long bass note
+  herds the bloom into the lattice.
 

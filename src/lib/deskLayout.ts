@@ -330,6 +330,42 @@ export function closePanel(l: DeskLayout, id: string): DeskLayout {
   return { ...out, collapsed: out.collapsed.filter(x => x !== id) };
 }
 
+export interface ClosedPanelSpot {
+  id: string;
+  where: Slot | 'float';
+  index: number;
+  collapsed: boolean;
+  float?: FloatingPanel;
+}
+
+/** Remember where a panel sat before closing so Undo puts it back in the same place. */
+export function snapshotPanelSpot(l: DeskLayout, id: string): ClosedPanelSpot {
+  const collapsed = l.collapsed.includes(id);
+  const f = l.floating.find(p => p.id === id);
+  if (f) return { id, where: 'float', index: 0, collapsed, float: { ...f } };
+  for (const s of SLOTS) {
+    const idx = l[s].indexOf(id);
+    if (idx >= 0) return { id, where: s, index: idx, collapsed };
+  }
+  return { id, where: 'deck', index: l.deck.length, collapsed };
+}
+
+/** Put a closed panel back where `snapshotPanelSpot` saw it unless it was already reopened. */
+export function restoreClosedPanel(l: DeskLayout, spot: ClosedPanelSpot): DeskLayout {
+  if (whereIs(l, spot.id)) return l;
+  const collapsed = spot.collapsed && !l.collapsed.includes(spot.id)
+    ? [...l.collapsed, spot.id]
+    : l.collapsed;
+  if (spot.where === 'float') {
+    const f = spot.float ? { ...spot.float } : { id: spot.id, x: 0.35, y: 0.25, w: 320, h: 360 };
+    return { ...l, floating: [...l.floating, f], collapsed };
+  }
+  const slot = spot.where;
+  const next = [...l[slot]];
+  next.splice(Math.min(spot.index, next.length), 0, spot.id);
+  return { ...l, [slot]: next, collapsed };
+}
+
 /** Open a panel that is not out, where it goes by default; a panel already out is left where it is. */
 export function openPanel(l: DeskLayout, id: string, where: Slot | 'float' = 'deck'): DeskLayout {
   if (whereIs(l, id)) return l;

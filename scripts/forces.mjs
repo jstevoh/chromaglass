@@ -55,16 +55,31 @@
  *      liquid at 1/7.9 of the default's, each to 8%; and the colour goes as
  *      the liquid there goes with no colour laid at all, to 3% (the draught's
  *      gusts make the pool's own speed differ from the plate's mean).
- *   6. Polarity pushes unlike colours apart the same everywhere (PLAN 38u-7).
- *      A straight boundary between two colours, the plate's own thin gap and
- *      the deep one, the same push along every row of it: every row pushes
- *      the one colour away from the other (none the other way), and the push
- *      varies along the boundary by under 25% (std over mean, 0.10 and 0.00;
- *      the push was multiplied by 1 + 2n, n a noise on the plate, which went
- *      negative in patches and pulled the colours together there: 26 of 76
- *      rows the wrong way on the thin gap, a spread of 2.5 times the mean).
- *      Polarity 0 on the same plate moves nothing, or the push is not what
- *      the rows are measuring.
+ *   6. Two dyes in one water mix, and Hold Apart is a tension (PLAN 18d-6).
+ *      A long pool of one colour laid in another, the same amount of dye
+ *      everywhere, on still liquid between the two glasses. At Hold Apart 0,
+ *      the real number and every look's, nothing moves: no cell has any
+ *      speed and the pool keeps its shape (its aspect, from the dye's second
+ *      moments, to 1%). What was there instead: a push between unlike
+ *      colours on in every look (Polarity times Blob Surface Tension), which
+ *      this line asked to lean on a straight boundary the same along every
+ *      row. A tension does not move a straight boundary at all, and that is
+ *      the second line: at Hold Apart 1 the flow about a straight edge is
+ *      under 2% of the flow about the pool, up the plate or leaning across
+ *      the grid (the first build pulled such an edge in from the dish's rim,
+ *      where it ended: 6.7%; and a leaning edge drew a shear along itself,
+ *      202% from the dye's own cells and 5% as a cell-sized shake from a
+ *      16-bit blur of them, 0.9% now). The pool itself rounds (its
+ *      aspect falls by over 0.05 in five seconds) and keeps its dye to 0.1%,
+ *      since a stress only moves liquid about. And the stress is Korteweg's,
+ *      which goes as the square of the step: the same pool at half the dye
+ *      on both sides rounds a quarter as far (0.15 to 0.4; a tension that
+ *      went as the step, as an oil's does with its share, would say a half).
+ *      The control is the first line: with the dial at 0 the same pool does
+ *      not round, or the rounding is not the dial's.
+ *      On the old plate (Thin Gap off), which has no gap's drag to take the
+ *      stress, the pool still rounds, slower, and keeps over 99% of its dye
+ *      (laid there as it is between the glasses it kept 12%).
  *   7. Rain Drip is gravity along the plate, g sin θ (PLAN 38u-12). On a
  *      level plate (Gravity 0) a pool of colour under Rain Drip does not fall
  *      (under 2% of the speed it has on the wall), tipped to a half it falls
@@ -241,34 +256,51 @@ try {
       }
     }
     /*
-      6. A straight boundary, red on the left and blue on the right over about
-      five cells, Polarity (immiscibility) 0.3 or 0. The push on the red side,
-      summed across the band left of the boundary, row by row over the middle
-      of the plate, on the thin gap (the app's) and on the deep plate.
+      6. A pool of one colour in another, 0.4 by 0.16 of the plate with an
+      edge about a cell wide, and a straight boundary between the same two,
+      the same amount of dye everywhere so nothing has a weight or a depth
+      to move by. Five seconds on the thin gap (the app's), Hold Apart 0 and
+      1, and the pool again at half the dye. The pool's aspect is the ratio
+      of its second moments along and across; the flow is the fastest cell
+      inside 0.4 of the plate, clear of the rim.
     */
-    out.polar = {};
-    for (const thin of [1, 0]) for (const imm of [0.3, 0]) {
-      await lab.create(N, N);
-      const d = new Array(N * N * 4).fill(0);
-      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-        const t = Math.min(1, Math.max(0, ((i + 0.5) / N - 0.5) / 0.04 + 0.5));
-        const k = (i + j * N) * 4;
-        d[k] = 1 - t; d[k + 2] = t; d[k + 3] = 1;
-      }
-      lab.addDye(d); lab.flush();
-      const over = thin ? { thinGap: 1, gapThickness: DEF, gapSpring: 0, immiscibility: imm } : { immiscibility: imm };
-      await lab.step(6, over);
-      const v = await lab.field('vel');
-      const rows = [];
-      for (let j = 0; j < N; j++) {
-        if (Math.abs((j + 0.5) / N - 0.5) > 0.3) continue;
-        let sum = 0;
-        for (let i = 0; i < N; i++) { const x = (i + 0.5) / N; if (x > 0.44 && x < 0.5) sum += v[(i + j * N) * 4]; }
-        rows.push(sum);
-      }
-      const mean = rows.reduce((a, b) => a + b, 0) / rows.length;
-      const sd = Math.sqrt(rows.reduce((a, b) => a + (b - mean) ** 2, 0) / rows.length);
-      out.polar[`${thin ? 'thin' : 'deep'}:${imm}`] = { mean, cv: sd / Math.max(Math.abs(mean), 1e-12), away: rows.filter((x) => x < 0).length, back: rows.filter((x) => x > 0).length, rows: rows.length };
+    out.hold = {};
+    {
+      const EDGE = 1 / N;
+      const lay = (shape, step) => {
+        const d = new Array(N * N * 4).fill(0);
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+          const x = (i + 0.5) / N - 0.5, y = (j + 0.5) / N - 0.5;
+          // 'flat' is a boundary straight up the plate, 'tilt' one leaning a cell across for every two up it, so it sits on no line of the grid.
+          const t = shape === 'flat' ? 0.5 + 0.5 * Math.tanh(x / EDGE) : shape === 'tilt' ? 0.5 + 0.5 * Math.tanh((x + 0.5 * y) / Math.hypot(1, 0.5) / EDGE)
+            : 0.5 - 0.5 * Math.tanh(((Math.hypot(x / 0.2, y / 0.08) - 1) * 0.08) / EDGE);
+          const k = (i + j * N) * 4;
+          d[k] = step * (1 - t); d[k + 1] = step * t; d[k + 3] = step;
+        }
+        return d;
+      };
+      const shapeOf = (d) => {
+        let m = 0, mx = 0, my = 0, xx = 0, yy = 0;
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const g = d[(i + j * N) * 4 + 1]; m += g; mx += g * i; my += g * j; }
+        mx /= m; my /= m;
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const g = d[(i + j * N) * 4 + 1]; xx += g * (i - mx) ** 2; yy += g * (j - my) ** 2; }
+        return { mass: m, aspect: Math.sqrt(xx / yy) };
+      };
+      const fastest = (v) => { let f = 0; for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (inDish(i, j)) f = Math.max(f, Math.hypot(v[(i + j * N) * 4], v[(i + j * N) * 4 + 1])); return f; };
+      const run = async (shape, hold, step, thin = true) => {
+        await lab.create(N, N);
+        lab.addDye(lay(shape, step)); lab.flush();
+        const before = shapeOf(await lab.field('dye'));
+        await lab.step(300, thin ? { thinGap: 1, gapThickness: DEF, gapSpring: 0, holdApart: hold } : { holdApart: hold });
+        const after = shapeOf(await lab.field('dye'));
+        return { before, after, flow: fastest(await lab.field('vel')) };
+      };
+      out.hold.real = await run('pool', 0, 1);
+      out.hold.pool = await run('pool', 1, 1);
+      out.hold.flat = await run('flat', 1, 1);
+      out.hold.tilt = await run('tilt', 1, 1);
+      out.hold.half = await run('pool', 1, 0.5);
+      out.hold.deep = await run('pool', 1, 1, false);
     }
     /*
       7. The same pool under Rain Drip 0.5 on a plate lying flat, tipped to a
@@ -345,13 +377,21 @@ try {
   }
 // 6.
 {
-  const P = r.polar;
-  for (const kind of ['thin', 'deep']) {
-    const on = P[`${kind}:0.3`], off = P[`${kind}:0`];
-    check(`Polarity pushes unlike colours apart along the whole boundary, ${kind === 'thin' ? 'on the thin gap' : 'on the deep plate'}: no row pulls them together, the push the same to 25%`,
-      on.back === 0 && on.away === on.rows && on.cv < 0.25 && off.away === 0 && off.back === 0 && Math.abs(on.mean) > 1e-5,
-      `${on.away} of ${on.rows} rows push the red side away from the blue, ${on.back} toward it; the spread along the boundary ${on.cv.toFixed(2)} of the mean ${on.mean.toFixed(5)}; Polarity 0: ${off.away} and ${off.back} rows`);
-  }
+  const H = r.hold;
+  const fell = (x) => x.before.aspect - x.after.aspect;
+  check('Two dyes in one water mix: at Hold Apart 0 a pool of one colour in another moves nothing and keeps its shape',
+    H.real.flow === 0 && Math.abs(H.real.after.aspect / H.real.before.aspect - 1) < 0.01,
+    `the fastest cell ${H.real.flow.toExponential(1)}; the pool's aspect ${H.real.before.aspect.toFixed(3)} then ${H.real.after.aspect.toFixed(3)} after five seconds`);
+  check('Hold Apart is a tension: at 1 the pool rounds and keeps its dye, and a straight boundary between the same two colours does not move',
+    fell(H.pool) > 0.05 && Math.abs(H.pool.after.mass / H.pool.before.mass - 1) < 0.001 && H.flat.flow < 0.02 * H.pool.flow && H.tilt.flow < 0.02 * H.pool.flow && H.pool.flow > 0,
+    `the pool's aspect ${H.pool.before.aspect.toFixed(3)} then ${H.pool.after.aspect.toFixed(3)} (with the dial at 0, ${H.real.after.aspect.toFixed(3)}), its dye ${(100 * H.pool.after.mass / H.pool.before.mass).toFixed(3)}% of what was laid; the flow about the straight boundary ${(100 * H.flat.flow / H.pool.flow).toFixed(2)}% of the flow about the pool (${H.flat.flow.toExponential(1)} against ${H.pool.flow.toExponential(1)}), about one leaning across the grid ${(100 * H.tilt.flow / H.pool.flow).toFixed(2)}%`);
+  check('On the old plate (Thin Gap off) Hold Apart rounds the pool too and does not throw its dye away',
+    fell(H.deep) > 0.01 && fell(H.deep) < fell(H.pool) && H.deep.after.mass / H.deep.before.mass > 0.99,
+    `the pool's aspect ${H.deep.before.aspect.toFixed(3)} then ${H.deep.after.aspect.toFixed(3)}, its dye ${(100 * H.deep.after.mass / H.deep.before.mass).toFixed(2)}% of what was laid (laid whole, with no gap's drag to take it, it kept 12%)`);
+  const quarter = fell(H.half) / fell(H.pool);
+  check('and it goes as the square of the step, as Korteweg\'s stress does: at half the dye the pool rounds a quarter as far',
+    quarter > 0.15 && quarter < 0.4,
+    `${quarter.toFixed(2)} of the rounding (the aspect fell ${fell(H.half).toFixed(4)} against ${fell(H.pool).toFixed(4)}); a tension that went as the step would say 0.5`);
 }
 // 7.
 {

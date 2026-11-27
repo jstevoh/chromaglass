@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, CirclePlus, LogIn, Shuffle, User } from 'lucide-react';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { TouchSlider } from '../ui/TouchSlider';
+import { PhoneSaveForm, type ExistingLook } from './PhoneSaveForm';
 import { useEscape } from '../../hooks/useEscape';
 import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
@@ -10,13 +11,15 @@ import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import { findPreset } from '../../presets';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
 
 const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
 import { shareClip } from '../../lib/shareClip';
-import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
+import { SlideTray, TapeReels } from '../ui/Playful';
+import { LookPicture } from '../ui/LookChip';
 
 /**
  * Play: ChromaGlass on a phone for someone listening, not performing.
@@ -90,15 +93,23 @@ export interface PhonePlayProps {
   onLook: (id: string) => void;
   onShuffle: () => void;
   /** Save the plate as a new look under a name, asked for every time (QA-18), as the desks' Save. */
-  onSave?: (name: string) => void;
+  onSave?: (name: string, description?: string, forSong?: boolean) => void;
   /** The name the field starts with. */
   saveSuggestion?: string;
+  /** Currently open user look, when saving can overwrite it directly (H4-16). */
+  replaceName?: string | null;
+  onReplace?: () => void;
+  /** Track playing now, so the saved look can bind to it. */
+  songName?: string | null;
+  /** User-saved looks checked for duplicate-name collisions. */
+  existingLooks?: ExistingLook[];
+  onReplaceExisting?: (id: string) => void;
   dyes: readonly string[];
   dye: string;
   onDye: (hex: string) => void;
   /** The app's hand: Play sets it from the tray and from the touch itself. */
   onTool: (t: PhoneTool) => void;
-  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'>;
+  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'> & Partial<Pick<VisualizerSettings, 'keepFull'>>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
@@ -268,7 +279,7 @@ export function PhonePlay(p: PhonePlayProps) {
         swiped.current = true;
         setSheet(e.clientY < from);
       }}
-      className="mx-auto flex h-6 w-24 touch-none items-center justify-center"
+      className="mx-auto flex h-11 w-28 touch-none items-center justify-center"
     >
       <span className="h-1 w-9 rounded-full bg-white/30" />
     </button>
@@ -299,13 +310,6 @@ export function PhonePlay(p: PhonePlayProps) {
   const s = p.settings;
   const zoom = zoomOf(s);
   const showHint = !sheet && !touched && picked === 'dropper' && visits < HINT_VISITS && accountShows.length === 0;
-  const saveNamed = () => {
-    const name = saveName?.trim();
-    if (!name || !p.onSave) return;
-    p.onSave(name);
-    setSaveName(null);
-    setSaved(true);
-  };
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 flex flex-col justify-between" data-testid="play-screen">
@@ -319,7 +323,7 @@ export function PhonePlay(p: PhonePlayProps) {
         >
           <span className={`flex h-9 min-w-0 items-center gap-2 rounded-[18px] pl-3.5 pr-2.5 ${GLASS_PILL}`}>
             <span className="truncate text-[14px] font-medium text-text">{p.lookName}</span>
-            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-medium text-text-2" data-testid="play-edited">edited</span>}
+            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[12px] font-medium text-text-2" data-testid="play-edited">edited</span>}
             {!sheet && <ChevronDown size={14} className="shrink-0 text-text-2" />}
           </span>
         </button>
@@ -348,7 +352,7 @@ export function PhonePlay(p: PhonePlayProps) {
             )
           ) : (
             <>
-              <Pill onPress={p.onShuffle} label="Shuffle the look" testId="play-shuffle"><Shuffle size={18} /></Pill>
+              <Pill onPress={p.onShuffle} label="Randomise the look" testId="play-shuffle"><Shuffle size={18} /></Pill>
               {p.recording.supported && (
                 <Pill onPress={p.recording.onToggle} label={p.recording.on ? 'Stop recording' : 'Record a clip'} testId="play-record" pressed={p.recording.on} live>
                   {/*
@@ -360,7 +364,7 @@ export function PhonePlay(p: PhonePlayProps) {
                   <span className="relative flex h-7 w-7 flex-col items-center justify-center gap-px" data-testid="play-record-box">
                     <TapeReels seconds={p.recording.seconds} running={p.recording.on} height={p.recording.on ? 11 : 13} />
                     {p.recording.on && (
-                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[9px] leading-none tabular-nums">
+                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[12px] leading-none tabular-nums">
                         {clock(p.recording.seconds)}
                       </span>
                     )}
@@ -403,18 +407,23 @@ export function PhonePlay(p: PhonePlayProps) {
           <div className={`pointer-events-auto w-full ${tablet ? 'max-w-[720px]' : 'max-w-[560px]'} rounded-t-[24px] px-4 pt-1.5 ${GLASS_TRAY}`}
             style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }} data-testid="play-tray">
             {handle}
-            <div className="mt-1.5 flex gap-2" role="radiogroup" aria-label="Dye">
+            <div className="-mx-2 mt-1 flex gap-0.5" role="radiogroup" aria-label="Dye">
               {p.dyes.map(hex => {
                 const on = hex.toLowerCase() === p.dye.toLowerCase();
                 return (
                   <button key={hex} role="radio" aria-checked={on} aria-label={`Dye ${hex}`} data-testid="play-dye"
                     onClick={() => p.onDye(hex)}
-                    className={`${tablet ? 'h-14 rounded-[14px]' : 'h-10 rounded-[12px]'} min-w-0 flex-1`}
-                    style={{ background: hex, boxShadow: on ? '0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-text)' : undefined }} />
+                    className={`${tablet ? 'h-14' : 'h-11'} min-w-0 flex-1 p-[2px]`}
+                  >
+                    <span
+                      className={`block h-full w-full ${tablet ? 'rounded-[14px]' : 'rounded-[11px]'}`}
+                      style={{ background: hex, boxShadow: on ? '0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-text)' : undefined }}
+                    />
+                  </button>
                 );
               })}
             </div>
-            <div className="mt-3 flex gap-2">
+            <div className="mt-2.5 flex gap-2">
               {TRAY_TOOLS.map(t => {
                 const on = picked === t.id;
                 return (
@@ -427,8 +436,9 @@ export function PhonePlay(p: PhonePlayProps) {
                 );
               })}
               <button onClick={p.onAllControls} aria-label="All controls" data-testid="play-all-controls"
-                className={`flex ${tablet ? 'h-[72px] w-[72px] rounded-[16px]' : 'h-[52px] w-[52px] rounded-[14px]'} shrink-0 items-center justify-center border border-white/10 bg-white/[0.04] text-text active:bg-white/10`}>
-                <CirclePlus size={20} />
+                className={`flex flex-col ${tablet ? 'h-[72px] w-[72px] rounded-[16px]' : 'h-[52px] w-[52px] rounded-[14px]'} shrink-0 items-center justify-center gap-0.5 border border-white/10 bg-white/[0.04] text-text active:bg-white/10`}>
+                <CirclePlus size={18} />
+                <span className="text-[12px] font-medium leading-none">All</span>
               </button>
             </div>
           </div>
@@ -441,21 +451,23 @@ export function PhonePlay(p: PhonePlayProps) {
               buttons: stacked, a phone on its side had the sheet over all of
               the plate and the buttons a scroll below it.
             */}
-            {saveName !== null && (
-              <form className="flex gap-2 px-4 pb-2" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="play-save-form">
-                <input
-                  autoFocus
-                  onFocus={e => e.currentTarget.select()}
+            {saveName !== null && p.onSave && (
+              <div className="px-4 pb-2">
+                <PhoneSaveForm
                   value={saveName}
-                  onChange={e => setSaveName(e.target.value)}
-                  aria-label="Name for the new look"
-                  // 16 px: under it, iOS zooms the page in on focus.
-                  className="h-12 min-w-0 flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-3 text-[16px] text-text outline-none focus:border-accent"
-                  data-testid="play-save-name"
+                  onValueChange={setSaveName}
+                  replaceName={p.replaceName}
+                  onReplace={p.onReplace}
+                  songName={p.songName}
+                  existingLooks={p.existingLooks}
+                  onReplaceExisting={p.onReplaceExisting}
+                  onSave={(name, desc, forSong) => { p.onSave?.(name, desc, forSong); setSaved(true); }}
+                  onDone={() => setSaveName(null)}
+                  prefix="play"
+                  ariaLabel="Name for the new look"
+                  glass
                 />
-                <button type="submit" disabled={!saveName.trim()} data-testid="play-save-confirm"
-                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-40">Save</button>
-              </form>
+              </div>
             )}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1 landscape:grid landscape:grid-cols-2 landscape:content-start landscape:gap-x-6">
               <div>
@@ -467,59 +479,78 @@ export function PhonePlay(p: PhonePlayProps) {
                 display={readSetting('vorticityConfinement', s.vorticityConfinement ?? 0, rangeOf('vorticityConfinement').min, rangeOf('vorticityConfinement').max)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
               <TouchSlider glass label="Soap" setting="surfactantFlow" {...rangeOf('surfactantFlow')} value={s.surfactantFlow ?? 0}
                 display={readSetting('surfactantFlow', s.surfactantFlow ?? 0, rangeOf('surfactantFlow').min, rangeOf('surfactantFlow').max)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
-              <TouchSlider glass label="Zoom" setting="macroZoom" help="How close the camera looks into the plate. One is the whole plate." {...rangeOf('macroZoom')} value={zoom}
+              <TouchSlider glass label="Macro Zoom" setting="macroZoom" help="How close the camera looks into the plate. One is the whole plate." {...rangeOf('macroZoom')} value={zoom}
                 display={readSetting('macroZoom', zoom, rangeOf('macroZoom').min, rangeOf('macroZoom').max)} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
-              <TouchSlider glass label="Evolve" setting="automateRate" {...rangeOf('automateRate')} value={s.automateRate ?? 0}
+              <TouchSlider glass label="Evolve Speed" setting="automateRate" {...rangeOf('automateRate')} value={s.automateRate ?? 0}
                 display={readSetting('automateRate', s.automateRate ?? 0, rangeOf('automateRate').min, rangeOf('automateRate').max)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
               </div>
               <div className="min-w-0">
 
-              <div className="mb-2 mt-4 flex items-baseline justify-between landscape:mt-1">
+              <div className="mb-1.5 mt-2.5 flex items-baseline justify-between landscape:mt-1">
                 <span className="flex items-center gap-2 text-[14px] font-medium text-text">Looks <span className="text-muted"><SlideTray at={p.lookSlot ?? null} size={22} /></span></span>
                 <span className="text-[12px] text-muted">swipe</span>
               </div>
               <div ref={stripRef} className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1" data-testid="play-looks">
                 {p.looks.map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
-                    <button key={l.id} onClick={() => (isPackLocked(findPreset(l.id)?.pack) ? openAccountSheet() : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
-                      className="flex w-[76px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
-                      {/* Lit like every other chosen thing (PLAN 35a): the slide's own film cannot change colour, so its name takes the lit chip and the mount a lit ring (on a wrapper, since the mount's clipped corner would cut a ring drawn on it). A slide a flick, snapping one at a time (35g). */}
-                      <span className={`flex w-full justify-center rounded-[4px] py-1 ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><SlideMount swatch={l.swatch} size={60} /></span>
+                    <button key={l.id} onClick={() => (locked ? openTierLock('moire', { itemName: l.name }) : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
+                      className="flex w-[84px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
+                      {/* Lit like every other chosen thing (PLAN 35a): the picture takes a lit ring and its name the lit chip. The picture is the look on the plate (PLAN 34b-6, lib/lookThumbs.ts), round as the desk's and the Looks sheet's chips are; a slide a flick, snapping one at a time (35g). */}
+                      <span className="flex w-full justify-center py-1"><span className={`rounded-full ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><LookPicture lookId={l.id} swatch={l.swatch} size={60} /></span></span>
                       <span className={`w-full truncate rounded-[6px] px-1.5 text-[12px] ${on ? `${LIT} font-medium` : 'text-text-2'}`}>{l.name}</span>
+                      {locked && <TierLockBadge label="Pro · Pack" className="self-start whitespace-nowrap" />}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-2.5 flex gap-2">
                 <button onClick={() => p.onListen(!p.listening)} aria-pressed={p.listening} data-testid="play-follow"
-                  className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
+                  className={`flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
                     p.listening ? LIT : 'border-white/10 text-text-2'
                   }`}>
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.listening ? (p.deaf ? 'bg-[#FBBF24]' : 'bg-accent') : 'bg-muted'}`} />
                   <span className="truncate">{p.listening && p.deaf ? 'Hearing nothing' : 'Follow the music'}</span>
                 </button>
                 <button onClick={() => p.onWander(!p.wandering)} aria-pressed={p.wandering} data-testid="play-wander"
-                  className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
+                  className={`flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
                     p.wandering ? LIT : 'border-white/10 text-text-2'
                   }`}>
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.wandering ? 'bg-accent' : 'bg-muted'}`} />
                   <span className="truncate">Evolve</span>
                 </button>
+                {/* Keep full (PLAN 18a-22), the desk's switch beside Evolve: the dropper tops up a dish left running. */}
+                <button onClick={() => p.onSetting({ keepFull: !s.keepFull })} aria-pressed={!!s.keepFull} data-testid="play-keepfull"
+                  className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
+                    s.keepFull ? LIT : 'border-white/10 text-text-2'
+                  }`}>
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${s.keepFull ? 'bg-accent' : 'bg-muted'}`} />
+                  <span className="truncate">Keep full</span>
+                </button>
               </div>
-              <div className="mt-3 flex gap-2 pb-1">
+              <div className="mt-2 flex gap-2">
                 <button onClick={p.onShuffle} data-testid="play-sheet-shuffle"
-                  className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Shuffle</button>
+                  className="h-12 min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Randomise</button>
                 <button onClick={p.onClear} data-testid="play-clear"
-                  className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Clear plate</button>
+                  className="h-12 min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Clear plate</button>
                 {p.recording.supported && (
                   <button onClick={() => { void onClip(); }} data-testid="play-share"
-                    className="h-[52px] min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium tabular-nums text-on-primary">{clipLabel}</button>
+                    className="h-12 min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium tabular-nums text-on-primary">{clipLabel}</button>
                 )}
+              </div>
+              <div className="mt-2 flex gap-2 pb-1">
+                <button
+                  onClick={() => { setSheet(false); p.onAllControls(); }}
+                  data-testid="play-sheet-all-controls"
+                  className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border border-white/15 bg-white/[0.04] px-3 text-[14px] font-medium text-text active:bg-white/10"
+                >
+                  <CirclePlus size={16} /> All controls
+                </button>
                 {p.onOpenAccount && (
                   <button onClick={() => { setSheet(false); p.onOpenAccount?.(); }} data-testid="play-sheet-account"
-                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">{signedOut ? 'Sign in' : 'Account'}</button>
+                    className="h-11 min-w-0 flex-1 rounded-[14px] border border-white/10 text-[14px] font-medium text-text active:bg-white/10">{signedOut ? 'Sign in' : 'Account'}</button>
                 )}
               </div>
               </div>

@@ -285,7 +285,7 @@ export function BandStrip({
           className="h-full w-full block pointer-events-none"
         />
       </div>
-      <div className="flex items-center justify-between text-[11px] text-white/55">
+      <div className="flex items-center justify-between text-[12px] text-muted">
         <span className="font-mono" data-testid={testId ? `${testId}-range` : undefined}>
           {fmtHz(loHz)}–{fmtHz(hiHz)} Hz{hasCustomBand ? ' · custom band' : ' · drag to tune band'}
         </span>
@@ -293,7 +293,7 @@ export function BandStrip({
           <button
             type="button"
             onClick={() => onChange(undefined, bandForHz(Math.sqrt(loHz * hiHz)))}
-            className="min-h-6 px-2 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-[11px] text-white/75"
+            className="min-h-6 px-2 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-[12px] text-text-2"
             data-testid={testId ? `${testId}-reset` : undefined}
           >
             Fixed band

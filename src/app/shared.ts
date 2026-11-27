@@ -1,5 +1,6 @@
 import { type MusicSettings, DEFAULT_MUSIC_SETTINGS } from '../lib/musicTypes';
 import { findPreset, PRESETS } from '../presets';
+import { RIG_KEYS } from '../lib/lookFade';
 import { stream } from '../lib/rng';
 import { pickLook } from '../lib/lookPick';
 import { isPackLocked } from '../lib/tierGates';
@@ -145,3 +146,31 @@ export interface ArmedLook {
   /** A stage sequence to start rather than a look to send. */
   sequence?: string;
 }
+
+/** Detect which preset (if any) matches the current settings (ignoring room RIG_KEYS). */
+export function detectActivePreset(settings: VisualizerSettings): string | null {
+  for (const preset of PRESETS) {
+    const ps = preset.settings;
+    const match = Object.keys(ps).filter(key => !RIG_KEYS.has(key as keyof VisualizerSettings)).every(key => {
+      const pv = (ps as Record<string, unknown>)[key];
+      const sv = (settings as unknown as Record<string, unknown>)[key];
+      if (typeof pv === 'object' && pv !== null) return JSON.stringify(pv) === JSON.stringify(sv);
+      return pv === sv;
+    });
+    if (match) return preset.id;
+  }
+  return null;
+}
+
+export const hasAccountOrLicenseUI =
+  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
+  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
+  (typeof window !== 'undefined' &&
+    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
+      new URLSearchParams(window.location.search).get('tierGates') === '1'));
+
+export const isProfileRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('profile') ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));

@@ -14,8 +14,10 @@ import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
 import { pouredOf } from '../../lib/bubbleLiquid';
 import { LIQUID_SIGMA } from '../../lib/bubbles';
-import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RGBA32, type FieldCarry } from './constants';
+import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
 import { FluidPasses } from './passes';
+import type { CoverState } from '../../lib/cover';
+import { captureFluidSnapshot, restoreFluidSnapshot, type FieldSnapshot, type SnapshotScalars, type SnapshotTargets } from './snapshot';
 
 export class FluidInputs extends FluidPasses {
   /**
@@ -305,6 +307,13 @@ export class FluidInputs extends FluidPasses {
       s.swap();
       this.speciesLive = true;
       this.speciesQuiet++;
+      // With ouzo on the plate (PLAN 48s): the ink takes the column's place, so the same share of the ethanol and the oil goes with what it replaced.
+      if (this.solventLive && this.solvent) {
+        const v = this.solvent;
+        this.run(pass, 'inkSpecies', v.write, [v.read, pad, this.sampler], this.arg('ink solvent', [Math.min(1, carrier.share), 0, 0, 0]));
+        v.swap();
+        if (this.cloudFresh) this.writeCloudView(pass);
+      }
     }
     pass.end();
     this.submit(enc);
@@ -755,7 +764,7 @@ export class FluidInputs extends FluidPasses {
    * for a check that needs a pool in place (`npm run thick`). Only on a thin
    * gap; in plate units.
    */
-  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number }, plateSigma = LIQUID_SIGMA): void {
+  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number; ethanol?: number; anise?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number }, plateSigma = LIQUID_SIGMA): void {
     if (!(radius > 0) || !(take > 0)) return;
     const enc = this.device.createCommandEncoder({ label: 'pour' });
     const pass = enc.beginComputePass({ label: 'pour' });
@@ -771,6 +780,29 @@ export class FluidInputs extends FluidPasses {
       this.speciesLive = true;
       this.speciesQuiet++;
       this.speciesPoured = pouredOf(what ?? sp, plateSigma);
+      /*
+        A bottle with ethanol or anise oil in it (PLAN 48s, lib/ouzo.ts) lays
+        both in the solvent field with the same kernel, the same dome and the
+        same share as its species, so the three land as one liquid. The field
+        starts at the first pour that brings oil: alcohol alone clouds
+        nothing, and a plate with no anise on it carries nothing for it (an
+        alcohol pour made before any anise is therefore not remembered, PLAN
+        48s-2). Once it is there, alcohol poured on a cloud is ethanol the
+        cloud dissolves in, and a liquid with neither that is laid in a
+        column's place (no push: speciesSplat replaces that share of the
+        column) takes the same share of the ethanol and the oil out with it.
+        The plate's view is then made again, so a pour onto a stopped plate
+        is not drawn with the species as it was before it.
+      */
+      const ethanol = sp.ethanol ?? 0, anise = sp.anise ?? 0;
+      if (anise > 0 || (this.solventLive && (ethanol > 0 || !push))) {
+        const v = (this.solvent ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'solvent'));
+        if (!this.solventLive) for (const t of [v.a, v.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+        this.run(pass, 'speciesSplat', v.write, [v.read, this.squeeze.read], this.arg('solvent splat', [x, y, radius, take, ethanol, anise, 0, push ? 1 : 0]));
+        v.swap();
+        this.solventLive = true;
+      }
+      if (this.solventLive && this.cloudFresh) this.writeCloudView(pass);
     }
     if (push) {
       this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
@@ -849,9 +881,13 @@ export class FluidInputs extends FluidPasses {
       field from going below zero (bodyAdvect's floor, there for the dye),
       and one field of signed w lost every light bottle's weight on its
       first step: an alcohol drop on a rocked thin gap moved nothing
-      (`npm run liquidfall`). The polarity's sign meets the same floor;
-      on a thin gap it no longer pushes (liquidForces), and the open plate
-      keeps it as it was.
+      (`npm run liquidfall`). The polarity's sign met the same floor
+      (PLAN 15e-13): every nonpolar bottle (oil −0.9, soap −0.25, silicone
+      −0.95) read zero after its first carried step, so on the open plate
+      only the polar half of a pair ever pushed. It is split the same way: a
+      polar bottle's polarity in liquids1.r, a nonpolar one's in liquids1.b
+      (free until now), and liquidForces reads r − b. On a thin gap it still
+      does not push (an oil keeps to itself there by its own tension, 38e).
     */
     const weight = what.weight ?? 0;
     const polar = what.polarity ?? 0;
@@ -863,7 +899,7 @@ export class FluidInputs extends FluidPasses {
       this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, Math.max(0, weight)]));
     this.liquids0.swap();
     this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
-      this.arg('liquid splat 1', [x, y, radius, take, polar, Math.max(0, -weight), 0, 0]));
+      this.arg('liquid splat 1', [x, y, radius, take, Math.max(0, polar), Math.max(0, -weight), Math.max(0, -polar), 0]));
     this.liquids1.swap();
     pass.end();
     this.submit(enc);
@@ -1003,6 +1039,7 @@ export class FluidInputs extends FluidPasses {
     this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.solventLive = this.cloudFresh = false;
     this.speciesClears++;
     this.speciesPoured = null;
     this.speciesSnap = null;
@@ -1073,6 +1110,11 @@ export class FluidInputs extends FluidPasses {
       rxn: copy(this.rxn, this.rxnLive),
       lies: copy(this.lies, this.liesLive),
       oilPoured: this.oilPoured,
+      species: copy(this.species, this.speciesLive),
+      liquids0: copy(this.liquids0, this.liquidsLive),
+      liquids1: copy(this.liquids1, this.liquidsLive),
+      speciesPoured: this.speciesPoured ? { ...this.speciesPoured } : null,
+      solvent: copy(this.solvent, this.speciesLive && this.solventLive),
       destroy: () => { for (const t of made.splice(0)) t.destroy(); },
     };
     this.submit(enc);
@@ -1114,6 +1156,53 @@ export class FluidInputs extends FluidPasses {
       this.oilPoured = carry.oilPoured;
       this.oilDyeStale = true;
     }
+    /*
+      The poured liquids, by area as the mix is (PLAN 18d-10). What was
+      reported: since nothing fades the species (18d), a liquid poured stays
+      for the show, and a governor's move (a new solver at a new grid) lost
+      every one: a bottle of glycerine stopped dragging the moment the
+      frame rate dipped. The species' channels are amounts per unit of plate
+      (a share, and the share times each property), and so are the forces'
+      fields (each bottle's soap, body, repel, weight and polarity times its
+      share), so an area average onto the new grid keeps every amount and
+      every ratio within a cell of the coarser grid, as the ferrofluid's and
+      the oil's. The last bottle's tension and density go with them; the
+      species' CPU snapshot is read again from the new grid.
+    */
+    if (carry.species) {
+      const s = (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species'));
+      this.run(pass, 'carryArea', s.write, [carry.species], this.arg('carry species', [carry.n, this.N, 0, 0]));
+      s.swap();
+      this.speciesLive = true;
+      this.speciesQuiet++;
+      this.speciesPoured = carry.speciesPoured ? { ...carry.speciesPoured } : null;
+    }
+    /*
+      And the ouzo's ethanol and oil with it (PLAN 48s). The species came
+      across a governor's move from 18d-10 on, and a plate that kept its
+      Ouzo's share and viscosity but dropped the oil would have lost its
+      cloud, and the oil, the moment the frame rate dipped. Its channels are
+      amounts per unit of plate as the species' are (ethanol, oil dissolved,
+      oil as droplets), so the same area average keeps each sum; a coarse
+      cell that takes in cloudy and clear cells holds for one step the
+      droplets of the cloudy ones, and the next step's ouzoCloud puts it on
+      the curve at its own mix, the oil's sum untouched. The plate's view is
+      written here so the frame before that step draws the carried cloud.
+    */
+    if (carry.species && carry.solvent) {
+      const v = (this.solvent ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'solvent'));
+      this.run(pass, 'carryArea', v.write, [carry.solvent], this.arg('carry solvent', [carry.n, this.N, 0, 0]));
+      v.swap();
+      this.solventLive = true;
+      this.writeCloudView(pass);
+    }
+    if (carry.liquids0 && carry.liquids1) {
+      this.run(pass, 'carryArea', this.liquids0.write, [carry.liquids0], this.arg('carry liquids 0', [carry.n, this.N, 0, 0]));
+      this.liquids0.swap();
+      this.run(pass, 'carryArea', this.liquids1.write, [carry.liquids1], this.arg('carry liquids 1', [carry.n, this.N, 0, 0]));
+      this.liquids1.swap();
+      this.liquidsLive = true;
+    }
     pass.end();
     const same = (from: GPUTexture | null, to: PingPong) => {
       if (!from || from.width !== to.size[0] || from.format !== to.format) return false;
@@ -1124,6 +1213,161 @@ export class FluidInputs extends FluidPasses {
     if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
     this.submit(enc);
     return true;
+  }
+
+  private snapshotTargets(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): SnapshotTargets {
+    return {
+      device: this.device,
+      n: this.N,
+      m: this.M,
+      disposed: this.disposed,
+      submit: (enc) => this.submit(enc),
+      dye: this.dye,
+      vel: this.vel,
+      velForced: this.velForced,
+      squeeze: this.squeeze,
+      cur: this.cur,
+      swirl: this.swirl,
+      phase: this.phase,
+      mix: this.mix,
+      ensureMix: () => this.ensureMix(),
+      oilDye: this.oilDye,
+      ensureOilDye: () => this.ensureOilDye(),
+      liquids0: this.liquids0,
+      liquids1: this.liquids1,
+      species: this.species,
+      ensureSpecies: () => (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species')),
+      solvent: this.solvent,
+      ensureSolvent: () => (this.solvent ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'solvent')),
+      chem: this.chem,
+      activeMat: this.activeMat,
+      rxn: this.rxn,
+      ensureRxn: () => this.ensureRxn(),
+      lies: this.lies,
+      ensureLies: () => this.ensureLies(),
+      boilAlpha: this.boilAlpha,
+      ensureBoilAlpha: () => (this.boilAlpha ??= new PingPong(this.device, this.disposer, [this.N, this.N], RG32, 'boil alpha')),
+      film: this.film,
+      ensureFilm: () => this.ensureFilm(),
+      hsGap: this.hsGap,
+      hsP: this.hsP,
+      hsP2: this.hsP2,
+      hsFlow: this.hsFlow,
+      ensureThinGap: () => this.ensureThinGap(),
+      scalars: {
+        phaseLive: this.phaseLive,
+        mixLive: this.mixLive,
+        oilPoured: this.oilPoured,
+        oilDyeStale: this.oilDyeStale,
+        bodiesWanted: this.bodiesWanted,
+        oilLayPending: this.oilLayPending,
+        liquidsLive: this.liquidsLive,
+        speciesLive: this.speciesLive,
+        solventLive: this.solventLive,
+        speciesClears: this.speciesClears,
+        speciesPoured: this.speciesPoured,
+        speciesSnap: this.speciesSnap,
+        speciesDisp: this.speciesDisp,
+        lastSpeciesCarry: this.lastSpeciesCarry,
+        chemLive: this.chemLive,
+        reagentLive: this.reagentLive,
+        rxnLive: this.rxnLive,
+        liesLive: this.liesLive,
+        swirlLive: this.swirlLive,
+        swirlTail: this.swirlTail,
+        boilLive: this.boilLive,
+        boilFresh: this.boilFresh,
+        boilTail: this.boilTail,
+        airPush: this.airPush,
+        airCover: this.airCover,
+        airCoverPrev: this.airCoverPrev,
+        airQuietSeconds: this.airQuietSeconds,
+        filmLaid: this.filmLaid,
+        grainAge: this.grainAge,
+        heatSeconds: this.heatSeconds,
+        coverGap: this.coverGap,
+        lastCurve: this.lastCurve,
+        thinLive: this.thinLive,
+        hsPrimed: this.hsPrimed,
+        phaseGapPrimed: this.phaseGapPrimed,
+        glassFlow: this.glassFlow,
+        ...cover,
+      },
+    };
+  }
+
+  protected captureFieldSnapshot(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): FieldSnapshot | null {
+    return captureFluidSnapshot(this.snapshotTargets(cover));
+  }
+
+  protected applyFieldSnapshot(snap: FieldSnapshot): SnapshotScalars | null {
+    if (!restoreFluidSnapshot(this.snapshotTargets({
+      cover: null, coverMl: 0, coverPoured: 0, coverLaid: 0,
+    }), snap)) return null;
+    const s = snap.scalars;
+    this.phaseLive = s.phaseLive;
+    this.mixLive = s.mixLive;
+    this.oilPoured = s.oilPoured;
+    this.oilDyeStale = s.oilDyeStale;
+    this.bodiesWanted = s.bodiesWanted;
+    this.oilLayPending = s.oilLayPending;
+    this.liquidsLive = s.liquidsLive;
+    this.speciesLive = s.speciesLive;
+    this.speciesClears = s.speciesClears;
+    this.speciesPoured = s.speciesPoured ? { ...s.speciesPoured } : null;
+    this.speciesSnap = s.speciesSnap
+      ? { L: s.speciesSnap.L, data: new Float32Array(s.speciesSnap.data), poured: { ...s.speciesSnap.poured } }
+      : null;
+    this.speciesDisp = s.speciesDisp;
+    this.lastSpeciesCarry = s.lastSpeciesCarry;
+    this.chemLive = s.chemLive;
+    this.reagentLive = s.reagentLive;
+    this.rxnLive = s.rxnLive;
+    this.liesLive = s.liesLive;
+    this.swirlLive = s.swirlLive;
+    this.swirlTail = s.swirlTail;
+    this.boilLive = s.boilLive;
+    this.boilFresh = s.boilFresh;
+    this.boilTail = s.boilTail;
+    this.airPush = s.airPush;
+    this.airCover = s.airCover;
+    this.airCoverPrev = s.airCoverPrev;
+    this.airQuietSeconds = s.airQuietSeconds;
+    this.air?.setBoilAlpha(this.boilLive && this.boilAlpha ? this.boilAlpha.read : null);
+    this.filmLaid = s.filmLaid;
+    this.grainAge = s.grainAge;
+    this.heatSeconds = s.heatSeconds;
+    this.coverGap = s.coverGap;
+    this.lastCurve = s.lastCurve;
+    this.thinLive = s.thinLive;
+    this.hsPrimed = s.hsPrimed;
+    this.phaseGapPrimed = s.phaseGapPrimed;
+    this.glassFlow = [s.glassFlow[0], s.glassFlow[1]];
+    this.printLive = false;
+    this.videoPending = false;
+    this.rbDyeSeq = -1;
+    /*
+      The ouzo's cloud with the plate it was on (PLAN 48s): the solvent came
+      back with the species, and what the plate is handed is made again from
+      the two here, so the frame after an Undo shows the cloud that was undone
+      to rather than the one undone, or none.
+    */
+    this.solventLive = s.speciesLive && s.solventLive;
+    this.cloudFresh = false;
+    if (this.solventLive) {
+      this.simF[0] = this.N; this.simF[1] = this.L;
+      this.device.queue.writeBuffer(this.sim, 0, this.simData);
+      const enc = this.device.createCommandEncoder({ label: 'undo cloud view' });
+      const pass = enc.beginComputePass({ label: 'undo cloud view' });
+      this.writeCloudView(pass);
+      pass.end();
+      this.submit(enc);
+    }
+    return s;
   }
 
   /** One frame of the drain: inward spiral, transport, evaporate. */

@@ -24,9 +24,12 @@ import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
+import { bankHasTwo, projectorGains } from '../lib/projectorBank';
+import { focusBoxPx } from '../lib/projectorFocus';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 import { BIREF_NM_PER_STRAIN } from '../lib/polar';
+import { FARADAY_GAIN_MAX } from '../lib/faraday';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
@@ -82,6 +85,8 @@ export interface PlateView {
   bubblePack: { packed: Float32Array; shape: Float32Array };
   /** The flash guard's gain, from the luminance the last frame read back. */
   dimmerGain: number;
+  /** Where each projector's shutter vane is, 0 open to 1 shut, as the frame walks it (lib/projectorBank.ts); left out, where the settings put it. */
+  shutters?: ArrayLike<number>;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
@@ -164,6 +169,10 @@ export interface PlateContext {
  * Fill `pack` from `ctx`. Every one of the layout's fields is written, in the
  * order the WebGL path sets them, so the two can be read side by side.
  */
+/** The bank's gains, filled each frame (no per-frame array). */
+const bankGains = new Float32Array(8);
+const focusBox = new Float32Array(4);
+
 export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   const { view, fluids, width, height } = ctx;
   const s = view.settings;
@@ -214,6 +223,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
   // The film projector's frame, if one is playing.
   let filmOn = 0;
+  const filmRing = (s.filmRing ?? 0) > 0.5 ? 1 : 0;
   let filmScaleX = 1, filmScaleY = 1;
   {
     const f = view.film;
@@ -381,8 +391,20 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     // and a look already on the lamp stays there. Only while a film plays.
     const ground = Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0;
     const fm = Number.isFinite(s.filmMix) ? clamp01(s.filmMix as number) : 0.7;
-    const videoLamp = filmOn && pos.film < pos.front ? fm : 0;
-    pack.set('lampGround', !photo ? ground + (1 - ground) * videoLamp : 0);
+    // On the LED ring (PLAN 14ag-9) the video is in the lamp wherever the
+    // mixer's arrows left its row: the ring is under the glass by definition.
+    const videoLamp = filmOn && (pos.film < pos.front || filmRing) ? fm : 0;
+    const lampGround = !photo ? ground + (1 - ground) * videoLamp : 0;
+    pack.set('lampGround', lampGround);
+    // The projector bank (PLAN 51a, lib/projectorBank.ts): two projectors only
+    // where the shader adds them (bankHasTwo says where that is).
+    const two = bankHasTwo(s, fluids.length, lampGround);
+    projectorGains(bankGains, s, two, view.shutters);
+    pack.set('projA', bankGains[0], bankGains[1], bankGains[2], bankGains[3]);
+    pack.set('projB', bankGains[4], bankGains[5], bankGains[6], bankGains[7]);
+    // Each projector's focus (PLAN 51b): the box its defocus spreads a point into, in this frame's pixels (gpu/focus.ts).
+    focusBoxPx(focusBox, s, two, Math.max(width, height), view.shot.zoom);
+    pack.set('projFocus', focusBox[0], focusBox[1], focusBox[2], focusBox[3]);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     // The clear film's dye (PLAN 20b-13): the colour one unit lets through, and the dial.
@@ -397,7 +419,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
     // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
-    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? 1 : 0);
+    // Its value is the Strength, the lens's throw over real water's (1 to 8, wgsl/plateFaraday.ts); 0 with no shaker.
+    const gain = Number.isFinite(s.faradayGain) ? Math.max(1, Math.min(FARADAY_GAIN_MAX, s.faradayGain as number)) : 1;
+    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? gain : 0);
     // The water's glow (PLAN 48c): its light's brightness, past the real one up to twice the stage's.
     pack.set('glow', Number.isFinite(s.glow) ? Math.max(0, Math.min(2, s.glow as number)) : 0);
   }
@@ -441,6 +465,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('dishSpread', clamp01(s.dishSpread ?? 0) * (1 - clamp01(view.macroAmount)));
     pack.set('cells', clamp01(s.cells ?? 0));
     pack.set('filmOn', filmOn);
+    pack.set('filmRing', filmOn ? filmRing : 0);
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
     pack.set('filmKey', clamp(s.filmKey ?? 0.18, 0, 0.9));
     pack.set('filmScale', filmScaleX, filmScaleY);

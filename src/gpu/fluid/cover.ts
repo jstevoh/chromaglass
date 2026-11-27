@@ -8,7 +8,8 @@
  */
 
 import { FluidReads } from './reads';
-import type { GpuStepParams } from '../solverTypes';
+import type { GpuStepParams, SolverSnapshot } from '../solverTypes';
+import type { FieldSnapshot } from './snapshot';
 import { THIN_GAP_THICKNESS, thinGapViscosity } from './constants';
 import { DISH_METRES, DISH_REST_GAP, DISH_GAP_FIELD_METRES } from '../../lib/turntable';
 import { COVER_FULL_ML, COVER_GLASS_G, coverNew, coverAdd, coverStep, type CoverState } from '../../lib/cover';
@@ -83,6 +84,27 @@ export class FluidCover extends FluidReads {
   clear(): void {
     super.clear();
     this.cover = null;
+  }
+
+  /** Copy every live GPU field and cover state for plate-level Undo (PLAN 49a). */
+  takeSnapshot(): SolverSnapshot | null {
+    return this.captureFieldSnapshot({
+      cover: this.cover ? { ...this.cover } : null,
+      coverMl: this.coverMl,
+      coverPoured: this.coverPoured,
+      coverLaid: this.coverLaid,
+    });
+  }
+
+  /** Restore fields and cover state captured by `takeSnapshot`. */
+  restoreSnapshot(snap: SolverSnapshot): boolean {
+    const s = this.applyFieldSnapshot(snap as FieldSnapshot);
+    if (!s) return false;
+    this.cover = s.cover ? { ...s.cover } : null;
+    this.coverMl = s.coverMl;
+    this.coverPoured = s.coverPoured;
+    this.coverLaid = s.coverLaid;
+    return true;
   }
 
   /** The gap's shape: laid on a new plate, shifted on a new curve (the squeeze stage's first job). */

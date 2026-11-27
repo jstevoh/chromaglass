@@ -58,7 +58,7 @@ export function PickList({ chosen, onChange, testId }: {
         )}
         {groups.map(([section, specs]) => (
           <div key={section}>
-            <div className="sticky top-0 bg-bg px-2 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-faint">
+            <div className="sticky top-0 bg-bg px-2 pb-1 pt-2 text-[12px] uppercase tracking-[0.18em] text-faint">
               {SECTION_NAME.get(section) ?? section}
             </div>
             {specs.map(spec => {
@@ -70,7 +70,7 @@ export function PickList({ chosen, onChange, testId }: {
                   onClick={() => onChange(on ? chosen.filter(k => k !== spec.key) : [...chosen, spec.key].slice(0, MAX_PINS))}
                   disabled={!on && full}
                   title={!on && full ? `A strip holds ${MAX_PINS}. Take one off first.` : undefined}
-                  className={`flex min-h-[40px] w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors disabled:opacity-30 ${
+                  className={`flex min-h-[40px] w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors disabled:opacity-65 ${
                     on ? LIT : 'text-muted hover:bg-hover hover:text-text'
                   }`}
                   data-testid={`${testId}-${String(spec.key)}`}
