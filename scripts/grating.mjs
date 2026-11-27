@@ -419,7 +419,7 @@ const oldPush = (strength) => ({
 });
 const CLASSIC = {
   dt: 0.000674, visc: 1.5, nu: 0.00015, diff: 0, buoyancy: 0.4, gravity: 0.006, advection: 0.35,
-  sharpness: 0, damping: 0.988, heatDecay: 0.992, turbScale: 0.576, turbDetail: 3, immiscibility: 0.02296,
+  sharpness: 0, damping: 0.988, heatDecay: 0.992, turbScale: 0.576, turbDetail: 3, holdApart: 0,
   phaseSharp: 0.35, phaseTension: 0.18, gapSpring: 0.0003, gapMemory: 0.998, platePressure: 0.25,
   vibIntensity: 0.0048, vibFrequency: 0.288, drip: 0.15, currentDamp: 0.988, currentBuoy: 0.12, currentGrav: 0.03,
   meanDensity: 0.38, maxCurrent: 16.7, gravityReach: 0.21,   // no twist: the motor's stir went in PLAN 22j
