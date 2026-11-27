@@ -32,9 +32,10 @@ import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
+import { autoMenuItem, startUpdates, updateMenuItem, updatesHook, updatesOff } from './updates.js';
 import { wireLive } from './liveSession.js';
 import { makeKeyStore } from './keys.js';
+import { pickSource } from './pickSource.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -93,6 +94,16 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 // The show starts its sound when it opens, not on the first click.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+/*
+  A TV at home plays the plate over WebRTC (PLAN 12-tv, src/lib/tvFeed.ts).
+  Chromium hides a page's network address behind a random mDNS name unless it
+  has the camera, and a TV finds that name only by multicast, which plenty of
+  home routers and mesh Wi-Fi drop: the TV then never connects, with nothing to
+  say why. The app is the show's own machine and its address is no secret on
+  its own network (the phone remote's address already prints it), so it offers
+  the real one. The TV's side is untouched; one real address is all ICE needs.
+*/
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 // macOS ScreenCaptureKit system-audio loopback (PLAN.md §23.8): lets the app
 // hear whatever the Mac plays with no tab picker.
 if (process.platform === 'darwin') {
@@ -131,6 +142,7 @@ let showServer = null;
 /** What the show server was started with, for the menu's details. */
 const show = {
   port: 0,
+  httpsPort: null,
   osc: 0,
   audioPort: 0,
   /** 'off', 'local' (this Mac only) or 'network' (anyone on the Wi-Fi); see oscSettings. */
@@ -233,7 +245,7 @@ async function serverUp(port) {
   while (Date.now() < deadline) {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/remote-info.json`, { cache: 'no-store' });
-      if (res.ok) return;
+      if (res.ok) return await res.json();
     } catch { /* not listening yet */ }
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -330,14 +342,17 @@ function grantPermissions() {
       callback({ video: request.frame });
       return;
     }
+    // A picture alone: a hand at this Mac picks the window or screen (pickSource.js).
     try {
       const sources = await Promise.race([
-        desktopCapturer.getSources({ types: ['window', 'screen'] }),
+        desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: true }),
         new Promise((r) => setTimeout(() => r([]), 1500)),
       ]);
-      callback(sources[0] ? { video: sources[0] } : { video: request.frame });
+      if (!sources.length) { callback({ video: request.frame }); return; }
+      const chosen = await pickSource(sources, { BrowserWindow, parent: showWindow ?? undefined });
+      callback(chosen ? { video: chosen } : {});
     } catch {
-      callback({ video: request.frame });
+      callback({});
     }
   });
 }
@@ -524,25 +539,64 @@ function wireWindow(win) {
 const lanAddresses = () =>
   Object.values(networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal).map((n) => n.address);
 
+/** Whether the show server / license currently permits Pro-only inputs (OSC, Ableton Link). */
+function isProTier() {
+  if (showServer?.linkTier) {
+    const lt = showServer.linkTier();
+    if (lt && lt.tier !== null) return Boolean(lt.pro);
+  }
+  if (show.license?.valid) return show.license.tier === 'pro';
+  return !show.requireSignIn;
+}
+
+function openProLearnMore() {
+  if (showWindow && !showWindow.isDestroyed()) {
+    if (showWindow.isMinimized()) showWindow.restore();
+    showWindow.show();
+    showWindow.focus();
+    const tier = showServer?.linkTier?.()?.tier ?? (show.license?.valid ? show.license.tier : 'free');
+    if (tier !== 'free') {
+      showWindow.webContents.send('chromaglass:open-account');
+      return;
+    }
+  }
+  void shell.openExternal('https://chromaglass.art/pro');
+}
+
 /** What the terminal server prints, for a show with no terminal. */
 function showDetails() {
   const hosts = lanAddresses();
+  const pro = isProTier();
   const lines = [
     `Show key: ${show.key}`,
     '',
     ...(hosts.length
-      ? hosts.flatMap((h) => [`Phone remote: http://${h}:${show.port}/?remote=1&key=${show.key}`, `Network display: http://${h}:${show.port}/?cast=true&key=${show.key}`])
+      ? hosts.flatMap((h) => [
+          `Phone remote: http://${h}:${show.port}/?remote=1&key=${show.key}`,
+          show.httpsPort
+            ? `Network display: https://${h}:${show.httpsPort}/?cast=true&key=${show.key}`
+            : 'Network display: https is off on this Mac (WebGPU needs https; use TV at home below, or run "npm run tunnel")',
+          `TV at home: http://${h}:${show.port}/tv?key=${show.key}`,
+        ])
       : ['No network: the phone remote and network displays need the laptop on Wi-Fi or Ethernet.']),
+    ...(hosts.length && show.httpsPort
+      ? ['(A network display’s browser warns once that the certificate is self-signed: choose Advanced, then Proceed.)']
+      : []),
     '',
-    show.oscMode === 'off'
-      ? 'OSC in: off (Show menu > OSC input turns it on)'
-      : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    !pro
+      ? 'OSC in: requires ChromaGlass Pro (UDP port 9000)'
+      : show.oscMode === 'off'
+        ? 'OSC in: off (Show menu > OSC input turns it on)'
+        : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    // Where a VJ finds the whole address space and the starter maps (PLAN 13.4):
+    // the details are the one place the app names OSC beside its port.
+    'Every OSC address, with Resolume and TouchDesigner maps: github.com/jstevoh/chromaglass/blob/main/docs/osc.md',
     // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
     // details say so, rather than an open port that answers nothing. Not a
     // dialog on the menu's pick: on a Mac a message box is a sheet on the
     // show window, and a window with a sheet up does not close, so the app
     // hung at quit in desktop.yml's packed check (no Pro key in that run).
-    ...(showServer?.linkTier && !showServer.linkTier().pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
+    ...(!pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
@@ -555,6 +609,24 @@ function showDetails() {
   that from its own signature without asking macOS.
 */
 let updates = null;
+/** The live stream's session holder (wireLive, below): whether the show is on air, for the updater. */
+let live = null;
+/**
+ * Why a show is on, for the updater (updates.js `busy`): the projector window
+ * open (any window beside the show's), or a live stream starting or on air.
+ * Null when neither, and only then may it download by itself or restart
+ * without asking.
+ */
+function showBusy() {
+  if (BrowserWindow.getAllWindows().length > 1) return 'the show is on the projector';
+  const phase = live?.current()?.phase;
+  if (phase === 'live' || phase === 'starting') return 'the show is live';
+  return null;
+}
+/** Install Updates Automatically, as kept in show.json: on unless it was switched off (13-update-auto). */
+function savedAutoUpdate() {
+  try { return readShowFile().autoUpdate !== false; } catch { return true; }
+}
 function packedFlags() {
   try { return JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')).chromaglass ?? {}; } catch { return {}; }
 }
@@ -566,6 +638,10 @@ function startUpdater() {
     // Squirrel.Mac itself, so Restart to Update waits until macOS has the update (updates.js).
     nativeUpdater: off || process.platform !== 'darwin' ? null : nativeAutoUpdater,
     off,
+    auto: savedAutoUpdate(),
+    save: (on) => writeShowFile({ autoUpdate: !!on }),
+    busy: showBusy,
+    confirm: ({ message, detail, ok, cancel }) => dialog.showMessageBox(showWindow ?? undefined, { type: 'warning', message, detail, buttons: [ok, cancel], defaultId: 1, cancelId: 1 }).then((r) => r.response === 0),
     version: app.getVersion(),
     signed: !!packedFlags().signed,
     feed,
@@ -584,26 +660,74 @@ function startUpdater() {
   globalThis.__chromaglassUpdate = { ...updates.state };
   // The profile sheet asks what was found, and its button does what the menu item does.
   ipcMain.handle('chromaglass:update-state', () => ({ ...updates.state, history: undefined }));
-  ipcMain.handle('chromaglass:update-act', () => { updates.act(); return { ...updates.state, history: undefined }; });
+  ipcMain.handle('chromaglass:update-act', async () => { await updates.act(); return { ...updates.state, history: undefined }; });
+  // The profile sheet's Install Updates Automatically, the same switch as the menu's.
+  ipcMain.handle('chromaglass:update-auto', (_e, on) => { updates.setAuto(on === true); return { ...updates.state, history: undefined }; });
 }
 
-/** The menu's OSC choice: kept, then applied to the running server without a restart. */
-async function setOscMode(mode) {
+/**
+ * The menu's OSC choice: kept, then applied to the running server without a restart. `quiet` (the assistant's call) answers
+ * with the socket's words instead of a dialog. `keep` false (the assistant opening it to the network) leaves show.json as it
+ * was, so a restart, like the switch going off (remote-server.js `assistantOpenedOsc`), puts back the owner's own choice.
+ */
+let oscTemporary = false;
+let lastMenuPro = null;
+async function setOscMode(mode, quiet = false, keep = true) {
+  if (!quiet && mode !== 'off' && !isProTier()) {
+    buildMenu();
+    return;
+  }
   show.oscMode = mode;
-  writeShowFile({ osc: mode });
+  oscTemporary = !keep;
+  if (keep) writeShowFile({ osc: mode });
   const state = await showServer?.setOsc?.(mode === 'off' ? 0 : show.osc, OSC_BINDS[mode]);
   process.env.OSC_PORT = String(mode === 'off' ? 0 : show.osc);
   process.env.OSC_BIND = OSC_BINDS[mode] ?? OSC_BINDS.local;
   globalThis.__chromaglassOsc = { mode, state };
   buildMenu();
   // A port that is taken says so, rather than leaving a menu that claims OSC is on.
-  if (mode !== 'off' && !/^udp /.test(state ?? '') && !process.env.CHROMAGLASS_OFFLINE) {
+  if (mode !== 'off' && !/^udp /.test(state ?? '') && !process.env.CHROMAGLASS_OFFLINE && !quiet) {
     void dialog.showMessageBox(showWindow ?? undefined, { type: 'warning', message: `OSC could not open UDP port ${show.osc}`, detail: `${state ?? 'The show server is not running'}. Another program may be using the port; quit it, or pick the setting again.`, buttons: ['OK'] });
   }
 }
 
+/*
+  OSC in and Syphon for the owner's assistant (PLAN 44k-14,
+  server/assistantOutputs.js): the Show menu's own doors, so a choice the
+  assistant makes is the menu's, ticked there, and the performer sees it where
+  they would have made it. Off and this Mac only are kept in show.json; the
+  network is not (the owner's choice after the security review of 2026-11-13):
+  it lasts until the assistant switch goes off or the app quits, and the
+  owner's own pick in the menu keeps it. Syphon is reached through
+  its menu item (`syphon-out`, the contract scripts/desktop-syphon.mjs holds
+  PLAN 13.2's build to), so this never touches the output itself: a build
+  with no such item says so.
+*/
+function outputsHook() {
+  const syphonItem = () => Menu.getApplicationMenu()?.getMenuItemById('syphon-out') ?? null;
+  return {
+    state: () => {
+      const item = syphonItem(), s = globalThis.__chromaglassSyphon;
+      return {
+        oscIn: { mode: show.oscMode, port: show.osc, socket: showServer?.oscState?.() ?? 'off', kept: !oscTemporary },
+        syphon: item ? { on: item.checked, serving: !!s?.serving, name: s?.name ?? null } : null,
+      };
+    },
+    setOscIn: async (mode) => { await setOscMode(mode, true, mode !== 'network'); return showServer?.oscState?.() ?? 'off'; },
+    setSyphon: (on) => {
+      const item = syphonItem();
+      if (!item) return 'Syphon out is not in this build of the Mac app yet';
+      if (!item.enabled) return 'Syphon out is greyed out in the Show menu';
+      if (item.checked !== on) item.click();
+      return null;
+    },
+  };
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
+  const pro = isProTier();
+  lastMenuPro = pro;
   const template = [
     ...(isMac ? [{ role: 'appMenu' }] : []),
     { role: 'fileMenu' },
@@ -623,23 +747,76 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
         {
+          id: 'osc-menu',
           label: 'OSC input (Pro)',
+          enabled: pro,
           submenu: [
             ['off', 'Off'],
             ['local', 'This Mac only'],
             ['network', 'From the network'],
-          ].map(([mode, label]) => ({ id: `osc-${mode}`, label, type: 'radio', checked: show.oscMode === mode, click: () => setOscMode(mode) })),
+          ].map(([mode, label]) => ({
+            id: `osc-${mode}`,
+            label,
+            type: 'radio',
+            enabled: pro,
+            checked: pro && show.oscMode === mode,
+            click: (m) => {
+              if (!isProTier()) {
+                m.checked = false;
+                buildMenu();
+                return;
+              }
+              void setOscMode(mode);
+            },
+          })),
         },
+        /*
+          Ableton Link, for an operator who never opens Settings → Sound
+          (PLAN.md 13.5-link-menu). The page owns the switch (it remembers it
+          and asks the server again on every connect), so the menu asks the
+          page rather than the server: a menu that switched the server alone
+          would be switched straight back by the page two seconds later. The
+          tick is the server's own state, rebuilt on each change it reports.
+        */
+        {
+          id: 'link',
+          label: 'Ableton Link (Pro)',
+          type: 'checkbox',
+          enabled: pro,
+          checked: pro && !!showServer?.linkOn?.(),
+          click: (item) => {
+            if (!isProTier()) {
+              item.checked = false;
+              buildMenu();
+              return;
+            }
+            if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send('chromaglass:link', item.checked);
+            else buildMenu();
+          },
+        },
+        ...(!pro ? [{
+          id: 'pro-learn-more',
+          label: 'Learn More About Pro (OSC & Link)…',
+          click: openProLearnMore,
+        }] : []),
       ],
     },
   ];
   // What the updater found goes under the app's name, where a Mac app keeps
   // Check for Updates…, and is rebuilt each time that changes (updates.js).
+  // Install Updates Automatically sits under it, a tick (13-update-auto), or
+  // an explanation on unsigned builds where Squirrel cannot install in place.
   const item = updates ? updateMenuItem(updates.state) : null;
+  const autoItem = updates ? autoMenuItem(updates.state) : null;
   if (item) {
-    const entry = { ...item, click: () => updates?.act() };
-    if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, entry, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
-    else template.push({ label: 'Help', submenu: [entry] });
+    const entries = [
+      { ...item, click: () => { void updates?.act(); } },
+      ...(autoItem
+        ? [{ ...autoItem, click: (m) => updates?.setAuto(m.checked) }]
+        : [{ id: 'auto-update-note', label: 'Automatic updates need a signed build', enabled: false }]),
+    ];
+    if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, ...entries, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
+    else template.push({ label: 'Help', submenu: entries });
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -679,6 +856,12 @@ async function start() {
   show.requireSignIn = app.isPackaged || Boolean(process.env.CHROMAGLASS_REQUIRE_SIGNIN);
   if (show.requireSignIn) process.env.CHROMAGLASS_REQUIRE_SIGNIN = '1';
   if (app.isPackaged) {
+    /* And no sign-in emulator: with FIREBASE_AUTH_EMULATOR set, the show
+       server's token check (server/firebase-token.js) takes unsigned tokens,
+       so anyone who could set the variable could post to the relay as any
+       account (the security review of 2026-11-13). The checks run it from the
+       repo, never packed. */
+    delete process.env.FIREBASE_AUTH_EMULATOR;
     delete process.env.LICENSE_PUBLIC_KEY;
     delete process.env.LICENSE_BUILD_CHECK_KEY;
     const checkKey = packedFlags().checkKey;
@@ -692,11 +875,23 @@ async function start() {
     void shell.openExternal(url);
     return true;
   });
+  // The way back (PLAN.md 23.17f-3): the sign-in the browser just made has
+  // reached the window, which is behind the browser. The owner, 2026-11-11:
+  // "it should just close the login window and go back to the app". Only the
+  // show's own window may ask, and it can only bring itself forward.
+  ipcMain.handle('chromaglass:bring-to-front', (e) => {
+    if (!showWindow || showWindow.isDestroyed() || e.sender !== showWindow.webContents) return false;
+    if (showWindow.isMinimized()) showWindow.restore();
+    showWindow.show();
+    app.focus({ steal: true });
+    showWindow.focus();
+    return true;
+  });
   // The live stream (PLAN.md 37x-4b): the page encodes, this process speaks
   // RTMPS (live.js), and the stream keys stay in the keychain store (keys.js),
   // where a packed app alone can read them. Headless until the panel (37x-4d):
   // the page's `window.__cgLive` drives it from the console and the check.
-  wireLive(ipcMain, {
+  live = wireLive(ipcMain, {
     keys: makeKeyStore({ file: join(app.getPath('userData'), 'live-keys.json'), safeStorage }),
     isPackaged: app.isPackaged,
     send: (channel, payload) => { if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send(channel, payload); },
@@ -706,8 +901,18 @@ async function start() {
   // The server reads its settings from the environment, as it does in a terminal.
   process.env.PORT = String(show.port);
   process.env.SHOW_KEY = show.key;
+  // The owner's assistant switch (PLAN 44b): one word in this file, read by
+  // the show server every second. No file, as on every customer's Mac, is off.
+  process.env.CHROMAGLASS_ASSISTANT_FILE ??= join(app.getPath('userData'), 'assistant');
+  // The TVs paired by four digits, and the show's random id the Bonjour
+  // advert carries (PLAN 12-tv-2, server/tv-pairing.js): kept with the app's
+  // own data, since the app's copy of the server is read-only.
+  process.env.CHROMAGLASS_TV_FILE ??= join(app.getPath('userData'), 'tvs.json');
   process.env.OSC_PORT = String(show.oscMode === 'off' ? 0 : show.osc);
   process.env.OSC_BIND = OSC_BINDS[show.oscMode] ?? OSC_BINDS.local;
+  // The https certificate for network displays (PLAN 14m-https) lives with the
+  // app's own data: the server's folder is inside the app, which is read-only.
+  process.env.TLS_DIR ??= join(app.getPath('userData'), 'tls');
   const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
   const licenseMgr = createServerLicenseManager({ filePath: licenseFile });
   await licenseMgr.initFromEnv();
@@ -724,11 +929,29 @@ async function start() {
     email: initialStatus.email,
     id: initialStatus.id,
     exp: initialStatus.exp,
+    packs: initialStatus.packs ?? [],
     error: initialError,
     enforced: initialStatus.enforced,
   };
   showServer = await import(pathToFileURL(SERVER).href);
-  await serverUp(show.port);
+  // The updater, for the owner's assistant (PLAN 44k-18): its state and its doors; the server judges the mode.
+  if (updates) showServer.setAppUpdates?.(updatesHook(updates));
+  showServer.setAppOutputs?.(outputsHook());
+  globalThis.__chromaglassOutputs = outputsHook();
+  // The tick set in place, not the menu rebuilt: a rebuild closes a menu the
+  // operator has open, and below Pro the page asks again every few seconds.
+  showServer.onLinkChange?.((on) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById('link');
+    const want = isProTier() && Boolean(on);
+    if (item && item.checked !== want) item.checked = want;
+  });
+  const serverInfo = await serverUp(show.port);
+  show.httpsPort = typeof serverInfo?.httpsPort === 'number' && serverInfo.httpsPort > 0 ? serverInfo.httpsPort : null;
+  buildMenu();
+  // Rebuild menus if the user activates or removes a Pro key while the app is open.
+  setInterval(() => {
+    if (isProTier() !== lastMenuPro) buildMenu();
+  }, 2000).unref?.();
   // What the check reads from the main process (scripts/desktop.mjs): the choice, and what the socket did with it.
   globalThis.__chromaglassOsc = { mode: show.oscMode, state: showServer.oscState?.() };
 
@@ -775,6 +998,8 @@ function fail(title, err) {
 }
 
 app.on('will-quit', () => {
+  // The Bonjour goodbye (PLAN 12-tv-2): a TV's list drops this Mac now, not in two minutes.
+  try { showServer?.stopBonjour?.(); } catch { /* quitting */ }
   if (loopbackAudioSocket) {
     try { loopbackAudioSocket.close(); } catch { /* ignore */ }
     loopbackAudioSocket = null;

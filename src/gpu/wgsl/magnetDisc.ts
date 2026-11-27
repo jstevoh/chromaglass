@@ -163,6 +163,22 @@ fn magnetDiscExact(rho: f32, z: f32, a: f32) -> f32 {
   let bz = a / s * (zp / np * magnetCel(kp, gam * gam, 1.0, gam) - zm / nm * magnetCel(km, gam * gam, 1.0, gam)) * 0.31830989;
   return sqrt(br * br + bz * bz);
 }
+// The same field as (B_ρ, B_z), for adding several magnets' fields (PLAN 38k).
+fn magnetDiscExactVec(rho: f32, z: f32, a: f32) -> vec2f {
+  let b = 0.5 * MAGNET_THICKNESS * a;
+  let zp = z + b;
+  let zm = z - b;
+  let s = rho + a;
+  let np = sqrt(zp * zp + s * s);
+  let nm = sqrt(zm * zm + s * s);
+  let d = a - rho;
+  let gam = d / s;
+  let kp = sqrt((zp * zp + d * d) / (np * np));
+  let km = sqrt((zm * zm + d * d) / (nm * nm));
+  let br = (a / np * magnetCel(kp, 1.0, 1.0, -1.0) - a / nm * magnetCel(km, 1.0, 1.0, -1.0)) * 0.31830989;
+  let bz = a / s * (zp / np * magnetCel(kp, gam * gam, 1.0, gam) - zm / nm * magnetCel(km, gam * gam, 1.0, gam)) * 0.31830989;
+  return vec2f(br, bz);
+}
 // The same magnet seen from far off: a dipole of its volume at its centre.
 fn magnetDiscFar(rho: f32, z: f32, a: f32) -> f32 {
   let q = rho * rho + z * z;
@@ -180,5 +196,33 @@ fn magnetDiscField(p: vec2f, m: vec4f, a: f32) -> f32 {
   let dip = magnetDiscFar(rho, z, a);
   if (far >= 1.0) { return dip; }
   return mix(magnetDiscExact(rho, z, a), dip, far);
+}
+
+/*
+  The field at p as a vector (x, y in the plate, z up through it), in units
+  of the remanence, so that several magnets add as fields (PLAN 38k): two
+  like-poled magnets side by side have their B_z add and their B_ρ cancel
+  between them, which a sum of each one's |B|² (the energy) does not see.
+  Its length is magnetDiscField's exactly, so one magnet alone reads as it
+  did: the direction is the near and far forms' blend, the length theirs.
+*/
+fn magnetDiscFieldVec(p: vec2f, m: vec4f, a: f32) -> vec3f {
+  let z = max(m.z - MAGNET_FACE, MAGNET_MIN_GAP) + 0.5 * MAGNET_THICKNESS * a;
+  let off = p - m.xy;
+  let rho = length(off);
+  let dir = select(vec2f(0.0), off / max(rho, 1e-9), rho > 1e-6);
+  let half = 0.5 * MAGNET_THICKNESS * a;
+  let size2 = a * a + half * half;
+  let far = smoothstep(36.0 * size2, 64.0 * size2, rho * rho + z * z);
+  // The dipole's components: Br V / 4π times (3ρz, 2z² − ρ²) / r⁵.
+  let q = rho * rho + z * z;
+  let c = 0.25 * MAGNET_THICKNESS * a * a * a / (q * q * sqrt(q));
+  let vf = vec2f(3.0 * rho * z, 2.0 * z * z - rho * rho) * c;
+  if (far >= 1.0) { return vec3f(dir * vf.x, vf.y); }
+  let ve = magnetDiscExactVec(rho, z, a);
+  let v = mix(ve, vf, far);
+  let len = mix(length(ve), length(vf), far);
+  let u = v * (len / max(length(v), 1e-12));
+  return vec3f(dir * u.x, u.y);
 }
 `;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { useEscape } from '../../hooks/useEscape';
-import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
+import { curveOf, handValueAt, travelOf } from '../../lib/midi';
 import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
 import { helpFor } from '../../lib/controlHelp';
 import { useControlTip } from './ControlTip';
@@ -66,7 +66,7 @@ export const LIVE = 'border-live bg-live text-bg';
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="rounded-xs bg-active px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted">
+    <kbd className="rounded-xs bg-active px-1.5 py-0.5 font-mono text-[12px] font-medium text-muted">
       {children}
     </kbd>
   );
@@ -129,7 +129,7 @@ export function Button({
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       style={{ height }}
-      className={`inline-flex items-center justify-center gap-2 rounded-md px-4 transition-colors duration-[120ms] disabled:opacity-40 ${
+      className={`inline-flex items-center justify-center gap-2 rounded-md px-4 transition-colors duration-[120ms] disabled:opacity-65 ${
         full ? 'w-full' : ''
       } ${pressed ? (live ? BUTTON_LIVE : BUTTON_PRESSED) : BUTTON_VARIANT[variant]} ${hit ? MIDI_HIT : ''}`}
     >
@@ -213,7 +213,7 @@ export function Tag({ children, tone = 'neutral' }: { children: ReactNode; tone?
   const cls = tone === 'live' ? 'bg-live-bg text-live'
     : tone === 'next' ? 'bg-accent-bg text-accent-text'
     : 'bg-active text-muted';
-  return <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
+  return <span className={`rounded-xs px-1.5 py-0.5 text-[12px] font-medium ${cls}`}>{children}</span>;
 }
 
 // ── Touched by the controller ────────────────────────────────────────
@@ -309,10 +309,10 @@ export function StatusDot({ on, label, short, tone = 'ok', testId, onClick, titl
         style={{ background: on ? (tone === 'live' ? 'var(--color-live)' : 'var(--color-ok)') : 'var(--color-knob-off)' }}
       />
       {tight ? (
-        <span className={`text-[10px] leading-none ${colour}`}>{small}</span>
+        <span className={`text-[12px] leading-none ${colour}`}>{small}</span>
       ) : (
         <>
-          <span className={`text-[10px] leading-none min-[1100px]:hidden ${colour}`}>{small}</span>
+          <span className={`text-[12px] leading-none min-[1100px]:hidden ${colour}`}>{small}</span>
           <span className={`hidden text-[12px] min-[1100px]:inline ${colour}`}>{label}</span>
         </>
       )}
@@ -367,9 +367,17 @@ export interface SliderProps extends Keyed {
   resetTo?: number;
   /** What it does, one line. A setting's own line is found by `midiKey`. */
   help?: string;
+  /**
+   * The name, the travel and the value on one line, for a strip that has to
+   * show all of itself in a short column (the desk's Rides). Ignored on touch,
+   * where the 48 px rule needs the full row.
+   */
+  dense?: boolean;
+  /** Disable the slider when a parent mode is off (e.g. phone's Show, Evolve, Spin). */
+  disabled?: boolean;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense, disabled = false }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -392,9 +400,14 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     would put a third of the way along. The panel and the phone were right
     and the desk was wrong, which is the hardest kind of wrong to notice.
   */
-  const settingKey = settingKeyOf(midiKey);
   const bareSettingKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
-  const curve = settingKey ? curveOf(settingKey) : 1;
+  /*
+    The curve by the bare name, not `settingKey`, which is only a setting MIDI
+    can learn: a panel dial with a curve of its own (`PANEL_CURVES`, such as
+    Gel Speed's, widened to 30 rpm) pinned to a desk would otherwise ride a
+    straight throw with the look's value hard against the left stop.
+  */
+  const curve = bareSettingKey ? curveOf(bareSettingKey as keyof VisualizerSettings) : 1;
   const at = curve === 1 ? (value - min) / (max - min) : travelOf(value, min, max, curve);
   const pct = at * 100;
   /*
@@ -412,11 +425,57 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   const line = help ?? helpFor(midiKey);
   const tip = useControlTip({
-    name: label, help: line, value: display,
-    hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
+    name: label, help: line, value: disabled ? undefined : display, disabled,
+    hint: !touch && !disabled && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
+  const labelDisplay = disabled ? 'Off' : display;
+  const track = (
+    <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
+      <input
+        type="range"
+        min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
+        step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
+        value={curve === 1 ? value : at}
+        disabled={disabled}
+        onChange={e => {
+          const raw = Number(e.target.value);
+          if (curve === 1) { onChange(raw); return; }
+          onChange(handValueAt(raw, min, max, curve));
+        }}
+        aria-label={label}
+        onDoubleClick={disabled || resetTo === undefined ? undefined : () => onChange(resetTo)}
+        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''} ${disabled ? 'cursor-not-allowed' : ''}`}
+        style={{ '--fill': `${pct}%` } as CSSProperties}
+      />
+    </PaceTrack>
+  );
+  /*
+    One line, for the Rides (the owner, 2026-11-07: "where is the macro zoom
+    control?"). On the Perform tab the Rides sit under the Bottles, and at
+    1440×900 the column left them room for three of their eight 88 px rows:
+    Macro Zoom, the seventh, was below the fold with the scrollbar hidden. The
+    owner chose denser faders over moving it. The name keeps the left, the
+    travel takes the middle and the value the right, so a row is 25 px and the
+    strip shows whole (`npm run layout`). The hand still gets the full width of
+    travel left after the name, the same curve, the CC chip and the card.
+  */
+  if (dense && !touch) {
+    return (
+      <div className={`mb-px flex h-6 items-center gap-2 ${disabled ? 'opacity-65' : ''}`} ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" data-disabled={disabled ? 'true' : undefined} {...tip.bind}>
+        {tip.card}
+        <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
+        <div className="min-w-0 flex-1">{track}</div>
+        {cc != null && (
+          <span className={`shrink-0 rounded-xs px-1 font-mono text-[12px] transition-colors duration-[120ms] ${
+            hit ? 'bg-text text-bg' : 'text-faint'
+          }`}>{cc}</span>
+        )}
+        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[12px] font-medium text-text-2">{labelDisplay}</span>
+      </div>
+    );
+  }
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
+    <div className={`mb-5 ${disabled ? 'opacity-65' : ''}`} ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-disabled={disabled ? 'true' : undefined} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (
@@ -435,30 +494,14 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
         )}
         <span className="flex items-center gap-2">
           {cc != null && (
-            <span className={`rounded-xs px-1 font-mono text-[11px] transition-colors duration-[120ms] ${
+            <span className={`rounded-xs px-1 font-mono text-[12px] transition-colors duration-[120ms] ${
               hit ? 'bg-text text-bg' : 'text-faint'
             }`}>CC {cc}</span>
           )}
-          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
+          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{labelDisplay}</span>
         </span>
       </div>
-      <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
-        <input
-          type="range"
-          min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
-          step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
-          value={curve === 1 ? value : at}
-          onChange={e => {
-            const raw = Number(e.target.value);
-            if (curve === 1) { onChange(raw); return; }
-            onChange(handValueAt(raw, min, max, curve));
-          }}
-          aria-label={label}
-          onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-          className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
-          style={{ '--fill': `${pct}%` } as CSSProperties}
-        />
-      </PaceTrack>
+      {track}
     </div>
   );
 }
@@ -506,7 +549,7 @@ export function Toggle({ label, on, onChange, testId, title, disabled }: {
       data-testid={testId}
       title={title}
       className={`flex min-h-[36px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
-        disabled ? 'opacity-50 cursor-not-allowed' : ''
+        disabled ? 'opacity-65 cursor-not-allowed' : ''
       }`}
     >
       <span className="text-[13px] text-text-2">{label}</span>
@@ -566,11 +609,11 @@ const RING = 2 * Math.PI * 16;          // 100.53
 const SWEEP = RING * 0.75;              // 75.4
 
 export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40, help }: KnobProps) {
-  const settingKey = settingKeyOf(midiKey);
   // The setting's own name even where no controller can learn it (Gel Speed): its group and its pace are by name.
   const bareKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
   const pace = paceOf(bareKey);
-  const curve = settingKey ? curveOf(settingKey) : 1;
+  // By the bare name too, as the Slider's: a panel dial's own curve (`PANEL_CURVES`).
+  const curve = bareKey ? curveOf(bareKey as keyof VisualizerSettings) : 1;
   const travel = (v: number) => Math.max(0, Math.min(1, curve === 1 ? (v - min) / (max - min || 1) : travelOf(v, min, max, curve)));
   const valueAt = (t: number) => {
     const c = Math.max(0, Math.min(1, t));
@@ -655,7 +698,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   return (
     <div
       ref={el => { tip.anchor.current = el; }}
-      className={`relative flex w-[58px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
+      className={`relative flex w-full max-w-[72px] flex-col items-center ${disabled ? 'opacity-65' : ''}`}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
@@ -753,9 +796,9 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
       {/* A finger has no hover: the name is the button there, marked like the phone's sliders. */}
       <span
         onClick={tip.toggle}
-        className={`mt-1 max-w-full truncate text-[11px] font-medium [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
+        className={`mt-1 w-full text-center text-[12px] font-medium leading-[1.15] line-clamp-2 break-words [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
       >{label}</span>
-      <span className="max-w-full truncate font-mono text-[10px] leading-tight">
+      <span className="max-w-full truncate font-mono text-[12px] leading-tight">
         <span className={drag ? 'text-text-2' : 'text-dim'}>{disabled ? 'off' : display}</span>
         {mapping && <span className="text-faint"> {mapping}</span>}
       </span>
@@ -825,7 +868,7 @@ export function PanelFrame({
       data-collapsed={collapsed ? 'true' : undefined}
     >
       <header
-        className={`flex h-8 shrink-0 items-center gap-1.5 pl-1.5 pr-1 ${floating ? 'cursor-move border-b border-border bg-elevated' : ''}`}
+        className={`flex h-8 shrink-0 items-center gap-1.5 pl-0.5 pr-1 ${floating ? 'cursor-move border-b border-border bg-elevated' : ''}`}
         onPointerDown={floating ? onHeaderDown : undefined}
         onContextMenu={onTitleMenu}
         data-panel-head
@@ -836,7 +879,7 @@ export function PanelFrame({
             aria-label={`Move ${title}`}
             title="Drag to move"
             onPointerDown={e => { e.stopPropagation(); onGripDown?.(e); }}
-            className="inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center text-faint"
+            className="inline-flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-faint hover:text-muted"
           >
             <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
               {[0, 1, 2].map(r => [0, 1].map(c => <circle key={`${r}${c}`} cx={1.5 + c * 5} cy={1.5 + r * 4.5} r="1.2" />))}
@@ -845,8 +888,21 @@ export function PanelFrame({
         )}
         {group && <span className="h-3 w-[3px] shrink-0 rounded-full" style={{ background: 'var(--cap)' }} data-group-tick aria-hidden />}
         <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
-        {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
-        {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
+        {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[12px] font-medium text-accent-text">floating</span>}
+        {meta && <span className="min-w-0 shrink truncate font-mono text-[12px] text-faint">{meta}</span>}
+        {!popped && onTitleMenu && (
+          <button
+            className={icon}
+            onClick={(e) => onTitleMenu(e)}
+            title="Panel placement and layout options (or right-click title)"
+            aria-label={`${title} panel options`}
+            data-testid={`panel-${id}-menu`}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+              <circle cx="2.5" cy="6" r="1" /><circle cx="6" cy="6" r="1" /><circle cx="9.5" cy="6" r="1" />
+            </svg>
+          </button>
+        )}
         {!popped && onPopOut && (
           <button className={icon} onClick={onPopOut} title="Open it in its own window, for a second display" aria-label={`Open ${title} in its own window`} data-testid={`panel-${id}-popout`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="1.5" y="3.5" width="7" height="6" rx="0.5" /><path d="M4 1.5h6.5V7" /></svg>
@@ -873,7 +929,7 @@ export function PanelFrame({
         </button>
         )}
         {!popped && (
-          <button className={icon} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
+          <button className={`${icon} ml-1.5`} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden><path d="M3 3l6 6M9 3l-6 6" /></svg>
           </button>
         )}
@@ -888,7 +944,7 @@ export function PanelFrame({
         moves when theirs cannot. Never sideways: a body is laid out to its
         panel's width, and `npm run layout` holds every control to it.
       */}
-      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-2.5 ${bodyClassName}`} data-panel-body>{children}</div>}
+      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden cg-scroll px-3 pb-2.5 ${bodyClassName}`} data-panel-body>{children}</div>}
       {floating && !collapsed && onResizeDown && (
         <span
           onPointerDown={onResizeDown}
@@ -961,7 +1017,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
   /**
    * Drawn inside a desk panel rather than over the window: no scrim, no
    * title bar (the panel has its own), the body filling the panel. For the
-   * screens a tab can hold (Songs, Sequences, Music & Drone). A container
+   * screens a tab can hold (Songs, Sequences). A container
    * for `@container` queries, so a body laid out in columns for the sheet's
    * width can stack them in a column a third as wide. Its test id is the
    * sheet's with `-box`, so a panel and the sheet open over it are never

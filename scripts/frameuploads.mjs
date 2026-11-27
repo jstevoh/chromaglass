@@ -107,19 +107,26 @@ function writtenRows(sim) {
 }
 const allRest = (sim) => writtenRows(sim).length === 0 && sim.dyeAdd.every((v) => v === 0) && sim.velAdd.every((v) => v === 0);
 
+/*
+  The bubbles' rim and fill run only with Thin Gap off now (PLAN 15g-8b): on
+  a thin gap the carries keep a bubble's colour and the CPU stands down, so
+  their frames are laid on the old plate, the one place they still write,
+  and one more check below asks that on a thin gap they write nothing.
+*/
+const oldPlate = (lay) => (s) => { s.gpu.thinGapLive = false; try { lay(s); } finally { s.gpu.thinGapLive = true; } };
 /** The frames: what a show's writers do between two steps, each a few rows somewhere, and once the whole plate. */
 const frames = [
   ['a tool\'s few cells', (s) => { for (let x = 90; x < 96; x++) s.addDensity(x, 40, 0.3, 1, 0.4, 0.2); s.addVelocity(92, 41, 0.5, -0.2); s.addTemp(93, 42, 0.1); }],
   // Radii in the 128-cell units the tools are given in (LiquidVisualizer's hand: 7).
   ['a hand in the liquid', (s) => s.fingerDrag(100, 120, 7, 0.05, 0.6, 0.2)],
   ['a breath on the film', (s) => s.blowWind(60, 150, 10, 1, 0.5, 0.5)],
-  ['a bubble\'s rim', (s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1); }],
-  ['the bubble popped, its hole filled', (s) => {
+  ['a bubble\'s rim', oldPlate((s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1); })],
+  ['the bubble popped, its hole filled', oldPlate((s) => {
     // The mirror shows the hole the bubble left, so there is something to fill.
     const v = s.gpu.rbDyeView, R = 0.04 * L;
     for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.3 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
     s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
-  }],
+  })],
   ['a hand elsewhere, two flushes after the last', (s) => s.fingerDrag(30, 20, 5, 0.05, -0.4, 0.3)],
   ['a breath elsewhere, its grid by rows', (s) => s.blowWind(120, 60, 10, 1, -0.5, 0.3)],
   /*
@@ -128,14 +135,33 @@ const frames = [
     marking the rim's rows for the fill left rows unsent past R = 22 cells
     (the review of 14ab-4).
   */
-  ['a big bubble\'s rim', (s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.5, 0.2, 1]), 1); }],
-  ['the big bubble popped, its hole filled', (s) => {
+  ['a big bubble\'s rim', oldPlate((s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.5, 0.2, 1]), 1); })],
+  ['the big bubble popped, its hole filled', oldPlate((s) => {
     const v = s.gpu.rbDyeView, R = 0.2 * L;
     for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.5 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
     s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
-  }],
+  })],
   ['a tool\'s few cells again', (s) => s.addDensity(150, 170, 0.2)],
   ['and the next step', (s) => s.addDensity(150, 171, 0.2)],
+  /*
+    The squish writers that run with no hand near the plate (PLAN 14ab-11):
+    a bubble sitting on the glass presses its disc every step it sits
+    (LiquidVisualizer's bubble poll, 'bubble'), a kick presses three nested
+    discs, holds them against the gap's spring a step at a time and gives
+    the gap back (KickRelease.step), and the bass's hand follows the bass
+    down and up (BassPress.follow). Each went through squishCell, whose
+    `dirty = true` sent the whole grid every step a bubble sat or music
+    played; each now says the rows of its disc. The spring (0.5) and the
+    one long step that gives the kick back whole are numbers for a check,
+    not the app's: what is asked is where each writes, not how much.
+  */
+  ['a bubble\'s press', (s) => s.applySquish(70, 50, 2, 0.0035, 0, false, 'press', 'bubble')],
+  ['a kick\'s press, three discs', (s) => s.pressKick(96, 96, 0.004, 0, [6, 4, 2])],
+  // Two steps: a kick's first step after its press holds nothing (KickRelease.step lays the hold from the second).
+  ['the kick held against the spring', (s) => { s.kickRelease.step(L, 0.02, s.squishCell, 0.5); s.kickRelease.step(L, 0.02, s.squishCell, 0.5); }],
+  ['the kick given back', (s) => s.kickRelease.step(L, 1, s.squishCell, 0.5)],
+  ['the bass\'s hand down', (s) => s.pressBass(140, 60, 9, 0.003)],
+  ['the bass\'s hand let up', (s) => s.pressBass(140, 60, 9, 0)],
   ['the room\'s stir, the whole plate', (s) => { for (let i = 0; i < AREA; i++) s.vx[i] += 1e-3; s.markDirty(); }],
   ['a tool\'s few cells after it', (s) => s.addVelocity(20, 100, 0.1, 0.1)],
 ];
@@ -183,8 +209,83 @@ check('rows and whole leave the solver the same, bit for bit, every flush', off.
 const at = frames.findIndex(([n]) => n === 'and the next step');
 const few = rowsRun[at].bytes, all = wholeRun[at].bytes;
 check('a step of a few cells after another sends their rows and nothing else', few === 2 * L * 36, `${MB(all)} → ${MB(few)}, against ${MB(2 * L * 36)} for rows 170 and 171`);
+/*
+  The squish writers say their rows, and those rows are a small share of the
+  grid (PLAN 14ab-11). "Said rows" alone would pass a writer that marked
+  every row one by one, so their count is held too: under a quarter of the
+  grid's 192 for each, where the largest disc above is 17 rows tall. The
+  bytes are printed beside it, and they carry the rows the last upload held
+  as well (rowsToWrite), so they are not the bar. Before the fix each handed
+  `rows()` null, the whole grid, and the scan above could not fault them:
+  it only asks about the rows a writer said, and "all" leaves none outside.
+*/
+const saidRows = (f) => f.span.reduce((n, [a, b]) => n + b - a + 1, 0);
+const squishers = rowsRun.map((f, i) => ({ f, all: wholeRun[i].bytes, i })).filter(({ i }) => /bubble's press|kick|bass/.test(frames[i][0]));
+check('a bubble\'s press, a kick\'s hold and release and the bass\'s hand hand rows, a small share of the grid',
+  squishers.length === 6 && squishers.every(({ f }) => f.span && f.rows > 0 && saidRows(f) < L / 4),
+  squishers.map(({ f, all }) => `${f.name}: ${f.span ? `${saidRows(f)} rows said` : 'whole'}, ${MB(all)} → ${MB(f.bytes)}`).join('; '));
 const sum = (r) => r.reduce((a, f) => a + f.bytes, 0);
 console.log(`  over the ${frames.length} frames: ${MB(sum(wholeRun))} → ${MB(sum(rowsRun))}`);
+
+// On a thin gap a bubble, put down and popped, writes nothing: the carries keep its colour (PLAN 15g-8b).
+const thinSim = new FluidSimulation(L, 0, 0, 0.1);
+thinSim.attachGpu(keeper());
+thinSim.flushDeltas(0.01);
+thinSim.rbSeq++; thinSim.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1);
+const thinRim = writtenRows(thinSim).length;
+{ // the mirror shows the hole, as on the old plate, so there is something a fill would take
+  const v = thinSim.gpu.rbDyeView, R = 0.04 * L;
+  for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.3 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
+}
+thinSim.rbSeq++; thinSim.depositBubbleRims(new Float32Array(4), 0);
+const thinFill = writtenRows(thinSim).length;
+check('on a thin gap a bubble\'s rim and its popped hole write nothing', thinRim === 0 && thinFill === 0, `rows ${thinRim} for the rim, ${thinFill} after the pop`);
+
+/*
+  The liquids' step with the GPU holding the liquids (14ab-11). Its CPU side
+  writes nothing there (LiquidField.apply and .step stand down), but the
+  first pour on a layer lands on the CPU too, since `gpuNative` is set only
+  by a step, and from then on every step said `dirty = true`: the whole
+  grid, 1.33 MB of zeros a step until the plate is cleared. That flush was
+  once not nothing: the solver's liquidForces and the soap's thinning of
+  the dye ran in its fold and on no other step, so this line first asked
+  for the fold with no rows. Since 15e-1 they run in the solver's own step
+  (stepLiquids, held by `npm run liquidsgpu`), nothing of the liquids' is
+  left in the fold, and the line is turned: the step asks for no flush at
+  all. The solver here takes addLiquidDrop, as the real one does, so the
+  field knows the GPU holds the liquid.
+*/
+const liq = new FluidSimulation(L, 0, 0, 0.1);
+const liqGpu = keeper();
+liqGpu.addLiquidDrop = () => {};
+liq.attachGpu(liqGpu);
+liq.flushDeltas(0.01);
+liq.liquid.deposit(96, 96, 10, { soap: 1, body: 0.5 }, 1);
+const liqSteps = [];
+for (let k = 0; k < 4; k++) {
+  const before = liqGpu.bytes;
+  liq.stepLiquid(1 / 60, 0.5);
+  // As the step reads them: a fold is due, and the rows flushDeltas hands across.
+  const due = liq.dirty || !!liq.foldDue, said = liq.rows.any ? liq.rows.rows() : liq.rows.mask;
+  const written = writtenRows(liq).length;
+  if (due) liq.flushDeltas(0.01);
+  liqSteps.push({ due, rows: said ? said.reduce((n, v) => n + v, 0) : L, written, bytes: liqGpu.bytes - before });
+}
+/*
+  The loop above acts the step's own test out (`dirty || foldDue`), and a
+  video pour's fold (14ab-2) rides the same test: with `foldDue` dropped
+  from FluidSimulation.step the fold would never run in the app and the
+  lines here would not see it (the check-skeptic, 2026-11-13). The step
+  itself needs a whole show's settings to call, so its test is read from
+  the source: the flag it flushes on and what it tells the solver.
+*/
+const stepSrc = (await import('node:fs')).readFileSync(new URL('../src/sim/fluidSimulation.ts', import.meta.url), 'utf8');
+check('the step flushes on a fold that is due as on rows written, and tells the solver it did',
+  /const applied = this\.dirty \|\| this\.foldDue;\s*if \(applied\) this\.flushDeltas\(p\.dt\);[\s\S]{0,120}this\.gpu\.step\(p, applied\);/.test(stepSrc),
+  'FluidSimulation.step: `applied = this.dirty || this.foldDue`, flushDeltas on it, gpu.step(p, applied)');
+check('the liquids\' step with the GPU holding them asks for no flush: nothing due, no rows, no bytes',
+  liqSteps.length === 4 && liqSteps.every((s) => !s.due && s.rows === 0 && s.written === 0 && s.bytes === 0),
+  liqSteps.map((s, k) => `step ${k + 1}: ${s.due ? 'a flush due' : 'no flush'}, ${s.rows} rows, ${MB(s.bytes)}`).join('; '));
 
 // Controls.
 const sneak = new FluidSimulation(L, 0, 0, 0.1);

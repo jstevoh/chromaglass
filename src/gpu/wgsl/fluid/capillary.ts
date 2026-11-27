@@ -10,6 +10,8 @@
 
 import { OPEN_RIM } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
+import { RIM_SIDE } from './oil';
+import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FROM, LAMP_GLASS } from '../../fluid/constants';
 
 /*
   How far inside the rim the rim's pressure is laid in (CAPILLARY, below), in
@@ -25,7 +27,7 @@ export const RIM_SAMPLES = 1024;
   The oil's capillary force, σ κ ∇c̃, at one cell (mixForce has the physics),
   shared by mixForce and rimLaplace so the rim reads the very force the flow
   is given. Both bind the oil's blur as \`soft\`; A.a.x is σ and A.a.y the most
-  it may add, both mixForce's (0: no cap, as on a thin gap, PLAN 38e).
+  it may add, both mixForce's.
 
   And the rim's share of it (PLAN 18g-6). The thin gap's rim is open: past
   it the liquid is the reservoir round the cover glass, held at the air's
@@ -62,18 +64,15 @@ fn grad(p: vec2i, n: f32) -> vec2f {
 }
 // The edge's unit normal, fading to nothing where there is no edge to have one.
 fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g) + 0.0004); }
-// κ = −∇·n̂, the normal's divergence by central differences of the normals
+// σ κ ∇c̃. The normal's divergence by central differences of the normals
 // themselves, not a second derivative of c: that is the step that keeps the
-// grid out of it. Positive where the oil is convex.
-fn curvature(p: vec2i, n: f32) -> f32 {
-  return -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
-}
-// σ κ ∇c̃.
+// grid out of it.
 fn capillaryAt(p: vec2i, n: f32) -> vec2f {
   let g = grad(p, n);
-  var f = A.a.x * curvature(p, n) * g;
+  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
+  var f = A.a.x * kappa * g;
   let l = length(f);
-  if (A.a.y > 0.0 && l > A.a.y) { f *= A.a.y / l; }
+  if (l > A.a.y) { f *= A.a.y / l; }
   return f;
 }
 // The ring rimLaplace integrates along: two cells inside the rim, inside
@@ -157,13 +156,37 @@ export const CAPILLARY_KERNELS: Record<string, string> = {
   /*
     Oil and water: the Cahn–Hilliard chemical potential.
 
-    μ = f′(c) − κ∇²c, with f(c) = c²(1 − c)², the double well whose two floors
-    are pure water and pure oil. The first term drives a mixed cell toward
-    one or the other; the second charges for every bit of boundary, which is
-    what surface tension *is*: a blob rounds up because a circle is the
-    shortest boundary for its area, and a thin thread breaks into drops for
-    the same reason (Rayleigh–Plateau). Neither is drawn; both fall out.
-    Stored in the mix's alpha for the update and the force to read.
+    μ = f′(c) − κ∇²c, with f a double well whose two floors are pure water
+    and pure oil. The first term drives a mixed cell toward one or the
+    other; the second charges for every bit of boundary, which is what
+    surface tension *is*: a blob rounds up because a circle is the shortest
+    boundary for its area, and a thin thread breaks into drops for the same
+    reason (Rayleigh–Plateau). Neither is drawn; both fall out. Stored in
+    the mix's alpha for the update and the force to read.
+
+    **The well is a deep quench** (PLAN 38f-2). It was c²(1 − c)², whose
+    spinodal (where f″ turns negative and a mixture comes apart by itself)
+    sits at 0.21 from either side: a cell under a fifth oil was metastable,
+    and with nothing to nucleate it, it stayed so. Once the heat rode the
+    flow (38f-1) the Lava Lamp's wax rose in plumes, and the carry spread
+    each plume's trailing edge into cells about 0.15 oil that never came
+    back: at 192², 6 s, 4,370 cells of haze, half the oil and its colour in
+    them, the dish 67% clear. Real wax and water are not like that. They
+    mix to parts per million (the regular solution at large χ, Flory–
+    Huggins' deep quench), so their spinodal lies within a few per cent of
+    the pure liquids and a smear of one in the other is unstable at any
+    share: it comes apart into drops, which ripen into the bodies.
+
+    So f′ is that shape, laid in two lines a side: from each pure liquid a
+    steep wall, f′ = (OIL_WELL / OIL_SPINODAL)·y for y (the share of the
+    other liquid) up to OIL_SPINODAL, then down in a straight line to 0 at
+    half full, a curvature of −1 there, the old well's own at the middle,
+    so an edge keeps the width it had. The capillary force does not read μ
+    (it is σκ∇c̃, mixForce), so the tension a body shows is unchanged; what
+    changes is that the mixture now has nowhere to rest between the two.
+    The same lab: haze 1,474 cells, 72% of the colour in the bodies against
+    42%, the dish 83% clear. Past the pure liquids the wall goes on, so an
+    overshoot is pulled back as before.
 
     And, with Film Hold (A.a.x), the water film between two bodies of oil
     pushes back as it thins: FILM_WGSL says what that is and why.
@@ -172,14 +195,22 @@ export const CAPILLARY_KERNELS: Record<string, string> = {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 fn cc(p: vec2i, n: f32) -> f32 { return textureLoad(src, clampP(p, n), 0).r; }
+${RIM_SIDE}
+// ∇c·n = 0 at the open rim (RIM_SIDE in oil.ts says why): a neighbour across it reads as this cell.
+fn ccN(p: vec2i, e: vec2i, n: f32, c: f32) -> f32 {
+  return select(cc(p + e, n), c, rimSide(p, n) != rimSide(clampP(p + e, n), n));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   let m = textureLoad(src, p, 0);
   let c = m.r;
-  let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
-  var mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
+  let lap = ccN(p, vec2i(1, 0), n, c) + ccN(p, vec2i(-1, 0), n, c) + ccN(p, vec2i(0, 1), n, c) + ccN(p, vec2i(0, -1), n, c) - 4.0 * c;
+  // The deep quench's slope (above): y the share of the other liquid, the wall then the slope to half full.
+  let y = min(c, 1.0 - c);
+  let well = select((${(OIL_WELL / OIL_SPINODAL).toFixed(4)}) * y, ${OIL_WELL.toFixed(4)} * (0.5 - y) / ${(0.5 - OIL_SPINODAL).toFixed(4)}, y > ${OIL_SPINODAL.toFixed(4)});
+  var mu = select(well, -well, c > 0.5) - lap;
   // In the water only: an edge cell on the oil's side sees its own oil
   // both ways along the edge's tangent, and is not in a film.
   if (A.a.x > 0.0) { mu += A.a.x * filmSqueeze(p, n) * (1.0 - smoothstep(0.15, 0.5, c)); }
@@ -288,8 +319,7 @@ fn sampleAt(g: vec2f, n: f32) -> vec3f {
     is curved, with κ = −∇·(∇c̃/|∇c̃|) and c̃ the oil blurred [1 4 6 4 1]²
     (mixSmooth). It is what makes an oil blob in water pull itself round and
     carry the dye inside it along. A.a.x = σ (in cells, so the host scales it
-    by N² for the same force on every grid; in N/m through oilMobility in
-    fluid/constants.ts), A.a.y the most it may add, on the old plate only.
+    by N² for the same force on every grid), A.a.y the most it may add.
 
     It was the Korteweg form, −σ c ∇μ, which is the same force on paper and
     is what the Cahn–Hilliard energy hands you. On a grid it is not: μ is a
@@ -320,9 +350,10 @@ fn sampleAt(g: vec2f, n: f32) -> vec3f {
     (with its size), A.b.z = βₛ, A.b.w = β_T.
 
     **The lamp**: heat A.a.z a step into the dye below A.a.w plate widths
-    from the centre, downhill, where a standing plate goes out of view.
+    from the centre, downhill, where a standing plate goes out of view; or,
+    where the wax is the oil, the warm glass floor (LAMP_GLASS) it lies on.
   */
-  mixForce: `${HEAD}${CAPILLARY}
+  mixForce: `${HEAD}${CAPILLARY}${RIM_SIDE}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
@@ -349,24 +380,78 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var v = textureLoad(vel, p, 0);
   var capillary = capillaryAt(p, n);
   // On a thin gap, the rim held at the oil's own pressure (CAPILLARY says why).
+  // Past the open rim there is no cover glass and no pressure solve (hsPrep
+  // holds p = 0 there): a body straddling the rim must not feed an unopposed
+  // trough capillary force into hsDivergence, which raised pressure inside the
+  // rim and pumped an unpoured lens out over it (PLAN 19ak-24d).
   if (S.thinGap > 0.5) {
-    capillary -= 0.5 * vec2f(rimHeld(p + vec2i(1, 0), n) - rimHeld(p - vec2i(1, 0), n), rimHeld(p + vec2i(0, 1), n) - rimHeld(p - vec2i(0, 1), n));
+    if (rimSide(p, n)) {
+      capillary = vec2f(0.0);
+    } else {
+      capillary -= 0.5 * vec2f(rimHeld(p + vec2i(1, 0), n) - rimHeld(p - vec2i(1, 0), n), rimHeld(p + vec2i(0, 1), n) - rimHeld(p - vec2i(0, 1), n));
+    }
   }
   let wax = textureLoad(dye, p, 0).a;
   let oil = textureLoad(mix, p, 0).r;
-  // Oil has density below water (PLAN §18f): floats upward when plate is upright/tilted.
-  let rho = wax - S.meanD - 0.15 * oil;
-  let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
+  /*
+    The oil's own weight (Oil Weight, S.oilRho: −0.15 the mineral oil that
+    floats up a standing plate, PLAN §18f; heavier than the water for a lava
+    lamp's wax, PLAN 27f-9c), and its heat lift beyond the water's: an oil
+    swells with heat two or three times what water does (OIL_EXPAND), so a
+    warmed body of it lifts more than the warmed water beside it, which is
+    what turns a lamp's wax from heavy to light.
+  */
+  let rho = wax - S.meanD + S.oilRho * oil;
+  let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z * (1.0 + S.oilExpand * oil));
   var heat = v.z;
   if (A.a.z > 0.0) {
     /*
-      Into the dye, not the water round it. Warming everything in the band
-      alike lifts nothing: the wax is still the heaviest thing there, and a
-      force the same everywhere is a pressure. The wax is what swells with
-      heat in a lava lamp, so that is where the lamp's heat goes.
+      Where the wax is dye (no oil heavier than the water, S.oilRho at 0) it
+      has no body to lie anywhere, so the lamp's heat is a kick into the dye
+      in the band just past the view (A.a.w), where a dye spreads out of
+      sight. Into the wax, not the water round it: warming everything in that
+      band alike lifts nothing, the wax is still the heaviest thing there.
+
+      Where the wax is a liquid of its own (the oil, PLAN 27f-9c) the dye is
+      only its colour, and the lamp is the glass floor it lies on (PLAN
+      27f-9h; constants.ts LAMP_GLASS has what was measured). The floor is
+      hot, and everything touching it comes toward its temperature by the
+      gap's own conduction (S.lampCool, the wax at its κ), over the glass's
+      fin length up from the floor: the cool glass below, turned over. Water
+      and wax alike, which is the point. It was a kick into the wax alone
+      first (LAMP_HEAT a second in a band over the floor, the water left
+      cold), and that lamp stopped: a body sinking into the band was light
+      again in a quarter of a second, so the wax parked on the band's upper
+      edge as one weightless slab and hovered (the lab's centre of mass at
+      0.49 to 0.50 from 22 s on). With the floor warming the water too, the
+      column is warm below and cool above, a rising body is lighter against
+      it the higher it goes, and a sunk one takes ten seconds to warm, by
+      which time it is on the floor: the lab's lamp goes round every 32 s
+      and is still doing it at three minutes.
     */
     let down = dot(uvOf(id) - vec2f(0.5), normalize(A.b.xy));
-    heat += A.a.z * smoothstep(A.a.w - 0.08, A.a.w, down) * clamp(wax * 2.0, 0.0, 1.0);
+    let isWax = S.oilRho > 0.0;
+    let dyeWax = select(clamp(wax * 2.0, 0.0, 1.0), 0.0, isWax);
+    heat += A.a.z * smoothstep(A.a.w - 0.08, A.a.w, down) * dyeWax * (1.0 - oil);
+    // (The wax's κ over the water's, by how much of the cell is wax; not mix(), the oil's texture's name here.)
+    let across = S.lampCool * (1.0 - ${(1 - KAPPA_WAX / KAPPA_WATER).toFixed(5)} * clamp(oil, 0.0, 1.0));
+    // down is 0 at the middle and 0.5 at the floor, so the height over the floor is 0.5 − down.
+    let warm = select(0.0, exp(-max(0.5 - down, 0.0) / ${GLASS_FIN.toFixed(5)}), isWax);
+    heat = ${LAMP_GLASS.toFixed(3)} + (heat - ${LAMP_GLASS.toFixed(3)}) * exp(-across * warm);
+    /*
+      And out through the cool upper glass (PLAN 27f-9e; constants.ts
+      KAPPA_WAX has the physics): every cell's heat crosses the gap to the
+      two glasses at the gap's slowest conduction rate, π²κ/h² (S.lampCool,
+      water's, on the step's real seconds), the wax's at its own κ, and the
+      glass takes it where it is cold: the plate's upper part, from
+      LAMP_COOL_FROM of its height, coming in over the glass's fin length
+      (GLASS_FIN). So a body that rose off the lamp keeps its heat through
+      the warm lower half, gives it up in the upper one in a few seconds,
+      is heavy again and comes down to be warmed: the cycle. Toward the
+      room's temperature, zero, from either side, so a hand's cold goes too.
+    */
+    let cold = 1.0 - exp(-max(${(0.5 - LAMP_COOL_FROM).toFixed(3)} - down, 0.0) / ${GLASS_FIN.toFixed(5)});
+    heat *= exp(-across * cold);
   }
   v = vec4f(v.xy + capillary + buoy, heat, v.w);
   textureStore(dst, p, safeVel(v));
@@ -393,44 +478,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     exp(−h / FILM_DECAY), times how much edge the cell holds (|∇c̃|).
 
     A.a.x = the push at h = 0 per unit of edge (σ's own scale times Film
-    Hold), A.a.y = the most a cell may add, as mixForce's, A.a.z = σ times
-    Film Hold for the waist's pull taken back (below; 0 on the old plate).
-
-    The waist's pull taken back (PLAN 38e). The push alone held the crowd
-    only while mixForce was capped (OIL_CELLS): the waist's curvature in
-    the blur is up to about one over a cell, and the push, FILM_PUSH at
-    h = 0, is 0.55 at the two or three cells a film is drawn as, so the
-    cap, which clipped the pull and the push alike, was what kept the pull
-    from winning. With the cap gone on the thin gap (oilMobility says why)
-    the lab's crowd of 35 kept 19 (npm run filmhold; 29 with the cap put
-    back, 21 with the cap gone and the old σ, so the cap and not σ's 12%).
-    The pull is the artefact itself, not a force a real film feels: the
-    faces of a held film are each its own drop's surface, flat or bowed
-    into the bigger drop by the smaller's 1/R (a drop ten cells across
-    bows it by a fifth of a cell's), never a neck as tight as the blur's.
-    So in a film the concave part of the blur's curvature is taken back
-    out of the force, and the push answers the drops' own Laplace pressure
-    as a real disjoining pressure does. A face's own convexity is left
-    alone. A film is where FILM_WGSL's filmSqueeze says so, oil past 0.55
-    on both sides of the cell along one of four lines within FILM_REACH,
-    the very cells whose water the hold already charges for in mixMu; not
-    the push's ray, which runs along the cell's own normal and misses the
-    saddle of a neck, where the normal runs along the film: gated by the
-    ray the crowd kept 28 of 35, by the four lines 31 (the capped plate's
-    own 31), by the four lines' weight rather than their yes or no 22, and
-    with no gate at all 32 but a lone drop moved (1.6e-3 of a cell's oil,
-    its edge's slight concavities between the grid's cells). A lone round
-    drop is convex everywhere and its edge reads no film, so it is
-    untouched to the bit (the check's sixth part; that part asks the gate,
-    since a round drop has no concave pull to take back). Not on the old
-    plate, whose capped pull the cap still answers (PLAN 38e-3).
+    Hold), A.a.y = the most a cell may add, as mixForce's.
   */
-  mixFilm: `${HEAD}${CAPILLARY}${FILM_WGSL}
+  mixFilm: `${HEAD}${CAPILLARY}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var soft: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
-fn cc(p: vec2i, n: f32) -> f32 { return textureLoad(mix, clampP(p, n), 0).r; }
 fn oilAt(q: vec2f, n: f32) -> f32 { return textureLoad(mix, clampP(vec2i(floor(q)), n), 0).r; }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -453,11 +507,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     if (h > 0.0) {
       var f = A.a.x * exp(-h / ${FILM_DECAY.toFixed(2)}) * g;
       let l = length(f);
-      if (A.a.y > 0.0 && l > A.a.y) { f *= A.a.y / l; }
+      if (l > A.a.y) { f *= A.a.y / l; }
       v = vec4f(v.xy + f, v.zw);
     }
-    // And the waist's pull taken back wherever the cell is in a film (above).
-    if (A.a.z > 0.0 && filmSqueeze(p, n) > 0.01) { v = vec4f(v.xy - A.a.z * min(curvature(p, n), 0.0) * g, v.zw); }
   }
   textureStore(dst, p, safeVel(v));
 }`,

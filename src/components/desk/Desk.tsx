@@ -2,21 +2,27 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 import { LogIn, User } from 'lucide-react';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
+import { useScrollEdges } from '../ui/ScrollCue';
 import { LensCap } from '../ui/Playful';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
 import { DeskHeader } from './DeskHeader';
+import { LooksGrid } from './LooksGrid';
 import { LEFT_WIDTH, PanelBody, RIDES_WIDTH, panelMeta } from './DeskPanels';
 import { PanelBrowser } from './PanelBrowser';
 import { PanelWindow, openPanelWindow } from './PanelWindow';
 import {
   PANEL_BY_ID, closePanel, collapseAll, dockPanel, floatPanel, openPanel, openPanels,
-  placeFloating, raiseFloating, toggleCollapsed, whereIs,
+  placeFloating, raiseFloating, restoreClosedPanel, snapshotPanelSpot, toggleCollapsed, whereIs,
   type DeskLayout, type Slot,
 } from '../../lib/deskLayout';
 import { getEffectiveTier } from '../../lib/tierGates';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
+import { useEscape } from '../../hooks/useEscape';
+import { matchesShortcut } from '../../lib/shortcuts';
 import type { DeskProps } from './deskProps';
+import { LiveFor } from './LiveFor';
+import { readEngineStatus } from '../../lib/readout';
 
 /**
  * The desk (Desk v2, the owner's design of 2026-10-10).
@@ -47,7 +53,8 @@ import type { DeskProps } from './deskProps';
  */
 const DECK_H = { knobs: 268, other: 236 } as const;
 const STRIP_H = 36;
-const SCREENS = new Set(['songs', 'sequences', 'player']);
+const SCREENS = new Set(['songs', 'sequences']);
+const FLEX_COLUMN_PANELS = new Set(['cues', 'rides', 'recipe', 'audio-input']);
 const COLUMN_W = { left: LEFT_WIDTH, right: RIDES_WIDTH } as const;
 /**
  * A side column: as wide as the widest panel in it asks (`columnWidth`), at
@@ -67,9 +74,11 @@ export function Desk(p: DeskProps) {
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const set = p.onLayout;
-  const [windowW, setWindowW] = useState(() => window.innerWidth);
+  const [windowSize, setWindowSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  const windowW = windowSize.w;
+  const windowH = windowSize.h;
   useEffect(() => {
-    const on = () => setWindowW(window.innerWidth);
+    const on = () => setWindowSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
@@ -88,6 +97,7 @@ export function Desk(p: DeskProps) {
    */
   const [gesture, setGesture] = useState<{ id: string; x: number; y: number; w: number; h: number } | null>(null);
   const browserButton = useRef<HTMLButtonElement | null>(null);
+  const deckScroll = useScrollEdges('x', [l.deck.join('|'), l.deckCollapsed, windowW]);
 
   // ── Panels in their own windows (PLAN.md 8g) ────────────────────────
   /*
@@ -132,12 +142,14 @@ export function Desk(p: DeskProps) {
     setBrowser(b => (b ? null : { top: (r?.bottom ?? 48) + 6, right: Math.max(8, window.innerWidth - (r?.right ?? window.innerWidth - 8)) }));
   }, []);
 
+  const narrow = windowW < 1024;
+  const stacked = windowW < 768;
   // The plate is measured where it is; the columns moving round it do not resize the window.
   const { onRelayout } = p;
   useEffect(() => {
     const id = requestAnimationFrame(() => onRelayout?.());
     return () => cancelAnimationFrame(id);
-  }, [l, p.tab, onRelayout]);
+  }, [l, p.tab, narrow, stacked, onRelayout]);
 
   // ── Keys ────────────────────────────────────────────────────────────
   /*
@@ -162,13 +174,13 @@ export function Desk(p: DeskProps) {
         k.onTab(k.tabs[Number(e.key) - 1].id);
         return;
       }
-      if (mod && (e.key === 'p' || e.key === 'P') && !e.shiftKey) { e.preventDefault(); k.openBrowser(); return; }
-      if (mod && e.key === ',') { e.preventDefault(); k.onStage(); return; }
+      if (matchesShortcut(e, 'panel-browser')) { e.preventDefault(); k.openBrowser(); return; }
+      if (matchesShortcut(e, 'stage')) { e.preventDefault(); k.onStage(); return; }
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-      if (e.altKey && !mod && e.code === 'KeyD') {
+      if (matchesShortcut(e, 'deck-fold')) {
         e.preventDefault();
         k.set(x => ({ ...x, deckCollapsed: !x.deckCollapsed }));
-      } else if (e.key === 'Tab' && !mod && !e.altKey && !e.shiftKey && k.floats > 0 && (!t || t === document.body)) {
+      } else if (matchesShortcut(e, 'floats-toggle') && k.floats > 0 && (!t || t === document.body)) {
         e.preventDefault();
         setFloatsHidden(v => !v);
       }
@@ -266,6 +278,12 @@ export function Desk(p: DeskProps) {
     const spec = PANEL_BY_ID.get(id);
     if (!spec) return null;
     const collapsed = l.collapsed.includes(id);
+    const closeWithUndo = (closePop?: boolean) => {
+      const spot = snapshotPanelSpot(l, id);
+      if (closePop) popIn(id);
+      set(x => closePanel(x, id));
+      p.onPanelClosed?.(spec.name, () => set(x => restoreClosedPanel(x, spot)));
+    };
     if (popped[id] && !opts.popped) {
       // Its place on the desk while it is out: what it is, where, and the way back.
       return (
@@ -280,7 +298,7 @@ export function Desk(p: DeskProps) {
           style={opts.style}
           onFloat={() => set(x => floatPanel(x, id))}
           onDock={() => set(x => dockPanel(x, id, 'deck'))}
-          onClose={() => { popIn(id); set(x => closePanel(x, id)); }}
+          onClose={() => closeWithUndo(true)}
           onGripDown={startDrag(id)}
           onHeaderDown={opts.floating ? startFloatGesture(id, 'move') : undefined}
           onResizeDown={opts.floating ? startFloatGesture(id, 'resize') : undefined}
@@ -312,15 +330,15 @@ export function Desk(p: DeskProps) {
         popped={opts.popped}
         onPopIn={() => popIn(id)}
         onCollapse={() => set(x => toggleCollapsed(x, id))}
-        onClose={() => set(x => closePanel(x, id))}
+        onClose={() => closeWithUndo()}
         onGripDown={startDrag(id)}
         onHeaderDown={opts.floating ? startFloatGesture(id, 'move') : undefined}
         onResizeDown={opts.floating ? startFloatGesture(id, 'resize') : undefined}
         onTitleMenu={opts.popped ? undefined : (e) => { e.preventDefault(); setMenu({ id, x: e.clientX, y: e.clientY }); }}
       >
         {/* Its own guard: one panel that throws is a card in its place, not the end of the desk. */}
-        <PanelGuard name={spec.name} inline onClose={() => set(x => closePanel(x, id))}>
-          <PanelBody id={id} p={p} />
+        <PanelGuard name={spec.name} inline onClose={() => closeWithUndo()}>
+          <PanelBody id={id} p={p} narrow={windowW < 1024} />
         </PanelGuard>
       </PanelFrame>
     );
@@ -329,23 +347,60 @@ export function Desk(p: DeskProps) {
   const dropping = !!drag?.moved;
   const dashed = dropping ? 'outline-dashed outline-1 outline-offset-[-4px] outline-accent-border' : '';
 
+  const sideIds = narrow ? [...l.left, ...l.right] : [];
+  const sideWidth = (ids: string[]): number =>
+    Math.max(
+      LEFT_WIDTH,
+      Math.min(
+        Math.round(windowW * 0.41),
+        Math.max(
+          ids.some(id => l.right.includes(id)) ? RIDES_WIDTH : LEFT_WIDTH,
+          ...ids.map(id => PANEL_BY_ID.get(id)?.columnWidth ?? 0),
+        ),
+      ),
+    );
+
   const column = (slot: 'left' | 'right') => {
     const ids = l[slot];
     if (ids.length === 0) return null;
-    const one = ids.length === 1 && !l.collapsed.includes(ids[0]);
+    return <DeskColumn key={slot} slot={slot} ids={ids} collapsed={l.collapsed} dashed={dashed} renderFrame={frame} />;
+  };
+
+  /**
+   * Below 1024 px, the desk keeps the plate and its controls by folding the two
+   * side columns into one column without changing `p.layout`, so snapping the
+   * window back to full width restores every panel to its slot. From 768 to
+   * 1023 px it sits beside the plate; below 768 px (`stacked`) it sits beneath
+   * the plate so a 360–420 px mouse window keeps both the plate and every
+   * panel reachable without horizontal spill.
+   */
+  const foldedColumn = () => {
+    if (sideIds.length === 0) return null;
+    const expanded = sideIds.filter(id => !l.collapsed.includes(id));
+    const one = expanded.length === 1;
     return (
       <aside
-        className={`flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide p-2 ${slot === 'left' ? 'border-r' : 'border-l'} border-border ${dashed}`}
-        data-slot={slot}
-        data-testid={`desk-${slot}`}
+        className={`flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden cg-scroll ${stacked ? 'border-t' : 'border-l'} border-border p-2 ${dashed}`}
+        data-slot="right"
+        data-testid="desk-right"
       >
-        {ids.map(id => frame(id, { className: one ? 'min-h-0 flex-1' : 'shrink-0' }))}
+        {sideIds.map(id => {
+          const isOne = one && !l.collapsed.includes(id);
+          const clampCues = id === 'cues' && !isOne && !l.collapsed.includes(id);
+          return frame(id, {
+            className: isOne ? 'min-h-0 flex-1' : 'shrink-0',
+            style: clampCues ? { maxHeight: '46vh' } : undefined,
+          });
+        })}
       </aside>
     );
   };
 
-  const deckH = l.deck.length === 0 ? 44 : l.deckCollapsed ? STRIP_H
+  const rawDeckH = l.deck.length === 0 ? 44 : l.deckCollapsed ? STRIP_H
     : DECK_H[l.deck.some(id => PANEL_BY_ID.get(id)?.kind === 'knobs') ? 'knobs' : 'other'];
+  const deckH = stacked && !l.deckCollapsed && l.deck.length > 0
+    ? Math.min(rawDeckH, Math.max(120, Math.round(windowH * 0.28)))
+    : rawDeckH;
   const left = l.left.length > 0, right = l.right.length > 0;
   const live = l.plateMode === 'live';
   // Live, the plate is the wall's look; in Preview, the look being built.
@@ -366,8 +421,14 @@ export function Desk(p: DeskProps) {
     <div
       className="fixed inset-0 z-10 grid bg-bg text-text"
       style={{
-        gridTemplateColumns: `${left ? `${columnWidth('left', l.left, windowW)}px ` : ''}minmax(0, 1fr)${right ? ` ${columnWidth('right', l.right, windowW)}px` : ''}`,
-        gridTemplateRows: `48px minmax(0, 1fr) ${deckH}px 28px`,
+        gridTemplateColumns: stacked
+          ? 'minmax(0, 1fr)'
+          : narrow
+            ? `${sideIds.length > 0 ? `minmax(0, 1fr) ${sideWidth(sideIds)}px` : 'minmax(0, 1fr)'}`
+            : `${left ? `${columnWidth('left', l.left, windowW)}px ` : ''}minmax(0, 1fr)${right ? ` ${columnWidth('right', l.right, windowW)}px` : ''}`,
+        gridTemplateRows: stacked
+          ? `minmax(48px, auto) ${sideIds.length > 0 ? `${windowH >= 560 ? 'minmax(130px, 30vh)' : 'minmax(0, 1fr)'} minmax(0, 1fr)` : 'minmax(0, 1fr)'} ${deckH}px 28px`
+          : `48px minmax(0, 1fr) ${deckH}px 28px`,
       }}
       // The tab's id, which a rename never changes: `perform-desk`,
       // `sequence-desk`, `setup-desk`, or a tab of the owner's own.
@@ -375,6 +436,7 @@ export function Desk(p: DeskProps) {
       data-desk="v2"
       data-layout={p.tab}
       data-plate-mode={l.plateMode}
+      data-narrow={narrow ? 'true' : undefined}
     >
       <DeskHeader
         breadcrumb={<DocMenu p={p} crumb="Look" />}
@@ -427,22 +489,22 @@ export function Desk(p: DeskProps) {
         }
       />
 
-      {column('left')}
+      {!narrow && column('left')}
 
       {/* ── The plate ─────────────────────────────────────────────── */}
-      <section className="flex min-h-0 min-w-0 flex-col px-4 py-3">
+      <section className={`flex min-h-0 min-w-0 flex-col ${stacked ? 'px-3 py-2' : 'px-4 py-3'}`}>
         {/*
           The plate bar. It wraps rather than runs under a column: at 1024 in
           Gig the plate is 440 px wide and its bar holds the name, Record, the
           layers, Live | Preview and Save.
         */}
-        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className={`${stacked ? 'mb-2' : 'mb-3'} flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2`}>
           {/* The name gives way first, so the bar is one row wherever the plate is wider than about 930 px. */}
           <span className="flex min-w-[100px] flex-1 items-center gap-2">
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: live ? 'var(--color-live)' : 'var(--color-accent)' }} />
             <span className="truncate text-[16px] font-medium" data-testid="plate-name">{plateName}</span>
             <span className="hidden shrink-0 whitespace-nowrap font-mono text-[12px] text-dim 2xl:inline">
-              {live ? `live · ${p.liveFor}` : p.dots.wall ? 'preview · ⌘⏎ sends to wall' : 'preview · not on wall'}
+              {live ? <>live · <LiveFor since={p.liveSince} /></> : p.dots.wall ? 'preview · ⌘⏎ sends to wall' : 'preview · not on wall'}
             </span>
           </span>
           <RecordControls
@@ -510,11 +572,11 @@ export function Desk(p: DeskProps) {
         <div ref={p.plateRef} className="min-h-0 flex-1 rounded-lg border border-border" data-testid="desk-preview" />
       </section>
 
-      {column('right')}
+      {narrow ? foldedColumn() : column('right')}
 
       {/* ── The deck ──────────────────────────────────────────────── */}
       {l.deckCollapsed && l.deck.length > 0 ? (
-        <div className="col-[1/-1] flex items-center gap-1.5 overflow-x-auto scrollbar-hide border-t border-border px-2" data-slot="deck" data-testid="deck-strip">
+        <div className="col-[1/-1] flex items-center gap-1.5 overflow-x-auto cg-scroll border-t border-border px-2" data-slot="deck" data-testid="deck-strip">
           {l.deck.map(id => (
             <button
               key={id}
@@ -524,7 +586,7 @@ export function Desk(p: DeskProps) {
               data-panel-wrap={id}
             >
               {PANEL_BY_ID.get(id)?.name ?? id}
-              {panelMeta(id, p) && <span className="font-mono text-[11px] text-faint">{panelMeta(id, p)}</span>}
+              {panelMeta(id, p) && <span className="font-mono text-[12px] text-faint">{panelMeta(id, p)}</span>}
             </button>
           ))}
           <button
@@ -538,28 +600,57 @@ export function Desk(p: DeskProps) {
           </button>
         </div>
       ) : (
-        <div
-          className={`col-[1/-1] flex min-h-0 items-stretch gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide border-t border-border p-2 ${dashed}`}
-          data-slot="deck"
-          data-testid="desk-deck"
-        >
-          {l.deck.map(id => {
-            const spec = PANEL_BY_ID.get(id);
-            const folded = l.collapsed.includes(id);
-            return frame(id, { className: `shrink-0 ${folded ? 'self-start' : ''}`, style: { width: spec?.deckWidth ?? 266 } });
-          })}
-          <button
-            onClick={openBrowser}
-            className="min-w-[180px] flex-1 rounded-lg border border-dashed border-border-strong text-[13px] text-dim transition-colors hover:bg-hover hover:text-text-2"
-            data-testid="deck-add"
-          >
-            + Panel here
-          </button>
+        <div className="relative col-[1/-1] flex min-h-0 items-stretch border-t border-border">
+          {deckScroll.start && (
+            <button
+              type="button"
+              onClick={() => deckScroll.scrollBy(-320)}
+              className="flex w-7 shrink-0 items-center justify-center border-r border-border bg-surface text-[16px] text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="More panels to the left"
+              aria-label="Scroll deck left"
+              data-testid="deck-scroll-left"
+            >‹</button>
+          )}
+          <div className="relative flex min-h-0 min-w-0 flex-1 items-stretch">
+            <div
+              ref={deckScroll.ref}
+              className={`flex min-h-0 min-w-0 flex-1 items-stretch gap-2 overflow-x-auto overflow-y-hidden cg-scroll p-2 ${dashed}`}
+              data-slot="deck"
+              data-testid="desk-deck"
+            >
+              {l.deck.map(id => {
+                const spec = PANEL_BY_ID.get(id);
+                const folded = l.collapsed.includes(id);
+                const w = stacked
+                  ? Math.min(spec?.deckWidth ?? 266, Math.max(220, windowW - 72))
+                  : (spec?.deckWidth ?? 266);
+                return frame(id, { className: `shrink-0 ${folded ? 'self-start' : ''}`, style: { width: w } });
+              })}
+              <button
+                onClick={openBrowser}
+                className="min-w-[180px] flex-1 rounded-lg border border-dashed border-border-strong text-[13px] text-dim transition-colors hover:bg-hover hover:text-text-2"
+                data-testid="deck-add"
+              >
+                + Panel here
+              </button>
+            </div>
+            {deckScroll.start && <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-bg/85 to-transparent" aria-hidden />}
+            {deckScroll.end && <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg/90 to-transparent" aria-hidden />}
+          </div>
+          {deckScroll.end && (
+            <button
+              type="button"
+              onClick={() => deckScroll.scrollBy(320)}
+              className="flex w-7 shrink-0 items-center justify-center border-l border-border bg-surface text-[16px] text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="More panels to the right"
+              aria-label="Scroll deck right"
+              data-testid="deck-scroll-right"
+            >›</button>
+          )}
           {l.deck.length > 0 && (
             <button
               onClick={() => set(x => ({ ...x, deckCollapsed: true }))}
-              className="w-7 shrink-0 self-start rounded-md text-[13px] text-faint hover:bg-hover hover:text-text"
-              style={{ height: 28 }}
+              className="flex w-7 shrink-0 items-center justify-center border-l border-border bg-surface text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
               title="Fold the deck to a strip (⌥D): the plate takes its height"
               aria-label="Fold the deck"
               data-testid="deck-fold"
@@ -569,7 +660,7 @@ export function Desk(p: DeskProps) {
       )}
 
       {/* ── Status ────────────────────────────────────────────────── */}
-      <footer className="col-[1/-1] flex items-center justify-between gap-3 border-t border-border px-3 font-mono text-[11px] text-dim">
+      <footer className="col-[1/-1] flex items-center justify-between gap-3 border-t border-border px-3 font-mono text-[12px] text-dim">
         <span className="flex min-w-0 items-center gap-3 truncate">
           {p.onOpenAccount && (
             // Signed out, the one place on the desk that lets you back in says so,
@@ -580,7 +671,7 @@ export function Desk(p: DeskProps) {
               data-cg-account-signin={signedOut ? '' : undefined}
               data-cg-tier={getEffectiveTier()}
               onClick={p.onOpenAccount}
-              className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 font-sans text-[11px] font-medium transition-colors ${
+              className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 font-sans text-[12px] font-medium transition-colors ${
                 signedOut
                   ? 'bg-primary text-on-primary hover:opacity-90'
                   : 'border border-border-strong bg-elevated text-text-2 hover:bg-hover hover:text-text'
@@ -591,7 +682,7 @@ export function Desk(p: DeskProps) {
               {signedOut ? <LogIn size={12} className="shrink-0" /> : <User size={12} className="shrink-0 text-muted" />}
               <span>{signedOut ? 'Sign in' : 'Account'}</span>
               {!signedOut && (
-                <span className="rounded-sm bg-accent-bg px-1 py-px font-mono text-[9px] uppercase tracking-wider text-accent-text">
+                <span className="rounded-sm bg-accent-bg px-1 py-px font-mono text-[12px] uppercase tracking-wider text-accent-text">
                   {getEffectiveTier()}
                 </span>
               )}
@@ -609,25 +700,41 @@ export function Desk(p: DeskProps) {
           <button
             type="button"
             onClick={p.onOpenSettings}
-            className="inline-flex h-6 shrink-0 items-center rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+            className="inline-flex h-6 shrink-0 items-center rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
             title="Every setting, by group (the Settings sheet)"
             data-testid="open-all-settings"
           >
             All settings…
           </button>
+          {p.onOpenShortcuts && (
+            <button
+              type="button"
+              onClick={p.onOpenShortcuts}
+              className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="Keyboard shortcuts (?)"
+              aria-label="Keyboard shortcuts"
+              data-testid="shortcuts-button"
+            >
+              <span className="font-mono text-[12px]">?</span>
+              <span className="hidden xl:inline">Shortcuts</span>
+            </button>
+          )}
           <span className="truncate" data-testid="status-hearing">
             {p.status.audio}
             {p.status.sequence && ` · ${p.status.sequence}`}
             {p.status.song && <span data-testid="status-song">{` · ${p.status.song}`}</span>}
           </span>
         </span>
-        <span className="flex items-center gap-3 truncate">
+        <span className="flex min-w-0 items-center gap-3">
           <span className="truncate" data-testid="status-running">
             {`tab ${tabName} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}
             {l.floating.length > 0 && ` · ${l.floating.length} floating`}
             {p.status.phone > 0 ? ` · ${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked` : ''}
             {p.status.rec ? ` · rec ${p.status.rec}` : ''}
-            {p.status.engine ? ` · ${p.status.engine}` : ''}
+            {p.status.engine && (() => {
+              const info = readEngineStatus(p.status.engine);
+              return <span title={info.tooltip} data-testid="status-engine">{` · ${info.text}`}</span>;
+            })()}
           </span>
         </span>
       </footer>
@@ -637,15 +744,14 @@ export function Desk(p: DeskProps) {
         <>
           {l.floating.map((stored, i) => {
             const f = gesture?.id === stored.id ? gesture : stored;
-            // Kept on this window: a layout floated on a big display and
-            // opened on a laptop would otherwise put the panel off the edge.
-            const left = Math.max(0, Math.min(f.x, window.innerWidth - 80));
-            const top = Math.max(48, Math.min(f.y, window.innerHeight - 40));
+            const w = Math.min(f.w, Math.max(220, windowW - 16));
+            const left = Math.max(0, Math.min(f.x, Math.max(0, windowW - w)));
+            const top = Math.max(48, Math.min(f.y, Math.max(48, window.innerHeight - 40)));
             return (
             <div
               key={f.id}
               className="fixed"
-              style={{ left, top, width: f.w, height: l.collapsed.includes(f.id) ? undefined : f.h, zIndex: 30 + i }}
+              style={{ left, top, width: w, height: l.collapsed.includes(f.id) ? undefined : f.h, zIndex: 30 + i }}
               onPointerDown={() => set(x => raiseFloating(x, f.id))}
               data-testid={`floating-${f.id}`}
             >
@@ -659,8 +765,8 @@ export function Desk(p: DeskProps) {
       {dropping && drag && createPortal(
         <>
           {/* An empty column, as a strip at the window's edge to drop on. */}
-          {!left && <div className="fixed bottom-[64px] left-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="left">Dock left</div>}
-          {!right && <div className="fixed bottom-[64px] right-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="right">Dock right</div>}
+          {!narrow && !left && <div className="fixed bottom-[64px] left-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[12px] text-accent-text [writing-mode:vertical-rl]" data-slot="left">Dock left</div>}
+          {(narrow ? sideIds.length === 0 : !right) && <div className="fixed bottom-[64px] right-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[12px] text-accent-text [writing-mode:vertical-rl]" data-slot="right">{narrow ? 'Dock column' : 'Dock right'}</div>}
           <div
             className="pointer-events-none fixed z-[63] rounded-md border border-border-strong bg-elevated px-2.5 py-1 text-[13px] font-medium text-text shadow-[0_20px_60px_rgba(0,0,0,.6)]"
             style={{ left: drag.x + 12, top: drag.y + 8 }}
@@ -687,11 +793,58 @@ export function Desk(p: DeskProps) {
         <PanelBrowser
           layout={l}
           at={browser}
+          anchorRef={browserButton}
           onDock={(id) => set(x => openPanel(x, id, 'deck'))}
           onFloat={(id) => set(x => openPanel(x, id, 'float'))}
+          onReveal={(id) => {
+            requestAnimationFrame(() => {
+              document.querySelector(`[data-panel="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            });
+          }}
           onStage={p.onStage}
           onClose={() => setBrowser(null)}
         />
+      )}
+    </div>
+  );
+}
+
+function DeskColumn({ slot, ids, collapsed, dashed, renderFrame }: {
+  slot: 'left' | 'right';
+  ids: string[];
+  collapsed: string[];
+  dashed: string;
+  renderFrame: (id: string, opts?: { className?: string }) => ReactNode;
+}) {
+  const scroll = useScrollEdges<HTMLElement>('y', [ids.join('|'), collapsed.join('|')]);
+  const one = ids.length === 1 && !collapsed.includes(ids[0]);
+  // Give the last scrollable panel (e.g. Rides under Bottles, Sound under Controller) remaining column height so its footer stays pinned on screen.
+  let flexIdx = -1;
+  if (one) flexIdx = 0;
+  else {
+    for (let i = ids.length - 1; i >= 0; i--) {
+      if (!collapsed.includes(ids[i]) && FLEX_COLUMN_PANELS.has(ids[i])) { flexIdx = i; break; }
+    }
+  }
+  return (
+    <div className={`relative flex min-h-0 flex-col ${slot === 'left' ? 'border-r' : 'border-l'} border-border`}>
+      <aside
+        ref={scroll.ref}
+        className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden cg-scroll p-2 ${dashed}`}
+        data-slot={slot}
+        data-testid={`desk-${slot}`}
+      >
+        {ids.map((id, i) => renderFrame(id, { className: i === flexIdx ? (one ? 'min-h-0 flex-1' : 'min-h-[180px] flex-1') : 'shrink-0' }))}
+      </aside>
+      {scroll.end && (
+        <button
+          type="button"
+          onClick={() => scroll.scrollBy(220)}
+          className="flex h-6 shrink-0 items-center justify-center gap-1 border-t border-border bg-surface/90 text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+          data-testid={`desk-${slot}-more`}
+        >
+          More panels ↓
+        </button>
       )}
     </div>
   );
@@ -707,6 +860,17 @@ function PanelMenu({ at, layout, popped, onPopOut, act, onReset, onClose }: {
   onReset: () => void;
   onClose: () => void;
 }) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEscape(onClose);
+  // Close on pointerdown outside without mounting an invisible scrim that blocks the header (H3-02).
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) onClose();
+    };
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
+  }, [onClose]);
+
   const id = at.id;
   const where = whereIs(layout, id);
   const allFolded = openPanels(layout).every(x => layout.collapsed.includes(x));
@@ -720,16 +884,18 @@ function PanelMenu({ at, layout, popped, onPopOut, act, onReset, onClose }: {
     ['Reset layout', onReset, 'reset'],
   ];
   return (
-    <>
-      <div className="fixed inset-0 z-[60]" onClick={onClose} onContextMenu={e => { e.preventDefault(); onClose(); }} />
-      <div className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface py-1 shadow-2xl" style={{ left: Math.min(at.x, window.innerWidth - 232), top: Math.min(at.y, window.innerHeight - 240) }} data-testid="panel-menu">
-        {rows.map(([label, run, key]) => (
-          <button key={key} onClick={run} className="block h-8 w-full px-3 text-left text-[13px] text-text-2 hover:bg-hover hover:text-text" data-testid={`panel-menu-${key}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-    </>
+    <div
+      ref={menuRef}
+      className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface py-1 shadow-2xl"
+      style={{ left: Math.max(8, Math.min(at.x, window.innerWidth - 232)), top: Math.max(8, Math.min(at.y, window.innerHeight - 240)) }}
+      data-testid="panel-menu"
+    >
+      {rows.map(([label, run, key]) => (
+        <button key={key} onClick={run} className="block h-8 w-full px-3 text-left text-[13px] text-text-2 hover:bg-hover hover:text-text" data-testid={`panel-menu-${key}`}>
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -810,14 +976,31 @@ function Layers({ p, report }: { p: DeskProps; report: boolean }) {
 function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const button = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const toggle = () => {
     if (at) { setAt(null); return; }
     const r = button.current?.getBoundingClientRect();
-    if (r) setAt({ top: r.bottom + 4, left: r.left });
+    if (r) setAt({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 232)) });
   };
+  // Close on Escape or pointerdown outside without an invisible scrim blocking the header (H3-01).
+  useEffect(() => {
+    if (!at) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAt(null); };
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (menuRef.current?.contains(t) || button.current?.contains(t)) return;
+      setAt(null);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', away);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', away);
+    };
+  }, [at]);
   return (
     <>
-      <span className="text-muted">{crumb}</span>
+      <LooksGrid label={crumb} activeLookId={p.liveLookId} onSelectLook={p.onSendSaved} />
       <span className="text-faint">/</span>
       <div className="relative flex min-w-0 items-center gap-2">
         <button
@@ -828,17 +1011,16 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
           data-testid="doc-menu-button"
         >
           <span className="truncate">{p.lookName ?? 'Untitled'}</span>
-          <span className="text-faint">⌄</span>
+          <span className="shrink-0 text-faint">⌄</span>
         </button>
         {p.edited && <Tag>edited</Tag>}
         {at && createPortal((
-          <>
-            <div className="fixed inset-0 z-[60]" onClick={() => setAt(null)} />
-            <div
-              className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
-              style={{ top: at.top, left: at.left }}
-              data-testid="doc-menu"
-            >
+          <div
+            ref={menuRef}
+            className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
+            style={{ top: at.top, left: at.left }}
+            data-testid="doc-menu"
+          >
               {([
                 ['New — an empty plate', '', p.onNew, 'doc-new'],
                 ['Save as a new preset…', '⌘S', p.onSave, 'doc-save'],
@@ -851,12 +1033,12 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
                   data-testid={id}
                 >
                   <span className="truncate">{label}</span>
-                  {kbd ? <span className="font-mono text-[11px] text-faint">{kbd}</span> : null}
+                  {kbd ? <span className="font-mono text-[12px] text-faint">{kbd}</span> : null}
                 </button>
               ))}
               {p.savedLooks.length > 0 && (
                 <div className="border-t border-border py-1" data-testid="doc-saved">
-                  <div className="px-3 pb-1 pt-1.5 text-[11px] text-faint">Your preset palettes</div>
+                  <div className="px-3 pb-1 pt-1.5 text-[12px] text-faint">Your preset palettes</div>
                   <div className="max-h-[50vh] overflow-y-auto">
                     {p.savedLooks.map(sl => (
                       <div key={sl.id} className={`group flex items-center ${sl.id === p.openLookId ? 'bg-active' : 'hover:bg-hover'}`}>
@@ -871,7 +1053,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
                         </button>
                         <button
                           onClick={() => p.onDeleteSaved(sl.id)}
-                          className="mr-1 rounded p-1.5 text-faint opacity-60 hover:bg-hover hover:text-text group-hover:opacity-100"
+                          className="mr-1 rounded p-1.5 text-faint hover:bg-hover hover:text-text"
                           title={`Remove ${sl.name} from your presets`}
                           aria-label={`Remove ${sl.name}`}
                           data-testid={`doc-saved-remove-${sl.id}`}
@@ -884,7 +1066,6 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
                 </div>
               )}
             </div>
-          </>
         ), document.body)}
       </div>
     </>

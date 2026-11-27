@@ -1,0 +1,8 @@
+{
+  "name": "chromaglass-mcp",
+  "private": true,
+  "type": "module",
+  "description": "The show's assistant link over the Model Context Protocol (PLAN 44c). No dependencies.",
+  "bin": "chromaglass-mcp.js",
+  "engines": { "node": ">=20" }
+}

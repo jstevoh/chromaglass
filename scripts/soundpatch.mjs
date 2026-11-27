@@ -31,6 +31,20 @@
  *      `bands`, `hits`), and the three looks written as the pattern for the
  *      rest (Cyberpunk, Aurora Borealis, Lava Lamp) each have two or three,
  *      into the liquid and never onto a dial that moves the whole frame.
+ *      The music's stir is counted apart (PLAN 38u-4, 38u-5): every look
+ *      also carries one cord from the sound's mids onto Turbulence, which is
+ *      not a new answer on the wall but the stir the solver's step used to
+ *      take from the analyser with no cord at all, now listed where it can
+ *      be turned and pulled. A look has at most one, and `npm run musicstir`
+ *      holds its depth; the two or three here are the look's own answers to
+ *      the drums and the notes, as they were. The glass's slow slide (LFO 1
+ *      on Glass Smear, PLAN 38u-11) is counted apart the same way, at most
+ *      one, held by `npm run glassstill`. And the music's shake (Music
+ *      Shake, the bass on the dish's speaker, PLAN 48f, 48c-5) the same way,
+ *      at most one: it is the phone's Music Shake slider, as the stir is its
+ *      Music Stir, and it reads `sound` (the bass the speaker's cone travels
+ *      on), which is heard at once but is not one of the hits and bands a
+ *      look's own answers are written from.
  *   3. The hits (lib/hitSource.ts), on a song whose drums are known to the
  *      sample (`scripts/arrangement.mjs`, as `npm run shape` uses), heard the
  *      way the show's loop hears them:
@@ -52,12 +66,16 @@
 import { analysePcm, SOURCE_NAMES } from '../src/lib/audioFeatures.ts';
 import { HitSource, HIT_FEATURES } from '../src/lib/hitSource.ts';
 import { PatchBay, SETTING_TRAVEL, cordReading } from '../src/lib/sceneMap.ts';
-import { AreaHands, isAreaCord } from '../src/lib/areaCords.ts';
+import { AreaHands, isAreaCord, isHandCord, plateArea } from '../src/lib/areaCords.ts';
+import { isMusicCord } from '../src/lib/musicCords.ts';
 import { plateAreas } from '../src/lib/plateAreas.ts';
 import { SoundLearn } from '../src/lib/soundLearn.ts';
 import { parseMidiMap, serializeMidiMap, MIDI_FORMAT, MUSIC_SOURCES } from '../src/lib/midi.ts';
 import { MODULATOR_FEATURES } from '../src/lib/modulators.ts';
 import { FRAME_MOTION } from '../src/lib/drift.ts';
+import { isStirCord } from '../src/lib/stir.ts';
+import { isSlideCord } from '../src/lib/glassSlide.ts';
+import { isShakeCord, musicShakeOf } from '../src/lib/shakeCord.ts';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { arrange, SR } from './arrangement.mjs';
@@ -105,11 +123,12 @@ for (const p of PRESETS) {
       acting on an area the look has. A name its source lacks reads 0 there
       too, the gate never opens, and the act is nothing.
     */
-    if (isAreaCord(m)) {
+    // And a hand on the whole plate (the music's own hands, PLAN 38v-1) the same, on the plate as its area.
+    if (isHandCord(m)) {
       const hands = new AreaHands();
       let acts = [];
-      for (let s = 0; s < 120; s++) acts = hands.step([m], plateAreas(p.id), (c) => cordReading(ctx, c, 0), 1 / 60);
-      if (!(Math.abs(acts[0]?.amount ?? 0) > 0)) dead.push(`${p.id} ${m.source ?? 'room'}:${m.feature} on ${m.setting} in area ${m.area}`);
+      for (let s = 0; s < 120; s++) acts = hands.step([m], plateAreas(p.id), (c) => cordReading(ctx, c, 0), 1 / 60, plateArea(5));
+      if (!(Math.abs(acts[0]?.amount ?? 0) > 0)) dead.push(`${p.id} ${m.source ?? 'room'}:${m.feature} on ${m.setting} in ${m.area ?? 'the plate'}`);
       continue;
     }
     const travel = SETTING_TRAVEL[m.setting];
@@ -142,9 +161,24 @@ for (const p of PRESETS) for (const m of p.settings.sceneMappings ?? []) {
   const src = m.source ?? 'room';
   if (!FAST.has(src) && !NOT_SOUND.has(src)) slow.push(`${p.id} ${src}:${m.feature}`);
 }
+/*
+  A look's own answers: its cords less the music's stir and its hands
+  (PLAN 38u-5, 38v-1), which every look carries and `npm run musicstir` and
+  `npm run musiccords` hold, and less the glass's slow slide (PLAN 38u-11),
+  which is not an answer to the sound at all: it is the constant slide
+  nineteen looks used to give the cover glass with no cord, handed to LFO 1
+  so it can be seen and pulled, and `npm run glassstill` holds its depth and
+  its speed. Counting it here would make Cyberpunk and Aurora Borealis
+  four-cord looks and call an LFO a sound patch, though neither look's
+  answer to the drums and the notes changed. And less the music's shake
+  (lib/shakeCord.ts, the phone's Music Shake slider), counted apart as the
+  stir is, at most one a look (PLAN 48c-5: Night Sea, the first look on the
+  shaker, carries it beside its own two answers to the drums).
+*/
+const answers = (p) => (p?.settings.sceneMappings ?? []).filter((m) => !isStirCord(m) && !isMusicCord(m) && !isSlideCord(m) && !isShakeCord(m));
 const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp', 'poster-1969'];
 const pattern = PATTERN.map((id) => {
-  const ms = PRESETS.find((p) => p.id === id)?.settings.sceneMappings ?? [];
+  const ms = answers(PRESETS.find((p) => p.id === id));
   return { id, n: ms.length, ok: ms.length >= 2 && ms.length <= 3 && ms.every((m) => FAST.has(m.source) && !FRAME_MOTION.has(m.setting)),
     says: ms.map((m) => `${m.source}:${m.feature} on ${m.setting} ${m.depth}`).join(', ') };
 });
@@ -161,7 +195,19 @@ const missing28i = [];
 for (const p of PRESETS) {
   if (REBUILT_25H.has(p.id)) continue;
   const areas = plateAreas(p.id);
-  const sm = (p.settings.sceneMappings ?? []).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
+  const stirs = (p.settings.sceneMappings ?? []).filter(isStirCord).length;
+  if (stirs > 1) missing28i.push(`${p.id}: ${stirs} cords for the music's stir`);
+  const slides = (p.settings.sceneMappings ?? []).filter(isSlideCord).length;
+  if (slides > 1) missing28i.push(`${p.id}: ${slides} cords for the glass's slide`);
+  const shakes = (p.settings.sceneMappings ?? []).filter(isShakeCord).length;
+  if (shakes > 1) missing28i.push(`${p.id}: ${shakes} cords for the music's shake`);
+  /*
+    And no deeper than 0.5: a full bass then shakes the dish at 1 g (Shake's travel is 2 g),
+    twelve times the water's threshold at 30 Hz, where the lattice already stands near the
+    steepness it breaks at (src/gpu/faraday.ts S0). Night Sea's is 0.15.
+  */
+  if (musicShakeOf(p.settings.sceneMappings) > 0.5) missing28i.push(`${p.id}: the music's shake at ${musicShakeOf(p.settings.sceneMappings)}, over 0.5`);
+  const sm = answers(p).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
   const platePatches = sm.filter((m) => !isAreaCord(m) && isFastReading(m) && !FRAME_MOTION.has(m.setting));
   const areaCords = sm.filter((m) => isAreaCord(m) && Boolean(areas?.[m.area]) && isFastReading(m));
   const total = platePatches.length + areaCords.length;
@@ -173,7 +219,7 @@ for (const p of PRESETS) {
     if (FRAME_MOTION.has(m.setting)) missing28i.push(`${p.id}: ${m.setting} moves the frame`);
   }
 }
-check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only (PLAN 28i-3b)',
+check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only, and at most one cord for the music\'s stir, one for the glass\'s slide and one for the music\'s shake beside them (PLAN 28i-3b, 38u-5, 38u-11, 48c-5)',
   missing28i.length === 0, missing28i.join('; ') || `${PRESETS.length - REBUILT_25H.size} looks checked (+ 3 from 25h)`);
 
 // ── 3. The hits ─────────────────────────────────────────────────────────────
@@ -203,18 +249,21 @@ function hear(every = 1, silentAfter = Infinity) {
 const frames = hear();
 
 // On the frame: every kick the analyser heard is in Kick hit on its own frame, at its strength.
-const onTime = frames.filter((f) => f.r?.onsets.kick.hit);
-const late = onTime.filter((f) => f.kickHit + 1e-9 < f.r.onsets.kick.strength);
+// Kick hit follows the beat (the kick, or the band where no kick keeps time:
+// lib/pulseEar.ts), so "the kick" here is the reading's beat.
+const beatOf = (r) => r?.beat ?? r?.onsets.kick;
+const onTime = frames.filter((f) => beatOf(f.r)?.hit);
+const late = onTime.filter((f) => f.kickHit + 1e-9 < beatOf(f.r).strength);
 check('a kick is in Kick hit on the frame it is heard, at the strength the analyser gave it',
   onTime.length > 50 && late.length === 0, `${onTime.length} kicks, ${late.length} under their strength on their frame`);
 
 // And gone: 0.6 s after each kick with none in between, under a tenth of where it was.
 const lens = [];
 for (let i = 0; i < frames.length; i++) {
-  if (!frames[i].r?.onsets.kick.hit) continue;
+  if (!beatOf(frames[i].r)?.hit) continue;
   const at = frames[i].t, peak = frames[i].kickHit;
   const later = frames.find((f) => f.t >= at + 0.6);
-  const between = frames.filter((f) => f.t > at && f.t < at + 0.6).some((f) => f.r?.onsets.kick.hit);
+  const between = frames.filter((f) => f.t > at && f.t < at + 0.6).some((f) => beatOf(f.r)?.hit);
   if (later && !between && peak > 0.2) lens.push(later.kickHit / peak);
 }
 const drop = song.truth.sections.filter((s) => s.kind === 'drop');

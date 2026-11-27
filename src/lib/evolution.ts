@@ -171,7 +171,9 @@ export function buildVisualParams(
     turbulenceScale: clamp01(base.turbulenceScale + seed.turbulenceOffset + complexity * 0.25),
     turbulenceDetail: complexity > 0.6 ? 4 : 3,
     blobSurfaceTension: clamp01(base.blobSurfaceTension + seed.tensionOffset),
-    saturationBoost: Math.max(0.5, Math.min(2, base.saturationBoost + seed.saturationOffset)),
+    // The Saturation dial's own range (0, grey, to 3: PLAN 27h-1), so a look set past
+    // the old 0.5..2 keeps its grey or its blaze while the music leads.
+    saturationBoost: Math.max(0, Math.min(3, base.saturationBoost + seed.saturationOffset)),
     boundaryContrast: clamp01(base.boundaryContrast + complexity * 0.15),
     densityBias: seed.densityBias,
   };

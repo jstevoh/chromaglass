@@ -12,13 +12,13 @@
  * On a machine rasterising in software the GPU rungs will all be refused,
  * which is the correct answer and the interesting one to have tested.
  */
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 
-const PORT = 4329;
+const PORT = port(4329);
 
 /*
   Two modes, because this script has two jobs.

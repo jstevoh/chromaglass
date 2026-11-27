@@ -43,6 +43,10 @@ export interface LinkStatus {
   available: boolean;
   on: boolean;
   peers: number;
+  /** The show server is not Pro, so it will not join (PLAN.md 13.5-link-gate). */
+  locked?: boolean;
+  /** Whether Live's play and stop move the Sequence (13.5-link-transport); the desk's switch. */
+  follows?: boolean;
 }
 
 /** What the desk shows of the tempo, sampled from the source four times a second (`useTempo`). */
@@ -59,7 +63,14 @@ export interface LinkMessage {
   peers: number;
   bpm: number;
   beat: number | null;
+  /** The session's transport: Live playing or stopped. */
+  playing?: boolean;
+  /** Off because the show server is not Pro. */
+  locked?: boolean;
 }
+
+/** A change in the Link session's transport, as `TempoSource.linkReading` hands it back. */
+export type LinkTransportEdge = 'start' | 'stop' | null;
 
 export interface TempoReading {
   /** Milliseconds per beat. */
@@ -76,7 +87,7 @@ export interface TempoReading {
   /**
    * That beat's place in the bar, 0 being the one, from a source that knows
    * the bar (Link, whose session agrees on it in fours); absent otherwise.
-   * Nothing reads it yet: the bar grid finds the one by ear (PLAN 13.5-link-one).
+   * The bar grid takes it as the one (`BarGrid.tell`, PLAN 13.5-link-one).
    */
   bar?: number;
 }
@@ -150,6 +161,7 @@ export const tempoSourceName = (source: string | null): string =>
 
 /** What Link is doing, in a few words beside its switch. */
 export function linkLine(link: LinkStatus): string {
+  if (link.locked) return 'part of Pro';
   if (!link.on) return 'off';
   if (link.peers === 0) return 'looking for a session on this network';
   return link.peers === 1 ? 'following 1 app' : `following ${link.peers} apps`;
@@ -183,6 +195,14 @@ export class TempoSource {
   linkStatus: LinkStatus = { available: false, on: false, peers: 0 };
   /** Whether the operator wants Link on; the remote link asks the server for it on every connect. */
   linkWanted = false;
+  /**
+   * Whether the session's play and stop move the Sequence (PLAN.md
+   * 13.5-link-transport). Off by default: a stopped transport in a DJ set,
+   * between two tracks, is not the end of the show. Remembered by `useTempo`.
+   */
+  linkTransport = false;
+  /** The session's transport at the last reading, or null while not in one. */
+  private linkWasPlaying: boolean | null = null;
   /** Set by the remote link: asks the show server to switch Link on or off. */
   onLinkSwitch: ((on: boolean) => void) | null = null;
 
@@ -212,13 +232,20 @@ export class TempoSource {
    * arrived, which on one machine is under a millisecond for the socket and up
    * to a frame for the page's event loop; LINK_CREEP keeps the least late.
    */
-  linkReading(now: number, m: LinkMessage): void {
-    this.linkStatus = { available: true, on: m.on, peers: m.on ? m.peers : 0 };
+  linkReading(now: number, m: LinkMessage): LinkTransportEdge {
+    this.linkStatus = { available: true, on: m.on, peers: m.on ? m.peers : 0, ...(m.locked ? { locked: true } : {}) };
     if (!m.on || m.beat === null || !(m.bpm > 0) || !Number.isFinite(m.beat)) {
       this.link = null;
       this.linkFresh = false;
-      return;
+      this.linkWasPlaying = null;
+      return null;
     }
+    // The transport's edge: only between two readings that were both in a
+    // session, so joining one that is already stopped stops nothing.
+    const playing = m.playing === true;
+    const was = this.linkWasPlaying;
+    this.linkWasPlaying = playing;
+    const edge: LinkTransportEdge = was === null || was === playing ? null : playing ? 'start' : 'stop';
     const period = periodOf(m.bpm);
     const origin = now - m.beat * period;
     const l = this.link;
@@ -229,6 +256,7 @@ export class TempoSource {
       // A new session, a tempo change or a jump in the bar: the anchor starts again.
       this.link = { origin, period, whole: l?.whole ?? Number.NaN, until: now + LINK_HOLD };
     }
+    return edge;
   }
 
   /** How many taps are in the current attempt, for a button that counts them in. */

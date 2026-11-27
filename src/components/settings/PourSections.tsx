@@ -54,7 +54,7 @@ export const InteractionSection = ({ c }: { c: SectionCtx }) => {
           label="Drop Height"
           value={settings.dropHeight ?? 0}
           min={0}
-          max={1.0}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ dropHeight: v })}
           settingKey="dropHeight"

@@ -44,12 +44,15 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { coveredControls, legibility } from './layoutProbe.mjs';
 import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
 import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
+import { magnetSizeEnds, MAGNET_SIZE_TOP } from './phoneMagnet.mjs';
+import { phoneZoomIn } from './phoneZoom.mjs';
+import { dyeSheetLines } from './phoneDye.mjs';
 
-const PORT = Number(process.env.PHONE_PORT ?? 4183);
+const PORT = port(4183, 'PHONE_PORT');
 const HEADED = process.argv.includes('--head');
 const NEED_GPU = !!process.env.PHONE_GPU;
 const SHOTS = process.env.PHONE_SHOTS || null;
@@ -147,7 +150,7 @@ const phonePage = async (width, height, { touch = true, query = '' } = {}) => {
   page.setDefaultTimeout(60_000);
   page.on('pageerror', (e) => { pageErrors.push(e.message); console.log('  [pageerror]', e.message.slice(0, 200)); });
   await page.goto(`${URL}${query}`, { waitUntil: 'load' });
-  for (let i = 0; i < 40 && !(await page.getByTestId('phone-stage').count()) && !(await page.getByTestId('liquid-water').count()); i++) await page.waitForTimeout(250);
+  for (let i = 0; i < 40 && !(await page.getByTestId('phone-stage').count()) && !(await page.getByTestId('desk-preview').count()); i++) await page.waitForTimeout(250);
   await page.waitForTimeout(800);
   return { ctx, page };
 };
@@ -164,7 +167,7 @@ try {
   {
     const { ctx, page } = await phonePage(390, 844, { touch: false });
     check('a mouse at 390 wide gets the laptop\'s layout, not the phone\'s',
-      (await page.getByTestId('phone-stage').count()) === 0 && (await visible(page, 'liquid-water')));
+      (await page.getByTestId('phone-stage').count()) === 0 && (await visible(page, 'desk-preview')));
     await ctx.close();
   }
 
@@ -303,23 +306,7 @@ try {
       middle after, the tool as it always was.
     */
     const magnetSize = await visible(page, 'phone-magnet-size');
-    let sizeUnder = false, sizeUp = null, sizeBack = null, sizeReset = null;
-    if (magnetSize) {
-      const amountBox = await box(page, 'phone-amount-slider'), sizeBox = await box(page, 'phone-magnet-size');
-      sizeUnder = !!amountBox && !!sizeBox && sizeBox.y >= amountBox.y + amountBox.height - 1;
-      const setting = () => page.evaluate(() => window.chromaglassDebug?.().settings?.magnetSize ?? null);
-      await page.getByTestId('phone-magnet-size').locator('input').focus();
-      await page.keyboard.press('End');
-      await page.waitForTimeout(200);
-      sizeUp = await setting();
-      await page.keyboard.press('Home');
-      await page.waitForTimeout(200);
-      sizeBack = await setting();
-      // Ten steps of 0.05 back to the middle, through the slider, and read back.
-      for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
-      sizeReset = await setting();
-    }
+    const { sizeUnder, sizeUp, sizeBack, sizeReset } = await magnetSizeEnds(page, magnetSize, box);
     await tap(page, 'phone-tool-magnet');
     /*
       Fingering on the Press tool's own Amount (lib/squish.ts: the glass
@@ -380,7 +367,7 @@ try {
       `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOff} then ${thinOn} ("${thinSaid}"); Press Lift ${liftUp} then ${liftBack}`);
     const pressSize = await visible(page, 'phone-magnet-size');
     check(`${label}: the Magnet's Amount has Size under it, and only the Magnet's, and it moves Magnet Size end to end`,
-      magnetSize && !pressSize && sizeUnder && sizeUp === 1 && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,
+      magnetSize && !pressSize && sizeUnder && sizeUp === MAGNET_SIZE_TOP && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,
       `on the Magnet ${magnetSize}, on the Press ${pressSize}, under the Amount ${sizeUnder}, Magnet Size ${sizeUp} then ${sizeBack}, then ${sizeReset} put back`);
     await tap(page, 'phone-tool-press');
     await tap(page, 'phone-tool-magnet');
@@ -664,11 +651,7 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
       await page.waitForTimeout(250);
 
-      // A bottle from the Dye sheet is the one in the dock.
-      await tap(page, 'phone-open-dye');
-      await tap(page, 'phone-liquid-ink');
-      const dyeLabel = (await page.getByTestId('phone-open-dye').innerText()).trim();
-      check('a bottle picked in the Dye sheet is the one in the dock', /ink/i.test(dyeLabel), `dock says "${dyeLabel}"`);
+      await dyeSheetLines(page, tap, check);
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*
@@ -981,7 +964,7 @@ try {
         await page.waitForTimeout(200);
         const m = (await mappings())?.[patchAt];
         hitPicked = m ? `${m.source}:${m.feature}` : null;
-        await page.getByLabel('Remove mapping').nth(patchAt).tap();
+        await page.getByTestId(`patch-remove-${patchAt}`).tap();
         await page.waitForTimeout(250);
       }
       const patchesAfter = (await mappings())?.length ?? null;
@@ -1004,7 +987,7 @@ try {
         the look's plate count alone, and every built-in carries one or two.
         Each look is laid from the Looks sheet, its button pressed, and the
         other button pressed to put it back: on Lumia (one plate) that is add,
-        then take off; on Classic (two) the reverse. What is measured is the
+        then take off; on Comet (two) the reverse. What is measured is the
         Front and Back pickers coming and going with the buttons, which are
         App's plate count on the stage, and the solvers the engine has (built
         with or without a GPU, so asked everywhere: a missing count fails). A tap that did nothing leaves the sheet as
@@ -1024,7 +1007,7 @@ try {
       // a FAIL that says what the sheet had, not a sixty-second timeout.
       const pressIf = async (testId) => { if (await visible(page, testId)) await tap(page, testId); };
       const plateSays = (st) => `${st.two ? 'Front/Back' : 'one'}${st.add ? ' +add' : ''}${st.off ? ' +off' : ''} (${st.solvers ?? 'no'} solvers)`;
-      for (const [id, plates] of [['lumia', 1], ['classic', 2]]) {
+      for (const [id, plates] of [['roy', 1], ['comet', 2]]) {
         await tap(page, 'phone-open-looks');
         await tap(page, `phone-look-${id}`);
         await page.waitForTimeout(1500);
@@ -1139,7 +1122,7 @@ try {
       await tap(page, 'phone-open-more');
       await tap(page, 'phone-full-layout');
       await page.waitForTimeout(500);
-      check('"Full layout" puts the laptop\'s layout up instead', !(await visible(page, 'phone-stage')) && (await visible(page, 'liquid-water')));
+      check('"Full layout" puts the laptop\'s layout up instead', !(await visible(page, 'phone-stage')) && (await visible(page, 'desk-preview')));
     }
     await ctx.close();
   }
@@ -1253,14 +1236,14 @@ try {
         rb.map((b, i) => (onScreen(b) ? null : rest[i])).filter(Boolean).join(', ') || `${rest.length} of them`);
       const sCovered = await coveredControls(page, { skipInside: '[data-testid="needs-webgpu"]' });
       check('Play: nothing covers a control on the sheet', sCovered.length === 0, sCovered.slice(0, 4).join('; '));
-      // A slider moves the setting it names: the value printed is the app's.
+      // A slider moves its setting; the readout has its unit.
       const speedText = () => page.getByTestId('play-slider-speed').locator('span').last().textContent();
       const before = await speedText();
       const track = await page.getByTestId('play-slider-speed').locator('input').boundingBox();
       await page.touchscreen.tap(track.x + track.width * 0.9, track.y + track.height / 2);
       await page.waitForTimeout(300);
       const after = await speedText();
-      check('Play: Speed moved is the plate\'s speed', before !== after && Number(after) > Number(before), `${before} → ${after}`);
+      check('Play: Speed moved is the plate\'s speed', before !== after && parseFloat(after) > parseFloat(before), `${before} → ${after}`);
       check('Play: and the look is marked edited', await visible(page, 'play-edited'));
       // A double tap puts it back where the look has it (8c: the desk's
       // double-click, on a phone where every knob is a slider). Tapped at a
@@ -2020,7 +2003,7 @@ try {
       await tap(page, 'phone-tool-dropper');
 
       // The closeup: two fingers are the camera.
-      await tap(page, 'phone-zoom');
+      await phoneZoomIn(page, tap, check);
       // Hold, so the closeup stays put between the reference and the check.
       await tap(page, 'phone-camera-hold');
       await settle(600);
@@ -2029,9 +2012,8 @@ try {
       // counted the thumb, and the plate zoomed toward the dock instead).
       const dockAt = await box(page, 'phone-tool-spray');
       const thumb = { x: dockAt.x + dockAt.width / 2, y: dockAt.y + dockAt.height / 2, id: 5 };
-      // Where that finger lands alone, once the closeup has come to rest:
-      // the zoom eases in after the tap, so two readings a moment apart must
-      // agree before either is the reference.
+      // Where that finger lands alone, once the closeup is at rest: the zoom
+      // eases in, so two readings a moment apart must agree first.
       let plateFinger = await alone({ x: 200, y: 400 });
       for (let i = 0; i < 12; i++) {
         await settle(250);

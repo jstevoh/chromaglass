@@ -51,13 +51,14 @@ import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { watchVideo, WatchError, findFfmpeg } from './watch.mjs';
 import { AUTOPLAY, withBand, untilRunning } from './recorder.mjs';
+import { untilFlowerFree } from './flowergate.mjs';
 
-const PORT = Number(process.env.SHOWREEL_PORT ?? 4353);
+const PORT = port(4353, 'SHOWREEL_PORT');
 const OUT = path.resolve(process.env.SHOWREEL_OUT ?? 'showreel');
 const ONLY = process.env.SHOWREEL_ONLY ? process.env.SHOWREEL_ONLY.split(',').map(s => s.trim()).filter(Boolean) : null;
 const SONG = process.env.SHOWREEL_SONG ?? 'showreel-song.mp3';
@@ -120,6 +121,8 @@ const reel = { song: { file: path.basename(SONG), from: FROM, seconds: SECONDS }
 const save = () => fs.writeFileSync(path.join(OUT, 'showreel.json'), JSON.stringify(reel, null, 1));
 console.log(`  ${looks.length} looks${SET ? `, with ${JSON.stringify(SET)} laid over each` : ''}${SHARD ? ` (shard ${SHARD.join('/')})` : ''}, rendered at ${W}x${H} ${FPS} fps on seed ${SEED} to ${SECONDS} s of ${path.basename(SONG)} from ${FROM} s, into ${OUT}\n`);
 
+// Before the app opens: no film of a build that draws the flower (PLAN 31s-8, scripts/flowergate.mjs).
+await untilFlowerFree({ dist: 'dist' });
 const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
 try {
   for (const look of looks) {

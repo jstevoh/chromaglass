@@ -9,6 +9,10 @@ import { kernel } from '../wgsl/fluid';
 import { STATS_GROUPS } from '../wgsl/stats';
 import type { SloshDrive } from '../../lib/slosh';
 import { WebGPUSlosh } from '../slosh';
+import type { SoapFilmPlate } from '../soapFilmPlate';
+import type { TankPlate } from '../tankPlate';
+import type { FaradayPlate } from '../faraday';
+import type { GlowPlate } from '../glow';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
@@ -16,7 +20,7 @@ import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
 import { RowUploads } from '../../lib/deltaRows';
 import { OIL_SIGMA } from '../../lib/liquidProps';
-import { MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
+import { REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
 
 export class FluidCore {
   readonly N: number;
@@ -48,6 +52,8 @@ export class FluidCore {
   protected readonly squeeze: PingPong;
   /** The plate shape the gap was last laid at; a change re-seeds it. */
   protected lastCurve: number | null = null;
+  /** The cover glass's gap on its liquid, in gap units (0.03 is 2 mm): the uniform S.cover, stepped by fluid/cover.ts (PLAN 38r-5). */
+  protected coverGap = REST_GAP;
   protected readonly phase: PingPong;
   /**
    * The pressure, in a storage buffer rather than a texture (H2).
@@ -100,6 +106,33 @@ export class FluidCore {
   /** The dish is to be laid level before its next step: it was driven by nothing for a while, or has just been made. */
   protected sloshLevel = true;
   protected sloshTex: GPUTexture | null = null;
+  /** The frame's soap film (PLAN 32d, gpu/soapFilmPlate.ts): made when Soap Film is first up, null on every other look. */
+  protected soapPlate: SoapFilmPlate | null = null;
+  /** The tank's side view (PLAN 47n), made while Tank is up. */
+  protected tankPlate: TankPlate | null = null;
+  /** The shaken dish's standing waves (PLAN 48f), made while Shaker is up. */
+  protected faradayPlate: FaradayPlate | null = null;
+  /** The water's glow (PLAN 48c, gpu/glow.ts), made while Glow is up. */
+  protected glowPlate: GlowPlate | null = null;
+  /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
+  protected boilAlpha: PingPong | null = null;
+  protected boilSites: GPUBuffer | null = null;
+  protected boilUni: GPUBuffer | null = null;
+  protected readonly boilUniData = new ArrayBuffer(112);
+  protected readonly boilUniF = new Float32Array(this.boilUniData);
+  protected readonly boilUniU = new Uint32Array(this.boilUniData);
+  protected boilLive = false;
+  /**
+   * A bottle's liquid has been poured since the last clear (addLiquidDrop),
+   * so `liquids0` and `liquids1` hold something for a step to act on
+   * (stepLiquids, PLAN 15e-1). False on a plate of plain dye, which then
+   * runs neither of that pass's two dispatches, and does not carry the two
+   * fields either (carryLiquids, PLAN 46g): addLiquidDrop is their one
+   * writer, and it is cleared where both halves of each pair are zeroed.
+   */
+  protected liquidsLive = false;
+  protected boilFresh = false;
+  protected boilTail = 0;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
   protected readonly velRide: GPUTexture;
   protected readonly scratchA: GPUTexture;
@@ -129,7 +162,6 @@ export class FluidCore {
   protected readonly sampler: GPUSampler;
 
   protected readonly rbRow: number;
-  protected readonly rbStaging: { dye: GPUBuffer; vel: GPUBuffer };
   protected readonly rbRings: { dye: ReadbackRing; vel: ReadbackRing };
   protected readonly rbDye: Float32Array;
   /** The reading `rbDye` holds: the ring's sequence when it was copied in, not when the next one landed. */
@@ -200,11 +232,17 @@ export class FluidCore {
   /** What the step's hsPrep reads as the velocity after the body forces: hsMid, or hsPrev when no body force ran. */
   protected hsMidNow: GPUTexture | null = null;
   protected hsMob: GPUBuffer | null = null;
-  protected hsOilMean: GPUBuffer | null = null;
   protected hsLiftSrc: GPUBuffer | null = null;
   protected hsLiftPsi: GPUBuffer | null = null;
+  protected hsLiftB: GPUBuffer | null = null;
+  /** The sealed bottle's (PLAN 27f-9): the weight's right-hand side and its Ψ, on the lift's grid. */
+  protected hsSealSrc: GPUBuffer | null = null;
+  protected hsSealPsi: GPUBuffer | null = null;
   protected liftN = 2;
   protected hsP: GPUBuffer | null = null;
+  /** The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12). */
+  protected hsWarm: GPUBuffer | null = null;
+  protected hsP2: GPUBuffer | null = null;
   /** Whether the thin gap's pipelines are built (prepareThinGap), and the build under way. */
   protected hsReady = false;
   protected hsBuilding: Promise<void> | null = null;
@@ -309,6 +347,12 @@ export class FluidCore {
   protected speciesLive = false;
   /** Pours since the last read of the plate's poured share, so a read made before a pour cannot drop the field it landed in. */
   protected speciesQuiet = 0;
+  /** Plate clears since the solver was made, so an in-flight species read started before a clear is dropped. */
+  protected speciesClears = 0;
+  /** The last poured species' surface tension and density (`pouredOf`, PLAN 33f), or null when cleared. */
+  protected speciesPoured: { sigma: number; rho: number } | null = null;
+  /** The last completed species snapshot (`speciesSnapshot`, PLAN 33f), or null when cleared or empty. */
+  protected speciesSnap: { L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null = null;
   /** The thin solve's volume source (PLAN 18c): the share of each column poured since the last step, which hsDivergence takes and empties. */
   protected hsPour: GPUBuffer | null = null;
   /** The last thin step's displacement scale, which the species' carry was given (benchSpecies repeats it). */
@@ -337,11 +381,11 @@ export class FluidCore {
   protected oilPoured = 0;
   /*
     The oil's tension against the water, N/m (PLAN 38e): each pour's own
-    (lib/liquidProps.ts, interfacialTension), averaged by the plate it
+    (lib/liquidProps.ts interfacialTension), averaged by the plate it
     covers, so a dish of sunflower oil is at 27 mN/m and one with silicone
     poured into it goes toward 37 as the silicone's share grows. One number
     for the plate's oil, not one a cell: the oil is one field, and two oils
-    on one plate share it (PLAN 38e-1).
+    on one plate share it.
   */
   protected oilSigma = OIL_SIGMA;
   protected rxnLive = false;
@@ -360,6 +404,15 @@ export class FluidCore {
   protected handFastest = 0;
   /** A Blow's breath on the liquid (applyDeltas' `breath`, lib/breath.ts), on the CPU's grid and on the solver's, made at the first breath on a thin gap. */
   protected cpuBreathTex: GPUTexture | null = null;
+  /*
+    A look's lay saying which of the dye it lays is the oil's (Oil Bodies,
+    PLAN 47z-1): the CPU's L² share and the solver's N² one, made the first
+    time a lay sends one (applyDeltas' oilAdd), and whether the fold still
+    owes the share to the oil (bodyLay).
+  */
+  protected cpuOilTex: GPUTexture | null = null;
+  protected deltaOilTex: GPUTexture | null = null;
+  protected oilLayPending = false;
   protected breathTex: GPUTexture | null = null;
   /** Whether the next step has a breath on it: laid each step the wind blows, gone the step after, as the hands are. */
   protected breathLive = false;
@@ -369,6 +422,7 @@ export class FluidCore {
   protected blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   protected scratchR: GPUTexture | null = null;
+  protected velScratch: GPUTexture | null = null;
   protected rimPhi: GPUTexture | null = null;
   /** The ferrofluid's long-range repulsion ψ (see screenJacobi), kept between steps. */
   protected psi: PingPong | null = null;
@@ -417,6 +471,8 @@ export class FluidCore {
     no longer read there.
   */
   protected airCoverPrev = 0;
+  /** How many quiet seconds the air field has gone with neither bubbles nor boil. */
+  protected airQuietSeconds = 0;
   /** How much of a press reaches the flow, from the look's plate pressure. */
   protected squeezeGain = 0;
   protected lastDt = 1 / 60;
@@ -476,17 +532,44 @@ export class FluidCore {
     this.press = this.disposer.track(device.createBuffer({
       label: 'pressure',
       size: this.N * this.N * 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     }));
-    for (let n = this.N; n % 2 === 0 && n / 2 >= 4;) {
-      n /= 2;
+    /*
+      The multigrid's levels, each about half the one above, down to a few
+      cells a side, for both projections (vcycle, hsCycle in passes.ts).
+
+      An odd level is halved too, rounding up: 130 goes 65, 33, 17, 9, 5,
+      and its last row and column of coarse cells cover one fine cell
+      instead of two (the restrictions and hsCoarsen skip the cell that is
+      not there, the prolongations clamp to the coarse edge). The halving
+      used to stop at the first odd level, so 130² had one coarse level,
+      65², and sixteen sweeps on 65² cannot solve a pressure field the size
+      of the plate: a press's pressure is a log r out to the open rim, a
+      mode the sweeps move one cell a step. Warm-started, that solve
+      converges across steps instead of within one, and a pressure a few
+      steps stale is applied to a mobility, h³, that has moved on: while
+      the glass closes the stale pressure is the open plate's and the flux
+      falls short of the volume displaced, while it lifts it is the pressed
+      film's and the flux overshoots, both inward. Measured in the 2 mm gap
+      (\`npm run thingap\`, the press on 130²): the flux out of a box round
+      the press read 4.5% of the gap's volume rate on the press's first
+      step and caught up only on its seventh, the ring went out 92% of the
+      displaced volume's shift, and the release took the ring 18% of that
+      shift past where it began, where 128², halved to 4², read 100% and
+      1%. The 6 mm gap hid it: the pressed film's mobility against the open
+      plate's was four times nearer one there (the drag kΔt under the press
+      40 against 4.5), so the stale pressure was nearer the right one. With
+      every grid halved to the bottom, 130² reads as 128² does.
+    */
+    for (let n = this.N; Math.ceil(n / 2) >= 4;) {
+      n = Math.ceil(n / 2);
       const make = (label: string) => this.disposer.track(device.createBuffer({ label, size: Math.max(16, n * n * 4), usage: GPUBufferUsage.STORAGE }));
       this.mg.push({ n, p: make(`mg p ${n}`), b: make(`mg b ${n}`) });
     }
     this.spress = this.disposer.track(device.createBuffer({
       label: 'squeeze pressure',
       size: this.N * this.N * 4,
-      usage: GPUBufferUsage.STORAGE,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }));
     this.cur = pp(this.M, VEL, 'current');
     this.curP = pp(this.M, R32, 'current pressure');
@@ -523,8 +606,6 @@ export class FluidCore {
     this.rbVel = new Float32Array(this.L * this.L * 4);
     this.rbRow = Math.ceil((this.L * 16) / 256) * 256;
     const bytes = this.rbRow * this.L;
-    const staging = (label: string) => this.disposer.track(device.createBuffer({ label, size: bytes, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
-    this.rbStaging = { dye: staging('readback dye'), vel: staging('readback vel') };
     this.rbRings = { dye: new ReadbackRing(device, this.disposer, bytes, 2, 'dye readback'), vel: new ReadbackRing(device, this.disposer, bytes, 2, 'vel readback') };
 
     this.clear();
@@ -632,6 +713,36 @@ export class FluidCore {
     pass.dispatchWorkgroups(w, w);
   }
 
+  /** A two-destination compute dispatch (for fused dye+velocity passes). */
+  protected run2(
+    pass: GPUComputePassEncoder,
+    name: string,
+    dst0: GPUTexture,
+    dst1: GPUTexture,
+    reads: (GPUTexture | GPUSampler)[],
+    args: GPUBuffer,
+    size = this.N,
+  ): void {
+    const pipe = this.pipeline(name, dst0.format);
+    if (!pipe) return;
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, pipe), dst0), dst1), args);
+    for (const r of reads) at = this.groupAt(at, r);
+    let group = at.group;
+    if (!group) {
+      group = bindGroup(this.device, pipe, [
+        this.sim, args,
+        ...reads.filter((r) => r instanceof GPUTexture) as GPUTexture[],
+        dst0, dst1,
+        ...reads.filter((r) => !(r instanceof GPUTexture)) as GPUSampler[],
+      ]);
+      at.group = group;
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(size / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
   protected fill(pass: GPUComputePassEncoder, dst: GPUTexture, value: [number, number, number, number], size: number): void {
     this.run(pass, 'fill', dst, [], this.arg(`fill ${dst.label}`, [...value, size, size, 0, 0]), size);
   }
@@ -645,26 +756,33 @@ export class FluidCore {
     // on the next deposit, and until then the plate shows the (empty) dye.
     this.printLive = false;
     this.resetFilm();
+    // And the tank's water clear again (PLAN 47n): the performer's wipe is the tank emptied and refilled.
+    this.tankPlate?.reset();
+    // And the shaken dish's water still again (PLAN 48f).
+    this.faradayPlate?.reset();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
-    // The sim buffer only needs its grid sizes for a fill.
-    this.simF[0] = this.N; this.simF[1] = this.L;
+    // The sim buffer only needs its grid sizes for a fill, and the cover's gap
+    // for the gap's rest below (gapRest reads S.cover, PLAN 38r-5): a solver's
+    // first clear runs before any step has written it, and laid the gap at
+    // the floor, which npm run ferrorest read as the drop's Σc·h growing 650%.
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[51] = this.coverGap;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.velScratch) this.fill(pass, this.velScratch, [0, 0, 0, 0], this.N);
     this.glassFlow = [0, 0];
     for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
-    this.clearBuffer(pass, this.press, 'clear pressure');
-    this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     // At the dome's own shape, not flat: a plate filled flat then sprung
     // toward the dome pumps its liquid inward until the two agree.
     for (const t of [this.squeeze.a, this.squeeze.b]) this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
@@ -677,23 +795,31 @@ export class FluidCore {
     for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b, this.swirlDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     this.swirlLive = false;
     this.swirlTail = 0;
+    if (this.boilAlpha) for (const t of [this.boilAlpha.a, this.boilAlpha.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.boilLive = false;
+    this.boilFresh = true;
+    this.boilTail = 0;
+    this.airPush = 0;
+    this.airCover = 0;
+    this.airCoverPrev = 0;
+    this.airQuietSeconds = 0;
+    this.air?.setBoilAlpha(null);
     if (this.grain) {
-      // Identity coordinates: seedGrain with both phases reseeded. It reads the
-      // other texture of the pair — a dispatch may not sample what it writes.
-      const identity = this.arg('grain identity', [0, 0, 0, 0]);
-      this.run(pass, 'seedGrain', this.grain.a, [this.grain.b], identity);
-      this.run(pass, 'seedGrain', this.grain.b, [this.grain.a], identity);
+      // Identity coordinates: reseed both phases without sampling the previous frame.
+      const identity = this.arg('grain clear', [0, 0, 0, 0]);
+      this.run(pass, 'grainStep', this.grain.a, [this.grain.b, this.velForced, this.sampler], identity);
+      this.run(pass, 'grainStep', this.grain.b, [this.grain.a, this.velForced, this.sampler], identity);
     }
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
-    // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
-    if (this.hsPour) this.clearBuffer(pass, this.hsPour, 'clear pours');
-    // The oil lift's Ψ is the last oil's shape; the next plate's starts from still.
-    if (this.hsLiftPsi) this.dispatchBuf(pass, 'mgZero', 'mgZero:lift', this.arg('lift zero', [2 * this.liftN * this.liftN, 0, 0, 0]), [this.hsLiftPsi], 2 * this.liftN * this.liftN);
+    this.speciesClears++;
+    this.speciesPoured = null;
+    this.speciesSnap = null;
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
     this.oilSigma = OIL_SIGMA;
@@ -705,6 +831,14 @@ export class FluidCore {
     // The clear film goes with the plate, and is laid fresh on the next step a look asks for one.
     this.filmLaid = 0;
     pass.end();
+    enc.clearBuffer(this.press);
+    enc.clearBuffer(this.spress);
+    // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
+    if (this.hsPour) enc.clearBuffer(this.hsPour);
+    // The oil lift's Ψ is the last oil's shape; the next plate's starts from still.
+    if (this.hsLiftPsi) enc.clearBuffer(this.hsLiftPsi);
+    // And the sealed bottle's, the last wax's.
+    if (this.hsSealPsi) enc.clearBuffer(this.hsSealPsi);
     this.submit(enc);
     this.grainAge = 0;
   }

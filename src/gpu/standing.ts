@@ -5,9 +5,9 @@
  * the plate's step drives it.
  */
 import { Disposer, PipelineCache, bindGroup } from './kit';
-import { SPIKES_WGSL, SPIKE_ONSET, SPIKE_PITCH } from './wgsl/spikes';
+import { SPIKES_WGSL, SPIKE_PITCH } from './wgsl/spikes';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
-import { FILM_H0, STAND_WINDOW, standingKernels } from './wgsl/standing';
+import { FILM_H0, LIFT_ONSET, STAND_WINDOW, standingKernels } from './wgsl/standing';
 
 /*
   The layer, in the capillary length l_c = √(σ / Δρ g), which the plate
@@ -38,7 +38,7 @@ const LC = SPIKE_PITCH / (2 * Math.PI);
   nought field: 2.6 for Ferrotec's EFH1, the light-show grade. It sets how
   hard the magnet pulls the layer against how hard it lifts it
   (wgsl/standing.ts, filmPressure): the pull's scale, in the film's units,
-  is the lift's at saturation (2 / L(onset / LANGEVIN)², 3.08) times
+  is the lift's at saturation (2 / L(LIFT_ONSET)², 3.08) times
   (1 + 1/μr) / (3 χ0), so 0.50. With the lab's earlier LANGEVIN of 0.07,
   where the shares below were tried, it was 0.84: under the Magnet a
   pressure 5.4 l_c deep on the axis against the pool's rim 0.12 away
@@ -79,7 +79,7 @@ const LC = SPIKE_PITCH / (2 * Math.PI);
 export const CHI0 = 2.6;
 const PULL_SHARE = 0;
 function langevin(x: number): number { return x < 1e-3 ? x / 3 : 1 / Math.tanh(Math.min(x, 20)) - 1 / x; }
-const PULL = PULL_SHARE * (2 / langevin(SPIKE_ONSET / LANGEVIN) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
+const PULL = PULL_SHARE * (2 / langevin(LIFT_ONSET) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
 /*
   The film's time unit, 3 μ l_c / σ = 3 μ / (l_c Δρ g), in seconds: an
   oil-based ferrofluid of 6 mPa·s (Ferrotec's light-show grades are 5 to

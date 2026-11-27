@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, type Dispatch, type SetStateA
 import type { EngineStatus } from '../lib/platform';
 import { type BenchOptions, runBench, readRenderer, formatBench } from '../lib/bench';
 import type { VisualizerSettings } from '../types';
+import { setCalibrateDoor } from './earNow';
 
 /**
  * The engine's status line and the grid sweep (`lib/bench.ts`): Calibrate, the
@@ -19,6 +20,13 @@ export function useBench({
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const shownEngineStatus = useRef<EngineStatus | null>(null);
   const engineStatusRef = useRef<EngineStatus | null>(null);
+  // Recalibrate room, for the owner's assistant (app/earNow.ts, PLAN 44k-10):
+  // the panel's own press, a new nonce, which restarts the ear and its room
+  // tracker. Set once: the setter never changes.
+  useEffect(() => {
+    setCalibrateDoor(() => setCalibrateNonce(n => n + 1));
+    return () => setCalibrateDoor(null);
+  }, []);
   // ── The grid sweep ──
   // Walks the solver down every grid and reports where a frame's time went on
   // each, so the question "is the grid what costs you" has an answer taken the

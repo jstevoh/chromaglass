@@ -26,9 +26,10 @@
  *      the speed the physics gives it, τh/2μ (lib/breath.ts) times the
  *      share of a disc of force a rigid film lets through, which is a half
  *      for a uniform disc in an unbounded layer (the rest is the divergent
- *      part, the pressure's to take), less for the breath's softer edge
- *      and a footprint six cells across: read between 0.28 and 0.47 of
- *      τh₀/2μ (0.37 measured in software).
+ *      part, the pressure's to take), and more for the jet's long patch
+ *      (PLAN.md 15g-11), whose liquid has further to go to come back
+ *      round: read between 0.46 and 0.76 of τh₀/2μ (0.61 measured in
+ *      software; 0.37 while the stress landed in a disc under the hand).
  *      And on a liquid ten times as thick (Thickness 0.45 → 0.783), a
  *      tenth as fast, within a fifth, and under a held Press that has
  *      closed the gap, slower as the gap is: the stress is the air's and
@@ -40,21 +41,24 @@
  *   3. A pool of colour the wind is drawn across goes the wind's way, out
  *      to the right and out to the left, its centre of mass at least 0.5% of
  *      the plate, where left alone it moves under 0.1%. Measured in software
- *      +2.72% and +2.82% at the breath's 8 m/s (+1.04% and +1.11% at the
- *      6 m/s it was first set to, as far as the carries moved a pool: 1.06%
- *      in `npm run wind`), and the old push alone +0.02%: the bar is under a
- *      fifth of what the air does and twenty-five times what the push did.
+ *      +13.07% and +13.93% with the breath a jet (PLAN.md 15g-11; +2.72%
+ *      and +2.82% while its stress landed in a disc under the hand, and the
+ *      carries before that moved a pool 1.06% in `npm run wind`), and the
+ *      old push alone +0.02%: the bar is twenty-five times what the push
+ *      did.
  *   4. And keeps its colour to 0.5% (the carries kept 99.4% of a puff's;
  *      the old eraser lost 21%), the pool left alone to 0.1%.
  *   5. A pool of ferrofluid and a drop of oil under the same wind are
- *      carried along by the flow alone, the ferrofluid at least half as far
- *      as the colour; the drop as one body, at least a third as far as the
- *      free colour and half as far as the colour inside it, which goes with
- *      it, neither drawn out where the free colour doubles its spread
- *      (PLAN 38e-6); none of either made or lost (0.5%).
+ *      carried along by the flow alone, each at least half as far as the
+ *      colour, none of either made or lost (0.5%).
  *   6. The Amount's range (PLAN.md QA-20): a gentle breath (Amount 0.25, a
  *      sixteenth of the stress) moves the pool under a tenth of what the
- *      default does, a gale (Amount 2.5) at least three times as far.
+ *      default does, the default less far than the hand went, and a gale
+ *      (Amount 2.5) on ahead of the hand, further than the whole stroke.
+ *   7. The breath runs on along the surface (PLAN.md 15g-11): a palm ahead
+ *      of where a held breath lands the liquid goes its way at 0.15 or
+ *      more of the speed under the landing, and at least four times what
+ *      goes as far behind it.
  *
  * The old push is run and printed as the before, as `npm run fingerflow`
  * prints the Finger's.
@@ -77,14 +81,14 @@ try {
     'push' (blowDirected's velocity, the before) or 'none'; `sign` the way
     it goes along x; `liquid` what is in the pool besides the colour.
   */
-  const stroke = (wind, sign, liquid, share = 1) => page.evaluate(async ({ wind, sign, liquid, share }) => {
+  const stroke = (wind, sign, liquid, share = 1, from = 0.5) => page.evaluate(async ({ wind, sign, liquid, share, from }) => {
     const N = 384, L = 192;
     const look = lab.look('classic').settings;
     const DT = look.globalSpeed * 0.2;
     const over = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, dt: DT, advection: look.advection, oilTension: liquid === 'oil' ? 0.5 : 0 };
     await lab.create(N, L);
     const s = lab.solver();
-    const POOL = { x: 0.5, y: 0.5, r: 0.06 };
+    const POOL = { x: from, y: 0.5, r: 0.06 };
     lab.dye(POOL.x, POOL.y, POOL.r, [0.2, 0.5, 0.9], 1);
     lab.flush(DT);
     if (liquid === 'ferro') lab.addPhase(POOL.x, POOL.y, POOL.r, 0.9);
@@ -92,23 +96,16 @@ try {
     await lab.step(30, over);
     const read = async () => {
       const d = await lab.field('dye');
-      // A field's amount, its middle along x and its spread about it (the root mean square, of the plate).
-      const moments = (data, n, stride, at) => {
-        let m = 0, mx = 0;
-        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = data[(x + y * n) * stride + at]; m += v; mx += v * (x + 0.5) / n; }
-        const cx = m > 0 ? mx / m : 0;
-        let xx = 0;
-        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = data[(x + y * n) * stride + at]; const dx = (x + 0.5) / n - cx; xx += v * dx * dx; }
-        return { m, cx, sx: m > 0 ? Math.sqrt(xx / m) : 0 };
-      };
-      const c = moments(d, L, 4, 3);
-      let f = { m: 0, cx: 0, sx: 0 };
+      let t = 0, mx = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { const v = d[(i + j * L) * 4 + 3]; t += v; mx += v * (i + 0.5) / L; }
+      let m = 0, fx = 0;
       if (liquid !== 'none') {
-        const r = liquid === 'oil' ? await s.readChemistry('mix') : await lab.phase();
-        f = moments(r.data, r.n, liquid === 'oil' ? 4 : 1, 0);
-        if (!(f.m > 0)) throw new Error(`no ${liquid} on the plate to measure`);
+        const f = liquid === 'oil' ? await s.readChemistry('mix') : await lab.phase();
+        const n = f.n, stride = liquid === 'oil' ? 4 : 1;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = f.data[(x + y * n) * stride]; m += v; fx += v * (x + 0.5) / n; }
+        if (!(m > 0)) throw new Error(`no ${liquid} on the plate to measure`);
       }
-      return { dye: c.m, cx: c.cx, sx: c.sx, mass: f.m, fx: f.cx, fsx: f.sx };
+      return { dye: t, cx: mx / t, mass: m, fx: m > 0 ? fx / m : 0 };
     };
     const t0 = await read();
     const R = lab.BLOW_RADIUS * L / 128;
@@ -136,7 +133,7 @@ try {
     await lab.step(30, over);
     const t1 = await read();
     return { t0, t1, laid };
-  }, { wind, sign, liquid, share });
+  }, { wind, sign, liquid, share, from });
 
   /*
     A breath held in one place, blowing along +x, on a fresh plate of clear
@@ -145,7 +142,7 @@ try {
     and half a second after it stops, in m/s; and τh₀/2μ for the breath's
     middle on this liquid.
   */
-  const held = (thickness, press = false) => page.evaluate(async ({ thickness, press }) => {
+  const held = (thickness, press = false) => page.evaluate(async ({ thickness, press, palm }) => {
     const N = 384, L = 192;
     const look = lab.look('classic').settings;
     const DT = look.globalSpeed * 0.2;
@@ -154,24 +151,48 @@ try {
     await lab.step(2, over);
     const R = lab.BLOW_RADIUS * L / 128, cx = L / 2, cy = L / 2;
     /*
-      Pressed: a palm four times the breath's size held down on the middle
+      Pressed: a palm sixteen times the breath's footprint held down on the middle
       of the plate as the app's Press lays it (lib/squish.ts), until the
       gap has stopped closing, and held on while the breath blows, so what
       flows under it is the breath's and not the press squeezing out.
+
+      Eight, not the four it was. τh/2μ is the speed where the gap is the
+      same all round, and the breath's flow comes back round it through
+      the film beside it: where that film is wider than under the breath
+      the way back is easier and the middle runs faster than its own gap
+      says. Since the glass lifts against the film's suction (PLAN 38l) a
+      held press settles at a dent in proportion to its push, so the
+      palm's bowl shows in the gap (before, every press sank to much the
+      same depth and the bottom was flat), and a palm four breaths wide
+      read 0.55 as fast at 0.43 of the gap, against 0.38 at 0.33 on the
+      old spring. Eight wide, the way back is under the palm too: 0.47 as
+      fast at 0.43 of the gap (software WebGPU).
+
+      Sixteen, not eight, since the breath is a jet (PLAN.md 15g-11): its
+      plume runs 22 footprints on from where it lands, so most of its
+      stress fell on the unpressed film past a palm of eight and drove the
+      liquid under the landing from there, and the line read the palm's
+      size more than the gap: 0.50 as fast at 0.42 of the gap, 1.17 of
+      what the gap gives against a bar of a fifth over. A palm of twelve
+      read 0.47 (1.11), and one of sixteen, which is the dish's own radius,
+      so the whole plume blows on pressed film, 0.46 (1.08).
     */
-    const pressDown = () => { if (press) lab.squish(cx, cy, 4 * R, 0.004, 0, 'press', 0, true); };
+    const pressDown = () => { if (press) lab.squish(cx, cy, palm * R, 0.004, 0, 'press', 0, true); };
     if (press) for (let k = 0; k < 120; k++) { pressDown(); lab.flush(DT); await lab.step(1, over, true); }
     const disp = DT * look.advection * (N - 2) / N;
     // Metres a second from the flow's units: plate widths a step over disp, 0.2 m plates, 60 steps a second.
     const mps = (v) => v * disp * 0.2 / lab.stepSeconds;
-    const mean = (vel) => { let a = 0, n = 0; const rr = Math.floor(R / 2);
-      for (let j = -rr; j <= rr; j++) for (let i = -rr; i <= rr; i++) { if (i * i + j * j > rr * rr) continue; a += vel[((cx + i) + (cy + j) * L) * 4]; n++; }
+    const mean = (vel, ox = 0, oy = 0) => { let a = 0, n = 0; const rr = Math.floor(R / 2);
+      for (let j = -rr; j <= rr; j++) for (let i = -rr; i <= rr; i++) { if (i * i + j * j > rr * rr) continue; a += vel[((cx + ox + i) + (cy + oy + j) * L) * 4]; n++; }
       return mps(a / n); };
     // The press alone, as long as the breath will blow: what the gap's own settling moves under it.
     let still = 0;
     if (press) { for (let k = 0; k < 60; k++) { pressDown(); lab.flush(DT); await lab.step(1, over, true); } still = mean(await lab.field('vel')); }
     for (let k = 0; k < 60; k++) { pressDown(); lab.breath(cx, cy, R, 1, 0); lab.flush(DT); await lab.step(1, over, true); }
-    const blowing = mean(await lab.field('vel'));
+    const blown = await lab.field('vel');
+    const blowing = mean(blown);
+    // The same a palm on (ten of the breath's footprints, 60 mm), as far behind where it lands, and five footprints to one side (check 7).
+    const ahead = mean(blown, 10 * R), behind = mean(blown, -10 * R), beside = mean(blown, 0, 5 * R);
     // The gap under the breath's middle, in metres (the field is in gap units: lib/turntable.ts DISH_GAP_FIELD_METRES a unit, PLAN 38r).
     const sq = await lab.squeeze();
     let hs = 0, hn = 0;
@@ -180,9 +201,21 @@ try {
     await lab.step(30, over);
     const after = mean(await lab.field('vel'));
     const nu = lab.thinGapViscosity(thickness);
-    return { blowing, after, still, h, theory: lab.breathStress * h / (2 * 1000 * nu), tau: h * h / (12 * nu), half: 30 * lab.stepSeconds };
-  }, { thickness, press });
+    return { blowing, ahead, behind, beside, after, still, h, theory: lab.breathStress * h / (2 * 1000 * nu), tau: h * h / (12 * nu), half: 30 * lab.stepSeconds };
+  }, { thickness, press, palm: PALM });
 
+  /*
+    Where the gale's pool starts, as a share of the plate along the breath:
+    0.2, where every other stroke starts in the middle. The jet's plume
+    reaches 0.68 of the plate ahead of the hand, the dish's rim is open
+    (wgsl/fluid/dye.ts: colour carried past it leaves the plate), and a
+    gale from the middle blew 36.17% of the pool over it in software, so
+    whether the breath itself kept the colour could not be told from what
+    the rim took. From 0.2 the rim is 0.8 of the plate ahead.
+  */
+  const GALE_FROM = 0.2;
+  // The held Press's size, in the breath's footprints (the story is at pressDown).
+  const PALM = 16;
   const only = process.env.AB_RUNS ? process.env.AB_RUNS.split(',') : null;
   const want = (k) => !only || only.includes(k);
   const got = {};
@@ -191,14 +224,14 @@ try {
     if (!want(name)) continue;
     const t = Date.now();
     const m = got[name] = await held(th, press);
-    console.log(`  ${name} (Thickness ${th}, gap ${(m.h * 1000).toFixed(2)} mm${press ? `, the press alone ${(m.still * 1000).toFixed(3)} mm/s` : ''}): ${(m.blowing * 1000).toFixed(2)} mm/s under the breath against τh/2μ ${(m.theory * 1000).toFixed(2)} (${(m.blowing / m.theory).toFixed(2)} of it); ${(m.after * 1000).toFixed(3)} mm/s half a second after it stopped, drag time ${m.tau.toFixed(3)} s (${((Date.now() - t) / 1000).toFixed(0)} s)`);
+    console.log(`  ${name} (Thickness ${th}, gap ${(m.h * 1000).toFixed(2)} mm${press ? `, the press alone ${(m.still * 1000).toFixed(3)} mm/s` : ''}): ${(m.blowing * 1000).toFixed(2)} mm/s under the breath against τh/2μ ${(m.theory * 1000).toFixed(2)} (${(m.blowing / m.theory).toFixed(2)} of it); a palm on ${(m.ahead * 1000).toFixed(2)}, as far behind ${(m.behind * 1000).toFixed(2)}, beside ${(m.beside * 1000).toFixed(2)}; ${(m.after * 1000).toFixed(3)} mm/s half a second after it stopped, drag time ${m.tau.toFixed(3)} s (${((Date.now() - t) / 1000).toFixed(0)} s)`);
   }
   // The Amount's range (6): a gentle breath at Amount 0.25 and a gale at 2.5, share Amount².
-  for (const [name, wind, sign, liquid, share] of [['right', 'air', 1, 'none'], ['left', 'air', -1, 'none'], ['alone', 'none', 1, 'none'], ['push', 'push', 1, 'none'], ['ferro', 'air', 1, 'ferro'], ['oil', 'air', 1, 'oil'],
-    ['gentle', 'air', 1, 'none', 0.0625], ['gale', 'air', 1, 'none', 6.25]]) {
+  for (const [name, wind, sign, liquid, share, from] of [['right', 'air', 1, 'none'], ['left', 'air', -1, 'none'], ['alone', 'none', 1, 'none'], ['push', 'push', 1, 'none'], ['ferro', 'air', 1, 'ferro'], ['oil', 'air', 1, 'oil'],
+    ['gentle', 'air', 1, 'none', 0.0625], ['gale', 'air', 1, 'none', 6.25, GALE_FROM]]) {
     if (!want(name)) continue;
     const t = Date.now();
-    const m = got[name] = await stroke(wind, sign, liquid, share);
+    const m = got[name] = await stroke(wind, sign, liquid, share, from);
     console.log(`  ${name}: colour ${m.t0.dye.toFixed(1)} → ${m.t1.dye.toFixed(1)} (${pc(m.t1.dye / m.t0.dye - 1)}), its middle ${pc((m.t1.cx - m.t0.cx) * sign)} of the plate the wind's way${liquid !== 'none' ? `; the ${liquid} ${pc((m.t1.fx - m.t0.fx) * sign)}, ${pc(m.t1.mass / m.t0.mass - 1)} of it made or lost` : ''}${wind === 'air' ? `; breath laid on ${m.laid} of 90 steps` : ''} (${((Date.now() - t) / 1000).toFixed(0)} s)`);
   }
   console.log('');
@@ -209,7 +242,12 @@ try {
     const a = got.held, b = got['held thick'], c = got['held pressed'];
     /*
       The share is held to a quarter either side of what software measured
-      (0.37), not to the 0.3 to 0.8 a first version took: `theory` repeats
+      (0.61 since the breath's stress lands as a jet along the surface, PLAN
+      15g-11; 0.37 while it landed in a disc under the hand: τh/2μ is the
+      speed where nothing pushes back, the liquid under a patch of stress is
+      held back by the pressure that sends it round again, and the jet's
+      long patch has a longer way round than the disc had, so its middle
+      runs nearer the whole), not to the 0.3 to 0.8 a first version took: `theory` repeats
       the breath's own formula, so this band is the only guard on the
       constant that turns pascals into the flow's speed, and a breath twice
       as strong (a 2 dropped from 2μ) read 0.74 inside the wide one.
@@ -221,7 +259,7 @@ try {
     const share = a ? a.blowing / a.theory : 0;
     const gapRatio = a && c ? c.h / a.h : 1, speedRatio = a && c ? (c.blowing - c.still) / a.blowing : 0;
     check('under a held breath the liquid goes its way at the speed the air\'s stress gives it, τh/2μ: a tenth as fast in a liquid ten times as thick, slower where the gap is pressed',
-      need('held', 'held thick', 'held pressed') && share > 0.28 && share < 0.47 && Math.abs((b.blowing / a.blowing) / (b.theory / a.theory) - 1) < 0.2 &&
+      need('held', 'held thick', 'held pressed') && share > 0.46 && share < 0.76 && Math.abs((b.blowing / a.blowing) / (b.theory / a.theory) - 1) < 0.2 &&
         gapRatio < 0.75 && Math.abs(speedRatio / gapRatio - 1) < 0.2,
       need('held', 'held thick', 'held pressed') ? `${share.toFixed(2)} of τh₀/2μ; the thick liquid ${(b.blowing / a.blowing).toFixed(3)} as fast, against ${(b.theory / a.theory).toFixed(3)} from its viscosity; pressed to ${gapRatio.toFixed(2)} of the gap, ${speedRatio.toFixed(2)} as fast` : 'not run');
   }
@@ -232,6 +270,29 @@ try {
     check('and it stops when the breath stops, as the gap\'s drag says',
       !!a && Math.abs(a.after) < 2 * decay * Math.abs(a.blowing) + 1e-5,
       a ? `${(a.after * 1000).toFixed(3)} mm/s half a second on, against e^(−0.5/τ) of ${(a.blowing * 1000).toFixed(2)}, ${(decay * a.blowing * 1000).toFixed(3)}` : 'not run');
+  }
+  // 7.
+  {
+    /*
+      The breath runs on along the surface (PLAN.md 15g-11; lib/breath.ts
+      has the jet). Reported: blowing "doesn't blow across the surface like
+      I would expect". While the stress landed in a disc under the hand, a
+      palm ahead of a held breath (ten of its footprints, 60 mm) the liquid
+      went 0.12 mm/s, 0.006 of the 19.62 under it, and the same as far
+      behind: the far flow of any patch of force, the same fore and aft.
+      The jet's stress there is 0.16 of its middle's, and the liquid goes
+      8.82 mm/s, 0.28 of the 31.84 under the landing, against 0.86 behind
+      (software WebGPU). So: at least 0.15 of the landing's speed a palm
+      on, and at least four times what goes as far behind, in the thin
+      liquid and in the thick one (the flow is the stress's to scale, so
+      the two shares agree: 0.28 and 0.27). A disc fails both by a factor of
+      twenty and of four; a plume laid the wrong way round fails the second.
+    */
+    const a = got.held, b = got['held thick'];
+    const on = (m) => m.ahead / m.blowing, fore = (m) => m.ahead / Math.max(Math.abs(m.behind), 1e-9);
+    check('the breath runs on along the surface: a palm ahead of where it lands the liquid still goes its way, and far less as far behind',
+      need('held', 'held thick') && a.ahead > 0 && b.ahead > 0 && on(a) >= 0.15 && on(b) >= 0.15 && fore(a) >= 4 && fore(b) >= 4 && Math.abs(on(b) / on(a) - 1) < 0.2,
+      need('held', 'held thick') ? `a palm on ${on(a).toFixed(2)} of the speed under the landing (${(a.ahead * 1000).toFixed(2)} mm/s), ${fore(a).toFixed(1)} times what goes as far behind (${(a.behind * 1000).toFixed(2)}); in the thick liquid ${on(b).toFixed(2)} and ${fore(b).toFixed(1)} times` : 'not run');
   }
   console.log(`  before (blowDirected's push on a thin gap, no carry): the pool's middle ${need('push') ? pc(along('push')) : 'not run'} the wind's way`);
   // 3.
@@ -249,79 +310,39 @@ try {
   {
     const moved = (k) => got[k].t1.fx - got[k].t0.fx;
     const kept = (k) => Math.abs(got[k].t1.mass / got[k].t0.mass - 1) < 0.005;
-    /*
-      The oil is a drop, and a drop is not a pool (PLAN 38e-6). The breath
-      is a jet half the drop's width, drawn from the drop's middle out past
-      its edge. A pool of colour has nothing holding it together, so the
-      jet draws a tongue of it out and carries the tongue the whole stroke:
-      the colour's middle goes 2.5% of the plate, its spread along x
-      doubles (2.50% → 5.04% on 192²) and it leans the wind's way (skew
-      1.1). A drop with its own surface tension is pushed as one body: the
-      jet pushes the oil under it forward, the oil round that flows back
-      inside the drop (between two glasses a push on part of a body is a
-      dipole, whose flow over the body is half the push's), and the tension
-      keeps the body round (its spread 3.01% → 3.11%, skew 0.16). So its
-      middle goes about half as far as a free pool's, and the colour inside
-      it rides with it: in the drop's own run the colour went 1.53% and the
-      oil 1.17% (384²: 1.65% and 1.21%), at three times the tension 1.41%
-      and 1.09%, where with next to no tension (0.01) the colour went 2.40%
-      and the oil 1.62%, drawn into the same tongue (its spread
-      3.01% → 4.64%). A drop at
-      rest, round or a teardrop, does not move at all (0.00%), so the force
-      has no net part of its own: what held the oil was the drop holding
-      together, and the half-cell cap the force had until 38e was what had
-      let the jet carve it like a pool (+2.07% against +2.93%).
-
-      So the drop is measured against the colour inside it, which the same
-      flow carries in the same substeps, and not against a pool of colour
-      without it; the colour's middle still leads the oil's by a quarter or
-      so because the colour is laid as a soft disc (its spread 2.50%) and
-      the oil as a full one (3.01%), so the jet, which starts in the
-      middle, moves more of the colour's share than of the oil's. And the
-      drop has to go the wind's way as a body for its share: at least a
-      third of the free pool's, where the dipole's half times the two
-      discs' shares puts it at 0.43 (384², and the Mac the same), and stay
-      one body, its spread along x grown by under a quarter (384²: 2.4%)
-      where the free pool's grows by half or more (117%). The colour
-      inside it has the same two bars (it went a third of the free pool's
-      at least, 1.65% against 0.93%, its spread +12%), so the pair cannot
-      pass by both sitting still, and the breath has to have been laid on
-      every step of both runs. Controls on 384²: with next to no tension
-      (0.01) the oil went +1.75% with its colour's +2.69%, past both
-      floors, and its spread +61%, drawn out like the pool; with the
-      half-cell cap put back on the force the oil went +2.07% with its
-      colour's +2.93%, past the old bar, its spread +50%. Only the spread
-      bar tells a drop from a pool, so it is the one that counts here. The
-      spread is taken along x, the jet's own line; a drop torn across it
-      would show in its mass or its colour. The ferrofluid is measured as
-      it was.
-    */
-    const ride = got.oil ? got.oil.t1.cx - got.oil.t0.cx : 0;
-    const spread = (k, f) => got[k].t1[f] / got[k].t0[f] - 1;
-    const body = (k) => moved(k) >= along('right') / 3 && spread(k, 'fsx') < 0.25;
-    check('a pool of ferrofluid and a drop of oil under the same wind are carried along by the flow, none made or lost; the drop as one body, with its colour inside it',
-      need('ferro', 'oil', 'right') && along('right') >= 0.005 && got.ferro.laid === 90 && got.oil.laid === 90 &&
-        moved('ferro') >= 0.5 * along('right') && kept('ferro') && kept('oil') &&
-        moved('oil') >= 0.5 * ride && ride >= along('right') / 3 && body('oil') && spread('oil', 'sx') < 0.25 && spread('right', 'sx') >= 0.5,
-      need('ferro', 'oil', 'right') ? `the ferrofluid ${pc(moved('ferro'))} (${pc(got.ferro.t1.mass / got.ferro.t0.mass - 1)} made or lost) against the colour's ${pc(along('right'))}; the oil ${pc(moved('oil'))} (${pc(got.oil.t1.mass / got.oil.t0.mass - 1)}) with its colour's ${pc(ride)}, their spreads along x ${pc(spread('oil', 'fsx'))} and ${pc(spread('oil', 'sx'))} where the free colour's ${pc(spread('right', 'sx'))}` : 'not run');
+    check('a pool of ferrofluid and a drop of oil under the same wind are carried along by the flow, none made or lost',
+      need('ferro', 'oil', 'right') && moved('ferro') >= 0.5 * along('right') && moved('oil') >= 0.5 * along('right') && kept('ferro') && kept('oil'),
+      need('ferro', 'oil', 'right') ? `the ferrofluid ${pc(moved('ferro'))} (${pc(got.ferro.t1.mass / got.ferro.t0.mass - 1)} made or lost), the oil ${pc(moved('oil'))} (${pc(got.oil.t1.mass / got.oil.t0.mass - 1)}), against the colour's ${pc(along('right'))}` : 'not run');
   }
   // 6.
   {
     /*
       The Amount is the breath's speed against a firm one's, so its stress,
       and the flow it drives, goes as its square (PLAN.md QA-20). Measured
-      in software along this stroke: Amount 0.05 moved the pool 0.003% of
-      the plate, 0.25 0.085%, 1 2.72%, 2.5 14.6% and 5 16.5% (the stroke is
-      16% long: past 2.5 the colour goes with the hand, and what 5 adds is
-      speed, the flow four times 2.5's). So a gentle breath has to move the
-      pool under a tenth of what a firm one does, and a gale at least three
-      times as far, the colour kept to 0.5% in both.
+      in software along this stroke since the breath is a jet (PLAN.md
+      15g-11): Amount 0.25 moved the pool 0.27% of the plate, 1 13.07% and
+      2.5 37.06%, its colour kept (+0.00%), from where the gale starts
+      (0.085%, 2.72% and 14.6% while the stress landed in a disc under the
+      hand; a gale from the middle 30.90% with 36.17% gone over the rim). The stroke is 16% long. So a gentle breath has to
+      move the pool under a tenth of what a firm one does; a firm one moves
+      it, but less far than the hand went; and a gale sends it on ahead of
+      the hand, further than the whole stroke and at least half as far
+      again as the firm one. (The bar was three times the firm breath's.
+      The firm breath now takes the pool most of the way the hand goes, and
+      three times that is past the dish's rim.)
+
+      The colour is kept to 0.5% by all three. The gale's pool starts
+      further back than the others' (GALE_FROM, above) so that it stays on
+      the plate: what is held here is the breath's own keeping of the
+      colour at its strongest, not the rim's.
     */
     const off = (k) => got[k].t1.dye / got[k].t0.dye - 1;
-    check('the Amount runs from a breath that barely moves the colour to a gale that takes it with the hand',
-      need('gentle', 'gale', 'right') && along('right') >= 0.005 && along('gentle') < 0.1 * along('right') && along('gale') >= 3 * along('right') &&
-        got.gentle.laid === 90 && got.gale.laid === 90 && Math.abs(off('gentle')) < 0.005 && Math.abs(off('gale')) < 0.005,
-      need('gentle', 'gale', 'right') ? `Amount 0.25 ${pc(along('gentle'))}, 1 ${pc(along('right'))}, 2.5 ${pc(along('gale'))} of the plate; colour ${pc(off('gentle'))}, ${pc(off('gale'))}` : 'not run');
+    const STROKE = 0.16;
+    check('the Amount runs from a breath that barely moves the colour, through one that moves it less far than the hand went, to a gale that sends it on ahead of the hand',
+      need('gentle', 'gale', 'right') && along('right') >= 0.005 && along('gentle') < 0.1 * along('right') && along('right') < STROKE &&
+        along('gale') > STROKE && along('gale') >= 1.5 * along('right') &&
+        got.gentle.laid === 90 && got.gale.laid === 90 && Math.abs(off('gentle')) < 0.005 && Math.abs(off('right')) < 0.005 && Math.abs(off('gale')) < 0.005,
+      need('gentle', 'gale', 'right') ? `Amount 0.25 ${pc(along('gentle'))}, 1 ${pc(along('right'))}, 2.5 ${pc(along('gale'))} of the plate, the stroke ${pc(STROKE)}; colour ${pc(off('gentle'))}, ${pc(off('right'))}, ${pc(off('gale'))}` : 'not run');
   }
 } finally {
   await close();

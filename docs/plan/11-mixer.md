@@ -12,12 +12,17 @@ and video standards on each." With it, a standing rule: every feature ships its 
 version in the same PR (see the operating rules below).
 
 1. ~~**The sources there are, in one stack**~~ *shipped* (#176). Story in `docs/plan-shipped.md` §11.1 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the film between the plates, the LED beam, whether 0–200 % is the right travel).
-2. ~~**The other pictures as rows**~~ *shipped* (#189). Story in `docs/plan-shipped.md` §11.2 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the gel's 1.5 gain over the lens; the lumia as a beam).
+2. ~~**The other pictures as rows**~~ *shipped* (#189). Story in `docs/plan-shipped.md` §11.2 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the lumia as a beam; the gel's 1.5 gain went in 38h, the gel is a filter now, judged in §99).
 3. ~~**A blend per row**~~ *shipped* (#193). Story in `docs/plan-shipped.md` §11.3 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the key's edge on a real film; Add over a bright plate).
 4. ~~**Crossfade a row**~~ *shipped* (#195). Story in `docs/plan-shipped.md` §11.4 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13, and a film coming in from a pad filmed by hand (`film.yml`) to show no hard cut in its motion table.
 6. **A row per projector** (rig-plan R1). Once a rig has more than one live plate,
    each projector's plate is a row, with its own grade at the projector's scope (R2).
    This is the large one; it waits on R1, and is §16e.
+7. **The Lumia from a real reflector** (M; Low). `lumiaLight` (`plate.ts:1985-1995`) is fbm
+   through a sin³, a soft wash. Thomas Wilfred's Lumia is the caustic of a lamp off a
+   rotating, bent reflector: thin bright filaments on dark, a heavy-tailed brightness. Draw it
+   as the caustic of a rotating height field. Check: a heavy tail, a few % of pixels over 4×
+   the mean. Updates 38u-9. (38v, from RS-32.)
 
 Found while shipping step 2, *shipped so far*: #189's deploy went red on two Mac `qa` checks that had passed on the same tree (the adapter going away under the run); `qa.mjs`'s sections now report `no frame` instead of aborting the suite. Story in `docs/plan-shipped.md` §11 (moved 2026-10-29, 19m-2).
 

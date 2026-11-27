@@ -96,8 +96,8 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           label="Grain Fineness"
           disabled={(settings.granulation ?? 0) <= 0.002 && 'needs Granulation above 0'}
           value={settings.grainScale ?? 320}
-          min={60}
-          max={900}
+          min={20}
+          max={1200}
           step={20}
           onChange={(v: number) => onUpdate({ grainScale: v })}
           settingKey="grainScale"
@@ -130,6 +130,15 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="edgeRelief"
         />
         <Slider
+          label="Crisp Edges"
+          value={settings.crispEdges ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ crispEdges: v })}
+          settingKey="crispEdges"
+        />
+        <Slider
           label="Projector Focus"
           value={settings.projectorFocus ?? 0.5}
           min={0}
@@ -156,6 +165,20 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ bubbles: v })}
           settingKey="bubbles"
         />
+        {/*
+          How fast that air dissolves (PLAN 38b-2). Beside Bubbles because
+          with no clock a look's bubbles leave only by the rim, a merge or
+          this, so it is how fast the plate turns its air over.
+        */}
+        <Slider
+          label="Bubble Melt"
+          value={settings.bubbleMelt ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ bubbleMelt: v })}
+          settingKey="bubbleMelt"
+        />
         <Slider
           label="Frame Sway"
           value={settings.frameSway ?? 0}
@@ -170,7 +193,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.layerScaleVariety ?? 0.5}
           min={0}
-          max={1.0}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ layerScaleVariety: v })}
           settingKey="layerScaleVariety"
@@ -187,8 +210,8 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         <Slider
           label="Saturation"
           value={settings.saturationBoost}
-          min={0.5}
-          max={2.0}
+          min={0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ saturationBoost: v })}
           settingKey="saturationBoost"
@@ -255,7 +278,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           label="Hue Journey (min/step)"
           value={settings.hueJourney ?? 0}
           min={0}
-          max={10}
+          max={30}
           step={0.5}
           onChange={(v: number) => onUpdate({ hueJourney: v })}
           settingKey="hueJourney"
@@ -264,7 +287,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           label="Kick Bloom"
           value={settings.kickBloom ?? 1}
           min={0}
-          max={1.5}
+          max={4}
           step={0.05}
           onChange={(v: number) => onUpdate({ kickBloom: v })}
           settingKey="kickBloom"
@@ -273,7 +296,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           label="Melody Walk"
           value={settings.melodyWalk ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ melodyWalk: v })}
           settingKey="melodyWalk"
@@ -350,7 +373,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.backgroundLoop ?? 0}
           min={0}
-          max={1.0}
+          max={1.4}
           step={0.05}
           onChange={(v: number) => onUpdate({ backgroundLoop: v })}
           settingKey="backgroundLoop"
@@ -467,6 +490,85 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
         <Slider label="Film Physics" value={settings.filmPhysics ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ filmPhysics: v })}
           settingKey="filmPhysics"
         />
+        {/* The frame's own soap film over the plate (PLAN 32d): a film with a
+            thickness that drains under gravity, is blown about by the plate's
+            flow, goes black from the top and is drawn again. Its colour is its
+            thickness's, seen in reflection. Drain Rate runs its clock; Film
+            Angle is where it is seen from (every band moves thicker). */}
+        <Slider label="Soap Film" value={settings.soapFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ soapFilm: v })}
+          settingKey="soapFilm"
+        />
+        {(settings.soapFilm ?? 0) > 0.001 && (
+          <>
+            <Slider label="Drain Rate" value={settings.soapFilmRate ?? 1} min={0.25} max={8} step={0.25} onChange={(v: number) => onUpdate({ soapFilmRate: v })}
+              settingKey="soapFilmRate"
+            />
+            <Slider label="Film Angle" value={settings.soapFilmAngle ?? 0} min={0} max={70} step={1} onChange={(v: number) => onUpdate({ soapFilmAngle: v })}
+              settingKey="soapFilmAngle"
+            />
+            <Slider label="Frame Tilt" value={settings.soapFilmTilt ?? 90} min={0} max={90} step={1} onChange={(v: number) => onUpdate({ soapFilmTilt: v })}
+              settingKey="soapFilmTilt"
+            />
+          </>
+        )}
+        {/* The water's glow (PLAN 48c): plankton in the plate's water flash
+            blue where a stroke shears it past Glow Shear, and spend their
+            light doing it, refilling over Glow Recharge seconds. It is
+            light the liquid makes, so it shows with the lamp low; the
+            music's hands (Patches) make the strokes. */}
+        <Slider label="Glow" value={settings.glow ?? 0} min={0} max={2} step={0.05} onChange={(v: number) => onUpdate({ glow: v })}
+          settingKey="glow"
+        />
+        {(settings.glow ?? 0) > 0.001 && (
+          <>
+            <Slider label="Glow Shear" value={settings.glowShear ?? 30} min={5} max={200} step={1} onChange={(v: number) => onUpdate({ glowShear: v })}
+              settingKey="glowShear"
+            />
+            <Slider label="Glow Recharge" value={settings.glowRecharge ?? 8} min={0.5} max={60} step={0.5} onChange={(v: number) => onUpdate({ glowRecharge: v })}
+              settingKey="glowRecharge"
+            />
+          </>
+        )}
+        {/* Glitter suspended in the liquid, and while there is any the lens's
+            stop (PLAN 47e, 47d): the specks ride the gap's flow at their own
+            depth, flip in its shear and glint in the side lamp; off the focal
+            plane (Projector Focus) they are discs of the aperture's shape,
+            and in focus a bright one is a six-pointed star. */}
+        <Slider label="Glitter" value={settings.glitter ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ glitter: v })}
+          settingKey="glitter"
+        />
+        {(settings.glitter ?? 0) > 0.001 && (
+          <Slider label="Lens Stop" value={settings.lensStop ?? 4} min={1.4} max={22} step={0.1} onChange={(v: number) => onUpdate({ lensStop: v })}
+            settingKey="lensStop"
+          />
+        )}
+        {/* The tank seen through its side instead of the dish from above
+            (PLAN 47n): heavy dye falls from a nozzle at the surface, thins to
+            a thread as gravity speeds it and runs along the floor. Tank is
+            its glow; the rest are the nozzle's feed and place, the dye's
+            weight, the floor's drain and the dye's colour. */}
+        <Slider label="Tank" value={settings.tank ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ tank: v })}
+          settingKey="tank"
+        />
+        {(settings.tank ?? 0) > 0.001 && (
+          <>
+            <Slider label="Feed" value={settings.tankFeed ?? 1.5} min={0} max={6} step={0.1} onChange={(v: number) => onUpdate({ tankFeed: v })}
+              settingKey="tankFeed"
+            />
+            <Slider label="Dye Weight %" value={settings.tankWeight ?? 0.5} min={0.05} max={3} step={0.05} onChange={(v: number) => onUpdate({ tankWeight: v })}
+              settingKey="tankWeight"
+            />
+            <Slider label="Nozzle" value={settings.tankNozzle ?? 0.5} min={0} max={1} step={0.01} onChange={(v: number) => onUpdate({ tankNozzle: v })}
+              settingKey="tankNozzle"
+            />
+            <Slider label="Drain" value={settings.tankDrain ?? 1} min={0} max={1} step={0.05} onChange={(v: number) => onUpdate({ tankDrain: v })}
+              settingKey="tankDrain"
+            />
+            <Slider label="Glow Hue" value={settings.tankHue ?? 205} min={0} max={360} step={1} onChange={(v: number) => onUpdate({ tankHue: v })}
+              settingKey="tankHue"
+            />
+          </>
+        )}
       </section>
       )}
     </>
@@ -497,14 +599,14 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           settingKey="stock"
         />
         <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Stock</span>
+          <span className="text-[12px] uppercase tracking-widest font-bold text-muted">Stock</span>
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
                 aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
-                className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
+                className={`py-2 rounded-lg text-[12px] uppercase tracking-wider font-bold border transition-colors ${
                   (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[
@@ -524,7 +626,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           label="Grain"
           value={settings.stockGrain ?? 0}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ stockGrain: v })}
           settingKey="stockGrain"
@@ -533,7 +635,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           label="Grain Size"
           value={settings.stockGrainSize ?? 2}
           min={1}
-          max={6}
+          max={16}
           step={0.5}
           onChange={(v: number) => onUpdate({ stockGrainSize: v })}
           settingKey="stockGrainSize"
@@ -542,7 +644,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           label="Gate Weave"
           value={settings.stockWeave ?? 0}
           min={0}
-          max={3}
+          max={12}
           step={0.1}
           onChange={(v: number) => onUpdate({ stockWeave: v })}
           settingKey="stockWeave"
@@ -614,6 +716,15 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
           settingKey="lampHotspot"
         />
         <Slider
+          label="Heat"
+          value={settings.heat ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ heat: v })}
+          settingKey="heat"
+        />
+        <Slider
           label="Second Lamp"
           value={settings.secondLamp ?? 0}
           min={0}
@@ -622,6 +733,46 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ secondLamp: v })}
           settingKey="secondLamp"
         />
+        {/* A coloured lamp low beside the dish (PLAN 47b-side): its colour on the
+            dye and on the walls facing it, falling off across the stage, and
+            the glints on the glitter. Its colour and its place while it is on. */}
+        <Slider label="Side Light" value={settings.sideLight ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ sideLight: v })}
+          settingKey="sideLight"
+        />
+        {(settings.sideLight ?? 0) > 0.001 && (
+          <>
+            <Slider label="Side Colour" value={settings.sideLightHue ?? 30} min={0} max={360} step={5} onChange={(v: number) => onUpdate({ sideLightHue: v })}
+              settingKey="sideLightHue"
+            />
+            <Slider label="Side Angle" value={settings.sideLightAngle ?? 160} min={0} max={360} step={5} onChange={(v: number) => onUpdate({ sideLightAngle: v })}
+              settingKey="sideLightAngle"
+            />
+          </>
+        )}
+        {/* Polarised light (PLAN 31p-1): a polariser under the plate and an
+            analyser at the lens; the liquid shows Michel-Levy colours where its
+            flow stretches it. The analyser and the liquid's strength while the
+            sheets are in. */}
+        <Slider label="Polarisers" value={settings.polariser ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ polariser: v })}
+          settingKey="polariser"
+        />
+        {(settings.polariser ?? 0) > 0.001 && (
+          <>
+            <Slider label="Analyser" value={settings.analyserAngle ?? 90} min={0} max={180} step={5} onChange={(v: number) => onUpdate({ analyserAngle: v })}
+              settingKey="analyserAngle"
+            />
+            <Slider label="Quarter Wave" value={settings.quarterWave ?? 1} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ quarterWave: v })}
+              settingKey="quarterWave"
+            />
+            <Slider label="Birefringence" value={settings.birefringence ?? 0.3} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ birefringence: v })}
+              settingKey="birefringence"
+            />
+            {/* The dish's own frozen moulding stress (PLAN 31p-3): rings round the gate, a pale wall, the cross with plane sheets. */}
+            <Slider label="Dish Stress" value={settings.dishStress ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ dishStress: v })}
+              settingKey="dishStress"
+            />
+          </>
+        )}
         <Slider
           label="Iridescence"
           value={settings.iridescence ?? 0}
@@ -666,7 +817,7 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
           disabled={(settings.gelWheel ?? 0) <= 0.001 && 'needs Gel Wheel above 0'}
           value={settings.gelSpeed ?? 0.5}
           min={0}
-          max={3}
+          max={30}
           step={0.1}
           onChange={(v: number) => onUpdate({ gelSpeed: v })}
           settingKey="gelSpeed"
@@ -800,7 +951,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
           settingKey="macroAimY"
         />
                 <Info>
-                  Alt-drag (Option-drag) on the plate pans the camera; Alt-click fixes it on the spot under the pointer.
+                  Arrow keys pan the camera (Shift for a whole frame); Alt-drag (Option-drag) on the plate pans it too; Alt-click fixes it on the spot under the pointer.
                   {(settings.macroCamera ?? 'hold') === 'follow' ? ' Follow locks onto the liquid there and rides with it.' : ''}
                   {' '}With Random Evolve on, the aim wanders slowly.
                 </Info>
@@ -810,7 +961,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Chase Speed"
               value={settings.macroChase}
               min={0}
-              max={1}
+              max={3}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroChase: v })}
           settingKey="macroChase"
@@ -820,13 +971,16 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Shot Length"
               value={settings.macroHold}
               min={1}
-              max={15}
+              max={60}
               step={0.5}
               onChange={(v: number) => onUpdate({ macroHold: v })}
           settingKey="macroHold"
         />
             )}
+            {/* Honest about what it does: with Frame Sway at 0 the music times Auto's cuts and
+                moves nothing else, so in Hold and Follow there is nothing for it to do until Frame Sway is up. */}
             <Slider
+              disabled={(settings.macroCamera ?? 'hold') !== 'auto' && (settings.frameSway ?? 0) <= 0.001 && 'needs Frame Sway'}
               label="Music Sync"
               value={settings.macroSync ?? 0.6}
               min={0}
@@ -839,7 +993,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Paint Cells"
               value={settings.macroCells}
               min={0}
-              max={1}
+              max={2}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroCells: v })}
           settingKey="macroCells"
@@ -848,7 +1002,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Cell Size"
               value={settings.macroCellScale}
               min={0.15}
-              max={1.5}
+              max={3}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroCellScale: v })}
           settingKey="macroCellScale"
@@ -872,15 +1026,6 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
           settingKey="macroDepth"
         />
             <Slider
-              label="Edge Detail"
-              value={settings.macroEdgeDetail}
-              min={0}
-              max={1}
-              step={0.05}
-              onChange={(v: number) => onUpdate({ macroEdgeDetail: v })}
-          settingKey="macroEdgeDetail"
-        />
-            <Slider
               label="Relief / 3D"
               value={settings.macroRelief}
               min={0}
@@ -888,6 +1033,15 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               step={0.05}
               onChange={(v: number) => onUpdate({ macroRelief: v })}
           settingKey="macroRelief"
+        />
+            <Slider
+              label="Fine Detail"
+              value={settings.macroFine}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroFine: v })}
+          settingKey="macroFine"
         />
           </>
         )}

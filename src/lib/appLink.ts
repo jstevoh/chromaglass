@@ -1,9 +1,11 @@
 /**
- * The iPhone app, and the laptop it can be a remote for.
+ * The phone apps, and the laptop they can be a remote for.
  *
- * The app (PLAN.md §12) is the same build as the website, bundled into a
- * Capacitor shell and drawn by WKWebView from `capacitor://localhost`. It
- * plays the show itself, like the website on a phone. Asked for on
+ * The apps (PLAN.md §12) are the same build as the website, bundled into a
+ * Capacitor shell: on the iPhone drawn by WKWebView from
+ * `capacitor://localhost`, on Android by the system WebView from
+ * `https://localhost` (12-ctl-3). Each plays the show itself, like the
+ * website on a phone. Asked for on
  * 2026-09-27: "make the remote control work on the iPhone app … I'd like to
  * be able to switch back and forth between modes" — so it can also be the
  * phone remote for a show running on the laptop, and go back to playing.
@@ -43,7 +45,7 @@ export interface LaptopLink {
 }
 
 /**
- * Running inside the iPhone app, not a browser.
+ * Running inside one of the phone apps (iPhone or Android), not a browser.
  *
  * Capacitor puts `window.Capacitor` on every page it draws and answers
  * `isNativePlatform()` true inside the shell; in a browser the global is
@@ -143,6 +145,112 @@ export function goRemote(): void {
 /** Switch the app back to playing the show itself. */
 export function goPlay(): void {
   // The site's show is at /show, past the webpage at / (lib/showPath.ts); the
-  // iPhone app has no webpage, and its own files answer / for certain.
+  // phone apps have no webpage, and their own files answer / for certain.
   window.location.href = isPhoneApp() ? '/' : SHOW_PATH;
+}
+
+/**
+ * Running inside the Android app (12-ctl-3), as against the iPhone's.
+ *
+ * Capacitor's `getPlatform()` says which shell drew the page. The two apps
+ * share every line but this one difference: Android's WebView has WebGPU on
+ * fewer phones than Chrome has, so a phone that cannot draw the plate in the
+ * app is offered Chrome (components/NeedsWebGpu.tsx). The iPhone's WKWebView
+ * is Safari's engine, which has WebGPU wherever Safari does, so it has
+ * nowhere better to send anyone.
+ */
+export function isAndroidApp(): boolean {
+  if (!isPhoneApp()) return false;
+  try {
+    const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor;
+    return cap?.getPlatform?.() === 'android';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The website's own show, for a phone that should play it in a browser.
+ *
+ * chromaglass.art is the site's own name (chromaglass.web.app answers the
+ * same build), and the show is at SHOW_PATH, past the webpage at /.
+ */
+export const SITE_SHOW_URL = `https://chromaglass.art${SHOW_PATH}`;
+
+/**
+ * Open the website's show in Chrome, from the Android app.
+ *
+ * The app's own plugin names Chrome's package (android/…/OpenInChromePlugin.java),
+ * because a plain https link from a WebView goes to the phone's default
+ * browser, which on many phones is not Chrome and may have no WebGPU either.
+ * The call goes through Capacitor's bridge directly (`nativePromise`), since
+ * the bundle does not carry Capacitor's web runtime. If the plugin is missing
+ * or refuses, the address is opened as a link, which the shell hands to the
+ * default browser: better a browser that may draw it than nothing.
+ *
+ * A check sets `window.__cgOpenExternal` to read the address instead
+ * (`npm run controller`), as it cannot see another app open.
+ */
+export function openInChrome(url: string = SITE_SHOW_URL): void {
+  if (typeof window.__cgOpenExternal === 'function') {
+    window.__cgOpenExternal(url);
+    return;
+  }
+  const cap = (window as unknown as { Capacitor?: { nativePromise?: (plugin: string, method: string, options: unknown) => Promise<unknown> } }).Capacitor;
+  const viaLink = () => { window.location.href = url; };
+  if (typeof cap?.nativePromise !== 'function') { viaLink(); return; }
+  cap.nativePromise('OpenInChrome', 'open', { url }).catch(viaLink);
+}
+
+/**
+ * Read a scanned QR code as the laptop's address (12-ctl-2).
+ *
+ * The code the Phone · iPad panel draws says the Phone line in full
+ * (`http://192.168.1.20:3000/?remote=1&key=1234`, lib/qr.ts), so a scan is
+ * held to more than the typed field is: it must say http:// or https://
+ * itself. The typed field fills in `http://` for `192.168.1.20` because a
+ * person typing an address leaves it off; a code never does, and a code that
+ * says a bare word ("laptop", a Wi-Fi password, a product number) is not a
+ * laptop's address that happens to lack its scheme. The key is the code's own:
+ * the server printed it with this code, and the one remembered may be old.
+ */
+export function parseScannedCode(text: string): LaptopLink | null {
+  const raw = text.trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  return parseLaptopAddress(raw);
+}
+
+/** What a scan came back with: the code's text, a person backing out, or why it could not scan. */
+export type ScanOutcome = { text: string } | { cancelled: true } | { error: string };
+
+/**
+ * Scan the laptop's code with the phone's camera, in either app.
+ *
+ * Each shell has a small plugin of its own named LaptopScan: VisionKit's live
+ * scanner on the iPhone (ios/App/App/LaptopScan.swift), Google's code scanner
+ * from Play services on Android (android/…/LaptopScanPlugin.java). The
+ * community ML Kit plugin would have been one plugin for both, but on iOS it
+ * installs only through CocoaPods, and the iPhone app is a Swift Package
+ * Manager project. Both resolve with `{ text }` or `{ cancelled: true }` and
+ * reject with a sentence the form can show as it is.
+ *
+ * A check sets `window.__cgScan` to stand in for the camera
+ * (`npm run controller`, part scan): it returns the text a code would say, or
+ * null for a cancel.
+ */
+export async function scanLaptopCode(): Promise<ScanOutcome> {
+  if (typeof window.__cgScan === 'function') {
+    const text = await window.__cgScan();
+    return text == null ? { cancelled: true } : { text };
+  }
+  const cap = (window as unknown as { Capacitor?: { nativePromise?: (plugin: string, method: string, options: unknown) => Promise<unknown> } }).Capacitor;
+  if (typeof cap?.nativePromise !== 'function') return { error: 'This app has no scanner. Type the laptop\'s address instead.' };
+  try {
+    const got = await cap.nativePromise('LaptopScan', 'scan', {}) as { text?: unknown; cancelled?: unknown } | null;
+    if (got && typeof got.text === 'string') return { text: got.text };
+    return { cancelled: true };
+  } catch (e) {
+    const message = (e as { message?: unknown } | null)?.message;
+    return { error: typeof message === 'string' && message ? message : 'The scanner would not open. Type the laptop\'s address instead.' };
+  }
 }

@@ -50,9 +50,9 @@ import { request } from 'node:http';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.SHOWKEY_PORT ?? 4197);
+const PORT = port(4197, 'SHOWKEY_PORT');
 const DIR = mkdtempSync(join(tmpdir(), 'showkey-'));
 const KEY_FILE = join(DIR, 'show-key');
 const LAN = Object.values(networkInterfaces()).flat()

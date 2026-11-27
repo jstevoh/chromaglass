@@ -13,10 +13,12 @@
  *           mark upload unlocked with Home / Pro keys
  *   - 34a-7a: OSC in, Art-Net out and Art-Net in reach the show on a Pro key
  *           only, refused on a Home key and with none (4b, 4c)
+ *   - 23.19: making, changing and loading your own liquids is Pro; a liquid a
+ *           free tier already has (made before the gate) stays on the shelf (13)
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { execSync, spawn } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -33,7 +35,7 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const PORT = 5294;
+const PORT = port(5294);
 const DIST = resolve(process.env.TIERS_DIST ?? 'dist-tiers');
 const tempDir = mkdtempSync(join(tmpdir(), 'cg-tiers-'));
 const licenseFile = join(tempDir, 'license.json');
@@ -84,6 +86,17 @@ try {
       tier: 'home',
       email: 'home@example.com',
       id: 'lic-home-check',
+    },
+    testPrivateJwk,
+  );
+  // The same Home key signed again with the moiré pack on it (PLAN.md 45a-2): what the
+  // licence Worker files when a Home buyer buys the pack (server/license-packs.js).
+  const homeMoireKey = await signLicenseKey(
+    {
+      tier: 'home',
+      email: 'home@example.com',
+      id: 'lic-home-check',
+      packs: ['moire'],
     },
     testPrivateJwk,
   );
@@ -321,9 +334,10 @@ try {
       const { displayKey } = await (await fetch(`${LINK_ORIGIN}/remote-info.json`)).json();
       ws = new WebSocket(`ws://127.0.0.1:${LINK_PORT}/remote-ws`);
       await new Promise((done, fail) => { ws.once('open', done); ws.once('error', fail); });
-      const got = { osc: 0, artIn: 0 };
+      const got = { osc: 0, artIn: 0, link: null };
       ws.on('message', (d) => {
         let m; try { m = JSON.parse(String(d)); } catch { return; }
+        if (m.type === 'link') got.link = m;
         if (m.type !== 'patch') return;
         if (m.settings?.audioImpact !== undefined) got.osc += 1;
         if (m.settings?.colorSpeed !== undefined) got.artIn += 1;
@@ -336,6 +350,10 @@ try {
       const phase = async (settle = 400) => {
         await new Promise((r) => setTimeout(r, settle)); // the server's renewal after a key is filed, with room
         got.osc = 0; got.artIn = 0; rigPackets = 0;
+        // Link (13.5-link-gate): whether it was still on from the phase before,
+        // then the laptop's page asking for it, as its Link button does.
+        const linkWasOn = got.link?.on === true;
+        ws.send(JSON.stringify({ type: 'link-enable', on: true }));
         for (let i = 0; i < 10; i++) {
           level = (level + 37) % 256;
           tx.send(oscMessage('/chromaglass/setting/audioImpact', level / 255), oscPort, '127.0.0.1');
@@ -344,7 +362,7 @@ try {
         }
         await new Promise((r) => setTimeout(r, 200));
         const tier = (await (await fetch(`${LINK_ORIGIN}/license-info.json`)).json()).tier;
-        return { tier, osc: got.osc, artOut: rigPackets, artIn: got.artIn };
+        return { tier, osc: got.osc, artOut: rigPackets, artIn: got.artIn, linkWasOn, link: got.link?.on === true, locked: got.link?.locked === true };
       };
       const post = async (path, key) => {
         const r = await fetch(`${LINK_ORIGIN}${path}`, {
@@ -379,13 +397,27 @@ try {
       const proFiled = await phase(2600);
       await fileDirect(homeKey);
       const homeFiled = await phase(2600);
-      const say = (p) => `${p.tier}: osc ${p.osc}, art-net out ${p.artOut}, art-net in ${p.artIn}`;
+      const say = (p) => `${p.tier}: osc ${p.osc}, art-net out ${p.artOut}, art-net in ${p.artIn}, link ${p.link ? 'on' : p.locked ? 'locked' : 'off'}`;
       const open = (p) => p.tier === 'pro' && p.osc >= 8 && p.artOut >= 15 && p.artIn >= 8;
       const refused = (p) => p.osc === 0 && p.artOut === 0 && p.artIn === 0;
       check(
         '4b. with a Pro key, OSC in, Art-Net out and Art-Net in all reach the show, whether the key came through the server or straight into its licence file',
         open(pro) && open(proFiled),
         `${say(pro)}; filed straight: ${say(proFiled)}`,
+      );
+      /*
+        4d. Link is Pro beside them (PLAN.md 13.5-link-gate). Asked for below
+        Pro it stays out of the session and says "locked", so the switch can
+        say why; and a Pro key swapped for a Home one closes it, not only the
+        next ask (the Home phase follows a Pro one that left Link on).
+      */
+      const linkOpen = (p) => p.link && !p.locked;
+      const linkShut = (p) => !p.link && p.locked;
+      check(
+        '4d. Ableton Link joins on a Pro key, is refused and says so on Home or none, and a Pro key swapped for Home leaves the session',
+        linkOpen(pro) && linkOpen(proFiled) && linkShut(none) && linkShut(home) && linkShut(removed) && linkShut(homeFiled)
+          && home.linkWasOn === false && homeFiled.linkWasOn === false && pro.linkWasOn === false,
+        `${[none, pro, home, removed, proFiled, homeFiled].map((p) => `${p.tier} ${p.linkWasOn ? 'was on, ' : ''}${p.link ? 'on' : p.locked ? 'locked' : 'off'}`).join('; ')}`,
       );
       check(
         '4c. with a Home key, with no key in an enforced launch, and once the key is removed, OSC and Art-Net (out and in) are refused',
@@ -479,6 +511,15 @@ try {
     await ctx.addInitScript((jwk) => {
       window.__cgTestLicensePublicKey = jwk;
     }, testPublicJwk);
+    // A liquid on the shelf from before (13): written once, so the shelf the
+    // app saves back after that is what the later halves read.
+    const LIQUID_NAME = 'Tiers Check Silk';
+    await ctx.addInitScript((name) => {
+      if (localStorage.getItem('chromaglass-custom-liquids')) return;
+      localStorage.setItem('chromaglass-custom-liquids', JSON.stringify([
+        { id: 'custom-tiers-check-silk', name, color: '#c8d0e0', behaviour: { weight: 0.4, polarity: -0.7 } },
+      ]));
+    }, LIQUID_NAME);
     const page = await ctx.newPage();
     await page.goto(`${ORIGIN}/?debug&tierGates=1`);
     await waitFor(
@@ -499,11 +540,36 @@ try {
       .locator('#settings-mark [data-cg-free-logo-mark="ChromaGlass"]')
       .count();
     const freeMarkFileCount = await page.locator('#settings-mark #mark-file').count();
+    // The moiré pack's note in the Moiré Sheets section (PLAN.md 45a): drawn while the pack
+    // is not on this copy. Read on Free, on Home, and on Home with the pack (14 below).
+    const moireNote = () => page.locator('[data-testid="moire-pack-note"]').count();
+    const freeMoireNote = await moireNote();
     check(
       '8. free tier shows "In the ChromaGlass app" tiles (23.2) and locks the logo layer to the ChromaGlass mark (23.6)',
-      freeTiles.length === 7 && freeLogoLocked === 1 && freeMarkFileCount === 0,
+      freeTiles.length === 8 && freeLogoLocked === 1 && freeMarkFileCount === 0,
       `tiles=${freeTiles.length}, freeLogoLocked=${freeLogoLocked}, markFile=${freeMarkFileCount}`,
     );
+
+    // 13, free half. Making your own liquids is Pro (PLAN.md 23.19). The
+    // Liquids section is in the panel's DOM whichever section is showing, so
+    // it is read by counts, not visibility. The page opened with one liquid
+    // already on the shelf (the init script above), the way a free user has
+    // one made before the gate or under a lapsed key, so the check needs the
+    // gate to close Design, Edit and Load and to leave that bottle on the
+    // shelf: hiding the whole designer, or dropping a non-Pro user's bottles,
+    // fails it as surely as leaving Design open.
+    const liquidsAt = async () => ({
+      design: await page.locator('[data-testid="liquid-design"]').count(),
+      edit: await page.locator('[data-testid="liquid-edit"]').count(),
+      upsell: await page.locator('[data-cg-pro-upsell="liquids"]').count(),
+      buy: (await page.locator('[data-cg-pro-upsell="liquids"] [data-cg-pro-upsell-buy]').textContent().catch(() => null)) ?? '',
+      href: (await page.locator('[data-cg-pro-upsell="liquids"] [data-cg-pro-upsell-buy]').getAttribute('href').catch(() => null)) ?? '',
+      // The button and its hidden input, each: a Load button moved out of the
+      // gate fails the line even with the input still inside it.
+      load: await page.locator('[data-testid="liquid-load"], [data-testid="liquid-file"]').count(),
+      kept: ((await page.locator('[data-testid="liquid-designer"]').textContent()) ?? '').includes(LIQUID_NAME),
+    });
+    const freeLiquids = await liquidsAt();
 
     // Close Settings and open Record panel
     await page.keyboard.press('Escape');
@@ -550,6 +616,7 @@ try {
       () => page.locator('[data-cg-account]').isVisible().catch(() => false),
       10_000,
     );
+    const freeMoireLine = await page.locator('[data-cg-moire-pack="free"]').count();
     await page.fill('[data-cg-license-input]', homeKey);
     await page.click('[data-cg-license-activate]');
     await waitFor(
@@ -568,12 +635,44 @@ try {
     const homeRemainingTiles = await page
       .locator('[data-cg-app-tiles] [data-cg-app-tile]')
       .evaluateAll((els) => els.map((e) => e.getAttribute('data-cg-app-tile')));
+    const homeLiquids = await liquidsAt();
     check(
       '10. activating a Home key unlocks custom logo upload and Record/Render, leaving only Pro tiles gated',
       homeRemainingTiles.length === 2 &&
         homeRemainingTiles.includes('multi-projector') &&
         homeRemainingTiles.includes('pro-io'),
       `remainingTiles=${JSON.stringify(homeRemainingTiles)}`,
+    );
+
+    // 14. The moiré pack on Home (PLAN.md 45a-2): a plain Home key leaves the pack locked
+    // and the account sheet offers it; the same key signed again with `packs: ['moire']`
+    // opens it, and the sheet says it is on the licence. Read by the section's own note
+    // and the sheet's own lines, on the same page, so the key is the only thing changed.
+    const homeMoireNote = await moireNote();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.click('[data-cg-account-open]');
+    await waitFor(() => page.locator('[data-cg-account]').isVisible().catch(() => false), 10_000);
+    const homeBuyMoire = await page.locator('[data-cg-buy-moire]').getAttribute('href').catch(() => null);
+    const homeOwnedBefore = await page.locator('[data-cg-moire-pack="owned"]').count();
+    await page.click('[data-cg-license-deactivate]');
+    await waitFor(async () => (await page.locator('[data-cg-license-tier]').getAttribute('data-cg-license-tier')) === 'free', 10_000);
+    await page.fill('[data-cg-license-input]', homeMoireKey);
+    await page.click('[data-cg-license-activate]');
+    await waitFor(async () => (await page.locator('[data-cg-license-tier]').getAttribute('data-cg-license-tier')) === 'home', 10_000);
+    const homeOwnedAfter = await page.locator('[data-cg-moire-pack="owned"]').count();
+    const homeBuyAfter = await page.locator('[data-cg-buy-moire]').count();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.click('[data-testid="open-all-settings"]');
+    await page.waitForTimeout(500);
+    const packMoireNote = await moireNote();
+    check(
+      '14. the moiré pack: locked on Free and Home (the section\'s note; the sheet offers it to Home with the account\'s email, and tells Free where it comes from), open on a Home key that names it',
+      freeMoireNote === 1 && freeMoireLine === 1 && homeMoireNote === 1 &&
+        typeof homeBuyMoire === 'string' && homeBuyMoire.includes('lemonsqueezy.com/checkout/buy/') && homeBuyMoire.includes('home%40example.com') &&
+        homeOwnedBefore === 0 && homeOwnedAfter === 1 && homeBuyAfter === 0 && packMoireNote === 0,
+      `note free/home/pack ${freeMoireNote}/${homeMoireNote}/${packMoireNote}, free line ${freeMoireLine}, buy ${homeBuyMoire}, owned ${homeOwnedBefore}→${homeOwnedAfter}, buy after ${homeBuyAfter}`,
     );
 
     // Upgrade to Pro key via AccountSheet and verify all tiles unlock
@@ -597,6 +696,18 @@ try {
     await page.click('[data-testid="open-all-settings"]');
     await page.waitForTimeout(500);
     const proTileSectionCount = await page.locator('[data-cg-app-tiles]').count();
+    const proLiquids = await liquidsAt();
+    check(
+      '13. making your own liquids is Pro: Free and Home see the Pro note (Get Pro, Upgrade to Pro) and no Design, Edit or Load, keep a liquid made before on the shelf, and a Pro key opens all three (23.19)',
+      freeLiquids.design === 0 && freeLiquids.edit === 0 && freeLiquids.load === 0 && freeLiquids.upsell === 1 && freeLiquids.kept &&
+        freeLiquids.buy.includes('Get Pro') && freeLiquids.href.includes('lemonsqueezy.com/checkout/buy/') &&
+        homeLiquids.design === 0 && homeLiquids.edit === 0 && homeLiquids.load === 0 && homeLiquids.upsell === 1 && homeLiquids.kept &&
+        homeLiquids.buy.includes('Upgrade to Pro') &&
+        // Home pays the difference: its link is the upgrade checkout, not Pro's full price.
+        homeLiquids.href.includes('lemonsqueezy.com/checkout/buy/') && homeLiquids.href !== freeLiquids.href &&
+        proLiquids.design === 1 && proLiquids.edit === 1 && proLiquids.load === 2 && proLiquids.upsell === 0 && proLiquids.kept,
+      `free=${JSON.stringify(freeLiquids)} home=${JSON.stringify(homeLiquids)} pro=${JSON.stringify(proLiquids)}`,
+    );
     check(
       '11. upgrading to a Pro key unlocks all Pro features and removes all app gate tiles',
       proTileSectionCount === 0,

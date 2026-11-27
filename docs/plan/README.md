@@ -1,9 +1,32 @@
 # The plan, one file a section
 
-`PLAN.md` at the root is the index: the order of work, the running order and the rules,
-and a table of these files. Each file here is one section of the plan (a big one cut
-between items into parts), with only its open work and the stubs of what shipped; the
-stories of shipped items are in `docs/plan-shipped.md`, under the same numbers.
+`PLAN.md` at the root is the index: this week's list, the order of work, the running order
+and the rules, and a table of these files. Each file here is one section of the plan (a big
+one cut between items into parts), and holds **only its open work**.
+
+## The archive
+
+Closed items live in [`archive/`](archive/), one file per section file, with the same name
+(`archive/18-physics-2.md` holds what closed in `18-physics-2.md`), each item whole, under
+the heading it stood under, with its id unchanged. `grep -rn '<id>' docs/plan/` finds an item
+wherever it is. The stories moved before 2026-11-21 are in `docs/plan-shipped.md`, under the
+same numbers. Sections that shipped whole (§2, §3, §7) moved there as files.
+
+`node scripts/planarchive.mjs` does the moving (`--dry` prints what it would move). It moves
+every item whose first line says it is closed, in the ways this plan writes it: struck
+through from the start (`- ~~**18c-2**~~`), `(shipped ...)` or `(fixed)` in its title,
+`**shipped**` or `*Shipped*` beside it, or `Shipped`, `Done`, `Dropped`, `Retired` or
+`Superseded` straight after its bold title. An item that shipped only in part stays. A
+closed heading stays as a one-line stub while open items stand under it. It checks that no
+line and no id is lost or doubled before it writes, and running it again moves nothing. So
+an item is closed the way it always was, where it stands, and the sweep moves it: run it in
+the PR or leave it for the next one.
+
+**A branch from before the first sweep (main before 2026-11-21's 19m-5).** Merging main may
+conflict in a section file where the branch edited lines next to an item that moved. Take
+main's side of the conflict, put the branch's own lines back in the live file (or, for a line
+inside an item that has since closed, in `archive/` under the same name), and run the sweep:
+an item the branch marked shipped then moves on its own.
 
 ## Where the old PLAN.md went
 

@@ -24,8 +24,9 @@ export class FluidReads extends FluidInputs {
    * dropped and its stage stops running.
    */
   async speciesShare(): Promise<number> {
-    if (!this.species || !this.speciesLive) return 0;
+    if (!this.species || !this.speciesLive) { this.speciesSnap = null; return 0; }
     const pours = this.speciesQuiet;
+    const clears = this.speciesClears;
     this.shareRead ??= new RimRead(this.device, this.disposer, 'species share');
     const share = await this.shareRead.read(this.L, this.rbRow, this.readTarget, (enc) => {
       this.simF[0] = this.N; this.simF[1] = this.L;
@@ -34,8 +35,26 @@ export class FluidReads extends FluidInputs {
       this.run(pass, 'downsample', this.readTarget, [this.speciesLive ? this.species!.read : this.blank('rgba')], this.arg('none', [0, 0, 0, 0]), this.L);
       pass.end();
     });
-    if (share < 1e-6 && pours === this.speciesQuiet) this.speciesLive = false;
+    if (clears !== this.speciesClears) { this.speciesSnap = null; return 0; }
+    if (share < 1e-6 && pours === this.speciesQuiet) { this.speciesLive = false; this.speciesSnap = null; return share; }
+    const data = this.shareRead.data;
+    this.speciesSnap = data && this.speciesPoured ? { L: this.L, data, poured: this.speciesPoured } : null;
     return share;
+  }
+
+  /**
+   * The species field downsampled to the logical grid (L × L × 4, rgba32float)
+   * and the last poured species' surface tension and density (`pouredOf`,
+   * PLAN 33f), shared with `speciesShare`'s one-second read so only one GPU
+   * read runs. Null when no species is live or when a plate clear landed
+   * before or during the read.
+   */
+  async speciesSnapshot(): Promise<{ L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null> {
+    if (!this.species || !this.speciesLive || !this.speciesPoured) { this.speciesSnap = null; return null; }
+    const clears = this.speciesClears;
+    await this.speciesShare();
+    if (clears !== this.speciesClears || !this.speciesLive || !this.speciesPoured) return null;
+    return this.speciesSnap;
   }
 
   /**
@@ -331,24 +350,28 @@ export class FluidReads extends FluidInputs {
    * see a field a frame or two old, as they did on WebGL.
    */
   readbackAsync(): boolean {
-    // Asked only after a write, each landing taken once (`ReadGate`, PLAN 14ab-3).
+    // Asked only after a write and while both rings have a free slot, each
+    // field copied straight from readTarget into its slot (`ReadGate`, PLAN
+    // 14ab-3, H2c-7): when a ring is full, nothing is encoded and askedNow is
+    // held back so the next frame asks again.
     const rings = this.rbRings;
-    if (this.reads.wants([rings.dye, rings.vel])) {
+    if (this.reads.wants([rings.dye, rings.vel]) && rings.dye.hasFree && rings.vel.hasFree) {
+      const dyeBuf = rings.dye.reserve()!;
+      const velBuf = rings.vel.reserve()!;
       this.simF[0] = this.N; this.simF[1] = this.L;
       this.device.queue.writeBuffer(this.sim, 0, this.simData);
       const none = this.arg('none', [0, 0, 0, 0]);
       const enc = this.device.createCommandEncoder({ label: 'readback' });
-      const slots: { which: 'dye' | 'vel'; buf: GPUBuffer | null }[] = [];
-      for (const which of ['dye', 'vel'] as const) {
+      for (const [which, buf] of [['dye', dyeBuf], ['vel', velBuf]] as const) {
         const pass = enc.beginComputePass({ label: `downsample ${which}` });
         this.run(pass, 'downsample', this.readTarget, [which === 'dye' ? this.dye.read : this.velForced], none, this.L);
         pass.end();
-        enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: this.rbStaging[which], bytesPerRow: this.rbRow }, [this.L, this.L]);
-        slots.push({ which, buf: rings[which].copyFrom(enc, this.rbStaging[which]) });
+        enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: buf, bytesPerRow: this.rbRow }, [this.L, this.L]);
       }
       this.submitRead(enc);
-      for (const s of slots) if (s.buf) rings[s.which].collect(s.buf);
-      if (slots.every((s) => s.buf)) this.reads.askedNow();
+      rings.dye.collect(dyeBuf);
+      rings.vel.collect(velBuf);
+      this.reads.askedNow();
     }
     let fresh = false;
     for (const which of ['dye', 'vel'] as const) {

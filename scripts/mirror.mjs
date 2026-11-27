@@ -36,11 +36,11 @@
  *   node scripts/mirror.mjs        (needs a WebGPU browser: CI's macOS runner)
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
-const PORT = 4351;
+const PORT = port(4351);
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
@@ -173,6 +173,15 @@ try {
       are then the plate's, which is what the derive pass's echo was (it lit
       each plate's relief from its mirror), whatever window the desk shows.
     */
+    /*
+      The pointer's mapping is the plate's to give (plateAt answers null until
+      the visualizer has laid its mapping down), so wait for it as for the
+      engine. Run first on a fresh Mac (PLAN 19k-12 moved this check to `show`,
+      and a PR that touches only it runs it alone) it answered null after the
+      settle and the line read "is not there"; last in `fifth` the shard's
+      earlier checks had warmed the runner. Up to 20 s, then the same line.
+    */
+    await page.waitForFunction(([x, y]) => !!window.chromaglassDebug?.().plateAt?.(x, y), [hx, hy], { timeout: 20000 }).catch(() => {});
     const cellPlate = await page.evaluate(({ hole, G }) => {
       const d = window.chromaglassDebug?.();
       if (typeof d?.plateAt !== 'function') return null;
@@ -366,6 +375,15 @@ try {
     });
     check(`${sc.name}: the plate hears no music while it is judged`, !music.band && music.kicks === 0 && music.heard === 0,
       `${music.band ? 'the band was started' : 'no band started'}, ${music.kicks} kicks reached the plate and the ear heard ${music.heard}, over the ${REPS} drops`);
+    /*
+      This line's name is built from the scenario's, so a quarantine of it in
+      scripts/checks.json cannot be found in this file by its own words. The two
+      held on main's deploy of 2026-11-22 (PLAN 19ak-22, until 2026-12-06), named
+      here whole so the manifest's self-test finds them. A rename of either
+      scenario changes this note and those entries in the same commit, or the
+      quarantine holds nothing: "Classic, calm, layer 1: and nowhere else" and
+      "Classic, calm, layer 1 turned a quarter: and nowhere else".
+    */
     check(`${sc.name}: and nowhere else`, !!worst && worst.over < 1,
       worst ? `most beyond the drop's reach ${worst.v.toFixed(1)} past its drift (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} under the drop; each drop ${worst.reps}, drift ${worst.dreps}, past it ${worst.preps}` : 'no cell was judged');
     await page.close();

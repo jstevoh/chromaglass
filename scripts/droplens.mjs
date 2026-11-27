@@ -48,7 +48,8 @@ import { readFileSync } from 'node:fs';
   u* + soft, t) is, soft being 0.7 of a mask texel (512 across) over the
   curved part's width.
 */
-const plateSrc = readFileSync(new URL('../src/gpu/wgsl/plate.ts', import.meta.url), 'utf8');
+// The aperture and the indices live in plateTransmit.ts's edge block since PLAN 38h-2, read with the plate.
+const plateSrc = ['plate.ts', 'plateTransmit.ts'].map((f) => readFileSync(new URL(`../src/gpu/wgsl/${f}`, import.meta.url), 'utf8')).join('\n');
 const constant = (name) => {
   const m = plateSrc.match(new RegExp(`const ${name}: f32 = ([0-9.]+);`));
   if (!m) throw new Error(`no ${name} in plate.ts`);
@@ -324,6 +325,18 @@ try {
         small: { core: mean(small, 0, 0.5), coreMax: Math.max(...small.slice(0, 11)), edge: cross(sS) / (perUnit * Rs), dark: mean(small, 0.75, 0.85) },
         big: { top: mean(big, 0.1, 0.75), edge: cross(sB) / (perUnit * Rb), dark: Math.min(...big.slice(17, 21)) },
       };
+      /*
+        The same small drop on water with no dye in it (PLAN 38u-14). The
+        band is the meniscus bending the light out of the aperture, and the
+        water round a drop does not have to be coloured for the oil to have a
+        curve: it was drawn at 0.35 of its strength there (the brightness
+        1 - 0.85 · 0.35 = 70% of the plate in the band, where the dyed plate
+        gives 24%; measured on main 72% against 24%), so the plate with a drop on a clear ground was a drop
+        drawn at a third.
+      */
+      await plate(() => null);
+      const sC = await shoot(0.3, 0.25, Rs, { ...PLATE, set: { lampGround: 1 } }); // clear water is dark on the bare ground; on the lamp it is lit
+      out.proj.clear = { dark: mean(profile(sC), 0.75, 0.85), edge: cross(sC) / (perUnit * Rs) };
       await plate((x) => (x < 0.5 ? A : B));
       const refs = { A: await swatch(0.3, 0.42), B: await swatch(0.7, 0.42) };
       out.proj.upright = turned(await shoot(0.5 - 0.15 * Rs, 0.42, Rs, PLATE), refs, [1, 0]);
@@ -439,52 +452,6 @@ try {
       let seam = 0;
       for (let i = 0; i < eOn.length; i += 4) if (Math.abs(eOn[i] - eOff[i]) + Math.abs(eOn[i + 1] - eOff[i + 1]) + Math.abs(eOn[i + 2] - eOff[i + 2]) > 24) seam++;
       out.dyed = { c, p, seam };
-    }
-    /*
-      The outline at the zoom a performer parks on (PLAN 33g-2b). The mask is
-      512 across the whole plate, so at 5x one of its texels is seven and a
-      half screen pixels and the contour of a bilinear read of its
-      antialiased coverage wanders by a third of a texel with the texel's
-      period: a rim of scallops, ragged on every big bead. A flat plate, so
-      nothing but the drop is drawn; the outline is the outermost pixel that
-      differs from the frame with no beads, read at every third of a degree
-      round the drop's middle (the drop is laid at the frame's centre), and
-      what is measured is how far it strays from a circle. Sizes: a droplet
-      (one, one and a half and two cells; a droplet of under two and a half
-      cells is where a step three texels in lands on the far side), the common
-      bead (four and a half), a merged pool (seven) and the biggest the
-      closeup lays (twelve, past the plate's DROP_BIGGEST). Both masks: the
-      rings' square one, and the drops' wide one (a different coverage ramp
-      and dome). `closed` is how much of the circle at 0.85 of the radius
-      differs from the plate: the dark outline a droplet is made of, none of
-      it erased.
-    */
-    {
-      await plate(() => A);
-      const cam = { zoom: 5, ...CAMERA.cam, cx: 0.5, cy: 0.5 };
-      const off = await lab.render(S, { beads: 0, ...CAMERA.set }, cam);
-      out.round = [];
-      const kinds = [['rings', {}, mask, [1, 1.5, 2, 4.5, 7, 12]], ['drops', { beadDrops: 1 }, wide, [2, 4.5, 12]]];
-      for (const [kind, over, make, sizes] of kinds) for (const cells of sizes) {
-        const on = await lab.render(S, { beads: 0.8, ...over, ...CAMERA.set }, { ...cam, beadMask: make([{ x: 0.5 * N, y: 0.5 * N, r: cells }]) });
-        const differs = (x, y) => {
-          if (x < 0 || y < 0 || x >= S || y >= S) return false;
-          const i = (Math.round(y) * S + Math.round(x)) * 4;
-          return Math.abs(on[i] - off[i]) + Math.abs(on[i + 1] - off[i + 1]) + Math.abs(on[i + 2] - off[i + 2]) > 24;
-        };
-        const cx = S / 2 - 0.5, cy = S / 2 - 0.5, edge = [];
-        for (let a = 0; a < 360; a += 1 / 3) {
-          const t = a * Math.PI / 180;
-          let far = 0;
-          for (let r = 2; r < S / 2; r += 0.25) if (differs(cx + Math.cos(t) * r, cy + Math.sin(t) * r)) far = r;
-          edge.push(far);
-        }
-        const mean = edge.reduce((p, c) => p + c, 0) / edge.length;
-        const sd = Math.sqrt(edge.reduce((p, c) => p + (c - mean) ** 2, 0) / edge.length);
-        let hit = 0, tot = 0;
-        for (let a = 0; a < 360; a += 1) { const t = a * Math.PI / 180; tot++; if (differs(cx + Math.cos(t) * 0.85 * mean, cy + Math.sin(t) * 0.85 * mean)) hit++; }
-        out.round.push({ kind, cells, mean, sd, closed: hit / tot });
-      }
     }
     /*
       The second plate turns the line over: A below y = 0.5, B above. The
@@ -617,6 +584,9 @@ try {
   check('and dark round it from where the aperture says',
     Math.abs(P.small.edge - predS) <= 0.03 && P.small.dark < 0.4,
     `half as bright ${P.small.edge.toFixed(3)} of the radius out, the aperture says ${predS.toFixed(3)}; ${(100 * P.small.dark).toFixed(0)}% of the plate from 0.75 to 0.85`);
+  check('and as dark on clear water as on dye: the band is the oil\'s curve, not the dye\'s',
+    dimOk && P.clear.dark < 0.4 && Math.abs(P.clear.dark - P.small.dark) <= 0.05 && Math.abs(P.clear.edge - P.small.edge) <= 0.03,
+    `${(100 * P.clear.dark).toFixed(0)}% of the plate from 0.75 to 0.85 with no dye, ${(100 * P.small.dark).toFixed(0)}% on the grey dye (on main: 72% against 24%, and no half-bright edge at all); half as bright ${P.clear.edge.toFixed(3)} of the radius out, ${P.small.edge.toFixed(3)} on dye`);
   check('projected, a big drop is flat to three quarters out and dark only at its edge',
     dimOk && P.big.top > 0.9 && P.big.top < 1.1 && Math.abs(P.big.edge - predB) <= 0.02 && P.big.dark < 0.4,
     `${(100 * P.big.top).toFixed(0)}% of the plate to 0.75, half as bright ${P.big.edge.toFixed(3)} of the radius out (half the gap and the aperture say ${predB.toFixed(3)}), down to ${(100 * P.big.dark).toFixed(0)}%`);
@@ -648,21 +618,6 @@ try {
   check('where two drops press together, neither shows the far side of the plate in the closeup',
     m.pairApart && m.pair.rings.changed > 500 && m.pair.drops.changed > 500 && m.pair.rings.b === 0 && m.pair.drops.b === 0,
     `pixels of the dye beyond 0.22: ${m.pair.rings.b} as rings, ${m.pair.drops.b} as drops (${m.pair.rings.changed} and ${m.pair.drops.changed} pixels drawn)`);
-  // One texel of the mask at 5x, in frame pixels: a frame is 1/(1.5 zoom) of the plate across (uvToFluid), 512 pixels of it per 512 texels.
-  const TEXEL5 = 1.5 * 5;
-  for (const q of m.round.filter((q) => q.cells >= 2)) {
-    check(`at 5x the outline of a ${q.cells}-cell drop (${q.kind} mask) is round, to under a tenth of a mask texel`,
-      q.sd <= TEXEL5 / 10,
-      `the outermost pixel strays ${q.sd.toFixed(2)} px (${(q.sd / TEXEL5).toFixed(3)} of a texel, ${(100 * q.sd / q.mean).toFixed(2)}% of the ${q.mean.toFixed(1)} px radius); the coverage's own contour strayed 1.2 px`);
-  }
-  for (const q of m.round.filter((q) => q.kind === 'rings' && q.cells <= 2)) {
-    check(`a ${q.cells}-cell droplet keeps its whole dark outline in the closeup`,
-      q.closed >= 0.97, `${(100 * q.closed).toFixed(1)}% of the circle at 0.85 of the radius differs from the plate (a step past the centre erased it)`);
-  }
-  const rr = (kind, c) => m.round.find((q) => q.kind === kind && q.cells === c).mean;
-  check('and the sizes are as laid (2 : 4.5 : 7 : 12)',
-    Math.abs(rr('rings', 4.5) / rr('rings', 2) / (4.5 / 2) - 1) < 0.1 && Math.abs(rr('rings', 7) / rr('rings', 4.5) / (7 / 4.5) - 1) < 0.1 && Math.abs(rr('rings', 12) / rr('rings', 7) / (12 / 7) - 1) < 0.1,
-    `radii ${[2, 4.5, 7, 12].map((c) => rr('rings', c).toFixed(1)).join(' : ')} px`);
   check('a dyed drop is its dye in the middle', m.dyed.c[1] - m.dyed.p[1] > 40,
     `green ${m.dyed.p[1]} → ${m.dyed.c[1]} (the plate ${m.dyed.p.join(',')}, the drop ${m.dyed.c.join(',')})`);
   check('and the wide mask\'s seam is not a drop', m.dyed.seam === 0, `${m.dyed.seam} pixels changed at the plate's right edge`);

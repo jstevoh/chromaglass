@@ -64,9 +64,9 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
 
   // The sheet's own tokens and sizes (AccountSheet.tsx `label`, `section`, `ghostBtn`), so the
   // card reads as part of it on the desk and keeps the phone's 48 px targets.
-  const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const label = 'text-[12px] font-medium uppercase tracking-wider text-dim';
   const section = 'border-t border-border pt-4';
-  const quiet = 'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-50';
+  const quiet = 'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-65';
   const textBtn = 'min-h-10 pointer-coarse:min-h-12 text-[12px] text-muted underline decoration-faint underline-offset-2 hover:text-text';
 
   if (tier !== 'pro') {
@@ -74,7 +74,7 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
       <div className={section} data-cg-cloud-sync="upsell">
         <div className={label}>Cloud sync · Pro</div>
         <p className="mt-1 text-[12px] leading-snug text-text-2">
-          Pro keeps your saved looks, sequences, set lists, song shows, MIDI map and settings the same in every
+          Pro keeps your saved looks, sequences, set lists, song shows, MIDI map, desk tabs and settings the same in every
           browser and Mac app you sign in to.
         </p>
         <a
@@ -123,7 +123,7 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
         {note ?? line(status, email)}
       </p>
       <p className="mt-1 text-[12px] leading-snug text-muted">
-        Saved looks, sequences, set lists, song shows, liquids, the MIDI map and settings. The projector layout,
+        Saved looks, sequences, set lists, song shows, liquids, the MIDI map, the desk's tabs and settings. The projector layout,
         audio input and MIDI ports stay with each computer.
       </p>
       <div className="mt-2 flex flex-wrap gap-2">

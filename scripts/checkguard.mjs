@@ -221,6 +221,7 @@ export function codeLines(text) {
 // Digits that only say how a number is printed are not a measurement.
 const PRINTING = /\.(toFixed|toPrecision|padStart|padEnd|toString)\(\s*\d+\s*(,[^)]*)?\)(?![\s)]*(<|>))/g;
 const NUM = /(?<![\w$.])(?:\d[\d_]*\.?\d*(?:e[-+]?\d+)?|\.\d+(?:e[-+]?\d+)?)(?![\w$])/gi;
+const SIGNED = /(?<![\w$.])[-\u2212](?:\d[\d_]*\.?\d*(?:e[-+]?\d+)?|\.\d+(?:e[-+]?\d+)?)(?![\w$])/gi;
 const CMP = /(<=|>=|===|!==|==|!=|(?<![=<>-])<(?![<=])|(?<![=>-])>(?![>=]))/;
 
 const clean = (code) => code.replace(PRINTING, '.$1()').replace(/\s+/g, ' ').trim();
@@ -547,7 +548,15 @@ const PLACEHOLDER = /^(reason|why|todo|tbd|because|n\/?a|calibrat\w*|fix(ed)?|ad
 export function names(line, change) {
   const low = line.toLowerCase();
   if (!change.words.every((w) => low.includes(w.toLowerCase()))) return false;
-  const vals = (line.replace(/(?<=\d),(?=\d{3})/g, '').match(NUM) ?? []).map(value);
+  const plain = line.replace(/(?<=\d),(?=\d{3})/g, '');
+  /*
+    A bar below zero (`p.ySoap <= -0.7`) is needed with its sign, and NUM,
+    which reads code, takes the minus for an operator: so a negative bar on a
+    rewritten line could never be named, whatever the line said (filmlook's
+    projector bar, #654). Its signed spelling in the body is read too, a
+    hyphen or the typeset minus; the unsigned reading stays as it was.
+  */
+  const vals = [...(plain.match(NUM) ?? []), ...(plain.match(SIGNED) ?? []).map((t) => t.replace('\u2212', '-'))].map(value);
   for (const t of change.need) if (!vals.some((v) => Math.abs(v - value(t)) <= 1e-12 * Math.max(1, Math.abs(v)))) return false;
   if (change.ops && !(line.includes(change.ops[0]) && line.includes(change.ops[1]))) return false;
   if (change.removed && !/\b(remov|delet|drop)/i.test(line)) return false;
@@ -615,12 +624,18 @@ export function manifestChanges(oldText, newText) {
     if (was.run !== is.run) diffs.push({ field: 'command', from: was.run, to: is.run });
     if (env(was) !== env(is)) diffs.push({ field: 'env', from: env(was) || '(none)', to: env(is) || '(none)' });
     if ((was.timeout ?? null) !== (is.timeout ?? null)) diffs.push({ field: 'timeout', from: String(was.timeout ?? 'none'), to: String(is.timeout ?? 'none') });
+    // A quarantine (PLAN.md 19ak-1) stops a line blocking a PR: one added, or
+    // one whose end moved later, is a looser check, named by the check's name.
+    // One taken off or ended sooner is not.
+    const qs = (c) => (c.quarantine ?? []).map((q) => `"${q.line}" (${q.plan}) until ${q.until}`).join('; ') || '(none)';
+    const looser = (is.quarantine ?? []).filter((q) => !(was.quarantine ?? []).some((o) => o.line === q.line && o.until >= q.until));
+    if (looser.length) diffs.push({ field: 'quarantine', from: qs(was), to: qs(is), dates: true });
     for (const d of diffs) {
       const before = (clean(d.from).match(NUM) ?? []).map(value), after = (clean(d.to).match(NUM) ?? []).map(value);
       // The numbers in one and not the other, as a bag.
       const left = [...after];
       const gone = before.filter((v) => { const i = left.indexOf(v); if (i >= 0) { left.splice(i, 1); return false; } return true; });
-      out.push({ file, line: 0, kind: 'manifest', what: `the check "${was.name}": its ${d.field} changed`, from: d.from, to: d.to, words: [was.name], need: [...gone, ...left].map(String), code: `${d.from.slice(0, 70)} → ${d.to.slice(0, 70)}` });
+      out.push({ file, line: 0, kind: 'manifest', what: `the check "${was.name}": its ${d.field} changed`, from: d.from, to: d.to, words: [was.name], need: d.dates ? [] : [...gone, ...left].map(String), code: `${d.from.slice(0, 70)} → ${d.to.slice(0, 70)}` });
     }
   }
   return out;
@@ -730,6 +745,10 @@ function selftest() {
   t(!names(namedLines('Check changes:\n- scripts/rides.mjs 0.05 → 0.045: the corners no longer count in the dish')[0], c[0]), 'named with the wrong new number, it does not');
   t(!names(namedLines('Check changes:\n- scripts/rides.mjs: Plate Rock bar recalibrated for the new dish mask measurement')[0], c[0]), 'named without the numbers, it does not');
   t(!names(namedLines('Check changes:\n- scripts/plates.mjs 0.05 → 0.04: the corners no longer count in the dish')[0], c[0]), 'named in another file, it does not');
+  const neg = { file: 'scripts/filmlook.mjs', kind: 'bar', words: ['filmlook.mjs'], need: ['-0.7'], removed: true };
+  t(names('scripts/filmlook.mjs:282 -0.7 removed: the condition rewritten, the projector keeps the same number', neg), 'a bar below zero, named with its sign, passes');
+  t(names('scripts/filmlook.mjs:282 \u22120.7 removed: the condition rewritten, the projector keeps the same number', neg), 'and with the typeset minus');
+  t(!names('scripts/filmlook.mjs:282 0.7 removed: the condition rewritten, the projector keeps the same number', neg), 'without its sign it does not');
   t(namedLines('Rides 0.05 → 0.04 is fine, the corners no longer count in the dish').length === 0, 'and the same words outside a "Check changes:" section do not count');
   t(names(namedLines('## Check changes\n\n1. `scripts/rides.mjs` bar: 0.050 → 0.04, because the dish rim now bounds the measured area')[0], c[0]), 'a heading, a numbered list and 0.050 for 0.05 are all the same naming');
   const handoff = '**Plan item:** 18g\n**Check changes:**\n- scripts/rides.mjs 0.05 → 0.04: the corners outside the rim no longer count\n**Done:** flushing\n- scripts/rides.mjs 0.05 → 0.04: written under Done instead';
@@ -869,6 +888,13 @@ function selftest() {
   t(manifestChanges(base, mf(other, qa)).length === 0, 'a reorder is not');
   t(manifestChanges(base, mf({ ...qa, why: ['reworded'] }, other)).length === 0, 'nor is the prose');
   t(manifestChanges(base, mf(qa, other, { name: 'A new one', shard: 'a', run: 'npm run slosh' })).length === 0, 'nor a new entry');
+  {
+    const q = (until) => [{ line: 'the flaky line', plan: '19ak-1', since: '2026-11-01', until }];
+    t(manifestChanges(base, mf({ ...qa, quarantine: q('2026-11-15') }, other)).length === 1, 'a quarantine added is a change to name (19ak-1)');
+    t(manifestChanges(mf({ ...qa, quarantine: q('2026-11-15') }, other), mf({ ...qa, quarantine: q('2026-11-20') }, other)).length === 1, 'and so is its end moved later');
+    t(manifestChanges(mf({ ...qa, quarantine: q('2026-11-15') }, other), mf({ ...qa, quarantine: q('2026-11-10') }, other)).length === 0, 'but not its end moved sooner');
+    t(manifestChanges(mf({ ...qa, quarantine: q('2026-11-15') }, other), mf(qa, other)).length === 0, 'nor a quarantine taken off');
+  }
   c = manifestChanges(base, mf(other));
   t(c.length === 1 && c[0].removed && c[0].words[0] === 'The app, every look', 'a removed entry is one change', c.map((x) => x.what).join('; '));
   t(names('The app, every look: removed, its looks are measured by gallery.yml now on the Mac', c[0]), 'named as removed with a reason, it passes');
