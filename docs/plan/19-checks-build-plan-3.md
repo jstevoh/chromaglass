@@ -655,8 +655,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
     `#889` `granulation = 0` under `splodascope` `saturationBoost = 1.3`), `airlens` 9–10
     (`23` vs `41` after `#889`, same as `19ak-24i`), and `spikes` 5 (`6/6` at `3271c994` with
     `16 vs 8`; `#859` moved `b1` `7 → 8`)).
-  - 19ak-24e, `live --codec aac`, `liveshow --stack`, `videolamp`, a show night: each run
-    alone three times first (load on deploy 967, or real).
+  - 19ak-24e, `live --codec aac`, `liveshow --stack`, `videolamp`, a show night:
+    - `live -- --codec aac` (3/3 green alone, 45/45) and `liveshow -- --stack` (3/3 green alone, 28/28): load/phase on deploy 967 (`liveshowstack.mjs:258` compares col 0/15 vs col 2/13, which hits the white bar on row 6 when the last decoded frame lands there).
+    - `qa` ("no section is more than three screens deep — deepest is 3.1 screens"): bisected to `#889` (`3bb0899b`, `38u-11` adding `glassSlide` cord to `Crowd Plate`, growing `Patches` from `2205/758 = 2.91` to `2327/758 = 3.07`); fixed in `PatchesSection.tsx` (2×2 LFOs and 2×1 Envelopes in the sheet). Full `npm run qa` remains blocked at `origin/main` on `49c-2` (`#963` unhooking `overlayUp` at `<1024px`).
+    - `videolamp` (0/3 alone, 9/11): bisected to `#755` (`6d11ce66`, `18e-2`, `19.57/3.57/3.91, flat 0.00` → `17.36/5.05/4.58, flat 8.68`); open for Claude Code (`scripts/videolamp.mjs` measures screen `(0.72, 0.5)` r=`0.12` where `uvToFluid` maps fluid `(0.72, 0.5)` r=`0.12` to screen `(0.83, 0.5)` r=`0.18` — `0.00` middle/far at true coords — and its `rim > 3 * flatRim` control predates `18e-2`'s real `|∇OPL|` pupil loss, which darkens the flat rim by `30.19` vs `58.27` on stripes).
   - 19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
     `lavaround` (after 27f-9q, #866, met 38w-31, #954).
   - ~~19ak-24g, `filmlook`'s two camera lines~~ **shipped**: 38h-6 (#750) rightly took the
