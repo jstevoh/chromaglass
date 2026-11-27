@@ -236,16 +236,10 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     = 1.6, drop the star, and drive the halo from `defocusShadow`. Check: a projected ferro
     look added to `scripts/nolight.mjs` gains no pixel over the lamp. (S–M; Medium; from
     RS-27.)
-  - **38h-14. The projector's bubble film still reflects at Film Physics 0** (S, nil; a
-    look change on the looks that set Iridescence over 0.25). Found writing 38h-6's
-    check: the plate's own bubbles at Iridescence 1 against 0 read 51 levels brighter at
-    Film Physics 0 (`cp * (0.45 + 1.25 * filmC)` above Iridescence 0.25, plate.ts's bubble
-    block), 0 at Film Physics 1. A pocket between the glasses throws only the light
-    through its film, so at Film Physics 0 the rainbow wants a transmitted form too (the
-    pale complement, 1 − k·R, never over 1), or Film Physics 0 is kept as the deliberate
-    look it was written as and named so. Owner's call on the looks. *Measure:* `npm run
-    nolight` line 15 prints the projector's number beside the camera's; ask it under
-    line 15's bar when this ships.
+  - ~~**38h-14**~~ *shipped 2026-11-08.* The projector's bubble film at Film Physics 0 is
+    the light through it, cp·(1 − 0.55·k·filmC) (`projectorFilm`, bubbleFilm.ts), a
+    transmittance in 0.67..1 per channel, never over the lamp: 54 levels over to 0.
+    `npm run nolight` line 16. Story in `docs/plan-shipped.md` §38.
   - **38h-16. The plate still reads the grid's hole round a bubble** (S–M, nil). Found doing
     38h-15. The solver cuts the dye out under a bubble on its grid, so the dye the plate
     decodes is thinned over a texel and a half inside each rim and, through the bicubic
