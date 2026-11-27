@@ -12,11 +12,7 @@ Every item keeps the standing rule: nothing moves the frame as a whole from soun
 each feature ships its phone version in the same PR (the plate shader is shared, so the
 phone and the iPad draw what the desk draws; a new control goes on the phone too).
 
-## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33a (moved 2026-10-29, 19m-2).
-
 ## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33b (moved 2026-10-29, 19m-2).
-
-Left from it, so none of it is lost:
 - **33b-2. A fixed reach and a wholesale flatten.** `airNear` looks 4.5 cells out and
   flattens the dye's whole normal there, so a real dye-to-dye step beside a bubble loses
   its relief inside that reach. Derive the reach from the Sobel and bicubic taps, and
@@ -62,8 +58,6 @@ pixel, and the 10–90 % rise of the edge no wider than 1.5 pixels. Today's numb
 printed first.
 
 ## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`). Story in `docs/plan-shipped.md` §33e (moved 2026-10-29, 19m-2).
-
-Left from it, so none of it is lost:
 - **33e-2. The band's width from the meniscus, for small bubbles too.** The old text
   here said the band is "a share of R"; that is wrong past R = half the gap (the big
   bubble's band is already half the gap, and `airlens` holds it there), so only a
@@ -111,9 +105,6 @@ against water follows u* from the cell's index within 15 %, ferrofluid draws a b
 window and milk a bright middle.
 
 ## ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped** (Paint Cells and Macro Lacing default to 0; `npm run macroview`; 20c-1 is closed by it)
-
-**Shipped.** Story in `docs/plan-shipped.md` §33g (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
-
 - **33g-2. The closeup is still lit, not refracted.** The relief is the dye's own
   gradient read as a dome under a lowered lamp (shortcut: not a physical height field,
   the gap's thickness is not magnified), and the boundary line is thinned by 80 % at
@@ -162,3 +153,35 @@ window and milk a bright middle.
   distance 1.21 to 3.11, half-turned crop least 9.25, 1x chroma least 7.62. These match
   SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
   line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
+
+## 33q. Fewer beads, and the oil in the dye's place (asked 2026-11-26)
+The owner: "too many bubbles in looks", and "the bubbles still aren't very good". The crowd
+was the oil beads, not the air: a look's air field holds 0 to 8 bubbles (a probe of 33
+looks), the bead field held 60 + 360 x Beads, 125 at the default 0.18, 312 at Macro Bead's
+0.7, and refilled every merge, so a field held its count while its oil grew.
+- ~~**33q-1. The Beads dial is oil, not a count.**~~ **Shipped** (this PR): the dial sets
+  how much of the glass the oil covers (5% at full, `BEAD_COVER` in `src/lib/beads.ts`),
+  `beadPopulation` turns that into a count for the beads' size, and the field is held to
+  that oil (`populate(..., byOil)`): a merge keeps its r squared, so the field coarsens
+  into fewer, bigger beads instead of being refilled. The default holds 44 beads where it
+  held 125, Macro Bead 112 where it held 312, and the closeup a quarter of the count at
+  twice the size. `npm run drops`: held by count for 1200 frames the plate carried 2.16 x
+  the dial's oil, held by oil 1.09 x, in 62 beads instead of 119.
+- **33q-2. The oil takes the dye's place, but not all of it.** Tried in this PR and taken
+  out before it shipped: a bead drawn as oil filling 98% of the gap, the dye under it
+  thinned to what is left (T^(1-f) on the lamp, 1-(1-a)^(1-f) on black). `npm run droplens`
+  went from green to 11 of 22: a projected drop's middle fell to 20% of the plate (the
+  check, from the owner's macro photographs, wants the plate seen through the drop, "multiple
+  background colors" in one bead), and the lensed picture, the right-way-round small drop
+  and the turned-over closeup, vanished with the dye it was a picture of. So the dish is not
+  a Hele-Shaw gap the beads fill: the dye layer runs under and over a drop and the drop is a
+  lens in it. What displacement there is wants f from the drop's height over the dye
+  layer's depth, not the gap, measured against the photographs before it is drawn.
+- **33q-3. The beads as obstacles in the solver.** The solver's dye runs on under a bead
+  as if it were not there, so it never piles against the bead's rim the way dye pushed by
+  a moving drop does.
+  The real one is the beads as moving solid inclusions in the thin-gap solve (15g-8d did
+  it for the air bubbles), the dye advected round them and the oil's area conserved.
+- **33q-4. The air bubbles' amount in looks.** Most looks still carry Bubbles 0.2 by
+  inheritance, not by choice; at 0 to 8 at a time they were not the crowd, but a pass over
+  which looks want air at all is owed once the owner has judged 33q-1.

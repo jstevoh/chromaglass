@@ -54,6 +54,7 @@ import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { port } from './ports.mjs';
+import { RESERVE_S } from '../mcp/tunnel-worker.js';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const MUTANTS_ON = !process.argv.includes('--no-mutants');
@@ -439,6 +440,47 @@ async function scenario(serverDir, mcpDir, showPort) {
     const dropped = (await status()).clients;
     line('a client whose tokens have all run out is dropped', typeof t5.access_token === 'string' && held === 1 && dropped === 0, `${held} then ${dropped}`);
 
+    // A full relay never pushes out the owner's open sign-in for a stranger's (the security review
+    // of 2026-11-13: it deleted the oldest page of all, so two addresses opening twenty pages
+    // could close the owner's mid-sign-in). The owner opens a page first; one stranger fills the
+    // relay from one address and another address asks: only the stranger's own pages make room.
+    // Then strangers holding one page each fill it, and the next waits while every page is young;
+    // once the oldest has stood RESERVE_S it gives way, so a squatter cannot lock the owner out.
+    {
+      const fresh = await (await http('/register', { method: 'POST', headers: { 'content-type': 'application/json', 'cf-connecting-ip': '198.51.100.78' }, body: JSON.stringify({ client_name: 'Claude', redirect_uris: [CLAUDE] }) })).json();
+      const openFrom = async (ip) => {
+        const r = await http(authorizeUrl({ code_challenge: await challengeOf(verifier()), client_id: fresh.client_id }), { headers: { 'cf-connecting-ip': ip } });
+        const html = await r.text();
+        return { status: r.status, p: /const P = "([^"]+)"/.exec(html)?.[1] ?? '' };
+      };
+      const pend = () => [...relay.ctx.storage.map.keys()].filter((k) => k.startsWith('pend:'));
+      for (const k of pend()) relay.ctx.storage.map.delete(k);
+      const ownerPage = await openFrom('198.51.100.77');
+      // One stranger fills the relay from one address (its 20th page is past PER_ADDRESS's
+      // window allowance, so 19), then another address asks: room comes out of the stranger's.
+      const flood = [];
+      for (let i = 0; i < 19; i++) flood.push(await openFrom('2001:db8:66::1'));
+      const another = await openFrom('203.0.113.9');
+      const kept = pend().includes(`pend:${ownerPage.p}`);
+      const floodKept = flood.filter((f) => pend().includes(`pend:${f.p}`)).length;
+      // Now every address but the stranger's holds one; strangers one page each fill it, and the next waits.
+      for (const k of flood.slice(1).map((f) => `pend:${f.p}`)) relay.ctx.storage.map.delete(k);
+      const others = [];
+      for (let i = 1; pend().length < 20; i++) others.push((await openFrom(`203.0.113.${100 + i}`)).status);
+      const extra = await openFrom('203.0.113.200');
+      const keptAfter = pend().includes(`pend:${ownerPage.p}`);
+      line('a full relay keeps the owner\'s open sign-in: strangers push out only their own, or wait',
+        ownerPage.status === 200 && flood.every((f) => f.status === 200) && another.status === 200 && kept && floodKept === 18 &&
+          others.every((x) => x === 200) && extra.status === 503 && keptAfter && pend().length === 20,
+        `owner ${ownerPage.status}, flood ${[...new Set(flood.map((f) => f.status))].join(',')} kept ${floodKept}/19, another ${another.status}, then ${others.length} more, next ${extra.status}, owner kept ${kept}/${keptAfter}`);
+      // Squatters holding one page each cannot lock the owner out for good: once the oldest page
+      // has stood RESERVE_S, a new one (the owner's, from anywhere) gets in in its place.
+      relay.advance(RESERVE_S + 5);
+      const later = await openFrom('192.0.2.200');
+      line('one page per address cannot lock the owner out: past RESERVE_S the oldest page gives way to a new one',
+        later.status === 200 && pend().includes(`pend:${later.p}`) && pend().length === 20, `after ${RESERVE_S + 5} s: ${later.status}, open ${pend().length}`);
+      for (const k of pend()) relay.ctx.storage.map.delete(k);
+    }
     // A flood from one address is cut off before it can push anyone's sign-in out.
     const flood = [];
     for (let i = 0; i < 25; i++) flood.push((await reg([CLAUDE])).status);
@@ -461,6 +503,8 @@ const MUTANTS = [
   { rule: 'fresh', file: W, find: 'if (signedIn < pend.opened - 5 || this.now() - signedIn > FRESH_SIGN_IN_S) return', to: 'if (false) return', line: 'one of the owner\'s tokens from a sign-in before this page is refused' },
   { rule: 'one-pair', file: W, find: 'if (used.child) {', to: 'if (false) {', line: 'inside the grace, an old refresh token leaves one live pair, not many' },
   { rule: 'drop-clients', file: W, find: '(v.used || v.created + CLIENT_IDLE_S < now)', to: '(!v.used && v.created + CLIENT_IDLE_S < now)', line: 'a client whose tokens have all run out is dropped' },
+  { rule: 'reserve', file: W, find: 'if (this.now() - oldest[1].opened < RESERVE_S) return page(', to: 'return page(', line: 'one page per address cannot lock the owner out: past RESERVE_S the oldest page gives way to a new one' },
+  { rule: 'owner-page', file: W, find: 'if (most > 1) await this.store.delete(pending.find(([, v]) => count.get(v.who) === most)[0]);', to: 'if (true) await this.store.delete(pending[0][0]);', line: 'a full relay keeps the owner\'s open sign-in: strangers push out only their own, or wait' },
   { rule: 'flood', file: W, find: "&& !this.allowed(request)) return", to: '&& false) return', line: 'a flood of registrations from one address is cut off' },
   { rule: 'origin', file: W, find: "if (request.headers.get('origin') !== origin) return json(", to: 'if (false) return json(', line: 'a post from another site\'s page is refused' },
   { rule: 'pkce', file: W, find: '(await s256(verifier)) !== rec.challenge', to: 'false', line: 'a wrong PKCE verifier gets no token' },

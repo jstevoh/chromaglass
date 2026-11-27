@@ -98,28 +98,54 @@ phone version in the same PR.
 
 ## 47a. Detail at the closeup's own scale: a fine window, with the dye finer than the flow (L)
 
-*Seen:* sharp structure down to a few hundredths of a millimetre inside a reaction a few
-centimetres across. *Physics:* a dye in water diffuses about a thousand times more slowly
-than momentum (Schmidt number Sc = ν/D ≈ 10³), so stirring folds it into filaments far
-finer than the smallest eddy: the Batchelor scale, η_B = η·Sc^(-1/2), about thirty times
-finer than the flow's own smallest scale. Fine dye over coarse flow is therefore not a
-cheat but what a real dish does. *Today:* the closeup is a crop of the whole plate's grid,
-magnified 1x to 16x; the particles of H1 (`wgsl/particles.ts`) carry finer structure than
-the grid, but at zoom they are drawn at the plate's scale, not the screen's. *Build:* in the
-closeup only, a second dye field covering the camera's window at screen resolution (about
-0.1 mm a cell at 6x), advected by the plate's velocity interpolated smoothly (one-way
-nesting, as a weather model nests a fine grid in a coarse one), seeded from the coarse dye
-when the window moves and fed back to nothing. Molecular diffusion at its real D (so a
-filament keeps its edge for seconds, not frames), and the window's own velocity correction
-where surface tension acts at that scale (capillary and Marangoni forces grow as the scale
-shrinks, so the fine window is where they belong). *Shortcut, named:* the fine window does
-not feed back into the coarse flow. *Measure:* in the lab at zoom 6, structure at 4 to 8
-screen pixels (the H1 measure) at least three times today's, and the edge's ripple at the
-cell's pitch gone (`macroview` gains both lines). Frame cost held by `npm run stages`.
-- **47a-1. First, the particles and the dye's edge at screen scale in the closeup** (S–M).
-  Draw H1's particles as screen-sized discs when `macroMode` is on, and cut the dye's edge
-  by its interpolated level set rather than its cells (with 38h-9, which names the same
-  grain). Closes the serrated edge in the photograph cheaply before 47a's window.
+- **47a-2. The rest of the fine window's physics** (M). Molecular diffusion at the dye's real D
+  in the fine fields (today none: a filament keeps its edge for the field's whole life, where a
+  real one blurs by √(Dt), a tenth of a millimetre in ten seconds, about a texel at 6x), and
+  capillary and Marangoni forces at the window's scale (they grow as the scale shrinks). The back
+  plate gets no fine dye (it is drawn through its own zoom and offset, `layer1`); give it its own
+  window.
+- **47a-3. A sharp interface carried** (M). A real dye's edge is sharp at the closeup's scale
+  (its diffusion length over ten seconds is an eighth of a cell here), the grid's is a cell or
+  two of numerical blur, and the fine fields only sharpen what the flow squeezes. Sharpening the
+  seed (one backward heat step, clamped) was tried and taken out: it turned the grid's edge,
+  a staircase at its cells softened by the Catmull-Rom read, into a row of teeth on a still
+  poured column (filmed on the owner's Mac, 2026-11-13). Carry the edge instead: a level set
+  or VOF fraction per dye body in the fine field, so an edge is never rebuilt from a blur.
+- **47a-5. Bars after a camera whip** (S). Filmed on the owner's Mac, Macro Bead, 2026-11-13:
+  for about half a second after the auto camera whips to a new bead, straight horizontal smear
+  bars at the top of the frame with Fine Detail at 1. Not reproduced in the lab; suspect the
+  window's margin reaching past the plate's edge (the fine fields clamp to the edge row there)
+  or the fields' remap across a jump. Film it again after the per-frame step and find it.
+- **47a-6. The fine fields resampled every step** (S, a shortcut named). Each step reads the
+  fields back through a clamped Catmull-Rom and stores them again, so three seconds of steps are
+  a few hundred resamplings, each a little blur and a little rounding (32-bit now, after 16-bit's
+  rounding drew a grid of squares on still pools). The physics is a characteristic map: carry
+  each texel's back-trace to where its dye was at the field's birth (a displacement field,
+  advected) and read the birth snapshot once, through the plate's own read, so a field resamples
+  its dye once in its life whatever the steps. Measure against finedye's lines 1 and 4.
+- **47a-7, closed by PR 842 and PR 807, not built here. Scalloped drop edges in macro** (M, reported by the owner 2026-11-13: "the drops in
+  macro still have jagged edges"). Not the fine window's: photographed on the owner's Mac (Macro
+  Bead, 6x, the same frame drawn four ways in one page), the bead outline is scalloped with Fine
+  Detail at 0 as at 1, a regular row of bumps about 12 to 13 screen pixels apart with a dark dot
+  in each. Edge Detail (`macroEdge`, `macroWarpOffset` in `wgsl/plate.ts`) adds an fbm
+  "silhouette crinkle" on top, visibly rougher at 0.75 than at 0. Two parts. (a) Retire the
+  crinkle: surface tension makes a drop's edge a smooth curve at this scale, so a drawn wobble
+  breaks the physics rule; whatever real roughness an edge has (capillary ripples, 47a-3's carried
+  interface) should come from the solver. It is a setting four presets lean on (0.75, 0.9), so
+  it needs the setting auditor and a film. (b) Find what draws the scallops at Edge Detail 0:
+  check whether their spacing is the grid's cell at 6x (a bilinear read of the phase or the
+  bead mask, `wgsl/beadMask.ts`, kinks at each cell), and read that field through the plate's
+  bicubic or carry it as a level set.
+  Closed 2026-11-13: PR 842 (38u) deletes Edge Detail, which is part (a), and PR 807
+  (38h-15, 38h-17) draws bubbles and beads at the screen's resolution rather than the bead
+  mask's grid, which is part (b). Judge the bead rims on the owner's Mac once both are on main;
+  if scallops remain, reopen this with the spacing measured.
+- **47a-4. Where the films' fine structure comes from** (finding, 2026-11-13). On the lab's
+  stirred swirl the fine dye raises fine over coarse from 1.08 to 1.11, where the films read 2.2
+  to 3.1: the thin gap's drag stops a free vortex in nine steps, so the plate's flow is slow and
+  smooth and folds little below a cell in the fine field's few-second life. More detail needs
+  more folding: a stir bar (47f), chaotic stirring, reactions and Marangoni cells (47g, the
+  owner's call). Measure each against `npm run finedye`'s line 1 on the owner's Mac.
 
 ## 47j. Caustics: the light focused into a network by a rippled or mixing layer (M)
 
@@ -159,6 +185,23 @@ lamp's cone set as an annulus outside the pupil. *Measure:* `nolight`-style lab 
 Dark field a flat dye with no gradient reads black within 2 levels, a front's ring reads
 brighter than either side by at least 30 levels, and Rheinberg's ring takes the ring's hue.
 
+- **47b-2. Open: the side lamp casts no shadows.** Its light reaches every height of the
+  dye undimmed: a thick blob should shade the dye behind it from a lamp this low, and the
+  lit side of a front should be brighter than its far side by the dye's own transmission
+  along the slanted ray. Needs a short march through the dye toward the lamp (four to eight
+  taps along `sideRay`), in the lens pass. *Measure:* in the lab, dye behind a dense blob on
+  the lamp's line reads at least 30 % darker than the same dye with the blob moved aside.
+- **47b-3. Open: the lens pass on every picture.** Projector sources drawn by `drawSource`
+  and the kaleidoscope's copy are drawn without it, so glitter and the side lamp vanish when
+  a source is up. Run `PlateGlint` after those paths too. *Measure:* a `glint` line with a
+  source up.
+- **47b-4. Open: the glint's light is counted twice.** The disc carries all of E
+  (`glint.ts:277`) and the spikes add another 0.31·E (`:326-328`); the wall's reflectance is
+  `WALL_FRESNEL` 0.03 (`:382`, `src/lib/glint.ts:131`), and the air-glass Fresnel loss is
+  missing (`:376`; 17.5% at 70°, 33% at 78°). Scale the disc by (1 − SPIKE_SHARE·arms·π/6) and
+  apply the Fresnel loss. *Measure:* in `npm run glint`, the totals within 2% of E. (S; Low;
+  38v, from RS-28.)
+
 ## 47c. Blacklight: fluorescent dyes under a UV lamp (M)
 
 *Seen:* blue and magenta that glow out of black, brightest where dye is thin and fresh, with
@@ -195,6 +238,10 @@ radius A·|z − z_f|/z_f on linear light so glints become discs. Built under 38
 it. *Measure:* 31f-3's DoF law within 10 % in the lab, and a glint's disc at the radius the
 law gives for its depth.
 
+- **47d-2. Open: discs and stars on every highlight.** Only the glitter is drawn through the
+  lens; the beads' and bubbles' speculars and the softbox's glints on the dye stay sharp and
+  starless. The whole-plate disc kernel above is the rest of 47d.
+
 ## 47e. Sparkle: microbubbles and mica that show the flow (M)
 
 *Seen:* pin-point glints scattered through the liquid; specks that light up along the
@@ -212,6 +259,16 @@ orientation is quasi-steady (the stretching axis), not an integrated Jeffery orb
 to integrate it if the shimmer reads wrong. *Measure:* glint count follows the population,
 and in a shear flow the mica's brightness correlates with the strain's direction as the
 mirror law predicts (lab).
+
+- **47e-1. Open: microbubbles.** The other half: bubbles far smaller than a cell, each a
+  convex mirror returning a glint of the same brightness whatever its size, beside the flakes.
+- **47e-2. Open: two shortcuts in the flakes.** A flake's orbit constant (which of Jeffery's
+  closed orbits it is on) is stood in for by a fixed lean, so every flake tumbles in the
+  flow's plane; and a flake that has lived 40 to 160 s fades out and is born again elsewhere,
+  standing in for a stir lifting it off the floor. Integrate the orbit constant from the
+  flow's vorticity, and lift landed flakes by the shear at the floor. *Measure:* in a shear
+  flow the share of flakes flashing settles to the closed-orbit average, and a stirred plate
+  lifts what a still one lets lie.
 
 ## 47f. A stir bar: the magnetic stirrer's vortex as a tool (S)
 
@@ -287,40 +344,61 @@ Filming the kit is a `watch` pass (`npm run watch`) that sets each item's bar.
 ## 47n. A side view: a falling thread and a gravity current in a tank (L; owner's call)
 
 *Gravity L1* films a tank from the side: fluorescent dye falls as a jet that stretches into
-one thread over about 40 s (the thread thins as gravity accelerates it, so its radius goes
-as the flow rate over the speed, a ∝ (Q/v)^½), lands, and spreads along the floor as a
-gravity current whose head curls into filaments, with glitter floating in dark water
-(near black 76 to 83 %, motion median 0.013, a jump to 0.029 at the landing). Our plate is a
-thin layer seen from above, so this is a different solver (a vertical 2D slice with
-buoyancy, or a 3D tank), not a camera move. Written down so it is not lost; the owner's
-call whether the show wants a tank at all.
+one thread over about 40 s, lands, and spreads along the floor as a gravity current whose
+head curls into filaments, with glitter floating in dark water (near black 76 to 83 %, motion
+median 0.013, a jump to 0.029 at the landing). The owner asked for it on 2026-11-13 and chose
+its own solver over standing the plate up (the plate's glass drag eats the momentum a jet and
+a curling head need).
+
+- **47n-2. Open: momentum carried with less smearing.** The momentum is carried
+  semi-Lagrangian, which smears it by about u·dx/2, about three times water's own viscosity
+  at a centimetre a second on 0.94 mm cells: the slice behaves like slightly thicker water,
+  and the lock exchange's floor front reads 0.42 of √(g′H) where experiments read 0.44 to
+  0.48. A MacCormack or BFECC carry would sharpen the gravity current's curling head; the
+  reference changes first, then the GPU, held by `tankgpu` as now. (Shortcut named in
+  `src/lib/tank.ts`, item 5.)
+- **47n-3. Open: a finger's place on the screen, exactly.** A held finger carries the nozzle
+  through the plate's hold coordinates, turned back to the screen assuming its long side is
+  the width and the camera unzoomed and unturned (`gpu/tankPlate.ts`, `screenX`). Hand the
+  solver the screen's own mapping so a portrait screen or a zoomed camera lands the nozzle
+  under the finger. A screen wider than 16:9 is off too: the tank keeps its shape and fills
+  the height there, with black water at the sides (`gpu/tankDraw.ts`), so the finger's x wants
+  that letterbox taken out as well.
+- **47n-4. Open: a Gravity Tank look.** Tank is a switch on any look today. A built-in look
+  needs its plate entries (`presetPlate.ts`: dyes, tools, liquids) and a seed case in
+  `sim/fluidSimulation.ts`, which is over its size ceiling, so the seed goes in a module
+  beside it first. Its cords: the bass on Feed, the kick on Dye Weight a little.
+- **47n-5. Open: the rest of the film in the tank.** A rod, not a sheet: the slice is 2D, so
+  the thread thins as a ∝ 1/v where the film's round jet thins as (Q/v)^½ (a 3D tank, or an
+  axisymmetric solve about the jet's axis, replaces it). Glitter (47e) and the side light
+  (47v-7's red rake) carried and lit in the tank once they exist; two or three dyes of
+  their own colours and weights, each a concentration the flux form carries.
+- **47n-6. Open: the dish's solver rests while the tank shows.** With Tank up the plate's
+  own solver still steps under it, unseen. Skipping it would hand the tank the frame's
+  whole budget; it has to come back where it was when Tank goes off. Touches and pours land
+  on that hidden plate too (a pour's dye, a magnet, a blow), so a tap meant for the tank
+  changes a look nobody sees until Tank goes off: route them to the tank (a tap drops a bead
+  of dye where it lands) or hold them while it shows.
+- **47n-7. Open: a real tank's stir, so the jet is not a mirror.** Filmed on the Mac
+  (2026-11-13), the flow is mirror-symmetric about the nozzle for the first 45 s: nothing in
+  the slice breaks the symmetry but float rounding, which takes that long to grow into the
+  buckling a real jet shows within seconds. A real tank is never still (the pour's own
+  wobble, a fraction of a degree of temperature): seed the water with a small, physical
+  disturbance (velocity noise of a few µm/s, or the nozzle wandering by a tenth of its bore),
+  in the reference first, the GPU after, and let `tankgpu` measure the left-right difference
+  growing where today it stays at rounding.
+- **47n-8. Open: the tank's glow is painted white.** `tankDraw.ts:57-59` adds 0.35·e² of
+  white, so the glow washes the dye's colour out. Light from the dye is the dye's colour: sum
+  it in linear light and let the shoulder roll it off. *Measure:* the chroma at glow 0.25
+  within 5% of the dye's. (S; Low; 38v, from RS-31.)
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
-
-~~**47w-1** The download half~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1): the
-cause was yt-dlp handed a bare `ffmpeg` as `--ffmpeg-location`; the tool now passes the full
-path, joins a picture-and-sound pair itself and refuses an audio-only fetch.
-
-~~**47w-2** Dissolves~~ (shipped; story in `docs/plan-shipped.md` §47w-2-47v-2-47v-3): a run
-of raised change whose ends differ by a cut's worth, whose frames are mixes of its ends and
-whose new picture the take never showed (`scripts/watchcuts.mjs`); 12 found in the Joshua
-Light Show film, each a superimposition on the sheets.
 
 - **47w-3. Open: *Streams II* again.** The film that showed the miss is on the owner's Mac
   (`~/chromaglass-films/watch/`); watch it once with this tool and write its cuts a minute
   beside the 7 counted by eye. Needs a thread with the Mac connected.
 
 ## 47v. Watching any link: a design read, a physics read and the techniques (S–M)
-
-~~**47v**~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1). Asked 2026-11-12: point
-Claude at any video or animation and get meaningful feedback on colour and form, a physics
-read, and the techniques used, and judge our own visuals the same way.
-
-~~**47v-2** A reference library~~ and ~~**47v-3** the physics read's real-footage bars~~
-(shipped; story in `docs/plan-shipped.md` §47w-2-47v-2-47v-3): `--keep`, `--refs` and `--vs
-<name>` over `/mnt/project-files/references/` (`scripts/watchrefs.mjs`); two performance films
-read and kept, their numbers in `REAL_SHOWS` (`scripts/watchphysics.mjs`) and printed beside
-each band.
 
 - **47v-4. Open: the third real show.** Tried 2026-11-12 with Liquid Light Lab, fetched on the
   owner's Mac, and none of their films makes a plain row. Their own films (*Melt Your Face
@@ -334,10 +412,15 @@ each band.
   0.03, turnover 0.5 s and a lifetime longer than the clip, which is the stage lights and the
   camera, not the oils. Still wanted: a projected show filmed square-on and close, or a dish
   camera with no video effects (the owner's own rig filmed is the surest).
-- **47v-6. Open: a crop too small to read says so.** `--crop 0.05,0.33,0.9,0.13` on the
-  Brooklyn Bowl film decoded to 320×26, and the physics read printed dashes ("0% of textured
-  blocks matched") with no reason. When the decoded crop is under about 64 rows, print that
-  the flow read needs a taller crop, and a selftest line for it.
+- **47v-8. Open: what still keeps carried low on real footage.** With the grain taken out the pairs
+  of the 1969 film still read carried 0.23 where the pairs with the least grain (a floor under half a grey
+  level) read about the same, 0.23, so the rest is not noise: the lamp's brightening and fading
+  across a whole shot, loops superimposed (two flows in one picture, one of which the other
+  hides), a dissolve, and flow faster than a second's search. Try, on those two films and the
+  synthetic cases, a second measure beside it: the share carried only over pairs inside one
+  shot with no whole-frame brightness change, and one with the lamp's change (the picture's
+  mean) taken out of both sides; see which of them moves real shows toward 0.5 without moving
+  the pulsing-in-place case. Keep the band's words as they are until one does.
 - **47v-7. Open: watching where the file can't be fetched.** Vimeo refuses the cloud and a
   headless browser, and a recording saved by the owner's Chrome lands in Downloads, which a
   thread may not open. What worked (2026-11-13): read the frames in the page itself, in the
@@ -346,12 +429,38 @@ each band.
   a script the watch skill keeps (`scripts/watchpage.js`, pasted into the page), printing the
   same names as `watch.mjs` so `--vs` can compare, with the run's own numbers checked
   against `watch.mjs` on one clip both can read.
-- **47v-5. Open: carried on real footage.** Real shows read carried 0.13 to 0.19 where the
-  synthetic texture slid reads 0.97: grain, a camcorder's noise in the dark, the lamp's hot
-  spot and superimposed loops all count as change the flow does not carry. Measure the
-  noise floor from the clip's own still samples and take it out of the raw change, so a
-  real plate's transport reads as transport; until then the read prints the real range and
-  the in-place guess fires only under it.
+
+## 47x. Watching in words, and what changed between two films (S–M)
+
+The owner asked (2026-11-22) for the watch tool to say what it sees, not only measure it,
+and to tell what changed between a before and an after film. The vocabulary is
+`docs/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
+Ching's ordering principles and Greenberg's all-over against centred for composition,
+Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling, a wash,
+a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
+an unsteady measure says "may vary from take to take", and every word names its source.
+
+- **47x-6** the watch selftest's A, B (sound against motion lag) and D (one composition change
+  in the crossfade) fail on a Mac's ffmpeg-full 9.0.2, on main as well as this branch, and the
+  Homebrew default ffmpeg has no libvorbis, so the selftest cannot make its clips at all. Find
+  whether the encoder or the reads moved, and say in the selftest which ffmpeg it needs.
+- **47x-9** the overall read against itself. Swells, rests and the peak's place come from one
+  take of a moving fluid: run two takes of one look through it and find which of its sentences
+  hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
+  check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
+- **47x-11** two takes of one look still read as changed on Ubuntu. On main's deploy of
+  2026-11-22 (f825ee6b, Measure sound, after 47x-10 shipped) "drift → drift2 (the same look,
+  another phase): no steady change past a step" failed with show/turnover and show/own flow
+  speed each 1.3 steps apart between the two takes. #936 merged without that shard running,
+  so this is its first Ubuntu read. Find which of the two measures the phase moves (the
+  turnover's window against the stripes' period, as 47x-10 found for the flow), fix the read,
+  not the bar. Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the
+  check now closes on the "n/m checks passed" tally a quarantine counts against, where its old
+  "watchwords: 1 of 58 FAIL" line read as a second FAIL and no quarantine could match.
+- **47x-15** refit the card's bands from the owner's ratings once there are enough.
+- **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
+  references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
+  five canons per row; today three rows leave each film outside one or two peers' bands.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
@@ -398,16 +507,35 @@ likely the camera and video mixer's gain; the plate's should come from the dye a
 
 The physics, in the order to build (each its own thread and PR):
 
-- **47z-1. Colour: a drop takes the water out of the light's path.** In the gap an oil drop
-  pushes the water aside, so the lamp's light through a red drop meets red dye only; the
-  plate multiplies the oil's colour by the water's, so red on cobalt reads black and
-  Splodascope's drops read murky green (its take: colourfulness 43 against 137, coloured
-  0.39 of the frame against 0.99). This is **28i-7b** (the displaced share, as
-  `gapScale × (1 − film)` does for Clear Film) and **28k-5** (a drop's edge multiplying
-  toward black); build them together, then give Splodascope the photograph's cobalt back.
-  *Measure:* a red drop on cobalt water keeps the red drop's own transmitted colour within a
-  just-noticeable step at its centre, and the edge's few cells do not go darker than either
-  liquid alone; Splodascope's take reads colourfulness over 100 and coloured share over 0.8.
+- ~~**47z-1. Colour: a drop takes the water out of the light's path.**~~ (**shipped**, this PR;
+  story in `docs/plan-shipped.md` 47z-1, with 28i-7b and 28k-5): a part-oil cell's light is the two
+  liquids' side by side (`packDyeBodies`), a look's lay puts each drop's colour in its own oil
+  (`addOilDensity`); `npm run dropcolour`. Found doing it, open:
+  - **47z-1e. Splodascope's water: cobalt was tried and is darker.** Filmed on the owner's Mac
+    (2026-11-13, 20 s takes): main's pale water read colourfulness 131, coloured 0.87, luminance
+    0.42; the photograph's cobalt with this PR 62, 0.51, 0.20, the frame 0.40 near black. The drops
+    kept their colours with no browning, but a full wash of cobalt passes too little of the lamp,
+    and the orange ferro reference's vivid colour is on a bright ground (luminance 0.52). Kept pale.
+    A thinner cobalt wash (the photograph's water is a thin layer) is the thing to try next, filmed.
+  - **47z-1a. Lava Lamp and the other lays.** Splodascope and Clock Glass lay each body's colour
+    as the oil's own; Lava Lamp still lays its wax's colour as plain dye, so the rim's share goes
+    to the water by the oil under each cell, and a faint halo of the wax's colour is the water's.
+    Left as it was because the owner had just approved the lamp's look (2026-11-12); try it in the
+    lab against `npm run lavawax`, and any other look that lays oil with a colour.
+  - **47z-1b. The averaging's path and the cells between.** The pack averages the light at the
+    composite's rest-gap path (DYE_PATH, 2.8), not the pixel's own gap (gapScale, 0.3 to 3 times),
+    and the composite's bicubic still interpolates absorbance between two cells, so a drop's edge
+    keeps a band about one cell wide where red and cobalt multiply. Named shortcuts: the true
+    sum is per pixel, which needs the oil's share in the composite, and its sixteen textures are
+    full (`view0` is packed to the bit); a seventeenth needs a binding freed first.
+  - **47z-1c. A rebuilt solver forgets whose colour is whose.** A lay's labels go across once,
+    with its flush; a solver rebuilt before the plate has come back (`restoreSeed`) or carried
+    to a new grid (`takeOver`) starts the oil's share from the oil under each cell again, as
+    before this item. Carry the share with the dye where the carry allows.
+  - **47z-1d. A drop inside another drop goes dark where they meet.** Splodascope's compound
+    drops (a hole in one colour with another drop in it): once the ring of water between them
+    thins, the two oils are one phase holding both colours, and they multiply. Real ones keep a
+    water film between them: 47z-3's films, or a second oil phase.
 - **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
   a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
   equal viscosities) stretches and splits, its pieces split again until each is under the
@@ -431,24 +559,41 @@ The physics, in the order to build (each its own thread and PR):
   That is **47y**'s rims, **18c-4** (lens or film by the spreading coefficient), **47j**
   (caustics) and **38h**'s shadowgraph; our edges are 1.7 to 2.4 times softer on the drop
   looks (Macro Bead's beads already read 1.04%). *Measure:* edge width on Splodascope's take
-  under 1.6% of the width, from the optics, never a drawn outline.
+  under 1.6% of the width, from the optics, never a drawn outline. Found in 47z-1: the look's
+  dark rims today are two stand-ins, the boundary line (Boundary Contrast, a colour step drawn as
+  a deflection, though a dye moves water's index by almost nothing) and Edge Relief's slope line,
+  each four or five of the solver's cells wide at a drop's rim; with both off a red drop's rim in
+  cobalt is no darker than the water (`npm run dropcolour`). This build replaces them at an oil
+  rim with the oil's own index step (18e-2's deflection by ∇OPL). **18e-5** (2026-11-13) took the boundary line off every look, since two dyes in one liquid bend nothing; Edge Relief's slope line is what is left at a drop's rim until this ships.
 
 Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
 page, add one build and a note:
 
-- **47z-5. A crowd packed past touching becomes polygons.** `cosmo-packed-foam-cells`
-  (`--to 4.7 --crop 0.05,0.2,0.9,0.62`): pale cells pressed into polygons, thin films meeting
-  in threes, rust-red dye collected in the borders. That is a packed emulsion or a foam held
-  by the films of 47z-3: past about nine tenths of the area the drops can no longer stay
-  round, each film is flat at the drops' pressure difference, and three films meet at 120°
-  (Plateau's laws, here in the plane of the gap); the dye of the continuous liquid is
-  squeezed out of the films into the borders, thickest where three meet. Splodascope's
-  photograph ("packed edge to edge") is the same crowd at a lower fill. *Build:* after 47z-3,
-  pack held drops past nine tenths and see whether the field forms flat films and three-way
-  junctions; where the Cahn–Hilliard edge (two to five cells, 28k-2's shortcut (a)) rounds
-  the junctions off, that edge is what to replace. *Measure:* at nine tenths fill, nine in
-  ten junctions are three-way and their angles 120° within 10°; the continuous liquid's dye
-  per area is higher in the borders than in the films by their width ratio.
+- **47z-6. A crowd that packs itself.** Foam Cells is laid pressed; a crowd of round drops does not
+  press itself into polygons, because nothing presses it: in open water a held crowd has room to
+  stay round (Splodascope's bowed glass gathers it, but at 0.45 not past touching in six seconds).
+  Real foams are pressed by gravity draining them, or held by films that stick (an attractive
+  part of the disjoining pressure, as in adhesive emulsions, where the film's tension is under
+  twice the interface's and drops meet at a contact angle). The second was tried here (a push
+  falling as e^(−h/5) against Film Hold's e^(−h/2.5), and the same as a chemical potential): the
+  drops did pull together, and then merged through the film at every strength from 0.3 to 1,
+  the potential by seeding oil in the film. The field cannot hold a film under about four
+  cells (28k-2 (a)), and the attraction brings the faces there faster than the hold answers.
+  Needs a sharper film first (a film carried as its own thin field, or a phase field per drop
+  colour as multiphase foam solvers do); then sticky films, or a gravity that drains a raft
+  standing on a tilted plate.
+- **47z-7. Films that pop by draining, not only when pressed.** Foam Cells' films hold until a
+  kick presses one past the hold; a real foam coarsens as films drain and rupture by chance,
+  the small cells losing to the big (von Neumann's law in 2D: a cell's area changes at a rate
+  set by its number of sides less six). That is 47z-3's drainage time per film, then a check
+  that cells under six sides shrink and over six grow.
+- **47z-8. Smaller cells.** A cell must be about fifty grid cells across for its films (four
+  cells each, the field's edge) to leave under a sixth of the dish water; under that the cells
+  round up into a wet crowd (lab: twenty across, fill 0.69, 68 cells to 33 in twelve seconds).
+  So Foam Cells has about a seventh of the plate per cell at 384² and a ninth at 512², where
+  the macro film has twenty or thirty. Thinner films (28k-2 (a)) give smaller cells; and with
+  them `npm run foam`'s 120° bar can go toward the nine in ten first proposed, since the reader
+  is exact only where a film runs straight for seven cells.
 - **The magnet beside the drops.** `cosmo-ferro-maze-drops` (`--crop 0,0.22,1,0.53`):
   ferrofluid in a thin cell as a labyrinth where it is thick and a lattice of fine dots at a
   drop's thin rim, beside large orange drops; stripes against dots by the fill and the
@@ -466,8 +611,9 @@ number it moves printed before and after.
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
-picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
-47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-5, 47v-6 and 47v-7 whenever the watch tool is next touched; 47y
-as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4, 47z-5 in that order (the owner asked
-for the drops' physics and their colour, 2026-11-12). Each its own thread
+picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
+47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
+for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
+Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread
 and PR.

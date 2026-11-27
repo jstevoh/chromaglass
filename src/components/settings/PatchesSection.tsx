@@ -12,6 +12,8 @@ import { Info } from '../Info';
 import { LIT } from '../ui';
 import { Slider, PinChips } from './controls';
 import { PATCH_SOURCES, featuresFor, sceneTargets, TARGET_GROUPS } from './patchLists';
+import { HandControls, MusicHandsFold } from './HandControls';
+import { isMusicCord } from '../../lib/musicCords';
 import type { SectionCtx } from './props';
 
 const SHAPE_NAMES: Record<typeof LFO_SHAPES[number], string> = {
@@ -52,8 +54,11 @@ const ENV_ON_NAMES: Record<typeof ENVELOPE_TRIGGERS[number], string> = {
 export const PatchesSection = ({ c }: { c: SectionCtx }) => {
   const {
     settings, onUpdate, readEar, focusSection, lookAreas, areaColours, pins, keep, shown, goTo, listens,
-    CARD, GRID, TITLE,
+    embed, CARD, GRID, TITLE,
   } = c;
+  // The music's cords folded until opened (HandControls.tsx MusicHandsFold says why).
+  const [handsOpen, setHandsOpen] = React.useState(false);
+  const musicRoles = (settings.sceneMappings ?? []).filter(isMusicCord).map(m => m.role!);
   return (
     <>
 
@@ -97,12 +102,13 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
             </button>
           </div>
           {(settings.sceneMappings ?? []).length === 0 ? (
-            <p className="text-[12px] text-white/40" data-testid="patch-empty">
+            <p className="text-[12px] text-dim" data-testid="patch-empty">
               Nothing patched yet. Add one, then pick what it listens to and what it moves.
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {(settings.sceneMappings ?? []).map((m, i) => (
+              <MusicHandsFold roles={musicRoles} open={handsOpen} onToggle={() => setHandsOpen(o => !o)} />
+              {(settings.sceneMappings ?? []).map((m, i) => !handsOpen && isMusicCord(m) ? null : (
                 <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-2">
                   <div className="flex items-center gap-1">
                     {/*
@@ -170,18 +176,28 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     >
                       {m.area !== undefined ? AREA_TARGETS.map(t => (
                         <option key={t.key} value={t.key} title={t.hint}>{t.label}</option>
-                      )) : TARGET_GROUPS.map(g => (
-                        <optgroup key={g.id} label={g.name}>
-                          {g.targets.map(t => (
-                            <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
+                      )) : <>
+                        {/* A hand on the whole plate (PLAN 38v-1): the music's own hands are these. */}
+                        <optgroup label="Hands on the plate">
+                          {AREA_TARGETS.map(t => (
+                            <option key={t.key} value={t.key} title={t.hint}>{t.plate}</option>
                           ))}
                         </optgroup>
-                      ))}
+                        {TARGET_GROUPS.map(g => (
+                          <optgroup key={g.id} label={g.name}>
+                            {g.targets.map(t => (
+                              <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </>}
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 text-muted hover:text-text"
                       aria-label="Remove mapping"
+                      // By the patch's index, for the phone's check: the music's folded cords make the nth on screen another patch.
+                      data-testid={`patch-remove-${i}`}
                     >
                       <X size={12} />
                     </button>
@@ -201,8 +217,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     <select
                       value={String(m.layer ?? 'all')}
                       aria-label="Plate"
-                      disabled={m.area !== undefined || !PER_LAYER.has(String(m.setting))}
-                      title={m.area !== undefined ? 'An area cord works on the plate the music plays'
+                      disabled={isAreaTarget(m.setting) || !PER_LAYER.has(String(m.setting))}
+                      title={isAreaTarget(m.setting) ? 'A hand works on the plate the music plays'
                         : PER_LAYER.has(String(m.setting))
                         ? 'Which plate this patch moves'
                         : `${sceneTargets.find(t => t.key === m.setting)?.label ?? 'This control'} is part of the finished picture, not one plate`}
@@ -212,7 +228,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                         next[i] = { ...m, layer: v === 'all' ? 'all' : Number(v) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="min-h-6 w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
+                      className="min-h-6 w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-65"
                       data-testid={`patch-layer-${i}`}
                     >
                       <option value="all">All plates</option>
@@ -235,7 +251,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       className="set-range flex-1"
                       style={{ '--fill': `${Math.round(50 * (m.depth + 1))}%` } as React.CSSProperties}
                     />
-                    <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
+                    <span className="text-[12px] font-mono text-dim w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
                   {/*
                     Live spectrum strip for `bands` cords (PLAN 30a): log
@@ -250,7 +266,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                         band={m.band}
                         feature={m.feature}
                         gain={m.gain ?? 1}
-                        threshold={(m.area !== undefined
+                        threshold={(isAreaTarget(m.setting)
                           ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
                           : m.mode === 'gate')
                           ? (m.threshold ?? 0.3)
@@ -285,7 +301,8 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                           const next = [...(settings.sceneMappings ?? [])];
                           const { area: _drop, layer: _layer, ...rest } = m;
                           next[i] = area === undefined
-                            ? { ...rest, layer: m.layer ?? 'all', setting: isAreaTarget(m.setting) ? 'turbulenceScale' : m.setting }
+                            // Off its area a hand works the whole plate (38v-1), so it stays a hand.
+                            ? { ...rest, layer: m.layer ?? 'all' }
                             : { ...rest, area, setting: isAreaTarget(m.setting) ? m.setting : 'areaStir' };
                           onUpdate({ sceneMappings: next });
                         }}
@@ -299,9 +316,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     both whole-plate sound/band cords and area cords. Not on the
                     note (PLAN 25i): a name has no level to gate or gain.
                   */}
-                  {(m.source === 'sound' || m.source === 'bands' || m.area !== undefined) && !isClassFeature(m.feature) && (() => {
+                  {(m.source === 'sound' || m.source === 'bands' || isAreaTarget(m.setting)) && !isClassFeature(m.feature) && (() => {
                     const isSoundOrBands = m.source === 'sound' || m.source === 'bands';
-                    const isGated = m.area !== undefined
+                    const isGated = isAreaTarget(m.setting)
                       ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
                       : m.mode === 'gate';
                     return (
@@ -322,7 +339,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                               style={{ '--fill': `${Math.round(100 * (m.gain ?? 1) / 4)}%` } as React.CSSProperties}
                               data-testid={`patch-gain-${i}`}
                             />
-                            <span className="text-[12px] font-mono opacity-50 w-12 text-right">{`${(m.gain ?? 1).toFixed(2)}×`}</span>
+                            <span className="text-[12px] font-mono text-dim w-12 text-right">{`${(m.gain ?? 1).toFixed(2)}×`}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between gap-2 min-h-[28px]" data-testid={`patch-mode-${i}`}>
@@ -383,12 +400,13 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                               style={{ '--fill': `${Math.round(100 * ((m[key] ?? 0) - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
                               data-testid={`patch-${key}-${i}`}
                             />
-                            <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
+                            <span className="text-[12px] font-mono text-dim w-12 text-right">{show(m[key] ?? 0)}</span>
                           </div>
                         ))}
                       </div>
                     );
                   })()}
+                  <HandControls m={m} i={i} settings={settings} onUpdate={onUpdate} />
                 </div>
               ))}
             </div>
@@ -401,8 +419,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
           attack, decay and trigger source (any, kick, snare, note, pad).
           Defaults match the fixed rates and shapes looks were built against.
         */}
+        {/* LFOs pair 2×2 and Envelopes 2×1 in the sheet (like SECTION_GRID) so Patches stays under three screens deep when a look has several cords (`npm run qa`); desk panels (`embed`) and phones stay one column. */}
         <div className="mt-6 mb-2 text-[13px] font-medium text-text" data-testid="patch-lfos">LFOs</div>
-        <div className="flex flex-col gap-2 mb-4">
+        <div className={`${embed ? 'flex flex-col' : 'grid grid-cols-1 md:grid-cols-2'} gap-2 mb-4`}>
           <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="lfo-row-1">
             <div className="flex items-center justify-between gap-1 mb-1.5">
               <span className="text-[12px] font-medium text-text">LFO 1</span>
@@ -597,7 +616,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
         </div>
 
         <div className="mt-4 mb-2 text-[13px] font-medium text-text" data-testid="patch-envelopes">Envelopes</div>
-        <div className="flex flex-col gap-2 mb-4">
+        <div className={`${embed ? 'flex flex-col' : 'grid grid-cols-1 md:grid-cols-2'} gap-2 mb-4`}>
           <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="env-row-1">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-[12px] font-medium text-text">Envelope 1 Trigger</span>

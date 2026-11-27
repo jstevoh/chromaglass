@@ -6,7 +6,8 @@
  * and the show's sound; desktop/liveSession.js writes it to every
  * destination) and drove it only from the console. The owner asked for "a
  * Live Show panel in the Mac app, Pro only" to stream to every popular
- * platform at once; this file is what that panel stands on:
+ * platform at once (moved to Home on 2026-11-15, PLAN.md 23.21: streamers
+ * are Home's buyers); this file is what that panel stands on:
  *
  *  - one controller, so the panel, the console and the remote's Stop all
  *    act on the same stream. Two (the console's and the panel's, each with
@@ -33,8 +34,9 @@ import { liveRates, keepCeiling, AUDIO_KBPS, HEADROOM } from './liveRate';
 import {
   LiveEncoder, liveConsolePlan, probeVideoEncoders,
   type LiveConsoleOptions, type LiveDestinationHealth, type LiveStartRequest, type LiveState,
-  type LiveTransport, type LiveTransportState, type LivePacket,
+  type LiveTransport, type LiveTransportState, type LivePacket, type LiveSource,
 } from './liveStream';
+export type { LiveSource } from './liveStream';
 
 // --- The Mac app's bridge ------------------------------------------------------
 
@@ -140,17 +142,22 @@ export function saveDestinations(list: LiveDestination[]): void {
 export const newDestinationId = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => (b % 36).toString(36)).join('');
 
 /**
- * The landscape encode's size and the rate of both. The portrait one is
- * 720x1280 (Instagram's and TikTok's). 60 fps unless the owner picked 30
- * (37x-4h): the plate is drawn at 60, and the rehearsal's stream at 30 lost
- * half its motion before YouTube's own compression took more. A format the
- * owner saved with 30 in it stays at 30.
+ * The landscape encode's size, the rate of both, and which picture is
+ * streamed (37x-4d-1). The portrait one is 720x1280 (Instagram's and
+ * TikTok's). 60 fps unless the owner picked 30 (37x-4h): the plate is drawn
+ * at 60, and the rehearsal's stream at 30 lost half its motion before
+ * YouTube's own compression took more. A format the owner saved with 30 in
+ * it stays at 30.
  */
-export interface LiveFormat { height: 720 | 1080; fps: 30 | 60 }
-export const DEFAULT_FORMAT: LiveFormat = { height: 1080, fps: 60 };
+export interface LiveFormat { height: 720 | 1080; fps: 30 | 60; source?: LiveSource }
+export const DEFAULT_FORMAT: LiveFormat = { height: 1080, fps: 60, source: 'plate' };
 export function loadFormat(): LiveFormat {
   const f = read<Partial<LiveFormat>>(FORMAT_KEY);
-  return { height: f?.height === 720 ? 720 : f?.height === 1080 ? 1080 : DEFAULT_FORMAT.height, fps: f?.fps === 30 ? 30 : f?.fps === 60 ? 60 : DEFAULT_FORMAT.fps };
+  return {
+    height: f?.height === 720 ? 720 : f?.height === 1080 ? 1080 : DEFAULT_FORMAT.height,
+    fps: f?.fps === 30 ? 30 : f?.fps === 60 ? 60 : DEFAULT_FORMAT.fps,
+    source: f?.source === 'stack' ? 'stack' : 'plate',
+  };
 }
 export const saveFormat = (f: LiveFormat) => write(FORMAT_KEY, f);
 
@@ -167,6 +174,7 @@ export function liveOptionsFor(list: LiveDestination[], f: LiveFormat, upload?: 
   return {
     destinations: list.map((d) => ({ name: d.name, url: d.url.trim(), keyName: keyNameFor(d), orientation: d.orientation })),
     width: Math.round(f.height * 16 / 9), height: f.height, fps: f.fps,
+    ...(f.source === 'stack' ? { source: 'stack' as const } : {}),
     ...(r.landscape ? { videoBitrate: r.landscape.kbps * 1000 } : {}),
     ...(r.portrait ? { portrait: { videoBitrate: r.portrait.kbps * 1000 } } : {}),
   };
@@ -241,8 +249,9 @@ export interface LiveShowState {
   destinations: LiveDestinationHealth[];
   frames: number;
   skipped: number;
+  grabMs: number;
 }
-const IDLE: LiveShowState = { phase: 'idle', test: false, error: null, seconds: 0, names: [], destinations: [], frames: 0, skipped: 0 };
+const IDLE: LiveShowState = { phase: 'idle', test: false, error: null, seconds: 0, names: [], destinations: [], frames: 0, skipped: 0, grabMs: 0 };
 
 let snap: LiveShowState = IDLE;
 const listeners = new Set<() => void>();
@@ -270,7 +279,7 @@ let ceilingBefore: LiveUpload | null = null;
 function show(s: LiveState): LiveShowState {
   return {
     phase: s.phase, test: testing, error: s.error, seconds: Math.floor(s.seconds), names,
-    destinations: s.transport?.destinations ?? [], frames: s.frames, skipped: s.skipped,
+    destinations: s.transport?.destinations ?? [], frames: s.frames, skipped: s.skipped, grabMs: s.timing.grabMs,
   };
 }
 
@@ -294,7 +303,7 @@ export const liveAllowed = () => deps?.allowed() ?? false;
 export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Promise<LiveState> {
   const native = nativeLive();
   if (!native || !deps) throw new Error('the live show streams from the Mac app');
-  if (!deps.allowed()) throw new Error('the live show is a Pro feature');
+  if (!deps.allowed()) throw new Error('the live show needs a Home or Pro licence');
   if (current && onAir(show(current.state()))) throw new Error('already live: stop() first');
   const canvas = deps.canvas();
   if (!canvas) throw new Error('no plate to stream');
@@ -311,7 +320,7 @@ export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Pro
   names = destinations.map((d) => d.name ?? d.url);
   upload = { heldKbps: 0, saturatedKbps: null };
   ceilingBefore = loadUpload();
-  const enc = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration, frames: 'plate' });
+  const enc = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration, frames: o.source === 'stack' ? 'stack' : 'plate' });
   current = enc;
   publish({ ...IDLE, phase: 'starting', test: testing, names });
   try {
@@ -451,7 +460,7 @@ export async function stopLive(): Promise<LiveState | null> {
  * orientation }] })` for several (37x-4c), `stop()`, `state()` (with each
  * destination's health under `transport.destinations`), `probe({ width,
  * height, fps })`, `keys.set(name, key)`, `keys.list()`, `keys.remove(name)`.
- * `allowed` is the Pro gate, asked at each start. Outside the app (no
+ * `allowed` is the Home gate (Home or Pro), asked at each start. Outside the app (no
  * RTMPS client to hand the packets to) it does nothing.
  */
 export function installLiveConsole(d: Deps): void {

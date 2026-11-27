@@ -9,9 +9,11 @@
  */
 
 import type { PlateSolver } from '../gpu/solverTypes';
-import type { BubbleField } from '../lib/bubbles';
+import { WebGPUFluid } from '../gpu/fluid';
+import { MAX_BUBBLES, type BubbleField } from '../lib/bubbles';
 import type { PouredLiquid, SpeciesSnapshot } from '../lib/bubbleLiquid';
 import type { LiquidPhase } from '../lib/liquidPhase';
+import { DISH_GAP_METRES } from '../lib/turntable';
 import type { VisualizerSettings } from '../types';
 import { GRID_SCALE, GRID_SIZE, particleFlowScale } from './constants';
 import type { FluidSimulation } from './fluidSimulation';
@@ -83,10 +85,10 @@ export function stepPlateBubbles(
   simStepS: number,
   tiltX: number,
   tiltY: number,
-  treble01: number,
 ): void {
   const vx = lead?.readVx, vy = lead?.readVy;
   const qk = particleFlowScale(lead, currentSettings);
+  bubbles.gapMetres = lead?.gpu?.coverMetres ?? DISH_GAP_METRES;
   bubbles.liquid(currentSettings);
   const thinGap = (currentSettings.thinGap ?? 1) > 0 && !!lead?.thinGap;
   const snap = thinGap && lead ? lead.speciesPoll.latest : null;
@@ -96,7 +98,7 @@ export function stepPlateBubbles(
     const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
     const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
     return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-  }, tiltX, tiltY, treble01 * 0.6);
+  }, tiltX, tiltY);
   // A bubble is air between the plates: the dye cannot sit under
   // it. A standing squeeze on each footprint keeps pumping the
   // dye out to the rim, so the field flows round the bubbles
@@ -109,11 +111,29 @@ export function stepPlateBubbles(
       if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');
     }
   }
-  // A pop is an inward cavity collapse into the void left behind.
-  for (const ev of bubbles.events) {
-    if (ev.kind === 'pop' && lead) {
-      const px = Math.round(ev.x), py = Math.round(ev.y);
-      if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.popBubble(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.04);
-    }
-  }
+  /*
+    A pop used to push the liquid in as well (`popBubble`): an inward kick
+    over the pocket's disc plus a swirl whose sign came from the parity of
+    its cell, "an annular vortex ring". Between two glasses neither is
+    there. The pocket's air going is a sink with no curl, and the liquid
+    closes in because the squeeze each pocket holds on its footprint (the
+    loop above) stops and the gap the solver sees opens back up to the
+    liquid; the thin gap's own pressure then fills the hole. A swirl that
+    turns one way or the other by which cell the pop fell in is no flow a
+    pop makes (PLAN 15g-17). The pop events stay on `bubbles.events` for
+    the checks that count them; nothing turns them into velocity.
+  */
+}
+
+/**
+ * Push the lead plate's stepped bubble list to `WebGPUAir` once per solver step
+ * (rather than once per frame) so multi-step frames spread bubble rate evenly,
+ * doing nothing when there are no bubbles and no air field allocated (H2c-8).
+ */
+export function syncBubblesGpu(lead: FluidSimulation | undefined, bubbles: BubbleField): void {
+  const gpu = lead?.gpu;
+  if (!(gpu instanceof WebGPUFluid)) return;
+  if (bubbles.bubbles.length <= 0 && !gpu.airLive) return;
+  const live = Math.min(bubbles.pack(), MAX_BUBBLES);
+  gpu.setBubbles(bubbles.packed, live, 0.25, bubbles.packedFinger);
 }

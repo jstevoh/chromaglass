@@ -10,14 +10,17 @@ import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
-import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
+import { OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
-import { SoapFilmPlate, SOAP_PLATE_DX } from '../soapFilmPlate';
+import { SoapFilmPlate, SOAP_PLATE_DX, soapLean } from '../soapFilmPlate';
+import { TankPlate } from '../tankPlate';
+import { FaradayPlate } from '../faraday';
+import { GlowPlate, GLOW_SHEAR, GLOW_RECHARGE } from '../glow';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
@@ -91,6 +94,46 @@ export class FluidPasses extends FluidFields {
     const t = this.airTex;
     t[0] = this.air.prev; t[1] = this.air.field; t[2] = this.airGiveTex; t[3] = this.airInTex;
     return t;
+  }
+
+  /** Free the air pair and its scratch targets after a quiet minute; clear bind-group caches so stale targets are never reused. */
+  protected dropAir(): void {
+    this.air?.dispose();
+    this.air = null;
+    if (this.airGiveTex) { this.disposer.release(this.airGiveTex); this.airGiveTex = null; }
+    if (this.airInTex) { this.disposer.release(this.airInTex); this.airInTex = null; }
+    this.airTex.length = 0;
+    this.airPush = 0;
+    this.airCover = 0;
+    this.airCoverPrev = 0;
+    this.airQuietSeconds = 0;
+    this.groups.clear();
+    this.groupRoot = { kids: new Map() };
+  }
+
+  /**
+   * Encode this step's air splat (when live or clearing), update `airPush`/`airCover`,
+   * and release the air storage after a quiet minute with neither bubbles nor boil (H2c-8).
+   */
+  protected stepAir(enc: GPUCommandEncoder, p: GpuStepParams, thin: boolean, disp: number): void {
+    if (this.air?.needsSplat) {
+      this.air.splat(enc, (label) => this.profiler.renderPass(label));
+    }
+    const hadAir = thin && this.airPush > 0 && this.airCover > 0;
+    const airAny = !!this.air?.any;
+    this.airPush = (airAny || hadAir) && disp > AIR_DISP_LEAST ? (p.bubbleClear ?? 1) : 0;
+    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
+    this.airCoverPrev = this.airCover;
+    this.airCover = this.air ? this.air.coverage : 0;
+    if (this.air) {
+      if (airAny || hadAir || this.air.needsSplat) {
+        this.airQuietSeconds = 0;
+      } else {
+        this.airQuietSeconds += Math.max(0, p.magnetSeconds ?? 1 / 60);
+        if (this.airQuietSeconds >= 60) this.dropAir();
+      }
+    }
+    this.lastDt = p.dt;
   }
 
   /** Whether both airGive kernels are built (asking builds them): a carry takes the air only then. */
@@ -270,6 +313,70 @@ export class FluidPasses extends FluidFields {
   }
 
   /**
+   * The solvers that run beside the plate's own, on `enc` before the step's
+   * pass: the frame's soap film, the tank's side view, the dish on a shaker
+   * and the water's glow.
+   */
+  protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    this.stepSoapPlate(enc, p);
+    this.stepTankPlate(enc, p);
+    this.stepFaradayPlate(enc, p);
+    this.stepGlowPlate(enc, p);
+  }
+
+  /**
+   * The water's glow (PLAN 48c, gpu/glow.ts): made the first time Glow is up,
+   * stepped on the show's own seconds with the flow the last step left (the
+   * flow over the glass, the glass's own drift taken off, since it is the
+   * water's shear against the glass the organisms feel) and the squeeze
+   * film's gap, whose depth sets the gap's wall shear and how much water
+   * glows. Turned off, it goes, and the next time the sea has rested.
+   */
+  protected stepGlowPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.glow ?? 0) > 0.001)) {
+      if (this.glowPlate) { this.glowPlate.dispose(); this.glowPlate = null; }
+      return;
+    }
+    if (!this.glowPlate) this.glowPlate = new GlowPlate(this.device);
+    // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N);
+    // The shaken dish's wave too, stepped just before (stepBeside), so its strain lights the cells (48c-6).
+    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE, this.faradayPlate?.field ?? null, p.faradayHz ?? 0);
+  }
+
+  /**
+   * The dish on a shaker (PLAN 48f, gpu/faraday.ts): made the first time
+   * Shaker is up, stepped on the show's own seconds at the Shake the patch
+   * bay folded (a cord carries the music there). Turned off, it goes, and
+   * the next time the water is still.
+   */
+  protected stepFaradayPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.faradayHz ?? 0) > 0)) {
+      if (this.faradayPlate) { this.faradayPlate.dispose(); this.faradayPlate = null; }
+      return;
+    }
+    if (!this.faradayPlate) this.faradayPlate = new FaradayPlate(this.device);
+    // The pattern rides the plate's own flow: the uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N);
+    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0, p.faradayRock ?? 0, this.ride(), travel);
+  }
+
+  /**
+   * The tank seen through its side (PLAN 47n, gpu/tankPlate.ts): made the
+   * first time Tank is up, stepped on the show's own seconds, with the
+   * fingers held on the plate to carry its nozzle. Turned off, it goes, and
+   * the next time it is clear water.
+   */
+  protected stepTankPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.tank ?? 0) > 0.001)) {
+      if (this.tankPlate) { this.tankPlate.dispose(); this.tankPlate = null; }
+      return;
+    }
+    if (!this.tankPlate) this.tankPlate = new TankPlate(this.device);
+    this.tankPlate.step(enc, p.magnetSeconds ?? 1 / 60, p, p.boilHolds);
+  }
+
+  /**
    * The frame's soap film (PLAN 32d, gpu/soapFilmPlate.ts), on `enc` before the
    * step's pass: made the first time Soap Film is up and stepped on the film's
    * own clock (the show's seconds times the drain rate), blown by the flow the
@@ -280,7 +387,9 @@ export class FluidPasses extends FluidFields {
       if (this.soapPlate) { this.soapPlate.dispose(); this.soapPlate = null; }
       return;
     }
-    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device);
+    const lean = soapLean(p.soapFilmTilt);
+    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device, undefined, lean);
+    this.soapPlate.lean = lean;
     const rate = Math.max(0, p.soapFilmRate ?? 1);
     // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement), in the frame's metres.
     const travel = p.dt * p.advection * ((this.N - 2) / this.N) * this.soapPlate.field.nx * SOAP_PLATE_DX / SOAP_FRAME_SPAN;
@@ -296,9 +405,86 @@ export class FluidPasses extends FluidFields {
     if (!this.slosh.ready()) { this.sloshTex = null; return; }
     // The oil is the mix's, while the look has Oil Tension and the mix is made (lib/slosh.ts: the lens floats at its capillary thickness).
     const oil = this.mix && (p.oilTension ?? 0) > 0 ? { tex: this.mix.read, n: this.N } : null;
-    this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'));
+    this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'), drive.spin, drive.spinRate);
     this.sloshLevel = false;
     this.sloshTex = this.slosh.flow;
+  }
+
+  /**
+   * What a step runs in passes of their own before the air is drawn: what
+   * the poured liquids do, then the plate's boil. `step` calls this where it
+   * called the boil alone.
+   */
+  protected stepAhead(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    this.stepLiquids(enc);
+    this.stepPlateBoil(enc, p);
+  }
+
+  /**
+   * What a bottle's liquid does to the plate, once a step, every step it is
+   * on the plate (PLAN 15e-1; 14ab-16 is the same fault met again).
+   *
+   * The soap thins the dye it lies on (`soapThin`) and the liquids push the
+   * flow (`liquidForces`: the soap's pull down its own gradient, a thick
+   * liquid's drag, a heavy one's slide down a rocked plate, an oil keeping
+   * to itself). Both ran inside the fold of the frame's hand-laid deltas
+   * (`foldDeltas`: the thinning in `deltaDye`, the forces after `deltaVel`),
+   * and a step nothing was laid in has no fold. A force a liquid puts on
+   * the liquid round it is there every instant the liquid is, whoever else
+   * touches the plate. The app folded on every step by accident: the CPU's
+   * copy of the liquids marked the deltas written while it held any, and it
+   * held the first pour forever, since it stops being stepped once the GPU
+   * has the liquids (liquidPhase.ts, gpuNative). A Clear empties that copy
+   * and nothing fills it again, so a liquid poured after a Clear was carried
+   * and drawn and did nothing until a hand, a kick or a bubble wrote a
+   * delta. Measured on a 64² plate rocked for six steps, a heavy drop and a
+   * soap's (`npm run liquidpush`): with no fold the slide under the heavy
+   * drop was 0 and the soap thinned no dye, where one fold a step gave
+   * 3.4e-2 and 8.3%; and with two folds a step (a frame that also read the
+   * plate back, pullStateFromGpu) 1.86 and 1.92 times that.
+   *
+   * Here, first in the step and in this order, they meet the plate exactly
+   * as one fold before the step left it for them, so a show that did fold
+   * every step sees the same arithmetic. On a thin gap only the drags are
+   * left here (liquidForces says why); the heavy liquid's weight is
+   * `driveLiquids`, after the gap keeps its flow. The thinning being an
+   * erasure and not a push is 15e-5.
+   *
+   * Nothing runs on a plate no bottle was poured on (`liquidsLive`).
+   */
+  protected stepLiquids(enc: GPUCommandEncoder): void {
+    if (!this.liquidsLive) return;
+    const pass = enc.beginComputePass({ label: 'liquids', timestampWrites: this.profiler.pass('liquids') });
+    this.run(pass, 'soapThin', this.dye.write, [this.dye.read, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
+    this.dye.swap();
+    this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
+    this.vel.swap();
+    pass.end();
+  }
+
+  /**
+   * A heavy liquid's weight down a rocked thin gap, as the thin solve's
+   * drive (PLAN 15e-10; the kernel, liquidDrive, says the physics). `step`
+   * calls it after 'thin gap keep', while a bottle has been poured.
+   *
+   * It went in with the other liquids' pushes before the keep, so the gap
+   * read it as flow the liquid already had, which its drag takes within the
+   * step: on a 64² plate rocked 0.5 for six steps (`npm run liquidpush`) the
+   * slide under a heavy drop was −9.4e-4 beside a flow of 0.53, two
+   * thousandths of it and against the rock's way, where the open plate's was
+   * 3.4e-2. So on the plate every look uses, a syrup or a glycerine did not
+   * slide down a rocked plate at all. Here it is a weight: LIQUID_FALL at
+   * the cover's gap (h², as the oil's lift and the colour's weight carry
+   * it), times the tilt and Plate Rock's gain, turned into the flow's
+   * per-step speed as the breath's is.
+   */
+  protected driveLiquids(pass: GPUComputePassEncoder, p: GpuStepParams, disp: number): void {
+    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+    // The cover's gap over the rest gap, squared (cover.ts coverH2, a class above this one): Darcy's h².
+    const k = LIQUID_FALL * (this.coverGap / REST_GAP) ** 2 * (p.rockGain ?? 1) * seconds / (PLATE_METRES * Math.max(disp, 1e-9));
+    const oil = this.mix && this.mixLive && (p.oilTension ?? 0) > 0.001 ? this.mix.read : this.blank('rgba');
+    this.run(pass, 'liquidDrive', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read, oil], this.arg('liquid drive', [k * p.rockX, k * p.rockY, 0, 0]));
+    this.vel.swap();
   }
 
   /**
@@ -404,7 +590,8 @@ export class FluidPasses extends FluidFields {
     this.vel.swap();
     this.boilAlpha.swap();
     this.boilLive = true;
-    this.air?.setBoilAlpha(this.boilAlpha.read);
+    this.airQuietSeconds = 0;
+    this.ensureAir().setBoilAlpha(this.boilAlpha.read);
   }
 
   /**
@@ -517,6 +704,8 @@ export class FluidPasses extends FluidFields {
   }
 
   protected stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    // The closeup's fine dye rides the same velocity by the same displacement (PLAN 47a-1, fineDye.ts).
+    this.fine?.step(enc, this.dye.read, this.velForced, this.N, stepDisplacement(p.dt, p.advection, this.N), p.dt);
     const want = Math.max(0, Math.min(1, p.particles ?? 0));
     if (want <= 0) {
       if (this.particles) { this.particles.dispose(); this.particles = null; }
@@ -538,7 +727,7 @@ export class FluidPasses extends FluidFields {
 
   protected jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {
     if (a.every((v) => v <= 0)) return;
-    const scratch = label === 'dye' ? this.scratchA : this.scratchB;
+    const scratch = label === 'dye' ? this.scratchA : this.ensureVelScratch();
     // x0, the field before the diffusion, kept while the field ping-pongs.
     this.run(pass, 'scaleDye', scratch, [field.read], this.arg('scale one', [1, 0, 0, 0]));
     const rcp = a.map((v) => 1 / (1 + 4 * v));
@@ -624,7 +813,9 @@ export class FluidPasses extends FluidFields {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.divRaw, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
+    const airCur = this.air ? this.air.field : this.blank('rgba');
+    const airPrev = this.air ? this.air.prev : this.blank('rgba');
+    this.run(pass, 'divergence', this.divRaw, [this.vel.read, airCur, airPrev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
         (this.airCover - this.airCoverPrev) * invDt,
         // The press: how much of it reaches the flow. Its mean is no longer
@@ -672,7 +863,7 @@ export class FluidPasses extends FluidFields {
       mixOn ? this.mix!.read : this.blank('rgba'),
       this.phaseLive ? this.phase.read : this.blank('r'),
     ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
-      Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT * oilLightnessOf(p.oilWeight)]), this.M);
+      Math.max(1e-7, p.spinNu ?? 1e-6), oilNuOf(p.oilThickness), Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT * oilLightnessOf(p.oilWeight)]), this.M);
     this.swirl.swap();
     /*
       A thin gap stops here, at one dispatch where it was thirteen (PLAN 22k).
@@ -693,7 +884,8 @@ export class FluidPasses extends FluidFields {
       it keeps its own projection.
     */
     if (thin) return;
-    const m = this.arg('current grid', [0, this.M, 0, 0]);
+    // A name of its own: the current's passes and the open plate's addCurrent run in this same step with other numbers (PLAN 46r, stepCurrent).
+    const m = this.arg('swirl grid', [0, this.M, 0, 0]);
     this.run(pass, 'curDivergence', this.swirlDiv, [this.swirl.read], m, this.M);
     for (let k = 0; k < CURRENT_ITERS; k++) {
       this.run(pass, 'curPressure', this.swirlP.write, [this.swirlP.read, this.swirlDiv], m, this.M);
@@ -917,14 +1109,18 @@ export class FluidPasses extends FluidFields {
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+    const airCur = this.air ? this.air.field : this.blank('rgba');
+    const airPrev = this.air ? this.air.prev : this.blank('rgba');
+    /* The oil bodies' viscosity (hsPrep's oilBody, PLAN 27f-7). */
+    const oilMix = this.mixLive && this.mix ? this.mix.read : this.blank('rgba');
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${airCur.label}:${airPrev.label}:${oilMix.label}`,
       this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, this.airPush, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, airCur, airPrev, oilMix]);
     this.vel.swap();
-    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${airCur.label}:${airPrev.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
-      [this.vel.read, this.squeeze.read, this.air!.field, this.air!.prev, this.div, mob, this.hsGap!, this.hsPour!]);
+      [this.vel.read, this.squeeze.read, airCur, airPrev, this.div, mob, this.hsGap!, this.hsPour!]);
     this.hsPrimed = true;
     // Each coarse level's faces and rim, from the level above it.
     for (let l = 0; l < this.mg.length; l++) {
@@ -1020,9 +1216,26 @@ export class FluidPasses extends FluidFields {
     smooth(l, MG_SWEEPS);
   }
 
-  /** The lasting current: forces, then its own projection, on the M grid. */
+  /**
+   * The lasting current: forces, then its own projection, on the M grid.
+   *
+   * Its args are under a name nothing else in a step writes (PLAN 46r). They
+   * were under 'current grid', which the swirl's projection and the open
+   * plate's addCurrent also wrote, each with its own numbers: z here is
+   * whether the boil runs (currentForces takes the boil's density rise for
+   * the clamped linear one), z there is Depth Drag's exponent. A buffer holds
+   * what was written to it last before the submit (`arg`), and on the open
+   * plate that was addCurrent's, so currentForces read Depth Drag as the
+   * boil. Measured on a 64² open plate, upright, a 30 K spot, one step
+   * (`npm run argnames`): at Depth Drag 1.5 and Heat 0 the current came to
+   * 0.33 against the 0.0094 it has at Depth Drag 0, the boil's uncapped rise
+   * with no boil; and at Heat 1 and Depth Drag 0 a 70 K spot's current sat
+   * at its cap, the boil's rise not read at all. A thin gap's addCurrent
+   * already had a name of its own ('current grid thin'), so the looks, which
+   * all open thin, never showed it.
+   */
   protected stepCurrent(pass: GPUComputePassEncoder): void {
-    const m = this.arg('current grid', [0, this.M, this.boilLive ? 1 : 0, 0]);
+    const m = this.arg('current step', [0, this.M, this.boilLive ? 1 : 0, 0]);
     this.run(pass, 'currentForces', this.cur.write, [this.cur.read, this.vel.read, this.dye.read], m, this.M);
     this.cur.swap();
     this.run(pass, 'curDivergence', this.curDiv, [this.cur.read], m, this.M);
@@ -1032,6 +1245,89 @@ export class FluidPasses extends FluidFields {
     }
     this.run(pass, 'curGradient', this.cur.write, [this.cur.read, this.curP.read], m, this.M);
     this.cur.swap();
+  }
+
+  /**
+   * The dye's molecular diffusion and along-flow dispersion (`dyeDisperse`,
+   * PLAN 18h, 46k), or nothing when both diffusion terms are zero (`dm <= 0`
+   * and `kappaT <= 0` or `dispCells <= 0`, as on Classic and the thirteen
+   * other looks with Diffusion Rate at 0) and Oil Bodies is not unspreading.
+   *
+   * Read in the code (2026-11-13): the stage's gate had `dispCells > 0 || …`
+   * in front of the diffusion check, from when shear dispersion was always on,
+   * so every moving step ran `dyeDisperse` (one full-grid dispatch, 25 loads
+   * of the rgba32float dye a cell) even with `dm = 0` and `kappaT = 0`. In
+   * `wgsl/fluid/dye.ts`, `getDisp` returns `vec3f(dm + fac * v.x², dm + fac *
+   * v.y², fac * v.x * v.y)` where `shear = kappaT * gapRel² * |v|²` and `v =
+   * vel * dispCells`. When `dm = 0` and either `kappaT = 0` or `dispCells =
+   * 0`, `getDisp` is `vec3f(0)` at every cell, every face flux `fluxX` and
+   * `fluxY` is `±0`, and `here + netFlux` writes back the cell's own dye bit
+   * for bit (the previous step's `decayDye` clamped every channel to `+0.0` or
+   * above, so `x + (±0.0)` is `x`).
+   *
+   * Oil Bodies (`bodies`: `bodiesOn && !bodiesFresh`) stays outside the gate:
+   * `bodyUnspread` (`wgsl/fluid/oil.ts`) writes `max(dye - spread, 0) +
+   * max(kept, 0)`, and because `slump` and `decayDye` at the end of the step
+   * before act on `this.dye` alone and not `this.oilDye`, a cell where `dye`
+   * dropped below `oilDye` is raised back to `oilDye` by that clamp, and a
+   * cell with both above zero computes `(dye - od) + od` in float32, which is
+   * not bit-identical to `dye` across different exponents.
+   */
+  protected disperseWanted(dm: number, kappaT: number, dispCells: number, bodies: boolean): boolean {
+    return bodies || dm > 0 || (kappaT > 0 && dispCells > 0);
+  }
+
+  protected disperseDye(pass: GPUComputePassEncoder, dm: number, kappaT: number, dispCells: number, dispCap: number, bodies: boolean): void {
+    if (!this.disperseWanted(dm, kappaT, dispCells, bodies)) return;
+    this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
+      this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+    this.dye.swap();
+    if (bodies) {
+      const od = this.oilDye!;
+      // Keep oil's pre-dispersion share in scratchB for bodyUnspread
+      this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
+      this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
+        this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+      od.swap();
+      this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
+      this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
+      this.dye.swap();
+      od.swap();
+    }
+  }
+
+  /**
+   * The poured liquids' two fields, carried as the step carries the dye
+   * (`how`: the thin gap's substepped carry, MacCormack, or the old plate's
+   * bodyAdvect), or not at all while nothing has been poured since the plate
+   * was last cleared (liquidsLive).
+   *
+   * Read in the code (2026-11-13): every step carried both, at every look,
+   * though most never pour a liquid: two MacCormack advections (three
+   * dispatches each) or two substepped carries (a dispatch a substep and the
+   * glass's drift) of fields that are zero. Every one of those kernels is a
+   * carry, a sum of the field's own values times weights (fluxes, a
+   * bilinear backtrace and its correction clamped to the neighbours' range,
+   * airShed's gather of what dry cells hold), so a field of zeros comes out
+   * zeros, and skipping it leaves the same zeros in whichever half of the
+   * pair is read. Nothing else reads the carry's side effects: airGive's
+   * shares are worked out again, from the air, before every carry that takes
+   * them. The gate is the one stepLiquids has for the liquids' forces
+   * (15e-1) and chemLive is for the reaction's grid. `npm run encode` holds
+   * both ways of it: no carry on a plate never poured on or cleared, and
+   * the carries back, open plate and thin gap, after one drop.
+   */
+  protected carryLiquids(pass: GPUComputePassEncoder, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp = 0, at?: GPUBuffer[]): void {
+    if (!this.liquidsLive) return;
+    this.carryLiquid(pass, this.liquids0, how, args, disp, at);
+    this.carryLiquid(pass, this.liquids1, how, args, disp, at);
+  }
+
+  private carryLiquid(pass: GPUComputePassEncoder, f: PingPong, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp: number, at?: GPUBuffer[]): void {
+    if (how === 'mac') { this.macCormack(pass, f, this.velForced, disp, 'dye'); return; }
+    if (how === 'thin') { this.carrySubsteps(pass, 'bodyAdvect', f, args!, undefined, at); return; }
+    this.runPressed(pass, 'bodyAdvect', f.write, [f.read, this.velForced], args!);
+    f.swap();
   }
 
   protected macCormack(pass: GPUComputePassEncoder, field: PingPong, velTex: GPUTexture, disp: number, label: string): void {

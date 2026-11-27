@@ -130,6 +130,9 @@ function search(a, b, px, py, bs, cx, cy, r) {
   return { dx: bx, dy: by, s: best, x, y };
 }
 
+/** How much worse a seeded match may be than the unseeded one and still win (see flowField). */
+const SEED_SLACK = 1.25;
+
 /**
  * The displacement field from half-size image A to B: a vector per 8×8 block
  * (16 pixels at 320), in half-size pixels, or null where the block has too
@@ -140,8 +143,35 @@ function search(a, b, px, py, bs, cx, cy, r) {
  * coarse blocks are bigger than the fine one on purpose: a block of 2 pixels
  * at an eighth matches noise (the first version did, and read a slid texture
  * at 0.4 of its true whole-field share).
+ *
+ * With `seed` (the field from A to an earlier sample) and `ratio` (this
+ * lag over the seed's), a block whose seed vector matched cleanly is also
+ * searched about that vector times the ratio, ±(1 + ceil(ratio)). The words
+ * check's drifting stripes found why (47x-10): a 64-pixel sine moving a pixel
+ * a frame moves 15 half-size pixels in the second, almost half its period of
+ * 32, so over the second the true shift and the one the other way (17 back)
+ * match the stripes about equally, and which one the coarse search took came
+ * down to the codec's noise. On one ffmpeg both takes of the same look took
+ * the alias and read the drift backwards, 7.1 and 6.9 % a second the wrong
+ * way; on Ubuntu's they split, two steps apart; the truth is 9.4 forwards.
+ *
+ * So physicsSummary follows the motion through time rather than guessing it
+ * between two far-apart frames: the one-sample field first (1.5 pixels, a
+ * twentieth of the period, which cannot alias), then lags of about 2.5 times
+ * the last (1, 3, 8, 10 samples), each seeded from the one before. Any
+ * repeating texture moving near half its period in a second (ripples,
+ * stripes, a lattice of cells) aliased the same way. The chain is short
+ * steps on purpose: a first version scaled the one-sample vector straight up
+ * to the second, and under the self-test's grain a one-sample vector is
+ * mostly noise, so ten times it landed nowhere (the carried share fell from
+ * 0.94 to 0.80); one seeded from it at three samples is already good to a
+ * pixel. The unseeded search still runs, and the seeded match wins unless it
+ * is worse than the unseeded one by more than SEED_SLACK: an alias matches
+ * about as well as the truth (that is what makes it an alias), so the seed
+ * decides between them, and a seed thrown off by grain lands far from any
+ * match and loses to the search.
  */
-export function flowField(A, B) {
+export function flowField(A, B, seed = null, ratio = 1, mask2 = null) {
   const qa = halve(A), qb = halve(B), ea = halve(qa), eb = halve(qb);
   const BS = 8, nx = Math.floor(A.w / BS), ny = Math.floor(A.h / BS), out = [];
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
@@ -151,6 +181,11 @@ export function flowField(A, B) {
     // could not explain).
     if (i === 0 || j === 0 || i === nx - 1 || j === ny - 1) { out.push(null); continue; }
     const x = i * BS, y = j * BS, cx = x + BS / 2, cy = y + BS / 2;
+    if (mask2) {
+      let mc = 0;
+      for (let yy = 0; yy < BS; yy++) for (let xx = 0; xx < BS; xx++) if (mask2[(y + yy) * A.w + x + xx]) mc++;
+      if (mc > (BS * BS) >> 2) { out.push(null); continue; }
+    }
     // Texture: a block flat to within a few levels cannot be matched (the
     // aperture problem), so it carries no vector.
     let m = 0, v = 0;
@@ -161,14 +196,19 @@ export function flowField(A, B) {
     if (sd < 3) { out.push(null); continue; }
     const e = search(ea, eb, cx / 4, cy / 4, 6, 0, 0, 6);
     const q = search(qa, qb, cx / 2, cy / 2, 8, Number.isFinite(e.s) ? 2 * e.dx : 0, Number.isFinite(e.s) ? 2 * e.dy : 0, 2);
-    const h = search(A, B, cx, cy, BS, Number.isFinite(q.s) ? 2 * q.dx : 0, Number.isFinite(q.s) ? 2 * q.dy : 0, 2);
+    let h = search(A, B, cx, cy, BS, Number.isFinite(q.s) ? 2 * q.dx : 0, Number.isFinite(q.s) ? 2 * q.dy : 0, 2);
+    let edge = Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6;
+    const sv = seed ? seed.v[j * nx + i] : null;
+    if (sv && !sv.edge && sv.resid <= 0.6) {
+      const t = search(A, B, cx, cy, BS, Math.round(sv.dx * ratio), Math.round(sv.dy * ratio), 1 + Math.ceil(ratio));
+      if (Number.isFinite(t.s) && !(t.s > SEED_SLACK * h.s)) { h = t; edge = false; }
+    }
     if (!Number.isFinite(h.s)) { out.push(null); continue; }
     const par = (l, c, r) => (Number.isFinite(l) && Number.isFinite(r) && l + r - 2 * c > 0 ? Math.max(-0.5, Math.min(0.5, (l - r) / (2 * (l + r - 2 * c)))) : 0);
     const fx = par(zsad(A, B, h.x, h.y, BS, h.dx - 1, h.dy), h.s, zsad(A, B, h.x, h.y, BS, h.dx + 1, h.dy));
     const fy = par(zsad(A, B, h.x, h.y, BS, h.dx, h.dy - 1), h.s, zsad(A, B, h.x, h.y, BS, h.dx, h.dy + 1));
     // Match quality: the residual a pixel against the block's own contrast.
     const resid = h.s / (BS * BS) / sd;
-    const edge = Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6;
     out.push({ x: cx, y: cy, dx: h.dx + fx, dy: h.dy + fy, resid, edge });
   }
   return { nx, ny, v: out };
@@ -201,7 +241,107 @@ function carried(A, B, field) {
       n++;
     }
   }
-  return n ? { raw: raw / n, res: res / n } : null;
+  if (!n) return null;
+  return { raw: raw / n, res: res / n, floor: Math.min(noiseSigma(A, B) * 1.128, quietestBlock(A, B, field)) };
+}
+
+/**
+ * The pixel noise of a pair, as the standard deviation of one sample's
+ * pixels (47v-5): Immerkaer's estimate, the response to the mask
+ * [1 −2 1; −2 4 −2; 1 −2 1], which has no response to a ramp or a smooth
+ * blob (a plane's second differences cancel) and answers to white noise
+ * alone: its mean absolute value × √(π/2) / 6 is the noise sd. Detail as
+ * fine as the grain adds to it, so it is an upper bound, and the quietest
+ * blocks below keep it honest. 1.128 σ is the mean absolute difference of
+ * two independent samples of that noise, which is what the grain adds to
+ * the change between a pair.
+ */
+function noiseSigma(A, B) {
+  let t = 0, c = 0;
+  for (const I of [A, B]) {
+    const w = I.w, d = I.d;
+    for (let y = 1; y < I.h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const q = y * w + x;
+      t += Math.abs(4 * d[q] - 2 * (d[q - 1] + d[q + 1] + d[q - w] + d[q + w]) + d[q - w - 1] + d[q - w + 1] + d[q + w - 1] + d[q + w + 1]);
+      c++;
+    }
+  }
+  return c ? (t / c) * Math.sqrt(Math.PI / 2) / 6 : 0;
+}
+
+/**
+ * The change of the quietest tenth of the picture's blocks. Whatever moves
+ * adds to a block's change, so the quietest are where grain is most of what
+ * changed. On a plate textured everywhere and all moving this is the motion,
+ * not the grain, which is why it only caps the estimate above and never
+ * stands for it.
+ */
+function quietestBlock(A, B, field) {
+  const BS = 8, W = A.w, bm = [];
+  for (let j = 1; j < field.ny - 1; j++) for (let i = 1; i < field.nx - 1; i++) {
+    let t = 0;
+    for (let yy = 0; yy < BS; yy++) for (let xx = 0; xx < BS; xx++) { const q = (j * BS + yy) * W + i * BS + xx; t += Math.abs(B.d[q] - A.d[q]); }
+    bm.push(t / (BS * BS));
+  }
+  bm.sort((a, b) => a - b);
+  return bm.length ? bm[Math.floor(0.1 * (bm.length - 1))] : 0;
+}
+
+/**
+ * One pair's carried share with the grain taken out of both sides. Grain
+ * adds to the change with and without the flow's correction alike, so a
+ * plate the flow carries perfectly still read most of its change as
+ * uncarried. The mean absolute change of motion c plus noise is about
+ * √(c² + floor²) (all noise when c is nothing, all motion when it is large),
+ * so each side is taken as √(x² − floor²). Null where less than 1.5 grey
+ * levels of change are left (the bar the raw change was held to before this,
+ * now on what the grain has not already explained).
+ */
+export function carriedShare(c) {
+  if (!c) return null;
+  const fl = (c.floor ?? 0) ** 2, raw = Math.sqrt(Math.max(0, c.raw ** 2 - fl)), res = Math.sqrt(Math.max(0, c.res ** 2 - fl));
+  return raw > 1.5 ? Math.max(0, Math.min(1, 1 - res / raw)) : null;
+}
+
+/**
+ * Robust global camera translation `(cu, cv)` via Tukey biweight IRLS over
+ * matched block vectors `vs`, initialized at the component-wise median so an
+ * internal fluid drift does not pull the camera estimate. Returns `{ cu, cv,
+ * speed, share }` where `share` (`cameraShare`) is the share of total motion
+ * energy explained by global camera translation alone.
+ *
+ * How `cameraShare` and `wholeShare` relate: `wholeShare` is the share
+ * explained by the full affine fit `v = v0 + M(p - c)`, which includes dish
+ * rotation (`curl`) and uniform spread (`div`) as well as translation.
+ * `cameraShare` isolates rigid camera pan/tilt (`(cu, cv)`), so a turned
+ * dish reads high `wholeShare` and near-zero `cameraShare`, while a panned
+ * frame reads high on both.
+ */
+function estimateCamera(vs) {
+  const n = vs.length;
+  if (n < 4) return null;
+  const med = a => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
+  let cu = med(vs.map(v => v.u)), cv = med(vs.map(v => v.w));
+  for (let it = 0; it < 6; it++) {
+    const res = vs.map(v => Math.hypot(v.u - cu, v.w - cv));
+    const mad = med(res);
+    const scale = Math.max(0.5, 1.4826 * mad);
+    const c = 4.685 * scale;
+    let wu = 0, wv = 0, ws = 0;
+    for (let i = 0; i < n; i++) {
+      const r = res[i];
+      const w = r < c ? (1 - (r / c) ** 2) ** 2 : 0;
+      wu += w * vs[i].u; wv += w * vs[i].w; ws += w;
+    }
+    if (ws > 0) { cu = wu / ws; cv = wv / ws; }
+  }
+  let tot = 0, rem = 0;
+  for (const v of vs) {
+    tot += v.u * v.u + v.w * v.w;
+    rem += (v.u - cu) ** 2 + (v.w - cv) ** 2;
+  }
+  const share = tot > 0 ? Math.max(0, 1 - rem / tot) : 0;
+  return { cu, cv, speed: Math.hypot(cu, cv), share, rmsFluid: Math.sqrt(rem / n) };
 }
 
 /** Least-squares affine fit v = v0 + M (p − c) to the vectors, in units per second. */
@@ -255,15 +395,23 @@ export function fft(re, im, inv = false) {
  * over a centre square of S pixels (S a power of two no bigger than the
  * frame's shorter side, at most 128), from 4 to 42 cycles across it.
  */
-export function spectrumSlope(px, W, H, { hann = true } = {}) {
+export function spectrumSlope(px, W, H, { hann = true, mask = null } = {}) {
   let S = 128; while (S > Math.min(W, H)) S >>= 1;
   if (S < 32) return null;
   const x0 = (W - S) >> 1, y0 = (H - S) >> 1;
   const re = Array.from({ length: S }, () => new Float64Array(S)), im = Array.from({ length: S }, () => new Float64Array(S));
-  let mean = 0;
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const p = ((y0 + y) * W + x0 + x) * 3; re[y][x] = 0.2126 * px[p] + 0.7152 * px[p + 1] + 0.0722 * px[p + 2]; mean += re[y][x]; }
-  mean /= S * S;
+  let mean = 0, cntMean = 0;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const idx = (y0 + y) * W + x0 + x;
+    if (mask?.[idx]) continue;
+    const p = idx * 3;
+    re[y][x] = 0.2126 * px[p] + 0.7152 * px[p + 1] + 0.0722 * px[p + 2];
+    mean += re[y][x]; cntMean++;
+  }
+  mean /= Math.max(1, cntMean);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const idx = (y0 + y) * W + x0 + x;
+    if (mask?.[idx]) re[y][x] = mean;
     // The window, so the square's hard edges do not leak power into every
     // band and flatten a steep spectrum (the self-test turns it off to show it).
     const wgt = hann ? (0.5 - 0.5 * Math.cos((2 * Math.PI * x) / (S - 1))) * (0.5 - 0.5 * Math.cos((2 * Math.PI * y) / (S - 1))) : 1;
@@ -291,13 +439,19 @@ export function spectrumSlope(px, W, H, { hann = true } = {}) {
   return sxy / sxx;
 }
 
+/** Fewest rows of a 320-wide sample the flow read is trusted on (PLAN 47v-6). */
+export const MIN_ROWS = 64;
+
 /** A running physics read: half-size luminance of every sample, and the spectra. */
-export function physicsAcc() { return { frames: [], spectra: [] }; }
+export function physicsAcc() { return { frames: [], spectra: [], title: [] }; }
 
 /** Add one sample (RGB24, W×H). The spectrum is taken on at most 400 samples, spread evenly by the caller's index. */
-export function physicsFrame(px, W, H, acc, k) {
+export function physicsFrame(px, W, H, acc, k, opts = {}) {
+  const skip = !!opts.skip;
+  acc.title ??= [];
+  acc.title.push(skip);
   acc.frames.push(poolLum(px, W, H, 2));
-  if (k % (acc.spectrumEvery ?? 1) === 0) { const s = spectrumSlope(px, W, H); if (s != null) acc.spectra.push(s); }
+  if (!skip && k % (acc.spectrumEvery ?? 1) === 0) { const s = spectrumSlope(px, W, H, { mask: opts.mask ?? null }); if (s != null) acc.spectra.push(s); }
 }
 
 const quant = (a, p) => { const s = a.filter(Number.isFinite).sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.round(p * (s.length - 1)))] : null; };
@@ -307,9 +461,19 @@ const quant = (a, p) => { const s = a.filter(Number.isFinite).sort((x, y) => x -
  * new shot, `W` the sample width (320), `scale` the design read's median
  * correlation length across (% of width) for the turnover time.
  */
-export function physicsSummary(acc, { rate, cut, W, scale }) {
+export function physicsSummary(acc, { rate, cut, W, scale, mask = null }) {
   const F = acc.frames, n = F.length;
-  const shotOf = new Int32Array(n); for (let k = 1; k < n; k++) shotOf[k] = shotOf[k - 1] + (cut[k] ? 1 : 0);
+  const title = acc.title ?? [];
+  let mask2 = null;
+  if (mask && F.length) {
+    const hw = F[0].w, hh = F[0].h;
+    mask2 = new Uint8Array(hw * hh);
+    for (let y = 0; y < hh; y++) for (let x = 0; x < hw; x++) {
+      if (mask[2 * y * W + 2 * x] || mask[2 * y * W + 2 * x + 1] || mask[(2 * y + 1) * W + 2 * x] || mask[(2 * y + 1) * W + 2 * x + 1]) mask2[y * hw + x] = 1;
+    }
+  }
+  const shotOf = new Int32Array(n);
+  for (let k = 1; k < n; k++) shotOf[k] = shotOf[k - 1] + (cut[k] || title[k] || title[k - 1] ? 1 : 0);
   const long = Math.max(1, Math.round(rate)); // about a second
   const pairs = [];
   const stride = Math.max(1, Math.ceil(n / 300));
@@ -320,10 +484,15 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
   // two seconds, or a shot that is, falls back to single samples.
   const useLong = n > 2 * long;
   for (let k = 0; k + 1 < n; k += stride) {
-    const L = useLong ? (k + long < n && shotOf[k + long] === shotOf[k] ? long : 0) : shotOf[k + 1] === shotOf[k] ? 1 : 0;
+    if (title[k]) continue;
+    const L = useLong ? (k + long < n && !title[k + long] && shotOf[k + long] === shotOf[k] ? long : 0) : (!title[k + 1] && shotOf[k + 1] === shotOf[k] ? 1 : 0);
     if (!L) continue;
-    const fl = flowField(F[k], F[k + L]);
-    const fs = L > 1 ? flowField(F[k], F[k + 1]) : null;
+    // Followed through time (47x-10, see flowField): the one-sample field,
+    // then each lag seeded from the one before, about 2.5 times shorter.
+    const fs = L > 1 ? flowField(F[k], F[k + 1], null, 1, mask2) : null;
+    let fl = fs, at = 1;
+    while (at < L) { const next = Math.min(L, Math.round(at * 2.5)); fl = flowField(F[k], F[k + next], fl, next / at, mask2); at = next; }
+    if (!fl) fl = flowField(F[k], F[k + L], null, 1, mask2);
     const vs = [];
     fl.v.forEach((f, i) => {
       let g = f, lag = L;
@@ -351,20 +520,40 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
       const keep = vs.filter(v => off(v) <= 3 * mad + 0.05 * (Math.abs(af.u) + Math.abs(af.v) + 0.1));
       if (keep.length >= 6 && keep.length < vs.length) { vs.length = 0; vs.push(...keep); af = affine(vs); }
     }
-    pairs.push({ k, vs, af, matched: valid ? vs.length / valid : 0, c1 });
+    const cam = estimateCamera(vs);
+    let flDrift = null;
+    if (cam && vs.length >= 4) {
+      const moving = vs.map(v => ({ u: v.u - cam.cu, w: v.w - cam.cv })).filter(v => Math.hypot(v.u, v.w) > 0.35);
+      if (moving.length >= Math.max(4, 0.12 * vs.length)) {
+        const medA = a => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
+        const fu = medA(moving.map(v => v.u)), fw = medA(moving.map(v => v.w));
+        flDrift = { u: fu, v: fw, speed: Math.hypot(fu, fw) };
+      } else {
+        flDrift = { u: 0, v: 0, speed: 0 };
+      }
+    }
+    pairs.push({ k, vs, af, cam, flDrift, matched: valid ? vs.length / valid : 0, c1 });
   }
   const speeds = pairs.flatMap(p => p.vs.map(v => Math.hypot(v.u, v.w)));
   const own = pairs.map(p => p.af?.rmsOwn).filter(x => x != null);
   const whole = pairs.map(p => (p.af ? Math.hypot(p.af.u, p.af.v) : null)).filter(x => x != null);
   const share = pairs.map(p => p.af?.share).filter(x => x != null);
+  const camSpeeds = pairs.map(p => p.cam?.speed).filter(x => x != null);
+  const camShares = pairs.map(p => p.cam?.share).filter(x => x != null);
+  const camU = pairs.map(p => p.cam?.cu).filter(x => x != null);
+  const camV = pairs.map(p => p.cam?.cv).filter(x => x != null);
+  const flSpeed = pairs.map(p => p.flDrift?.speed).filter(x => x != null);
+  const flU = pairs.map(p => p.flDrift?.u).filter(x => x != null);
+  const flV = pairs.map(p => p.flDrift?.v).filter(x => x != null);
   // Curl and divergence in 1/s: the fit's velocities are % of width per
   // second over positions in % of width, so the ratio is per second.
   const curl = pairs.map(p => p.af?.curl).filter(x => x != null);
   const div = pairs.map(p => p.af?.div).filter(x => x != null);
   const vert = pairs.map(p => p.af?.v).filter(x => x != null);
   const horiz = pairs.map(p => p.af?.u).filter(x => x != null);
-  // Carried: only where the picture changed by more than the codec's noise.
-  const carr = pairs.map(p => (p.c1 && p.c1.raw > 1.5 ? Math.max(0, Math.min(1, 1 - p.c1.res / p.c1.raw)) : null)).filter(x => x != null);
+  // Carried: only where the picture changed by more than its own grain (carriedShare).
+  const carr = pairs.map(p => carriedShare(p.c1)).filter(x => x != null);
+  const noiseFloor = quant(pairs.map(p => p.c1?.floor), 0.5);
 
   // Lifetime: the correlation of a sample with one τ later, inside a shot,
   // averaged over anchors, until it falls under a half.
@@ -383,23 +572,42 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
   for (let s = 1; s <= maxLag; s = Math.max(s + 1, Math.round(s * 1.25))) lagS.push(s);
   for (const L of lagS) {
     const cs = [];
-    for (let k = 0; k + L < n; k += Math.max(1, Math.ceil((n - L) / 60))) if (shotOf[k + L] === shotOf[k]) { const c = corr(qs[k], qs[k + L]); if (c != null) cs.push(c); }
+    for (let k = 0; k + L < n; k += Math.max(1, Math.ceil((n - L) / 60))) if (!title[k] && !title[k + L] && shotOf[k + L] === shotOf[k]) { const c = corr(qs[k], qs[k + L]); if (c != null) cs.push(c); }
     if (cs.length < 3) { lifeCapped = true; break; }
     const c = cs.reduce((a, b) => a + b, 0) / cs.length;
     if (c < 0.5) { const prevL = lagS[lagS.indexOf(L) - 1] ?? 0; lifetime = (prevL + ((prevC - 0.5) / Math.max(1e-6, prevC - c)) * (L - prevL)) / rate; break; }
     prevC = c;
   }
   if (lifetime == null) lifeCapped = true;
-  const longestShot = (() => { let best = 0, run = 1; for (let k = 1; k < n; k++) { if (shotOf[k] === shotOf[k - 1]) run++; else run = 1; best = Math.max(best, run); } return Math.max(best, n ? 1 : 0) / rate; })();
+  const longestShot = (() => {
+    let best = 0, run = 0;
+    for (let k = 0; k < n; k++) {
+      if (title[k]) { run = 0; continue; }
+      if (k > 0 && !title[k - 1] && shotOf[k] === shotOf[k - 1]) run++;
+      else run = 1;
+      best = Math.max(best, run);
+    }
+    return best / rate;
+  })();
 
   const ownMed = quant(own, 0.5);
+  // The decoded sample's height (the frames are pooled to half size). The
+  // flow is read in 8-pixel blocks at half size, the outer ring left out, so
+  // a strip under MIN_ROWS rows has one row of blocks or none and every
+  // flow measure comes out as dashes (47v-6).
+  const rows = F.length ? F[0].h * 2 : null;
   return {
+    rows, tooShort: rows != null && rows < MIN_ROWS,
+    noiseFloor,
     pairs: pairs.length,
     matched: quant(pairs.map(p => p.matched), 0.5),
     speed: { med: quant(speeds, 0.5), p90: quant(speeds, 0.9) },
     own: { med: ownMed, p90: quant(own, 0.9) },
     whole: { med: quant(whole, 0.5), p90: quant(whole, 0.9) },
     wholeShare: quant(share, 0.5),
+    camera: { med: quant(camSpeeds, 0.5), p90: quant(camSpeeds, 0.9), u: quant(camU, 0.5), v: quant(camV, 0.5) },
+    cameraShare: quant(camShares, 0.5),
+    fluid: { speed: quant(flSpeed, 0.5), horizontal: quant(flU, 0.5), vertical: quant(flV, 0.5) },
     curl: { med: quant(curl, 0.5), p10: quant(curl, 0.1), p90: quant(curl, 0.9) },
     div: { med: quant(div, 0.5), p10: quant(div, 0.1), p90: quant(div, 0.9) },
     vertical: quant(vert, 0.5),
@@ -431,18 +639,22 @@ const f = (x, d = 1) => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(d)
  * highest of them, and physicsLines prints it beside each measure, with
  * "under" or "over" when a clip falls outside every real show.
  *
- * What they say, 2026-11-12: real shows read carried 0.13 to 0.19, low by
+ * What they say, 2026-11-12: real shows read carried 0.13 to 0.23, low by
  * the synthetic bands' words, with p90s near 0.4: on real footage this
  * measure tells a transported plate from a crossfading one only well under
- * 0.1 or well over 0.4. Lifetime spans 0.9 s (an edited film of the loops,
+ * 0.1 or well over 0.4. (0.13 to 0.19 before the grain was taken out of the
+ * change, 47v-5: the film's read rose from 0.187 to 0.229 and the bar's stayed
+ * at 0.125 to 0.127, so grain was a small part of why they read low; the rest
+ * is the lamp, the superimposed loops and the camera, which no noise floor
+ * removes.) Lifetime spans 0.9 s (an edited film of the loops,
  * superimposed) to 5 s (one projector, one take, at a bar). Every one sits
  * in the spectrum's cascade band, −2.7 to −2.8.
  */
 export const REAL_SHOWS = [
   { name: 'jls-liquid-loops-1969', what: 'the Joshua Light Show, Liquid Loops 1969: 35 mm film of the loops, edited, with dissolves and superimpositions; 10 min',
-    own: 8.02, carried: 0.187, turnover: 1.51, lifetime: 0.91, spectrum: -2.69, wholeShare: 0.16 },
+    own: 8.02, carried: 0.229, turnover: 1.51, lifetime: 0.91, spectrum: -2.69, wholeShare: 0.16 },
   { name: 'bar-the-dip-2016', what: 'a liquid light show on the wall behind a band at a bar (The Dip, Redding, 2016-08-08), one camera from the floor, cropped to the wall; 10 min of the set',
-    own: 1.96, carried: 0.125, turnover: 2.43, lifetime: 4.98, spectrum: -2.79, wholeShare: 0.14 },
+    own: 1.96, carried: 0.127, turnover: 2.43, lifetime: 4.98, spectrum: -2.79, wholeShare: 0.14 },
 ];
 
 /** The lowest and highest real show for a measure (a key of REAL_SHOWS' rows). */
@@ -479,41 +691,76 @@ export function physicsLines(p) {
   const vert = p.vertical;
   const drift = vert == null || Math.abs(vert) < 0.3 ? 'no steady drift up or down' : vert > 0 ? `drifting down (${f(vert, 1)}% of the width a second): falling, pouring or a plate tilted down` : `drifting up (${f(-vert, 1)}% a second): rising, as warm wax or bubbles`;
   const turnover = p.turnover;
+  const lifeLine = `- **lifetime**: ${p.lifetime != null ? `a picture stays like itself for about ${f(p.lifetime, 1)} s (correlation with itself falls to a half)${realNote('lifetime', p.lifetime)}` : `longer than the clip shows (longest shot ${f(p.longestShot, 0)} s)`}`;
+  const specLine = p.spectrum?.reliable === false
+    ? '- **spectrum**: unreliable (compression)'
+    : `- **spectrum**: slope ${f(sl, 2)} (${f(p.spectrum.p10, 2)} to ${f(p.spectrum.p90, 2)})${realNote('spectrum', sl, 2)} of power per wavenumber band: ${spec}`;
+  // A strip too short to hold two rows of flow blocks reads nothing of the
+  // flow: say so, in place of lines of dashes that look like a read that
+  // found nothing moving. Lifetime and spectrum do not need the blocks.
+  if (p.tooShort) return [
+    '## Physics',
+    '',
+    `**The flow read needs a taller crop.** The decoded sample is ${p.rows} rows high (320 wide), under the ${MIN_ROWS} the flow's 8-pixel blocks need, so speed, whole-field motion, rotation, spreading, carried, turnover and drift are not read (they would only be dashes). Use a crop at least a fifth as tall as it is wide (\`--crop x,y,w,h\`), such as the projection itself, not a strip of it.`,
+    '',
+    lifeLine,
+    specLine,
+  ];
   return [
     '## Physics',
     '',
     `From ${p.pairs} sample pairs; speeds in % of the frame's width a second (×0.25 for cm/s on an overhead projector's 25 cm stage). Definitions: \`scripts/watchphysics.mjs\`.`,
     '',
     `- **flow**: the fluid's own speed (whole-field motion taken out) median ${f(own, 1)}${realNote('own', own)}, 90th ${f(p.own.p90, 1)}: ${pace}. Block speeds median ${f(p.speed.med, 1)}, 90th ${f(p.speed.p90, 1)}; ${f((p.matched ?? 0) * 100, 0)}% of textured blocks matched`,
-    `- **whole-field motion** (camera, or the dish slid, turned or zoomed): median ${f(p.whole.med, 1)}, and it explains ${f((p.wholeShare ?? 0) * 100, 0)}% of the motion`,
+    `- **whole-field motion** (camera, or the dish slid, turned or zoomed): median ${f(p.whole.med, 1)}, and it explains ${f((p.wholeShare ?? 0) * 100, 0)}% of the motion${p.cameraShare != null ? ` (camera pan ${f(p.cameraShare * 100, 0)}%)` : ''}`,
     `- **rotation**: curl median ${f(curl, 3)}/s (${f(p.curl.p10, 3)} to ${f(p.curl.p90, 3)}): ${turn}`,
     `- **spreading**: divergence median ${f(dv, 3)}/s (${f(p.div.p10, 3)} to ${f(p.div.p90, 3)}): ${spread}`,
-    `- **carried**: ${f(car, 2)} (${f(p.carried.p10, 2)} to ${f(p.carried.p90, 2)}, over ${p.carried.n} changing pairs)${realNote('carried', car, 2)} of the change from one sample to the next is the flow moving material: ${carriedWord}`,
+    `- **carried**: ${f(car, 2)} (${f(p.carried.p10, 2)} to ${f(p.carried.p90, 2)}, over ${p.carried.n} changing pairs)${realNote('carried', car, 2)} of the change from one sample to the next (the grain, about ${f(p.noiseFloor, 1)} grey levels of it, taken out) is the flow moving material: ${carriedWord}`,
     `- **turnover**: ${turnover != null ? `${f(turnover, 1)} s for the flow to carry a form across its own size${realNote('turnover', turnover)}` : '–'}${turnover != null ? `, ${band(turnover, [[0.5, 'churning'], [2, 'lively'], [6, 'unhurried'], [Infinity, 'stately, viscous']])}` : ''}`,
-    `- **lifetime**: ${p.lifetime != null ? `a picture stays like itself for about ${f(p.lifetime, 1)} s (correlation with itself falls to a half)${realNote('lifetime', p.lifetime)}` : `longer than the clip shows (longest shot ${f(p.longestShot, 0)} s)`}`,
-    `- **spectrum**: slope ${f(sl, 2)} (${f(p.spectrum.p10, 2)} to ${f(p.spectrum.p90, 2)})${realNote('spectrum', sl, 2)} of power per wavenumber band: ${spec}`,
+    lifeLine,
+    specLine,
     `- **drift**: ${drift}`,
   ];
 }
 
+/** Structured physics gaps between `ref` and `cur`, biggest first. */
+export function physicsGaps(ref, cur) {
+  const rows = [];
+  const skipped = [];
+  const add = (key, label, a, b, kind, words, reliable = true) => {
+    if (!reliable) { skipped.push(label); return; }
+    if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) return;
+    let size, say;
+    if (kind === 'ratio') {
+      if (a <= 0 || b <= 0) return;
+      size = Math.abs(Math.log(b / a)) / Math.log(1.5);
+      say = `${label}: cur ${f(b, 2)} against ${f(a, 2)}, ${b > a ? `${f(b / a, 1)}× ${words[0]}` : `${f(a / b, 1)}× ${words[1]}`}`;
+    } else {
+      size = Math.abs(b - a) / kind;
+      say = `${label}: cur ${f(b, 2)} against ${f(a, 2)}, ${b > a ? words[0] : words[1]}`;
+    }
+    rows.push({ key, label, ref: a, cur: b, size, direction: b < a ? 'raise' : 'lower', words, say });
+  };
+  add('own', 'own flow speed (% width/s)', ref.own?.med, cur.own?.med, 'ratio', ['faster', 'slower']);
+  add('carried', 'carried share', ref.carried?.med, cur.carried?.med, 0.15, ['more transported', 'more changing in place']);
+  add('turnover', 'turnover (s)', ref.turnover, cur.turnover, 'ratio', ['more stately', 'more churning']);
+  add('lifetime', 'lifetime (s)', ref.lifetime, cur.lifetime, 'ratio', ['longer-lived forms', 'shorter-lived forms']);
+  add('spectrum', 'spectrum slope', ref.spectrum?.med, cur.spectrum?.med, 0.4, ['more fine detail', 'smoother, less fine detail'], ref.spectrum?.reliable !== false && cur.spectrum?.reliable !== false);
+  add('wholeShare', 'whole-field share', ref.wholeShare, cur.wholeShare, 0.2, ['more of the motion is the whole picture', 'more of the motion is the fluid\'s own']);
+  add('curl', 'curl (1/s)', ref.curl?.med, cur.curl?.med, 0.05, ['turning more clockwise', 'turning more anticlockwise']);
+  rows.sort((u, v) => v.size - u.size);
+  return { rows, skipped };
+}
+
 /** Physics gaps against a reference, biggest first, in the design read's style. */
 export function comparePhysics(ref, cur, refName = 'the reference', curName = 'this') {
-  const rows = [];
-  const add = (label, a, b, kind, words) => {
-    if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) return;
-    let size;
-    if (kind === 'ratio') { if (a <= 0 || b <= 0) return; size = Math.abs(Math.log(b / a)) / Math.log(1.5); rows.push({ size, say: `${label}: ${curName} ${f(b, 2)} against ${f(a, 2)}, ${b > a ? `${f(b / a, 1)}× ${words[0]}` : `${f(a / b, 1)}× ${words[1]}`}` }); }
-    else { size = Math.abs(b - a) / kind; rows.push({ size, say: `${label}: ${curName} ${f(b, 2)} against ${f(a, 2)}, ${b > a ? words[0] : words[1]}` }); }
-  };
-  add('own flow speed (% width/s)', ref.own?.med, cur.own?.med, 'ratio', ['faster', 'slower']);
-  add('carried share', ref.carried?.med, cur.carried?.med, 0.15, ['more transported', 'more changing in place']);
-  add('turnover (s)', ref.turnover, cur.turnover, 'ratio', ['more stately', 'more churning']);
-  add('lifetime (s)', ref.lifetime, cur.lifetime, 'ratio', ['longer-lived forms', 'shorter-lived forms']);
-  add('spectrum slope', ref.spectrum?.med, cur.spectrum?.med, 0.4, ['more fine detail', 'smoother, less fine detail']);
-  add('whole-field share', ref.wholeShare, cur.wholeShare, 0.2, ['more of the motion is the whole picture', 'more of the motion is the fluid\'s own']);
-  add('curl (1/s)', ref.curl?.med, cur.curl?.med, 0.05, ['turning more clockwise', 'turning more anticlockwise']);
-  rows.sort((u, v) => v.size - u.size);
-  return [`## Physics against ${refName}`, '', ...rows.map(r => `- (${f(r.size, 1)}) ${r.say}`)];
+  const { rows, skipped } = physicsGaps(ref, cur);
+  return [
+    `## Physics against ${refName}`,
+    '',
+    ...rows.map(r => `- (${f(r.size, 1)}) ${r.say.replace(': cur ', `: ${curName} `)}`),
+    ...(skipped.length ? [`- skipped (unreliable due to compression): ${skipped.join(', ')}`] : []),
+  ];
 }
 
 // ─── techniques: what the page says, and guesses from the footage ───────────
@@ -567,7 +814,7 @@ export function guessTechniques(d, p, cutsPerMin = 0) {
   if (p?.wholeShare > 0.5 && period != null && period < 90) say(3, 'the glass or dish is turned (or the camera rotates)', `whole-field motion explains ${(p.wholeShare * 100).toFixed(0)}% of the motion, one turn in ${period.toFixed(0)} s`);
   else if (p?.wholeShare > 0.5 && p?.whole?.med > 2) say(2.5, 'the camera pans or the plate is slid: the picture moves as one', `whole-field share ${(p.wholeShare * 100).toFixed(0)}%, ${p.whole.med.toFixed(1)}% of the width a second`);
   if (div != null && div > 0.03) say(2, 'pours or presses: material spreading out from where it is added', `divergence ${div.toFixed(3)}/s`);
-  // Real shows read carried 0.13 to 0.19 (REAL_SHOWS): noise, the lamp and
+  // Real shows read carried 0.13 to 0.23 (REAL_SHOWS): noise, the lamp and
   // superimposition pull it down. So only a clip under every real show is
   // guessed to change in place rather than flow; the old bar, 0.3, called
   // both real films digital.

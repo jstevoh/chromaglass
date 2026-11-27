@@ -4,6 +4,7 @@ import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { MappingPanel, OutputPanel } from '../OutputPanel';
 import { SwitchPill, Toggle, LIT } from '../ui';
+import { readEngineStatus } from '../../lib/readout';
 import { isProLicenseUnlocked } from '../../lib/platform';
 import { CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../../lib/tierGates';
 import { Slider, PinChips } from './controls';
@@ -126,7 +127,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             >
               <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
                 <span>In the ChromaGlass app · Custom band logo &amp; text layer</span>
-                <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
+                <span className="shrink-0 text-[12px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
               </div>
               <p className="mt-0.5 text-amber-100/90">
                 On the free site, the logo layer displays the ChromaGlass mark. Unlock Home or Pro to load your own band mark or SVG.
@@ -146,7 +147,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
               <button
                 onClick={() => onMarkClear?.()}
                 disabled={!markLoaded}
-                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
                 data-testid="mark-clear"
               >
                 Take it off
@@ -174,7 +175,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             <button
               onClick={() => onMarkClear?.()}
               disabled={!markLoaded}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
               data-testid="mark-clear"
             >
               Take it off
@@ -241,31 +242,14 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
         <div className="flex flex-col gap-2 mb-3">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-text">Fluid Grid</span>
-            {engineStatus && (
-              <span className="text-[12px] font-mono opacity-50">
-                {engineStatus.label} · {(live ?? engineStatus).frameMs > 0 ? Math.round(1000 / (live ?? engineStatus).frameMs) : '–'} fps
-                {/*
-                  The speed, when it is not full speed. A frame rate says the
-                  frames are arriving; it cannot say the liquid inside them is
-                  advancing slower than the clock, which is what happens when a
-                  solver step costs more than a frame and the catch-up gives up.
-                  Shown only when it is true, because on a machine with room it
-                  is always 60 and would be noise.
-                */}
-                {(() => {
-                  const st = live ?? engineStatus;
-                  const sps = st.stepsPerSec;
-                  // Against what the loop asked for, not a hard sixty. Thirty
-                  // steps at twice the timestep is the same liquid at the same
-                  // speed, and this read it as "50% speed" in amber — the one
-                  // warning that catches a plate silently running slow, fired
-                  // at a plate running exactly on time.
-                  const want = st.stepRate > 0 ? st.stepRate : 60;
-                  if (!(sps > 0) || sps >= want * 0.95) return null;
-                  return <span className="text-amber-300/80"> · {Math.round((sps / want) * 100)}% speed</span>;
-                })()}
-              </span>
-            )}
+            {engineStatus && (() => {
+              const info = readEngineStatus(live ?? engineStatus);
+              return (
+                <span className={`text-[12px] font-mono ${info.tone === 'warn' ? 'text-amber-300/80 opacity-90' : 'opacity-60'}`} title={info.tooltip} data-testid="stage-engine-status">
+                  {info.text}
+                </span>
+              );
+            })()}
           </div>
           {/*
             Where a frame actually goes, on a `?debug` visit. Cost that does
@@ -279,7 +263,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             timestamp queries instead.
           */}
           {showFrameSplit && engineStatus && (
-            <div className="text-[11px] font-mono opacity-40 leading-relaxed">
+            <div className="text-[12px] font-mono text-dim leading-relaxed">
               solver {(live ?? engineStatus).simMs.toFixed(1)} ms/step
               {' · '}other {(live ?? engineStatus).otherMs.toFixed(1)} ms/frame
               {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of {Math.round((live ?? engineStatus).stepRate || 60)} steps/s
@@ -316,7 +300,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
               <div className="font-semibold text-amber-200">
                 Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
               </div>
-              <p className="mt-1 text-[11px] text-white/75">
+              <p className="mt-1 text-[12px] text-white/75">
                 Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -324,14 +308,14 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
                   href={getEffectiveTier() === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-amber-300"
+                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[12px] font-semibold text-black hover:bg-amber-300"
                 >
-                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $164' : 'Get Pro — $199'}
+                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $170' : 'Get Pro — $199'}
                 </a>
                 <button
                   type="button"
                   onClick={openAccountSheet}
-                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/85 hover:bg-white/[0.12]"
+                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[12px] font-medium text-white/85 hover:bg-white/[0.12]"
                 >
                   Enter licence key
                 </button>

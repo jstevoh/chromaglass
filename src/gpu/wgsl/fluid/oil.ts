@@ -155,6 +155,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    Oil Bodies: a look's lay, which says which colour is the oil's (PLAN
+    47z-1; inputs.ts foldDye says why). The oil's share takes the lay's oil
+    colour, never more than the frame's dye in that cell nor less than none,
+    and keeps the multiplier as the dye does; the rest of the frame's dye is
+    the water's, by being left out of the share.
+  */
+  bodyLay: `${HEAD}
+@group(0) @binding(2) var oil: texture_2d<f32>;
+@group(0) @binding(3) var addT: texture_2d<f32>;
+@group(0) @binding(4) var mulT: texture_2d<f32>;
+@group(0) @binding(5) var layT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let add = max(textureLoad(addT, p, 0), vec4f(0.0));
+  let o = textureLoad(oil, p, 0) * textureLoad(mulT, p, 0).r + clamp(textureLoad(layT, p, 0), vec4f(0.0), add);
+  textureStore(dst, p, select(vec4f(0.0), max(o, vec4f(0.0)), finite4(o)));
+}`,
+
+  /*
     Oil Bodies: the dye's diffusion, for the water's colour only (see the
     host's 'dye disperse' stage). In: the whole dye and the oil's share, both
     diffused, and the oil's share before. Out: the water's colour diffused
@@ -449,9 +470,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let lap = mmN(p, vec2i(1, 0), n, m) + mmN(p, vec2i(-1, 0), n, m) + mmN(p, vec2i(0, 1), n, m) + mmN(p, vec2i(0, -1), n, m) - 4.0 * m;
   // Not clamped to 0..1: Cahn–Hilliard overshoots a little either side of an
   // interface and its own double well brings it back, where a clamp would
-  // make or destroy oil every step (measured: the oil swung ±30%). The wide
-  // band is only a guard against a runaway.
-  let c = clamp(m.r + A.a.x * lap.a, -0.25, 1.25);
+  // make or destroy oil every step (measured: the oil swung ±30%). The band
+  // is only a guard against a runaway, and it was once -0.25..1.25, which
+  // was not wide enough: wax pressed against a sealed bottle's wall packs to
+  // c ≈ 1.8 before mixRelax shares it back into the body, and the guard cut
+  // every one of those cells to 1.25 each step, destroying the wax (PLAN
+  // 27f-9q: with the rim's leak closed, Lava Lamp at four times the tension
+  // still lost 0.8% of its oil in 120 seconds; at ±8 it keeps Σc to the cell
+  // over 180 seconds). Only a sealed bottle's (A.b.y) is widened: an open
+  // dish's oil packs against its lip too, unmeasured, so its guard is kept.
+  let g = select(vec2f(-0.25, 1.25), vec2f(-8.0, 8.0), A.b.y > 0.5);
+  let c = clamp(m.r + A.a.x * lap.a, g.x, g.y);
   let rim = A.a.z > 0.0 && length(uvOf(id) - vec2f(0.5)) >= A.a.z;
   let s = select(clamp((m.g + A.a.y * lap.g) * A.b.x, 0.0, 64.0), 0.0, rim);
   let a = clamp(m.b + A.a.w * lap.b, -1.0, 1.0);

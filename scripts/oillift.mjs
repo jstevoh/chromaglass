@@ -22,9 +22,12 @@
  *
  *   1. A lens rises at Hele-Shaw's speed. Between two glasses h apart a
  *      column of oil Δρ lighter, tipped θ, would rise at Darcy's
- *      u = Δρ g sinθ h²/12μ; a round lens in a liquid of its own thickness
- *      has that liquid to push round it and goes at half, less a²/R² for the
- *      dish's wall (Saffman–Taylor's inclusion), and a lens whose edge is
+ *      u = Δρ g sinθ h²/12μ, μ the water's; a round lens pushes the water
+ *      round it and drags its own oil, λ = μ_oil/μ the water's (0.88 × the
+ *      oil's ν over the water's), and goes at u(1 − ε)/(λ(1 − ε) + 1 + ε),
+ *      ε = a²/R² for the dish's wall (Saffman–Taylor's inclusion, the
+ *      oil's own viscosity in it: half, less ε, when the two are alike, as
+ *      they were taken to be before PLAN 27f-7), and a lens whose edge is
  *      soft goes at that times ∫c²/∫c of its own oil (each ring of a soft
  *      lens is a sharp lens of its own, and its flow outside it averages to
  *      nothing round the ring). Light mineral oil 880 kg/m³ against 1000,
@@ -67,7 +70,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
-import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
+import { DISH_GAP_METRES, OIL_NU } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -217,12 +220,19 @@ const speed = (a, b) => (b.x - a.x) * PLATE / (60 * r.seconds);    // m/s, over 
 const flowToMs = r.disp * PLATE / r.seconds;                       // a unit of the flow in m/s
 const darcy = DRHO * G * SIN * GAP * GAP / (12 * r.nu);
 const soft = (r.lens.a.soft + r.lens.b.soft) / 2;
-const want = -0.5 * (1 - (R / 0.5) ** 2) * darcy * soft;          // uphill is −x
+// ρ_oil/ρ_water is 1 − SPIN_OIL_LIGHT (0.88), the solver's own number, read from
+// its source (constants.ts cannot be imported under plain node): a typed 0.88 here
+// would let the oil's density change while the theory stayed put.
+const SPIN_OIL_LIGHT = Number(/export const SPIN_OIL_LIGHT = ([\d.]+);/.exec(readFileSync('src/gpu/fluid/constants.ts', 'utf8'))[1]);
+const lambda = (1 - SPIN_OIL_LIGHT) * OIL_NU / r.nu;              // the oil's dynamic viscosity over the water's
+const eps = (R / 0.5) ** 2;
+const share = (1 - eps) / (lambda * (1 - eps) + 1 + eps);
+const want = -share * darcy * soft;                                // uphill is −x
 const lens = speed(r.lens.a, r.lens.b);
 // 1.
-check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved for the water it pushes round it',
+check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ shared between the water it pushes round it and its own oil',
   lens < 0 && Math.abs(lens / want - 1) < 0.06,
-  `${mms(-lens).toFixed(2)} mm/s against ${mms(-want).toFixed(2)} (a free column ${mms(darcy).toFixed(2)}; × ½ × (1 − a²/R²) ${(0.5 * (1 - (R / 0.5) ** 2)).toFixed(3)} × its soft edge's ∫c²/∫c ${soft.toFixed(3)}), at sinθ ${SIN}, h ${(GAP * 1000).toFixed(0)} mm, ν ${(r.nu * 1e6).toFixed(1)} cSt`);
+  `${mms(-lens).toFixed(2)} mm/s against ${mms(-want).toFixed(2)} (a free column ${mms(darcy).toFixed(2)}; × (1 − ε)/(λ(1 − ε) + 1 + ε) ${share.toFixed(3)}, λ ${lambda.toFixed(2)} × its soft edge's ∫c²/∫c ${soft.toFixed(3)}), at sinθ ${SIN}, h ${(GAP * 1000).toFixed(0)} mm, ν ${(r.nu * 1e6).toFixed(1)} cSt`);
 {
   const still = speed(r.level.a, r.level.b);
   check('and on a level plate the same lens stays where it is', Math.abs(still) < 0.02 * Math.abs(lens),
@@ -270,17 +280,32 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved f
   const vis = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
   const solver = readFileSync('src/sim/fluidSimulation.ts', 'utf8');
   const rock = readFileSync('src/lib/plateRock.ts', 'utf8');
+  const hand = readFileSync('src/lib/handTilt.ts', 'utf8');
   /*
     Since PLAN 38r-9 the step's rock goes through plateRock's rockStep (the
     sinθ each way, plateSin as before, and the slider's past-real gain), and
     the lift is × that gain, so the same chain is read through it: the gain
     is 1 at and below the default Plate Rock and multiplies the tilt, never
     stands in for it, so the phone's tilt still lifts the oil.
+
+    Since PLAN 27f-7 (Classic round five) that tilt no longer reaches the
+    plate as a force on the colour: hsBody turns it through the closed
+    circulation, ψ = L_y Ψ_x − L_x Ψ_y with Ψ the dish's solve of the
+    oil's and the dyed water's weight together, so the chain ends in the
+    `...closed` the regex below holds, and the circulation is only live
+    when hsLiftSource and hsLiftRelaxOil both built (Clock Glass's mean-flow bar above
+    is what fails if the colour's weight went back to the open rim).
+
+    Since PLAN 18a-13m the frame loop's rock is lib/handTilt.ts's tipPlate,
+    called for every plate: the phone's tilt, faded, joins the Tilt knobs'
+    and the swing there (rockX = swingX + x × 1.1, x the phone's plus the
+    knobs'), so the chain is read through it.
   */
   check('the phone\'s tilt lifts the oil too: the step lifts by its rockX, and the frame loop\'s rockX carries the phone\'s tilt',
-    /lift \* rockGain \* p\.rockX, lift \* rockGain \* p\.rockY/.test(fluid) && /const rockX = swingX \+ ext\.x/.test(vis)
+    /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX : 0, rockOn \? ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockY : 0, \.\.\.closed\]/.test(fluid) && /tipPlate\(fluid, hand, swingX, swingY\)/.test(vis)
+      && /h\[PHONE_X\] = ext\.x \* k/.test(hand) && /let x = h\[PHONE_X\] \+/.test(hand) && /p\.rockX = swingX \+ x \* PHONE_ROCK/.test(hand) && /PHONE_ROCK = 1\.1\b/.test(hand)
       && /rockStep\(this\.tiltX, this\.tiltY, this\.rockX, this\.rockY/.test(solver) && /rockX: plateSin\(holdX, swingX\)/.test(rock),
-    'fluid.ts hands hsBody lift × rockGain × p.rockX; LiquidVisualizer: rockX = swingX + ext.x…; sim/fluidSimulation.ts: the step rockStep(tiltX, …, rockX, …), lib/plateRock.ts: rockX = plateSin(tiltX, rockX)');
+    'fluid.ts hands hsBody the tilt × rockGain × p.rockX, which turns the circulation of the oil and the colour together; LiquidVisualizer: tipPlate(fluid, hand, swingX, swingY), lib/handTilt.ts: rockX = swingX + (phone + knobs) × 1.1; sim/fluidSimulation.ts: the step rockStep(tiltX, …, rockX, …), lib/plateRock.ts: rockX = plateSin(tiltX, rockX)');
 }
 
 const failed = checks.filter((c) => !c.ok);

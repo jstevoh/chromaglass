@@ -7,13 +7,6 @@ Part 4 of 4 of §19; it begins at 19al. The section starts in `19-checks-build-p
 First built 2026-10-24 as #450 (plan id 19ae then, since given to the phone check),
 closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
 
-- **19al-1. Shipped:** a green head says so on the PR, and every hop names its commit
-  (`ready.yml`; docs/plan-shipped.md, 19al).
-- **19al-2. Shipped:** a `PASS` merges without waiting for Antigravity: the reviewer
-  merges on its own `PASS`, pinned to the head it passed (the owner, 2026-10-24;
-  docs/plan-shipped.md, 19al).
-- **19al-3. Shipped:** "Who takes what" by what the job needs, the owner's 2026-11-01
-  split; two `CHANGES` hand a PR to Claude Code (docs/plan-shipped.md, 19al).
 - **19al-4. Open: the watcher no longer relays "ready".** With `READY` on the PR, the
   reviewing thread can subscribe to each Antigravity PR and wake on the comment itself;
   the Mac watcher keeps only what needs the Mac (full `qa`, driving Antigravity). A
@@ -22,9 +15,6 @@ closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
   and merge timestamps on each Antigravity PR: green → review, review → fix, fix →
   merge. The daily scorecard reads open → merge today; split, it would show which hop to
   fix next.
-- **19al-6. Shipped:** the first live labels. `ready.yml` labelled five Antigravity PRs
-  on their own green heads on 2026-11-09 between 05:35Z and 09:16Z, each with its
-  `READY #N <item> head <sha>` line (docs/plan-shipped.md, 19al).
 - **19al-7. Open: nothing merges a ready PR by itself.** Found 2026-11-10: those five
   sat labelled and green for a day, unmerged. Three causes, all in the hop after the
   label. (1) `ready.yml` only labels and comments, by design: the merge was the
@@ -46,22 +36,16 @@ closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
   payments, sign-in or Worker paths; anything else keeps `ready-for-review` for a
   Claude session. Check: a stubbed-`gh` harness over the five PRs of 2026-11-09 (four
   merge, P7-cpu stays) in `scripts/checks.json`.
-
 ## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
 
 The owner's rule since 2026-11-01, made mechanical on 2026-11-09 (card 14 adopted
 13:12Z): on 11-08 the fifth shard was red on deploys 699 and 701 and 16 of 34 merges
 landed on a red main.
 
-- **19am-1. Shipped:** `hold.yml` posts `Main not held red` on every open PR, red while
-  the same job is red at its newest two results on main's deploys, green on a PR labelled
-  `fixes-main` (`scripts/mainhold.mjs`, `npm run mainhold`; docs/plan-shipped.md, 19am).
-- **19am-2. Open: the ruleset on main requires `Main not held red`.** Until it does, the
-  status refuses nothing by itself; the ship skill and docs/handoff.md's merge step read
-  it. Add the context to ruleset 24848041's required checks (a cloud session's proxy
-  refuses rulesets writes, 19u), only after `hold.yml` has posted on every open PR once,
-  or a PR with no status waits forever. Pin it to GitHub Actions (integration 15368) so
-  no other app's status of that name satisfies it.
+- **19am-2. Declined (the owner, 2026-11-13): `Main not held red` stays advisory.** It
+  was to be added to ruleset 24848041's required checks, so that the status refused a
+  merge by itself. The owner chose to keep it a status the ship skill and
+  docs/handoff.md's merge step read, and not a rule on main. Nothing to build.
 - **19am-3. Open: the same check line, not the same shard.** A shard holds dozens of
   lines, so two different flakes in `fifth` on two deploys hold main as if one check
   were red. The failing lines are in each red job's log (`FAIL` lines from checks.mjs);
@@ -75,7 +59,6 @@ landed on a red main.
   and the early stop on saved runs, but not the HTTP reading itself (paging, the re-run
   attempt lookup, the GraphQL read of each PR's status). A recorded set of responses
   played through a stub `fetch` would cover it.
-
 ## 19an. Conflict markers reached main and nothing stopped them (2026-11-11)
 
 A squash merge on 2026-11-10 (25i-10) landed `<<<<<<< HEAD` / `=======` / `>>>>>>>` blocks
@@ -91,3 +74,26 @@ hand, keeping both sections (24.3 stays §121, Chemical Clock's 25i-10 becomes �
   `>>>>>>> `-prefixed (the three together, so a Markdown rule of `=======` alone is not
   caught), with a self-test that plants a block and goes red. An entry in
   `scripts/checks.json`, not a step in `checks.yml`.
+
+## 19ao. The Mac app's ambient TV line fails when the hosted runner draws four frames a second (2026-11-12)
+
+`npm run desktop`'s line "ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds
+the opening rung" went red twice on the hosted macOS runner on PR #820 (runs 43277666913 and
+43277185397) with `drawn=4/s, skipped=118 of 120 Hz offers`, passed on the rerun, and passes
+on main. The code under test did what it should: the solver was at 30, the rung held, and
+118 of 120 offers were skipped. What failed is the floor in `drawCapped`
+(`scripts/desktop.mjs`): on the Mac it asks for five frames and five draws in the counted
+second, to say the plate is drawing and not stalled. That floor was already lowered once
+from 20, with a comment saying it "measured the runner"; at five it still does, because a
+loaded hosted runner drew four.
+
+- **19ao-1. Open: the floor counts frames a second on a machine whose speed is not the
+  feature.** The ceiling (no more than 60 draws on a 120 Hz offer) is the feature and stays.
+  The floor should ask what it means, that the plate is not stalled, without a rate: wait
+  for a set number of draws under ambient mode with a generous deadline (a condition, not a
+  second on the wall clock), then read the ratio of skipped offers to drawn frames over that
+  stretch, which a slow machine does not change. `npm run rungs` already counts the 120 Hz
+  cap on a clock the machine cannot touch; this line then only has to show the app is wired
+  to it and still drawing. Not a lowered number: four today would be three on a worse day.
+  Until then it is a known flake of the `desktop` job: rerun it, and count it in
+  `npm run flakes -- --check 'ambient TV'`.

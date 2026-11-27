@@ -32,6 +32,7 @@ interface NativeBridgeWindow {
     platform?: string;
     requireSignIn?: boolean;
     license?: NativeLicenseBridge;
+    onOpenAccount?: (fn: () => void) => () => void;
   };
 }
 
@@ -45,6 +46,10 @@ export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cg-open-account'));
   }
+}
+
+if (typeof window !== 'undefined') {
+  (window as unknown as NativeBridgeWindow).__CHROMAGLASS_NATIVE__?.onOpenAccount?.(openAccountSheet);
 }
 
 const MARKETING_OPTIN_KEY = 'chromaglass-marketing-optin';
@@ -138,6 +143,15 @@ export const APP_FEATURE_TILES: AppTileSpec[] = [
     title: 'Custom band logo & text layer',
     tier: 'home',
     summary: 'In the ChromaGlass app — put your own band mark or SVG on the glass instead of the ChromaGlass mark.',
+  },
+  // Pro only until 2026-11-15, when the owner dropped Home to $29 and moved
+  // the Live Show into it (PLAN.md 23.21): streamers are Home's buyers, and a
+  // $29 visualizer they compare us with streams too.
+  {
+    id: 'live-show',
+    title: 'Live Show streaming',
+    tier: 'home',
+    summary: 'In the ChromaGlass app — stream the show to YouTube, Twitch, Facebook and the rest at once.',
   },
   // The two Pro tiles sold several projectors with edge blending and MIDI out,
   // and neither ships: the app drives one projector output (mapped into up to
@@ -315,10 +329,19 @@ export function drawChromaGlassWatermark(
   const padY = Math.max(12, Math.round(height * 0.022));
   ctx.font = `600 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
   ctx.textBaseline = 'bottom';
-  ctx.textAlign = 'right';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
   ctx.shadowBlur = 6;
   ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
-  ctx.fillText(FREE_SITE_LOGO_TEXT, width - padX, height - padY);
+  if (height > width) {
+    // A portrait clip (PLAN 34f) is watched inside Reels' and TikTok's own
+    // chrome: the caption and account name cover the bottom fifth and the
+    // buttons the right edge, so a corner mark would be hidden by the very
+    // app the clip is for. Centred, above that band.
+    ctx.textAlign = 'center';
+    ctx.fillText(FREE_SITE_LOGO_TEXT, width / 2, height * 0.8);
+  } else {
+    ctx.textAlign = 'right';
+    ctx.fillText(FREE_SITE_LOGO_TEXT, width - padX, height - padY);
+  }
   ctx.restore();
 }

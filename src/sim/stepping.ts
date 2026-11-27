@@ -15,6 +15,9 @@ import { PipelineCache } from '../gpu/kit';
 import { QualityGovernor } from '../lib/governor';
 import type { GpuStepParams } from '../gpu/solverTypes';
 import { BOIL_BUOY_PER_KG_M3, T_AMBIENT, waterDensity } from '../gpu/lampBoil';
+import { DISH_GAP_METRES } from '../lib/turntable';
+import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
+import { KICK_HOLD } from '../lib/squish';
 
 /**
  * The largest grid a pinned `?sim=` may ask for.
@@ -234,7 +237,7 @@ export const LOCKSTEP = (() => {
 /**
  * The lasting current on the CPU half-grid (M = S/2): buoyancy from water's
  * real density (Kell 1975, PLAN §36e-2), warm Gauss-Seidel projection, and
- * bilinear upsampling into the logical velocity grid.
+ * bilinear upsampling into the logical velocity grid (kept for scripts/plateboil.mjs --part=zero).
  */
 export function stepCurrentCpu(
   M: number,
@@ -301,4 +304,25 @@ export function stepCurrentCpu(
       vyOut[i + j * S] += uy;
     }
   }
+}
+
+/**
+ * Press the rhythm sheet (lib/sheet.ts) with the live cover gap (PLAN 38r-17),
+ * pushing out from under it as much liquid as the stamped bowl closed over the same reach.
+ */
+export function pressSheetKick(
+  sheet: RhythmSheet,
+  size: number,
+  x: number,
+  y: number,
+  amount: number,
+  r128: number,
+  nu: number,
+  curve: number,
+  coverMetres: number | undefined,
+): void {
+  sheet.h0 = coverMetres ?? DISH_GAP_METRES;
+  sheet.setLiquid(nu);
+  const u = (x + 0.5) / size, v = (y + 0.5) / size;
+  sheet.pressVolume(u, v, stampedVolume(amount, r128 / 128), r128 / 128, KICK_HOLD, kickRoom(u, v, curve));
 }

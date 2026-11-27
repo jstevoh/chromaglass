@@ -21,7 +21,7 @@ struct Sim {
   disp: f32,           // velocity → uv displacement for advection
   visc: f32,
   turbScale: f32,
-  spin: f32,
+  free7: f32,          // was the music's eddies (PLAN 38u-5); the slot is kept so every offset after it stands
   tension: f32,
   thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
@@ -91,6 +91,8 @@ struct Sim {
     (PLAN 27f-9e, constants.ts KAPPA_WAX), the heat kept exp(−that).
   */
   lampCool: f32,
+  // ln of the oil's drag over water's, ρν against ν_water (Oil Thickness, constants.ts oilBodyLn, PLAN 38w-31): hsPrep's oilBody.
+  oilVisc: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 

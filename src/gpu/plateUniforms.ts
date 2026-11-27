@@ -19,17 +19,23 @@ import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
 import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
+import { type CloseupWindow, closeupFine, closeupWindowOf } from './closeupWindow';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 import { SOAP } from '../lib/filmTable';
+import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
+import { BIREF_NM_PER_STRAIN } from '../lib/polar';
+import { FARADAY_GAIN_MAX } from '../lib/faraday';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+/** Video Zoom as the plate takes it (PLAN 14ag): its travel, and 1 (as it always landed) for a look saved before it. */
+export const filmZoomOf = (z: number | undefined) => (Number.isFinite(z) ? clamp(z as number, 0.25, 4) : 1);
 
 /**
  * The frame, as the uniforms read it.
@@ -109,6 +115,11 @@ export interface PlateFluid {
     readonly grainMix: number;
     /** The coordinates the pigment rides, where the device can carry them. */
     readonly grainTexture?: unknown;
+    /** Where the closeup looks, for the fine dye's next step (PLAN 47a-1, closeupWindow.ts). */
+    setCloseupWindow?(w: CloseupWindow | null, amount: number): void;
+    /** The window the fine detail is in now, and how much of it the plate adds. */
+    readonly fineWindow?: CloseupWindow | null;
+    readonly fineStrength?: number;
   } | null;
 }
 
@@ -213,6 +224,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
       // Cover-fit: crop whichever axis the frame has too much of.
       const va = v.videoWidth / v.videoHeight, ca = width / height;
       if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
+      // Video Zoom over the cover-fit (PLAN 14ag): 2 shows half the frame's span, 0.5 twice it.
+      const zoom = filmZoomOf(s.filmZoom);
+      filmScaleX /= zoom;
+      filmScaleY /= zoom;
     }
   }
 
@@ -251,7 +266,32 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('benDay', clamp01(s.benDay ?? 0));
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('projectorFocus', clamp01(s.projectorFocus ?? 0.5));
+  /*
+    Glitter, the lens photographing it and the side lamp (PLAN 47e, 47d,
+    47b-side; lib/glint.ts). At 0 and 0 the lens pass does not run, and the
+    display is drawn as it was. Focus (projectorFocus) is the lens's focal
+    plane, a depth in the gap, for the specks as for the Becke lines.
+  */
+  pack.set('glitter', Number.isFinite(s.glitter) ? clamp01(s.glitter) : 0);
+  pack.set('lensStop', clamp(Number.isFinite(s.lensStop) ? s.lensStop : 4, 1.4, 22));
+  const side = Number.isFinite(s.sideLight) ? clamp01(s.sideLight) : 0;
+  pack.set('sideLight', side * SIDE_RADIANCE);
+  pack.set('sideColor', ...sideLampColour(Number.isFinite(s.sideLightHue) ? s.sideLightHue : 30));
+  pack.set('sideLamp', ...sideLampPlace(Number.isFinite(s.sideLightAngle) ? s.sideLightAngle : 160));
+  /*
+    Polarised light (PLAN 31p-1; lib/polar.ts). 0, and so out of the beam,
+    for every look saved before it. The analyser's angle is taken mod 180:
+    a polarising sheet turned half round is the same sheet.
+  */
+  pack.set('polariser', Number.isFinite(s.polariser) ? clamp01(s.polariser) : 0);
+  const an = Number.isFinite(s.analyserAngle) ? s.analyserAngle : 90;
+  pack.set('analyserAngle', ((((an % 180) + 180) % 180) * Math.PI) / 180);
+  pack.set('quarterWave', Number.isFinite(s.quarterWave) ? clamp01(s.quarterWave) : 1);
+  pack.set('birefringence', Math.max(0, Number.isFinite(s.birefringence) ? s.birefringence : 0.3) * BIREF_NM_PER_STRAIN);
+  // The dish's frozen stress (PLAN 31p-3; lib/polarDish.ts): 0, the dish retarding nothing, for every look saved before it.
+  pack.set('dishStress', Math.max(0, Number.isFinite(s.dishStress) ? s.dishStress : 0));
   pack.set('edgeRelief', s.edgeRelief ?? 0);
+  pack.set('crispEdges', Number.isFinite(s.crispEdges) ? clamp01(s.crispEdges as number) : 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));
   pack.set('transmission', clamp01(s.transmission ?? 1));
@@ -334,7 +374,16 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('spectral', clamp01(s.spectralOptics ?? 0));
     // The photograph has its own ground, the paper, and lays the dye over
     // it as transmission already; the lamp's is the projector's.
-    pack.set('lampGround', !photo && Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0);
+    // A video in the lamp (PLAN 14ag-3) is a picture under the dish, and a
+    // picture under the dish is only seen through the dye: on the black
+    // ground the dye is painted as light and nothing under it shows. So the
+    // video brings the lamp ground up with it, by Film Mix: at 1 the look is
+    // on the lamp (the video, filtered by the dye), at 0 on its own ground,
+    // and a look already on the lamp stays there. Only while a film plays.
+    const ground = Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0;
+    const fm = Number.isFinite(s.filmMix) ? clamp01(s.filmMix as number) : 0.7;
+    const videoLamp = filmOn && pos.film < pos.front ? fm : 0;
+    pack.set('lampGround', !photo ? ground + (1 - ground) * videoLamp : 0);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     // The clear film's dye (PLAN 20b-13): the colour one unit lets through, and the dial.
@@ -348,6 +397,12 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('soapFilm', Number.isFinite(s.soapFilm) ? clamp01(s.soapFilm) : 0);
     const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
+    // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
+    // Its value is the Strength, the lens's throw over real water's (1 to 8, wgsl/plateFaraday.ts); 0 with no shaker.
+    const gain = Number.isFinite(s.faradayGain) ? Math.max(1, Math.min(FARADAY_GAIN_MAX, s.faradayGain as number)) : 1;
+    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? gain : 0);
+    // The water's glow (PLAN 48c): its light's brightness, past the real one up to twice the stage's.
+    pack.set('glow', Number.isFinite(s.glow) ? Math.max(0, Math.min(2, s.glow as number)) : 0);
   }
   {
     // Lumia and gel colours come from the working harmony, so they
@@ -392,6 +447,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
     pack.set('filmKey', clamp(s.filmKey ?? 0.18, 0, 0.9));
     pack.set('filmScale', filmScaleX, filmScaleY);
+    pack.set('filmPan', clamp(s.filmX ?? 0, -1, 1), clamp(s.filmY ?? 0, -1, 1));
   }
   {
     const throw1 = view.layer1;
@@ -418,7 +474,6 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('macroCellScale', s.macroCellScale ?? 0.5);
   pack.set('macroLacing', s.macroLacing ?? 0);
   pack.set('macroDepth', s.macroDepth ?? 0.5);
-  pack.set('macroEdge', s.macroEdgeDetail ?? 0.6);
   pack.set('macroRelief', s.macroRelief ?? 0.7);
   pack.set('flowRate', view.flowRate);
   pack.set('cellClock', view.cellClock);
@@ -465,6 +520,24 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('particles', parts);
   pack.set('particleMix', clamp01(s.particleMix ?? 0.6));
   pack.set('particleNorm', Math.max(1e-4, PARTICLE_NORM * parts));
+  /*
+    The closeup's fine dye (PLAN 47a-1, fineDye.ts), on the front plate only:
+    the back plate is drawn through its own zoom and offset (`layer1`), and a
+    window cut for the front frame would be the wrong piece of it. The solver
+    is told where the camera looks for its next step, and the shader the
+    window the detail is in now, which is the last step's: the two differ by
+    a frame while the camera moves, and reading the detail through the window
+    it was made in keeps every thread where it was drawn. A back plate that
+    is the same solver (the lab's) is not told again.
+  */
+  const front = fluids[0]?.gpu;
+  const fine = closeupFine(s, view.macroAmount);
+  front?.setCloseupWindow?.(closeupWindowOf(view.shot, fine, view.rotations[0] ?? 0, width, height, front.N, s), fine);
+  const back = fluids[1]?.gpu;
+  if (back && back !== front) back.setCloseupWindow?.(null, 0);
+  const fw = front?.fineWindow ?? null;
+  pack.set('fineWin', fw?.cx ?? 0, fw?.cy ?? 0, fw?.hx ?? 0, fw?.hy ?? 0);
+  pack.set('fineTurn', fw?.c ?? 1, fw?.s ?? 0, fw ? front?.fineStrength ?? 0 : 0, 0);
 
   pack.set('grainOn', grainOn);
   pack.set('grainMix', fluids[0]?.gpu?.grainMix ?? 0);
@@ -474,7 +547,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
   // Into the chain's half floats nothing; into the camera's 8-bit texture
   // still a dither, or a dark ramp bands before the camera sees it.
-  pack.set('finishInMain', !ctx.postChain ? 1 : ctx.cameraOn ? 2 : 0);
+  const finishInMain = !ctx.postChain ? 1 : ctx.cameraOn ? 2 : 0;
+  pack.set('finishInMain', finishInMain);
+  // The lens pass lays this finish instead when it runs (gpu/glint.ts; WebGPUPlate.draw sets finishInMain to 0 for the display then).
+  pack.set('lensFinish', finishInMain);
 }
 
 /**

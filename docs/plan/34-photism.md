@@ -27,25 +27,25 @@ dropped picture or 3D model driven by the music as its own look does not.
 because our free site asks for a login and needs its own reason to (saves your looks);
 a grid of generic stock thumbnails: ours are the plate itself.
 
-- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped.md` §34a (moved 2026-10-29, 19m-2).
-- **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
-  video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
-  the app's own frames, because a cloud session cannot film the app and the lab's plate barely
-  moves in a hero's seconds. A 10 to 15 second loop of the real show (`npm run film` records
-  through `scripts/recorder.mjs`), 1280 wide, under 1.5 MB as WebM and MP4, would replace it: the
-  page then loads it after its first paint and keeps the stills for reduced motion. The loop is
-  filmed with the track it was filmed to (the recorder takes the audio, and the show's own music in
-  `public/music` is ours to use), and a browser will not start sound on its own: the video starts
-  muted, and a "Sound on" button (and a tap on the video) unmutes it, with the sound off again when
-  the visitor leaves for the sign-in. More than one clip (a ferrofluid, a dye pour, a close macro)
-  would be the "video examples" row under the hero, each its own filmed look with its sound.
-  *Measure:*
-  the loop's first and last frames differ by less than a frame of motion; `npm run signin` 3a still
-  true with the plate not up.
-- **34a-3. Sharper looks in the grid.** *(S.)* The cards are 480 × 300 frames from the preset
-  contact sheets (28i-1) and are soft where a Retina screen draws them at 2x. `pixels.yml` renders
-  every look one to one at a laptop's size: take the eight from it and keep the file sizes under
-  60 KB each.
+- **34a-2. A filmed hero, and a clip that plays to music.** *Shipped (2026-11-21, the owner's ask that day:
+  the hero a full-width loop filmed from the app, and a clip of the plate playing to music, muted until
+  tapped, the music Scott Buckley's CC BY tracks the rescore films to); story in `docs/plan-shipped.md`
+  §34a-2.* `npm run landingclips` cuts both from the films, `npm run landinghero` holds them.
+  - **34a-2a. Later: more than one music clip.** A row of them (a ferrofluid, a dye pour, a close
+    macro), each its own look to its own track, once the rescore has filmed more than one look whole.
+- **34a-3. Sharper looks in the grid.** *Shipped (2026-11-21): twelve cards at 960 × 600 from the app
+  on the top rung, the chemical clock, polarised light and a palette from a picture among them; story
+  in `docs/plan-shipped.md` §34a-3.* `npm run landinglooks` photographs them on a Mac.
+  - **34a-3a. The Splodascope's blue water.** Its description promises yellow, green, red and pink
+    drops "in blue water"; photographed after twenty seconds on the top rung (2026-11-21) the water
+    is the lamp's white and the drops red and green. Either the blue drains or the lamp ground eats
+    it: look at what its water dye does over the first minute and fix the look or its words.
+  - **34a-3b. A look laid under a palette lock lays its own dyes.** Found photographing the
+    picture card (2026-11-21): with a picture's palette locked, a reload or a Go lays the look's
+    first plate (`seedPreset` in LiquidVisualizer's preset laying) in the look's own colours, and
+    only later pours take the lock, so a slow look like aurora stays its own green and violet for
+    a minute or more after "From picture" is chosen. Seed the laying from the locked harmony (as
+    the Seed and drain refills already do), measured by a plate read under a lock.
 - **34a-4. Buy buttons on the landing page.** *(S; built, held for the go-live order.)* The Home
   and Pro cards carry a Buy button to the live Lemon Squeezy checkout (new tab) and the Free card
   Play free; "Buying opens soon" is gone. The links live in `lib/checkoutLinks.ts` (the landing
@@ -72,6 +72,32 @@ a grid of generic stock thumbnails: ours are the plate itself.
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
+- **34a-6. The looks as films, each to its own kind of music, and on the channel.** *The row
+  shipped (2026-11-08): six 1920s records, each played whole by a look, under the gallery; story
+  in `docs/plan-shipped.md` §34a-6.*
+  - **34a-6c. Open: the channel's content claims.** Five of the six carry a claim from the
+    channel's matching of a label's remaster: Rachmaninoff and Tears are blocked in some
+    countries (Tears in Russia), Bessie, Caruso and the Wolverines only lose earnings. Every one
+    is a Great 78 transfer of the original disc, published in the US before 1926, so each is
+    disputed as public domain with the credit lines and `public/landing/films/SOURCES.md`;
+    all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
+    about 30 days). Until one is won, a visitor in a blocked country who opens
+    that card gets YouTube's own notice in the player, not the film.
+  - **34a-6d. The films to modern ambient music.** *(The owner, 2026-11-21: "we need to move
+    all of the demo videos off of the old recordings. The quality is just too low.")*
+    **Shipped (2026-11-22):** the webpage's six loops, the TV samples (release `tv-films-1`)
+    and four of their channel copies on Scott Buckley's CC BY 4.0 library, each on the look its
+    record had. `public/landing/films/SOURCES.md` has each page, licence line and checksum.
+    The 1920s films stay on the channel and 34a-6c's disputes stand.
+  - **34a-6f. Open: the last three channel films.** Hymn to the Dawn and Permafrost are
+    rendered (`/Volumes/Media/ChromaGlass/renders/ambient-2026-11/`) but YouTube's daily upload
+    limit refused them, so their cards loop and do not open; and the long film of Chris
+    Zabriskie's *Cylinders* (CC BY 4.0, a look a piece, `npm run sitefilms -- --album
+    cylinders`) has 7 of 9 pieces. Upload them, then put the ids in `siteFilms.ts`
+    (`SITE_FILMS`, `CHANNEL_ALBUMS`) and `Sample.FILMS`.
+  - **34a-6e. Open: a TV build with the new films.** The Android TV app names its sample films
+    in `Sample.java`; a TV on build 24 or older keeps playing the 1920s films (they stay in the
+    `tv-films-1` release) until the next build reaches Play.
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
   synth people, producers and artists, who need the technical capabilities before they pay.)*
   `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
@@ -87,8 +113,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
   MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
   sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
   Found along the way:
-  - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
-    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
   - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
     a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
     packets are ignored; the menu could instead show the item disabled with an upgrade line, read
@@ -103,21 +127,13 @@ a grid of generic stock thumbnails: ours are the plate itself.
     variables when the show server starts, which a Finder launch never sets, though
     `desktop/README.md` says it works "with no terminal". A Show menu item or a Settings → Wall
     card for host, universe, fixtures, order and the in-map, kept in the app's settings.
-  - **34a-7d. Network displays cannot start over the Wi-Fi.** A `?cast` page at an `http://`
-    address gets no WebGPU (14m-https, #443), so "more screens on other computers" is not sold yet.
+  - **34a-7d. Network displays cannot start over the Wi-Fi.** The show server now serves them over
+    https (14m-https, shipped); "more screens on other computers" can be sold once the owner has seen
+    a TV or a second computer take it (judging §136).
   - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
     the set beside the page as a download.
-  - **34a-7f. The rig's wires, checked without the rig.** **Shipped** (`npm run rig`, `scripts/rig.mjs`):
-    the real show server with a Pro key; every OSC address on `/pro`, sent as Resolume, TouchDesigner
-    and Max send it, arrives as the message the page acts on; the page's `lights` leaves as an
-    ArtDmx universe at the set rate; a desk's universe arrives as settings; and in the built app an
-    OSC setting, a desk fader, a MIDI fader (past soft takeover) and a DAW's 120 BPM clock move the
-    page, and an OSC setting lights the controller's ring. All 33 lines green: no
-    claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
-    need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
-    programs themselves are `docs/judging.md` §93, one sitting with free versions.
   - **34a-7g. Resolume sends its own OSC addresses.** **Page half shipped** (`/pro`'s "OSC in" card and
     `docs/guide.md` § OSC, "From Resolume"). Resolume's manual allows what was needed: its OSC output
     mirrors its own address space (`/composition/layers/1/video/opacity`), and a custom output address per
@@ -134,12 +150,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
     another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
     Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
-- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
-  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
-  - **34a-8a. The films themselves on the page.** The link sends a visitor away to watch; the six
-    public films (PR #729's ids in `siteFilms`) could play on the page itself, a card per look, once
-    #679's cards are on main. Until then the channel link is the only way to see a look move.
-
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
@@ -161,6 +171,11 @@ a grid of generic stock thumbnails: ours are the plate itself.
   (`chromaglassDebug().preview`, `{ id, stepCount }`), so a picture that only moves cannot pass it. Not in the check: no preview while a show is live on the wall (needs a cast
   or mirror open; the reviewer reads it), and `BUDGET_SHARE` (0.95) is unmeasured on the Mac until
   a preview exists.
+  *34b-1 shipped* (2026-11-08): a 240×150 WebP still per shipped look under `public/looks/<id>.webp`
+  (2.9–16.8 KB, rendered from the plate shader), shared through `src/lib/lookStills.ts` across the
+  Perform desk's new Looks grid (`LooksGrid`, opened from `looks-grid-open` in the desk breadcrumb),
+  the narrow window's `PresetMenu` (`preset-menu-<id>`) and the phone's Looks sheet (`phone-look-<id>`),
+  with `<img loading="lazy">` inside `SlideMount` on the narrow menu and phone cards; `npm run looksgrid -- --owed=preview` green (39 looks on 3 surfaces, 240 px, 2936–16754 bytes, closest pair 26.9 apart). Left: 34b-2 (live preview on hover/hold).
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the
@@ -177,12 +192,27 @@ a grid of generic stock thumbnails: ours are the plate itself.
   site. A lane on a song's timeline, bound to a setting by the same learn flow as MIDI
   (§5), saved with the song map. Phone: lanes are read and switched there, drawn on
   the desk. Waits on the sequencer's cue model; no default look changes.
-- **34f. One-button share export.** *(S.)* §6's Render and Record make the file; the
-  gap is a single "Save a clip with sound" on the desk and the phone that picks the
-  container and size itself, with the small mark on the free site (§23). First the 3-minute
-  1080p render in §6 has to be measured on a Mac. A portrait frame (9:16, for Reels and
-  TikTok) beside landscape, as VS 2's recorder offers (§30, 2026-10-24): the plate
-  rendered at that aspect, not a crop of the landscape frame.
+- **34f. One-button share export.** *Shipped (2026-10-28): the Record button's portrait
+  frame; the story is in `docs/plan-shipped.md` §34f, the owner's look is
+  `docs/judging.md` §133.* Not a second button (14ae): a **Frame** choice in the Record panel
+  (and More › Record on the phone), *As the plate is* or *Portrait 9:16*, that makes the one
+  Record button write a 9:16 MP4 with sound. Open from it:
+  - **34f-2.** *(M; the shortcut to replace.)* With a projector attached the wall must keep its
+    shape, so the clip is the centred 9:16 slice of the wall's picture (31.6% of a 16:9 frame's
+    width), the very crop the plan said not to make. The real thing is a second small plate for
+    the clip, solved beside the wall's, fed the same hands and sound: a second solver the
+    performer pays for the whole time the clip runs. Measure the frame cost of a second 720p
+    plate on the Mac before choosing; until then the Record panel says it is a slice.
+  - **34f-3.** *(S.)* Render a song at 9:16. `render.ts` and `plate.begin` take any width and
+    height already; the Render panel offers landscape sizes only. Add 1080 × 1920 and 720 × 1280
+    beside them (the free site's 720p ceiling and mark apply), then measure the 3-minute render
+    that §6 still has not.
+  - **34f-4.** *(S.)* The clip on the phone is the same slice (a phone screen is nearly 9:16, so it
+    loses about 18% of its height). Where a phone is held in landscape it is the 16:9 case:
+    tell it to turn the phone, or draw the stage at 9:16 as the desk does.
+  - **34f-5.** *(S; the owner's Mac.)* Instagram and TikTok take the MP4 from the share sheet:
+    whether they accept Chromium's and Safari's own H.264 mux is judged by posting one
+    (`docs/judging.md` §133), not by a check.
 - **34g. Legible reactions, named on the page.** *(S, copy.)* Kicks that stir the dye,
   a hit that seeds a bubble: these already exist in the sound patches (§28i-3). Name each
   look's reaction on its card in 34a and 34b ("kicks stir the ink") so a viewer sees that
@@ -197,6 +227,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
   13.7 is the one a music-maker audience (Home's buyers) asks for first: when the signed
   Mac app (13.1-sign) is out, take 13.7 before 13.3.
 
-**Order.** 34a first (it needs no engine work and the site is the demo), then 34f and 34g
+- **34j. The second look: the clips, watched (2026-11-15).** The owner sent a Photism Instagram ad;
+  this time its nineteen scene clips (photism.app/clips/, 4 to 16 s, silent) were watched with
+  `npm run watch`. Notes and a poster mosaic: the project's shared `references/photism-2026-11-15/`.
+  It is shader art, not fluid: fractals, raymarched tunnels, lasers, particles on a swirl, a chrome
+  bust, and one reaction-diffusion maze (Morphogen). Its hero (Anemone) pumps the whole frame's
+  brightness on the beat (luminance 0.06 to 0.28 at 2.0 s and 6.0 s), the whole-frame reaction our
+  rule forbids. Morphogen is the one picture to aim at: a crisp lit labyrinth, edges 0.71% of the
+  width, stripes about 1.2% apart, about 213 forms a frame; kept as the reference
+  `photism-morphogen` for Ferro Labyrinth's fingers (38d, the fingers thread's PR #838), where the
+  maze must come from the magnetic instability, not a reaction-diffusion formula. New on its page
+  since 10-22: cover art builds a scene's palette (ours is being built from any image or video,
+  17 and 43), and 1,000+ users became 3,000+. The owner's calls: Home to $29 with the Live Show
+  and the DAW bridge (23.21); the page's refund line and phone-to-computer email are not taken.
+
+**Order.** 34a first (it needs no engine work and the site is the demo), then ~~34f~~ (shipped) and 34g
 (small), then 34b and 34c; 34d, 34e and 34h are for when the planned VJ and DAW steps
 have shipped. Not started.

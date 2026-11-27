@@ -107,14 +107,19 @@ function quantile(sorted, p) {
  * to `acc` when one is given. Scratch arrays are kept on `acc` so a clip of a
  * thousand samples allocates them once.
  */
-export function designFrame(px, W, H, acc = null) {
+export function designFrame(px, W, H, acc = null, mask = null) {
   const N = W * H;
   const lum = new Float32Array(N);
-  let sRg = 0, sYb = 0, sRg2 = 0, sYb2 = 0, coloured = 0, warm = 0, hs = 0, hc = 0;
+  const unmasked = [];
+  let sRg = 0, sYb = 0, sRg2 = 0, sYb2 = 0, coloured = 0, warm = 0, hs = 0, hc = 0, M = 0;
   const hue12 = new Float64Array(12);
   for (let i = 0, p = 0; p < N; i += 3, p++) {
     const r = px[i], g = px[i + 1], b = px[i + 2];
-    lum[p] = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    const yv = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    lum[p] = yv;
+    if (mask?.[p]) continue;
+    M++;
+    unmasked.push(yv);
     const rg = r - g, yb = 0.5 * (r + g) - b;
     sRg += rg; sYb += yb; sRg2 += rg * rg; sYb2 += yb * yb;
     if (acc) {
@@ -130,14 +135,15 @@ export function designFrame(px, W, H, acc = null) {
       hs += Math.sin(a); hc += Math.cos(a);
     }
   }
-  const mRg = sRg / N, mYb = sYb / N;
-  const colourfulness = Math.sqrt(Math.max(0, sRg2 / N - mRg * mRg) + Math.max(0, sYb2 / N - mYb * mYb)) + 0.3 * Math.sqrt(mRg * mRg + mYb * mYb);
+  const mCount = Math.max(1, M);
+  const mRg = sRg / mCount, mYb = sYb / mCount;
+  const colourfulness = Math.sqrt(Math.max(0, sRg2 / mCount - mRg * mRg) + Math.max(0, sYb2 / mCount - mYb * mYb)) + 0.3 * Math.sqrt(mRg * mRg + mYb * mYb);
 
   // Luminance spread.
-  let lsum = 0; for (let p = 0; p < N; p++) lsum += lum[p];
-  const lmean = lsum / N;
-  let lvar = 0; for (let p = 0; p < N; p++) lvar += (lum[p] - lmean) ** 2;
-  const sorted = Float32Array.from(lum).sort();
+  let lsum = 0; for (let p = 0; p < unmasked.length; p++) lsum += unmasked[p];
+  const lmean = lsum / mCount;
+  let lvar = 0; for (let p = 0; p < unmasked.length; p++) lvar += (unmasked[p] - lmean) ** 2;
+  const sorted = Float32Array.from(unmasked).sort();
   const p5 = quantile(sorted, 0.05), p95 = quantile(sorted, 0.95);
 
   // Gradients (central differences, so a step from 0 to 1 over w pixels reads
@@ -147,6 +153,7 @@ export function designFrame(px, W, H, acc = null) {
   const Jxx = new Float64Array(bx * by), Jyy = new Float64Array(bx * by), Jxy = new Float64Array(bx * by);
   for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
     const p = y * W + x;
+    if (mask && (mask[p] || mask[p - 1] || mask[p + 1] || mask[p - W] || mask[p + W])) continue;
     const gx = (lum[p + 1] - lum[p - 1]) / 2, gy = (lum[p + W] - lum[p - W]) / 2;
     grad[p] = Math.hypot(gx, gy);
     const cx = Math.floor(x / B), cy = Math.floor(y / B);
@@ -159,14 +166,14 @@ export function designFrame(px, W, H, acc = null) {
   // columns in 320, under the 2% a 98th percentile of the frame would need
   // to see it, and read no edge at all (the self-test's 2-pixel ramp did).
   const steep = [];
-  for (let p = 0; p < N; p++) if (grad[p] > 0.02 * range) steep.push(grad[p]);
+  for (let p = 0; p < N; p++) if (!mask?.[p] && grad[p] > 0.02 * range) steep.push(grad[p]);
   steep.sort((a, b) => a - b);
   const gTop = range > 0.05 ? quantile(steep, 0.9) : NaN;
   // A frame with no edges to speak of (one flat colour, or black) has no
   // edge width; null, not a huge number.
   const edgeWidth = Number.isFinite(gTop) && gTop > 0.004 ? (range / gTop / W) * 100 : null;
   const edgeT = Number.isFinite(gTop) ? Math.max(0.02, 0.5 * gTop) : Infinity;
-  let onEdge = 0; for (let p = 0; p < N; p++) if (grad[p] > edgeT) onEdge++;
+  let onEdge = 0; for (let p = 0; p < N; p++) if (!mask?.[p] && grad[p] > edgeT) onEdge++;
 
   let cohW = 0, cohS = 0, oS = 0, oC = 0;
   for (let c = 0; c < bx * by; c++) {
@@ -185,19 +192,26 @@ export function designFrame(px, W, H, acc = null) {
   // A quarter-size luminance for the correlation lengths and the symmetry.
   const qw = Math.max(8, Math.floor(W / 4)), qh = Math.max(4, Math.floor(H / 4));
   const q = new Float32Array(qw * qh);
+  const qValid = new Uint8Array(qw * qh);
   for (let y = 0; y < qh; y++) for (let x = 0; x < qw; x++) {
     let s = 0, k = 0;
-    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const xx = x * 4 + i, yy = y * 4 + j; if (xx < W && yy < H) { s += lum[yy * W + xx]; k++; } }
-    q[y * qw + x] = s / k;
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+      const xx = x * 4 + i, yy = y * 4 + j;
+      if (xx < W && yy < H && !mask?.[yy * W + xx]) { s += lum[yy * W + xx]; k++; }
+    }
+    if (k > 0) { q[y * qw + x] = s / k; qValid[y * qw + x] = 1; }
   }
-  let qm = 0; for (const v of q) qm += v; qm /= q.length;
-  let qv = 0; for (const v of q) qv += (v - qm) ** 2; qv /= q.length;
+  let qm = 0, qn = 0; for (let idx = 0; idx < q.length; idx++) if (qValid[idx]) { qm += q[idx]; qn++; } qm /= Math.max(1, qn);
+  let qv = 0; for (let idx = 0; idx < q.length; idx++) if (qValid[idx]) qv += (q[idx] - qm) ** 2; qv /= Math.max(1, qn);
   const corrLen = (dx, dy, max) => {
     if (qv < 1e-6) return null;
     let prev = 1;
     for (let l = 1; l <= max; l++) {
       let s = 0, k = 0;
-      for (let y = 0; y + l * dy < qh; y++) for (let x = 0; x + l * dx < qw; x++) { s += (q[y * qw + x] - qm) * (q[(y + l * dy) * qw + x + l * dx] - qm); k++; }
+      for (let y = 0; y + l * dy < qh; y++) for (let x = 0; x + l * dx < qw; x++) {
+        const i1 = y * qw + x, i2 = (y + l * dy) * qw + x + l * dx;
+        if (qValid[i1] && qValid[i2]) { s += (q[i1] - qm) * (q[i2] - qm); k++; }
+      }
       const c = k ? s / k / qv : 0;
       // Interpolated to where it crosses a half, in quarter-size pixels.
       if (c < 0.5) return (l - 1 + (prev - 0.5) / Math.max(1e-6, prev - c)) * 4;
@@ -208,8 +222,13 @@ export function designFrame(px, W, H, acc = null) {
   const lx = corrLen(1, 0, Math.floor(qw / 2)), ly = corrLen(0, 1, Math.floor(qh / 2));
   const pearQ = (f) => {
     if (qv < 1e-6) return null;
-    let s = 0; for (let y = 0; y < qh; y++) for (let x = 0; x < qw; x++) { const [x2, y2] = f(x, y); s += (q[y * qw + x] - qm) * (q[y2 * qw + x2] - qm); }
-    return s / q.length / qv;
+    let s = 0, k = 0;
+    for (let y = 0; y < qh; y++) for (let x = 0; x < qw; x++) {
+      const [x2, y2] = f(x, y);
+      const i1 = y * qw + x, i2 = y2 * qw + x2;
+      if (qValid[i1] && qValid[i2]) { s += (q[i1] - qm) * (q[i2] - qm); k++; }
+    }
+    return k ? s / k / qv : null;
   };
   const mirror = pearQ((x, y) => [qw - 1 - x, y]);
   const halfTurn = pearQ((x, y) => [qw - 1 - x, qh - 1 - y]);
@@ -221,44 +240,47 @@ export function designFrame(px, W, H, acc = null) {
   let cx = 0, cy = 0, wsum = 0;
   const thirds = new Float64Array(9);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const v = Math.max(0, lum[y * W + x] - p5); cx += v * x; cy += v * y; wsum += v;
+    const p = y * W + x;
+    if (mask?.[p]) continue;
+    const v = Math.max(0, lum[p] - p5); cx += v * x; cy += v * y; wsum += v;
     thirds[Math.min(2, Math.floor((3 * y) / H)) * 3 + Math.min(2, Math.floor((3 * x) / W))] += v;
   }
   let spread = null, centroid = null;
-  if (wsum > 1e-6 * N) {
+  if (wsum > 1e-6 * mCount) {
     cx /= wsum; cy /= wsum;
-    let sd = 0; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sd += Math.max(0, lum[y * W + x] - p5) * ((x - cx) ** 2 + (y - cy) ** 2);
+    let sd = 0; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!mask?.[y * W + x]) sd += Math.max(0, lum[y * W + x] - p5) * ((x - cx) ** 2 + (y - cy) ** 2);
     spread = Math.sqrt(sd / wsum) / Math.hypot(W, H);
     centroid = [cx / (W - 1), cy / (H - 1)];
   }
 
   // Forms: bright regions on a half-size mask, 4-connected.
-  const hw = Math.floor(W / 2), hh = Math.floor(H / 2), M = hw * hh;
+  const hw = Math.floor(W / 2), hh = Math.floor(H / 2), M2 = hw * hh;
   const thr = p5 + 0.5 * range;
-  const mask = new Uint8Array(M);
+  const formMask = new Uint8Array(M2);
   if (range > 0.05) for (let y = 0; y < hh; y++) for (let x = 0; x < hw; x++) {
+    if (mask && (mask[2 * y * W + 2 * x] || mask[2 * y * W + 2 * x + 1] || mask[(2 * y + 1) * W + 2 * x] || mask[(2 * y + 1) * W + 2 * x + 1])) continue;
     const v = (lum[2 * y * W + 2 * x] + lum[2 * y * W + 2 * x + 1] + lum[(2 * y + 1) * W + 2 * x] + lum[(2 * y + 1) * W + 2 * x + 1]) / 4;
-    mask[y * hw + x] = v > thr ? 1 : 0;
+    formMask[y * hw + x] = v > thr ? 1 : 0;
   }
-  const stack = new Int32Array(M);
+  const stack = new Int32Array(M2);
   const forms = [];
-  for (let s0 = 0; s0 < M; s0++) {
-    if (mask[s0] !== 1) continue;
-    let top = 0; stack[top++] = s0; mask[s0] = 2;
+  for (let s0 = 0; s0 < M2; s0++) {
+    if (formMask[s0] !== 1) continue;
+    let top = 0; stack[top++] = s0; formMask[s0] = 2;
     let a = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
     while (top) {
       const p = stack[--top], x = p % hw, y = (p - x) / hw;
       a++; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y;
-      if (x > 0 && mask[p - 1] === 1) { mask[p - 1] = 2; stack[top++] = p - 1; }
-      if (x < hw - 1 && mask[p + 1] === 1) { mask[p + 1] = 2; stack[top++] = p + 1; }
-      if (y > 0 && mask[p - hw] === 1) { mask[p - hw] = 2; stack[top++] = p - hw; }
-      if (y < hh - 1 && mask[p + hw] === 1) { mask[p + hw] = 2; stack[top++] = p + hw; }
+      if (x > 0 && formMask[p - 1] === 1) { formMask[p - 1] = 2; stack[top++] = p - 1; }
+      if (x < hw - 1 && formMask[p + 1] === 1) { formMask[p + 1] = 2; stack[top++] = p + 1; }
+      if (y > 0 && formMask[p - hw] === 1) { formMask[p - hw] = 2; stack[top++] = p - hw; }
+      if (y < hh - 1 && formMask[p + hw] === 1) { formMask[p + hw] = 2; stack[top++] = p + hw; }
     }
     if (a < 4) continue;
     const mx = sx / a, my = sy / a;
     const vxx = sxx / a - mx * mx + 1 / 12, vyy = syy / a - my * my + 1 / 12, vxy = sxy / a - mx * my;
     const t = (vxx + vyy) / 2, d = Math.sqrt(((vxx - vyy) / 2) ** 2 + vxy * vxy);
-    forms.push({ area: a / M, elong: Math.sqrt(Math.max(0, t - d) / Math.max(1e-9, t + d)) });
+    forms.push({ area: a / M2, elong: Math.sqrt(Math.max(0, t - d) / Math.max(1e-9, t + d)) });
   }
   forms.sort((u, v) => u.area - v.area);
   // Elongation weighted by area: the big forms are the ones the eye reads.
@@ -270,12 +292,12 @@ export function designFrame(px, W, H, acc = null) {
   if (coloured && second != null) { gap = Math.abs(top2[0][0] - second) * 30; if (gap > 180) gap = 360 - gap; }
 
   return {
-    colourfulness, coloured: coloured / N, warm: coloured ? warm / coloured : null,
+    colourfulness, coloured: coloured / mCount, warm: coloured ? warm / coloured : null,
     hueSpread: coloured ? 1 - Math.hypot(hs, hc) / coloured : null,
     hue1: coloured ? top2[0][0] : null, hue2: coloured ? second : null, hueGap: gap,
     hue12: coloured ? [...hue12].map(v => v / coloured) : null,
-    lumMean: lmean, p5, p95, rms: Math.sqrt(lvar / N),
-    edgeWidth, edgeShare: onEdge / N,
+    lumMean: lmean, p5, p95, rms: Math.sqrt(lvar / mCount),
+    edgeWidth, edgeShare: onEdge / mCount,
     scaleX: lx != null ? (lx / W) * 100 : null, scaleY: ly != null ? (ly / W) * 100 : null,
     coherence, lineAngle,
     forms: forms.length, formArea: forms.length ? forms[forms.length >> 1].area : null, elongation: ew > 0 ? es / ew : null,
@@ -311,10 +333,16 @@ export function palette(acc, k = 6) {
 /** The palette as a strip, each colour as wide as its share. RGB24, w×h. */
 export function paletteStrip(pal, w = 960, h = 96) {
   const img = Buffer.alloc(w * h * 3);
-  let x0 = 0;
+  // Each edge is placed from the running share, not from the last edge plus this share:
+  // rounding each step on top of the last one drifted a column per colour, and on a
+  // Classic closeup film (shares 0.44, 0.18, 0.17, 0.12, 0.08, 0.0001) the fifth edge
+  // landed at 961 of 960, so the last colour ran backwards and Buffer.set threw past the
+  // end, killing the whole read (47x-3).
+  let x0 = 0, run = 0;
   const tot = pal.reduce((s, p) => s + p.share, 0) || 1;
   pal.forEach((p, i) => {
-    const x1 = i === pal.length - 1 ? w : Math.round(x0 + (p.share / tot) * w);
+    run += p.share;
+    const x1 = i === pal.length - 1 ? w : Math.min(w, Math.round((run / tot) * w));
     for (let y = 0; y < h; y++) for (let x = x0; x < x1; x++) img.set(p.rgb, (y * w + x) * 3);
     x0 = x1;
   });
@@ -379,13 +407,55 @@ export function designLines(s) {
     `- **colourfulness** ${range(s.colourfulness, x => f(x, 0))}: ${vivid} (Hasler–Süsstrunk: 33 moderate, 59 quite, 82 highly, 109 extremely)`,
     `- **hues**: ${s.hues.map(([n, v]) => `${n} ${pc(v)}`).join(', ') || 'none'}; coloured ${range(s.coloured, pc)} of the frame; the two strongest ${f(gap, 0)}° apart, ${harmony}; spread ${range(s.hueSpread, x => f(x, 2))} (0 one hue, 1 all); warm ${range(s.warm, pc)} of the colour`,
     `- **light**: mean luminance ${range(s.lumMean, x => f(x, 2))}; 5th to 95th percentile ${f(s.p5?.med, 2)} to ${f(s.p95?.med, 2)}; RMS contrast ${range(s.rms, x => f(x, 2))}`,
-    `- **edges**: width ${range(s.edgeWidth, x => `${f(x, 2)}%`)} of the frame's width, ${edges}; ${range(s.edgeShare, pc)} of the frame on an edge`,
-    `- **scale**: forms hold together over ${f(sx, 1)}% of the width across and ${f(sy, 1)}% down${sx && sy ? ` (${sx / sy > 1.4 ? 'stretched across' : sy / sx > 1.4 ? 'stretched down' : 'about even'})` : ''}; 10th to 90th across ${f(s.scaleX?.p10, 1)} to ${f(s.scaleX?.p90, 1)}%`,
+    `- **edges**: ${s.edgeWidth?.reliable === false ? 'unreliable (compression)' : `${range(s.edgeWidth, x => `${f(x, 2)}%`)} of the frame's width, ${edges}; ${range(s.edgeShare, pc)} of the frame on an edge`}`,
+    `- **scale**: ${(s.scaleX?.reliable === false || s.scaleY?.reliable === false) ? 'unreliable (compression)' : `forms hold together over ${f(sx, 1)}% of the width across and ${f(sy, 1)}% down${sx && sy ? ` (${sx / sy > 1.4 ? 'stretched across' : sy / sx > 1.4 ? 'stretched down' : 'about even'})` : ''}; 10th to 90th across ${f(s.scaleX?.p10, 1)} to ${f(s.scaleX?.p90, 1)}%`}`,
     `- **flow lines**: coherence ${range(s.coherence, x => f(x, 2))}, ${lines}${coh != null && coh >= 0.5 && s.lineAngle != null ? `, running at ${f(s.lineAngle, 0)}° (0 across, 90 up and down)` : ''}`,
-    `- **forms**: ${range(s.forms, x => f(x, 0))} bright forms a frame, median size ${range(s.formArea, x => `${f(x * 100, 2)}%`)} of the frame; elongation ${range(s.elongation, x => f(x, 2))}, ${shape}`,
+    `- **forms**: ${s.forms?.reliable === false ? 'unreliable (compression)' : `${range(s.forms, x => f(x, 0))} bright forms a frame, median size ${range(s.formArea, x => `${f(x * 100, 2)}%`)} of the frame; elongation ${range(s.elongation, x => f(x, 2))}, ${shape}`}`,
     `- **symmetry**: mirror ${range(s.mirror, x => f(x, 2))}, half-turn ${range(s.halfTurn, x => f(x, 2))}: ${symWord}`,
     `- **composition**: light centred at ${s.centroid ? `${f(s.centroid[0], 2)} across, ${f(s.centroid[1], 2)} down` : '–'}, spread ${range(s.spread, x => f(x, 2))} (0 a point, about 0.4 even); most light in the ${ti >= 0 ? thirdNames[ti] : '–'} third (${s.thirds ? pc(s.thirds[ti]) : '–'})`,
   ];
+}
+
+const DESIGN_GAPS = [
+  ['colourfulness', 'colourfulness', 15, ['more vivid', 'duller']],
+  ['coloured share of the frame', 'coloured', 0.15, ['more of the frame coloured', 'less of the frame coloured']],
+  ['hue spread', 'hueSpread', 0.2, ['more hues at once', 'fewer hues at once']],
+  ['warm share', 'warm', 0.2, ['warmer', 'cooler']],
+  ['mean luminance', 'lumMean', 0.08, ['brighter', 'darker']],
+  ['RMS contrast', 'rms', 0.05, ['more contrast', 'flatter']],
+  ['edge width (% of width)', 'edgeWidth', 'ratio', ['softer edges', 'crisper edges']],
+  ['form scale across (% of width)', 'scaleX', 'ratio', ['larger forms', 'finer forms']],
+  ['flow-line coherence', 'coherence', 0.12, ['more filaments and streaks', 'blobbier, fewer flow lines']],
+  ['forms a frame', 'forms', 'ratio', ['more separate forms', 'fewer separate forms']],
+  ['elongation', 'elongation', 0.15, ['rounder forms', 'more stretched forms']],
+  ['mirror symmetry', 'mirror', 0.2, ['more symmetric', 'less symmetric']],
+  ['spread of the light', 'spread', 0.06, ['light spread wider', 'light more concentrated']],
+];
+
+/** Structured design gaps between `ref` and `cur`, biggest first. */
+export function designGaps(ref, cur) {
+  const rows = [];
+  const skipped = [];
+  for (const [label, key, kind, words] of DESIGN_GAPS) {
+    if (ref[key]?.reliable === false || cur[key]?.reliable === false) {
+      skipped.push(label);
+      continue;
+    }
+    const a = ref[key]?.med, b = cur[key]?.med;
+    if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) continue;
+    let size, say;
+    if (kind === 'ratio') {
+      if (a <= 0 || b <= 0) continue;
+      size = Math.abs(Math.log(b / a)) / Math.log(1.5);
+      say = `${label}: cur ${f(b, 2)} against ${f(a, 2)}, ${b > a ? `${f(b / a, 1)}× ${words[0]}` : `${f(a / b, 1)}× ${words[1]}`}`;
+    } else {
+      size = Math.abs(b - a) / kind;
+      say = `${label}: cur ${f(b, 2)} against ${f(a, 2)}, ${b > a ? words[0] : words[1]}`;
+    }
+    rows.push({ key, label, ref: a, cur: b, size, direction: b < a ? 'raise' : 'lower', words, say });
+  }
+  rows.sort((u, v) => v.size - u.size);
+  return { rows, skipped };
 }
 
 /**
@@ -394,42 +464,15 @@ export function designLines(s) {
  * same gap at any size), shares and correlations as differences.
  */
 export function compareDesign(ref, cur, refName = 'the reference', curName = 'this') {
-  const rows = [];
-  const add = (label, key, kind, words) => {
-    const a = ref[key]?.med, b = cur[key]?.med;
-    if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) return;
-    let size, say;
-    if (kind === 'ratio') {
-      if (a <= 0 || b <= 0) return;
-      size = Math.abs(Math.log(b / a)) / Math.log(1.5);
-      say = `${label}: ${curName} ${f(b, 2)} against ${f(a, 2)}, ${b > a ? `${f(b / a, 1)}× ${words[0]}` : `${f(a / b, 1)}× ${words[1]}`}`;
-    } else {
-      size = Math.abs(b - a) / kind;
-      say = `${label}: ${curName} ${f(b, 2)} against ${f(a, 2)}, ${b > a ? words[0] : words[1]}`;
-    }
-    rows.push({ size, say });
-  };
-  add('colourfulness', 'colourfulness', 15, ['more vivid', 'duller']);
-  add('coloured share of the frame', 'coloured', 0.15, ['more of the frame coloured', 'less of the frame coloured']);
-  add('hue spread', 'hueSpread', 0.2, ['more hues at once', 'fewer hues at once']);
-  add('warm share', 'warm', 0.2, ['warmer', 'cooler']);
-  add('mean luminance', 'lumMean', 0.08, ['brighter', 'darker']);
-  add('RMS contrast', 'rms', 0.05, ['more contrast', 'flatter']);
-  add('edge width (% of width)', 'edgeWidth', 'ratio', ['softer edges', 'crisper edges']);
-  add('form scale across (% of width)', 'scaleX', 'ratio', ['larger forms', 'finer forms']);
-  add('flow-line coherence', 'coherence', 0.12, ['more filaments and streaks', 'blobbier, fewer flow lines']);
-  add('forms a frame', 'forms', 'ratio', ['more separate forms', 'fewer separate forms']);
-  add('elongation', 'elongation', 0.15, ['rounder forms', 'more stretched forms']);
-  add('mirror symmetry', 'mirror', 0.2, ['more symmetric', 'less symmetric']);
-  add('spread of the light', 'spread', 0.06, ['light spread wider', 'light more concentrated']);
-  rows.sort((u, v) => v.size - u.size);
+  const { rows, skipped } = designGaps(ref, cur);
   const pal = p => p.slice(0, 4).map(x => `${x.name} ${pc(x.share)}`).join(', ');
   return [
     `## Design against ${refName}`,
     '',
     `Biggest gaps first; a size of 1 is about a just-noticeable step (15 colourfulness, 1.5× a scale, 0.15 of a share).`,
     '',
-    ...rows.map(r => `- (${f(r.size, 1)}) ${r.say}`),
+    ...rows.map(r => `- (${f(r.size, 1)}) ${r.say.replace(': cur ', `: ${curName} `)}`),
+    ...(skipped.length ? [`- skipped (unreliable due to compression): ${skipped.join(', ')}`] : []),
     `- palette: ${refName} ${pal(ref.palette ?? [])}; ${curName} ${pal(cur.palette ?? [])}`,
   ];
 }

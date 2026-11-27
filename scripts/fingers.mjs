@@ -93,7 +93,7 @@ const POUR = 0.25;
 // The phase settings the app runs each look on (LiquidVisualizer: Phase
 // Edge as set, else 0.35; the tension 0.45 of Ferrofluid Scale, else of
 // 0.4).
-const GARDEN = { ferroLabyrinth: 0.8, phaseSharp: 0.75, phaseTension: 0.3 * 0.45 };
+const GARDEN = { ferroLabyrinth: 1, phaseSharp: 0.75, phaseTension: 0.3 * 0.45 };
 const S = 420;
 const CIRCLES = [0.06, 0.09, 0.12, 0.15];
 

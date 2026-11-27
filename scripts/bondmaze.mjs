@@ -27,10 +27,13 @@
  *      the period is the plate (MAZE_WIDEST) at Labyrinth 0.3
  *   4. the looks: Magnet Garden and Ferro Paint at their own Labyrinth (the
  *      frame loop plays the coil about the setting, and the period is read
- *      from its mean square, mazeFelt) ask for periods at least three times
- *      the old constant, where the owner's photos are; and the top of the
- *      dial is the old constant's maze within a tenth, so `npm run maze`
- *      still measures the maze it was written for
+ *      from its mean square, mazeFelt) ask for periods no wider than they
+ *      drew under the old constant (0.045, and Ferro Paint's 0.045/√3): the
+ *      owner, 2026-11-13, of this item's first cut, which widened them to
+ *      0.27 and 0.15: "The reference images have much thinner and more
+ *      complex fingers." And the top of the dial is the old constant's maze
+ *      within a tenth, so `npm run maze` still measures the maze it was
+ *      written for
  *   5. the felt field: steady in, steady out; a kick held for a beat moves
  *      it by under a tenth of the way; held for MAZE_SETTLE, by 1 − 1/e of
  *      the squares
@@ -123,8 +126,8 @@ const minimum = (N) => {
   const look = (id) => M.PRESETS.find((p) => p.id === id).settings;
   const at = (id) => { const s = look(id); return M.mazePeriodOf(s.ferroLabyrinth) / Math.pow(3, s.mazeDetail ?? 0); };
   const mg = at('magnet-garden'), fp = at('ferro-paint'), top = M.mazePeriodOf(1);
-  check('4. the looks ask for the photos\' wide cells, and the top of the dial is the old maze',
-    mg >= 3 * OLD && fp >= 3 * OLD && Math.abs(top / OLD - 1) < 0.1,
+  check('4. the looks\' fingers are no wider than the old maze\'s, and the top of the dial is the old maze',
+    mg <= OLD && fp <= OLD / Math.sqrt(3) && Math.abs(top / OLD - 1) < 0.1,
     `Magnet Garden ${mg.toFixed(3)}, Ferro Paint ${fp.toFixed(3)} of the plate (were ${OLD} and ${(OLD / Math.sqrt(3)).toFixed(3)}); Labyrinth 1 ${top.toFixed(3)}`);
 }
 

@@ -5,7 +5,6 @@ import { Info } from '../Info';
 import { LIT } from '../ui';
 import { StrobeRing } from '../ui/Playful';
 import { TipPad } from '../ui/TipPad';
-import { SPIN_AUTO_NAMES } from '../../lib/turntable';
 import { Slider, PinChips } from './controls';
 import { AUDIO_FEATURES } from './patchLists';
 import type { SectionCtx } from './props';
@@ -136,6 +135,25 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ slosh: v })}
           settingKey="slosh"
         />
+        {/* A hand's tip of the flat plate, two knobs' worth (lib/handTilt.ts, PLAN 18a-13m): the middle is level. */}
+        <Slider
+          label="Tilt Left/Right"
+          value={settings.plateTiltX ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ plateTiltX: v })}
+          settingKey="plateTiltX"
+        />
+        <Slider
+          label="Tilt Up/Down"
+          value={settings.plateTiltY ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ plateTiltY: v })}
+          settingKey="plateTiltY"
+        />
         <Slider
           label="Plate Rock"
           value={settings.plateRock ?? 0.45}
@@ -145,6 +163,61 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ plateRock: v })}
           settingKey="plateRock"
         />
+        {/*
+          The dish on a speaker (PLAN 48f, gpu/faraday.ts): Shaker is the
+          drive's frequency (nought, no speaker), Shake how hard it shakes in
+          g. The music reaches Shake through a cord from the bass, in Patches
+          beside this card (the phone, with no patch bay, has its depth as
+          Music Shake: lib/shakeCord.ts), as Music Stir is the stir's.
+          Past the water's threshold the shaking stands up in a lattice of
+          Faraday waves at half the drive's frequency.
+        */}
+        <Slider
+          label="Shaker Hz"
+          value={settings.faradayHz ?? 0}
+          min={0}
+          max={150}
+          step={1}
+          onChange={(v: number) => onUpdate({ faradayHz: v })}
+          settingKey="faradayHz"
+        />
+        {(settings.faradayHz ?? 0) > 0 && (
+          <>
+            <Slider
+              label="Shake g"
+              value={settings.faraday ?? 0}
+              min={0}
+              max={2}
+              step={0.01}
+              onChange={(v: number) => onUpdate({ faraday: v })}
+              settingKey="faraday"
+            />
+            {/*
+              Rock (48f-6): the strobe slipped off the waves, so the crests
+              and troughs trade places at its rate. Wave Strength: the
+              projector's throw past the dye, 1 real water's light, up to 8
+              so a bass pulse's pattern reads (wgsl/plateFaraday.ts).
+            */}
+            <Slider
+              label="Rock Hz"
+              value={settings.faradayRock ?? 0}
+              min={0}
+              max={2}
+              step={0.01}
+              onChange={(v: number) => onUpdate({ faradayRock: v })}
+              settingKey="faradayRock"
+            />
+            <Slider
+              label="Wave Strength"
+              value={settings.faradayGain ?? 1}
+              min={1}
+              max={8}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ faradayGain: v })}
+              settingKey="faradayGain"
+            />
+          </>
+        )}
       </section>
       )}
     </>
@@ -224,7 +297,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
         */}
         <div className="mb-1 flex items-center gap-3" data-testid="spin-strobe">
           <StrobeRing mode={settings.spinAuto ?? 0} rpm={settings.spinRpm ?? 6} beats={settings.spinBeats ?? 16} bpm={spinBpm} />
-          <p className="text-[11px] leading-snug text-white/50" data-testid="spin-strobe-says">
+          <p className="text-[12px] leading-snug text-muted" data-testid="spin-strobe-says">
             {Math.round(settings.spinAuto ?? 0) === 2 && spinBpm > 0
               ? `Locked to ${spinBpm} bpm: the dots stand still while the dish turns once in ${Math.round(settings.spinBeats ?? 16)} beats.`
               : Math.round(settings.spinAuto ?? 0) === 0 ? 'Auto Spin is off.'
@@ -232,7 +305,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           </p>
         </div>
         <Slider
-          label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
+          label="Auto Spin"
           value={settings.spinAuto ?? 0}
           min={0}
           max={2}
@@ -241,7 +314,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           settingKey="spinAuto"
         />
         <Slider
-          label={`Spin Rate — ${(settings.spinRpm ?? 6).toFixed(1)} rpm`}
+          label="Spin Rate"
           value={settings.spinRpm ?? 6}
           min={-45}
           max={45}
@@ -250,7 +323,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           settingKey="spinRpm"
         />
         <Slider
-          label={`Beats a Turn — ${Math.round(settings.spinBeats ?? 16)}`}
+          label="Beats a Turn"
           value={settings.spinBeats ?? 16}
           min={1}
           max={64}
@@ -269,7 +342,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
             Reverse Spin
           </button>
         </div>
-        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+        <p className="mb-2 mt-1 text-[12px] leading-relaxed text-dim">
           The dish turns and the liquid follows it: water lags for a few seconds, oil goes at once,
           and a fast dish flings the heavy colour outward. Tempo turns once every so many beats,
           locked to the beat; with no beat heard yet it turns at the Rate.
@@ -282,10 +355,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           is the default and is what every look did before there was a choice.
         */}
         <Slider
-          label={`Spin Direction — ${
-            (settings.spinDirection ?? 0) > 0.5 ? 'all clockwise'
-              : (settings.spinDirection ?? 0) < -0.5 ? 'all anticlockwise'
-              : 'plates opposed'}`}
+          label="Spin Direction"
           value={settings.spinDirection ?? 0}
           min={-1}
           max={1}
@@ -302,7 +372,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ spinWander: v })}
           settingKey="spinWander"
         />
-        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+        <p className="mb-2 mt-1 text-[12px] leading-relaxed text-dim">
           Wander drifts the motor off its speed. Past about half it crosses zero and the plate
           turns back on itself now and then, the way a dish nudged by hand does.
         </p>
@@ -542,7 +612,7 @@ export const AutomationSection = ({ c }: { c: SectionCtx }) => {
           them back (lib/scenePacing.ts). With Pacing at 0 there is no scene,
           so it is dimmed there rather than hidden: the pair reads as one.
         */}
-        <div className={(settings.pacing ?? 0) > 0.001 ? '' : 'opacity-50'}>
+        <div className={(settings.pacing ?? 0) > 0.001 ? '' : 'opacity-65'}>
           <Slider
             label="Follow the Song"
             value={settings.songFollow ?? 0}

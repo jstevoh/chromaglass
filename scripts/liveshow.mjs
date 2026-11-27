@@ -28,7 +28,8 @@
  *   real one (lib/liveStream.ts, WebCodecs' H.264 on Chromium's software
  *   encoder), so the packets the stand-in counts are real frames of the
  *   plate. The website (no bridge) does not offer the panel; a free licence
- *   gets the Pro note and no Go live; and a phone on the remote sees the
+ *   gets the licence note and no Go live, a Home licence gets the panel
+ *   (Pro only until 2026-11-15, PLAN.md 23.21); and a phone on the remote sees the
  *   stream on Draw and on Controls, and its Stop, two taps, ends it.
  *
  * What it does not say: anything about a real platform or the real
@@ -293,13 +294,25 @@ try {
   check('the website does not offer the Live Show panel', !(await dock(site)));
   await site.context().close();
 
-  // ── Pro only ────────────────────────────────────────────────────
+  // ── Free gets the note ──────────────────────────────────────────
   const free = await open({ enforced: true, valid: false, tier: 'free' });
   const freeDocked = await dock(free);
   const freeSays = await until(free, () => document.querySelector('[data-testid="live-show-pro"]')?.textContent ?? document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase'));
   const freeGo = await free.getByTestId('live-go').count();
-  check('on a free licence the panel says it is Pro and has no Go live', freeDocked && /Pro/.test(String(freeSays)) && freeGo === 0, `docked ${freeDocked}, says "${freeSays}", Go live ${freeGo}`);
+  check('on a free licence the panel says it needs a paid licence and has no Go live', freeDocked && /Home and Pro/.test(String(freeSays)) && freeGo === 0, `docked ${freeDocked}, says "${freeSays}", Go live ${freeGo}`);
   await free.context().close();
+
+  // ── Home opens it (the owner, 2026-11-15, PLAN.md 23.21) ─────────
+  // The Live Show was Pro only until Home dropped to $29 and took it: a Home
+  // key, enforced as the Mac app enforces it, must reach the panel itself and
+  // its Go live, not the note. Read from the same panel the free line reads,
+  // so the licence in the stub is the only thing that differs.
+  const home = await open({ enforced: true, valid: true, tier: 'home' });
+  const homeDocked = await dock(home);
+  const homePhase = await until(home, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') ?? (document.querySelector('[data-testid="live-show-pro"]') ? 'note' : null));
+  const homeGo = await home.getByTestId('live-go').count();
+  check('on a Home licence the panel opens with Go live, not the licence note', homeDocked && homePhase !== 'note' && homePhase != null && homeGo > 0, `docked ${homeDocked}, phase "${homePhase}", Go live ${homeGo}`);
+  await home.context().close();
 
   // ── The Mac app, Pro ─────────────────────────────────────────────
   const page = await open(null);
@@ -382,7 +395,7 @@ try {
   check('the page\'s encoder is handing the bridge real packets, the first frame a keyframe', packets?.packets > 30 && packets.empty === 0 && packets.firstVideo === true,
     packets ? `${packets.packets} packets, ${packets.empty} empty, first frame a keyframe ${packets.firstVideo}` : 'none');
 
-  // ── The Mac app's narrow window (37x-4d-4; scripts/liveshownarrow.mjs) ──
+  // ── The Mac app's narrow window keeps the panel (49c-3; scripts/liveshownarrow.mjs) ──
   await narrowLines({ page, until, check });
 
   // ── The phone ───────────────────────────────────────────────────
@@ -463,7 +476,7 @@ check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 finish();
 
 function finish() {
-  console.log(`\n${total - failed}/${total} passed`);
+  console.log(`\n${total - failed}/${total} checks passed`);
   process.exit(failed ? 1 : 0);
 }
 
@@ -580,16 +593,18 @@ async function stackLines() {
     check('the moving judgement passes every made-up moving stream and fails every frozen one, including those first-against-last read as still', p.ok,
       `${p.cases} streams; ${p.aliased} moving ones read as still by first against last; ${p.wrong.length ? `wrong on ${p.wrong.length}: ${p.wrong.slice(0, 3).join('; ')}` : 'wrong on none'}`);
   }
-  const moving = (which, f, id) => {
-    if (presentsInXvfb()) { console.log(` skip  the ${which} stream moves with the film: software WebGPU draws a few frames a minute`); return true; }
+  // `line` is written out whole at each call, so a quarantine on it
+  // (scripts/checks.json) finds its text in this file.
+  const moving = (line, f, id) => {
+    if (presentsInXvfb()) { console.log(` skip  ${line}: software WebGPU draws a few frames a minute`); return true; }
     const trail = (f?.trail ?? []).map(t => ({ ms: t.ms, col: barColumnOfRow(t.row) }));
     const m = barMoves(trail);
     // The strip's read of the last frame against the whole frame's, so a red
     // says whether the strip reader itself is wrong on this machine.
     const whole = f?.grid ? barColumnOfRow(f.grid.slice(7 * f.cols, 8 * f.cols)) : null;
     const strip = trail.length ? trail[trail.length - 1].col : null;
-    due(id, `the ${which} stream moves with the film: its bar is somewhere else a second later`, m.ok,
-      `${m.detail}; last frame's bar at column ${strip} by the strip, ${whole} by the whole frame; ${f?.during ?? ''}`, m.ok === false && f?.blackStream === true);
+    due(id, `${line}: its bar is somewhere else a second later`, m.ok,
+      `${m.detail}; last frame's bar at column ${strip} by the strip, ${whole} by the whole frame; ${f?.during ?? "the film's clock unread"}`, m.ok === false && f?.blackStream === true);
     return m.ok;
   };
   const STACK_LINE = 'with a film in the mixer and a keystone on the wall, the Mixer stack source\'s frames carry the film and are square';
@@ -674,7 +689,7 @@ async function stackLines() {
     await page.getByTestId('live-stop').click();
     await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
     const d = (k) => (before[k] === null || after[k] === null ? '?' : after[k] - before[k]);
-    const during = `while it was live the plate drew ${d('plate')} frames and the film's clock went ${typeof d('film') === 'number' ? d('film').toFixed(2) : '?'} s, ${d('filmFrames')} of its frames${after.paused ? ', paused' : ''}`;
+    const during = `while it was live the plate drew ${d('plate')} frames and the film's clock went ${typeof d('film') === 'number' ? d('film').toFixed(2) : 'unread'} s, ${d('filmFrames')} of its frames${after.paused ? ', paused' : ''}`;
     return { during, ...(await page.evaluate(async () => {
       const { video, desc } = window.__liveStub.calls;
       window.__liveStub.calls.keep = false;
@@ -762,7 +777,7 @@ async function stackLines() {
   if (decoded('Plate source\'s', plate)) {
     const p = stackJudge(plate, seen);
     due('plate', 'the Plate source\'s frames are the plate: the film, with the wall\'s keystone on it as the canvas has it', p.film && p.keystoned && p.same, p.detail, plate.blackStream);
-    moving('Plate source\'s', plate, 'plate');
+    moving("the Plate source's stream moves with the film", plate, 'plate');
   }
 
   const choice = await page.getByTestId('live-source').count();
@@ -772,7 +787,7 @@ async function stackLines() {
   if (decoded('Mixer stack source\'s', stack)) {
     const s = stackJudge(stack, seen);
     due('stack', STACK_LINE, s.film && s.square && s.same, s.detail, false);
-    moving('Mixer stack source\'s', stack, 'stack');
+    moving("the Mixer stack source's stream moves with the film", stack, 'stack');
   }
   await page.getByTestId('live-source').selectOption('plate');
 }

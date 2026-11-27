@@ -29,8 +29,18 @@
  * minimised numerically while writing this: within 4% of the full sum for N
  * from 2 to 20, the range the dish uses). So the stripes widen exponentially
  * as the field falls toward the onset, and a pool under the critical field
- * stays a pool: the period runs off the plate (WIDEST). That is the physics
- * the looks lacked: in the photos the field is gentle and the cells wide.
+ * stays a pool: the period runs off the plate (WIDEST).
+ *
+ * The looks are NOT moved toward the onset. 38d-1 first did (Magnet
+ * Garden at 0.58, Ferro Paint at 0.65: periods of 0.27 and 0.15 of the
+ * plate), reading the photos' cells as the maze's period; the owner, seeing
+ * the pictures (2026-11-13): "The reference images have much thinner and
+ * more complex fingers." Near the onset the instability gives a few fat
+ * blobs; the photos' long, branched, thin fingers are the same instability
+ * far above it, high N, over a pool much wider than the period. So both
+ * looks sit at the top of the dial (N 14, 0.042, no wider than the old
+ * constant's 0.045), Ferro Paint still divided by Maze Detail; the branched
+ * look over big pools (and the dipoles' own kernel, 38d-3) is still open.
  *
  * M is the layer's magnetisation in the coil's field B0. The field inside a
  * thin layer normal to it is the applied one less the layer's own
@@ -46,10 +56,10 @@
  * it (as the maze feels it, mazeFelt). COIL_TESLA is its field at Labyrinth
  * 1: 7.5 mT, where the period is 0.042 of the plate, the old constant's
  * maze, so the top of the dial is today's fine labyrinth and `npm run maze`
- * measures the same maze it did. Down the dial it widens: Ferro Paint's 0.65
- * (4.9 mT) is N 5.9, 0.15 of the plate; Magnet Garden's 0.58 (4.35 mT) N
- * 4.7, 0.27; under about 0.47 (3.5 mT) the layer is past the critical Bond
- * number and the pool stays a pool. Applied fields of a few millitesla are
+ * measures the same maze it did. Down the dial it widens: 0.65 (4.9 mT) is
+ * N 5.9, 0.15 of the plate; 0.58 (4.35 mT) N 4.7, 0.27; under about 0.47
+ * (3.5 mT) the layer is past the critical Bond number and the pool stays a
+ * pool. Applied fields of a few millitesla are
  * what thin-cell labyrinth experiments use, and a real layer under this σ
  * stands into spikes near 4 mT (SPIKE_ONSET_REAL), the same neighbourhood.
  *

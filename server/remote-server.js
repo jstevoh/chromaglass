@@ -18,7 +18,9 @@
  */
 
 import { createServer } from 'node:http';
-import { chmodSync, createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createServer as createTlsServer } from 'node:https';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { extname, join, normalize, resolve } from 'node:path';
 import { hostname, networkInterfaces } from 'node:os';
@@ -145,8 +147,8 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.map': 'application/json; charset=utf-8',
-  // The films a TV plays while the show is off (PLAN 12-tv) and the cartoons
-  // the Film source pours: a TV's WebView is stricter about a video sent as
+  // The films a TV plays while the show is off (PLAN 12-tv), and a video
+  // served to the assistant's film or pour: a TV's WebView is stricter about a video sent as
   // octet-stream than a desktop browser, which sniffs it.
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
@@ -209,7 +211,8 @@ void licenseManager.initFromEnv().then(refreshTier);
 setInterval(refreshTier, 2000).unref?.();
 
 // ── Static files, with SPA fallback ────────────────────────────────────
-const server = createServer((req, res) => {
+// One handler for both the http and the https server (PLAN 14m-https, below).
+const handle = (req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (url.pathname === ACCOUNT_SHOWS_PATH) {
     void handleAccountShows(req, res, url);
@@ -237,7 +240,7 @@ const server = createServer((req, res) => {
     // The keys go to the laptop alone: anyone on the Wi-Fi can ask this, and
     // a key it gave them would be the key to the show.
     const laptop = isLaptop(req);
-    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH, port: PORT, hosts: lanAddresses(), key: laptop ? SHOW_KEY : null, displayKey: laptop ? DISPLAY_KEY : null }));
+    res.end(JSON.stringify({ chromaglass: 'relay', path: WS_PATH, port: PORT, httpsPort: tlsServer ? HTTPS_PORT : null, hosts: lanAddresses(), key: laptop ? SHOW_KEY : null, displayKey: laptop ? DISPLAY_KEY : null }));
     return;
   }
   // normalize() collapses any ../ before it can escape dist
@@ -259,7 +262,65 @@ const server = createServer((req, res) => {
     'Cache-Control': 'no-cache',
   });
   createReadStream(filePath).pipe(res);
-});
+};
+const server = createServer(handle);
+
+/*
+  ── https on the Wi-Fi, for network displays (PLAN 14m-https) ──────────
+
+  What was found (2026-10-24, measured in Chromium): a network display could
+  not start at all. Browsers give WebGPU only to a secure page, which is https
+  or the machine's own localhost, and the address this server printed for a
+  projector's browser or a second computer was http on the Wi-Fi, so the page
+  stopped at its first shader module ("GPUTextureUsage is not defined"). The
+  phone's remote needs no GPU and was never affected.
+
+  So the same files and the same relay are served over https too, on
+  HTTPS_PORT (PORT + 443 by default: 3443 beside 3000), with a certificate made
+  on the first launch and kept in server/.tls (ignored by git). It is
+  self-signed, so each display's browser warns once ("Your connection is not
+  private"; Advanced, then Proceed), and from then on the page is a secure
+  context with the GPU: Chromium treats a page whose certificate warning was
+  accepted as secure, which is what the check asks of it. Why not the other
+  ways: a certificate the browsers trust outright needs a public name and a
+  certificate authority, which a room's Wi-Fi does not have; a home-made
+  authority installed on every display is the same warning made into a setup
+  step per device; the tunnel's https works but leaves the room and needs the
+  internet; and a WebGL copy of the plate for displays would be a second
+  renderer to keep in step. The warning once per display is the least of them.
+
+  The certificate is made with the system's openssl (on every Mac, and on any
+  Linux); where there is none, or HTTPS_PORT=0, the server runs as before,
+  http only, and says so. It names localhost, this machine's .local name and
+  the addresses it has now; a display on an address added later still opens
+  it, since the warning it accepts is the same one.
+*/
+const HTTPS_PORT = Number(process.env.HTTPS_PORT ?? PORT + 443);
+const TLS_DIR = process.env.TLS_DIR ?? join(HERE, '.tls');
+const tlsFiles = () => {
+  const key = join(TLS_DIR, 'key.pem');
+  const cert = join(TLS_DIR, 'cert.pem');
+  if (!existsSync(key) || !existsSync(cert)) {
+    mkdirSync(TLS_DIR, { recursive: true });
+    const names = ['DNS:localhost', `DNS:${hostname()}`, `DNS:${hostname().replace(/\.local$/, '')}.local`, 'IP:127.0.0.1', ...lanAddresses().map((a) => `IP:${a}`)];
+    execFileSync('openssl', [
+      'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes',
+      '-keyout', key, '-out', cert, '-days', '825', '-subj', '/CN=ChromaGlass show',
+      '-addext', `subjectAltName=${[...new Set(names)].join(',')}`,
+    ], { stdio: 'ignore' });
+    try { chmodSync(key, 0o600); } catch { /* the key still works; it is only less private */ }
+  }
+  return { key: readFileSync(key), cert: readFileSync(cert) };
+};
+let tlsServer = null;
+let tlsWhyNot = '';
+if (HTTPS_PORT > 0) {
+  try {
+    tlsServer = createTlsServer(tlsFiles(), handle);
+  } catch (e) {
+    tlsWhyNot = /ENOENT/.test(String(e?.code ?? e)) ? 'no openssl on this machine to make a certificate' : String(e?.message ?? e).split('\n')[0];
+  }
+}
 
 // ── Control relay ──────────────────────────────────────────────────────
 // Displays and controllers each broadcast to the other side. There is no
@@ -336,7 +397,22 @@ const named = (req) => {
   const n = (unnamedBy.get(req.address) ?? 1) - 1;
   if (n > 0) unnamedBy.set(req.address, n); else unnamedBy.delete(req.address);
 };
-const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: MAX_FRAME, verifyClient });
+/*
+  One relay for both servers: a socket that came in over https (a network
+  display) and one over http (the laptop, a phone) are clients of the same
+  WebSocketServer, so every count and broadcast below sees them all. With
+  `noServer` the socket server no longer refuses another path itself, so the
+  upgrade does that here, as it did (400).
+*/
+const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, verifyClient });
+const upgrade = (req, socket, head) => {
+  let path = '';
+  try { path = new URL(req.url ?? '/', 'http://localhost').pathname; } catch { /* refused below */ }
+  if (path !== WS_PATH) { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); return; }
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+};
+server.on('upgrade', upgrade);
+tlsServer?.on('upgrade', upgrade);
 const roles = new WeakMap();
 
 /**
@@ -466,7 +542,7 @@ pairingWatch.unref?.();
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-outputs', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'assistant-media', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music', 'assistant-projector', 'assistant-desk']);
+const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-outputs', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'assistant-media', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music', 'assistant-projector', 'assistant-desk', 'assistant-edit']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
 /** The Mac app's updater, when main.js hands it over (PLAN 44k-18); null in a show run from a terminal. */
 let appUpdates = null;
@@ -488,6 +564,17 @@ const serverOutputs = {
   setOscIn: (mode) => setOsc(mode === 'off' ? 0 : OSC_ON_PORT, OSC_IN_BINDS[mode]),
 };
 const assistantMode = () => assistantNow;
+/*
+  OSC in opened to the whole network by the assistant closes again when the
+  switch goes off (the owner's choice, 2026-11-13). The security review found
+  that Full mode's osc_in network, asked by an assistant a page or a title had
+  talked round, bound unauthenticated OSC on 0.0.0.0 and kept it in show.json,
+  so anyone on the venue's Wi-Fi could drive the show long after the assistant
+  was switched off. This is the mode it was in before the assistant opened it,
+  or null when the assistant has not (or the owner had it open already); the
+  Mac app does not keep the assistant's network choice in show.json either.
+*/
+let assistantOpenedOsc = null;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
 // last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
@@ -507,6 +594,16 @@ const assistantWatch = setInterval(() => {
   guard.stop();
   // Cut, not a closing handshake a stalled socket could sit in for half a minute.
   if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.terminate();
+  if (mode === 'off' && assistantOpenedOsc !== null) {
+    const back = assistantOpenedOsc;
+    assistantOpenedOsc = null;
+    const outs = appOutputs ?? serverOutputs;
+    // The owner picked it in the Show menu since (the Mac app keeps that choice): theirs, left open.
+    if (!(appOutputs && outs.state()?.oscIn?.kept)) {
+      console.log(`  assistant switch off: OSC in back to ${back}`);
+      void Promise.resolve(outs.setOscIn(back)).catch(() => {});
+    }
+  }
 }, 1000);
 assistantWatch.unref?.();
 
@@ -719,7 +816,13 @@ wss.on('connection', (socket, req) => {
         reply = updatesCall(message, assistantMode(), appUpdates);
       } else if (message.type === 'assistant-outputs' && RELAY_OUTPUTS.includes(message.do)) {
         // OSC in, Syphon and their status (PLAN 44k-14): the relay's own, answered once the socket has bound.
-        void outputsCall(message, assistantMode(), appOutputs ?? serverOutputs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+        const outs = appOutputs ?? serverOutputs;
+        const oscBefore = message.do === 'osc-in' ? outs.state()?.oscIn?.mode ?? 'off' : null;
+        void outputsCall(message, assistantMode(), outs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+          if (oscBefore !== null && r?.ok) {
+            if (message.mode !== 'network') assistantOpenedOsc = null;
+            else if (oscBefore !== 'network' && assistantOpenedOsc === null) assistantOpenedOsc = oscBefore;
+          }
           if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...r }));
         });
         return;
@@ -1085,6 +1188,22 @@ const portTaken = (err) => {
 server.on('error', portTaken);
 wss.on('error', portTaken);
 
+/*
+  The https port is taken first and is never a reason to stop the show: if
+  something else holds it, the server says why and runs http only, as before.
+  The http port is listened on once that is settled, so the addresses printed
+  below are only ones that answer.
+*/
+const tlsReady = new Promise((settle) => {
+  if (!tlsServer) { settle(); return; }
+  tlsServer.once('error', (e) => {
+    tlsWhyNot = e?.code === 'EADDRINUSE' ? `port ${HTTPS_PORT} is in use (HTTPS_PORT=<another> moves it)` : String(e?.message ?? e);
+    tlsServer = null;
+    settle();
+  });
+  tlsServer.listen(HTTPS_PORT, '0.0.0.0', () => settle());
+});
+await tlsReady;
 // The Bonjour advert, so a TV app finds this show by itself (PLAN 12-tv-2,
 // `bonjour.js`). CHROMAGLASS_BONJOUR=0 keeps it quiet.
 let bonjour = null;
@@ -1105,10 +1224,12 @@ server.listen(PORT, '0.0.0.0', () => {
   } else {
     for (const host of hosts) {
       console.log(`  Phone (the remote): http://${host}:${PORT}/?remote=1&key=${SHOW_KEY}`);
-      console.log(`  Network display:    http://${host}:${PORT}/?cast=true&key=${SHOW_KEY}`);
+      if (tlsServer) console.log(`  Network display:    https://${host}:${HTTPS_PORT}/?cast=true&key=${SHOW_KEY}`);
       console.log(`  TV at home:         http://${host}:${PORT}/tv?key=${SHOW_KEY}`);
     }
   }
+  if (tlsServer) console.log('  (A network display\'s browser warns once that the connection is not private: Advanced, then Proceed.)');
+  else console.log(`  Network displays need https, which is off: ${tlsWhyNot || 'HTTPS_PORT=0'}.`);
   console.log('\n  Same Wi-Fi: use the addresses above. Across buildings, other access points');
   console.log('  or the internet: run "npm run tunnel" in another window and use the https');
   console.log(`  address it prints, with ?cast=true&key=${SHOW_KEY} or ?remote=1&key=${SHOW_KEY}.\n`);

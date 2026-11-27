@@ -7,6 +7,171 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the standing waves move (PLAN 48f-6, 48f-9)
+
+- **Rock** (`faradayRock`, 0–2 Hz): the strobe slips off the Faraday waves so crests and
+  troughs trade places smoothly. The pattern now rides the plate's flow, streams its own mean
+  flow, and at a hard shake breaks up and re-forms as a new pattern. **Strength** (`faradayGain`, 1–8):
+  the lens's throw past real water, so a bass pulse reads on the wall. Settings → Tilt & Rock,
+  MIDI, the desks, the remote, the phone's Sound sheet. `npm run faraday`.
+### Fixed — a picture palette recolours the plate (PLAN 43d-6)
+
+- **Palette from a picture or video** now changes the colours on the plate, not only the dyes
+  still to come: the plate takes the picture's colours over eight seconds, as does any palette
+  picked by hand. A look opened while a palette is locked is laid in that palette's dyes.
+### Added — Dish Stress: moulded dishes between the polarisers (PLAN 31p-3)
+
+- **Dish Stress** (under Polarisers in Settings → Lamp & Light, MIDI, the desks and the
+  phone): the plastic dish's own frozen moulding stress between the sheets, in series with
+  the liquid. Coloured rings round the middle and a pale rim; with Quarter Wave down, the dark
+  cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
+  to the dish's and the rings shift. 0 leaves the look as it was.
+### Changed — the glass still and the dye smooth unless someone moves them (PLAN 38u-8, 38u-11)
+
+- **Granulation** rests at 0 in every look (it was 0.5): a dye in solution has no grain. The
+  dial stays, on the sheet, the desks and MIDI.
+- **Glass Smear** rests at 0 (it was 0.3): the cover glass is still until a hand or a cord
+  moves it. The 19 looks that slid it all the time carry the slide as a cord, LFO 1 on Glass
+  Smear, whose top is the look's old speed; the phone's Sound sheet has a **Glass Slide**
+  slider for it, and Glass Smear is now MIDI-learnable.
+### Changed — The liquid moves what floats in it (PLAN 15g-17, 15g-18, 18c-14)
+
+- **Bubbles and beads ride the liquid.** A stroke or a drop no longer kicks the bubbles and
+  oil beads round it away from the hand; they move only as the liquid under them moves (a
+  pocket at the Taylor–Saffman speed, a bead at 2/(1+λ)), and liquid laid on a bubble
+  takes it. A pop no longer pushes and turns the liquid: the gap closing over the air
+  draws it in from all round.
+- **A press squeezes, and turns nothing.** The pointer's press no longer lays a swirl round
+  its disc; it pushes the liquid straight out from under the glass, as the remote press
+  always did.
+- **A plate left alone stays as it is.** The hidden seeding that laid colour and heat from
+  three orbits on every frame is gone, so a quiet passage settles; a plate that is
+  entirely empty is still woken by its emergency seed.
+### Added — the water's glow (PLAN 48c)
+
+- **Glow** (Settings → Camera, MIDI, the desks, the remote and the phone's Sound sheet): the
+  plate's water holds plankton that flash blue where the flow shears it, so a finger, a pour
+  or a stirring cord draws a glowing wake on a dark plate, and still water stays dark.
+- **Glow Shear** is the shear it takes to light (seawater's measured threshold by default);
+  **Glow Recharge** the seconds a spent cell takes to refill, so a path stroked again soon
+  glows less and a quiet passage lets it come back.
+
+### Added — Soap Film's big swirls and Frame Tilt (PLAN 32k, 32h, 32d-1)
+
+- Soap Film folds into big marbled swirls: the film's large motions run while its small patches
+  crawl (its surface viscosity against the air's drag), and the air over it is a fluid of its own
+  that the plate's flow and the film's plumes set turning.
+- Frame Tilt (Settings → Camera with Soap Film up, MIDI, the phone): how the frame is held. 90
+  hangs it (the default, today's film), so gravity drains it into level bands; toward 0 it lies
+  flat and keeps its swirls. The look Soap Film holds it at 12°.
+
+### Removed — the Close-up button; the Macro Zoom is the way in and out (PLAN QA-32c)
+
+- The **Close-up** button on the desk, the side rail's **Macro**, the remote's Closeup switch,
+  the palette's "Macro closeup", the **Macro** pad action and the gamepad's R3 are gone. Push
+  the **Macro Zoom** up to come in (it still lands on the nearest liquid) and down to 1× for
+  the whole plate. On the phone the microscope opens the Macro Zoom slider, and the side rail
+  has a Zoom slider where its Macro button was.
+- A controller's factory map keeps every button where it was: the pad that was Macro is Tap
+  Tempo (Watch the Room on the APC40).
+
+### Added — the music shakes the dish into Faraday waves (PLAN 48f)
+
+- **Shaker** and **Shake** (`faradayHz`, `faraday`, Settings → Tilt & Rock under Plate Rock; MIDI,
+  the desks, the remote and the phone's Sound sheet), and **Music Shake** on the phone (on the
+  desk, the cord in Patches): the dish sat on a speaker at a frequency, shaken at a peak
+  acceleration in g, with the music's bass on Shake through a cord. Past the water's threshold
+  the surface stands up in a standing lattice at half the speaker's frequency, its cells the
+  water's own wavelength (36 mm at 10 Hz, 11 mm at 40, 4 mm at 150), growing as the bass swells
+  and ringing down as it fades, drawn by the lamp's light through the wavy surface. Its own
+  solver (src/gpu/faraday.ts): the Mathieu equation's growth exact in Fourier space. Off in
+  every look until turned on. `npm run faraday`.
+
+### Added — Crisp Edges (PLAN 38w-15)
+
+- **Crisp Edges** (Settings → Look) draws the oil/water rim one pixel wide instead of the solver's band;
+  Classic uses it, with a denser crowd of smaller cells laid at the solver's own grid.
+
+### Changed — three drawn stand-ins made physical (PLAN 38u-7, 38u-12, 38u-14)
+
+- **Rain Drip** needs the plate tipped (Gravity): the weight along a plate is g sin θ, nothing on a
+  level one. Seven looks that lean on it now sit on a plate tipped about 15 degrees;
+  Velvet Underground on one tipped about 3 degrees, so its pools stay pools and still drift.
+- **A clear oil drop** is drawn with the same dark ring as in dyed liquid (it was a third of it);
+  the clear oil's tint fades over the meniscus.
+- **Polarity** pushes unlike colours apart the same everywhere; a noise had pulled them together in patches.
+### Added — Polarised light (PLAN 31p-1)
+
+- **Polarisers** (Settings → Lamp & Light, MIDI, the desks and the phone): sheets under the
+  plate and at the lens. Where the liquid's flow stretches it, it lights in rainbow bands in
+  the real Michel-Levy order; still liquid stays dark between crossed sheets.
+- **Analyser** turns the top sheet from crossed (dark field) to parallel (white field,
+  opposite colours); **Quarter Wave** (on by default) takes the dark lines out of the bands,
+  and turned down brings back the dark pinwheel arms; **Birefringence** sets how high the
+  colours climb.
+
+### Added — tilt the plate from two knobs (PLAN 18a-13m)
+
+- **Tilt Left/Right** and **Tilt Up/Down** (`plateTiltX`, `plateTiltY`, Settings → Tilt & Rock under
+  Slosh; MIDI, the desks, the remote and the phone's Motion sheet): a hand tipping the flat plate on
+  the projector, −1 to 1 with the middle level. Learn them on two knobs and the plate tips as you
+  turn: on a thin gap heavy colour slides down the tip and light oil rises the other way, the
+  dish sloshes as far as Slosh lets it, and the cover glass slides as far as Frame Sway does. The
+  knob is eased (a critically damped follow, nine tenths of the way in a third of a second), so a
+  quick twist does not knock the liquid, and the middle twenty-fifth of the travel is level so a
+  knob left near its centre does not drain the plate. Right stays the screen's right on a look
+  whose dish turns. Not Gravity: the plate stays flat and is not stood up as a bottle. The sound,
+  the patch bay and Evolve never move them. `npm run handtilt`.
+### Changed — Your own video: played, poured, read and framed (PLAN 14ag)
+
+- **The demo videos are gone**: the three demo loops and the cartoon shelf no longer ship.
+- **One video, two uses**: a video you load (Settings → Video's Video file, the Dyes panel's
+  Pour a video…, or the phone's A video as dye) gets a row with **Play** (through the
+  projector, under the dye) and **Pour** (into the dish as dye), either or both.
+- **The plate reacts to a poured video**: Film Drive and the film's patches read the video
+  pouring when nothing is on the projector.
+- **Video Zoom, Video Across and Video Up** frame the video on the plate (zoom 0.25 to 4,
+  the slides −1 to 1), with **Fit**; MIDI-learnable, and `set` from the assistant.
+- **Film is now Video**, and its panel is on the Perform tab. The assistant's `film` and
+  `pour_file` take `loaded` (the video loaded) where they took `cartoon`.
+
+### Removed — what the closeup drew over the liquid (PLAN 38u-1, 38u-2, 38u-3)
+
+- **Edge Detail** is gone (Settings → Macro, the desks, the phone). It read the closeup through
+  a drifting noise so that edges looked ragged; surface tension holds an edge smooth at that
+  scale, and the warp crawled on a plate that was still.
+- **Depth / Focus** is the close-up camera's depth of field and nothing else. It also drew a
+  paper's fibre on the ground, the dye's shadow down and to the right as if a lamp hung over
+  the plate, and a shading that made thick dye brighter than thin.
+- A bubble's film no longer shifts colour on a clock; it shifts when the bubble moves or drains.
+
+`npm run stillcloseup`: a still plate drawn ten seconds apart changed by 0.12% to 0.38% of the
+frame's mean, 0 now; the ground beside a pool was 20% darker on one side, 0.004% now.
+
+### Added — Glitter, a macro lens's discs and stars, and a side lamp (PLAN 47e, 47d-1, 47b-1)
+
+- **Glitter** (Settings → Camera): fine flakes suspended in the liquid that ride the flow at
+  their own depth, tumble as it shears them, settle slowly and flash where a lamp meets their
+  mirror angle; dark specks on a lamp ground.
+- **Lens Stop** (under Glitter): the closeup's aperture. Wide open, specks away from focus
+  blur into soft round discs; stopped down, they shrink to six-sided ones and the brightest
+  glints grow six-pointed diffraction stars. Projector Focus picks the sharp depth.
+- **Side Light**, **Side Colour**, **Side Angle** (Settings → Lamp & Light): a second lamp
+  raking in from one side, amber by default, over the glow; it lights the dye's near side and
+  the slopes facing it and leaves black ground black.
+- All five on MIDI, the desks and the phone's remote; at 0 every look is unchanged.
+
+### Added — the tank seen through its side (PLAN 47n)
+
+- Tank (Settings → Camera, MIDI, the phone): a tank of water seen through its side in place of
+  the dish from above, as Davy Evans' *Gravity L1* films one. Heavy dye falls from a nozzle at the
+  surface, thins to a thread as gravity speeds it, lands and runs along the floor as a gravity
+  current. Its own solver: a vertical slice of water with real viscosity, glass walls, a free
+  surface, and the dye's weight (`npm run tank`, `npm run tankgpu`).
+- While it is up: Feed (cm/s), Dye Weight %, Nozzle (a finger held on the plate, or a hold on the
+  phone, carries it too), Drain and Glow Hue. Feed, Dye Weight, Nozzle and Glow Hue take cords;
+  Tank itself never does. Tank at 0, the default, keeps the dish exactly as it was.
+
 ### Added — Lava Lamp's wax as blobs in a clear liquid; Oil Weight (PLAN 27f-9c)
 
 - Lava Lamp's wax is a liquid of its own: crimson bodies in a clear, lamp-lit liquid that sink
@@ -75,6 +240,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   thickness (Beer–Lambert), so the lace takes the colour, deeper where the film is thick,
   and the holes show the water's. On the desk, the phone's Dye sheet, the remote and MIDI.
   0 in every look, which leaves the plate exactly as it was (`npm run lace` 8).
+### Added — Bubble Melt, the bubbles' air dissolving away (PLAN 38b-2)
+
+- A new dial under Bubbles (Settings → Look, the desks, MIDI, the phone): how fast a
+  bubble's air dissolves into the liquid, by Henry's law with air's diffusivity scaled past
+  nature. Off is nature's rate, where a bubble stays all night; up, the small ones melt
+  first, from minutes at the bottom of the dial to seconds at the top. Every look keeps it off.
 
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 

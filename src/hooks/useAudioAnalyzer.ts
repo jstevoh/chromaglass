@@ -5,9 +5,11 @@ import {
   AudioFeatures, ANALYSER_FFT_SIZE, ANALYSER_SMOOTHING, type AudioReading,
 } from '../lib/audioFeatures';
 import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
+import { pumpShowIntervals } from '../lib/showClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
 import { installLiveConsole, setLiveAudio } from '../lib/liveShow';
-import { canUseProFeature } from '../lib/tierGates';
+import { canUseHomeFeature } from '../lib/tierGates';
+import { createEarView, type EarView } from './useEarView';
 
 export interface AudioData {
   /**
@@ -93,19 +95,27 @@ const TICK_MS = 16;
 
   So the ear keeps two things. `live` is a ref holding every reading the
   moment it is made, and the plate (and the cast feed) read it on their own
-  clocks. `audioData` is the same reading published as state at most every
-  EAR_VIEW_MS, for what renders. 100 ms is ten a second: faster than a meter
-  needs to look alive, and slow enough that a render of the App is no longer
-  a per-frame cost.
+  clocks. `view` is the same reading published at most every EAR_VIEW_MS,
+  for what renders. 100 ms is ten a second: faster than a meter needs to look
+  alive, and slow enough that a render is no longer a per-frame cost.
+
+  It was React state on this hook until PLAN.md 46f, so each of those ten
+  rendered the App that calls it, shell and desks and all: 14.3 ms at the
+  median on the owner's Mac, 5.4 s of a 34 s profile with the band playing.
+  Now it is a store (hooks/useEarView.ts) that the few components showing a
+  level subscribe to, each for the part it shows, and the App renders for
+  none of them.
 */
 const EAR_VIEW_MS = 100;
 
 export interface Ear {
   /**
-   * The show's analysis is running and hearing, as React state at most ten
-   * times a second, for the desks, meters and anything else that renders.
+   * The show's analysis is running and hearing, published at most ten times
+   * a second, for the meters and readouts: a store, read with `useEarView`
+   * by the component that shows a part of it, so nothing above that
+   * component renders for a reading (PLAN.md 46f). Stable for the hook's life.
    */
-  audioData: AudioData | null;
+  view: EarView;
   /**
    * Every reading, the moment it is made, for readers on their own clock (the
    * plate's frame, the cast feed). Null while the ear is off. Reading it
@@ -155,15 +165,16 @@ export function useAudioAnalyzer(
    */
   sharedContext: AudioContext | null = null,
 ): Ear {
-  const [audioData, setAudioData] = useState<AudioData | null>(null);
+  const [earView] = useState(createEarView);
   const liveRef = useRef<AudioData | null>(null);
   /*
     The live stream's console in the Mac app (PLAN.md 37x-4b; the panel is
     37x-4d): `window.__cgLive.start({ url, keyName })` streams the plate's
     canvas and this stream, the one the show hears, whichever source it is
     (lib/liveStream.ts; the panel and the console share lib/liveShow.ts). Installed from here because this hook is where the
-    show's sound and the plate meet; App.tsx is at its size ceiling. Pro
-    only, asked at each start; absent on the website, where there is no RTMPS
+    show's sound and the plate meet; App.tsx is at its size ceiling. A Home
+    or Pro licence, asked at each start (Pro only until the owner moved it to
+    Home on 2026-11-15, PLAN.md 23.21, beside Home's drop to $29); absent on the website, where there is no RTMPS
     client to hand the packets to (`installLiveConsole` does nothing there).
   */
   const streamRef = useRef<MediaStream | null>(stream);
@@ -172,7 +183,7 @@ export function useAudioAnalyzer(
     installLiveConsole({
       canvas: () => document.getElementById('liquid-canvas') as HTMLCanvasElement | null,
       audio: () => streamRef.current,
-      allowed: () => canUseProFeature(),
+      allowed: () => canUseHomeFeature(),
     });
   }, []);
   // A source chosen on air reaches the stream at once, not at the next Go (37x-4f-2). Does nothing with no stream running.
@@ -223,7 +234,7 @@ export function useAudioAnalyzer(
     sourceRef.current = null;
     liveRef.current = null;
     publishedAtRef.current = -Infinity;
-    setAudioData(null);
+    earView.publish(null);
     deafRef.current = false;
     setDeaf(false);
   }, []);
@@ -347,7 +358,7 @@ export function useAudioAnalyzer(
         if (now - due >= EAR_VIEW_MS) {
           publishedAtRef.current = Number.isFinite(due) ? Math.max(due + EAR_VIEW_MS, now - EAR_VIEW_MS) : now;
           publishedRef.current++;
-          setAudioData(next);
+          earView.publish(next);
         }
         if (deafRef.current && audioContext.state === 'running') { deafRef.current = false; setDeaf(false); }
       };
@@ -383,6 +394,11 @@ export function useAudioAnalyzer(
         ticker.onmessage = () => {
           if (earRef.current !== ear) return;
           const now = performance.now();
+          // Drive due show intervals on the worker's unthrottled tick as well
+          // (PLAN.md 14a-timers): Chrome holds a covered show window's own
+          // setInterval to about one a second, which would step a 4 s look
+          // fade four times instead of gliding.
+          pumpShowIntervals(now);
           if (ear.offer('tick', now, document.hidden)) update();
         };
         ticker.postMessage(TICK_MS);
@@ -472,5 +488,5 @@ export function useAudioAnalyzer(
     return () => { set.delete(fn); };
   }, []);
 
-  return { audioData, live: liveRef, onReading, deaf: deaf && isActive, debug };
+  return { view: earView.view, live: liveRef, onReading, deaf: deaf && isActive, debug };
 }

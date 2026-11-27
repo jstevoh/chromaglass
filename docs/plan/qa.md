@@ -6,99 +6,63 @@ thread takes the top open item in a tier; the PR that fixes it strikes the line 
 Perform and Design desks), **phone**, **wall** (the show screen or projector), **Mac**
 (the desktop app).
 
+**The bug bash (QA-33, 2026-11-26).** The owner asked for an automated bug bash.
+`npm run bugbash` (scripts/bugbash.mjs) opens every look, puts every desk panel out on
+seven seeded tabs and turns, presses or picks each of their controls end to end, then
+does the same on the phone layout, one level into each sheet. It notes crashes, hangs,
+freezes, a plate gone black, flat or NaN, settings past finite, new console errors,
+switches that do not come back, and (low, to read rather than fix blind) controls that
+change nothing. It is a report, never a gate, and runs on the Mac's GPU through the
+film queue. Antigravity runs it and triages; its grouped list becomes one fix thread per
+area, each fix striking its own line here.
+
+- **QA-33a** Run the bug bash on main and write the grouped findings (Antigravity, the
+  Mac). Shipped as a report when the list is in the project's files.
+- **QA-33b** Fix threads, one per area of the list, each a QA item of its own. The
+  list (2026-11-26) went to Antigravity as six briefs, the small ones batched:
+  - **QA-33b-1** Lens: Tank turns the plate black (luma 0.30 → 0.003 on Classic, 0.27 →
+    0.003 on Magnet Garden), and Focus, Aperture, Bloom, Glow, Glow Shear, Glitter and
+    Lens Stop show nothing on Classic.
+  - **QA-33b-2** One dial's end blacks out the picture: the Wall's Gamma (0.35 → 0.004,
+    more than a gamma of 2.5 can do) and Oil & Soap's Clear Film on Magnet Garden
+    (0.27 → 0.014).
+  - **QA-33b-3** Ferrofluid: Phase Edge, Magnet Strength, Height, Across, Up, Walk and
+    Labyrinth flatten Magnet Garden from 37% to 85–93% one colour. A ferrofluid under a
+    stronger field spikes and gathers; it does not spread into a sheet.
+  - **QA-33b-4** Light Show Look (Sharpness, Glossiness, Post Blur, Boundary Glow, Particle
+    Colour, Turbulence Detail, Grain Fineness, Blob Surface Tension, Layer Scale Variety)
+    and Film Stock (Grain, Gate Weave) move their settings and nothing shows on Classic.
+  - **QA-33b-5** Switches: Patches' Gate pressed twice leaves `sceneMappings` changed; the
+    phone's More "Drop" does nothing; pick-one rows carry `aria-pressed` (a switch's
+    role) where a radio's `aria-checked` is meant.
+  - **QA-33b-6** Simulation: the finest grid drops the plate from 62 to 14 fps on the
+    owner's laptop.
+- **QA-33d** The sweep's own mistakes in the 2026-11-26 run. Rides' Drain emptied the
+  plate and every later control on its tab was judged against the drained plate (about
+  fifty "flat 19%→97%" findings, one number); and a row of `aria-pressed` buttons with
+  one chosen (the phone's 41 look buttons) was judged as switches that "don't come
+  back". The sweep now opens the tab again when the plate stays empty with the settings
+  back, and reads such a row as a choice. Left: "unseen" waits 1.5 s, short for slow
+  physics, and does not say when a look has the feature off; five controls time out on
+  click (Controller "What this does", Wall corner, three Dyes picture/video/album).
+- **QA-33c** The sweep cannot judge what a control *should* do, only that it did
+  something and nothing broke; a dial that works but feels wrong is the owner's list
+  and the heuristic review, not this.
+
 **Tier 1. Seen by the room, or it stops the show.**
 
-- ~~**QA-1** The plate pulses each time a control is pressed or a tool is picked.~~ #277
-  live (the microphone heard the click; onsets gated in a gesture's moment).
-- ~~**QA-2** The mouse pointer shows on the show screen.~~ #271 live.
-- ~~**QA-19** Interacting with settings switches to and maximizes the performance window.~~
-  Fixed on main's 5b81f3c (`useCastSession.ts`; #323 superseded). Story in
-  `docs/plan-shipped.md` §QA-19 (moved 2026-10-29, 19m-2).
-- ~~**QA-28** The whole plate slides under the camera with the sound, a jolt on every
-  kick: nauseating to watch (the owner, 2026-10-11).~~ **Fixed** (Frame Sway, 27a-7;
-  `npm run framesway`). Story in `docs/plan-shipped.md` §QA-28 (moved 2026-10-29, 19m-2).
-- ~~**QA-29** Choices that did nothing: 20 of the 80 values the menus offer were silently
-  dropped (2026-10-09 to 2026-10-11).~~ Shipped; story in `docs/plan-shipped.md` §QA-29
-  (moved 2026-10-29, 19m).
-- ~~**QA-31** The closeup is "even bouncier and twitchier than before": it punches, pumps
-  and shivers with the music at Frame Sway 0 (the owner, 2026-10-11).~~ Shipped; story in
-  `docs/plan-shipped.md` §QA-31 (moved 2026-10-29, 19m).
+- **QA-32a** A held closeup whose frame empties while it is in (the pool flows out of it,
+  Evolve thins it, a finger sweeps it) stays on the glass: Hold holds, by design, and only
+  coming in lands (QA-32). Follow rides the liquid instead. Whether Hold should step to the
+  nearest liquid when its frame has been bare for a few seconds, with no hand on the aim,
+  is the owner's call; `npm run closeupland` is where its line would go. Found with QA-32.
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
-- ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
-  Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
-  the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
-  are drawn in all, one of them the …~~ Shipped; story in `docs/plan-shipped.md` §QA-30
-  (moved 2026-10-29, 19m).
-- ~~**QA-20** Blow amount isn't sensitive enough.~~ Story in `docs/plan-shipped.md` §QA-20
-  (moved 2026-10-29, 19m).
 - **QA-20a** The other tools' Amounts, read the same way: what each lays or moves at
   0.05, 1 and 5 of its Amount, against what the dial's ends should mean (the Spray's
   mist, the Press's pressure, the Finger's drag, capped at 0.25 in `fingerDrag`, so its
   Amount stops doing anything past about 1.7). Found with QA-20; not measured yet.
-- ~~**QA-20b** Blow's push on `npm run tools` (Mac) spreads widely from run to run (0.08% to
-  2.62% on twelve runs of 9 and 10 October against the lab's 2.72%).~~ **Fixed with 15g-7**
-  (#623): what the app did between the pointer's moves and the steps was the pointer
-  handler's press of the glass on every pointer event, thirty a stroke, against the breath's
-  steps, which came with the runner's pace.
-
-- ~~**QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours).~~ #269
-  live (PLAN 15i).
-- ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box,
-  not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856
-  px² over Record). Story in `docs/plan-shipped.md` §QA-4 (moved 2026-10-29, 19m).
-- ~~**QA-5** Layers: + appears only on one-plate looks and there is no −.~~ **Shipped**
-  (#273, §16f; a third plate is 16d). Story in `docs/plan-shipped.md` §QA-5 (moved
-  2026-10-29, 19m-2).
-- ~~**QA-6** The Magnet lays a fixed grid of spikes.~~ #247 live (9t).
-
-- ~~**QA-12**~~ **Fixed, #296**: switching to Hold writes the camera's own centre into the aim (`holdWhereItIs` in `src/lib/macroCamera.ts`, run by App's `updateSettings`, so the desk's chip, the phone's Hold and the Camera menu all get it). `npm run holdjump`: the frame moved 0.299 (from Auto) and 0.197 (from Follow) of the plate in the second after Hold on main, 0.000 now; `npm run phone` asks it in the app on the Mac shard.
-
-- ~~**QA-16**~~ **Fixed, #293**: a green on Roy, 1963 prints as two inks overprinted
-  (`npm run benday` 7; violet laid flat, 21f). Story in `docs/plan-shipped.md` §QA-16
-  (moved 2026-10-29, 19m-2).
-- ~~**QA-18**~~ **Fixed, this PR** (`npm run saves`, 28 lines, in Measure's browser part;
-  main fails "Save asks for a name again with a saved look open"). Story in
-  `docs/plan-shipped.md` §QA-18 (moved 2026-10-29, 19m).
-- ~~**QA-18a**~~ **Fixed, this PR** (the owner's ask, 2026-10-06; `npm run saves`, 33
-  lines). Story in `docs/plan-shipped.md` §QA-18 (moved 2026-10-29, 19m).
-
-**Tier 3. On the wall, it looks wrong.**
-
-- ~~**QA-7** Looks read as pixelated, "very digital", on a laptop.~~ #267 live (1b–1g open).
-- ~~**QA-8** Sensual Laboratory is washed out by the lamp.~~ #262 live (18b-1).
-- ~~**QA-9** Clock Glass and the ferrofluid looks fall short of their references.~~ #280
-  live for Clock Glass and Ferro Paint; the maze is 9aa.
-- ~~**QA-10** Velvet Underground, Lumia and Cell Bloom are underwhelming: one area of
-  interest, not several.~~ #276 live (25a).
-
-- ~~**QA-13** Fillmore East's dish fills only a small part of the canvas.~~ #276 live
-  (25g: a square frame 44 % lit → 99 %).
-
-- ~~**QA-14** The looks carry too few colours.~~ #281 live (18l; 18l-1..7 open).
-
-- ~~**QA-15**~~ **Fixed, #293**: the seed is a laid-out panel, Dye Budget 0.45; `npm run
-  royopen` 6/6 (main 1/6). Story in `docs/plan-shipped.md` §QA-15 (moved 2026-10-29, 19m).
-
-**Tier 4. Polish.**
-
-- ~~**QA-17** The phone's **Looks** tab wore a sparkle, the icon apps use for AI, and the
-  owner wants nothing in the app to read as AI.~~ Shipped; story in `docs/plan-shipped.md`
-  §QA-17 (moved 2026-10-29, 19m).
-
-- ~~**QA-11**~~ **Fixed, this PR**: Follow wears a crosshair (locked on one subject) and
-  Auto names its cut, "Auto cuts 5s" from Shot Length (`shotLabel`,
-  `src/lib/macroCamera.ts`, the same `max(0.5, macroHold ?? 5)` the camera rides for), on
-  the desk's chip and the phone's camera buttons; the … Story in `docs/plan-shipped.md`
-  §QA-11 (moved 2026-10-29, 19m).
-
-**Checks that went red on a tree they do not measure.** Not seen by the room, but each
-holds a deploy until someone re-runs it, so they rank by how often they cost one; Wave
-0's step 0.3 is their home and its rule holds: root cause, never loosen. Found on #338's
-own deploy, which went red on five Mac checks #338 does not touch and green on the next
-run. The Stage sheet's Esc and the Magnet's drag are another thread's (#349).
-
 - **QA-21** Same-seed render determinism failed: two renders of one seed differed
   slightly, then matched on the re-run. Either the check reads a frame before the
   plate is settled or something in the step is not seeded.

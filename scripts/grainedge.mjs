@@ -13,7 +13,7 @@
  * and dark, a pixel or two across, like a dithered picture's.
  *
  * The cause was the order of two steps in the plate shader (wgsl/plate.ts).
- * Granulation, the pigment's grain (on at 0.5 in every look), scaled the
+ * Granulation, the pigment's grain (then on at 0.5 in every look), scaled the
  * dye's opacity up and down by a noise; then the gooey contrast curve, which
  * is the meniscus that rounds a pool's edge, steepened that opacity about
  * 0.5 by as much as five times. Inside a pool the opacity is near 1 and the
@@ -27,7 +27,8 @@
  * The fix draws the grain after the edge, as what it is: pigment that sits
  * deeper in some places than others, which changes how much light the dye
  * stops (its optical depth), not where the liquid ends. Asked here, of every
- * shipped look with any grain, on one stirred plate of nine pools at 256²
+ * shipped look at its grain (or at 0.5 where, since PLAN 38u-8, it ships
+ * with none), on one stirred plate of nine pools at 256²
  * (the rung the website's governor gives a laptop most often, and the
  * coarsest), each picture against the same plate with the grain at 0:
  *
@@ -89,18 +90,32 @@ const N = 256, STEPS = 300, SIZE = 720;
 const FLECK = 40, MAX_FLECKS = 2, MIN_TEXTURE = 0.1, TEXTURE_RATIO = 2, TEXTURE_GRAIN = 0.2;
 /** The looks the grain-before-the-curve shader failed check 1 on (6 to 20%, in the worst channel). */
 const CONTROL = ['classic', 'jellyfish-bloom', 'stardust-collapse', 'oil-and-water', 'velvet-underground'];
+/*
+  A control look with no grain of its own is run at CONTROL_GRAIN. Classic
+  was one of the five, and 38w-1 (#917) took its grain out (the references
+  show none), so it dropped out of the looks run and the control count read
+  4/5: red on main, with nothing wrong at any edge. Its palette and its dish
+  are still what the old shader flecked, so it is still asked, at the 0.5
+  it had.
+*/
+const CONTROL_GRAIN = 0.5;
 const only = process.env.GRAINEDGE_ONLY?.split(',').map((x) => x.trim()).filter(Boolean);
 
 const { page, close } = await openLab();
 const rows = [];
 let looks = [];
 try {
-  // Every shipped look whose grain is on, over the defaults as the app lays it.
+  // Every shipped look, over the defaults as the app lays it. Until PLAN
+  // 38u-8 (2026-11-15) every look shipped its grain on at 0.5 and this asked
+  // the looks whose grain was on; now every look ships it off (a dye in
+  // solution is smooth) and the grain is the performer's to turn up, so each
+  // look is asked at the grain it ships with where that is above zero, and at
+  // 0.5, the old default and the dial's middle, where it is not. Asking only
+  // the looks that ship grain would ask none, and pass on nothing.
   const all = await page.evaluate(() => lab.lookIds());
   const unknown = (only ?? []).filter((id) => !all.includes(id));
   if (unknown.length) throw new Error(`GRAINEDGE_ONLY: no look ${unknown.join(', ')}`);
-  looks = (await page.evaluate(() => lab.lookIds().filter((id) => lab.look(id).settings.granulation > 0)))
-    .filter((id) => !only || only.includes(id));
+  looks = all.filter((id) => !only || only.includes(id));
   await page.evaluate(async ({ N, STEPS }) => {
     await lab.create(N);
     // Nine pools of three colours, stirred by pushes for STEPS steps, so the
@@ -116,9 +131,10 @@ try {
   // The front plate in every look, then the back plate alone in each lamp look (line 4).
   const lampLooks = await page.evaluate((ids) => ids.filter((id) => (lab.look(id).settings.lampGround ?? 0) > 0), looks);
   for (const [id, back] of [...looks.map((id) => [id, false]), ...lampLooks.map((id) => [id, true])]) {
-    const row = await page.evaluate(async ({ id, SIZE, FLECK, back }) => {
+    const row = await page.evaluate(async ({ id, SIZE, FLECK, back, CONTROL_GRAIN }) => {
       const Lk = lab.look(id);
-      const g0 = Lk.settings.granulation;
+      // The grain asked about: the look's own, or CONTROL_GRAIN (0.5) where it ships with none (above).
+      const g0 = Lk.settings.granulation > 0 ? Lk.settings.granulation : CONTROL_GRAIN;
       // What the plate draws of it: the film stock's grain takes the plate's
       // place (plateUniforms.ts), so a look on film has less of its own.
       const eff = g0 * (1 - Math.min(1, Math.max(0, Lk.settings.stock ?? 0)));
@@ -141,7 +157,7 @@ try {
       // and no satellite droplets, which still read the front plate's dye.
       const alone = back ? { layerCount: 2, frontLevel: 0, microDroplets: 0 } : {};
       const shot = async (set) => new Uint8ClampedArray(await lab.render(SIZE, { ...Lk.settings, ...under, ...alone, ...set }, { zoom: 1, macroAmount: 0, grain: true, backPlate: back }));
-      const z = await shot({ granulation: 0 }), g = await shot({}), g2 = await shot({ granulation: Math.min(1, 2 * g0) });
+      const z = await shot({ granulation: 0 }), g = await shot({ granulation: g0 }), g2 = await shot({ granulation: Math.min(1, 2 * g0) });
       const W = SIZE, P = W * W;
       const lum = (p) => { const L = new Float32Array(P); for (let i = 0; i < P; i++) L[i] = 0.2126 * p[4 * i] + 0.7152 * p[4 * i + 1] + 0.0722 * p[4 * i + 2]; return L; };
       const Lz = lum(z), Lg = lum(g), Lg2 = lum(g2);
@@ -189,7 +205,7 @@ try {
       if (e < 0.03 * P || b < 0.03 * P) throw new Error(`${id}: ${e} edge and ${b} body pixels: too few to measure`);
       const f = (v, k = 2) => +v.toFixed(k);
       return { id: `${id}${under.benDay === 0 ? ' (under its print)' : ''}${under.moireAmount === 0 ? ' (under its sheets)' : ''}${back ? ' (back plate)' : ''}`, back, g0, eff: f(eff), edge: f(100 * e / P, 1), body: f(100 * b / P, 1), flecks: f(100 * eF / e), edgeMove: f(eD / e), texture: f(Math.sqrt(bT / b), 3), texture2: f(Math.sqrt(bT2 / b), 3), dense: f(100 * dn / P, 1), logTex: f(Math.sqrt(dT / Math.max(1, dn)), 4), lone: f(100 * lone / e) };
-    }, { id, SIZE, FLECK, back });
+    }, { id, SIZE, FLECK, back, CONTROL_GRAIN });
     rows.push(row);
     console.log(`  ${row.id.padEnd(20)} grain ${row.eff}  edges ${row.edge}%  body ${row.body}%  flecks ${row.flecks}%  edge moved ${row.edgeMove}  body texture ${row.texture} (x2 grain: ${row.texture2})  dense ${row.dense}% log texture ${row.logTex}  lone flecks ${row.lone}%`);
   }

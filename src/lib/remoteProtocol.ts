@@ -34,6 +34,7 @@ export type RemoteAction =
   | 'clear'
   | 'drain'
   | 'lucky'
+  | 'undo-reset'
   | 'automate-on'
   | 'automate-off'
   /** Hide every overlay on the display (a clean projected frame) / bring them back. */
@@ -88,7 +89,8 @@ export interface RemoteSequencer {
    * for the owner's assistant to pick one by name. Optional, since a display
    * one build older sends only the transport above.
    */
-  sequences?: { id: string; name: string; stages: number }[];
+  /** Each sequence; `builtIn` ones stay as they shipped (edit a copy), `song` the one it was made for (PLAN 44k-16a). */
+  sequences?: { id: string; name: string; stages: number; builtIn?: boolean; loop?: boolean; song?: string | null }[];
   selectedId?: string | null;
 }
 
@@ -117,6 +119,8 @@ export interface RemoteState {
   cuedName?: string | null;
   /** Seconds the next Go will take, so the remote can print it on the button. */
   fadeSeconds?: number;
+  /** Active 8 s plate Undo window after a destructive action (PLAN 49a). */
+  undo?: { id: number; title: string } | null;
   /** Whether a film and a logo are loaded, so the remote's mixer can say when a row has nothing on the wall. */
   filmLoaded?: boolean;
   markLoaded?: boolean;
@@ -165,7 +169,7 @@ export interface RemoteState {
    * item 3 rather than guessing what "the third" is. `look` is the look an
    * item sends (null for a sequence), for the guard's Undo.
    */
-  set?: { name: string; items: { n: number; name: string; kind: string; look: string | null; fade: number | null; missing: boolean }[]; armed: number | null; fadeSeconds: number };
+  set?: { name: string; items: { n: number; name: string; kind: string; look: string | null; fade: number | null; missing: boolean; song?: string | null }[]; armed: number | null; fadeSeconds: number; saved?: { name: string; items: number }[] };
   /**
    * The song shows (PLAN 44k-5): Follow songs, the show running and the show
    * of the song playing, and every show by id and song, without their actions
@@ -222,7 +226,7 @@ export interface RemoteState {
    * Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts):
    * what drives the plate as the film, what pours into the dish, the room
    * camera on or off and which camera, the mark up or not, the cameras by the
-   * pickers' names, and the cartoon shelf.
+   * pickers' names, and the video loaded (PLAN 14ag).
    */
   media?: MediaNow;
   /** OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts): OSC out's switch and target, MIDI on or off, its ports by name, clock and the map. */
@@ -280,17 +284,18 @@ export interface MidiNow {
 export interface OutputsNow { oscOut: OscOutNow | null; midi: MidiNow | null }
 
 export interface MediaNow {
-  /** The film: its source, the file's or the cartoon's name, the cartoon's id, the camera's name, and whether that camera was unplugged mid-show. */
-  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; cartoon: string | null; camera: string | null; cameraLost: boolean };
+  /** The film: its source, the file's name, the camera's name, and whether that camera was unplugged mid-show. */
+  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; camera: string | null; cameraLost: boolean };
   /** The film pouring into the dish (a picture, once laid, is dye and not a pour). */
-  pour: { playing: boolean; name: string | null; cartoon: string | null };
+  pour: { playing: boolean; name: string | null };
+  /** The video loaded, by its name: the one the Video panel's row plays and pours, and film/pour_file's `loaded` take (PLAN 14ag). */
+  video: string | null;
   /** The room camera (the motion camera): on, the camera's name (null: the browser's own pick), and whether last session left it on. */
   room: { on: boolean; camera: string | null; resume: boolean };
   /** The mark (the logo card) is up. */
   mark: boolean;
   /** The cameras by the pickers' names. */
   cameras: string[];
-  cartoons: { id: string; title: string; seconds: number }[];
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -485,13 +490,15 @@ export type RemoteMessage =
   /** Recording's options and a Take replayed, stopped or deleted, from the owner's assistant (PLAN 44k-11), relayed only from the guard, with `answer`. */
   | { type: 'assistant-record'; do: string; makes?: string; quality?: string; fps?: number; format?: string; sound?: boolean; take?: number; id?: string; answer?: number }
   /** Film, pours, the room camera and the mark from the owner's assistant (PLAN 44k-13), relayed only from the guard, with `answer`; a file as the show server's own address for it (`url`, server/assistantMedia.js). */
-  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; cartoon?: string; camera?: string; on?: boolean; answer?: number }
+  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; camera?: string; on?: boolean; answer?: number }
   /** OSC out and MIDI from the owner's assistant (PLAN 44k-14), relayed only from the guard, with `answer`; OSC in and Syphon are the relay's own. */
   | { type: 'assistant-outputs'; do: string; on?: boolean; target?: string; input?: string; output?: string; answer?: number }
   /** The projector and the wall from the owner's assistant (PLAN 44k-15), relayed only from the guard, with `answer`; the geometry already judged there (server/assistantProjector.js). */
   | { type: 'assistant-projector'; do: string; on?: boolean; mode?: string; wall?: Record<string, unknown>; answer?: number }
   /** The desk from the owner's assistant (PLAN 44k-16, 44k-17), relayed only from the guard (server/assistantDesk.js), with `answer`; names and ids are found on the page. */
   | { type: 'assistant-desk'; do: string; verb?: string; tab?: string; op?: string; name?: string; by?: number; copyOf?: string; panel?: string; slot?: string; index?: number; plate?: string; surface?: string; key?: string; on?: boolean; hand?: Record<string, unknown>; view?: Record<string, unknown>; answer?: number }
+  /** The set list and the sequences built from the owner's assistant (PLAN 44k-16a), relayed only from the guard (server/assistantEdit.js), with `answer`; names are found on the page (app/editNow.ts), which reads every field as untrusted. */
+  | { type: 'assistant-edit'; of?: string; op: string; answer?: number; [field: string]: unknown }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
@@ -622,6 +629,13 @@ export interface RelayInfo {
    * It is a fresh 32-hex-digit key each launch, never shown or put in a URL.
    */
   displayKey: string | null;
+  /**
+   * The port the show server also serves https on, for network displays (PLAN
+   * 14m-https): a browser runs WebGPU only on a secure page, so a display
+   * opened at the http Wi-Fi address cannot start. Null when the server has no
+   * certificate (no openssl, or HTTPS_PORT=0).
+   */
+  httpsPort: number | null;
 }
 
 /**
@@ -646,13 +660,14 @@ export async function relayInfo(): Promise<RelayInfo | null> {
   try {
     const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
-    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null; displayKey?: string | null };
+    const body = (await res.json()) as { chromaglass?: unknown; port?: number; httpsPort?: number | null; hosts?: string[]; key?: string | null; displayKey?: string | null };
     if (body?.chromaglass !== 'relay') return null;
     return {
       port: body.port ?? (Number(window.location.port) || 3000),
       hosts: Array.isArray(body.hosts) ? body.hosts : [],
       key: body.key ?? null,
       displayKey: body.displayKey ?? null,
+      httpsPort: typeof body.httpsPort === 'number' && body.httpsPort > 0 ? body.httpsPort : null,
     };
   } catch {
     return null;

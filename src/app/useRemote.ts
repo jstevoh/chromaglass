@@ -32,6 +32,8 @@ import { useProjectorNow, askProjector } from './projectorNow';
 import { useDeskNow, askDesk } from './deskNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet, armSetItem } from './setNow';
+import { askEdit } from './editNow';
+import { songLabel } from '../lib/songRef';
 import { useSongsNow, askSongs } from './songShowNow';
 import { livePresetId } from '../presets';
 import { assistantLook } from '../lib/assistantLook';
@@ -85,6 +87,11 @@ interface RemoteDeps {
   setClearTrigger: Dispatch<SetStateAction<number>>;
   setDrainTrigger: Dispatch<SetStateAction<number>>;
   triggerLucky: () => void;
+  clearPlate?: () => void;
+  drainPlate?: () => void;
+  luckyPlate?: () => void;
+  undoNotice?: RemoteState['undo'];
+  restorePlateUndo?: () => void;
   setIsAutomated: Dispatch<SetStateAction<boolean>>;
   hideOverlays: () => void;
   setOverlaysVisible: Dispatch<SetStateAction<boolean>>;
@@ -114,7 +121,7 @@ export function useRemote({
   allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
   updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
   cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypes, setSelectedLiquidId,
-  setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
+  setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, clearPlate, drainPlate, luckyPlate, undoNotice, restorePlateUndo, setIsAutomated,
   hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording, togglePerformance,
   goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName, runActionRef, runAction,
   tempoRef, oscOutHearRef,
@@ -194,10 +201,11 @@ export function useRemote({
     const items = setNow.list.items.map((item, i) => {
       const seq = item.kind === 'sequence' ? sequencer.sequences.find(q => q.id === item.ref) : undefined;
       const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
-      return { n: i + 1, name: item.name ?? look?.name ?? seq?.name ?? item.ref, kind: item.kind, look: look?.id ?? null, fade: item.fade ?? null, missing: item.kind === 'sequence' ? !seq : !look };
+      return { n: i + 1, name: item.name ?? look?.name ?? seq?.name ?? item.ref, kind: item.kind, look: look?.id ?? null, fade: item.fade ?? null, missing: item.kind === 'sequence' ? !seq : !look, song: item.song ? songLabel(item.song) : null };
     });
     const armed = setNow.armedItem ? setNow.list.items.findIndex(i => i.id === setNow.armedItem) : -1;
-    return { name: setNow.list.name, items, armed: armed >= 0 ? armed + 1 : null, fadeSeconds: setNow.fadeSeconds };
+    // The kept sets by name, for set_list_edit's open (PLAN 44k-16a).
+    return { name: setNow.list.name, items, armed: armed >= 0 ? armed + 1 : null, fadeSeconds: setNow.fadeSeconds, saved: setNow.saved.map(x => ({ name: x.name, items: x.items.length })) };
   }, [setNow, sequencer.sequences, allPresets]);
   /*
     The same set and shows as the phone controller lists them (PLAN 12-ctl-1):
@@ -230,7 +238,7 @@ export function useRemote({
       stageName: sequencer.status.stageName,
       progress: Math.round(sequencer.status.progress * 100) / 100,
       stages: sequencer.status.stages.map(st => ({ name: st.name, seconds: st.seconds })),
-      sequences: sequencer.sequences.map(q => ({ id: q.id, name: q.name, stages: q.stages.length })),
+      sequences: sequencer.sequences.map(q => ({ id: q.id, name: q.name, stages: q.stages.length, builtIn: !!q.builtIn, loop: q.loop, song: q.song ? songLabel(q.song) : null })),
       selectedId: sequencer.selectedId,
     },
     presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
@@ -239,6 +247,7 @@ export function useRemote({
     cuedPresetId: cued?.id ?? null,
     cuedName: cued?.name ?? null,
     fadeSeconds,
+    undo: undoNotice ?? null,
     filmLoaded: filmSource !== 'none',
     markLoaded,
     rowFading,
@@ -257,7 +266,7 @@ export function useRemote({
     media,
     outputs,
     projector, desk,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs, projector, desk]);
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, undoNotice, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs, projector, desk]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -285,10 +294,10 @@ export function useRemote({
     direction in the room, so it is turned and keeps its length and angle.
   */
   const onWall = (wall: unknown, x: number, y: number, layer: number, dx?: number, dy?: number,
-                  vec: 'stroke' | 'lean' = 'stroke', turned = true) => {
+                  vec: 'stroke' | 'lean' = 'stroke', turned = true, reach = false) => {
     const v = wallRef.current;
     if (wall !== true || !v) return { x, y, dx, dy };
-    const p = v.wallToPlate(x, y, layer, turned);
+    const p = v.wallToPlate(x, y, layer, turned, reach);
     if (dx === undefined || dy === undefined) return { x: p.x, y: p.y, dx, dy };
     if (vec === 'stroke') {
       const q = v.wallToPlate(x - dx, y - dy, layer, turned);
@@ -442,6 +451,10 @@ export function useRemote({
         case 'assistant-songs':
           answer(message.answer, askSongs(message));
           break;
+        // The set list and the sequences built (PLAN 44k-16a, app/editNow.ts), answered with what a read or a file out found.
+        case 'assistant-edit':
+          answer(message.answer, askEdit(message));
+          break;
         /*
           The phone controller's Songs screen (PLAN 12-ctl-1), through the same
           doors: a set row armed by its id, a song's show run or stopped, and
@@ -546,9 +559,10 @@ export function useRemote({
             case 'play':          setIsActive(true); break;
             case 'pause':         setIsActive(false); break;
             case 'seed':          setSeedCount(prev => prev + 1); break;
-            case 'clear':         setClearTrigger(prev => prev + 1); break;
-            case 'drain':         setDrainTrigger(prev => prev + 1); break;
-            case 'lucky':         triggerLucky(); break;
+            case 'clear':         (clearPlate ?? (() => setClearTrigger(prev => prev + 1)))(); break;
+            case 'drain':         (drainPlate ?? (() => setDrainTrigger(prev => prev + 1)))(); break;
+            case 'lucky':         (luckyPlate ?? triggerLucky)(); break;
+            case 'undo-reset':    restorePlateUndo?.(); break;
             case 'automate-on':   setIsAutomated(true); break;
             case 'automate-off':  setIsAutomated(false); break;
             case 'overlays-off':  hideOverlays(); break;
@@ -586,7 +600,8 @@ export function useRemote({
         case 'drop': {
           const g = parseRemoteGesture(message);
           if (!g || g.type !== 'drop') break;
-          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount, ...laidColour(selectedLiquid, g.color) });
+          // A drop at the pad's edge lands on the dish past the wall, as a finger's on the screen does (PLAN 18a-18).
+          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(g.wall, g.x, g.y, g.layer, undefined, undefined, 'stroke', true, true), layer: g.layer, amount: g.amount, ...laidColour(selectedLiquid, g.color) });
           break;
         }
         case 'press': {

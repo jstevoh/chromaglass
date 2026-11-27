@@ -6,6 +6,7 @@ import { CAST_CHANNEL, type CastMessage, type CastState } from '../lib/castProto
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { LOCKUP_URL } from '../brand';
+import { PALETTE_RECOLOUR_SECONDS, setPictureDyes } from '../lib/picturePalette';
 
 /**
  * The cast receiver: the show on the second screen.
@@ -341,6 +342,7 @@ function CastReceiver() {
   const [audio, setAudio] = useState<AudioData | null>(null);
   const [linked, setLinked] = useState(false);
   const lastPresetSeq = useRef(0);
+  const lastLockKey = useRef<string | null>(null);
   const lastMessageAt = useRef(0);
   const [stale, setStale] = useState(false);
 
@@ -376,7 +378,14 @@ function CastReceiver() {
       lastPresetSeq.current = state.presetSeq;
       visualizerRef.current?.applyPreset(state.presetId);
     }
-    visualizerRef.current?.setHarmonyLock(state.harmonyLock);
+    if (state.pictureDyes) setPictureDyes(state.pictureDyes);
+    // A palette the sender chose after this display came up recolours its
+    // plate as the sender's does (PLAN 43d-6); the first state it hears, and
+    // every state with the same palette, only re-assert the lock.
+    const lockKey = JSON.stringify([state.harmonyLock, state.pictureDyes ?? null]);
+    const recolour = lastLockKey.current != null && lastLockKey.current !== lockKey;
+    lastLockKey.current = lockKey;
+    visualizerRef.current?.setHarmonyLock(state.harmonyLock, recolour ? PALETTE_RECOLOUR_SECONDS : 0);
   }, [state]);
 
   // A network display: served by the show server on the LAN, fed through

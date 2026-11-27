@@ -39,7 +39,6 @@ export interface GpuStepParams {
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
-  spin: number;         // vorticity strength (0 = off)
   immiscibility: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
   /*
@@ -98,6 +97,8 @@ export interface GpuStepParams {
   /** Oil Bodies: the oil and the water each keep their own colour (see bodyPartition). */
   /** Oil Weight, −1..1: the oil's density against the water cold (constants.ts OIL_RHO; left out, −0.05, the mineral oil's lightness). PLAN 27f-9c. */
   oilWeight?: number;
+  /** Oil Thickness, 0..1 on the Thickness scale: the oil's own viscosity (constants.ts oilNuOf; left out, the 50 mm²/s mineral oil). PLAN 38w-31. */
+  oilThickness?: number;
   oilBodies?: number;
   /** Film Hold: the water film between two drops of oil pushes back as it thins, so drops crowd without merging (FILM_WGSL). */
   filmHold?: number;
@@ -199,6 +200,25 @@ export interface GpuStepParams {
   soapFilm?: number;
   /** The film's drain rate, its seconds per show second (default 1; PLAN 32i's time dial). */
   soapFilmRate?: number;
+  /** The frame's tilt from flat, degrees (default 90, hanging; PLAN 32h): gravity along the film is g sin of it. */
+  soapFilmTilt?: number;
+  /** Glow (0 off, else the light's brightness, 1 a fully charged sea at the stage's strength): the water's dinoflagellates flash where the flow shears them (PLAN 48c, gpu/glow.ts). The front plate's only. */
+  glow?: number;
+  /** The shear rate that fires them, per second (default 30, 0.03 Pa in seawater). */
+  glowShear?: number;
+  /** The seconds a fired cell takes to recharge (default 8). */
+  glowRecharge?: number;
+  /** The tank's side view (PLAN 47n, gpu/tankPlate.ts): Tank (0 off, else its glow), Feed cm/s, Dye Weight % heavier than water, Nozzle 0..1 across, Drain 0..1, Glow Hue degrees. The front plate's only. */
+  tank?: number;
+  tankFeed?: number;
+  tankWeight?: number;
+  tankNozzle?: number;
+  tankDrain?: number;
+  tankHue?: number;
+  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), Shake, its peak acceleration in g, and Rock, the strobe's slip in Hz (48f-6). The front plate's only. */
+  faradayHz?: number;
+  faraday?: number;
+  faradayRock?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
@@ -278,6 +298,16 @@ export interface SolverCarry {
 }
 
 /**
+ * Full GPU field snapshot for plate-level Undo (PLAN 49a): holds exact copies
+ * of dye, velocity, gap and active chemistry/phase fields on the same device
+ * so a drained or cleared plate returns byte-for-byte before the wipe.
+ */
+export interface SolverSnapshot {
+  /** Release copied GPU textures and buffers held by this snapshot. */
+  destroy(): void;
+}
+
+/**
  * What the plate needs of a solver, whichever API it runs on
  * (docs/webgpu-plan.md, P3).
  *
@@ -311,6 +341,17 @@ export interface PlateSolver {
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** Lay the oil cell for cell, replacing the mix (Foam Cells' pressed drops, PLAN 47z-5): `oil` is asked at each cell's middle in plate units, with the mix's size. */
+  layOil?(oil: (x: number, y: number, n: number) => number): void;
+  /**
+   * A look's dye laid at the solver's own grid (PLAN 38w-8): `dye` N²×4 in the
+   * CPU's delta format (absorbance × amount per channel, then the amount),
+   * `oil` the oil's own colour of it in the same format, or null. Held until
+   * the next lay; false when the arrays are not N² (the caller then lays on
+   * the CPU's grid). `layShare(k)` adds k of it to the plate.
+   */
+  layDye?(dye: Float32Array, oil: Float32Array | null): boolean;
+  layShare?(k: number): void;
   /**
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
@@ -322,6 +363,8 @@ export interface PlateSolver {
   /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
   readonly coverUnits?: number;
   pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
+  /** Whether a pour's volume can be laid now without compiling on the frame that asks: its kernel is built behind the show (fluid.ts), and until it is, a drop is laid as a stamp (sim/dropSplash.ts). */
+  pourReady?(): boolean;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
   /**
@@ -343,6 +386,13 @@ export interface PlateSolver {
    * (lib/squish.ts). Optional because only the WebGPU solver has one.
    */
   readonly thinGapLive?: boolean;
+  /**
+   * A press's bowl in the glass on a thin gap, at the solver's own cells
+   * (PLAN 18a-14): centre and radius in logical cells, unrounded, the bowl
+   * (1 − d²/r²)² deep 3·amount, folded at the next flush. Laid on the CPU's
+   * 192² grid it came up through the bilinear upsample as facets.
+   */
+  pressBowl?(x: number, y: number, radius: number, amount: number): void;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */
@@ -359,6 +409,10 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /** Copy the live GPU fields for an 8 s Undo safety net (PLAN 49a). */
+  takeSnapshot?(): SolverSnapshot | null;
+  /** Restore fields captured by `takeSnapshot` back onto this solver. */
+  restoreSnapshot?(snap: SolverSnapshot): boolean;
   /**
    * A frame of the video pour, its dye and its motion worked out on the GPU
    * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:
@@ -394,7 +448,13 @@ export interface PlateSolver {
    * is zero (`dyeMul` one), and only those rows, with the rows the last upload
    * wrote, go across.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null): void;
+  /**
+   * `oilAdd` (Oil Bodies): the part of `dyeAdd` a look's lay says is the
+   * oil's own colour, L²×4, so the oil takes its colour and the water the
+   * rest (PLAN 47z-1); left out, the frame's dye is shared by the oil under
+   * each cell.
+   */
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null, oilAdd?: Float32Array | null): void;
   /**
    * Drive the slosh dish for the next step (lib/slosh.ts SloshDrive: the tilt,
    * the water's viscosity, the presses, whether to lay it level first), or null

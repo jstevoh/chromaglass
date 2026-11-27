@@ -121,7 +121,8 @@ try {
     the phase does not depend on it. The field is the look's Labyrinth, about
     which the app plays it on average (it was 0.725 of it until PLAN 38d-1
     centred the frame loop's swing on the setting, so the period the Bond
-    number reads from it is the look's whether music plays or not); the magnet walks the app's path at the app's speed for middling
+    number reads from it is the look's whether music plays or not); the
+    magnet walks the app's path at the app's speed for middling
     loudness (magnetWalk in LiquidVisualizer), at the look's strength and
     height. Read at the pour and at each checkpoint.
   */

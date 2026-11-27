@@ -10,6 +10,11 @@ import type { BarNow } from '../lib/barGrid';
 import type { LookPhase, FrameDigest, VisualizerRender, SongShapeReport } from '../sim/frameTypes';
 import type { MidiEvent, MidiTarget } from '../lib/midi';
 
+export interface PlateSnapshot {
+  /** Release GPU copies held for the Undo window. */
+  destroy: () => void;
+}
+
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
@@ -89,8 +94,12 @@ export interface LiquidVisualizerHandle {
   setPlateLiquids: (ids: string[]) => void;
   /** Pin the color harmony to a specific palette-index set (music intelligence). */
   setHarmony: (indices: number[]) => void;
-  /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
-  setHarmonyLock: (indices: number[] | null) => void;
+  /**
+   * User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock.
+   * With `recolourSeconds`, the plate already lit is recoloured over that long too
+   * (PLAN 43d-6: a palette chosen by hand); without, only the dye still to come is.
+   */
+  setHarmonyLock: (indices: number[] | null, recolourSeconds?: number) => void;
   /**
    * Evolve turns the palette for the dye still to come (lib/slowEvolve.ts: at a
    * drop or a breakdown, or every few minutes with no music). Nothing already
@@ -112,9 +121,11 @@ export interface LiquidVisualizerHandle {
    * point under it, through the camera: the plate is wider than the wall,
    * turns with the dish and is magnified by the closeup. `turned` false
    * leaves the dish's turn out, for a hand on the dish (Spin reads its
-   * angle as the room sees it). The point itself, until the canvas is up.
+   * angle as the room sees it). `reach` carries a pouring hand in the
+   * wall's edge band onto the dish past the wall (lib/pointerPlate.ts,
+   * PLAN 18a-18). The point itself, until the canvas is up.
    */
-  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean) => { x: number; y: number };
+  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean, reach?: boolean) => { x: number; y: number };
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -123,7 +134,7 @@ export interface LiquidVisualizerHandle {
   plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
   /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
-  /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
+  /** A film by address, from the app's own origin (the video loaded by its address, PLAN 14ag): it streams, where a file is read whole first. */
   loadFilmUrl: (url: string) => Promise<void>;
   /**
    * A camera's picture as the film (lib/cameras.ts): `deviceId` from the
@@ -188,4 +199,8 @@ export interface LiquidVisualizerHandle {
    * (the projector's pixels) and letterbox it here. Null returns to the window.
    */
   setStage: (size: { width: number; height: number } | null) => void;
+  /** Copy the live plate state (liquids, bubbles, beads, palette) before a destructive reset (PLAN 49a). */
+  takeSnapshot?: () => PlateSnapshot | null;
+  /** Restore a snapshot taken by `takeSnapshot`, cancelling any drain or handoff. */
+  restoreSnapshot?: (snap: PlateSnapshot) => void;
 }

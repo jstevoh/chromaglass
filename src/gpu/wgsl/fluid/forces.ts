@@ -12,6 +12,25 @@ import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../l
 import { BOIL_PROPERTIES_WGSL } from '../lampBoil';
 
 export const FORCE_KERNELS: Record<string, string> = {
+  /*
+    A poured soap thins the dye it lies on, once a step (stepLiquids,
+    PLAN 15e-1). This is the multiply `deltaDye` carried, with the same
+    numbers, moved out of the fold of the hand's deltas so that it runs on
+    every step the soap is there and once on each. It erases where a soap
+    should push the dye out of its way; that is PLAN 15e-5's to replace.
+  */
+  soapThin: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let soap = textureLoad(liquids0, p, 0).r;
+  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
+  textureStore(dst, p, capDye(textureLoad(dye, p, 0) * soapMul));
+}`,
+
   liquidForces: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var liquids0: texture_2d<f32>;
@@ -27,7 +46,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let soap = l0.r;
   let body = l0.g;
   let repel = l0.b;
-  let heavy = l0.a;
+  let heavy = l0.a - l1.g;   // a heavy liquid's w, less a light one's lightness (addLiquidDrop)
   let polar = l1.r;
   
   if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
@@ -40,7 +59,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let dt = S.dt;
   let s = S.n;
   
-  if (soap > 0.0) {
+  /*
+    On a thin gap (A.a.y) only the drags stay here, acting on the flow the
+    liquid already had: the soap's pull and the polar keeping-apart have no
+    place between two glasses (no free surface for a Marangoni stress, and
+    the oil's own tension is the mix's), and the heavy liquid's weight is a
+    drive the thin solve reads after it keeps the flow (liquidDrive, PLAN
+    15e-10).
+  */
+  let open = A.a.y == 0.0;
+  if (soap > 0.0 && open) {
     let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
     let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
     fx -= gx * A.a.x * dt * s;
@@ -53,12 +81,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     fy -= v.y * k;
   }
   
-  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
+  if (heavy != 0.0 && open && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
     fx += S.rock.x * heavy * A.a.w * dt * s;
     fy += S.rock.y * heavy * A.a.w * dt * s;
   }
   
-  if (polar != 0.0) {
+  if (polar != 0.0 && open) {
     let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
     let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
     let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
@@ -90,11 +118,52 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
 }`,
 
-  // Everything the CPU applies after the projection.
+  /*
+    A heavy liquid's weight down a rocked thin gap (PLAN 15e-10,
+    driveLiquids). The liquids' fields carry w, the column's density over
+    the water's less one (a heavy liquid's in liquids0.a, a light one's
+    lightness in liquids1.g: addLiquidDrop says why), and a plate tipped by θ puts w ρ g sinθ on that
+    column more than on the liquid round it. Laid after the thin gap keeps
+    its flow ('thin gap keep') and before it keeps the body forces, it is
+    read as every body force is there: the speed it drives the reference
+    liquid to at the rest gap, which the solve then turns into the flow
+    a weight between two glasses makes. The drop goes as its own viscosity
+    lets it (the species field, in hsPrep's drag), the water goes round it
+    (the pressure), and on balance nothing else moves.
+
+    Where the mix holds oil this step's lift already weighs it (hsBody,
+    OIL_LIFT): the same oil, laid by the same pour into both fields, would
+    otherwise rise twice. So the weight here is the column's less the oil's
+    share. `mixT` is the mix while the look has Oil Tension on, else 1×1
+    and empty.
+
+    A.a.xy is the drive per unit of w: LIQUID_FALL at the cover's gap,
+    times Plate Rock's tilt and gain, in the flow's per-step speeds.
+  */
+  liquidDrive: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var liquids1: texture_2d<f32>;
+@group(0) @binding(5) var mixT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let oil = clamp(textureLoad(mixT, min(p, vec2i(textureDimensions(mixT)) - 1), 0).r, 0.0, 1.0);
+  let w = (textureLoad(liquids0, p, 0).a - textureLoad(liquids1, p, 0).g) * (1.0 - oil);
+  textureStore(dst, p, safeVel(vec4f(v.xy + A.a.xy * w, v.z, v.w)));
+}`,
+
+  // Everything the CPU applies after the projection, fused with addCurrent.
   forcesB: `${HEAD}${NOISE_WGSL}${BILERP_N}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var cur: texture_2d<f32>;
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var sw: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(8) var dstForced: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -120,29 +189,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
 
   /*
-    Spin's stir, where there is colour. Masked by the colour of the cell and
-    its four neighbours, [1 4 1] each way, not of the cell alone (PLAN 38r-6).
-    A force between two glasses does not stop at a cell's edge: the gap's
-    viscous shear spreads it over about the gap's own width (Brinkman's
-    ν∇²u, whose reach in a Hele-Shaw cell is h/√12), and at 2 mm that is a
-    cell or so of the app's plate. Masked by the cell alone the stir stepped
-    from nothing to whole at every pool's sharp edge, and glycerine, which
-    takes a step's force whole (kΔt 50), left that step's grid-scale
-    pressure in the flow: \`npm run thingap\` read its |∇·(hu)| at 0.0059 of
-    the flux against 0.005, and 0.00056 with Spin off.
+    The music's eddies were here: a second curl of noise laid wherever there
+    was colour, sized by mid and treble read straight off the analyser, with
+    no cord and no control (PLAN 38u-5; the physics audit, 2026-11-13).
+    Sound reaches the plate only through cords, so they are gone, and what
+    they added is in the depth of each look's cord from the sound's mids
+    onto Turbulence above (lib/stir.ts); npm run musicstir holds it.
   */
-  if (S.spin > 0.0) {
-    let n4 = textureLoad(dye, clampP(q + vec2i(1, 0), S.n), 0).a + textureLoad(dye, clampP(q - vec2i(1, 0), S.n), 0).a
-           + textureLoad(dye, clampP(q + vec2i(0, 1), S.n), 0).a + textureLoad(dye, clampP(q - vec2i(0, 1), S.n), 0).a;
-    let dm = (4.0 * d + n4) / 8.0;
-    if (dm > 0.05) {
-      let qn = p * 0.025 + vec2f(0.0, S.time * 0.08);
-      let n = snoise(qn);
-      let dn_dx = (snoise(qn + vec2f(0.01, 0.0)) - n) * 100.0;
-      let dn_dy = (snoise(qn + vec2f(0.0, 0.01)) - n) * 100.0;
-      v = vec4f(v.xy + vec2f(dn_dy, -dn_dx) * (S.spin / 0.03) * (0.4 / 3.0) * min(1.0, dm), v.z, v.w);
-    }
-  }
 
   if (S.tension > 0.0 && d >= 0.01) {
     let col = dyeC.rgb / d;
@@ -162,8 +215,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       let db = length(cB.rgb / cB.a - col);
       cdy = dt_ * dt_ - db * db;
     }
-    let n = snoise(p * 0.03 + vec2f(0.0, S.time * 0.05));
-    v = vec4f(v.xy - vec2f(cdx, cdy) * (S.tension * 0.8) * d * (1.0 + n * 2.0), v.z, v.w);
+    /*
+      The push is the same sign everywhere. It was multiplied by 1 + 2n, n a
+      slow noise on the plate, and where n fell under -0.5 that factor was
+      negative: there the force pulled unlike colours together, the backward
+      diffusion that the removed fingering push was taken out for (below).
+      Polarity 0.5 in every look, so a third of the plate's patches did it
+      (npm run forces, 6). The noise stood for nothing physical: a tension
+      between two liquids does not depend on where on the glass they meet.
+      The force itself is still a stand-in for the mixing law (18d-6).
+    */
+    v = vec4f(v.xy - vec2f(cdx, cdy) * (S.tension * 0.8) * d, v.z, v.w);
   }
 
   /*
@@ -245,7 +307,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.x + gx, v.y + gy, v.z, v.w);
   }
 
-  textureStore(dst, q, safeVel(v));
+  let v0 = safeVel(v);
+  let c = bilerpN(cur, uv, A.a.y).xy;   // the current is on the M grid
+  var flow = v0.xy + c;
+  if (A.a.z > 0.0) {
+    let h = max(textureLoad(sq, q, 0).r, 0.0005);
+    let nominal = ${DISH_REST_GAP};
+    let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
+    flow = flow * pow(ratio, A.a.z);
+  }
+  if (A.a.w != 0.0) {
+    flow += bilerpN(sw, uv, A.a.y).xy * A.a.w;
+  }
+  let forced = safeVel(vec4f(flow, v0.z, v0.w));
+  if (thin) {
+    textureStore(dst, q, forced);
+  } else {
+    textureStore(dst, q, v0);
+    textureStore(dstForced, q, forced);
+  }
 }`,
 
   // The lasting current, at half resolution: A.a.x is 1/M for its own grid.
@@ -314,53 +394,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     downstream can take it back, because there is no downstream: this *is*
     what carries the liquid.
 
+    Fused into `forcesB` above (previously `addCurrent`).
     A.a.z is the exponent, so zero is exactly one — off, bit for bit, and the
     plate is the plate it was. One is the physical h^2. Above one exaggerates
     it, which is what a dial on a light-show desk is for.
   */
-  addCurrent: `${HEAD}${BILERP_N}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var cur: texture_2d<f32>;
-@group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var sw: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let v = textureLoad(vel, vec2i(id.xy), 0);
-  let c = bilerpN(cur, uvOf(id), A.a.y).xy;   // the current is on the M grid
-  var flow = v.xy + c;
-  if (A.a.z > 0.0) {
-    let h = max(textureLoad(sq, vec2i(id.xy), 0).r, 0.0005);
-    let nominal = ${DISH_REST_GAP};
-    /*
-      Capped at one, so this is a drag and never a pump.
-
-      Left free to rise above one it reached four at the dome's deep centre,
-      and the plate did not run four times faster there — it ran fifty-three
-      times faster and was plainly diverging, because the dye this carries
-      feeds the forces that make the velocity it is built from. A mobility
-      above one is physically fine and numerically a loop.
-
-      So a gap deeper than nominal is not accelerated, it is simply not
-      slowed, and the difference across the plate is the same difference. The
-      floor keeps the tightest gap the plate allows from stopping the liquid
-      dead.
-    */
-    let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
-    flow = flow * pow(ratio, A.a.z);
-  }
-  /*
-    The spun dish's swirl (spinSwirl), after the depth: it is already the
-    gap's own flow, worked out from the drag the gap sets, so the mobility
-    above would count the gap twice. A.a.w turns plate widths a second into
-    this field's units (the step's seconds over its displacement), and is
-    zero whenever the swirl is not running, which adds nothing at all.
-  */
-  if (A.a.w != 0.0) {
-    flow += bilerpN(sw, uvOf(id), A.a.y).xy * A.a.w;
-  }
-  textureStore(dst, vec2i(id.xy), safeVel(vec4f(flow, v.z, v.w)));
-}`,
 
   /*
     The spun dish, in the frame that turns with its liquid (PLAN.md §22,
@@ -426,13 +464,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 // Oil: its share of a cell, from the mix where a look has one (1×1 blank otherwise).
 fn oilAt(uv: vec2f) -> f32 { return clamp(bilerpN(mixT, uv, f32(textureDimensions(mixT).x)).r, 0.0, 1.0); }
 /*
-  Δρ/ρ here. The dye as the current reads it (saturated about the plate's mean,
-  so a plate with more dye everywhere is not heavier everywhere), times the
-  dye's contrast (A.b.z); the oil lighter (A.b.w); the ferrofluid heavier, a
-  fixed property of the liquid (lib/turntable.ts).
+  Δρ/ρ here. Linear in the dye's density gap above the plate's mean (Boussinesq,
+  PLAN 22r / 18m-3: the mean is constant across the plate so its gradient is
+  zero, and taking it off keeps weightAt centred near zero), times the dye's
+  contrast (A.b.z); the oil lighter (A.b.w); the ferrofluid heavier, a fixed
+  property of the liquid (lib/turntable.ts).
 */
 fn weightAt(uv: vec2f) -> f32 {
-  let d = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
+  let d = bilerpN(dye, uv, S.n).a - S.meanD;
   let f = clamp(bilerpN(ph, uv, f32(textureDimensions(ph).x)).r, 0.0, 1.0);
   return A.b.z * d - A.b.w * oilAt(uv) + 0.25 * f;
 }
