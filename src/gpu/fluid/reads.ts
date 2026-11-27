@@ -91,6 +91,28 @@ export class FluidReads extends FluidInputs {
     return performance.now() - t0;
   }
 
+  /**
+   * The dye's two shares carried `reps` times as the last step carried them
+   * (its plate, its substeps, its air), in one pass (`fused`) or apart, the
+   * ms the queue took. For `npm run splitcarry`, which reads the slope
+   * between two counts so the submit's own cost drops out.
+   */
+  async benchShares(reps: number, fused: boolean): Promise<number> {
+    if (!this.oilDye || !this.sharesArgs) return NaN;
+    const was = this.fuseSplit;
+    this.fuseSplit = fused;
+    const enc = this.device.createCommandEncoder({ label: 'bench shares' });
+    const pass = enc.beginComputePass({ label: 'bench shares' });
+    for (let k = 0; k < reps; k++) this.carryShares(pass, this.oilDye, this.sharesThin, this.sharesArgs, undefined, this.sharesAt);
+    pass.end();
+    this.fuseSplit = was;
+    await this.device.queue.onSubmittedWorkDone();
+    const t0 = performance.now();
+    this.submit(enc);
+    await this.device.queue.onSubmittedWorkDone();
+    return performance.now() - t0;
+  }
+
   /** The clear film read back whole (thickness, solvent, ·, ·), or null with none on the plate. For checks. */
   async readFilm(): Promise<{ n: number; data: Float32Array } | null> {
     if (!this.film || this.filmLaid <= 0) return null;

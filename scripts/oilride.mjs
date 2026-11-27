@@ -228,7 +228,7 @@ try {
   check(`on the ${PLATE} plate, where this run asks`, thin === (PLATE !== 'old'), `thinGapLive ${thin}`);
   if (PLATE === 'air') {
     check('and the oil\'s colour was carried in the air\'s room', airSeen.ran >= STEPS - 60 - 5 && airSeen.ran <= STEPS,
-      `${airSeen.ran} steps through bodyAdvectSharpSubAir, of ${STEPS - 60} with a bubble down (bar all but 5)`);
+      `${airSeen.ran} steps with the oil's share in the air's room (bodyAdvectSplitSubAir, or bodyAdvectSharpSubAir apart), of ${STEPS - 60} with a bubble down (bar all but 5)`);
     check('and the bubble stood on oil', airSeen.onOil >= airSeen.read / 4 && airSeen.read > 0, `on oil in ${airSeen.onOil} of ${airSeen.read} reads (bar a quarter)`);
   }
   check('no GPU errors', gpuErrors.length === 0, gpuErrors[0] ?? '');
