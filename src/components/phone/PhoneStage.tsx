@@ -942,8 +942,8 @@ export function PhoneStage(p: PhoneStageProps) {
               both of, and Pour's Stop is here too. */}
           {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
-              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} onMixOrder={p.mixer ? o => p.mixer!.onSetting({ mixOrder: o }) : undefined} />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Video in</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} filmRing={p.mixer?.settings.filmRing} onPlace={p.mixer ? patch => p.mixer!.onSetting(patch) : undefined} />
             </div>
           )}
           </PanelGuard>

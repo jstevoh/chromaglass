@@ -169,6 +169,7 @@ export const CONTROL_HELP: Record<string, string> = {
   filmZoom: 'How big the video is on the plate. 1 fills it, cropping what does not fit; below 1 shows the whole frame smaller, with black round it.',
   filmX: 'Slides the video left or right on the plate. 0 is centred.',
   filmY: 'Slides the video down or up on the plate. 0 is centred.',
+  filmRing: 'Puts the video on the spinning LED platform under the dish: the picture turns with LED Rotation Speed and lights the glass from below.',
   soundImpact: 'The master depth over every patch that reads the sound.',
   shapeImpact: 'The master depth over every patch driven by a slow wave or an envelope.',
   sceneImpact: 'The master depth over every patch that reads the room.',
