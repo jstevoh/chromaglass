@@ -8,7 +8,7 @@
  * the one table every pass is asked for by name.
  */
 
-import { OPEN_RIM, DISH_GAP_FIELD_METRES, DISH_METRES } from '../../../lib/turntable';
+import { OPEN_RIM, DISH_GAP_FIELD_UV } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
 import { RIM_SIDE } from './oil';
 import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FROM, LAMP_GLASS } from '../../fluid/constants';
@@ -25,7 +25,7 @@ const RIM_BAND = 8;
 export const RIM_SAMPLES = 1024;
 /** The narrowest thread the oil's field draws, in cells: its edge's own width (THREAD, PLAN 38w-27). */
 export const THREAD_CELLS = 2.0;
-/** How far THREAD reads across the oil each way, in cells: past a 768² grid's 2 mm gap (7.7 cells) and its blur. */
+/** How far THREAD reads across the oil each way, in cells: past a 768² grid's rest gap (7.7 cells) and its blur; a walk that runs out of it is across a wide body. */
 export const THREAD_REACH = 12;
 /*
   The oil's capillary force, σ κ ∇c̃, at one cell (mixForce has the physics),
@@ -106,7 +106,8 @@ fn rimRamp(r: f32, n: f32) -> f32 { return smoothstep(${OPEN_RIM.toFixed(2)} - (
   small drop its diameter, where the same 2/w is the drop's own
   out-of-plane curvature: a drop narrower than the gap is a sphere, 4/D, the
   in-plane outline's 2/D and this one's 2/D. Past the gap the sum stops, as
-  only the gap matters.
+  only the gap matters, and a walk still in the oil at THREAD_REACH is
+  across a wide body (a lifted gap on a 1024² grid is 20 cells).
 
   The grid sets the floor. The field draws no thread narrower than its own
   edge, two cells or so (THREAD_CELLS), so a gap no wider than that on the
@@ -125,23 +126,28 @@ fn csAt(g: vec2f, n: f32) -> f32 {
 }
 fn threadCurve(p: vec2i, g: vec2f, n: f32) -> f32 {
   if (S.thinGap < 0.5) { return 0.0; }
-  let h = max(textureLoad(sq, clampP(p, n), 0).r, 0.0) * ${(DISH_GAP_FIELD_METRES / DISH_METRES).toFixed(6)} * n;
+  let h = max(textureLoad(sq, clampP(p, n), 0).r, 0.0) * ${DISH_GAP_FIELD_UV.toFixed(6)} * n;
   let gl = length(g);
   if (h <= ${THREAD_CELLS.toFixed(1)} || gl < 0.004) { return 0.0; }
   let u = g / gl;
   let o = vec2f(p);
   var w = cs(p, n);
+  // A walk that runs out of reach still in the oil is across a wide body
+  // (a lifted gap on a fine grid is wider than the reach), and reads as one.
+  var out = 0;
   for (var k = 1; k <= ${THREAD_REACH}; k++) {
     let s = csAt(o + u * f32(k), n);
-    if (s < 0.02 || w >= h) { break; }
+    if (s < 0.02) { out++; break; }
     w += s;
+    if (w >= h) { return 0.0; }
   }
   for (var k = 1; k <= ${THREAD_REACH}; k++) {
     let s = csAt(o - u * f32(k), n);
-    if (s < 0.02 || w >= h) { break; }
+    if (s < 0.02) { out++; break; }
     w += s;
+    if (w >= h) { return 0.0; }
   }
-  if (w >= h) { return 0.0; }
+  if (out < 2) { return 0.0; }
   return 2.0 / max(w, ${THREAD_CELLS.toFixed(1)}) - 2.0 / h;
 }
 // σ κ ∇c̃. The normal's divergence by central differences of the normals
