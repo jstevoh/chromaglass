@@ -49,6 +49,24 @@ as before: the shader editor and imports, the feedback layer, and anything that 
 the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
 analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
 
+## ~~30c. The controller's pads play the liquid~~ (shipped 2026-11-27)
+- **30c-1** (S) The laptop remote's phone (useRemote, remoteProtocol) has no pads: the
+  phone stage's Pads play the phone's own plate only. A `pad-hold` message, with its
+  lift, would put the grid on the remote too.
+- **30c-2** (S, named shortcut) A held drip of a viscous liquid waits at most 3 s
+  (`DRIP_MAX_S`); syrup really drips about every 29 s at the same squeeze. Replace with the
+  real wait, shown (the pad's LED, or the plate, swelling with the drop forming at the
+  tip) so a long wait does not read as a dead pad.
+- **30c-3** (S, needs the board) The device-control buttons Bank ◀ ▶ are bound as notes
+  0x3C and 0x3D on channel 1 from Akai's protocol; on the owner's APC40 mkII, check they
+  arrive there (learn shows it) and that Track Select's LEDs light the pick.
+- **30c-4** (M) The tool rows lay where they land and stay: a Pour held while the pad's
+  lane is pressed again at another height could move the stream (a hand carrying the
+  bottle), and Splatter's direction could follow the hit's column (a flick across).
+- **30c-5** (S) A layout that claims more than the grid (51h's projector layout wants the
+  crossfader and the Activator, Solo and A|B rows): `isGridBinding` is one set for every
+  layout; give each layout the sources it lays, so switching away gives them back.
+
 ## ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
 - **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
   on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the

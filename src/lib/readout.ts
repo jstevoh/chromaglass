@@ -18,6 +18,7 @@
 
 import type { VisualizerSettings } from '../types';
 import { kelvinLabel } from './lampKelvin';
+import { lampLabel } from './projectorBank';
 import { curveOf, travelOf } from './midi';
 import { MIX_CONTROLS, MIX_FADE_KEYS } from './mixer';
 import { ENVELOPE_TRIGGERS, formatLfoBars, LFO_SHAPES, LFO_TRIGGERS } from './modulators';
@@ -76,6 +77,11 @@ const UNITS: Record<string, (v: number) => string> = {
   spinDirection: v => (v > 0.5 ? 'clockwise' : v < -0.5 ? 'anticlockwise' : 'opposed'),
   layerCount: v => `${Math.round(v)}`,
   twoProjectors: v => (v > 0.5 ? 'On' : 'Off'),
+  projLampA:  v => lampLabel(v),
+  projLampB:  v => lampLabel(v),
+  projShutterA: v => (v <= 0.005 ? 'Open' : v >= 0.995 ? 'Shut' : `${Math.round(v * 100)}% across`),
+  projShutterB: v => (v <= 0.005 ? 'Open' : v >= 0.995 ? 'Shut' : `${Math.round(v * 100)}% across`),
+  projCross:  v => (v <= 0.005 ? 'A' : v >= 0.995 ? 'B' : `A ${Math.round((1 - v) * 100)} · B ${Math.round(v * 100)}`),
   thinGap:    v => (v > 0.5 ? 'On' : 'Off'),
   liquidMl:   v => `${Math.round(v)} mL`,
   coverWeight: v => `${Math.round(v)} g`,

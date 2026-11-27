@@ -5,6 +5,10 @@ import { X, Printer, Eraser, Search } from 'lucide-react';
 import { ACTION_LABELS, LEARNABLE_SETTINGS, type MidiAction, type MidiTarget } from '../lib/midi';
 import { useMidiLastEvent, type MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
+import { DEFAULT_LIQUID_TYPES } from '../types';
+import { PAD_TOOL_LABELS } from '../lib/padTarget';
+
+const liquidName = (id: string): string => DEFAULT_LIQUID_TYPES.find(l => l.id === id)?.name ?? id;
 import { controlKey, type ControllerSurface as Surface, type SurfaceControl } from '../lib/controllerSurface';
 import { livePresetId } from '../presets';
 
@@ -32,6 +36,10 @@ const KIND_COLOUR: Record<MidiTarget['kind'], string> = {
   setlist: '#34d399',
   dye: '#ffffff',
   voices: '#f472b6',
+  pad: '#fb7185',
+  hand: '#e2e8f0',
+  toolAmount: '#38bdf8',
+  padLayout: '#fbbf24',
 };
 
 /**
@@ -61,10 +69,16 @@ function shortLabel(t: MidiTarget, presetName: (id: string) => string | undefine
     case 'setlist': return `Set #${t.index + 1}`;
     case 'dye': return PALETTE[t.paletteIndex]?.name ?? `Dye ${t.paletteIndex + 1}`;
     case 'voices': return 'Voices';
+    // A pad is a tool (and a colour, which it is drawn in); its row says the liquid.
+    case 'pad': return t.tool ? PAD_TOOL_LABELS[t.tool] : (t.liquid ? liquidName(t.liquid) : 'Hand');
+    case 'hand': return t.tool ? PAD_TOOL_LABELS[t.tool] : liquidName(t.liquid ?? '');
+    case 'toolAmount': return `${PAD_TOOL_LABELS[t.tool]} Size`;
+    case 'padLayout': return t.step > 0 ? 'Layout ▶' : '◀ Layout';
   }
 }
 
 function colourOf(t: MidiTarget): string {
+  if (t.kind === 'pad' && t.dye !== undefined) return PALETTE[t.dye]?.hex ?? KIND_COLOUR.pad;
   return t.kind === 'dye' ? (PALETTE[t.paletteIndex]?.hex ?? '#ffffff') : KIND_COLOUR[t.kind];
 }
 
