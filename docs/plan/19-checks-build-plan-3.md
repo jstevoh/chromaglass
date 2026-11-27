@@ -646,7 +646,15 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   - 19ak-24b, `looksgrid --owed=preview` (four flat stills) and `benday` (after 43d-6, #913).
   - 19ak-24c, `tools` (Press on the old plate "and keeps it", 225 → 173), `drawwall --app`,
     `wall`, `oillift` (after 15g-18, #914, and 18a-13n, #955).
-  - 19ak-24d, `rimhold`, `dropcolour`, `airlens`, `spikes`, `thick`, `airblow`.
+  - 19ak-24d, `rimhold`, `dropcolour`, `airlens`, `spikes`, `thick`, `airblow` (**part shipped**:
+    `thick` `bodyAdvectPairSub` MC limiter matching `#948` `9/9`, and `rimhold` check 7
+    unpoured trough capillary leak in `mixForce` past `OPEN_RIM` fixed `0.20 → 0.26`;
+    remaining check-vs-physics reds need check/deep-solver decisions: `rimhold` 6 (`0.59` vs
+    `0.6` after `#946` 44 cSt oil), `airblow` 5 (`oil +4.65%` after `#946`; `ferro` `+31.12%`
+    vs its colour `+23.69%` partly from `phaseVelocity` `front`), `dropcolour` 4 (`0.103` after
+    `#889` `granulation = 0` under `splodascope` `saturationBoost = 1.3`), `airlens` 9–10
+    (`23` vs `41` after `#889`, same as `19ak-24i`), and `spikes` 5 (`6/6` at `3271c994` with
+    `16 vs 8`; `#859` moved `b1` `7 → 8`)).
   - 19ak-24e, `live --codec aac`, `liveshow --stack`, `videolamp`, a show night: each run
     alone three times first (load on deploy 967, or real).
   - 19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
