@@ -491,6 +491,9 @@ fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapUnits: f32) -> vec3f {
     seen = plateSeen(fuv + dir * travel * LC_UV, bg);
   }
   let dye = pow(dyeColumnAt(fuv), vec3f(2.0 * above / max(gapLc, 1e-3)));
-  return F * seen * dye;
+  // Fresnel's F is a share of the light, so it scales the light (38p): on
+  // display values a 4% reflection was 4% of the display value, which is
+  // 0.08% of the light, fifty times too dark (29a-10's black domes).
+  return displayOf(F * lightOf(seen * dye));
 }
 `;

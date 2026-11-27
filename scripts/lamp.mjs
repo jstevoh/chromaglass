@@ -270,16 +270,26 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
 
 // ── 6. Halfway ───────────────────────────────────────────────────────
 {
-  let err = 0, n = 0;
+  /*
+    Half of each picture's light (PLAN 38p): a fader between two pictures is
+    half of each light, and the plate is in display values, so the halfway
+    pixel is the encode of the mean of the two lights. Until 38p this asked
+    for the mean of the display values, which is the fade sagging dark in
+    its middle; the old mean is kept as a reading, and must be well off, so
+    the line cannot pass on a pair of pictures where the two laws agree.
+  */
+  const L = (v) => (v / 255) ** 2.2, E = (l) => 255 * l ** (1 / 2.2);
+  let err = 0, errOld = 0, n = 0;
   for (let k = 0; k < shots.poolHalf.length; k++) {
     if (k % 4 === 3) continue;
-    err += Math.abs(shots.poolHalf[k] - (shots.blackWhite[k] + shots.poolWhite[k]) / 2); n++;
+    err += Math.abs(shots.poolHalf[k] - E((L(shots.blackWhite[k]) + L(shots.poolWhite[k])) / 2));
+    errOld += Math.abs(shots.poolHalf[k] - (shots.blackWhite[k] + shots.poolWhite[k]) / 2); n++;
   }
   const pool = disc(0.2);
-  check('halfway, the picture is half the dye on black and half the lamp through it, pixel by pixel',
+  check('halfway, the picture is half the light of the dye on black and half the lamp through it, pixel by pixel',
     // The two pictures it is between must differ, or half of each is either.
-    err / n <= 1 && Math.abs(lum(mean(shots.poolWhite, pool)) - lum(mean(shots.blackWhite, pool))) > 20,
-    `mean error ${f2(err / n)} of a byte; the pool ${r0(mean(shots.blackWhite, pool))} on black, ${r0(mean(shots.poolHalf, pool))} halfway, ${r0(mean(shots.poolWhite, pool))} on the lamp`);
+    err / n <= 1 && errOld / n > 3 && Math.abs(lum(mean(shots.poolWhite, pool)) - lum(mean(shots.blackWhite, pool))) > 20,
+    `mean error ${f2(err / n)} of a byte (the mean of display values ${f2(errOld / n)} off); the pool ${r0(mean(shots.blackWhite, pool))} on black, ${r0(mean(shots.poolHalf, pool))} halfway, ${r0(mean(shots.poolWhite, pool))} on the lamp`);
 }
 
 // ── 7. The photograph ────────────────────────────────────────────────

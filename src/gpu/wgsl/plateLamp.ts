@@ -138,7 +138,7 @@ fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
     }
     if (U.lumia > 0.001 && U.mixPos2.y == fp) {
       let m = mixBlendOf(U.mixBlend.z);
-      if (m == 0) { c += lumiaLight(uv) * U.lumia; } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
+      if (m == 0) { c = displayOf(lightOf(c) + lightOf(lumiaLight(uv)) * U.lumia); } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
     }
     if (U.mixPos.z == fp && videoInLamp() && U.filmRing == 0) {
       let frame = filmFrame(uv + lampBend, vec4f(0.0), vec3f(0.0, 0.0, 1.0));
