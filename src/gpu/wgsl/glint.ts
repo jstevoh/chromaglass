@@ -125,7 +125,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 /*
   Shared by the splat and the lens: the plate's uniforms, linear light, and
   where a screen point is on the stage. The plate's picture holds display
-  values; light adds in linear light (the 29a-10 fix took the same road).
+  values; light adds in linear light (the 29a-13 fix took the same road).
 */
 const COMMON = /* wgsl */ `
 ${PLATE_STRUCT}

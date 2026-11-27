@@ -71,6 +71,27 @@ the code's entry points, the checks to add and the scenes to match, in
     uniform (`dropSolved`, `ferroDrop.ts:266-267`). Check: a ferro closeup's ground matches
     Relief 0's within a few levels, and milk outside a ferro domain keeps `dropSolved` 0.
     (38v, from RS-25.)
+  - ~~**29a-13. The Magnet's domes were one black in the closeup.**~~ **Shipped** (the owner,
+    2026-11-01: "Let's make sure we have 3d in the macro view"; `npm run ferrodrop` 11-13).
+    The drop's reflection is worked in light and encoded as a camera records it, so a dome's
+    steep sides show the lit liquid round them as a dark gloss. Story in
+    `docs/plan-shipped.md` §29a-13.
+  - **29a-14. The domes' ridges and their star, in the closeup** (M, nil; found doing
+    29a-13). The references (Colored I) show each dome's sides ridged from the point down,
+    the finer spikes a big one carries, and the reflection broken into a star round its top.
+    The plate at 1x paints that star (the rays term in the display's ferrofluid block); the
+    closeup's surface is the drop solve plus the film's own height, smooth at the grid, so
+    it shows none. A real ridge is the instability's own second scale on a peak's flank,
+    under a cell on 384²: it needs the surface at a finer scale than the solver's grid (a
+    sub-cell height, or the drop solve on its own finer grid), not a pattern laid on top.
+    *Measure:* the number of light-dark turns round a dome's top in the closeup at 6x.
+  - **29a-15. The dye over a dome's foot in the closeup is the macro's film contrast, not
+    the column's** (S, nil; found doing 29a-13). `dyeColumnAt` takes its amount from the
+    closeup's Film Level and Film Gain (a contrast for the dye's own picture) when the
+    camera is in, so how strongly the dye tints a dome's reflection is a display setting's,
+    and a dome's foot, under nearly the whole column twice, reads a deep red-brown. Take the
+    column's absorbance from the decode's own amount at every zoom. *Measure:* a dome's foot
+    colour against Beer-Lambert over 2(gap - h) of the decoded dye.
 - **29b. Dye on the drop: carried, spread, and shed off its back.** The water over the
   drop is the gap less the drop's height and is dragged with the drop's surface (no slip
   on the drop, no shear at the top glass's far side through the thin film), so its dye

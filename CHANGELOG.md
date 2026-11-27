@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the Magnet's domes have depth in the closeup (PLAN 29a-13)
+
+- Zoomed in, the domes a magnet stands out of the ferrofluid show a dark glossy sheen down
+  their sides (the lit liquid round them, mirrored) and a glint on each top, where they were
+  flat black blobs. The plate at 1x is unchanged.
+
 ### Added — the standing waves move (PLAN 48f-6, 48f-9)
 
 - **Rock** (`faradayRock`, 0–2 Hz): the strobe slips off the Faraday waves so crests and
