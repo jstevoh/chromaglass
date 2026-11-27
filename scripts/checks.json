@@ -317,6 +317,29 @@
       ]
     },
     {
+      "name": "Every folder's README names what its code exports",
+      "shard": "logic",
+      "run": "npm run readmes",
+      "always": true,
+      "why": [
+        "CLAUDE.md's rule that a PR changing an export updates its folder's README (PLAN.md 50n):",
+        "a name a PR newly exports under src/ or server/ is named in that folder's README, one it",
+        "removes is not still named there as live, and no README names a code name no code has.",
+        "Always: it reads the diff and the tree by walking them, which no trace can see."
+      ]
+    },
+    {
+      "name": "The mutation run tells a caught fault from a missed one",
+      "shard": "logic",
+      "run": "npm run mutate -- --self",
+      "why": [
+        "The weekly mutation run's own test (PLAN.md 50l): on made-up files, a fault a check sees",
+        "is caught, one every check stays green on is missed, a check red without the fault is no",
+        "catch, a fault that only breaks the typecheck is to rewrite, every file is put back; and",
+        "scripts/mutants.json is well formed, its files there and its expected checks real."
+      ]
+    },
+    {
       "name": "Main held red lets only the fix merge",
       "shard": "logic",
       "run": "npm run mainhold -- --self-test",
@@ -1624,7 +1647,7 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads -- --owed=h2c9",
+      "run": "npm run framereads",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",
@@ -3231,6 +3254,19 @@
         "open-rim solve slid Solar Flare's whole dish out over its rim (0% of",
         "its dye left in the lab); a closed dish answers it with its pressure,",
         "so only the gusts' curl moves the liquid, as strong as before."
+      ]
+    },
+    {
+      "name": "The ouzo clouds on its measured curve, and Louche's cloud leads",
+      "shard": "lab",
+      "run": "npm run ouzo",
+      "timeout": 15,
+      "why": [
+        "PLAN 48s-1 and 48s-6: each cell's droplets are ouzoDrops of its own",
+        "ethanol, oil and gap, none without oil or at the bottle's strength,",
+        "the oil kept through water and Alcohol and across a regrid, the plate",
+        "handed 209 x the droplets; and Louche's small seed, Ouzo-led dish and",
+        "translucent white (two control builds and a 3% control)."
       ]
     },
     {
