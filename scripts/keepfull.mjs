@@ -26,7 +26,7 @@
  *  5. The visualizer steps it only with `keepFull` on, while playing and not
  *     draining, through the hand's own Drop (dropBottle), on its own dice
  *     (DICE.keep, so Evolve's draws do not move); and it is a room key
- *     (RIG_KEYS and SETUP_KEYS), off by default, so no look changes.
+ *     (RIG_KEYS), off by default, so no look changes.
  *  6. The desk (both Evolve rows), the settings sheet, the phone and the
  *     phone remote each draw its switch.
  *  0. The control: a dose function that always pours (or never) fails 1–3,
@@ -37,7 +37,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { keepFullDose, KEEP_FULL_LOW, KEEP_FULL_HIGH, KEEP_FULL_FAST_S, KEEP_FULL_SLOW_S } from '../src/sim/keepFull.ts';
-import { RIG_KEYS, SETUP_KEYS } from '../src/lib/lookFade.ts';
+import { RIG_KEYS } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
 const checks = [];
@@ -88,7 +88,7 @@ const hands = mod.slice(mod.indexOf('export function keepFullHands'), mod.indexO
 check('its hand aims with its own dice (DICE.keep), never Evolve\'s', hands.length > 200 && /DICE\.keep/.test(hands) && !/DICE\.(evolve|hands|music|lay)/.test(hands)
   && /keepFullRef = useRef\(keepFullState\(\{/.test(viz) && /hands: keepFullHands\(look\)/.test(mod));
 check('a top-up is the hand\'s own Drop (dropBottle), not a stamp or a fade', /dropBottle\(af, x, y, KEEP_FULL_DROP \* dose/.test(mod) && !/addDensity|autoInject/.test(mod.replace(/\/\*[\s\S]*?\*\//g, '')));
-check('it is the room\'s switch: off by default, kept over a Go and a Back', DEFAULT_SETTINGS.keepFull === false && RIG_KEYS.has('keepFull') && SETUP_KEYS.has('keepFull'));
+check('it is the room\'s switch: off by default, kept over a Go (as Song titles and the logo melt are)', DEFAULT_SETTINGS.keepFull === false && RIG_KEYS.has('keepFull'));
 
 // 6. Every surface draws it.
 const has = (file, re) => re.test(readFileSync(file, 'utf8'));

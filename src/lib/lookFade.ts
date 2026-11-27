@@ -182,8 +182,6 @@ export const SETUP_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof V
   'pacing', 'songFollow',
   'sceneDeadzone', 'sceneSmooth', 'scenePeople', 'sceneMirror',
   'simResolution',
-  // Whether the dish is kept topped up while it is left running: set once for the night, as the pacing is.
-  'keepFull',
   // Where the logo sits and how big it is: placed once for the room, like a
   // projector, not ridden in a show.
   'markX', 'markY', 'markScale',

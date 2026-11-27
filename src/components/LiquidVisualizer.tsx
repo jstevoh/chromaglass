@@ -3591,7 +3591,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
           }
 
-          // The plate's own slow hands while playing: the hue journey (sim/hueJourney.ts) and Keep Full (sim/keepFull.ts, PLAN 18a-22).
+          // The hue journey: a set drifts its colours over minutes (sim/hueJourney.ts). And Keep Full (sim/keepFull.ts, PLAN 18a-22).
           if (isActiveRef.current && drainFrameRef.current === 0) {
             if (!harmonyLockRef.current && hueJourneyTurns(journeyRef.current, currentSettings.hueJourney ?? 0, showNow() * 0.001)) {
               const contract = presetContractRef.current;
