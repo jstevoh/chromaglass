@@ -62,7 +62,7 @@ comments, which moved with it.
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption only since the ink was shelved, 37x-10m; `titleCaption` deleted); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film, and `loopRender`, a seamless Canvas loop (PLAN 43b) |
 | `useControllers` | MIDI, the gamepad, the projector window |
-| `useCommandPalette` | the palette's commands and the keyboard |
+| `useCommandPalette` | the palette's commands, panel/section indexing, the `?` shortcut sheet state, and the keyboard |
 | `useCheckHooks` | the checks' `?debug` doors (`lib/checkHooks.ts` declares them) |
 | `useCrashState` | the black box's half from here |
 

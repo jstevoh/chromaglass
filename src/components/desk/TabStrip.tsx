@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowRight, Pencil, Plus, Copy, Trash2 } from 'lucide-react';
 import { Segmented } from '../ui';
 import { TAB_NAME_MAX, TABS_MAX } from '../../lib/deskTabs';
 import type { TabEdit } from '../../hooks/useDeskLayout';
+import { useEscape } from '../../hooks/useEscape';
 
 /**
  * The desk's tabs, and the editor that makes them the owner's.
@@ -72,6 +73,7 @@ export function TabStrip({ tabs, tab, onTab, onEdit, onAddPanel, height = 32, to
           onAddPanel={onAddPanel ? () => { setOpen(null); onAddPanel(); } : undefined}
           onClose={() => setOpen(null)}
           at={touch ? null : open}
+          pencilRef={pencil}
           touch={touch}
         />,
         document.body,
@@ -80,7 +82,7 @@ export function TabStrip({ tabs, tab, onTab, onEdit, onAddPanel, height = 32, to
   );
 }
 
-function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
+function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, pencilRef, touch }: {
   tabs: { id: string; name: string }[];
   tab: string;
   onEdit: (e: TabEdit) => void;
@@ -88,23 +90,33 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
   onClose: () => void;
   /** Hung under the pencil; null for the phone's sheet along the bottom. */
   at: { top: number; left: number } | null;
+  pencilRef: RefObject<HTMLButtonElement | null>;
   touch: boolean;
 }) {
   /** The tab whose Delete has been pressed once: the second press takes it away. */
   const [arm, setArm] = useState<string | null>(null);
   const [armReset, setArmReset] = useState(false);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  useEscape(onClose);
+  // On desktop, close on pointerdown outside without mounting an invisible scrim over the header.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    if (!at) return;
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (editorRef.current?.contains(t) || pencilRef.current?.contains(t)) return;
+      onClose();
+    };
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
+  }, [at, onClose, pencilRef]);
   const row = touch ? 48 : 32;
   const btn = `inline-flex shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-30 disabled:hover:bg-transparent`;
   const full = tabs.length >= TABS_MAX;
   return (
     <>
-      <div className="fixed inset-0 z-[60]" onClick={onClose} data-testid="tabs-editor-scrim" />
+      {!at && <div className="fixed inset-0 z-[60] bg-black/30" onClick={onClose} data-testid="tabs-editor-scrim" />}
       <div
+        ref={editorRef}
         className={`fixed z-[61] flex flex-col gap-1 border border-border-strong bg-elevated p-2 shadow-[0_20px_60px_rgba(0,0,0,.6)] ${at ? 'w-[320px] rounded-lg' : 'inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl pb-6'}`}
         style={at ? { top: at.top, left: at.left } : undefined}
         role="dialog"
