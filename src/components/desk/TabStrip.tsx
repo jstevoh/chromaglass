@@ -41,8 +41,8 @@ export function TabStrip({ tabs, tab, onTab, onEdit, onAddPanel, height = 32, to
   };
   return (
     <div className="flex min-w-0 items-center gap-1" data-testid="desk-tabs">
-      {/* Half the header at most on the desk, where it is centred between two clusters; the sheet's width on the phone. */}
-      <div className={`min-w-0 overflow-x-auto scrollbar-hide ${touch ? 'flex-1' : 'max-w-[min(52vw,720px)]'}`}>
+      {/* Half the header at most on the desk, where it is centred between two clusters; the sheet's width on the phone or when wrapped below 768 px. */}
+      <div className={`min-w-0 overflow-x-auto scrollbar-hide ${touch ? 'flex-1' : 'max-w-full md:max-w-[min(52vw,720px)]'}`}>
         <Segmented
           value={tab}
           options={tabs.map(t => [t.id, t.name] as const)}
@@ -117,7 +117,7 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, pencilRef, touc
       {!at && <div className="fixed inset-0 z-[60] bg-black/30" onClick={onClose} data-testid="tabs-editor-scrim" />}
       <div
         ref={editorRef}
-        className={`fixed z-[61] flex flex-col gap-1 border border-border-strong bg-elevated p-2 shadow-[0_20px_60px_rgba(0,0,0,.6)] ${at ? 'w-[320px] rounded-lg' : 'inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl pb-6'}`}
+        className={`fixed z-[61] flex flex-col gap-1 border border-border-strong bg-elevated p-2 shadow-[0_20px_60px_rgba(0,0,0,.6)] ${at ? 'w-[min(320px,calc(100vw-16px))] rounded-lg' : 'inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl pb-6'}`}
         style={at ? { top: at.top, left: at.left } : undefined}
         role="dialog"
         aria-label="The tabs"

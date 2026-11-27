@@ -74,9 +74,11 @@ export function Desk(p: DeskProps) {
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const set = p.onLayout;
-  const [windowW, setWindowW] = useState(() => window.innerWidth);
+  const [windowSize, setWindowSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  const windowW = windowSize.w;
+  const windowH = windowSize.h;
   useEffect(() => {
-    const on = () => setWindowW(window.innerWidth);
+    const on = () => setWindowSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
@@ -141,12 +143,13 @@ export function Desk(p: DeskProps) {
   }, []);
 
   const narrow = windowW < 1024;
+  const stacked = windowW < 768;
   // The plate is measured where it is; the columns moving round it do not resize the window.
   const { onRelayout } = p;
   useEffect(() => {
     const id = requestAnimationFrame(() => onRelayout?.());
     return () => cancelAnimationFrame(id);
-  }, [l, p.tab, narrow, onRelayout]);
+  }, [l, p.tab, narrow, stacked, onRelayout]);
 
   // ── Keys ────────────────────────────────────────────────────────────
   /*
@@ -365,8 +368,11 @@ export function Desk(p: DeskProps) {
 
   /**
    * Below 1024 px, the desk keeps the plate and its controls by folding the two
-   * side columns into one right-hand column without changing `p.layout`, so
-   * snapping the window back to full width restores every panel to its slot.
+   * side columns into one column without changing `p.layout`, so snapping the
+   * window back to full width restores every panel to its slot. From 768 to
+   * 1023 px it sits beside the plate; below 768 px (`stacked`) it sits beneath
+   * the plate so a 360–420 px mouse window keeps both the plate and every
+   * panel reachable without horizontal spill.
    */
   const foldedColumn = () => {
     if (sideIds.length === 0) return null;
@@ -374,7 +380,7 @@ export function Desk(p: DeskProps) {
     const one = expanded.length === 1;
     return (
       <aside
-        className={`flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide border-l border-border p-2 ${dashed}`}
+        className={`flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden cg-scroll ${stacked ? 'border-t' : 'border-l'} border-border p-2 ${dashed}`}
         data-slot="right"
         data-testid="desk-right"
       >
@@ -390,8 +396,11 @@ export function Desk(p: DeskProps) {
     );
   };
 
-  const deckH = l.deck.length === 0 ? 44 : l.deckCollapsed ? STRIP_H
+  const rawDeckH = l.deck.length === 0 ? 44 : l.deckCollapsed ? STRIP_H
     : DECK_H[l.deck.some(id => PANEL_BY_ID.get(id)?.kind === 'knobs') ? 'knobs' : 'other'];
+  const deckH = stacked && !l.deckCollapsed && l.deck.length > 0
+    ? Math.min(rawDeckH, Math.max(120, Math.round(windowH * 0.28)))
+    : rawDeckH;
   const left = l.left.length > 0, right = l.right.length > 0;
   const live = l.plateMode === 'live';
   // Live, the plate is the wall's look; in Preview, the look being built.
@@ -412,10 +421,14 @@ export function Desk(p: DeskProps) {
     <div
       className="fixed inset-0 z-10 grid bg-bg text-text"
       style={{
-        gridTemplateColumns: narrow
-          ? `${sideIds.length > 0 ? `minmax(0, 1fr) ${sideWidth(sideIds)}px` : 'minmax(0, 1fr)'}`
-          : `${left ? `${columnWidth('left', l.left, windowW)}px ` : ''}minmax(0, 1fr)${right ? ` ${columnWidth('right', l.right, windowW)}px` : ''}`,
-        gridTemplateRows: `48px minmax(0, 1fr) ${deckH}px 28px`,
+        gridTemplateColumns: stacked
+          ? 'minmax(0, 1fr)'
+          : narrow
+            ? `${sideIds.length > 0 ? `minmax(0, 1fr) ${sideWidth(sideIds)}px` : 'minmax(0, 1fr)'}`
+            : `${left ? `${columnWidth('left', l.left, windowW)}px ` : ''}minmax(0, 1fr)${right ? ` ${columnWidth('right', l.right, windowW)}px` : ''}`,
+        gridTemplateRows: stacked
+          ? `minmax(48px, auto) ${sideIds.length > 0 ? `${windowH >= 560 ? 'minmax(130px, 30vh)' : 'minmax(0, 1fr)'} minmax(0, 1fr)` : 'minmax(0, 1fr)'} ${deckH}px 28px`
+          : `48px minmax(0, 1fr) ${deckH}px 28px`,
       }}
       // The tab's id, which a rename never changes: `perform-desk`,
       // `sequence-desk`, `setup-desk`, or a tab of the owner's own.
@@ -479,13 +492,13 @@ export function Desk(p: DeskProps) {
       {!narrow && column('left')}
 
       {/* ── The plate ─────────────────────────────────────────────── */}
-      <section className="flex min-h-0 min-w-0 flex-col px-4 py-3">
+      <section className={`flex min-h-0 min-w-0 flex-col ${stacked ? 'px-3 py-2' : 'px-4 py-3'}`}>
         {/*
           The plate bar. It wraps rather than runs under a column: at 1024 in
           Gig the plate is 440 px wide and its bar holds the name, Record, the
           layers, Live | Preview and Save.
         */}
-        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className={`${stacked ? 'mb-2' : 'mb-3'} flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2`}>
           {/* The name gives way first, so the bar is one row wherever the plate is wider than about 930 px. */}
           <span className="flex min-w-[100px] flex-1 items-center gap-2">
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: live ? 'var(--color-live)' : 'var(--color-accent)' }} />
@@ -608,7 +621,10 @@ export function Desk(p: DeskProps) {
               {l.deck.map(id => {
                 const spec = PANEL_BY_ID.get(id);
                 const folded = l.collapsed.includes(id);
-                return frame(id, { className: `shrink-0 ${folded ? 'self-start' : ''}`, style: { width: spec?.deckWidth ?? 266 } });
+                const w = stacked
+                  ? Math.min(spec?.deckWidth ?? 266, Math.max(220, windowW - 72))
+                  : (spec?.deckWidth ?? 266);
+                return frame(id, { className: `shrink-0 ${folded ? 'self-start' : ''}`, style: { width: w } });
               })}
               <button
                 onClick={openBrowser}
@@ -709,7 +725,7 @@ export function Desk(p: DeskProps) {
             {p.status.song && <span data-testid="status-song">{` · ${p.status.song}`}</span>}
           </span>
         </span>
-        <span className="flex items-center gap-3 truncate">
+        <span className="flex min-w-0 items-center gap-3">
           <span className="truncate" data-testid="status-running">
             {`tab ${tabName} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}
             {l.floating.length > 0 && ` · ${l.floating.length} floating`}
@@ -871,7 +887,7 @@ function PanelMenu({ at, layout, popped, onPopOut, act, onReset, onClose }: {
     <div
       ref={menuRef}
       className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface py-1 shadow-2xl"
-      style={{ left: Math.min(at.x, window.innerWidth - 232), top: Math.min(at.y, window.innerHeight - 240) }}
+      style={{ left: Math.max(8, Math.min(at.x, window.innerWidth - 232)), top: Math.max(8, Math.min(at.y, window.innerHeight - 240)) }}
       data-testid="panel-menu"
     >
       {rows.map(([label, run, key]) => (
@@ -964,7 +980,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
   const toggle = () => {
     if (at) { setAt(null); return; }
     const r = button.current?.getBoundingClientRect();
-    if (r) setAt({ top: r.bottom + 4, left: r.left });
+    if (r) setAt({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 232)) });
   };
   // Close on Escape or pointerdown outside without an invisible scrim blocking the header (H3-01).
   useEffect(() => {
@@ -990,7 +1006,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
         <button
           ref={button}
           onClick={toggle}
-          className="flex min-w-[84px] items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
+          className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
           title="New, Save, and your saved preset palettes"
           data-testid="doc-menu-button"
         >

@@ -2556,7 +2556,7 @@
     {
       "name": "The Live Show panel",
       "shard": "browser2",
-      "run": "npm run liveshow -- --owed=narrow",
+      "run": "npm run liveshow",
       "why": [
         "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
         "its sums in node against numbers worked by hand, then the built app",
@@ -2565,8 +2565,8 @@
         "the public, the upload warning, and the phone's Stop. No GPU: the",
         "encoder is WebCodecs' software H.264. Through npm run, which builds",
         "dist/ first and puts esbuild on the PATH (a bare esbuild in the",
-        "shard's shell is not found: exit 127 on the first CI run). The narrow",
-        "window's chip (37x-4d-4, scripts/liveshownarrow.mjs) is owed until built."
+        "shard's shell is not found: exit 127 on the first CI run). Narrowed to",
+        "900 x 800 the folded desk keeps the panel live (49c-3, scripts/liveshownarrow.mjs)."
       ]
     },
     {

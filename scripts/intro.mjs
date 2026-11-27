@@ -451,14 +451,22 @@ const hang = () => {
   // beside or under the plate is a failure of this check, not a pass.
   let deskLeft = 'no desk beside the plate to press';
   if (desk) {
-    // Somewhere on the desk that is not a control: its own background.
-    const spot = await page.evaluate(([x, y]) => { const h = document.elementFromPoint(x, y); return h && !h.closest('button,input,select,a,[role="slider"],[role="button"]') ? 'bare' : h?.tagName; }, desk);
-    if (spot === 'bare') {
+    // Somewhere on the desk that is not a control: its own background. The
+    // first point tried can land on a control (49f put Shortcuts at the
+    // desk's foot), so walk up from it to the first bare point, never into the
+    // plate's frame; nowhere bare at all is still a failure.
+    const spot = await page.evaluate(([x, y, top]) => {
+      const bare = (py) => { const h = document.elementFromPoint(x, py); return h && !h.closest('button,input,select,a,[role="slider"],[role="button"]') ? h : null; };
+      for (let py = y; py > top; py -= 12) if (bare(py)) return { at: py };
+      return { tag: document.elementFromPoint(x, y)?.tagName };
+    }, [...desk, desk[0] < f[0] ? f[1] : f[1] + f[3]]);
+    if (spot.at !== undefined) {
+      desk[1] = spot.at;
       await page.mouse.click(desk[0], desk[1]);
       await page.waitForTimeout(1300);
       const after = await intro(page);
       deskLeft = after.there && !after.leaving ? null : 'it went';
-    } else deskLeft = `no bare desk at ${desk.join(',')} (${spot})`;
+    } else deskLeft = `no bare desk up the column from ${desk.join(',')} (${spot.tag})`;
   }
   await page.mouse.click(f[0] + f[2] / 2, f[1] + f[3] / 2);
   await page.waitForTimeout(1300);

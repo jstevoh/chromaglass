@@ -93,9 +93,9 @@ const SECTIONS: Section[] = [
         <H>The first two minutes</H>
         <Rows items={[
           ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Lava Pop</Em> preset — round cells of oil in a coloured water, lit from below by the lamp: the 1960s clock-glass dish.</>],
-          ['2. Give it sound', <>The quickest is <Em>Band</Em>: a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Mic</Em>, <Em>System</Em> and <Em>File</Em> are the real inputs.</>],
-          ['3. Pick a preset palette', <>Click the name under the ChromaGlass title. The preset palettes come in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
-          ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> is your breath: drag and it runs along the surface the way you dragged, a long plume ahead of your hand that keeps going that way while you hold; press without moving on layer 1 and it is a straw, one round bubble that grows while you hold, <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
+          ['2. Give it sound', <>The quickest is <Em>A band in a box</Em> (<Em>Band</Em> on a phone): a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Microphone</Em>, <Em>Another tab</Em> (or <Em>System audio</Em> in the Mac app) and <Em>Your file</Em> are the real inputs.</>],
+          ['3. Pick a look', <>Click <Em>Look</Em> in the top bar or use the <Em>Looks</Em> panel on the desk. The built-in looks come in groups — Light show, Photograph, Closeup and the Moiré pack — plus any you have saved.</>],
+          ['4. Put a hand on it', <>The <Em>Drop</Em> tool adds dye, <Em>Blow</Em> is your breath: drag and it runs along the surface the way you dragged, a long plume ahead of your hand that keeps going that way while you hold; press without moving on layer 1 and it is a straw, one round bubble that grows while you hold, <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
         <H>Your first show, in order</H>
         <P>
@@ -103,27 +103,27 @@ const SECTIONS: Section[] = [
           watching, and easy before.
         </P>
         <Rows items={[
-          ['1. Sound first', <>Pick the input and let <Em>room calibration</Em> settle for a minute (Settings → Inputs → Sound). It learns this room's floor and ceiling, so the plate reacts to where the music sits between them rather than to an absolute level. Skip it and the show is either dead or frantic all night.</>],
-          ['2. Then the projector', <>Cast → <Em>Second display</Em>. Do it before you tune anything: the projector announces its resolution and the plate re-renders at it, so a look tuned on the laptop alone can arrive coarser or finer than you expected.</>],
-          ['3. Then the look', <>Build in <Em>Design</Em> (the plate filling the window), where <Em>Load</Em> on a preset row is what you want — it lands on clean glass. Save anything you like: <Em>Save As...</Em> keeps the settings, the dyes, the injection styles and the liquids together.</>],
-          ['4. Plan the songs', <>In <Em>Songs</Em> (the desk's third mode), give each song a look — a built-in or one you saved — and say what happens while it plays: the title poured on the first note, a burst every four kicks, in close for each chorus, a drain before the end. Pick them from <Em>Add an action</Em> and change the numbers; keep a list that works as an <Em>action set</Em> for the next song. With <Em>Follow songs</Em> on, a song's show starts when the song is recognised; <Em>Run now</Em> starts it by hand.</>],
-          ['5. Switch to Perform', <>Now the plate becomes a preview and the desk gets the room. From here, change looks by <Em>cueing</Em> and pressing Go, never by Load — Load clears the plate, which on a wall is a cut to black.</>],
-          ['6. Clean Screen last', <>Hides every overlay and the cursor for the projection. Esc brings them back, or a finger held still on a touch screen.</>],
+          ['1. Sound first', <>Pick the input and let <Em>room calibration</Em> settle for a minute (Settings → Feed → Sound, or the <Em>Sound</Em> dot in the top bar). It learns this room's floor and ceiling, so the plate reacts to where the music sits between them rather than to an absolute level. Skip it and the show is either dead or frantic all night.</>],
+          ['2. Then the projector', <>Open <Em>Wall</Em> in Settings → Stage (or press <C>⌘K</C> → <Em>Send the show to a window</Em>). Do it before you tune anything: the projector announces its resolution and the plate re-renders at it, so a look tuned on the laptop alone can arrive coarser or finer than you expected.</>],
+          ['3. Then the look', <>Switch the plate bar to <Em>Preview</Em> while you tune, where <Em>Load</Em> on a look lands on clean glass without clearing the room's wall. Save anything you like with <Em>Save</Em> (<C>⌘S</C>): it keeps the settings, the dyes, the injection styles and the liquids together.</>],
+          ['4. Plan the songs', <>On the <Em>Sequence</Em> tab (<Em>Songs</Em> and <Em>Sequences</Em>), give each song a look — a built-in or one you saved — and say what happens while it plays: the title poured on the first note, a burst every four kicks, in close for each chorus, a drain before the end. Pick them from <Em>Add an action</Em> and change the numbers; keep a list that works as an <Em>action set</Em> for the next song. With <Em>Follow songs</Em> on, a song's show starts when the song is recognised; <Em>Run now</Em> starts it by hand.</>],
+          ['5. Switch to Live', <>Flip the plate bar back to <Em>Live</Em> on the <Em>Perform</Em> tab so the desk drives the wall. From here, change looks by queuing them into <Em>Cues</Em> and pressing <Em>Go</Em>, never by Load — Load clears the plate, which on a wall is a cut to black.</>],
+          ['6. Clean Screen last', <><C>⌘K</C> → <Em>Clean screen</Em> (or the eye button on a phone) hides every panel and the cursor for the projection. <C>Esc</C> brings them back, or a finger held still on a touch screen.</>],
         ]} />
         <P>
-          <Em>Record</Em>, the red button beside Cast (<C>R</C>), writes the plate and its music to a{' '}
+          <Em>Record</Em>, the red control on the plate bar (<C>R</C>), writes the plate and its music to a{' '}
           <C>.webm</C> file (the Plate video), keeps your strokes as a Take, or both: the sliders button beside it says which. <C>T</C> records a Take on its own. <C>B</C> is blackout — the thing to hit when something goes
           wrong, because it fades rather than cuts.
         </P>
         <H>When something is wrong</H>
         <Rows items={[
-          ['Nothing is moving', <>In this order: is the plate playing; can the show hear anything (the level meter in the status line, or Settings → Inputs → Sound); is the <Em>Dimmer</Em> up. <C>B</C> is blackout and it is easy to leave on — the status line says <Em>Blackout</Em> in red when it is.</>],
-          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the bands are set to <C>none</C> — Settings → Inputs → Sound, under What the sound moves.</>],
-          ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on roughly doubles every audio-driven push on top of it, so a plate tuned with it off will be about twice as emphatic once it is on.</>],
+          ['Nothing is moving', <>In this order: is the plate playing; can the show hear anything (the audio level in the bottom status bar, or Settings → Feed → Sound); is the <Em>Dimmer</Em> up. <C>B</C> is blackout and it is easy to leave on — the status bar says <Em>Blackout</Em> in red when it is.</>],
+          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em>. If it still will not, check the bands in Settings → Feed → Sound under What the sound moves, and check that the patches in Settings → Feed → Patches are still in place.</>],
+          ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on adds automated dye drops and breaths on top of what the patches already push.</>],
           ['The plate has gone flat', <>It is saturated: there are no boundaries left to see. Lower <Em>Dye Budget</Em> — counter-intuitively that makes it look fuller, because empty glass is what makes the colour read.</>],
-          ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration and Refraction are the lens's — they do nothing with <Em>Lens</Em> (Settings → Look → Camera) at zero. A slider that cannot do anything says why in place of its value.</>],
+          ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration and Refraction are the lens's — they do nothing with <Em>Lens</Em> (Settings → Look → Lens) at zero. A slider that cannot do anything says why in place of its label description.</>],
           ['The wall went dark on a look change', <>You used Load rather than Cue and Go. Load clears the plate on purpose; Go never does.</>],
-          ['It got slow', <>The status line names the rung the engine settled on. Set <Em>Sim Resolution</Em> to a fixed number rather than auto if a look depends on a particular grid, and expect the frame-time governor to step auto back down on a machine that cannot hold it.</>],
+          ['It got slow', <>The bottom status bar names the rung the governor settled on. Set <Em>Fluid Grid</Em> in Settings → Stage → Simulation to a fixed number rather than auto if a look depends on a particular grid, and expect the governor to step auto back down on a machine that cannot hold it.</>],
         ]} />
       </>
     ),
@@ -154,8 +154,8 @@ const SECTIONS: Section[] = [
           capped so a stall cannot spiral.
         </P>
         <P>
-          On a GPU it solves at whatever grid the quality governor picks (Settings →
-          Simulation, <Em>Sim Resolution</Em>); without float render targets it falls back
+          On a GPU it solves at whatever grid the quality governor picks (Settings → Stage →
+          Simulation, <Em>Fluid Grid</Em>); without float render targets it falls back
           to a 192² solver in JavaScript. Both run the same scheme, so a preset looks like
           itself on either — a finer grid resolves thinner filaments and real cell
           structure, it does not change the physics.
@@ -172,11 +172,14 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>
-          The dropper has nine bottles, and they are not nine colours. Five put dye on the
-          glass and nothing else. Four also write themselves into a second field the plate
-          carries, and the plate goes on acting on that field long after the drop.
+          The shelf holds fourteen bottles, and they are not fourteen colours. Five put dye
+          and weight on the glass (<Em>Water</Em>, <Em>Oil</Em>, <Em>Alcohol</Em>, <Em>Ink</Em>,{' '}
+          <Em>Syrup</Em>); four also write into a second field the plate carries and keep acting
+          long after the drop (<Em>Soap</Em>, <Em>Milk</Em>, <Em>Silicone</Em>, <Em>Glycerine</Em>);
+          and five are special reagents (<Em>Turing Reagent</Em>, <Em>Acid</Em>, <Em>Base</Em>,{' '}
+          <Em>BZ Activator</Em>, <Em>Ferrofluid</Em>).
         </P>
-        <H>Colour only</H>
+        <H>Colour and weight</H>
         <P>
           <Em>Water</Em>, <Em>Oil</Em>, <Em>Alcohol</Em>, <Em>Ink</Em> and <Em>Syrup</Em> differ
           in how wide the drop is, how much dye it lays down and how much warmth it brings.
@@ -238,14 +241,15 @@ const SECTIONS: Section[] = [
           where their liquids, their chemistry or their print make the colour.
         </P>
         <Rows items={[
-          ['Hue Journey', <>Settings → Show. Minutes per step. The set drifts its colours over the length of a set, one dye draining as the next arrives, never a jump. At zero the old behaviour stays: a re-pick every forty-five seconds or so.</>],
+          ['Hue Journey', <>Settings → Look → Show. Minutes per step. The set drifts its colours over the length of a set, one dye draining as the next arrives, never a jump. At zero the old behaviour stays: a re-pick every forty-five seconds or so.</>],
           ['Palette lock', <>Pin a harmony and it wins outright — over drains, seeds, auto-rotation and the music. Persists across sessions.</>],
-          ['Save As...', <>Writes the look, its dyes, its injection styles and its liquids to your library and to a <C>.chromaglass-preset.json</C> file. Load a friend's the same way.</>],
+          ['Save / Save as…', <>Writes the look, its dyes, its injection styles and its liquids to your library and to a <C>.chromaglass-preset.json</C> file. Load a friend's the same way.</>],
           ['For this song', <>A saved preset can be attached to the track that was playing. It is applied whenever that song is identified again.</>],
         ]} />
         <Note>
-          The presets live on the title, and nowhere else. They used to be in the settings
-          panel too, which meant two lists that could disagree about which one was active.
+          The looks live in the <Em>Looks</Em> panel and the top-bar <Em>Look</Em> menu, and nowhere
+          else. They used to be duplicated in Settings too, which meant two lists that could
+          disagree about which one was active.
         </Note>
       </>
     ),
@@ -260,17 +264,17 @@ const SECTIONS: Section[] = [
       <>
         <H>Where it listens</H>
         <Rows items={[
-          ['Mic', <>The microphone, or whichever input is chosen in Settings → Inputs → Sound. The app never opens it on load — it only comes back where the browser already says granted.</>],
-          ['System', <>System audio, for music playing on this machine.</>],
-          ['File', <>A music file played here, with its own small player.</>],
-          ['Band', <>A synthesised band — kick, snare, hats, bass and pad in verses and choruses at 122 bpm — played silently into the analyser. It is a real audio stream, so the analyser, the room calibration, the beat clock's tempo lock and every mapping run exactly as they do on a microphone.</>],
+          ['Microphone', <>The microphone, or whichever input is chosen in Settings → Feed → Sound. The app never opens it on load — it only comes back where the browser already says granted.</>],
+          ['Another tab / System audio', <>Audio from another browser tab, or system audio in the Mac app, for music playing on this machine.</>],
+          ['Your file', <>A music file played here, with its own small player.</>],
+          ['A band in a box', <>A synthesised band (labelled <Em>Band</Em> on a phone) — kick, snare, hats, bass and pad in verses and choruses at 122 bpm — played silently into the analyser. It is a real audio stream, so the analyser, the room calibration, the beat clock's tempo lock and every mapping run exactly as they do on a microphone.</>],
         ]} />
         <H>The controls</H>
         <Rows items={[
           ['Sensitivity', <>How hard the analysis drives everything downstream. The first thing to reach for in a room that is louder or quieter than the last one.</>],
           ['Bass Boost', <>A gain on the bass's push: the glass presses deeper under each kick and bass note and every kick throws more dye, at up to three times the strength, while the beat detection is untouched. A PA with no low end is fixed here rather than by re-tuning every slider.</>],
-          ['Speed', <>How fast the whole plate lives, independent of the music. In Settings → Live → Master, with the house lights.</>],
-          ['Dimmer / Blackout', <>The house lights for the plate, in Settings → Live → Master. <C>B</C> fades to black and back, as does the Blackout button on the phone or a controller.</>],
+          ['Speed', <>How fast the whole plate lives, independent of the music. In Settings → Play → Master, with the house lights.</>],
+          ['Dimmer / Blackout', <>The house lights for the plate, in Settings → Play → Master (and the desk header). <C>B</C> fades to black and back, as does the Blackout button on the phone or a controller.</>],
           ['Room calibration', <>Learns this room's noise floor and dynamics and drives the visuals from where the music sits between them, rather than from an absolute level. A quiet room and a loud one then look the same.</>],
           ['Beat Prediction', <>A phase-locked beat clock. The microphone hears a kick after it happens, so the clock learns the tempo and fires the next one <Em>early</Em>. <Em>Beat Lead</Em> is how early, in milliseconds.</>],
         ]} />
@@ -278,10 +282,10 @@ const SECTIONS: Section[] = [
         <P>
           Four destinations — velocity, density, colour, rotation — each fed by one of
           eight features: volume, bass, mid, treble, energy, timbre, complexity, or none.
-          This is the coarse wiring, at the foot of Settings → Inputs → Sound. <Em>Sound Drive</Em>, at the top of Sound, is how
+          This is the coarse wiring, at the foot of Settings → Feed → Sound. <Em>Sound Drive</Em>, at the top of Sound, is how
           hard the result lands, and it is the slider to move when the plate is either ignoring
           the music or being shoved around by it. Any sound feature onto any other control is a
-          patch, in Settings → Inputs → Patches.
+          patch, in Settings → Feed → Patches.
         </P>
       </>
     ),
@@ -310,12 +314,12 @@ const SECTIONS: Section[] = [
           ['Boundary Glow', <>A bright line where two distinct dyes meet — the oil-water interface, without a multi-fluid solve.</>],
           ['Saturation / Glossiness / Post Blur', <>The final grade. Glossiness steepens the liquid's surface as the lens sees it: zero is the real surface, and up from there its slopes bend more of the lamp out of the lens, so ripples and edges darken. Lit from beneath, nothing on the plate shines.</>],
         ]} />
-        <H>Camera: two render styles</H>
+        <H>Film Stock &amp; Lens: two render styles</H>
         <P>
           <Em>Light show</Em> is dye as light on black — the projected image. <Em>Photograph</Em> is
-          a two-pass render with a camera over the plate and lit paper behind it, and it
-          is what the Oil on Water and Colorful Cosmos preset palettes are. <Em>Lens</Em> is
-          how much of a camera is over either: Focus, Aperture, Bloom, Chromatic Aberration and
+          a two-pass render with a camera over the plate and lit paper behind it (Settings → Look → Film Stock),
+          which is what the Oil on Water and Colorful Cosmos looks are. <Em>Lens</Em> (Settings → Look → Lens)
+          is how much of a camera is over either: Focus, Aperture, Bloom, Chromatic Aberration and
           Refraction are its controls, and do nothing with it at zero.
         </P>
         <H>Lamp &amp; Light</H>
@@ -340,7 +344,7 @@ const SECTIONS: Section[] = [
         <H>Fluid Physics</H>
         <Rows items={[
           ['Diffusion Rate', <>How fast dye bleeds into its neighbours. Near zero keeps pinpoints sharp; up high everything becomes a wash.</>],
-          ['Buoyancy', <>How strongly warm liquid rises. This and Heat Intensity are what make a plate left alone keep moving.</>],
+          ['Buoyancy', <>How strongly warm liquid rises. This and the lamp's <Em>Heat</Em> (Settings → Look → Lamp &amp; Light) are what make a plate left alone keep moving.</>],
           ['Advection', <>How far the dye is carried per step. Raise it and the plate sweeps; lower it and motion becomes local churn.</>],
           ['Momentum', <>How much velocity survives each step (the setting is still <C>damping</C>; up keeps more of the motion, which is less friction, not more). This is how long a gesture lasts — at 0.99 a blow is still visible half a minute later, at 0.95 it is gone in a second.</>],
         ]} />
@@ -349,7 +353,7 @@ const SECTIONS: Section[] = [
           ['Plate Pressure', <>A standing radial spread from the middle, as if the glass were slightly bowed.</>],
           ['Glass Smear', <>Slow wandering of the whole field, the way a plate on a warm projector drifts.</>],
           ['Rain Drip', <>Heavy colour runs downhill in streaks, as far as the plate is tipped (Gravity). Flat, nothing runs.</>],
-          ['Fingering', <>Settings → Show. With it up, a press does not thin evenly: the film thins more along a ring of spokes and the outflow follows them, so the front breaks into radial fingers instead of a smooth ring. The physics is Saffman–Taylor — thin liquid shooting through thick.</>],
+          ['Fingering', <>Settings → Look → Show (or the <Em>Press</Em> tool's options chip). With it up, a press does not thin evenly: the film thins more along a ring of spokes and the outflow follows them, so the front breaks into radial fingers instead of a smooth ring. The physics is Saffman–Taylor — thin liquid shooting through thick.</>],
         ]} />
         <H>Heat and polarity</H>
         <Rows items={[
@@ -359,7 +363,7 @@ const SECTIONS: Section[] = [
         ]} />
         <H>Simulation</H>
         <P>
-          <Em>Sim Resolution</Em> is the grid the solver runs on. <C>auto</C> hands the choice to
+          <Em>Fluid Grid</Em> (Settings → Stage → Simulation) is the grid the solver runs on. <C>auto</C> hands the choice to
           a frame-time governor that climbs when there is headroom and steps down when
           there is not; <C>cpu</C> is the 192² JavaScript fallback; a pinned number is
           honoured up to the graphics card's texture limit.
@@ -378,7 +382,7 @@ const SECTIONS: Section[] = [
         <P>
           A tracking camera that magnifies the plate and chases a single travelling bead
           of liquid, from 1× to 16×. <C>+</C> and <C>−</C>, the wheel over the plate, or the
-          chip under the title. It is a different subject, not a zoom: at 8× the frame is
+          <Em>Macro Zoom</Em> slider (Settings → Look → Macro Closeup, or the microscope button on a phone). It is a different subject, not a zoom: at 8× the frame is
           the liquid itself, shaded as a thick film under a low lamp, in the dye's own
           colour. Paint cells and lacing are opt-in, off unless you turn them up; of the
           shipped looks only Lacing Run draws lacing.
@@ -410,7 +414,7 @@ const SECTIONS: Section[] = [
           A real light show was never one projector. These are the others, each able to
           run under or over the dye. Lumia, Chemistry, the gel wheel, Lamp Warmth and Exposure
           are in Settings → Look → Lamp &amp; Light; the film projector is an input of its own,
-          Settings → Inputs → Film.
+          Settings → Feed → Video (or the <Em>Film</Em> dot in the top bar).
         </P>
         <Rows items={[
           ['Lumia', <>Thomas Wilfred's aurora: slow folded sheets of light drifting under a nearly clear plate. No beat, no dye to speak of, minutes-long evolutions.</>],
@@ -441,7 +445,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Room Drive', <>The optical-flow lattice upsampled onto the grid and added as velocity every solver step. A wave of an arm reaches the plate about 100 ms after it happens.</>],
           ['Hands', <>Everyone the sensor holds becomes a projectionist: standing still is a palm on the top glass (so <Em>Fingering</Em> breaks it into spokes), moving is a puff of air the way they are going, arriving is a drop. A track keeps its identity, so the same dancer keeps the same dye across a set.</>],
-          ['Patches', <>How busy the floor is, how suddenly it moves and how long it has been busy, how many people, how spread out, where they are, which way they are going, how light the room is and what colour — any of them on any control, each with its own depth, under one master <Em>Room Impact</Em>. The patch bay is a section of its own, Settings → Inputs → Patches, because it reads the film, the sound and the shapes as well.</>],
+          ['Patches', <>How busy the floor is, how suddenly it moves and how long it has been busy, how many people, how spread out, where they are, which way they are going, how light the room is and what colour — any of them on any control, each with its own depth, under one master <Em>Room Impact</Em>. The patch bay is a section of its own, Settings → Feed → Patches, because it reads the film, the sound and the shapes as well.</>],
           ['Flip Camera', <>For a camera facing the room, so a hand moved left moves the dye left.</>],
           ['Deadzone / Smoothing', <>What counts as nothing, and how much the reading is smoothed before it is used. A room is a noisy sensor.</>],
         ]} />
@@ -468,7 +472,7 @@ const SECTIONS: Section[] = [
       <>
         <H>Hands</H>
         <Rows items={[
-          ['MIDI', <>Plug the controller in and click the <Em>MIDI</Em> dot in the header, or open Settings → Inputs → Controller: if we recognise the port, its factory map is one button. Factory maps for APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad and Launch Control XL, or teach yours: choose what a control should do, then touch it. Soft takeover, endless encoders and LED feedback. The panel draws your controller to scale, which doubles as a printable cheat sheet. Maps save as <C>.chromaglass-midi.json</C>.</>],
+          ['MIDI', <>Plug the controller in and click the <Em>MIDI</Em> dot in the header, or open Settings → Feed → Controller: if we recognise the port, its factory map is one button. Factory maps for APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad and Launch Control XL, or teach yours: choose what a control should do, then touch it. Soft takeover, endless encoders and LED feedback. The panel draws your controller to scale, which doubles as a printable cheat sheet. Maps save as <C>.chromaglass-midi.json</C>.</>],
           ['Game controller', <>Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons fire the one-shots.</>],
           ['Phone / iPad', <>A projectionist's pad: drag to blow, tap to drop, pick a dye, pick which plate you are working, tilt the device to rock the plate. On an iPad it is two columns — the pad on the left, the dials and sequencer on the right. A pen's pressure sets how much dye and its lean sets which way the air goes.</>],
           ['OSC', <>Addresses like <C>/chromaglass/preset galaxy</C> or <C>/chromaglass/setting/dimmer 0.5</C> for Resolume, TouchDesigner, a lighting desk or a laptop running a show-control app, on UDP port 9000 (Pro; the Mac app's Show → OSC input turns it on). Every address, with a starter Resolume map and a TouchDesigner script: <C>docs/osc.md</C> on ChromaGlass's GitHub.</>],
@@ -477,7 +481,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Automation', <>Dye drops and air blows driven by the music. <Em>Evolve Speed</Em> is how often: small drops and soft breaths, from one every several seconds to about one a second. Evolve drifts; it never floods the plate.</>],
           ['Sequencer', <>Script how the show evolves over a song or a set: stages with their own presets and durations, saved as <C>.chromaglass-sequence.json</C> with any of your presets it needs, so it arrives whole on another laptop.</>],
-          ['Mixer', <>Every picture on the wall in one stack: the LED ring, the gel wheel, the lumia, the front and back plates, the film and the logo. Move a source up or down the stack, and give each its own <Em>level</Em>, <Em>brightness</Em>, <Em>contrast</Em>, <Em>saturation</Em> and <Em>hue</Em>. What is under the front plate is the lamp; above it, the LED ring and the lumia are beams of their own and the gel is a filter on the lens. On the Perform desk under the rides, in Settings → Live → Mixer, and on the phone's dock. Each row but the front plate also has a <Em>blend</Em>, in its Grade drawer: its own way in, or screen, add, multiply or key. Pads can raise a source a row at a time, or step its blend. The <Em>Fade</Em> button beside a row's level takes it out over its <Em>fade time</Em>, in bars (in the Grade drawer; 0 is a cut), and brings it back to where it was; a pad does the same.</>],
+          ['Mixer', <>Every picture on the wall in one stack: the LED ring, the gel wheel, the lumia, the front and back plates, the film and the logo. Move a source up or down the stack, and give each its own <Em>level</Em>, <Em>brightness</Em>, <Em>contrast</Em>, <Em>saturation</Em> and <Em>hue</Em>. What is under the front plate is the lamp; above it, the LED ring and the lumia are beams of their own and the gel is a filter on the lens. On the Perform desk under <Em>Rides → Mixer</Em>, in Settings → Play → Mixer, and on the phone's Mix sheet. Each row but the front plate also has a <Em>blend</Em>, in its Grade drawer: its own way in, or screen, add, multiply or key. Pads can raise a source a row at a time, or step its blend. The <Em>Fade</Em> button beside a row's level takes it out over its <Em>fade time</Em>, in bars (in the Grade drawer; 0 is a cut), and brings it back to where it was; a pad does the same.</>],
           ['Plates & LED', <>A second plate composited over the first with screen, lighter, exclusion, multiply or overlay, each turning its own way. <Em>Layer Scale Variety</Em> gives the second its own magnification, which is what two projectors at different throws actually look like.</>],
           ['Music intelligence', <>The first listen to a song is recorded and analysed offline into a map — verse and chorus structure, pitch and energy curves — cached locally. On every later listen the show is driven by known structure rather than by the last half-second: choruses surge, intros and outros calm. Lyrics come from LRCLIB, with themed word triggers and a per-section sentiment arc.</>],
         ]} />
@@ -487,10 +491,10 @@ const SECTIONS: Section[] = [
           desk is for and it is not obvious from the buttons alone.
         </P>
         <Rows items={[
-          ['Arm it', <>Click the plate's name at the top left and pick a look. Nothing happens on the wall. The bar at the bottom now reads <Em>On stage</Em> → <Em>Cued</Em>.</>],
-          ['Set the fade', <>The timer on that bar: cut, 1, 2, 4 or 8 seconds. Two is a good default; eight is a scene change; cut is for when you mean it.</>],
-          ['Go', <>The new look crossfades in and the plate is never wiped. The Go button fills as it travels, so you can see how far through it is without watching the wall.</>],
-          ['Undo', <>The arrow beside Go returns to the look before the last Go, at the same fade. It also undoes <Em>Lucky</Em> — that is why Lucky is safe to press.</>],
+          ['Arm / Cue it', <>Pick a look in the <Em>Looks</Em> panel (or click <Em>Look</Em> at the top left) and queue it into <Em>Cues</Em>. Nothing changes on the wall until you fire it.</>],
+          ['Set the fade', <>The fade selector on <Em>Cues</Em>: cut, 1, 2, 4 or 8 seconds. Two is a good default; eight is a scene change; cut is for when you mean it.</>],
+          ['Go', <>Press <Em>Go</Em> (<C>Space</C>) to crossfade to the next queued look without wiping the plate.</>],
+          ['Back', <><C>⌫</C> (or <C>⌘K</C> → <Em>Back</Em>) returns to the look before the last Go, at the same fade.</>],
         ]} />
 
         <H>The keyboard</H>
@@ -498,9 +502,9 @@ const SECTIONS: Section[] = [
           ['B', <>Blackout — fades the plate down and back. The panic button, and the one to leave your hand near.</>],
           ['+ / −', <>Macro zoom, 1× to 16×, the closeup's one control. <C>+</C> from the plate comes in gently; <C>−</C> down to 1× is the whole plate again.</>],
           ['[ / ]', <>Less or more of the tool in hand: the dye a drop lays, the pressure of a press, the wind, the drag, the magnet's pull. Each tool keeps its own <Em>Amount</Em>; 1× is the usual.</>],
-          ['Alt-drag', <>In the closeup, pans the camera; <C>Alt</C>-click fixes it on the spot under the pointer. <Em>Hold</Em>, <Em>Follow</Em> and <Em>Auto</Em> on the zoom chip say who moves it.</>],
-          ['?', <>This manual.</>],
-          ['Esc', <>Brings the overlays back after Clean Screen; with them up, closes whatever panel is open.</>],
+          ['Alt-drag', <>In the closeup, pans the camera; <C>Alt</C>-click fixes it on the spot under the pointer.</>],
+          ['?', <>Opens the Keyboard Shortcuts sheet. (Use <C>⌘K</C> → <Em>Guide</Em>, or <Em>More › Guide</Em> on a phone, for this manual.)</>],
+          ['Esc', <>Brings the overlays back after Clean Screen; with them up, closes whatever menu, sheet or modal is open.</>],
           ['Wheel over the plate', <>Zooms the closeup while it is running. It will not turn it on — a trackpad brush must not become a camera cut.</>],
         ]} />
 
@@ -555,12 +559,12 @@ const SECTIONS: Section[] = [
           in it. Turbulence alone, with momentum low, mostly produces noise that vanishes.
         </P>
 
-        <H>Heat Intensity × Buoyancy × Boiling Point × Heat Decay</H>
+        <H>Heat × Buoyancy × Heat Spread × Heat Decay</H>
         <P>
-          Heat does nothing visible without Buoyancy to turn it into motion. Boiling Point
-          is the ceiling on how violent that motion may get, and Heat Decay is how long it
-          lasts between events. A plate that is calm despite a lot of heat usually has
-          Boiling Point near 1; a plate that will not settle usually has Heat Decay near 1.
+          The lamp's <Em>Heat</Em> (Settings → Look → Lamp &amp; Light) does nothing visible
+          without <Em>Buoyancy</Em> to turn warmth into rising motion. <Em>Heat Spread</Em> diffuses
+          warmth across the dish, and <Em>Heat Decay</Em> sets how long warmth lingers between
+          events — a plate that will not settle usually has Heat Decay near 1.
         </P>
 
         <H>The liquids are local; the sliders are plate-wide</H>
