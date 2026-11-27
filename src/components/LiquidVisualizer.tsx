@@ -81,6 +81,8 @@ import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun'
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { dropBottle, layStream } from '../sim/dropSplash';
+import { keepFullState, stepKeepFull } from '../sim/keepFull';
+import { hueJourneyTurns } from '../sim/hueJourney';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
@@ -508,6 +510,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (areaBottlesRef.current || (layer >= 1 && backDyesRef.current)) pourLiquid(fluid, a.liquid, x, y, strength);
     else doseLiquid(fluid, liquidsOf(layer), x, y, strength);
   };
+  // Keep Full's hand (PLAN 18a-22, sim/keepFull.ts): built once, as everything it reads is a ref.
+  const keepFullRef = useRef(keepFullState({ areasOf, areaColor, harmonyOf, liquidsOf }));
   /**
    * The working harmony for the current contract: the sequencer's window if
    * it set one, else the hue journey's window (one dye short of the contract,
@@ -1050,7 +1054,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     another. Two integers make the difference between "the plate moved" and
     "evolving thinned it twice and drew a finger through it once".
   */
-  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0, palettes: 0 });
+  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0, palettes: 0, kept: 0 });
   /*
     A finger the automation is drawing, over frames rather than in one.
 
@@ -3587,28 +3591,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
           }
 
-          /*
-            The hue journey: a set drifts its colours over minutes, one dye
-            draining as the next arrives, never a jump.
-
-            It lived inside the evolve block above, so with Random Evolve off —
-            the default — it never ran, and its "minutes" were the solver's clock:
-            at the default Speed one of them took three and a half real minutes,
-            at full Speed eight seconds. On the wall clock now, while playing.
-          */
-          if (isActiveRef.current && drainFrameRef.current === 0 && !harmonyLockRef.current) {
-            const journeyMin = currentSettings.hueJourney ?? 0;
-            if (journeyMin > 0) {
-              const j = journeyRef.current;
-              const nowS = showNow() * 0.001;
-              if (j.lastAt < 0 || j.lastAt > nowS) j.lastAt = nowS;
-              if (nowS - j.lastAt >= journeyMin * 60) {
-                j.lastAt = nowS;
-                j.lead += 1;
-                const contract = presetContractRef.current;
-                harmonyRef.current = contract ? harmonyFromContract(contract, true) : pickHarmony();
-              }
+          // The hue journey: a set drifts its colours over minutes (sim/hueJourney.ts). And Keep Full (sim/keepFull.ts, PLAN 18a-22).
+          if (isActiveRef.current && drainFrameRef.current === 0) {
+            if (!harmonyLockRef.current && hueJourneyTurns(journeyRef.current, currentSettings.hueJourney ?? 0, showNow() * 0.001)) {
+              const contract = presetContractRef.current;
+              harmonyRef.current = contract ? harmonyFromContract(contract, true) : pickHarmony();
             }
+            if (currentSettings.keepFull) autoEventsRef.current.kept += stepKeepFull(keepFullRef.current, fluidsRef.current, now, currentSettings);
           }
 
           // ── A pressed look change handing over (see `handoffRef`) ──
