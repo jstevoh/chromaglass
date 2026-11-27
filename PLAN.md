@@ -41,6 +41,9 @@ real, and the plate shader draws only what the solver makes.
 3. **Video as the lamp** (**14ag-3**, PR #899): any footage under the dish, seen through
    the liquid, refracted and coloured by the oil. A new source for every look. Shipped
    by PR #899; filmed on the owner's Mac 2026-11-14 (`docs/judging.md` §141).
+   **14ag-9** shipped (asked 2026-11-27): the camera's or window's own row with a live
+   preview, Plate / Lamp / LED ring / Pour for any input (the camera pours too), the video
+   on the spinning LED ring (`filmRing`), the Video dot opening the desk's panel (§147).
 4. **The liquid looks at a real show's pace** (**48q**): 25 of 33 liquid looks turn over
    several times slower than real shows, and the cause is the forcing, not the camera.
    The widest change on the list, since it touches most looks: work the liquid harder by

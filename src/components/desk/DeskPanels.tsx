@@ -779,8 +779,8 @@ function DyesBody({ p }: { p: DeskProps }) {
           in the Video panel: one row, Play and Pour, either or both. */}
       {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
-          <span className="text-[12px] uppercase tracking-wider text-dim">Your video</span>
-          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
+          <span className="text-[12px] uppercase tracking-wider text-dim">Video in</span>
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} filmRing={p.settings.filmRing} onPlace={patch => p.onSetting(patch)} />
         </div>
       )}
     </div>
