@@ -265,7 +265,7 @@ sub-cell droplets. Ranked by what a person watching the wall would see against w
 
 | Rank | Item | On the wall | GPU cost | Build |
 |---|---|---|---|---|
-| 1 | 48s ouzo clouding (shipped #PRNUM; its check is 48s-1) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built; Claude's check owed |
+| 1 | 48s ouzo clouding (shipped #1007; its check is 48s-1) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built; Claude's check owed |
 | 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
 | 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
 | 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |
@@ -282,7 +282,7 @@ shadowgraph); the Cheerios effect (needs a free surface the sandwiched gap does 
 bubbles' crowding is 38g); the coffee ring (in §18 with evaporation as solvent loss); Bénard
 cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
 
-- **48s. Ouzo clouding: a clear pour turns milky where it mixes** (shipped #PRNUM, 2026-11-27;
+- **48s. Ouzo clouding: a clear pour turns milky where it mixes** (shipped #1007, 2026-11-27;
   builds on **18j** milk's scattering). A fifteenth bottle, **Ouzo**: anise oil in alcohol at a
   kitchen extract's strength (3% oil in 75% alcohol; the drink's 0.2% is only a haze in a
   2 mm dish). The solver carries its ethanol and its oil in a field of their own (`solvent`,
