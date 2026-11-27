@@ -37,7 +37,8 @@ import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
 import { lookStill } from '../../lib/lookStills';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
 import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
@@ -1007,6 +1008,7 @@ export function PhoneStage(p: PhoneStageProps) {
               <div className="flex flex-col gap-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
                     <button
                       key={l.id}
@@ -1014,8 +1016,8 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        // A pack's look without the pack opens the account sheet (PLAN 45a).
-                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        // A pack's look without the pack opens the lock/account sheet (PLAN 45a, 49j).
+                        if (locked) openTierLock('moire', { itemName: l.name });
                         else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
@@ -1029,6 +1031,7 @@ export function PhoneStage(p: PhoneStageProps) {
                         <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
                       </span>
+                      {locked && <TierLockBadge label="Pro · Pack" />}
                     </button>
                   );
                 })}
@@ -1280,7 +1283,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.score && (
             <>
               <SectionLabel>The song</SectionLabel>
-              <SongScore {...p.score} touch />
+              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
             </>
           )}
           {/*

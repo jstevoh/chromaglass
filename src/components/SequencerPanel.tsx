@@ -129,37 +129,92 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
         A script for the show instead of dice: stages that change the plate over a song or a set, each gliding into the next on a clock or when the song moves to a new section.
       </p>
 
+      {!selected ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4" data-testid="seq-empty">
+          <p className="text-[13px] font-medium text-white">No sequences yet</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-white/75">
+            Create your first sequence to script looks and settings across timed or song-section stages.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={makeNew}
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[12px] font-semibold text-black hover:opacity-90"
+              data-testid="seq-empty-new"
+            >
+              <Plus size={13} /> New sequence
+            </button>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-[12px] font-medium text-white/85 hover:bg-white/10"
+              data-testid="seq-import"
+            >
+              <FolderOpen size={12} /> Load file
+            </button>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            data-testid="seq-file-input"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (!f || !onImportFile) return;
+              try { setFileError(null); await onImportFile(f); } catch (err) { setFileError(err instanceof Error ? err.message : 'Could not read that file'); }
+            }}
+          />
+          {fileError && <p className="mt-2 text-[12px] text-red-300">{fileError}</p>}
+        </div>
+      ) : (
+      <>
       {/* Sequence picker */}
       <Field label="Sequence">
-        <select value={selected?.id ?? ''} onChange={(e) => { onSelect(e.target.value); setEditIndex(null); }} className={inputCls} data-testid="seq-select">
+        <select value={selected.id} onChange={(e) => { onSelect(e.target.value); setEditIndex(null); }} className={inputCls} data-testid="seq-select">
           {sequences.map(q => <option key={q.id} value={q.id}>{q.name}{q.builtIn ? '' : ' ✎'}</option>)}
         </select>
       </Field>
-      {selected?.description && <p className="text-[10px] leading-relaxed opacity-50 mb-4">{selected.description}</p>}
-      {selected?.song && (
-        <p className="text-[10px] leading-relaxed opacity-60 mb-4" data-testid="seq-song">
+      {selected.description && <p className="text-[12px] leading-relaxed text-white/65 mb-4">{selected.description}</p>}
+      {selected.song && (
+        <p className="text-[12px] leading-relaxed text-white/70 mb-4" data-testid="seq-song">
           ♪ Made for <span className="text-white/90">{songLabel(selected.song)}</span>: starts when that song is identified, at the right point in it, and stops when it ends.
         </p>
       )}
 
-      {/* Transport */}
+      {/* Transport: while idle, only the one Play button rather than greyed Prev/Next/Stop. */}
       <div className="flex items-center gap-2 mb-4" data-testid="seq-transport">
-        <button onClick={onPrev} disabled={!isRunningThis} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-30" title="Previous stage" data-testid="seq-prev"><SkipBack size={14} /></button>
+        {isRunningThis && (
+          <button onClick={onPrev} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Previous stage" data-testid="seq-prev"><SkipBack size={14} /></button>
+        )}
         {isRunningThis && status.running ? (
           <button onClick={onPause} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-pause"><Pause size={14} /> Pause</button>
         ) : (
-          <button onClick={() => onPlay(selected?.id)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
+          <button onClick={() => onPlay(selected.id)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
         )}
-        <button onClick={onNext} disabled={!isRunningThis} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-30" title="Next stage" data-testid="seq-next"><SkipForward size={14} /></button>
-        <button onClick={onStop} disabled={status.sequenceId === null} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-30" title="Stop the sequencer and hand the show back" data-testid="seq-stop"><Square size={14} /></button>
+        {isRunningThis && (
+          <>
+            <button onClick={onNext} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Next stage" data-testid="seq-next"><SkipForward size={14} /></button>
+            <button onClick={onStop} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Stop the sequencer and hand the show back" data-testid="seq-stop"><Square size={14} /></button>
+          </>
+        )}
       </div>
       {status.sequenceId !== null && !isRunningThis && (
-        <p className="text-[10px] opacity-50 mb-4">Running: {status.name} — stage {status.stageIndex + 1}, {status.stageName}</p>
+        <div className="mb-4 flex items-center justify-between gap-2 text-[12px] text-white/70">
+          <span>Running: {status.name} — stage {status.stageIndex + 1}, {status.stageName}</span>
+          <button onClick={onStop} className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium hover:bg-white/10" data-testid="seq-stop">Stop</button>
+        </div>
       )}
 
       {/* Stage strip */}
       <div className="flex flex-col gap-1.5 mb-5" role="radiogroup" aria-label="Sequence stages" data-testid="seq-stages">
-        {selected?.stages.map((st, i) => {
+        {selected.stages.length === 0 && (
+          <p className="text-[12px] text-white/70" data-testid="seq-stages-empty">
+            No stages yet. {editable ? 'Press Add stage below to add your first stage.' : 'Copy this sequence to add stages.'}
+          </p>
+        )}
+        {selected.stages.map((st, i) => {
           const current = isRunningThis && status.stageIndex === i;
           const prog = current ? status.progress : 0;
           return (
@@ -187,7 +242,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
           );
         })}
       </div>
-      {selected?.stages.some(st => st.advance === 'section') && !hasSections && (
+      {selected.stages.some(st => st.advance === 'section') && !hasSections && (
         <p className="text-[10px] leading-relaxed opacity-50 mb-4">
           Section stages wait for the song map from Track intelligence; until a track is identified, or while the show is not sure where in the song the band is, they advance on their own clock.
         </p>
@@ -195,7 +250,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
 
       {/* Files: a sequence is a JSON file you can keep and share */}
       <div className="flex gap-2 mb-2">
-        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium disabled:opacity-30" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
+        <button onClick={() => onExport?.(selected)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
         <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
         <input
           ref={fileRef}
@@ -214,17 +269,22 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
       {fileError && <p className="text-[10px] text-red-300 mb-3">{fileError}</p>}
 
       {/* Sequence actions */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-3">
         <button onClick={makeCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Copy this sequence so you can edit it"><Copy size={12} /> Copy</button>
         <button onClick={makeNew} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Start a new sequence"><Plus size={12} /> New</button>
         {editable && (
           <button onClick={() => { onRemove(selected.id); setEditIndex(null); }} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-400/40" title="Delete this sequence"><Trash2 size={12} /></button>
         )}
       </div>
+      {selected.builtIn && (
+        <p className="mb-6 text-[12px] leading-relaxed text-white/65" data-testid="seq-builtin-hint">
+          Built-in sequence — press Copy to edit its stages, or New to start your own.
+        </p>
+      )}
 
       {/* Editor */}
       {editable && (
-        <section className="mb-8">
+        <section className="mb-8 mt-3">
           <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4">Edit</h3>
           <Field label="Name">
             <input value={selected.name} onChange={(e) => update(seq => ({ ...seq, name: e.target.value }))} className={inputCls} />
@@ -249,7 +309,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
             )}
           </div>
           <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"><Plus size={12} /> Add stage</button>
-          {!stage && <p className="text-[10px] opacity-40">Tap a stage above to edit it.</p>}
+          {!stage && selected.stages.length > 0 && <p className="text-[12px] text-white/60">Tap a stage above to edit it.</p>}
           {stage && editIndex !== null && (
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-center justify-between mb-3">
@@ -345,6 +405,8 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
             </div>
           )}
         </section>
+      )}
+      </>
       )}
       </div>
     </Sheet>

@@ -88,8 +88,8 @@ export function LaptopLinkForm() {
         </div>
       )}
       <p className="mt-2 text-[13px] leading-relaxed text-white/55">
-        On the laptop, run the show server (<span className="font-mono">npm run remote</span>). Paste the Phone
-        address it prints here, or type the laptop's address. The phone and the laptop must be on the same Wi-Fi.
+        Open the show in the ChromaGlass Mac app on the laptop, then scan its Phone · iPad code or paste the address
+        shown there. The phone and the laptop must be on the same Wi-Fi.
       </p>
 
       {canScan && (

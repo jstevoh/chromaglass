@@ -1056,7 +1056,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
                   <p className="text-[11.5px] leading-snug text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
                 ) : (
                   <p className="text-[11.5px] leading-snug text-dim">
-                    No show server behind this page, so the code opens the show on the phone itself. Link to this show via the Mac app (or <span className="font-mono text-[11px]">npm run remote</span>).
+                    No show server behind this page, so the code opens the show on the phone itself. Open the show in the ChromaGlass Mac app to pair a phone remote.
                   </p>
                 )}
                 <code className="break-all rounded-md bg-elevated px-2 py-1 font-mono text-[11px] text-text-2" data-testid="phone-link-url">{url}</code>
@@ -1119,7 +1119,7 @@ export function PanelBody({ id, p, narrow = false }: { id: string; p: DeskProps;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
     case 'live': return <LiveShowPanel />;
-    case 'score': return p.score ? <SongScore {...p.score} /> : null;
+    case 'score': return p.score ? <SongScore {...p.score} onOpenSound={p.onSound} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;
   }

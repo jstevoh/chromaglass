@@ -4,6 +4,7 @@ import { getCachedEmail } from '../lib/authFlag';
 import CloudSyncCard from './CloudSyncCard';
 import { MacAppCard } from './MacAppCard';
 import { MoirePackBuy } from './MoirePackBuy';
+import { TIER_LOCK_SPECS, TierLockBadge, clearTierLock, useTierLock } from './TierLock';
 import { isDesktopApp } from '../lib/platform';
 import { cloudSync } from '../lib/cloudSyncApp';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
@@ -88,8 +89,13 @@ const TIER_NAME = { free: 'Free', home: 'Home', pro: 'Pro' } as const;
  * desk's tokens: violet is what you own, red only on delete.
  */
 export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  const activeLock = useTierLock();
+  const handleClose = useCallback(() => {
+    clearTierLock();
+    onClose();
+  }, [onClose]);
+  const onCloseRef = useRef(handleClose);
+  onCloseRef.current = handleClose;
   const signedInFlag = useSignedIn();
   const signedIn = ACCOUNTS_ON && signedInFlag;
   // A stable callback: SignInForm's redirect check re-runs whenever it changes.
@@ -271,11 +277,13 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
     'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-50';
   const textBtn = 'text-[12px] text-muted underline decoration-faint underline-offset-2 hover:text-text disabled:opacity-50';
 
+  useEffect(() => () => clearTierLock(), []);
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleClose();
       }}
     >
       <div
@@ -289,7 +297,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
           <h2 className="text-[16px] font-medium text-text">Account</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close account"
             className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-text"
           >
@@ -298,6 +306,34 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
+          {activeLock && currentTier !== 'pro' && (() => {
+            const spec = TIER_LOCK_SPECS[activeLock.feature];
+            const unlockedByHome =
+              currentTier === 'home' &&
+              (activeLock.feature === 'full-record' ||
+                activeLock.feature === 'full-render' ||
+                activeLock.feature === 'custom-logo' ||
+                activeLock.feature === 'live-show' ||
+                activeLock.feature === 'song-id' ||
+                activeLock.feature === 'phone-remote' ||
+                (activeLock.feature === 'moire' && licenseInfo.valid && licenseInfo.packs.includes('moire')));
+            if (unlockedByHome) return null;
+            return (
+              <div
+                data-testid="tier-lock-sheet-banner"
+                className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] p-3 text-[12px] leading-relaxed text-amber-100"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-amber-200">
+                    {activeLock.itemName ? `“${activeLock.itemName}” · ${spec.title}` : spec.title}
+                  </span>
+                  <TierLockBadge label={spec.badge} />
+                </div>
+                <p className="mt-1 font-medium text-amber-100">{spec.unlocks}</p>
+                <p className="mt-0.5 text-amber-100/80">{spec.summary}</p>
+              </div>
+            );
+          })()}
           {/* ── 1. Who you are, and what this machine has ──────── */}
           {/* Always drawn, signed in or not. Before 2026-11-11 a signed-out
               sheet showed only the sign-in, so a Mac with a Pro key read "You're

@@ -5,7 +5,8 @@ import type { VisualizerSettings } from '../types';
 import type { UserPreset } from '../lib/userPresets';
 import { songLabel, type SongRef } from '../lib/songRef';
 import { LIT } from './ui';
-import { isPackLocked, openAccountSheet } from '../lib/tierGates';
+import { isPackLocked } from '../lib/tierGates';
+import { TierLockBadge, openTierLock } from './TierLock';
 import { SlideMount } from './ui/Playful';
 import { groupedShippedLooks } from '../lib/lookStills';
 
@@ -194,8 +195,8 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                     // Cue where the desk can, load where it cannot. A click
                     // used to put the look on the wall that instant, through
                     // the path that clears the plate first.
-                    // A pack's look without the pack opens the account sheet, where it is bought.
-                    onClick={() => { if (isPackLocked(p.pack)) openAccountSheet(); else if (onCuePreset) onCuePreset(p.id); else onApplyPreset(p.id, p.settings); onClose(); }}
+                    // A pack's look without the pack opens the lock/account sheet, where it is bought.
+                    onClick={() => { if (isPackLocked(p.pack)) openTierLock('moire', { itemName: p.name }); else if (onCuePreset) onCuePreset(p.id); else onApplyPreset(p.id, p.settings); onClose(); }}
                     className={`flex flex-1 items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left ${active ? LIT : 'text-white/75'}`}
                     title={onCuePreset ? `Cue ${p.name} — ${p.description}` : p.description}
                     data-testid={`preset-menu-${p.id}`}
@@ -205,13 +206,13 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                       <span className="text-xs font-semibold truncate">{p.name}</span>
                     </span>
                     {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
-                    {!active && isPackLocked(p.pack) && <span className="text-[8px] uppercase tracking-wider font-bold text-white/40 shrink-0" data-testid={`preset-pack-${p.id}`}>Pack</span>}
+                    {!active && isPackLocked(p.pack) && <TierLockBadge label="Pro · Pack" testId={`preset-pack-${p.id}`} />}
                   </button>
                   {onCuePreset && (
                     <button
                       // The old behaviour, kept where it belongs: landing on
                       // clean glass is the point when you are building a look.
-                      onClick={() => { if (isPackLocked(p.pack)) openAccountSheet(); else onApplyPreset(p.id, p.settings); onClose(); }}
+                      onClick={() => { if (isPackLocked(p.pack)) openTierLock('moire', { itemName: p.name }); else onApplyPreset(p.id, p.settings); onClose(); }}
                       className="px-2 rounded-r-lg text-[8px] font-bold uppercase tracking-wider text-white/30 hover:text-white hover:bg-white/10 shrink-0"
                       title={`Load ${p.name} onto a cleared plate — cuts the stage`}
                       data-testid={`preset-load-${p.id}`}

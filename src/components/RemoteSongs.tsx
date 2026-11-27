@@ -61,7 +61,7 @@ export function RemoteSongs({ state, send, connected, onBack, backLabel }: {
         <section className="mb-8" data-testid="remote-set">
           <h2 className="mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Set list{set?.name ? ` · ${set.name}` : ''}</h2>
           <p className="mb-3 text-[12px] text-white/40">Tap to arm for the next Go.</p>
-          {!set?.items.length && <p className="text-[13px] text-white/45" data-testid="remote-set-empty">The set list on the laptop is empty.</p>}
+          {!set?.items.length && <p className="text-[13px] text-white/60" data-testid="remote-set-empty">The set list on the laptop is empty. Add looks in Cues on the laptop.</p>}
           <div className="flex flex-col gap-2">
             {set?.items.map((item, i) => {
               const live = set.liveId === item.id;
@@ -105,7 +105,7 @@ export function RemoteSongs({ state, send, connected, onBack, backLabel }: {
             </span>
             <SwitchPill on={!!songs?.follow} />
           </button>
-          {!songs?.shows.length && <p className="text-[13px] text-white/45" data-testid="remote-songs-empty">No song shows saved on the laptop.</p>}
+          {!songs?.shows.length && <p className="text-[13px] text-white/60" data-testid="remote-songs-empty">No song shows saved yet. Add a song in Songs on the laptop.</p>}
           <div className="flex flex-col gap-2">
             {songs?.shows.map((show) => {
               const running = songs.runningId === show.id;

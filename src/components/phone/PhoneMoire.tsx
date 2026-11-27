@@ -3,7 +3,7 @@ import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import { MOIRE_SHEETS } from '../../lib/moire';
 import { useMoirePreview } from '../../hooks/useMoirePreview';
-import { openAccountSheet } from '../../lib/tierGates';
+import { TierLockBanner } from '../TierLock';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -47,21 +47,28 @@ export function PhoneMoire({ settings, onSetting }: {
     <div className="mt-3" data-testid="phone-moire">
       <div className="mb-2 text-[13px] font-medium text-text">Moiré Sheets</div>
       {!pack.allowed && (
-        <div className="mb-2 flex items-center gap-2 text-[12px] text-dim" data-testid="phone-moire-pack">
-          <span className="flex-1">
-            {pack.secondsLeft > 0 ? `Trying the moiré pack: ${pack.secondsLeft} s left.` : 'The moiré pack: in Pro, an add-on for Home.'}
-          </span>
-          {pack.secondsLeft <= 0 && (
-            <button type="button" onClick={pack.start} className="h-11 rounded-full bg-text px-4 text-[14px] font-medium text-bg" data-testid="phone-moire-try">
-              Try it
+        <TierLockBanner
+          feature="moire"
+          touch
+          className="mb-2"
+          dataAttrs={{ 'data-testid': 'phone-moire-pack' }}
+          summary={
+            pack.secondsLeft > 0
+              ? `Trying the moiré pack: ${pack.secondsLeft} s left.`
+              : 'Included in ChromaGlass Pro, or a $15 add-on for Home.'
+          }
+          actionLabel={pack.secondsLeft > 0 ? 'See unlock options →' : 'Unlock…'}
+          secondaryAction={pack.secondsLeft <= 0 ? (
+            <button
+              type="button"
+              onClick={pack.start}
+              className="inline-flex min-h-11 items-center rounded-full bg-text px-4 text-[13px] font-medium text-bg"
+              data-testid="phone-moire-try"
+            >
+              Try for 60 s
             </button>
-          )}
-          {pack.secondsLeft <= 0 && (
-            <button type="button" onClick={openAccountSheet} className="h-11 rounded-full border border-border-strong px-4 text-[14px] font-medium text-text" data-testid="phone-moire-get">
-              Get it
-            </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       )}
       <div className="mb-3 flex gap-2">
         {picker('moireSheetA', 'Lower sheet', v => onSetting({ moireSheetA: v }))}

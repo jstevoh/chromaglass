@@ -9,6 +9,7 @@ import { Sheet } from './ui';
 import { useScrollEdges } from './ui/ScrollCue';
 import type { EngineStatus } from '../lib/platform';
 import { APP_FEATURE_TILES, getEffectiveTier, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
+import { TierLockBadge, openTierLock, type TierLockFeatureId } from './TierLock';
 import { MasterSection, MixerSection } from './settings/PlaySections';
 import { AudioInputSection } from './settings/SoundSection';
 import { LookSection, ShowSection, CameraSection, StockSection, LampSection, MacroSection } from './settings/LookSections';
@@ -460,17 +461,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 key={tile.id}
                 data-cg-app-tile={tile.id}
                 data-cg-tile-tier={tile.tier}
-                onClick={openAccountSheet}
+                onClick={() => openTierLock(tile.id as TierLockFeatureId)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTierLock(tile.id as TierLockFeatureId); } }}
                 className="cursor-pointer rounded-lg border border-white/10 bg-black/40 p-2.5 text-[12px] leading-snug transition-colors hover:border-amber-500/40 hover:bg-black/60"
               >
                 <div className="flex items-center justify-between gap-2 font-medium text-neutral-100">
                   <span>{tile.title}</span>
-                  <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
-                    {tile.tier}
-                  </span>
+                  <TierLockBadge label={tile.tier === 'pro' ? 'Pro' : 'Home · Pro'} />
                 </div>
                 <p className="mt-1 text-[11px] text-neutral-400">{tile.summary}</p>
               </div>

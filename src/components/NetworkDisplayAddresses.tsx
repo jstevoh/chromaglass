@@ -33,9 +33,7 @@ export function NetworkDisplayAddresses({ relay }: { relay: RelayInfo }) {
       <div className="mt-2">
         <Info label="">
           Open one of these on a projector, a TV or a tablet and it shows the
-          show.{relay.httpsPort ? ' Its browser warns once that the connection is not private: choose Advanced, then Proceed.' : ' This show server has no https, and a display needs it to start: see the server\'s window.'} Across buildings or other access points: run{' '}
-          <span className="font-mono">npm run tunnel</span> and use the https
-          address it prints, with the same{' '}
+          show.{relay.httpsPort ? ' Its browser warns once that the connection is not private: choose Advanced, then Proceed.' : ' This show server has no https, and a display needs it to start: see the server\'s window.'} Across buildings or other access points, open a secure HTTPS tunnel to the show server and use its address with{' '}
           <span className="font-mono">?cast=true&amp;key=…</span>.
         </Info>
       </div>

@@ -27,10 +27,10 @@
  * opens the designer without reopening Settings.
  */
 import { useEffect, useState, type ReactNode } from 'react';
-import { Sparkles } from 'lucide-react';
 import {
   buildCheckoutUrl, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getActiveLicenseInfo, getEffectiveTier, type EffectiveTier,
 } from '../lib/tierGates';
+import { TierLockBadge, openTierLock } from './TierLock';
 
 const LICENCE_EVENTS = ['chromaglass:license-changed', 'cg-license-changed'] as const;
 
@@ -61,21 +61,25 @@ export function ProMakerUpsell({ id, what, children }: { id: string; what: strin
   if (tier === 'pro') return null;
   const email = getActiveLicenseInfo().email;
   return (
-    <div data-cg-pro-upsell={id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 mb-3">
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] opacity-50">
-        <Sparkles size={11} /> {what} · Pro
+    <div data-cg-pro-upsell={id} className="rounded-lg border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5 mb-3 text-[12px] text-amber-100">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-semibold text-amber-200">{what}</span>
+        <TierLockBadge label="Pro" />
       </div>
-      <p className="text-[12px] opacity-60 leading-snug mt-1">{children}</p>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+      <p className="text-[12px] text-amber-100/90 leading-snug mt-1">Unlocked by ChromaGlass Pro. {children}</p>
+      <div className="flex flex-wrap items-center gap-2 mt-2">
         <a href={buildCheckoutUrl(tier === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL, email)}
           target="_blank" rel="noreferrer" data-cg-pro-upsell-buy
-          className="inline-flex min-h-10 pointer-coarse:min-h-12 items-center text-[13px] font-medium text-accent-text hover:text-text">
+          className="inline-flex min-h-7 pointer-coarse:min-h-11 items-center rounded-full border border-amber-400/40 bg-amber-400/20 px-3 text-[11px] font-medium text-amber-100 hover:bg-amber-400/30">
           {tier === 'home' ? 'Upgrade to Pro' : 'Get Pro'}
         </a>
-        <a href="/pro" target="_blank" rel="noreferrer"
-          className="inline-flex min-h-10 pointer-coarse:min-h-12 items-center text-[12px] opacity-50 underline underline-offset-2 hover:opacity-80">
-          What Pro adds
-        </a>
+        <button
+          type="button"
+          onClick={() => openTierLock(id === 'liquids' ? 'liquids' : 'pro-io', { itemName: what })}
+          className="inline-flex min-h-7 pointer-coarse:min-h-11 items-center rounded-full bg-white/10 px-3 text-[11px] font-medium text-white/90 hover:bg-white/20"
+        >
+          See unlock options →
+        </button>
       </div>
     </div>
   );
