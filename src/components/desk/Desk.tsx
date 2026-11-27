@@ -19,6 +19,7 @@ import { getEffectiveTier } from '../../lib/tierGates';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import type { DeskProps } from './deskProps';
 import { LiveFor } from './LiveFor';
+import { readEngineStatus } from '../../lib/readout';
 
 /**
  * The desk (Desk v2, the owner's design of 2026-10-10).
@@ -629,7 +630,10 @@ export function Desk(p: DeskProps) {
             {l.floating.length > 0 && ` · ${l.floating.length} floating`}
             {p.status.phone > 0 ? ` · ${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked` : ''}
             {p.status.rec ? ` · rec ${p.status.rec}` : ''}
-            {p.status.engine ? ` · ${p.status.engine}` : ''}
+            {p.status.engine && (() => {
+              const info = readEngineStatus(p.status.engine);
+              return <span title={info.tooltip} data-testid="status-engine">{` · ${info.text}`}</span>;
+            })()}
           </span>
         </span>
       </footer>
