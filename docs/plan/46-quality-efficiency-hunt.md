@@ -156,10 +156,7 @@ again ten times a second for three meters and a percentage.
   where the lamp ground is off (ten a pixel on Classic); the ferrofluid dome's curvature
   loading again the four neighbours it holds; the projector's `scene` sample overwritten
   when the surface is not the wall. `samelook`, `lamp`, `spikes`, `ferrolook`, `wall`.
-- **46m · Tank and the lamp's boil compile on the frame that turns them on** (S): eleven and
-  two pipelines in no `prepare` list, a stop of two to six seconds at the Mac's compile
-  pace. Built behind the show as glint's are. Check to write first (Claude): a
-  `startup`-style line that turns each on after the opening and counts none built on a frame.
+- ~~**46m · Tank and the lamp's boil compile on the frame that turns them on** (S):~~ **shipped** (`TankPlate.prepare` in `src/gpu/tankPlate.ts`, `prepareTankDraw` in `src/gpu/tankDraw.ts` + `src/gpu/plate.ts`, `plateBoilStep` and air-carry kernels `bodyAdvectSubAir`/`bodyAdvectPairSubAir`/`bodyAdvectThinAir`/`airShed` in `src/gpu/fluid.ts`, `air boil` in `src/gpu/air.ts`, wired in `src/gpu/prepare.ts` all with `later = true` so Classic's opening count stays 77 WebGPU / 72 ledger; cold-cache 3 s Tank/boil frame gaps dropped from `116.7 ms` (`builtOnFrame=11`) and `683.3 ms` (`builtOnFrame=4`, since boil sets `airCarry`) to `16.8 ms` (`builtOnFrame=0`) and `16.8 ms` (`builtOnFrame=0`); `samelook` 0.00 %, `wgsl` 224/224, `tankgpu` 24/24). **Open:** check owed — `startup`-style line turning Tank then boil on after the opening and counting none built on a frame.
 - **46n · Device calls a frame can lose** (S each): up to eight `queue.submit` a frame (the
   readback's and the probe's into the frame's encoder; the deltas' needs its own copy of
   `sim`); the flash guard's probe encoding both dispatches with every ring slot busy and

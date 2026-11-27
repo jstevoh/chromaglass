@@ -44,6 +44,7 @@ import { SPIKE_ONSET, fieldOnAxis, spikesOnAxis } from './wgsl/spikes';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { splatKernel } from './wgsl/splat';
 import { STATS_KERNELS } from './wgsl/stats';
+import { PLATE_BOIL_WGSL } from './wgsl/lampBoil';
 import type { GpuStepParams } from './solverTypes';
 import { stepDisplacement } from '../lib/detailFlow';
 import { SLOSH_N } from '../lib/slosh';
@@ -285,6 +286,13 @@ export class WebGPUFluid extends FluidCover {
       // The oil's colour carried as the oil is (PLAN 38w-29, the advect dye stage), from the open where the look keeps its bodies.
       add(`bodyAdvectSharpSub:${dye}`, kernel('bodyAdvectSharpSub', dye), open.oilBodies);
       add(`bodyAdvectSharpSubAir:${dye}`, kernel('bodyAdvectSharpSubAir', dye), false);
+      // Air-carry kernels for bubbles and boil steam (PLAN 46m): behind the show, never before opening.
+      for (const f of [...new Set([dye, VEL, RGBA32])]) {
+        add(`bodyAdvectSubAir:${f}`, kernel('bodyAdvectSubAir', f), false);
+        add(`airShed:${f}`, kernel('airShed', f), false);
+      }
+      add(`bodyAdvectPairSubAir:${dye}`, kernel('bodyAdvectPairSubAir', dye), false);
+      for (const f of [...new Set([dye, RGBA32])]) add(`bodyAdvectThinAir:${f}`, kernel('bodyAdvectThinAir', f), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's lift up a rocked plate (PLAN 27f-5): waited for where a look's own oil opens on one (Opening.oilLift), else behind the show.
@@ -323,6 +331,7 @@ export class WebGPUFluid extends FluidCover {
     add(`videoFlow:${RGBA32}`, splatKernel('videoFlow', RGBA32), false);
     add(`upsampleDeltaSum:${RGBA32}`, splatKernel('upsampleDeltaSum', RGBA32), false);
     for (const name of ['statsTiles', 'statsFold'] as const) add(name, STATS_KERNELS[name], false);
+    add('plateBoilStep', PLATE_BOIL_WGSL, false);
     return [...keyed].map(([key, [code, now]]) => cache.computePrep(key, code, !now));
   }
 
