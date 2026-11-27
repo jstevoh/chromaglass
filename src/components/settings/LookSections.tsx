@@ -599,14 +599,14 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           settingKey="stock"
         />
         <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Stock</span>
+          <span className="text-[12px] uppercase tracking-widest font-bold text-muted">Stock</span>
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
                 aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
-                className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
+                className={`py-2 rounded-lg text-[12px] uppercase tracking-wider font-bold border transition-colors ${
                   (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[

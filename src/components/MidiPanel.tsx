@@ -128,7 +128,7 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
           Bind
         </button>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-white/60">
+      <p className="mt-1.5 text-[12px] leading-relaxed text-white/60">
         {mapping
           ? `Follows the level: with ${name} at full, ${label} moves ${depthLabel(depth)} of its travel. Sound Impact is its master.`
           : source === 'beat' || source === 'bar'
@@ -178,15 +178,15 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
     return (
       <div key={key} className="border-b border-white/5">
         <div className="flex items-center gap-2 py-1" data-testid={`midi-target-${key}`} data-midi-key={target.kind === 'voices' ? 'voices' : undefined}>
-          <span className="flex-1 text-[11px] truncate">{label}</span>
-          <span className="text-[11px] font-mono text-white/40 truncate max-w-[40%]">
+          <span className="flex-1 text-[12px] truncate">{label}</span>
+          <span className="text-[12px] font-mono text-dim truncate max-w-[40%]">
             {[...bound.map(b => b.target.kind === 'voices' ? `Ch ${b.source.channel + 1}` : sourceLabel(b.source)), ...heard.map(soundLabel)].join(', ')}
           </span>
           <button
             aria-pressed={!!isLearning}
             onClick={() => (isLearning ? midi.cancelLearn() : midi.learn(target, encoder && target.kind === 'setting' ? 'relative' : 'absolute'))}
             disabled={!midi.enabled}
-            className={`px-2 py-1 rounded-md border text-[12px] font-medium disabled:opacity-30 ${isLearning ? `${LIT} animate-pulse` : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`px-2 py-1 rounded-md border text-[12px] font-medium disabled:opacity-65 ${isLearning ? `${LIT} animate-pulse` : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid={`midi-learn-${key}`}
           >
             {isLearning ? 'Touch it…' : 'Learn'}
@@ -201,7 +201,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
             title={notMusic ?? `Bind ${label} to the music`}
             aria-label={`Bind ${label} to the music`}
             aria-expanded={open}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:opacity-30 ${open || heard.length ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:opacity-65 ${open || heard.length ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid={`sound-learn-${key}`}
           >
             <Music size={12} />
@@ -228,7 +228,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
         <ControllerSurface midi={midi} presets={presets} surface={surface} onClose={() => setShowSurface(false)} />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6 text-white">
-      <p className="text-[12px] leading-relaxed opacity-40 mb-4">
+      <p className="text-[12px] leading-relaxed text-muted mb-4">
         Faders ride the show, pads cue presets and dyes, buttons fire the one-shots. Teach your controller here: choose what a control should do, then touch it.
         Or teach it to the music with the note beside Learn: a slider follows a drum or a band, a button fires on its hits.
         Both are kept in the same map and the same file.
@@ -274,7 +274,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
       </div>
       {midi.error && <p className="text-[12px] text-red-300 mb-3" data-testid="midi-error">{midi.error}</p>}
       {midi.enabled && lastEvent && (
-        <p className="mb-3 text-[11px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(lastEvent.source)} = {lastEvent.value}</p>
+        <p className="mb-3 text-[12px] font-mono text-dim" data-testid="midi-last">Last: {sourceLabel(lastEvent.source)} = {lastEvent.value}</p>
       )}
 
       {/* Map: name, clear, file. The factory maps and Auto-map are Settings' Controller section. */}
@@ -303,7 +303,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
           <LayoutGrid size={11} /> {surface.name} picture
         </button>
         {fileError && <p className="text-[12px] text-red-300 mt-2" data-testid="midi-file-error">{fileError}</p>}
-        <p className="text-[11px] text-white/40 mt-2" data-testid="midi-binding-count">
+        <p className="text-[12px] text-dim mt-2" data-testid="midi-binding-count">
           {midi.map.bindings.length} bindings{midi.map.sound?.length ? ` · ${midi.map.sound.length} to the music` : ''}{midi.map.device ? ` · made on ${midi.map.device}` : ''}
         </p>
       </div>
@@ -312,8 +312,8 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
       {midi.enabled && (
         <div className="mb-4">
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[12px] text-white/50">Bank</span>
-            <span className="font-mono text-[11px] text-white/35" data-testid="midi-bank-count">
+            <span className="text-[12px] text-muted">Bank</span>
+            <span className="font-mono text-[12px] text-dim" data-testid="midi-bank-count">
               {midi.map.bindings.filter(b => b.bank !== undefined).length} on a layer
             </span>
           </div>
@@ -333,7 +333,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">
+          <p className="mt-1.5 text-[12px] leading-relaxed text-dim">
             Nine faders cannot reach forty settings. Learn a control while a layer is chosen and it belongs to that layer;
             learn it on <span className="text-white/60">1</span> and it is live on all of them, which is where presets, dyes and the transport belong.
             Put <span className="text-white/60">Bank +</span> on a button to step them in the dark.
@@ -379,7 +379,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
         {tab === 'presets' && presets.map(p => learnButton({ kind: 'preset', presetId: p.id }, p.name, `preset-${p.id}`))}
         {tab === 'setlist' && (setItems.length > 0
           ? setItems.map(item => learnButton({ kind: 'setlist', index: item.index }, `#${item.index + 1} · ${item.name}`, `setlist-${item.index}`))
-          : <p className="text-[12px] text-white/40">No items in the set list.</p>)}
+          : <p className="text-[12px] text-dim">No items in the set list.</p>)}
         {tab === 'dyes' && PALETTE.map((c, i) => learnButton({ kind: 'dye', paletteIndex: i }, c.name, `dye-${i}`))}
         {tab === 'voices' && (
           <div>
@@ -388,7 +388,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
               'Notes as voices (channel)',
               'voices',
             )}
-            <p className="mt-2 text-[11px] leading-relaxed text-white/50">
+            <p className="mt-2 text-[12px] leading-relaxed text-muted">
               Play any note on a channel to learn that channel. Each note-on lets go one drop placed by pitch along Melody Walk’s line, its size by velocity; a held note pours with its attack and release, up to the channel’s voice cap.
             </p>
           </div>
@@ -396,38 +396,38 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
       </div>
 
       {/* Bindings */}
-      <h3 className="text-[12px] text-white/50 mb-2">Bindings</h3>
+      <h3 className="text-[12px] text-muted mb-2">Bindings</h3>
       <div data-testid="midi-bindings">
-        {midi.map.bindings.length === 0 && !midi.map.sound?.length && <p className="text-[12px] text-white/40">None yet.</p>}
+        {midi.map.bindings.length === 0 && !midi.map.sound?.length && <p className="text-[12px] text-dim">None yet.</p>}
         {midi.map.bindings.map(b => (
-          <div key={b.id} className={`py-1.5 border-b border-white/5 text-[12px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-40' : ''}`} data-testid="midi-binding" data-midi-key={b.target.kind === 'voices' ? 'voices' : undefined}>
+          <div key={b.id} className={`py-1.5 border-b border-white/5 text-[12px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-65' : ''}`} data-testid="midi-binding" data-midi-key={b.target.kind === 'voices' ? 'voices' : undefined}>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-white/50 w-28 shrink-0">{b.target.kind === 'voices' ? `Ch ${b.source.channel + 1}` : sourceLabel(b.source)}</span>
+              <span className="font-mono text-muted w-28 shrink-0">{b.target.kind === 'voices' ? `Ch ${b.source.channel + 1}` : sourceLabel(b.source)}</span>
               <span className="flex-1 truncate">{targetLabel(b.target, presetName, setItemName)}</span>
               {b.target.kind === 'setting' && b.source.kind === 'cc' && (
-                <button onClick={() => midi.setBindingMode(b.id, b.mode === 'relative' ? 'absolute' : 'relative')} className="text-[8px] uppercase text-white/40 hover:text-white" title="Absolute fader or endless encoder">{b.mode === 'relative' ? 'enc' : 'abs'}</button>
+                <button onClick={() => midi.setBindingMode(b.id, b.mode === 'relative' ? 'absolute' : 'relative')} className="text-[12px] uppercase text-dim hover:text-white" title="Absolute fader or endless encoder">{b.mode === 'relative' ? 'enc' : 'abs'}</button>
               )}
               <button
                 onClick={() => midi.setBindingBank(b.id, b.bank === undefined ? 1 : b.bank + 1 >= midi.banks ? undefined : b.bank + 1)}
-                className="w-8 shrink-0 text-[8px] uppercase text-white/40 hover:text-white"
+                className="w-8 shrink-0 text-[12px] uppercase text-dim hover:text-white"
                 title="Which shift layer this binding answers on — 'all' is every one"
               >
                 {b.bank === undefined ? 'all' : `bk${b.bank + 1}`}
               </button>
-              <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-white/40 hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
+              <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-dim hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
             </div>
             {b.target.kind === 'voices' && (() => {
               const vt = b.target;
               return (
                 <div className="mt-2 flex flex-col gap-1.5 rounded-lg border border-white/10 bg-white/5 p-2" data-testid={`midi-voices-${b.id}`}>
                   <div className="flex items-center gap-2">
-                    <label className="flex flex-1 items-center gap-1.5 text-[11px] text-white/60">
+                    <label className="flex flex-1 items-center gap-1.5 text-[12px] text-white/60">
                       Tool
                       <select
                         value={vt.tool ?? 'dropper'}
                         aria-label="Voice tool"
                         onChange={e => midi.updateBinding(b.id, { ...vt, tool: e.target.value as VoiceTool })}
-                        className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-[11px] text-white outline-none"
+                        className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-[12px] text-white outline-none"
                         data-testid={`midi-voices-tool-${b.id}`}
                       >
                         <option value="dropper">Drop</option>
@@ -436,13 +436,13 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
                         <option value="splatter">Splatter</option>
                       </select>
                     </label>
-                    <label className="flex flex-1 items-center gap-1.5 text-[11px] text-white/60">
+                    <label className="flex flex-1 items-center gap-1.5 text-[12px] text-white/60">
                       Liquid
                       <select
                         value={vt.liquid ?? ''}
                         aria-label="Voice liquid"
                         onChange={e => midi.updateBinding(b.id, { ...vt, liquid: e.target.value || undefined })}
-                        className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-[11px] text-white outline-none"
+                        className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-[12px] text-white outline-none"
                         data-testid={`midi-voices-liquid-${b.id}`}
                       >
                         <option value="">Look’s own</option>
@@ -455,7 +455,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
                     ['release', 'Release', 0, 4, 0.05, vt.release ?? VOICE_DEFAULTS.release, (v: number) => `${v.toFixed(2)} s`],
                     ['cap', 'Voices', 1, 8, 1, vt.cap ?? VOICE_DEFAULTS.cap, (v: number) => `${Math.round(v)}`],
                   ] as const).map(([k, lbl, min, max, step, val, fmt]) => (
-                    <label key={k} className="flex items-center gap-2 text-[11px] text-white/60">
+                    <label key={k} className="flex items-center gap-2 text-[12px] text-white/60">
                       <span className="w-12 shrink-0">{lbl}</span>
                       <input
                         type="range" min={min} max={max} step={step} value={val}
@@ -464,7 +464,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
                         className="h-5 flex-1 accent-white"
                         data-testid={`midi-voices-${k}-${b.id}`}
                       />
-                      <span className="w-11 text-right font-mono text-[11px] text-white/80">{fmt(val)}</span>
+                      <span className="w-11 text-right font-mono text-[12px] text-white/80">{fmt(val)}</span>
                     </label>
                   ))}
                 </div>
@@ -477,10 +477,10 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
           <div key={b.id} className="flex items-center gap-2 py-1 border-b border-white/5 text-[12px]" data-testid={`sound-binding-${b.id}`}>
             <span className="w-28 shrink-0 truncate font-mono text-amber-100/80" title={MUSIC_SOURCE_LABELS[b.source]}>{'♪'} {MUSIC_SOURCE_LABELS[b.source]}</span>
             <span className="flex-1 truncate">{targetLabel(b.target, presetName, setItemName)}</span>
-            <span className="shrink-0 font-mono text-[11px] text-white/60">{isMapping(b) ? depthLabel(b.depth) : 'on hit'}</span>
+            <span className="shrink-0 font-mono text-[12px] text-white/60">{isMapping(b) ? depthLabel(b.depth) : 'on hit'}</span>
             <button
               onClick={() => midi.removeSound(b.id)}
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-white/40 hover:text-red-300"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-dim hover:text-red-300"
               aria-label="Remove binding"
             >
               <Trash2 size={11} />

@@ -58,7 +58,7 @@ export function HandControls({ m, i, settings, onUpdate }: Props) {
             style={{ '--fill': `${Math.round(100 * (value - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
             data-testid={`patch-${String(key)}-${i}`}
           />
-          <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(value)}</span>
+          <span className="text-[12px] font-mono text-dim w-12 text-right">{show(value)}</span>
         </div>
       ))}
       <div className="flex items-center justify-between gap-2 min-h-[28px]">
@@ -110,9 +110,9 @@ export function MusicHandsFold({ roles, open, onToggle }: { roles: readonly stri
     >
       <div className="flex items-center justify-between text-[12px] font-medium text-text">
         <span>The music's hands, {roles.length} cords</span>
-        <span className={open ? 'text-white/70' : 'text-white/40'}>{open ? 'Fold' : 'Open'}</span>
+        <span className={open ? 'text-text-2' : 'text-dim'}>{open ? 'Fold' : 'Open'}</span>
       </div>
-      <div className="text-[11px] text-white/40 mt-0.5">{names}, on Sound Drive</div>
+      <div className="text-[12px] text-dim mt-0.5">{names}, on Sound Drive</div>
     </button>
   );
 }

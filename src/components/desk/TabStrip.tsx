@@ -99,7 +99,7 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   const row = touch ? 48 : 32;
-  const btn = `inline-flex shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-30 disabled:hover:bg-transparent`;
+  const btn = `inline-flex shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-65 disabled:hover:bg-transparent`;
   const full = tabs.length >= TABS_MAX;
   return (
     <>
@@ -111,7 +111,7 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
         aria-label="The tabs"
         data-testid="tabs-editor"
       >
-        <p className="px-1 pb-1 text-[11px] font-bold uppercase tracking-widest text-muted">Tabs</p>
+        <p className="px-1 pb-1 text-[12px] font-bold uppercase tracking-widest text-muted">Tabs</p>
         {tabs.map((t, i) => (
           <div key={t.id} className="flex items-center gap-1" data-testid={`tabs-row-${t.id}`}>
             <NameField id={t.id} name={t.name} lit={t.id === tab} height={row} onRename={(name) => onEdit({ op: 'rename', id: t.id, name })} />
@@ -145,7 +145,7 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
             </button>
           )}
         </div>
-        <p className="px-1 pt-1 text-[11px] leading-snug text-dim">
+        <p className="px-1 pt-1 text-[12px] leading-snug text-dim">
           A tab is a set of panels. Put one on the tab that is up with + Panel (⌘P); a panel taken off a tab is still in the browser. ⌘1 to ⌘9 go to the tabs in order.
         </p>
         {armReset ? (

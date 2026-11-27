@@ -50,14 +50,14 @@ function ActionButton({ label, icon: Icon, onPress, connected, tone = 'default' 
     <button
       onClick={onPress}
       disabled={!connected}
-      className={`flex flex-1 flex-col items-center gap-1.5 rounded-2xl border py-4 transition-colors active:scale-95 disabled:opacity-30 ${
+      className={`flex flex-1 flex-col items-center gap-1.5 rounded-2xl border py-4 transition-colors active:scale-95 disabled:opacity-65 ${
         tone === 'warn'
           ? 'border-red-400/25 bg-red-500/10 text-red-200 active:bg-red-500/20'
-          : 'border-white/10 bg-white/5 text-white/80 active:bg-white/15'
+          : 'border-white/10 bg-white/5 text-text active:bg-white/15'
       }`}
     >
       <Icon size={20} />
-      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+      <span className="text-[12px] font-bold uppercase tracking-widest">{label}</span>
     </button>
   );
 }
@@ -456,12 +456,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       onContextMenu={(e) => e.preventDefault()}
       data-testid="remote-pad"
     >
-      <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[10px] uppercase tracking-[0.25em] text-white/25">
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[12px] uppercase tracking-[0.25em] text-dim">
         {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : padTool === 'spin' ? 'drag round the middle to turn the dish; hold still to stop it' : 'tap or drag to drop dye'}
         {penSeen ? ' · pen: press for more, lean to steer' : ''}
       </span>
       {padTouchCount > 0 && (
-        <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-white/10 px-2 py-0.5 text-[9px] text-white/50" data-testid="remote-pad-touches">
+        <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-white/10 px-2 py-0.5 text-[12px] text-muted" data-testid="remote-pad-touches">
           {padTouchCount} {padTouchCount === 1 ? 'hand' : 'hands'}
         </span>
       )}
@@ -478,7 +478,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={i}
               onClick={() => setPadLayer(i)}
               disabled={!connected}
-              className={`h-9 w-9 rounded-full border text-[11px] font-bold disabled:opacity-30 ${padLayer === i ? LIT : 'border-white/10 text-white/50'}`}
+              className={`h-9 w-9 rounded-full border text-[12px] font-bold disabled:opacity-65 ${padLayer === i ? LIT : 'border-white/10 text-muted'}`}
               title={`This device works plate ${i + 1}`}
             >
               {i + 1}
@@ -498,7 +498,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={t}
               onClick={() => setPadTool(t)}
               disabled={!connected}
-              className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${padTool === t ? LIT : 'border-white/10 text-white/50'}`}
+              className={`rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${padTool === t ? LIT : 'border-white/10 text-muted'}`}
               data-testid={`remote-tool-${t}`}
             >
               {t}
@@ -508,7 +508,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={tiltOn}
             onClick={toggleTilt}
             disabled={!connected}
-            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${tiltOn ? LIT : 'border-white/10 text-white/60'}`}
+            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${tiltOn ? LIT : 'border-white/10 text-text-2'}`}
             title="Tilting the device tilts the plate"
           >
             <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
@@ -523,7 +523,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         on a full plate — was reachable from the laptop and nowhere else.
       */}
       <div className="mt-3" data-testid="remote-liquids">
-        <div className="text-[9px] uppercase tracking-widest font-bold text-white/40 mb-1.5">Bottle</div>
+        <div className="text-[12px] uppercase tracking-widest font-bold text-dim mb-1.5">Bottle</div>
         <div className="flex flex-wrap gap-1.5">
           {DEFAULT_LIQUID_TYPES.map((liq) => {
             const on = padLiquid === liq.id;
@@ -533,8 +533,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 key={liq.id}
                 onClick={() => chooseLiquid(liq.id)}
                 disabled={!connected}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-30 ${
-                  on ? LIT : 'border-white/10 text-white/55'
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-65 ${
+                  on ? LIT : 'border-white/10 text-muted'
                 }`}
                 title={liq.description}
               >
@@ -555,7 +555,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={padColor?.toLowerCase() === padBottle.own.toLowerCase()}
             onClick={() => chooseColor(padBottle.own!)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/40'}`}
+            className={`h-7 w-7 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-65 md:h-8 md:w-8 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/40'}`}
             style={isClearLiquid(padBottle) ? { backgroundColor: 'transparent' } : { backgroundColor: padBottle.own }}
             title={`Natural: ${padBottle.name.toLowerCase()} with no dye`}
             aria-label={`Natural ${padBottle.name}`}
@@ -568,7 +568,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             key={c.hex}
             onClick={() => chooseColor(c.hex)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'}`}
+            className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-65 md:h-8 md:w-8 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'}`}
             style={{ backgroundColor: c.hex }}
             title={c.name}
             aria-label={c.name}
@@ -656,11 +656,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* The Alpha label on the line under the name, not beside it: beside
               it, on a 390 phone it crowded the connection status on the right. */}
           <div className="mt-1 flex items-center gap-2">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
+            <p className="text-[12px] uppercase tracking-[0.25em] text-dim">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
             <AlphaBadge />
           </div>
         </div>
-        <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
+        <div className={`flex items-center gap-2 text-[12px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400' : 'text-amber-300'}`}>
           {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
           {status === 'denied' && <span className="ml-2 text-red-300">{inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key — open the address the show server printed, key included'}</span>}
           {status === 'locked' && <span className="ml-2 text-red-300">{LOCKED_WORDS}</span>}
@@ -669,7 +669,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       </header>
 
       {!connected && (
-        <p className="px-5 py-3 text-xs leading-relaxed text-white/45">
+        <p className="px-5 py-3 text-xs leading-relaxed text-dim">
           Waiting for the laptop. Make sure the show is open there and both devices are on the
           same network.
         </p>
@@ -680,10 +680,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         <section className="md:sticky md:top-20 md:self-start">
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-projectionist">
             <div className="mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
-                <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-white/40" />}
+              <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
+                <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-dim" />}
               </span>
-              <button onClick={openDraw} className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
+              <button onClick={openDraw} className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[12px] font-bold uppercase tracking-widest text-text-2" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
                 <Maximize2 size={12} /> Draw
               </button>
             </div>
@@ -699,8 +699,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               aria-pressed={!state?.isActive}
               onClick={() => action(state?.isActive ? 'pause' : 'play')}
               disabled={!connected}
-              className={`flex flex-[2] items-center justify-center gap-2 rounded-2xl py-5 text-sm font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-30 ${
-                !state?.isActive ? `border ${LIT}` : 'border border-white/15 bg-white/5 text-white/80'
+              className={`flex flex-[2] items-center justify-center gap-2 rounded-2xl py-5 text-sm font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-65 ${
+                !state?.isActive ? `border ${LIT}` : 'border border-white/15 bg-white/5 text-text'
               }`}
             >
               {state?.isActive ? <Pause size={18} /> : <Play size={18} fill="currentColor" />}
@@ -710,14 +710,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               aria-pressed={!!state?.isAutomated}
               onClick={() => action(state?.isAutomated ? 'automate-off' : 'automate-on')}
               disabled={!connected}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border py-5 transition-colors active:scale-95 disabled:opacity-30 ${
+              className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border py-5 transition-colors active:scale-95 disabled:opacity-65 ${
                 state?.isAutomated
                   ? LIT
-                  : 'border-white/10 bg-white/5 text-white/70'
+                  : 'border-white/10 bg-white/5 text-text-2'
               }`}
             >
               <Waves size={18} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Auto</span>
+              <span className="text-[12px] font-bold uppercase tracking-widest">Auto</span>
             </button>
           </div>
 
@@ -727,10 +727,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             className="mb-6 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 text-left active:scale-[0.99]"
             data-testid="remote-to-songs"
           >
-            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+            <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
               <ListMusic size={15} /> Set list &amp; songs
             </span>
-            <span className="truncate pl-3 text-[12px] text-white/45">
+            <span className="truncate pl-3 text-[12px] text-dim">
               {state?.songs?.runningId ? state.songs.shows.find(sh => sh.id === state.songs?.runningId)?.title ?? '' : state?.setList?.name ?? ''}
             </span>
           </button>
@@ -749,8 +749,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               aria-pressed={state?.recording != null}
               onClick={() => action('record-toggle')}
               disabled={!connected}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-30 ${
-                state?.recording != null ? LIVE : 'border-white/10 bg-white/5 text-white/70'
+              className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border py-4 text-[12px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-65 ${
+                state?.recording != null ? LIVE : 'border-white/10 bg-white/5 text-text-2'
               }`}
               data-testid="remote-record"
             >
@@ -941,7 +941,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             The camera's own dials follow it in.
           */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-macro">
-            <span className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+            <span className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
               <Microscope size={15} /> Macro Closeup
             </span>
             <Slider label="Macro Zoom" field="macroZoom" step={0.5} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
@@ -959,10 +959,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={state?.overlaysVisible === false}
             onClick={() => action(state?.overlaysVisible === false ? 'overlays-on' : 'overlays-off')}
             disabled={!connected}
-            className={`mb-6 flex w-full items-center justify-center gap-2 rounded-2xl border py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-30 ${
+            className={`mb-6 flex w-full items-center justify-center gap-2 rounded-2xl border py-4 text-[12px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-65 ${
               state?.overlaysVisible === false
                 ? LIT
-                : 'border-white/10 bg-white/5 text-white/70'
+                : 'border-white/10 bg-white/5 text-text-2'
             }`}
           >
             {state?.overlaysVisible === false ? <Monitor size={16} /> : <MonitorOff size={16} />}
@@ -973,18 +973,18 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {state?.sequencer && (
             <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-sequencer">
               <div className="mb-3 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+                <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
                   <Clapperboard size={15} /> Sequencer
                 </span>
-                <span className="text-[10px] text-white/40 truncate max-w-[50%]">
+                <span className="text-[12px] text-dim truncate max-w-[50%]">
                   {state.sequencer.name ?? 'Stopped'}
                 </span>
               </div>
               {state.sequencer.name && (
                 <div className="mb-3">
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[12px]">
                     <span className="truncate">{state.sequencer.stageIndex + 1}. {state.sequencer.stageName}</span>
-                    <span className="text-white/40">{state.sequencer.stageIndex + 1}/{state.sequencer.stages.length}</span>
+                    <span className="text-dim">{state.sequencer.stageIndex + 1}/{state.sequencer.stages.length}</span>
                   </div>
                   <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
                     <div className="h-full bg-white/70 transition-[width]" style={{ width: `${Math.round(state.sequencer.progress * 100)}%` }} />
@@ -992,25 +992,25 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 </div>
               )}
               <div className="flex gap-2">
-                <button onClick={() => action('seq-prev')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Previous stage" data-testid="remote-seq-prev">
+                <button onClick={() => action('seq-prev')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Previous stage" data-testid="remote-seq-prev">
                   <SkipBack size={16} className="mx-auto" />
                 </button>
                 <button
                   aria-pressed={!!state.sequencer.running}
                   onClick={() => action(state.sequencer?.running ? 'seq-pause' : 'seq-play')}
                   disabled={!connected}
-                  className={`flex-[2] flex items-center justify-center gap-2 rounded-xl border py-3 text-[11px] font-bold uppercase tracking-[0.2em] disabled:opacity-30 active:scale-95 ${
-                    state.sequencer.running ? LIT : 'border-white/10 bg-white/5 text-white/80'
+                  className={`flex-[2] flex items-center justify-center gap-2 rounded-xl border py-3 text-[12px] font-bold uppercase tracking-[0.2em] disabled:opacity-65 active:scale-95 ${
+                    state.sequencer.running ? LIT : 'border-white/10 bg-white/5 text-text'
                   }`}
                   data-testid="remote-seq-toggle"
                 >
                   {state.sequencer.running ? <Pause size={16} /> : <Play size={16} />}
                   {state.sequencer.running ? 'Pause' : state.sequencer.name ? 'Resume' : 'Play'}
                 </button>
-                <button onClick={() => action('seq-next')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Next stage" data-testid="remote-seq-next">
+                <button onClick={() => action('seq-next')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Next stage" data-testid="remote-seq-next">
                   <SkipForward size={16} className="mx-auto" />
                 </button>
-                <button onClick={() => action('seq-stop')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Stop sequencer" data-testid="remote-seq-stop">
+                <button onClick={() => action('seq-stop')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-65 active:scale-95" aria-label="Stop sequencer" data-testid="remote-seq-stop">
                   <Square size={16} className="mx-auto" />
                 </button>
               </div>
@@ -1036,7 +1036,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {settings && (
             <details className="mb-7 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2" data-testid="remote-mixer">
-              <summary className="cursor-pointer py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Mixer</summary>
+              <summary className="cursor-pointer py-2 text-[12px] font-bold uppercase tracking-[0.2em] text-text-2">Mixer</summary>
               <div className="pb-2 pt-1">
                 <MixerPanel
                   settings={{ ...settings, ...localValues } as VisualizerSettings}
@@ -1062,15 +1062,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
 
           {/* Presets */}
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30">Preset palettes — tap to arm, Go sends</h2>
+            <h2 className="text-[12px] uppercase tracking-[0.3em] text-dim">Preset palettes — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
-              <button onClick={() => action('preset-prev')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={14} /></button>
-              <button onClick={() => action('preset-next')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={14} /></button>
+              <button onClick={() => action('preset-prev')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-65 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={14} /></button>
+              <button onClick={() => action('preset-next')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-65 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={14} /></button>
             </div>
           </div>
           {presetGroups.map(({ label, presets }) => (
             <section key={label} className="mb-7" data-testid={`remote-presets-${label.toLowerCase().replace(/\s+/g, '-')}`}>
-              <h3 className="mb-3 text-[10px] uppercase tracking-[0.3em] text-white/30">{label}</h3>
+              <h3 className="mb-3 text-[12px] uppercase tracking-[0.3em] text-dim">{label}</h3>
               <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
                 {presets.map((preset) => {
                   const isActive = state?.activePresetId === preset.id;
@@ -1081,18 +1081,18 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                       key={preset.id}
                       onClick={() => send({ type: 'cue', presetId: preset.id })}
                       disabled={!connected}
-                      className={`rounded-2xl border px-3 py-4 text-left transition-colors active:scale-95 disabled:opacity-30 ${
+                      className={`rounded-2xl border px-3 py-4 text-left transition-colors active:scale-95 disabled:opacity-65 ${
                         isActive ? LIT
                         : isCued ? 'border-lit bg-elevated'
                         : 'border-white/10 bg-white/5'
                       }`}
                       data-testid={`remote-preset-${preset.id}`}
                     >
-                      <span className={`block text-sm font-bold leading-tight ${isActive ? 'text-white' : 'text-white/75'}`}>
+                      <span className={`block text-sm font-bold leading-tight ${isActive ? 'text-on-lit' : 'text-text-2'}`}>
                         {preset.name}
                       </span>
                       {(isActive || isCued) && (
-                        <span className={`mt-1 block text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-red-300' : 'text-violet-300'}`}>
+                        <span className={`mt-1 block text-[12px] font-bold uppercase tracking-widest ${isActive ? 'text-on-lit' : 'text-violet-300'}`}>
                           {isActive ? 'live' : 'next'}
                         </span>
                       )}
@@ -1129,8 +1129,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={!!state?.blackout}
             onClick={() => action('blackout-toggle')}
             disabled={!connected}
-            className={`flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl border text-[11px] font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-30 md:w-[140px] md:flex-none ${
-              state?.blackout ? LIVE : 'border-white/10 bg-white/5 text-white/80'
+            className={`flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl border text-[12px] font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-65 md:w-[140px] md:flex-none ${
+              state?.blackout ? LIVE : 'border-white/10 bg-white/5 text-text'
             }`}
             data-testid="remote-blackout"
           >
@@ -1156,16 +1156,16 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                   key={preset.id}
                   onClick={() => send({ type: 'cue', presetId: preset.id })}
                   disabled={!connected}
-                  className={`flex h-14 w-[170px] shrink-0 flex-col justify-center rounded-xl border px-3 text-left transition-colors active:scale-95 disabled:opacity-30 ${
+                  className={`flex h-14 w-[170px] shrink-0 flex-col justify-center rounded-xl border px-3 text-left transition-colors active:scale-95 disabled:opacity-65 ${
                     live ? LIT
                     : next ? 'border-lit bg-elevated'
                     : 'border-white/10 bg-white/5'
                   }`}
                   data-testid={`remote-cue-${preset.id}`}
                 >
-                  <span className="truncate text-[13px] font-semibold text-white/85">{preset.name}</span>
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                    live ? 'text-red-300' : next ? 'text-violet-300' : 'text-white/30'
+                  <span className="truncate text-[13px] font-semibold text-text">{preset.name}</span>
+                  <span className={`text-[12px] font-bold uppercase tracking-widest ${
+                    live ? 'text-on-lit' : next ? 'text-violet-300' : 'text-dim'
                   }`}>
                     {live ? 'live' : next ? 'next' : preset.user ? 'yours' : preset.macro ? 'closeup' : 'look'}
                   </span>
@@ -1176,14 +1176,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <button
             onClick={() => action('go')}
             disabled={!connected || !state?.cuedPresetId}
-            className="flex h-14 flex-[2] flex-col items-center justify-center rounded-2xl bg-white px-4 text-black transition-transform active:scale-95 disabled:bg-white/15 disabled:text-white/40 md:w-[220px] md:flex-none"
+            className="flex h-14 flex-[2] flex-col items-center justify-center rounded-2xl bg-white px-4 text-black transition-transform active:scale-95 disabled:bg-white/15 disabled:text-text-2 md:w-[220px] md:flex-none"
             data-testid="remote-go"
           >
             <span className="text-sm font-bold">
               {state?.cuedName ? `Go to ${state.cuedName}` : 'Nothing armed'}
             </span>
             {state?.cuedName && (
-              <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">
+              <span className="text-[12px] font-bold uppercase tracking-widest opacity-80">
                 {state.fadeSeconds ? `${state.fadeSeconds}s fade` : 'cut'}
               </span>
             )}
@@ -1191,7 +1191,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <button
             onClick={() => action('back')}
             disabled={!connected}
-            className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 text-white/70 active:scale-95 disabled:opacity-30"
+            className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 text-text-2 active:scale-95 disabled:opacity-65"
             aria-label="Back — undo the last look"
             data-testid="remote-back"
           >
