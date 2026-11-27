@@ -30,7 +30,7 @@ export function PhoneInkTitle({ settings, onSetting, disabled = false, testId = 
         onClick={() => onSetting({ inkTitle: !on })}
         disabled={disabled}
         data-testid={`${testId}-switch`}
-        className="flex min-h-11 w-full items-center justify-between gap-3 text-left disabled:opacity-30"
+        className="flex min-h-11 w-full items-center justify-between gap-3 text-left disabled:opacity-65"
       >
         <span className="flex flex-col">
           <span className="text-[13px] font-semibold text-text">Title</span>
@@ -46,7 +46,7 @@ export function PhoneInkTitle({ settings, onSetting, disabled = false, testId = 
         onClick={() => onSetting({ logoMelt: !melt })}
         disabled={disabled}
         data-testid={`${testId}-logo`}
-        className="flex min-h-11 w-full items-center justify-between gap-3 text-left disabled:opacity-30"
+        className="flex min-h-11 w-full items-center justify-between gap-3 text-left disabled:opacity-65"
       >
         <span className="flex flex-col">
           <span className="text-[13px] font-semibold text-text">Logo melt</span>

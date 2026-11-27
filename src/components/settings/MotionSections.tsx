@@ -297,7 +297,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
         */}
         <div className="mb-1 flex items-center gap-3" data-testid="spin-strobe">
           <StrobeRing mode={settings.spinAuto ?? 0} rpm={settings.spinRpm ?? 6} beats={settings.spinBeats ?? 16} bpm={spinBpm} />
-          <p className="text-[11px] leading-snug text-white/50" data-testid="spin-strobe-says">
+          <p className="text-[12px] leading-snug text-muted" data-testid="spin-strobe-says">
             {Math.round(settings.spinAuto ?? 0) === 2 && spinBpm > 0
               ? `Locked to ${spinBpm} bpm: the dots stand still while the dish turns once in ${Math.round(settings.spinBeats ?? 16)} beats.`
               : Math.round(settings.spinAuto ?? 0) === 0 ? 'Auto Spin is off.'
@@ -342,7 +342,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
             Reverse Spin
           </button>
         </div>
-        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+        <p className="mb-2 mt-1 text-[12px] leading-relaxed text-dim">
           The dish turns and the liquid follows it: water lags for a few seconds, oil goes at once,
           and a fast dish flings the heavy colour outward. Tempo turns once every so many beats,
           locked to the beat; with no beat heard yet it turns at the Rate.
@@ -372,7 +372,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ spinWander: v })}
           settingKey="spinWander"
         />
-        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+        <p className="mb-2 mt-1 text-[12px] leading-relaxed text-dim">
           Wander drifts the motor off its speed. Past about half it crosses zero and the plate
           turns back on itself now and then, the way a dish nudged by hand does.
         </p>
@@ -620,7 +620,7 @@ export const AutomationSection = ({ c }: { c: SectionCtx }) => {
           them back (lib/scenePacing.ts). With Pacing at 0 there is no scene,
           so it is dimmed there rather than hidden: the pair reads as one.
         */}
-        <div className={(settings.pacing ?? 0) > 0.001 ? '' : 'opacity-50'}>
+        <div className={(settings.pacing ?? 0) > 0.001 ? '' : 'opacity-65'}>
           <Slider
             label="Follow the Song"
             value={settings.songFollow ?? 0}

@@ -52,7 +52,7 @@ export const LAMP_MIX_WGSL = /* wgsl */ `
 */
 var<private> lampBend: vec2f = vec2f(0.0);
 
-fn videoInLamp() -> bool { return U.filmOn != 0 && U.mixPos.z < U.mixPos2.z && U.filmMix > 0.001; }
+fn videoInLamp() -> bool { return U.filmOn != 0 && (U.mixPos.z < U.mixPos2.z || U.filmRing != 0) && U.filmMix > 0.001; }
 
 // The column's depth in rest gaps, as calcOpl takes it from the view.
 fn lampDepthAt(fuv: vec2f) -> f32 {
@@ -77,6 +77,32 @@ fn lampBendAt(fuv: vec2f, c: f32, s: f32) -> vec2f {
 }
 
 /**
+ * The video as the LED platform (PLAN 14ag-9). The owner asked for the video
+ * "as the spinning LED light background": the ring a liquid show sets its
+ * dish on is a disc of lights turning under the glass, and here the disc is
+ * the picture. So the frame is read at the point the platform has carried
+ * round to here: the screen point turned back by the ring's angle about the
+ * plate's centre, in pixels so the turn stays a turn on a wide wall, then
+ * framed (Video Zoom, Across, Up) as the projector frames it. It turns with
+ * LED Rotation Speed, as the ring's own colours do (ledLight's angle), and
+ * dims toward the rim by the same bevel. It takes the ring's row and the
+ * ring's blend; its level is Film Mix, the video's, by how much of the frame
+ * is there, so a zoomed-out frame's corners pass the lamp under them bare.
+ * The liquid bends it (lampBend) as it bends any picture in the lamp.
+ */
+fn videoRing(uv: vec2f) -> vec4f {
+  let p = (uv - 0.5) * U.resolution;
+  let a = U.ledAngle * 2.0 * PI;
+  let ca = cos(a);
+  let sa = sin(a);
+  let turned = vec2f(ca * p.x - sa * p.y, sa * p.x + ca * p.y) / U.resolution + 0.5;
+  let frame = filmFrame(turned, vec4f(0.0), vec3f(0.0, 0.0, 1.0));
+  let maxR = max(U.resolution.x, U.resolution.y) * 0.8;
+  let bevel = 1.0 - smoothstep(maxR * 0.5, maxR, length(p)) * 0.8;
+  return vec4f(frame.rgb * bevel, frame.w);
+}
+
+/**
  * The rows under the front plate, bottom up: the lamp the glass is lit by.
  * The LED ring replaces what is under it by its level, as the platform always
  * did; the gel filters what is under it (gelFilter: it makes no light, so
@@ -97,7 +123,12 @@ fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
   for (var p = 0; p < 7; p++) {
     let fp = f32(p);
     if (fp >= U.mixPos2.z) { break; }
-    if (U.ledPlatform != 0 && U.mixPos.x == fp) {
+    // The ring's row, or the lamp's bottom when the LED row was moved above the glass as a beam.
+    if (U.filmRing != 0 && (U.mixPos.x == fp || (U.mixPos.x >= U.mixPos2.z && p == 0))) {
+      let ring = videoRing(uv + lampBend);
+      let m = mixBlendOf(U.mixBlend.x);
+      if (m == 0) { c = mixLevelled(c, ring.rgb, U.filmMix * ring.w); } else { c = blendRow(c, ring.rgb, U.filmMix * ring.w, m); }
+    } else if (U.ledPlatform != 0 && U.mixPos.x == fp) {
       let m = mixBlendOf(U.mixBlend.x);
       if (m == 0) { c = mixLevelled(c, ledLight(uv), U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
     }
@@ -109,7 +140,7 @@ fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
       let m = mixBlendOf(U.mixBlend.z);
       if (m == 0) { c += lumiaLight(uv) * U.lumia; } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
     }
-    if (U.mixPos.z == fp && videoInLamp()) {
+    if (U.mixPos.z == fp && videoInLamp() && U.filmRing == 0) {
       let frame = filmFrame(uv + lampBend, vec4f(0.0), vec3f(0.0, 0.0, 1.0));
       let a = U.filmMix * frame.w;
       let m = mixBlendOf(U.mixBlend.w);

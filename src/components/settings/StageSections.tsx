@@ -127,7 +127,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             >
               <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
                 <span>In the ChromaGlass app · Custom band logo &amp; text layer</span>
-                <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
+                <span className="shrink-0 text-[12px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
               </div>
               <p className="mt-0.5 text-amber-100/90">
                 On the free site, the logo layer displays the ChromaGlass mark. Unlock Home or Pro to load your own band mark or SVG.
@@ -147,7 +147,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
               <button
                 onClick={() => onMarkClear?.()}
                 disabled={!markLoaded}
-                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
                 data-testid="mark-clear"
               >
                 Take it off
@@ -175,7 +175,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             <button
               onClick={() => onMarkClear?.()}
               disabled={!markLoaded}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
               data-testid="mark-clear"
             >
               Take it off
@@ -263,7 +263,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             timestamp queries instead.
           */}
           {showFrameSplit && engineStatus && (
-            <div className="text-[11px] font-mono opacity-40 leading-relaxed">
+            <div className="text-[12px] font-mono text-dim leading-relaxed">
               solver {(live ?? engineStatus).simMs.toFixed(1)} ms/step
               {' · '}other {(live ?? engineStatus).otherMs.toFixed(1)} ms/frame
               {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of {Math.round((live ?? engineStatus).stepRate || 60)} steps/s
@@ -300,7 +300,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
               <div className="font-semibold text-amber-200">
                 Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
               </div>
-              <p className="mt-1 text-[11px] text-white/75">
+              <p className="mt-1 text-[12px] text-white/75">
                 Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -308,14 +308,14 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
                   href={getEffectiveTier() === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-amber-300"
+                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[12px] font-semibold text-black hover:bg-amber-300"
                 >
                   {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $170' : 'Get Pro — $199'}
                 </a>
                 <button
                   type="button"
                   onClick={openAccountSheet}
-                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/85 hover:bg-white/[0.12]"
+                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[12px] font-medium text-white/85 hover:bg-white/[0.12]"
                 >
                   Enter licence key
                 </button>

@@ -35,7 +35,8 @@ fn filmFrame(uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec4f {
  * blend lays the frame itself, by Film Mix, and Key keys it by Film Key too.
  */
 fn filmOver(color: vec3f, uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
-  if (U.filmOn == 0 || U.filmMix <= 0.001) { return color; }
+  // On the LED ring (PLAN 14ag-9) the video is in the lamp (mixLamp), never laid over the plate as well.
+  if (U.filmOn == 0 || U.filmMix <= 0.001 || U.filmRing != 0) { return color; }
   let frame = filmFrame(uv, fluid0, normal0);
   let filmC = frame.rgb;
   let mixHere = U.filmMix * frame.w;

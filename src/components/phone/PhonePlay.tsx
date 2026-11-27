@@ -340,7 +340,7 @@ export function PhonePlay(p: PhonePlayProps) {
         >
           <span className={`flex h-9 min-w-0 items-center gap-2 rounded-[18px] pl-3.5 pr-2.5 ${GLASS_PILL}`}>
             <span className="truncate text-[14px] font-medium text-text">{p.lookName}</span>
-            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-medium text-text-2" data-testid="play-edited">edited</span>}
+            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[12px] font-medium text-text-2" data-testid="play-edited">edited</span>}
             {!sheet && <ChevronDown size={14} className="shrink-0 text-text-2" />}
           </span>
         </button>
@@ -381,7 +381,7 @@ export function PhonePlay(p: PhonePlayProps) {
                   <span className="relative flex h-7 w-7 flex-col items-center justify-center gap-px" data-testid="play-record-box">
                     <TapeReels seconds={p.recording.seconds} running={p.recording.on} height={p.recording.on ? 11 : 13} />
                     {p.recording.on && (
-                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[9px] leading-none tabular-nums">
+                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[12px] leading-none tabular-nums">
                         {clock(p.recording.seconds)}
                       </span>
                     )}
@@ -476,7 +476,7 @@ export function PhonePlay(p: PhonePlayProps) {
                   data-testid="play-save-name"
                 />
                 <button type="submit" disabled={!saveName.trim()} data-testid="play-save-confirm"
-                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-40">Save</button>
+                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-65">Save</button>
               </form>
               {saveDup && (
                 <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="play-save-duplicate">

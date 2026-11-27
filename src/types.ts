@@ -885,6 +885,7 @@ export interface VisualizerSettings {
   filmZoom: number;           // the film's frame on the plate: 1 fills it (cover-fit), above crops in, below shows it smaller with black round it
   filmX: number;              // the film's frame slid across, in plate widths (0 centred)
   filmY: number;              // the film's frame slid up, in plate heights (0 centred)
+  filmRing: number;           // 1: the video is the spinning LED platform under the dish, turning with LED Rotation Speed (PLAN 14ag-9); 0 off
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -1382,6 +1383,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmZoom: 1,
   filmX: 0,
   filmY: 0,
+  // The video is not on the LED ring until someone puts it there (PLAN 14ag-9).
+  filmRing: 0,
   lampWarmth: 0,
   transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,
