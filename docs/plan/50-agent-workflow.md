@@ -25,8 +25,8 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
 
 - **50a** *Clear the hitches already found* (rank 1, S to M each, Antigravity; §46's items,
   not new ones). In order of what the eye sees: **46m** Tank and the lamp's boil compile 13
-  pipelines on the frame that turns them on, a two to six second stop; **46o** Song ID
-  resamples and matches on the page's thread every six seconds; **46h** a MIDI fader or a Go
+  pipelines on the frame that turns them on, a two to six second stop; ~~**46o**~~ (gone with Song ID, retired
+  2026-11-27); **46h** a MIDI fader or a Go
   fade renders every desk panel, ten to thirty times a second; **46p** the remote's whole
   snapshot is serialised every 80 ms with no phone connected; **46j** the frame's own
   garbage. Each already names its check or the check Claude writes first. The cheapest

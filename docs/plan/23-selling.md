@@ -45,7 +45,7 @@ sit behind the key.
 | Two or more projectors, each its own plate (§16) | | | ✓ | Only multi-screen rigs need it, and they are paying jobs. |
 | Show Sequencer and set lists | ✓ | ✓ | ✓ | Free to try; a cap on a site set list's length can come later. |
 | Lyrics overlay (LRCLIB) | ✓ | ✓ | ✓ | A free service and a good party trick. |
-| Song ID | manual tag only | ✓, a monthly cap | ✓ | Every lookup costs the owner money; the cap keeps Home's price above its cost. |
+| ~~Song ID~~ | manual tag only | ~~✓, a monthly cap~~ | ~~✓~~ | **Retired 2026-11-27** (the owner: not used); every tier names songs by hand, and the pricing pages no longer list it. Code in `archive/song-id/`. |
 | Song maps, per-track identity, history | ✓ | ✓ | ✓ | Work from a manual tag at no cost. |
 | Your own logo on the wall | ChromaGlass mark | ChromaGlass mark | ✓ | A club or a band putting its name up is a paying use. |
 | Record | short clips, small mark | full length, no mark, to disk | full length, no mark, to disk | The site holds the take in memory anyway (§13 found along the way). |

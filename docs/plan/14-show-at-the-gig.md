@@ -397,7 +397,7 @@ the checks and the build §19.
   ever meets that, the fix is a longer key for the tunnel, not a looser budget.
 
 ## ~~14o. The song-ID Worker is open to anyone~~
-- **14o-count** (S): the counters are in Workers KV, which takes one write a second per
+- ~~**14o-count**~~ **parked: the song-ID Worker was retired with Song ID on 2026-11-27 and is kept in `archive/song-id/`** (S): the counters are in Workers KV, which takes one write a second per
   key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
   free plan meters about 500 lookups a day, and a second lookup from one address in the
   same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
