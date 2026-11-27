@@ -63,7 +63,7 @@ const R = 0.06;   // the lens's radius, in plates (oillift's)
 /*
   Check 1 reads a lens against the rim settling there: six readings, the
   last three after it has. Every speed the surface tension gives the oil
-  between two glasses goes as h² (Darcy: h²/12μ times σ∇κ, OIL_TENSION_GAP),
+  between two glasses goes as h² (Darcy: h²/12μ times σ∇κ, oilMobility),
   so on the 2 mm gap (PLAN 38r) the lens settles nine times slower than on
   the 6 mm one it was written on, and six seconds caught it settling: the
   lens at the middle of the grid's edge lost 2.9% of its oil over the rim in

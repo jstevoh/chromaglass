@@ -207,7 +207,7 @@ export const CONTROL_HELP: Record<string, string> = {
   oilThickness: 'How thick the oil is: left, a lamp\'s thin molten wax that sinks freely; right, a thick oil that lags the water.',
   oilWeight: 'How heavy the oil is against the water. Right, it sinks like a lava lamp\'s wax and the lamp lifts it. Needs Gravity.',
   filmHold: 'The water film between two oil drops holds them apart, so they crowd without merging until pressed. Needs Oil Tension.',
-  oilTension: 'Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge.',
+  oilTension: 'Surface tension between oil and water, at 1 the poured oil\'s own: oil rounds into drops, threads break into beads, drops merge.',
   clearFilm: 'Pours a clear oil film over the dish. Thin spots and dust tear it open into a lace of holes (dewetting).',
   clearFilmDye: 'Dyes the clear film, so the lace takes a colour, deeper where it is thick, and its holes show the water.',
   thinGap: 'Treats the plate as a thin gap between two glasses, so a push coasts and viscosity matters.',

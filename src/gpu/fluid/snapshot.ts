@@ -12,6 +12,8 @@ export interface SnapshotScalars {
   phaseLive: boolean;
   mixLive: boolean;
   oilPoured: number;
+  /** The oil's tension, N/m (FluidCore.oilSigma, PLAN 38e). */
+  oilSigma: number;
   oilDyeStale: boolean;
   bodiesWanted: boolean;
   oilLayPending: boolean;

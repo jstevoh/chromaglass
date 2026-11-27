@@ -28,7 +28,11 @@
  *      the gap stage compiles carries the constants and no other;
  *   3. the drag time ρh²/12μ (the plate's memory, the spin's lag) at H0,
  *      by both the solver's and the turntable's function;
- *   4. the oil's free rise up a tipped plate, Δρ g h₀²/12μ_ref;
+ *   4. the oil's free rise up a tipped plate, Δρ g h₀²/12μ_ref; and its
+ *      capillary pull, h₀²σ/12μ_ref with σ each bottle's own tension
+ *      against water in N/m (PLAN 38e: sunflower 27 mN/m, silicone 37,
+ *      a Designer oil by Antonow's rule), the lab's old 4e-4 at 6 mm
+ *      being σ = 0.0239 by the same law;
  *   5. a held pour's share a second, over a dome of πr²/2 × H0;
  *   6. the cover glass's shear drag, μ/(m h₀) a second;
  *   7. the rhythm sheet's film (its mobility h₀³/12μ) and the dent radius
@@ -95,7 +99,9 @@ await build({
       "export * from './src/lib/turntable.ts';",
       "export { REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, OIL_LIFT, NU_REF, SPIN_OIL_LIGHT, thinGapDragSeconds, thinGapViscosity } from './src/gpu/fluid/constants.ts';",
       "export { GAP_KERNELS } from './src/gpu/wgsl/fluid/gap.ts';",
-      "export { pourShare, HELD_POUR } from './src/lib/liquidProps.ts';",
+      "export { pourShare, HELD_POUR, interfacialTension, OIL_SIGMA, WATER_SIGMA } from './src/lib/liquidProps.ts';",
+      "export { oilMobility, oilTensionOf, OIL_TENSION, OIL_TENSION_SIGMA, LIQUID_DENSITY } from './src/gpu/fluid/constants.ts';",
+      "export { DEFAULT_LIQUID_TYPES } from './src/bottles.ts';",
       "export { coverDrag, COVER_KG_M2 } from './src/lib/plateRock.ts';",
       "export { RhythmSheet, sheetReach } from './src/lib/sheet.ts';",
       "export { dentRadius, KICK_HOLD } from './src/lib/squish.ts';",
@@ -162,6 +168,23 @@ check(`the rest gap is ${MM}, and the field's rest number times its metres is th
   const want = L.SPIN_OIL_LIGHT * G * H0 * H0 / (12 * L.thinGapViscosity(0.45));
   check(`the oil's free rise up a tipped plate is Darcy's Δρ g h₀²/12μ_ref at ${MM}`, near(L.OIL_LIFT, want, 1e-6) && near(L.NU_REF, L.thinGapViscosity(0.45), 1e-12),
     `${(L.OIL_LIFT * 100).toFixed(2)} cm/s per unit sinθ (SI ${(want * 100).toFixed(2)})`);
+}
+// 4, the pull: σ in N/m from the bottle, through the same Darcy mobility (PLAN 38e).
+{
+  const shelf = (id) => L.interfacialTension(L.DEFAULT_LIQUID_TYPES.find((b) => b.id === id)?.behaviour);
+  const sun = shelf('oil'), sil = shelf('silicone');
+  // SI, plate widths a second per unit curvature-gradient taken per plate width: h₀²σ/(12ρν) over W³.
+  const want = (sigma) => H0 * H0 * sigma / (12 * 1000 * L.thinGapViscosity(0.45)) / W ** 3;
+  // The lab's 4e-4 was set on the 6 mm gap; carried by h² it is the σ this law makes of it.
+  const old = L.OIL_TENSION * (H0 / 0.006) ** 2 / want(1);
+  const designer = L.interfacialTension({ tension: 30 });
+  const ok = near(sun, 0.027, 1e-12) && near(sil, 0.037, 1e-12) && near(L.OIL_SIGMA, sun, 1e-12) && near(L.interfacialTension(undefined), sun, 1e-12)
+    && near(designer, L.WATER_SIGMA - 0.030, 1e-9) && L.LIQUID_DENSITY === 1000
+    && near(L.oilMobility(sun), want(sun), 1e-9) && near(L.oilTensionOf(sil, true) / L.oilTensionOf(sun, true), 37 / 27, 1e-9)
+    && near(L.OIL_TENSION_SIGMA, old, 1e-9) && old > 0.023 && old < 0.025
+    && near(L.oilTensionOf(L.OIL_TENSION_SIGMA, false), L.OIL_TENSION, 1e-12) && near(L.oilTensionOf(L.OIL_TENSION_SIGMA, true), L.OIL_TENSION * (H0 / 0.006) ** 2, 1e-9);
+  check(`the oil's capillary pull is Darcy's h₀²σ/12μ_ref at ${MM}, σ each bottle's against water (sunflower 27 mN/m, silicone 37, a Designer oil |γ_w − γ_o|)`, ok,
+    `sunflower ${(sun * 1e3).toFixed(1)}, silicone ${(sil * 1e3).toFixed(1)}, Designer γ 30 → ${(designer * 1e3).toFixed(1)} mN/m; pull ${L.oilMobility(sun).toExponential(4)} (SI ${want(sun).toExponential(4)}); the old 4e-4 at 6 mm is σ ${(old * 1e3).toFixed(2)} mN/m (solver ${(L.OIL_TENSION_SIGMA * 1e3).toFixed(2)})`);
 }
 
 // 5
@@ -415,7 +438,7 @@ const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), passes = readFileSync('src/gpu/fluid/passes.ts', 'utf8'), thin = readFileSync('src/gpu/wgsl/thinGap.ts', 'utf8');
   const solver = [
     /get coverH2\(\): number \{\s*const r = this\.coverGap \/ DISH_REST_GAP;\s*return r \* r;/.test(readFileSync('src/gpu/fluid/cover.ts', 'utf8')),
-    /OIL_TENSION_GAP \* this\.coverH2/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX : 0, rockOn \? ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockY : 0/.test(fluid), /const kappa = -OIL_LIFT \* oilLightnessOf\(p\.oilWeight\) \* seconds \/ \(PLATE_METRES \* Math\.max\(disp, 1e-9\) \* ROCK_FALL\);/.test(fluid),
+    /oilTensionOf\(this\.oilSigma, thin\) \* \(thin \? this\.coverH2 \*/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX : 0, rockOn \? ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockY : 0/.test(fluid), /const kappa = -OIL_LIFT \* oilLightnessOf\(p\.oilWeight\) \* seconds \/ \(PLATE_METRES \* Math\.max\(disp, 1e-9\) \* ROCK_FALL\);/.test(fluid),
     /const h0 = this\.coverGap \* GAP_METRES;/.test(fluid), /const b = this\.coverGap \* GAP_METRES;/.test(passes), /const hc = this\.coverGap \* GAP_METRES;/.test(passes),
     /\(A\.a\.x \/ \(S\.cover \* S\.cover\) \* A\.a\.y\)/.test(thin),
   ];

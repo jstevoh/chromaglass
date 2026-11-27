@@ -1,4 +1,5 @@
 import type { SloshDrive } from '../lib/slosh';
+import type { LiquidBehaviour } from '../types';
 /**
  * What a solver is told, and what the plate needs of one
  * (docs/webgpu-plan.md, P7).
@@ -340,7 +341,8 @@ export interface PlateSolver {
   addLiquidDrop?(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number; bz?: number; viscosity?: number; tension?: number; density?: number }, amount: number, seconds?: number): void;
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
-  addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number; viscosity?: number; tension?: number; density?: number }): void;
+  /** `of`, the bottle the oil came from, for its tension against water (PLAN 38e, lib/liquidProps.ts interfacialTension); the shelf's Oil without it. */
+  addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number; viscosity?: number; tension?: number; density?: number; of?: LiquidBehaviour }): void;
   /** Lay the oil cell for cell, replacing the mix (Foam Cells' pressed drops, PLAN 47z-5): `oil` is asked at each cell's middle in plate units, with the mix's size. */
   layOil?(oil: (x: number, y: number, n: number) => number): void;
   /**

@@ -556,24 +556,23 @@ export class FluidSimulation {
         Without it a dose is a thin film a few cells across, a quarter to
         four fifths full, which Cahn–Hilliard either dissolves back into the
         water or leaves as a speck: there was never a body on the plate for
-        a colour to keep to. The soap and the acid in the same bottle land
-        as they always did.
+        a colour to keep to. Soap and acid land as before.
       */
       if (oil > 0 && (s.oilBodies ?? 0) > 0.001) {
         const room = 1 - (g.oilCover ?? 0) / BODY_COVER;
         if (room > 0) {
           const r = Math.max(1.5, radius) * BODY_DROP * Math.sqrt(Math.min(1, oil) * Math.min(1, room + 0.25));
-          g.addMix(cx / L, cy / L, r / L, { oil: 1 });
+          g.addMix(cx / L, cy / L, r / L, { oil: 1, of: what });
         }
         oil = 0;
       }
-      
+
       if (g.addLiquidDrop) {
         g.addLiquidDrop(cx / L, cy / L, Math.max(1.5, radius) / L, what, amount, seconds);
       }
       
       if (oil <= 0 && soap <= 0 && acid === 0) return;
-      g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
+      g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid, of: what });
     };
 
     this.density = new Float32Array(GRID_AREA);

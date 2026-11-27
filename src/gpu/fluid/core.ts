@@ -20,6 +20,7 @@ import { WebGPUParticles } from '../particles';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
 import { RowUploads } from '../../lib/deltaRows';
+import { OIL_SIGMA } from '../../lib/liquidProps';
 import { REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
 
 export class FluidCore {
@@ -381,6 +382,15 @@ export class FluidCore {
     when the plate is full of them.
   */
   protected oilPoured = 0;
+  /*
+    The oil's tension against the water, N/m (PLAN 38e): each pour's own
+    (lib/liquidProps.ts interfacialTension), averaged by the plate it
+    covers, so a dish of sunflower oil is at 27 mN/m and one with silicone
+    poured into it goes toward 37 as the silicone's share grows. One number
+    for the plate's oil, not one a cell: the oil is one field, and two oils
+    on one plate share it.
+  */
+  protected oilSigma = OIL_SIGMA;
   protected rxnLive = false;
   /** What the plate draws from the liquids' own physics, packed (see packView). */
   protected viewTex: GPUTexture | null = null;
@@ -818,6 +828,7 @@ export class FluidCore {
     this.speciesSnap = null;
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
+    this.oilSigma = OIL_SIGMA;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     this.mixLive = false;

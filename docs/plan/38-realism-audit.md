@@ -153,6 +153,23 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   h²σ/(12μR) for two oils.
   38v (2026-11-21): the ferrofluid's own rounding runs by steps, with no seconds and no grid
   size in its Cahn–Hilliard mobility (`fluid.ts:1393-1401`): 9ae.
+  - ~~**38e-1**~~ σ in N/m from each bottle: shipped 2026-11-27 (from PR #624, ported onto
+    38r's gap and the sealed bottle). The thin gap's pull is `oilMobility(σ)`, Darcy's
+    h₀²σ/12μ_ref, times the cover's (h/h₀)² as before; σ is each pour's own against water
+    (`interfacialTension`: the bottle's `interfacial`, sunflower 27 mN/m, silicone 37, or
+    Antonow's |γ_w − γ_o| for a Designer oil), averaged over the plate by what each covers
+    (`oilSigma`, carried and snapshotted with the oil). The dial keeps its 0–1 and is the share
+    of the oil's own. The old `OIL_TENSION_GAP` was σ = 0.0239 by the same law, so oil looks
+    round 13% faster with sunflower and 55% with silicone. `npm run gap` part 4 holds it.
+  - **38e-2** The cap, still there (`OIL_CELLS` 0.5, `SEALED_CELLS` 1 cell a step). PR #624
+    took it off the thin gap outright and needed three things with it, measured on the lab in
+    October before 38r: a held film taking the blur's concave waist pull back out (Film Hold's
+    crowd fell 35 → 19 uncapped, back to 31 with it), `airblow` part 5 measuring a drop as one
+    body (written against the Blow before its rebuild as a jet, #852), and `npm run oiltension`
+    (a drop's rounding against h²σ/4μR³, the silicone's ratio, twice the dial in half the
+    time, and stability at three times real). Since then 27f-9q found the explicit force at
+    nine times sheds the sealed lamp's interface as haze, and PLAN 27f-9s plans the capillary
+    implicit. Redo on the lab, after 27f-9s or as CFL sub-steps; the PR branch has the three.
 
 - **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
   (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).

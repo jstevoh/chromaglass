@@ -44,8 +44,10 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // over water and will not mix with it.
   { id: 'oil',     name: 'Oil',     color: '#faf6cc', own: '#faf6cc', description: 'Lighter than water and will not mix with it — rides up and beads',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0,
     // Sunflower oil: 49 mPa·s, 0.92 g/cm³, 33 mN/m, n 1.47 (an immiscible
-    // bottle: its own phase, the oil, and not the species field).
-    behaviour: { weight: -0.12, polarity: -0.9, repel: 0.3, viscosity: 49, density: 0.92, tension: 33, index: 1.47 } },
+    // bottle: its own phase, the oil, and not the species field). Against
+    // water about 27 mN/m: reported from 23 for a kitchen oil to 31 refined,
+    // its own polar traces lowering it (PLAN 38e).
+    behaviour: { weight: -0.12, polarity: -0.9, repel: 0.3, viscosity: 49, density: 0.92, tension: 33, interfacial: 27, index: 1.47 } },
   // Lighter still, and polar enough to go into water rather than sit on it.
   { id: 'alcohol', name: 'Alcohol', color: '#ffffff', own: '#ffffff', description: 'Light and thin: it rises through water and disperses with heat, and opens holes in a clear film',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
     // Ethanol: 1.2 mPa·s at 0.79 g/cm³, so a little thinner than water by
@@ -95,8 +97,9 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     // The least polar thing on the shelf, which is why it shoulders colour
     // aside instead of tinting it.
     // A 50 cSt silicone oil (PDMS): 48 mPa·s, 0.96 g/cm³, 21 mN/m, n 1.402;
-    // immiscible, so the oil's phase, not the species field.
-    behaviour: { soap: 0.8, repel: 0.45, weight: -0.04, polarity: -0.95, viscosity: 48, density: 0.96, tension: 21, index: 1.402 } },
+    // immiscible, so the oil's phase, not the species field. Against water
+    // about 37 mN/m (measured on 50 mPa·s oil; 37 to 41 reported).
+    behaviour: { soap: 0.8, repel: 0.45, weight: -0.04, polarity: -0.95, viscosity: 48, density: 0.96, tension: 21, interfacial: 37, index: 1.402 } },
   /*
     Acid and base, for a pH indicator in the dye (docs/physics-plan.md): they
     do nothing to the flow, and with pH Indicator up the dye they land in

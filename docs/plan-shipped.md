@@ -16401,3 +16401,18 @@ dragged drop 7.4 R behind.
   "every look's own magnet raises none" turned to "is past it".
 - Found along the way: `startup` 1b's red on GitHub's Macs is the intro's 1.5 s frame cap,
   not this change (19aa-7, fixed on main by 19aa-7a).
+### 38e-1: oil's surface tension in newtons a metre, from each bottle (2026-11-27, from PR #624)
+
+The thin gap's capillary pull was a 0–1 dial times `OIL_TENSION_GAP`, the lab's 4e-4 at 6 mm
+carried to 2 mm by h². It is now `oilMobility(σ)`, Darcy's h₀²σ/12μ_ref over the plate's
+width cubed, times the cover's (h/h₀)² and the sealed bottle's `SEALED_TENSION` as before,
+with σ each pour's own tension against water: a bottle's `interfacial` (sunflower 27 mN/m,
+silicone 37) or, for a Designer oil with only its tension against air, Antonow's
+|γ_w − γ_o| (`interfacialTension` in `src/lib/liquidProps.ts`). The plate's oil has one σ,
+averaged by the area each pour covers (`oilSigma`, carried across a resize and kept in
+Undo's snapshot); a look's own laid oil is the shelf's Oil. The old plate keeps its 4e-4,
+scaled by σ over the σ it stood for. By the same law the old number was σ = 0.0239 N/m, so
+every oil look rounds 13% faster with sunflower oil and 55% with silicone. The dial keeps
+its 0–1 range and is the share of the oil's own tension. `npm run gap` part 4 holds the law
+in SI from the millimetres (its first run caught the 6 mm ratio written upside down, σ 1.93
+N/m). The cap is unchanged: 38e-2.
