@@ -18,14 +18,35 @@
  * to r 0.44, the dish's own rim at 0.5):
  *  1. With Air 0.35 the dish keeps its dye (at least 97%; it kept 0% before).
  *  2. The draught still moves the liquid: its gusts (the flow's rms about its
- *     mean) between half and twice the old ones (OLD_GUST, from the old code),
+ *     mean) within a quarter of the old ones (OLD_GUST, from the old code),
  *     and the dye's picture changes against the same plate with Air off.
  *  3. It does not slide the dish: the mean flow over the dish under a tenth of
  *     its rms (the old shear's mean was most of it).
- *  4. The control: a push that still goes through the open rim (Rain Drip on a
- *     standing plate, PLAN 18a-17) loses dye here, so line 1 can fail.
+ *  0. The lab ran the thin gap, and laid the disc it says (its soft disc's
+ *     mass, π·0.44²/2 of the 128² plate), so a lab on the deep plate, which
+ *     has no open rim, or an empty plate cannot pass 1.
+ *  4. The control: the same lab with the old draught's uniform shear put back
+ *     on top of the gusts (a build-time edit of wgsl/thinGap.ts, as
+ *     lampcontrol.mjs edits the plate) loses the dish and slides it, so 1 and
+ *     3 can fail. Rain Drip on a standing plate, which still goes through the
+ *     open rim (PLAN 18a-17), is printed beside it, not held.
  */
+import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
+
+/** The control's build: hsBody's gusts with the old draught's uniform −y shear (S.air × 8 a step) laid back on them. */
+const OLD_SHEAR = {
+  name: 'old-shear',
+  setup(b) {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]thinGap\.ts$/ }, (a) => {
+      const s = readFileSync(a.path, 'utf8');
+      const at = /(let g = vec2f\(cy, -cx\)[^;]*);/g;
+      const found = s.match(at)?.length ?? 0;
+      if (found !== 1) throw new Error(`draught: the old-shear control found ${found} of 1 gust lines in wgsl/thinGap.ts`);
+      return { contents: s.replace(at, '$1 + vec2f(0.0, -S.air * 8.0 * S.dt);'), loader: 'ts' };
+    });
+  },
+};
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -41,10 +62,9 @@ const check = (name, ok, detail = '') => {
 */
 const OLD_GUST = 1.73e-2;
 const STEPS = 600;
+const DISC = Math.PI * 0.44 * 0.44 / 2 * 128 * 128;
 
-const { page, close } = await openLab();
-try {
-  const run = (over) => page.evaluate(async ({ over, steps }) => {
+const run = (page, over) => page.evaluate(async ({ over, steps }) => {
     await lab.create(128, 128);
     await lab.step(1, { thinGap: 1 });
     lab.dye(0.5, 0.5, 0.44, [1.0, 0.6, 0.2], 1.0);
@@ -63,28 +83,40 @@ try {
     const sp = await speed();
     await lab.step(steps - 30, base);
     const after = await dye();
-    return { kept: after.s / before.s, ...sp, field: Array.from(after.f) };
+    return { before: before.s, kept: after.s / before.s, thin: lab.thinLive(), ...sp, field: Array.from(after.f) };
   }, { over, steps: STEPS });
 
-  const still = await run({ air: 0 });
-  const air = await run({ air: 0.35 });
-  const drip = await run({ air: 0, drip: 0.5, plateUpright: 1 });
+let still, air, drip, shear;
+{
+  const { page, close } = await openLab();
+  try {
+    still = await run(page, { air: 0 });
+    air = await run(page, { air: 0.35 });
+    drip = await run(page, { air: 0, drip: 0.5, plateUpright: 1 });
+  } finally { await close(); }
+}
+{
+  const { page, close } = await openLab({ plugins: [OLD_SHEAR], tag: 'old-shear' });
+  try { shear = await run(page, { air: 0.35 }); } finally { await close(); }
+}
+{
   if (process.argv.includes('--rms')) console.log(`      rms ${air.rms.toExponential(3)} mean ${air.mean.toExponential(3)} gust ${air.gust.toExponential(3)} kept ${air.kept.toFixed(3)}`);
 
+  check('0. the lab ran the thin gap and laid the disc', air.thin && still.thin && shear.thin && Math.abs(air.before / DISC - 1) < 0.01,
+    `thin ${air.thin}/${still.thin}/${shear.thin}; laid ${air.before.toFixed(1)} against the disc's ${DISC.toFixed(1)}`);
   check('1. with Air 0.35 the dish keeps its dye', air.kept >= 0.97,
     `${(100 * air.kept).toFixed(1)}% left after ${STEPS} steps (bar 97%; Air off ${(100 * still.kept).toFixed(1)}%)`);
   let moved = 0, total = 0;
   for (let k = 0; k < air.field.length; k++) { moved += Math.abs(air.field[k] - still.field[k]); total += still.field[k]; }
-  check('2a. the draught still moves the liquid: its gusts between half and twice the old ones', air.gust >= 0.5 * OLD_GUST && air.gust <= 2 * OLD_GUST,
+  check('2a. the draught still moves the liquid: its gusts within a quarter of the old ones', Math.abs(air.gust / OLD_GUST - 1) <= 0.25,
     `${air.gust.toExponential(2)} against the old ${OLD_GUST.toExponential(2)}`);
   check('2b. and the dye\'s picture moves with it', moved / total > 0.05,
     `${(100 * moved / total).toFixed(1)}% of the dye in a different place than with Air off (bar 5%)`);
   check('3. it does not slide the dish: mean flow under a tenth of its rms', air.mean < 0.1 * air.rms,
     `mean ${air.mean.toExponential(2)}, rms ${air.rms.toExponential(2)}`);
-  check('4. control: a push through the open rim (Rain Drip, standing plate) loses dye here', drip.kept < 0.9,
-    `${(100 * drip.kept).toFixed(1)}% left`);
-} finally {
-  await close();
+  check('4. control: the old uniform shear put back loses the dish and slides it', shear.kept < 0.5 && shear.mean > 0.5 * shear.rms,
+    `${(100 * shear.kept).toFixed(1)}% left, mean flow ${shear.mean.toExponential(2)} of rms ${shear.rms.toExponential(2)}`);
+  console.log(`      (Rain Drip 0.5 on a standing plate, still through the open rim, PLAN 18a-17: ${(100 * drip.kept).toFixed(1)}% left)`);
 }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
