@@ -25,9 +25,9 @@ import type { Preset } from './presets';
  * white is the brightest thing on the glass and reads as it does in a glass
  * held against a dark room: by the light it scatters back.
  *
- * The dish (presetPlate.ts PRESET_LIQUIDS) is Ouzo twice, water and
- * Alcohol, one of them with each of the automation's drops, so half the
- * drops are cloud and the three things the curve does all happen on the
+ * The dish (presetPlate.ts PRESET_LIQUIDS) is Ouzo three times, Alcohol
+ * twice and water once, one of them with each of the automation's drops,
+ * so half the drops are cloud and the three things the curve does all happen on the
  * glass. Worked from it for a drop at the automation's dose (AUTO_DOSE,
  * 0.35 of a column at the middle of its disc), with the bottle at 1% oil:
  *
@@ -67,6 +67,26 @@ import type { Preset } from './presets';
  *    its drop half as wide again, so a drop reads 130 to 150, a laid dose
  *    about 205, and a strong pour keeps a clear middle in a white ring.
  *
+ * Then a middle between the two (PLAN 48s-7, the owner's pick, 2026-11-27).
+ * The retune's own film had the cloud from the first frame, but the dish
+ * 72 to 80% near black, the purple barely there, swells down from 4.9 to
+ * 1.0 a minute, and from the half minute the white gathered into opaque
+ * ribbons. Each has its cause, and each its change:
+ *  - Too little colour: three small drops are 9% of the dish, and a drop
+ *    moving dark water shows nothing. Four middling drops colour about a
+ *    quarter (presetPlate.ts plainSeed).
+ *  - No swells: at 0.36 something landed every three seconds or so, a
+ *    steady drizzle whose motion never stood above its own median, which is
+ *    what a swell is (scripts/watch.mjs shape()). At 0.24, between the two,
+ *    a drop has time to spread before the next.
+ *  - The opaque ribbons: nothing takes oil out of a dish (the droplets are
+ *    conserved, `npm run ouzo` line 3), so the dish gathers what the drops
+ *    bring, and at 0.36 with half the drops Ouzo that was three and a half
+ *    times the first version's oil a minute. Still half Ouzo, at 0.24 it is
+ *    two thirds of the retune's; and a third of the drops are Alcohol, not a
+ *    quarter, so for each drop of Ouzo there are two thirds of a drop of the
+ *    spirit that dissolves the droplets where it lands, not half of one.
+ *
  * The music reaches it the way a hand would: the kick presses the top glass
  * (platePressure, as Night Sea's and Foam Cells' kick does), which pushes
  * the liquid out sideways and folds clear into cloudy, and the snare
@@ -104,7 +124,7 @@ export const LOUCHE: Preset = {
     advection: 0.4,
     damping: 0.99,
     heatDecay: 0.995,
-    automateRate: 0.36,
+    automateRate: 0.24,
     platePressure: 0.2,
     glassSmear: 0,
     rainDrip: 0,
