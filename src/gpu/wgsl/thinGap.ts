@@ -90,6 +90,7 @@ import { HAND_GRIP } from '../../lib/handSolid';
 import { DISH_GAP_FIELD_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
 import { thinWarmKernels } from './thinWarm';
+import { FACE_STAR } from './thinFlow';
 
 /**
  * The kernels, built on the solver's own head (the Sim and Args structs) and
@@ -912,37 +913,30 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(7) var<storage, read> mob: array<f32>;
 @group(0) @binding(8) var<storage, read_write> gapBefore: array<f32>;
 @group(0) @binding(9) var<storage, read_write> poured: array<f32>;
-const DRY_FACES = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
-fn flux(p: vec2i, n: i32) -> vec2f {
-  let c = clamp(p, vec2i(0), vec2i(n - 1));
-  var w = textureLoad(vel, c, 0).xy * abs(mob[c.x + c.y * n]);
-  if (p.x < 0 || p.x > n - 1) { w.x = -w.x; }
-  if (p.y < 0 || p.y > n - 1) { w.y = -w.y; }
-  return w;
-}
+@group(0) @binding(10) var<storage, read> flow: array<vec4f>;
+@group(0) @binding(11) var<storage, read_write> flowStar: array<vec2f>;
+${FACE_STAR}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
-  var div = 0.5 * (flux(p + vec2i(1, 0), n).x - flux(p - vec2i(1, 0), n).x
-                 + flux(p + vec2i(0, 1), n).y - flux(p - vec2i(0, 1), n).y);
   /*
-    A face of a cell the air fills (no mobility, hsPrep) carries nothing:
-    not the pressure's flux, whose coefficient is zero there, and not u*'s
-    either, which the centred sum above takes as the mean of the two cells
-    and so half the liquid's beside it. Left in, that half pushed liquid
-    into the air with nothing to answer it, and the air's pressure rose
-    without bound. So each such face is taken back out, and the dry cell's
-    own equation is p = anything, b = 0. With no air every face stays and
-    the sum is the one it was.
+    What the step's u* would carry through each face, M·u* (FACE_STAR in
+    wgsl/thinFlow.ts, PLAN 18a-8): the face's own velocity from the last
+    step plus what this step's forces asked of its two cells. A face of a
+    cell the air fills (no mobility, hsPrep) carries nothing: not the
+    pressure's flux, whose coefficient is zero there, and not u*'s either.
+    Left in, half the liquid's beside it pushed into the air with nothing
+    to answer it, and the air's pressure rose without bound; so the dry
+    cell's own equation is p = anything, b = 0. The grid's wall carries
+    nothing either. This cell's east and north faces are kept for
+    hsGradient, which takes the solve's correction from them.
   */
+  let east = starFace(p, 0, n);
+  let north = starFace(p, 1, n);
+  flowStar[p.x + p.y * n] = vec2f(east, north);
+  let div = east - starFace(p - vec2i(1, 0), 0, n) + north - starFace(p - vec2i(0, 1), 1, n);
   let dry = mob[p.x + p.y * n] == 0.0;
-  for (var k = 0; k < 4; k++) {
-    let e = DRY_FACES[k];
-    let q = p + e;
-    if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
-    if (dry || mob[q.x + q.y * n] == 0.0) { div -= 0.5 * dot(flux(p, n) + flux(q, n), vec2f(e)); }
-  }
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
   let g = textureLoad(sq, p, 0).r;
@@ -1225,15 +1219,26 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
     /*
-      The velocity the step ends with: u = c u* − M∇p / h.
+      The velocity the step ends with: u = c u* − M∇p / h, face by face.
 
-      Each face's correction is its own coefficient times the pressure step
-      across it, and the cell takes the mean of its two faces on each axis,
-      over its own gap. On a plate of one gap and one liquid that is exactly
-      c u* − c∇p by central differences, the old gradientSubtract with the
-      drag in it; where the gap changes, the face beside a tight cell carries
-      what a tight cell can. A face on the grid's wall carries nothing, and a
-      neighbour past the rim is at p = 0. A.a.x is h0.
+      Each face's flux is what u* would carry through it (hsDivergence's
+      flowStar) less its own coefficient times the pressure step across it,
+      M_f·ΔP, which is what the solve made conserve liquid; its velocity is
+      that over the face's gap (the mean of its two cells'), and it is kept
+      as the flow's state for the next step and for the carries (\`flow\`,
+      PLAN 18a-8). The cell's velocity is the mean of its two faces on each
+      axis, for everything that reads the flow at a cell. On a plate of one
+      gap and one liquid that is c u* − c∇p by central differences, the old
+      gradientSubtract with the drag in it; where the gap changes, the face
+      beside a tight cell carries what a tight cell can. A face on the
+      grid's wall carries nothing, and a neighbour past the rim is at p = 0.
+      A.a.x is h0.
+
+      Before 18a-8 the cell kept its own M·u* less the mean of its faces'
+      corrections, and the faces saw only the mean of two cells' u*: a
+      checkerboard in the cells' velocities was a mode the solve never saw,
+      which only the drag took out (a laid one kept 93% of itself through
+      a step of water, \`npm run gridnull\`; 4e-8 now).
     */
     hsGradient: `${HEAD}${COMMON}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -1242,16 +1247,26 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(5) var<storage, read> pr: array<f32>;
 @group(0) @binding(6) var<storage, read> mob: array<f32>;
 @group(0) @binding(7) var<storage, read_write> seen: array<f32>;
+@group(0) @binding(8) var<storage, read> flowStar: array<vec2f>;
+@group(0) @binding(9) var<storage, read_write> flow: array<vec4f>;
 fn pAt(x: i32, y: i32, n: i32) -> f32 {
   if (mob[x + y * n] < 0.0) { return 0.0; }
   return pr[hsPacked(x, y, n)];
 }
-// The flux correction through the face from this cell toward (dx, dy), as M_f (p_nb − p).
-fn face(x: i32, y: i32, dx: i32, dy: i32, n: i32, mi: f32, pi: f32) -> f32 {
-  let qx = x + dx;
-  let qy = y + dy;
-  if (!hsIn(qx, qy, n)) { return 0.0; }
-  return hsHarm(mi, abs(mob[qx + qy * n])) * (pAt(qx, qy, n) - pi);
+// The velocity through the east (ax 0) or north (ax 1) face of cell q, as the solve made it conserve liquid.
+// A face that is not a finite number carries nothing, decided by the face alone, so both cells beside it
+// read the same face (the cell's velocity is safeVel's, a cell blown past VEL_BOUND asks to come back next step).
+fn faceVel(q: vec2i, ax: i32, n: i32) -> f32 {
+  let e = select(vec2i(0, 1), vec2i(1, 0), ax == 0);
+  let b = q + e;
+  if (!hsIn(q.x, q.y, n) || !hsIn(b.x, b.y, n)) { return 0.0; }
+  let ma = abs(mob[q.x + q.y * n]);
+  let mb = abs(mob[b.x + b.y * n]);
+  let star = flowStar[q.x + q.y * n];
+  let f = select(star.y, star.x, ax == 0) - S.n * hsHarm(ma, mb) * (pAt(b.x, b.y, n) - pAt(q.x, q.y, n));
+  let h = 0.5 * (hsGap(textureLoad(sq, q, 0).r, A.a.x) + hsGap(textureLoad(sq, b, 0).r, A.a.x));
+  let v = f / h;
+  return select(0.0, v, abs(v) < 1e30);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -1260,12 +1275,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, q, 0);
   let mi = abs(mob[q.x + q.y * n]);
   let pi = pAt(q.x, q.y, n);
-  // Toward +x the face gives M(p_R − p); toward −x, M(p_L − p), which is minus the gradient's face.
-  let gx = face(q.x, q.y, 1, 0, n, mi, pi) - face(q.x, q.y, -1, 0, n, mi, pi);
-  let gy = face(q.x, q.y, 0, 1, n, mi, pi) - face(q.x, q.y, 0, -1, n, mi, pi);
-  let h = hsGap(textureLoad(sq, q, 0).r, A.a.x);
-  let u = (mi * v.xy - 0.5 * S.n * vec2f(gx, gy)) / h;
+  let east = faceVel(q, 0, n);
+  let north = faceVel(q, 1, n);
+  let u = 0.5 * vec2f(east + faceVel(q - vec2i(1, 0), 0, n), north + faceVel(q - vec2i(0, 1), 1, n));
+  flow[q.x + q.y * n] = vec4f(east, north, pi, 0.0);
   textureStore(dst, q, safeVel(vec4f(u, v.z, v.w)));
+  let h = hsGap(textureLoad(sq, q, 0).r, A.a.x);
   /*
     The pressure the rest of the step sees. bodyAdvect, phaseAdvect and
     mixAdvect correct their face velocities with the last projection's
@@ -1281,8 +1296,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     On a thin gap the colour's and the oil's carries, carryCourant and the
     ferrofluid's volume carry no longer read it: they cross the solve's own
-    faces from P and the mobility (THIN_FACE in wgsl/fluid.ts, PLAN 15b),
-    which are exact where c is not flat, at a hand's rim above all. What
+    faces (THIN_FACE in wgsl/fluid.ts, PLAN 15b; since 18a-8 the faces this
+    writes to \`flow\`), which are exact where c is not flat, at a hand's
+    rim above all. What
     still reads c·P here is phaseAdvect's area form (Phase Volume off, or
     the step before it is primed) and the old plate's carries.
   */

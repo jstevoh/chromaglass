@@ -211,6 +211,30 @@ its frame rate live. "Free" means no new passes or texture reads.
     the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
     radial flow (the pressed rings in the picture). A staggered grid takes all three,
     and `dampGrid`'s job.
+    **The third, shipped** (2026-11-27): the squaring was the carry's corner, not the
+    grid's storage. The faces moved each axis's share from the same old colour at once,
+    so a diagonal flow spread colour across itself as well as along (½|u_x|Δx along x
+    plus ½|u_y|Δx along y). The thin gap's carries now take Colella's corner transport
+    (`ACROSS` in `wgsl/fluid/carry.ts`, `cornered` in `wgsl/fluid.ts`); the old plate
+    keeps its faces. `npm run gridiso` (lab, 128², a thin ring turned by a solid swirl):
+    the fourfold part of the width it gained 0.331 → 0.218, the width gained 0.353 →
+    0.273 cells, colour +0.088% from the half-float floor on that fast ring (0.000% at
+    `dyeedge`'s speed). **The first, the checkerboard, shipped** (2026-11-27): the cell
+    kept its own predicted velocity (hsGradient wrote c·u*_cell − M∇p/h) and the faces saw
+    only the mean of two cells' u*, so a checkerboard in the flow was a mode the solve
+    never saw. The thin solve's faces are now the flow's state (Harlow and Welch's
+    staggered grid, `wgsl/thinFlow.ts`): hsGradient keeps each face's velocity in
+    `hsFlow`, hsDivergence predicts each face from its own last velocity plus the mean of
+    what the step's forces asked of its two cells, a cell's velocity is the mean of its
+    faces, and `thinFaceVel` reads the face (with the ridden flow's slosh, drift and
+    ferrofluid drop laid on as the cells' change). `npm run gridnull` (lab, 128²): a
+    checkerboard laid in water kept 0.93 of itself after a step on main (0.46 in the oil),
+    4e-8 now; an eight-cell wave keeps its inertia (0.983 of a long wave's, main 0.981);
+    a floored dent's rim under a push 0.0303 → 0.0108 sharp in the oil, 0.0115 → 0.0083
+    in water; `gridiso`'s drop window rounder (0.0092 → 0.0061). The [1 2 1] rebuild (tried first) damped
+    the eight-cell wave 0.85 a step. *Open:* 18a-8b, the dye's own grid filter
+    (`dampGrid`), which the plan named this item's to retire: measure whether the
+    thin gap's colour still grows a checkerboard without it, now that the flow has none.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
@@ -353,6 +377,54 @@ its frame rate live. "Free" means no new passes or texture reads.
     look's first seconds, until hsLiftSource and hsLiftRelax are built, still lay the weight
     into the open rim; widen the wait if `npm run startup` has the slack. A Blow's breath is local
     and stays open: its liquid comes back.
+  - **18a-22, Keep full: a dish left running is topped up with the dropper: shipped** (the
+    owner, 2026-11-27: "We also need an automatically apply liquid option if I decide to leave
+    the player running. I left it going and the plate just emptied eventually"). Why it
+    emptied: the Mac app that evening was 1.3.1751 (9:18 AM PST 11-26), before 18a-16 (#968,
+    Lava Pop's Air 0.02 was the draught's uniform shear sliding the dish out over the open
+    rim) and 18a-17 (#979); and every look's Evaporation still takes dye a step, a night's
+    worth of it most of the dish (18g-3 is the real fix: solvent leaves, the dye stays).
+    Nothing poured any back with Evolve off. Keep Full (`keepFull`, a room switch beside
+    Random Evolve on both desk rows, the settings sheet, the phone and the phone remote) is
+    the hand on the dropper and nothing else: below 80% of the look's own amount it lets a
+    real drop of the look's own bottle, in the look's colours, fall where the dish is
+    palest (the hand's own Drop, with its volume on the thin gap), until 95%, at a pace set
+    by how empty the dish was when it began (a drop every 3.5 s just under the line to 0.4 s
+    on an emptied dish) and held until full: following the dish as it filled stalled an
+    emptied Lava Pop at 0.43 of 0.80 on the Mac, its small slow drops near the top only
+    matching what it loses on its own (18a-23). sim/keepFull.ts; the hue journey moved to
+    sim/hueJourney.ts beside it to keep the visualizer's size. `npm run keepfull` (node: the
+    sums, the wiring, every surface), `npm run keepfullapp` (the Mac: Lava Pop's leak, an
+    emptied dish refilled and the hand stopping).
+  - **18a-23, Lava Pop's dye leaks out with nothing driving it: shipped** (2026-11-27; the
+    owner: "I left it going and the plate just emptied eventually"). Measured on the owner's
+    Mac on main (a scratch run of the app, the dish's own measure inside the rim, every 15 s):
+    4–5% of the dish's dye every 120 s, about half in half an hour, the same with Evaporation,
+    Air and Plate Rock each at 0 and all three at 0 (0.823 → 0.778). In the lab (Lava Pop's own step from the app's deriveStep, the app's own
+    lay of its oil cells and water, 128²) the press, centre gravity, vibration and buoyancy
+    each changed nothing; the oil did (0.36% gone in 400 steps with Oil Tension on, 0.02%
+    off). Liquid crossing the rim was not it: a trial pool past the rim that counted and gave
+    back every colour the step's carry moved over it took in 0.11 while the dish lost 121 in
+    600 steps. It was Oil Bodies' bodyPartition (each liquid's colour evened out across the
+    oil's edge, and colour astray drifting back to its own liquid down the oil's blur), which
+    read the cells past the rim as neighbours: they hold no oil and no colour, decayDye clears
+    them every step, and the water's colour at the rim levelled and drifted into them. Its
+    faces now stop at the rim, as dyeDisperse's and the oil's relaxation (18g-7) already did.
+    `npm run rimdye`: kept 98.851% → 99.967% in 600 steps (lost 121.0 → 3.4), Oil Bodies off
+    3.0; over 2400 lab steps 89.78% → 99.62%. Open: 18a-24.
+  - **18a-24, the rest of a still dish's loss, and the rim's exchange.** (a) With Oil Bodies
+    off, Lava Pop's lay still loses 0.03% in 600 lab steps (3 of 10534), not yet traced. A
+    candidate: gridFilter's three `pastRim` and slump's rim test count the radius only, so the
+    grid's own edge cells at the four compass points (inside r 0.5, cleared by decayDye as
+    `pastOpenRim` counts them) are still dish to those passes. (b)
+    The oil's surface tension drives a slow back and forth of liquid over the open rim (0.50
+    out against 0.54 in round the ring, lab units), whose colour is cleared going out and comes
+    back clear; it carries little now (the trial pool above), but a free meniscus would resist
+    it (the gap closing outward raises its suction), and the liquid round the cover glass is
+    the dish's own, so what comes back should carry what went out. A pool past the rim that
+    keeps it (tried here: a mixed ring of the meniscus's volume, π h / 4R of the dish) is the
+    model if it ever matters; Oil Bodies' own share past the rim (oilDye, never cleared there)
+    would have to be cleared with it, or bodyUnspread raises the dye to it.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

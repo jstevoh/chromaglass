@@ -23,8 +23,8 @@ export function ToolAmount({ tool, value, onChange, className = '' }: {
 }) {
   const means = TOOL_AMOUNT_MEANS[tool] ?? 'amount';
   return (
-    <label className={`flex min-w-0 items-center gap-2 text-[11px] ${className}`} title={`How much the tool does: its ${means}. 1× is the usual; double-click to reset.`} data-testid="tool-amount">
-      <span className="whitespace-nowrap opacity-60">Amount</span>
+    <label className={`flex min-w-0 items-center gap-2 text-[12px] ${className}`} title={`How much the tool does: its ${means}. 1× is the usual; double-click to reset.`} data-testid="tool-amount">
+      <span className="whitespace-nowrap text-muted">Amount</span>
       <input
         type="range"
         className="h-6 w-0 min-w-0 flex-1"
@@ -36,8 +36,8 @@ export function ToolAmount({ tool, value, onChange, className = '' }: {
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(1)}
       />
-      <span className="w-9 text-right font-mono tabular-nums opacity-80" data-testid="tool-amount-value">{value.toFixed(1)}×</span>
-      <span className="hidden whitespace-nowrap opacity-40 xl:inline">{means}</span>
+      <span className="w-9 text-right font-mono tabular-nums text-text-2" data-testid="tool-amount-value">{value.toFixed(1)}×</span>
+      <span className="hidden whitespace-nowrap text-dim xl:inline">{means}</span>
     </label>
   );
 }
@@ -188,11 +188,11 @@ export function ToolOptions({ tool, value, onChange, at, onClose, magnetSize, on
         </div>
       )}
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-[11px] text-faint">[ and ] step it · double-click resets</span>
+        <span className="text-[12px] text-faint">[ and ] step it · double-click resets</span>
         <button
           onClick={() => onChange(1)}
           disabled={value === 1}
-          className="rounded-md border border-border-strong px-2.5 py-1 text-[12px] text-text-2 hover:bg-hover disabled:opacity-40"
+          className="rounded-md border border-border-strong px-2.5 py-1 text-[12px] text-text-2 hover:bg-hover disabled:opacity-65"
           data-testid="tool-options-reset"
         >1×</button>
       </div>

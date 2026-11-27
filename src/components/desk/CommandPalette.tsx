@@ -128,7 +128,7 @@ export function CommandPalette({ commands, onClose }: { commands: Command[]; onC
           {rows.map((c, i) => (
             <Fragment key={c.id}>
             {(i === 0 || rows[i - 1].kind !== c.kind) && (
-              <div className="px-4 pb-1 pt-3 text-[11px] uppercase tracking-[0.18em] text-faint">{c.kind}</div>
+              <div className="px-4 pb-1 pt-3 text-[12px] uppercase tracking-[0.18em] text-faint">{c.kind}</div>
             )}
             <button
               key={c.id}
@@ -148,7 +148,7 @@ export function CommandPalette({ commands, onClose }: { commands: Command[]; onC
             </Fragment>
           ))}
         </div>
-        <div className="flex items-center gap-4 border-t border-border px-4 py-2 text-[11px] text-faint" data-testid="palette-hints">
+        <div className="flex items-center gap-4 border-t border-border px-4 py-2 text-[12px] text-faint" data-testid="palette-hints">
           <span><Kbd>↑↓</Kbd> move</span>
           <span><Kbd>⏎</Kbd> {rows[at]?.look ? 'set as next' : 'run'}</span>
           {rows[at]?.runNow && <span><Kbd>⇧⏎</Kbd> go now</span>}

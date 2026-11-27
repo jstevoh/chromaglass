@@ -74,8 +74,15 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   holes in on every bar. A pour is a hand's gesture.
   Two Projectors (PLAN §18b-10) switches the rig between one lamp and two, so
   a patch or LFO must not flip it mid-song.
+  Video on LED Ring (PLAN 14ag-9) moves the video under the dish; a hand's
+  choice, the same way.
+  The projector bank's lamps, shutters and crossfade (PLAN 51a) are the
+  operator's hands on the rig, as the house dimmer is: a cord riding a
+  shutter or the crossfade on the beat would flash the wall between
+  projectors. Whether a lamp may follow the sound (a colour organ) is 51a-2.
 */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
@@ -134,8 +141,8 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  */
 export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'automateRate', 'backgroundLoop',
-  'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
-  'dimmer', 'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heat', 'heatDecay',
+  'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
+  'dimmer', 'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heat', 'heatDecay', 'holdApart',
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring', 'depthDrag',
@@ -160,7 +167,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // own population, so the amount is that plate's. How far their colour is
   // trusted is read by the render pass, which sees one picture.
   'particles',
-  'platePressure', 'polarity', 'rainDrip', 'rotationSpeed', 'sharpness', 'turbulenceDetail',
+  'platePressure', 'rainDrip', 'rotationSpeed', 'sharpness', 'turbulenceDetail',
   'turbulenceScale', 'vibrationFrequency',
 ]);
 

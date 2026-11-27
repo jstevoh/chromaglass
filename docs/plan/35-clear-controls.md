@@ -19,8 +19,8 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - ~~The remote's two Blackouts share the test id `remote-blackout` (one per layout).~~ One
     Blackout since 35f (the bar under the thumb), so one test id.
   - The phone dock's Motion dot stands for two states (Evolve or Tilt) at once.
-  - Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
-    rows): legible, but a third way of saying off; make them `disabled` with the reason.
+  - ~~Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
+    rows): legible, but a third way of saying off; make them `disabled` with the reason.~~ **Shipped (#972)** (`PhoneStage.tsx` / `ui/index.tsx` `Slider`: `disabled` on Follow the song, Evolve speed, Spin rate, Beats a turn, and Reverse with `'Off'` badge and hint text; no half-opacity wrapper).
   - ~~"All settings…" twice on the desk (DeskPanels' rides and recipe) beside "+ Panel".~~ The
     status bar's alone since 35c-5.
   - ~~"Sound" in the layout switch next to the Sound dot that opens the same panel.~~ Gone with the
@@ -29,12 +29,12 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
 - **35-owed** *Checks written first* (2026-11-07) for the four of these that are a build with an
-  answer the source can show, `npm run clearleft -- --owed=pace,spin,tray,dimmed` (logic): `pace`
+  answer the source can show, `npm run clearleft -- --owed=pace,spin,tray` (logic): `pace`
   (35d-2, the remote's Speed and Evolve Speed draw `PaceTrack`), `spin` (35a-2 and 35f-2, Auto Spin and
   Spin Direction picked from their named answers in Settings and on the remote, keeping `settingKey`),
   `tray` (35g-2, a `SlideMount` on the remote's looks, its cue strip and the Sequencer's stages) and
-  `dimmed` (35a-2, the phone's Show, Evolve and Spin rows `disabled`, no group at half opacity). All
-  four read owed on main. 35a-2's touch targets under 44 px are not among them: only a page measures
+  ~~`dimmed` (35a-2, the phone's Show, Evolve and Spin rows `disabled`, no group at half opacity)~~ (**shipped (#972)**). The other
+  three read owed on main. 35a-2's touch targets under 44 px are not among them: only a page measures
   a target, so they want a line in `npm run phone` first (open).
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:

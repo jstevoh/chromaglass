@@ -25,7 +25,31 @@ area, each fix striking its own line here.
     Lens Stop show nothing on Classic.
   - **QA-33b-2** One dial's end blacks out the picture: the Wall's Gamma (0.35 → 0.004,
     more than a gamma of 2.5 can do) and Oil & Soap's Clear Film on Magnet Garden
-    (0.27 → 0.014).
+    (0.27 → 0.014). **Shipped (this PR):**
+    - `Gamma`: `src/gpu/wgsl/output.ts` applies `pow(max(col * U.gain, 0.0), vec3f(U.gamma))`
+      once on the display-encoded output and is not doubled. With `gain = 1`, `gamma = 2.5`
+      gives mean luma `0.1978` on `classic` (from `0.3416`) and `0.1794` on `magnet-garden`
+      (from `0.3088`), keeping the `0.5–2.5` range usable as a projectionist ambient-wash
+      curve. The sweep's `0.0040` came from `scripts/bugbash.mjs` restoring only
+      `chromaglassSettings` between Wall controls so `Output gain` Home (`gain = 0.2`)
+      stayed set when `Gamma` End (`gamma = 2.5`) ran (`(col * 0.2)^2.5 -> 0.0040` on
+      `classic`, `0.0032` on `magnet-garden`).
+    - `Clear Film`: `src/gpu/fluid.ts` pours clear oil (`h = 0.06..0.86` in `film`) and
+      does not remove dye or ferrofluid (`stats.mean 0.167 -> 0.168`). Because water depth
+      under the film narrows (`gapScale *= 1.0 - view.film`), `Clear Film` lets more light
+      through on `classic` (`0.3453 -> 0.7325`, `lampGround = 1`) and on fresh
+      `magnet-garden` (`0.2792 -> 0.3618`), while thinning the water path on a black ground
+      when already drained or unlit (`0.1587 -> 0.029` after tab 5's `Squish Plate`).
+      Added `clearFilmGroundNote` in Oil & Soap, Desk Oil panel, and Phone Dye sheet, plus
+      clearer `Gamma` and `Clear Film` copy in `OutputPanel.tsx` and `docs/guide.md`.
+    - **QA-33b-2a** `scripts/bugbash.mjs` restores `chromaglassSettings` after each
+      control (`line ~381`) without restoring `window.chromaglassOutput`, leaving
+      `Output gain = 0.2` (and `Mask Edge = 0`) across subsequent Wall controls. Found in
+      `QA-33b-2`; not fixed here because `scripts/bugbash.mjs` is untouched by this run.
+    - **QA-33b-2b** On `magnet-garden` tab 5, `Squish Plate` (`Liquid` Home 1 mL +
+      `Cover Weight` End 1000 g + `evaporationRate: 0.003`) drains ~97% of the plate's dye
+      (`stats.mean 5.036 -> 0.167`) before `Oil & Soap` and `Ferrofluid` run, leaving
+      `Magnet Up` hitting `luma 0.015`. Found in `QA-33b-2`.
   - **QA-33b-3** Ferrofluid: Phase Edge, Magnet Strength, Height, Across, Up, Walk and
     Labyrinth flatten Magnet Garden from 37% to 85–93% one colour. A ferrofluid under a
     stronger field spikes and gathers; it does not spread into a sheet.

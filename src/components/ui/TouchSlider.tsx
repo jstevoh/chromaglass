@@ -1,4 +1,5 @@
 import { useRef, type CSSProperties } from 'react';
+import { Info } from 'lucide-react';
 import { curveOf, handValueAt, travelOf } from '../../lib/midi';
 import { helpFor } from '../../lib/controlHelp';
 import type { VisualizerSettings } from '../../types';
@@ -91,10 +92,13 @@ export function TouchSlider({ label, value, min, max, setting, onChange, display
           aria-expanded={tip.open}
           aria-describedby={tip.open ? tip.id : undefined}
           data-info="name"
-          className="h-11 w-[84px] shrink-0 select-none truncate text-left text-[14px] font-medium text-text-2 underline decoration-dotted decoration-white/25 underline-offset-4 [-webkit-touch-callout:none]"
-        >{label}</button>
+          className="flex h-11 w-[92px] shrink-0 select-none items-center gap-1 text-left text-[14px] font-medium text-text-2 [-webkit-touch-callout:none]"
+        >
+          <span className="truncate">{label}</span>
+          <Info size={12} className="shrink-0 text-white/45" aria-hidden />
+        </button>
       ) : (
-        <span className="w-[84px] shrink-0 truncate text-[14px] font-medium text-text-2">{label}</span>
+        <span className="w-[92px] shrink-0 truncate text-[14px] font-medium text-text-2">{label}</span>
       )}
       <div className="min-w-0 flex-1">
         <PaceTrack settingKey={setting} at={at} size={16}>
