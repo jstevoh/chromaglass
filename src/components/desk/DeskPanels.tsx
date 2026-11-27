@@ -27,6 +27,7 @@ import { TipPad } from '../ui/TipPad';
 import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 /**
  * The bodies of the desk's panels (Desk v2).
@@ -917,10 +918,16 @@ function KnobsBody({ id, p }: { id: string; p: DeskProps }) {
   const name = PANEL_BY_ID.get(id)?.name ?? id;
   // A knob the Rides or the Recipe have out is drawn there, not here as well (`drawnElsewhere`).
   const elsewhere = drawnElsewhere(p.layout, id, keys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
+  const oilGroundNote = id === 'oil' ? clearFilmGroundNote(p.settings.lampGround, p.settings.clearFilmDye) : undefined;
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid={`section-knobs-${id}`}>
       <div className={scroller}>
         <ControlGrid keys={keys.filter(k => !elsewhere.has(String(k)))} p={p} prefix="knob" />
+        {oilGroundNote && (
+          <p className="mt-2 text-[11px] leading-snug text-dim" data-testid="desk-clear-film-ground-note">
+            {oilGroundNote}
+          </p>
+        )}
         <Elsewhere held={elsewhere} testId={`panel-${id}-elsewhere`} />
       </div>
       {/*
