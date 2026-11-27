@@ -417,11 +417,11 @@ export function DrawScreen(p: DrawScreenProps) {
   const controlsButton = (
     <button
       onClick={p.onControls}
-      className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 ${GLASS}`}
+      className={`flex ${tablet ? 'h-9 px-3' : 'h-11 min-w-11 px-3.5'} shrink-0 items-center justify-center gap-1.5 rounded-full text-[12px] font-medium text-text-2 ${GLASS}`}
       title="Transport, sequencer, mixer and looks"
       data-testid="draw-controls"
     >
-      <SlidersHorizontal size={14} /> {tablet && 'Controls'}
+      <SlidersHorizontal size={16} /> {tablet && 'Controls'}
     </button>
   );
   /*
@@ -432,11 +432,11 @@ export function DrawScreen(p: DrawScreenProps) {
   const songsButton = (
     <button
       onClick={p.onSongs}
-      className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 ${GLASS}`}
+      className={`flex ${tablet ? 'h-9 px-3' : 'h-11 min-w-11 px-3.5'} shrink-0 items-center justify-center gap-1.5 rounded-full text-[12px] font-medium text-text-2 ${GLASS}`}
       title="The set list and the song shows"
       data-testid="remote-to-songs"
     >
-      <ListMusic size={14} /> {tablet && 'Songs'}
+      <ListMusic size={16} /> {tablet && 'Songs'}
     </button>
   );
   const touches = (

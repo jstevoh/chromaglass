@@ -22,6 +22,7 @@ comments, which moved with it.
 | `useSceneSource` | the room camera as a sensor |
 | `usePaletteLock` | the palette held across looks; since PLAN 43d also `paletteFromFile` (a picture or video file's colours as the palette, "From picture", the lock `PICTURE_LOCK`), `palettes` (the list the desk and the phone draw, the picture's last) and `pictureDyes` (sent to a projector with the lock) |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
+| `useLookDocument` | the open saved look (`docId`, `docDirty`) and save, overwrite and delete for the desk and phone |
 | `useSetListState` | the set list, the armed look, the Go's fade; publishes them to `setNow.ts` for the assistant, and its fade and cancel |
 | `usePhoneLayout` | phone or desks (the old narrow overlay is unhooked, PLAN 49c); Live or Preview |
 | `useWallLook` | Preview's copy for the wall, and Send to wall |

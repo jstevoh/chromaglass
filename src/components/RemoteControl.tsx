@@ -478,7 +478,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={i}
               onClick={() => setPadLayer(i)}
               disabled={!connected}
-              className={`h-9 w-9 rounded-full border text-[11px] font-bold disabled:opacity-30 ${padLayer === i ? LIT : 'border-white/10 text-white/50'}`}
+              className={`h-11 w-11 rounded-full border text-[12px] font-bold disabled:opacity-30 ${padLayer === i ? LIT : 'border-white/10 text-white/60'}`}
               title={`This device works plate ${i + 1}`}
             >
               {i + 1}
@@ -498,7 +498,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={t}
               onClick={() => setPadTool(t)}
               disabled={!connected}
-              className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${padTool === t ? LIT : 'border-white/10 text-white/50'}`}
+              className={`min-h-11 rounded-full border px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest disabled:opacity-30 ${padTool === t ? LIT : 'border-white/10 text-white/60'}`}
               data-testid={`remote-tool-${t}`}
             >
               {t}
@@ -508,10 +508,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={tiltOn}
             onClick={toggleTilt}
             disabled={!connected}
-            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${tiltOn ? LIT : 'border-white/10 text-white/60'}`}
+            className={`flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest disabled:opacity-30 ${tiltOn ? LIT : 'border-white/10 text-white/65'}`}
             title="Tilting the device tilts the plate"
           >
-            <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
+            <Compass size={14} /> {tiltOn ? 'Tilt live' : 'Tilt'}
           </button>
         </div>
       </div>
@@ -523,7 +523,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         on a full plate — was reachable from the laptop and nowhere else.
       */}
       <div className="mt-3" data-testid="remote-liquids">
-        <div className="text-[9px] uppercase tracking-widest font-bold text-white/40 mb-1.5">Bottle</div>
+        <div className="text-[12px] uppercase tracking-widest font-bold text-white/60 mb-1.5">Bottle</div>
         <div className="flex flex-wrap gap-1.5">
           {DEFAULT_LIQUID_TYPES.map((liq) => {
             const on = padLiquid === liq.id;
@@ -533,29 +533,29 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 key={liq.id}
                 onClick={() => chooseLiquid(liq.id)}
                 disabled={!connected}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-30 ${
-                  on ? LIT : 'border-white/10 text-white/55'
+                className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-30 ${
+                  on ? LIT : 'border-white/10 text-white/65'
                 }`}
                 title={liq.description}
               >
-                <span className="h-2.5 w-2.5 rounded-full border border-white/30" style={bottleSwatch(liq)} />
+                <span className="h-3 w-3 rounded-full border border-white/30" style={bottleSwatch(liq)} />
                 {liq.name}
                 {/* A dot for the four that do something the dye cannot. */}
-                {liq.behaviour && <span className="h-1 w-1 rounded-full bg-amber-300/80" />}
+                {liq.behaviour && <span className="h-1.5 w-1.5 rounded-full bg-amber-300/80" />}
               </button>
             );
           })}
         </div>
       </div>
       {/* Dye colours: a tap picks the colour this pad drops and the laptop's dropper with it */}
-      <div className="mt-3 flex flex-wrap gap-1.5" data-testid="remote-dyes">
+      <div className="mt-3 flex flex-wrap gap-2" data-testid="remote-dyes">
         {/* The bottle as it is, with no dye in it: its own colour, or clear. */}
         {padBottle?.own && (
           <button
             aria-pressed={padColor?.toLowerCase() === padBottle.own.toLowerCase()}
             onClick={() => chooseColor(padBottle.own!)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/40'}`}
+            className={`h-11 w-11 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-30 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-105' : 'border-white/40'}`}
             style={isClearLiquid(padBottle) ? { backgroundColor: 'transparent' } : { backgroundColor: padBottle.own }}
             title={`Natural: ${padBottle.name.toLowerCase()} with no dye`}
             aria-label={`Natural ${padBottle.name}`}
@@ -568,7 +568,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             key={c.hex}
             onClick={() => chooseColor(c.hex)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'}`}
+            className={`h-11 w-11 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-30 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-105' : 'border-white/20'}`}
             style={{ backgroundColor: c.hex }}
             title={c.name}
             aria-label={c.name}
@@ -683,8 +683,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-white/40" />}
               </span>
-              <button onClick={openDraw} className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
-                <Maximize2 size={12} /> Draw
+              <button onClick={openDraw} className="flex min-h-11 items-center gap-1.5 rounded-full border border-white/10 px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest text-white/70" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
+                <Maximize2 size={14} /> Draw
               </button>
             </div>
             {padSurface}
@@ -1064,8 +1064,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30">Preset palettes — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
-              <button onClick={() => action('preset-prev')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={14} /></button>
-              <button onClick={() => action('preset-next')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={14} /></button>
+              <button onClick={() => action('preset-prev')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={16} /></button>
+              <button onClick={() => action('preset-next')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={16} /></button>
             </div>
           </div>
           {presetGroups.map(({ label, presets }) => (

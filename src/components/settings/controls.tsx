@@ -1,4 +1,5 @@
 import React from 'react';
+import { Info } from 'lucide-react';
 import { VisualizerSettings } from '../../types';
 import { curveOf, handValueAt, travelOf } from '../../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../../lib/deskPins';
@@ -61,7 +62,7 @@ export function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings 
     );
   };
   return (
-    <span className="flex items-center gap-1" data-testid={`pins-${String(settingKey)}`}>
+    <span className="hidden items-center gap-1 sm:flex pointer-coarse:hidden" data-testid={`pins-${String(settingKey)}`}>
       {chip('perform', 'P', 'the Perform desk')}
       {chip('design', 'D', 'the Design bench')}
     </span>
@@ -111,10 +112,18 @@ export const Slider = ({ label, value, min, max, step, onChange, icon: Icon, dis
         */}
         <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-text-2">
           {Icon && <Icon size={14} />}
-          <span
-            className={`truncate ${line ? '[@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4' : ''}`}
-            onClick={line ? tip.toggle : undefined}
-          >{label}</span>
+          {line ? (
+            <button
+              type="button"
+              onClick={tip.toggle}
+              className="inline-flex min-w-0 items-center gap-1 text-left pointer-coarse:min-h-[44px]"
+            >
+              <span className="truncate">{label}</span>
+              <Info size={12} className="hidden shrink-0 text-white/45 pointer-coarse:inline" aria-hidden />
+            </button>
+          ) : (
+            <span className="truncate">{label}</span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {settingKey && <PinChips settingKey={settingKey} />}

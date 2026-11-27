@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
+import { useLookDocument } from './app/useLookDocument';
 import type { EarView } from './hooks/useEarView';
 import { EarMeters, EarPercent } from './components/EarLeaves';
 import { RenderPanel } from './components/RenderPanel';
@@ -952,36 +953,14 @@ export default function App() {
 
   const { layerReport } = useLayerReport({ deskLayout, visualizerRef });
 
-  const [docId, setDocId] = useState<string | null>(null);
-  const [docDirty, setDocDirty] = useState(false);
+  const {
+    docId, setDocId, docDirty, setDocDirty,
+    saveCurrentPreset, replacePresetById, replaceLook, deleteSavedLook,
+  } = useLookDocument({
+    visualizerRef, getSettings: () => settingsRef.current, userPresets, getCurrentSong: () => currentSong,
+    setPinnedPresetId, setToast, openSaveSheet: (on) => setShowSave(on),
+  });
 
-  const saveCurrentPreset = (name: string, description: string, forSong = false) => {
-    const plate = visualizerRef.current?.describePlate();
-    // From the ref: ⌘K's list is memoised and would otherwise hand this the
-    // settings as they stood when the list was last built.
-    const p = userPresets.saveCurrent(name, description, settingsRef.current, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null, forSong ? currentSong : null);
-    setPinnedPresetId(p.id);
-    setDocId(p.id);
-    setDocDirty(false);
-    setToast(`Saved “${p.name}”`);
-  };
-
-  /*
-    Save asks for a name, every time: a new preset made from what is on the
-    plate now.
-
-    Reported by the owner (2026-10-05) as Save not working on the desk, when
-    what they wanted was to name a new preset from the current settings. It
-    did work, once: the first Save of a session asked for a name. From then
-    on the look just saved, or any saved look opened, was "the document", and
-    Save wrote over it without a word bar a toast for two seconds at the
-    bottom of the plate. Naming a second preset meant finding Save as… in a
-    menu hung off the look's name in the breadcrumb, which nothing pointed
-    to. Measured in `npm run saves`: the second Save on the Design desk
-    opened no sheet. So Save names a new one now, on both desks, ⌘S and the
-    phone alike, and writing over the look you opened is the sheet's second
-    button, named for the look it would replace, and the look menu's.
-  */
   const newPalette = () => {
     setDocId(null);
     setDocDirty(false);
@@ -990,23 +969,6 @@ export default function App() {
   };
 
   const saveLook = () => setShowSave(true);
-  /** Write over the saved look that is open, keeping its name and song. */
-  const replaceLook = () => {
-    if (!docId) { setShowSave(true); return; }
-    const plate = visualizerRef.current?.describePlate();
-    const saved = userPresets.saveOver(docId, settingsRef.current, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null);
-    // Taken out underneath us (another tab, say): the sheet stays up to save
-    // it as a new one, and says why the Replace did nothing.
-    if (!saved) { setDocId(null); setShowSave(true); setToast('That preset is gone; save it under a name'); return; }
-    setShowSave(false);
-    setDocDirty(false);
-    setToast(`Saved over “${saved.name}”`);
-  };
-  /** A saved look taken out of the library; the plate keeps what is on it. */
-  const deleteSavedLook = (id: string) => {
-    userPresets.remove(id);
-    if (docId === id) setDocId(null);
-  };
 
   /**
    * An empty plate.
@@ -2989,7 +2951,17 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── The phone (components/phone/PhoneStage.tsx) ─────────── */}
-      {phone && showControls && phoneScreenUp === 'play' && (
+      {phone && showControls && (() => {
+        const phoneSave = {
+          saveSuggestion: docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look',
+          replaceName: docId ? docName : null,
+          onReplace: replaceLook,
+          songName: musicIntel.state.track?.title ?? null,
+          existingLooks: userPresets.presets,
+          onReplaceExisting: replacePresetById,
+        };
+        return (<>
+      {phoneScreenUp === 'play' && (
         <PanelGuard name="Play">
         <PhonePlay
           lookName={activePresetName ?? (fading > 0 ? allPresets.find(p => p.id === pinnedPresetId)?.name ?? null : null) ?? pinnedLookName ?? 'Untitled'}
@@ -2999,8 +2971,8 @@ export default function App() {
           lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
           onShuffle={triggerLucky}
-          onSave={(name) => saveCurrentPreset(name, '', false)}
-          saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          onSave={(name, desc, forSong) => saveCurrentPreset(name, desc ?? '', forSong ?? false)}
+          {...phoneSave}
           dyes={DROPPER_COLORS.slice(0, 8)}
           dye={liquidTypes.find(t => t.id === selectedLiquidId)?.color ?? DROPPER_COLORS[0]}
           onDye={(hex) => updateLiquidColor(selectedLiquidId, hex)}
@@ -3031,9 +3003,7 @@ export default function App() {
         />
         </PanelGuard>
       )}
-      {phone && showControls && (
-        <>
-          {phoneScreenUp === 'stage' && (
+      {phoneScreenUp === 'stage' && (
           <PanelGuard name="The phone controls">
           <PhoneStage
             deskTabs={{
@@ -3060,8 +3030,11 @@ export default function App() {
             onLook={(id) => goLookNow(id)}
             onRandomLook={() => { const next = randomLook(activePresetId, stream('phone.look').float); if (next) goLookNow(next.id); }}
             onRevert={previousLook.current ? revertLook : null}
-            onSaveLook={(name) => saveCurrentPreset(name, '', false)}
-            saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+            onSaveLook={(name, desc, forSong) => saveCurrentPreset(name, desc ?? '', forSong ?? false)}
+            {...phoneSave}
+            userLookIds={new Set(userPresets.presets.map(p => p.id))}
+            onDeleteLook={deleteSavedLook}
+            onExportLook={(id) => { const p = userPresets.presets.find(u => u.id === id); if (p) userPresets.exportPreset(p); }}
             onBackLook={(id) => backLookNow(id)}
             backLook={backLookName}
             onBackFollowsFront={backFollowsFront}
@@ -3181,6 +3154,7 @@ export default function App() {
             recording={phoneRecording}
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
+            midiProps={{ midi, presets: allPresets, setItems: cues.map((c, index) => ({ index, name: c.name })), activity: showActivity, onActivity: setShowActivity, onSetup: () => openSettingsAt('midi') }}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
@@ -3191,8 +3165,8 @@ export default function App() {
           />
           </PanelGuard>
           )}
-        </>
-      )}
+        </>);
+      })()}
 
       {/* ── Run-it-locally nudge (hosted build, once the governor has stepped down) ── */}
       {/* One child per AnimatePresence: it tells its children apart by key, two

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { Info as InfoIcon } from 'lucide-react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { useEscape } from '../../hooks/useEscape';
 import { curveOf, handValueAt, travelOf } from '../../lib/midi';
@@ -482,9 +483,12 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             aria-expanded={tip.open}
             aria-describedby={tip.open ? tip.id : undefined}
             data-info="name"
-            /* 48 px each way, the touch rule, taken from the margins so the row keeps its height; the slider below sits over the overlap. */
-            className="-mx-3 -my-[14px] select-none px-3 py-[14px] text-left [-webkit-touch-callout:none] text-[13px] font-medium text-text underline decoration-dotted decoration-white/25 underline-offset-4"
-          >{label}</button>
+            /* 44 px minimum touch target without inflating the row above. */
+            className="-mx-2 -my-2.5 inline-flex min-h-[44px] select-none items-center gap-1.5 px-2 py-2.5 text-left text-[13px] font-medium text-text [-webkit-touch-callout:none]"
+          >
+            <span>{label}</span>
+            <InfoIcon size={13} className="shrink-0 text-white/45" aria-hidden />
+          </button>
         ) : (
           <span className="text-[13px] font-medium text-text">{label}</span>
         )}
@@ -544,7 +548,7 @@ export function Toggle({ label, on, onChange, testId, title, disabled }: {
       aria-checked={on}
       data-testid={testId}
       title={title}
-      className={`flex min-h-[36px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
+      className={`flex min-h-[36px] pointer-coarse:min-h-[44px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
         disabled ? 'opacity-50 cursor-not-allowed' : ''
       }`}
     >
@@ -632,9 +636,10 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
     hand was on the knob, and a chip over the row above hid the next one, so
     a hand could not tell which knob it had.
   */
+  const knobHelp = help ?? helpFor(midiKey);
   const tip = useControlTip({
     name: label,
-    help: help ?? helpFor(midiKey),
+    help: knobHelp,
     value: disabled ? 'off' : display,
     held: !!drag,
     disabled,
@@ -789,11 +794,14 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           className="absolute inset-0 h-full w-full cursor-ns-resize touch-none appearance-none rounded-full opacity-0"
         />
       </span>
-      {/* A finger has no hover: the name is the button there, marked like the phone's sliders. */}
+      {/* A finger has no hover: the name is the button there, with an info mark on touch. */}
       <span
         onClick={tip.toggle}
-        className={`mt-1 max-w-full truncate text-[11px] font-medium [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
-      >{label}</span>
+        className={`mt-1 inline-flex max-w-full items-center gap-0.5 text-[11px] font-medium ${drag ? 'text-text' : 'text-text-2'}`}
+      >
+        <span className="truncate">{label}</span>
+        {knobHelp && <InfoIcon size={10} className="hidden shrink-0 text-white/45 pointer-coarse:inline" aria-hidden />}
+      </span>
       <span className="max-w-full truncate font-mono text-[10px] leading-tight">
         <span className={drag ? 'text-text-2' : 'text-dim'}>{disabled ? 'off' : display}</span>
         {mapping && <span className="text-faint"> {mapping}</span>}
@@ -1046,7 +1054,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
       >
         <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-2 text-[16px] font-medium text-text">{title}</div>
-          <button onClick={onClose} className="rounded-md p-2 text-muted transition-colors hover:bg-hover hover:text-text" aria-label="Close">
+          <button onClick={onClose} className="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text" aria-label="Close">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         </div>

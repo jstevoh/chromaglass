@@ -95,7 +95,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
             <div className="text-[13px] font-medium text-text">Patch bay</div>
             <button
               onClick={() => onUpdate({ sceneMappings: [...(settings.sceneMappings ?? []), { source: 'room', feature: 'motion', setting: 'turbulenceScale', depth: 0.5, layer: 'all' }] })}
-              className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"
+              className="px-2 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"
               data-testid="scene-map-add"
             >
               Add
@@ -194,7 +194,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
+                      className="flex h-6 w-6 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-60 hover:opacity-100"
                       aria-label="Remove mapping"
                       // By the patch's index, for the phone's check: the music's folded cords make the nth on screen another patch.
                       data-testid={`patch-remove-${i}`}

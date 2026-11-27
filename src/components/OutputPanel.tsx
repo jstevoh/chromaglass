@@ -383,7 +383,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
           onClick={onReset}
           disabled={identity}
           data-testid="output-reset"
-          className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all ${
+          className={`rounded-lg border px-3 py-1.5 pointer-coarse:min-h-11 text-[13px] font-medium transition-all ${
             identity ? 'cursor-not-allowed border-white/5 opacity-30' : 'border-white/15 hover:bg-white/10'
           }`}
         >
@@ -427,7 +427,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
             onClick={() => onTest({ ...test, identifyUntil: Date.now() + IDENTIFY_MS })}
             title="Flash each projector's and each shape's number on the wall"
             data-testid="output-identify"
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[13px] font-medium transition-all hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 pointer-coarse:min-h-11 text-[13px] font-medium transition-all hover:bg-white/10"
           >
             Identify
           </button>
@@ -444,7 +444,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
       <div className="mb-3 flex justify-end">
         <button
           onClick={() => set({ corners: [...IDENTITY_CORNERS] as OutputConfig['corners'] })}
-          className="min-h-6 rounded-md px-1.5 text-[12px] text-white/60 hover:text-white/80"
+          className="min-h-6 pointer-coarse:min-h-11 rounded-md px-1.5 text-[12px] text-white/60 hover:text-white/80"
           data-testid="corners-square"
         >
           Square the corners
@@ -549,7 +549,7 @@ export function MappingPanel({ output, onChange }: {
             key={shape}
             onClick={() => addSurfaces([makeSurface(shape, surfaces.length)])}
             disabled={surfaces.length >= MAX_SURFACES}
-            className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+            className="rounded border border-white/20 px-2.5 py-1 pointer-coarse:min-h-11 text-[12px] hover:bg-white/10 disabled:opacity-30"
             data-testid={`add-surface-${shape}`}
           >
             + {SHAPE_LABELS[shape]}
@@ -558,7 +558,7 @@ export function MappingPanel({ output, onChange }: {
         <button
           onClick={() => addSurfaces(makeCube())}
           disabled={surfaces.length + 3 > MAX_SURFACES}
-          className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+          className="rounded border border-white/20 px-2.5 py-1 pointer-coarse:min-h-11 text-[12px] hover:bg-white/10 disabled:opacity-30"
           title="Three faces, arranged as a box. Each is an ordinary shape afterwards."
           data-testid="add-surface-cube"
         >
@@ -567,7 +567,7 @@ export function MappingPanel({ output, onChange }: {
         {surfaces.length > 0 && (
           <button
             onClick={() => { setSurfaces([]); setSelected(null); }}
-            className="ml-auto text-[12px] text-white/35 hover:text-white/70"
+            className="ml-auto pointer-coarse:min-h-11 px-2 text-[12px] text-white/50 hover:text-white/70"
             data-testid="surfaces-clear"
           >
             Clear all
