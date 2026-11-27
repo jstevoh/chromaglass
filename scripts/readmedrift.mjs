@@ -29,9 +29,16 @@
 // The diff: the rule CLAUDE.md names is about the moment a PR changes an
 // export, and the whole-tree half cannot see a new export nobody wrote down,
 // so for the files a PR changed:
-//   - a name it newly exports from a folder's files must be named, in
-//     backticks, in that folder's README (or the README of the folder above
-//     that owns the file, below);
+//   - a function, class or value it newly exports from a folder's files
+//     must be named, in backticks, in that folder's README (or the README of
+//     the folder above that owns the file, below): those are the edges other
+//     domains call. A new type, interface or SHOUTING_CASE constant needs
+//     only its file named there (`keepFull.ts`, or `keepFull:` as src/lib
+//     lists its files): measured on the day's merges 2026-11-27, 41 new
+//     exports went unnamed across 163 files, 39 of them types and constants
+//     of a file whose functions were the point, and a rule that asks for
+//     every `PinchSpan` and `KEEP_FULL_TRIES` would be red on most PRs for
+//     names nobody looks up;
 //   - a name it stops exporting, when no code anywhere still has it, must
 //     not still be named in that README as if it were there.
 // Not every export the tree has today is named (src/lib's 221 files have
@@ -54,7 +61,7 @@
 // unnamed is red, named is green, a removed one still named is red, kept as
 // history is green, a type-only export counts, a re-export counts, a
 // comment that says `export function` does not. A check that cannot go red
-// is not a check (PLAN.md 50i, the mutation run, exists for that reason).
+// is not a check (PLAN.md 50l, the mutation run, exists for that reason).
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -79,21 +86,34 @@ const bindingNames = (n, out) => {
   if (ts.isIdentifier(n)) out.add(n.text);
   else if (ts.isObjectBindingPattern(n) || ts.isArrayBindingPattern(n)) for (const e of n.elements) if (!ts.isOmittedExpression(e)) bindingNames(e.name, out);
 };
+// A Map of name to kind: 'type' (a type, an interface, `export type {}`),
+// 'value' (a function, a class, an enum, a variable, a re-export), and a
+// variable named in SHOUTING_CASE 'constant'.
 export function exportsOf(text, file = 'x.ts') {
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, kindOf(file));
-  const out = new Set();
+  const out = new Map();
   for (const st of sf.statements) {
     if (ts.isExportDeclaration(st)) {
       const c = st.exportClause;
-      if (c && ts.isNamedExports(c)) for (const e of c.elements) { if (e.name.text !== 'default') out.add(e.name.text); }
-      else if (c && ts.isNamespaceExport(c)) out.add(c.name.text);
+      if (c && ts.isNamedExports(c)) for (const e of c.elements) { if (e.name.text !== 'default') out.set(e.name.text, st.isTypeOnly || e.isTypeOnly ? 'type' : 'value'); }
+      else if (c && ts.isNamespaceExport(c)) out.set(c.name.text, 'value');
       continue;
     }
     if (!(ts.canHaveModifiers(st) && ts.getModifiers(st)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))) continue;
-    if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) bindingNames(d.name, out);
-    else if (st.name && ts.isIdentifier(st.name)) out.add(st.name.text);
+    if (ts.isVariableStatement(st)) {
+      const names = new Set();
+      for (const d of st.declarationList.declarations) bindingNames(d.name, names);
+      for (const n of names) out.set(n, /^[A-Z][A-Z0-9_]*$/.test(n) ? 'constant' : 'value');
+    } else if (st.name && ts.isIdentifier(st.name)) out.set(st.name.text, ts.isTypeAliasDeclaration(st) || ts.isInterfaceDeclaration(st) ? 'type' : 'value');
   }
   return out;
+}
+
+// Whether a README names a file: its base name, with or without the
+// extension, as a word (`keepFull.ts`, keepFull: ...).
+export function namesFile(readme, file) {
+  const base = path.posix.basename(file).replace(/\.(ts|tsx|mjs|js)$/, '');
+  return new RegExp(`(^|[^\\w$])${base.replace(/\$/g, '\\$')}(\\.(ts|tsx|mjs|js))?(?![\\w$])`).test(readme);
 }
 
 // The words of a file's code, its comments left out: identifiers, and the
@@ -171,16 +191,20 @@ export function drift({ files, readmes, everywhere, unowned = null }) {
     if (!owner) { unowned?.push(f); continue; }
     const was = before == null ? new Set() : exportsOf(before, f);
     const now = after == null ? new Set() : exportsOf(after, f);
-    for (const n of now) if (!was.has(n)) { if (!added.has(owner)) added.set(owner, []); added.get(owner).push([n, f]); }
-    for (const n of was) if (!now.has(n)) { if (!removed.has(owner)) removed.set(owner, []); removed.get(owner).push([n, f]); }
+    for (const [n, kind] of now) if (!was.has(n)) { if (!added.has(owner)) added.set(owner, []); added.get(owner).push([n, f, kind]); }
+    for (const n of was.keys()) if (!now.has(n)) { if (!removed.has(owner)) removed.set(owner, []); removed.get(owner).push([n, f]); }
   }
   const problems = [];
   for (const [owner, list] of added) {
     const named = namesIn(readmes.get(owner));
-    for (const [n, f] of list) {
+    for (const [n, f, kind] of list) {
       // A name moved between two files of the same folder is not new.
       if ((removed.get(owner) ?? []).some(([r]) => r === n)) continue;
-      if (!named.has(n)) problems.push(`${f} newly exports \`${n}\`, and ${owner}/README.md does not name it`);
+      if (named.has(n)) continue;
+      if (kind !== 'value' && namesFile(readmes.get(owner), f)) continue;
+      problems.push(kind === 'value'
+        ? `${f} newly exports \`${n}\`, and ${owner}/README.md does not name it`
+        : `${f} newly exports the ${kind} \`${n}\`, and ${owner}/README.md names neither it nor ${path.posix.basename(f)}`);
     }
   }
   for (const [owner, list] of removed) {
@@ -209,7 +233,7 @@ function selfTest() {
     'export type { G } from "./y";', 'export default class H {}',
     '// export function notMe() {}', '/* export const alsoNot = 1 */', 'const local = 1;',
   ].join('\n'));
-  t('the shapes of export the repository writes, and no comment', [...ex].sort(), ['C_MAX', 'G', 'H', 'I', 'T', 'a', 'b', 'd', 'f']);
+  t('the shapes of export the repository writes, and no comment', [...ex.keys()].sort(), ['C_MAX', 'G', 'H', 'I', 'T', 'a', 'b', 'd', 'f']);
   t('names in backticks, with calls and members, not paths or commands',
     [...namesIn('`foo`, `bar(x, y)`, `Baz.qux`, `src/lib`, `npm run x`, `a.ts`')].sort(), ['Baz', 'bar', 'foo']);
   const readmes = new Map([['src/k', 'The k folder: `kept`, `named()`; `oldName` was the old way, and `alsoOld`, `andThis` and `THIS_TOO` went with it; `kept` is here.\n']]);
@@ -226,7 +250,12 @@ function selfTest() {
   t('one history word does not excuse a whole line: only its clause', namedAsLive('`gone` was here; `liveName` is the way in, and so on.', 'liveName'), true);
   t('a name only a comment still has is gone from the code', codeWords('// it was gateOld\nconst x = `fn shade() {}`; f("str word");').has('gateOld'), false);
   t('a name in a string or a shader template is code', [...['shade', 'word', 'x']].every((w) => codeWords('const x = `fn shade() {}`; f("str word");').has(w)), true);
-  t('every name of `export const a = 1, b = 2`, a generator, a const enum, `export * as ns`', [...exportsOf('export const a = 1, b = 2;\nexport function* gen() {}\nexport const enum E { A }\nexport * as ns from "./n";\nexport * from "./m";\nconst s = "src/*.wgsl"; export const after = 1;')].sort(), ['E', 'a', 'after', 'b', 'gen', 'ns']);
+  t('every name of `export const a = 1, b = 2`, a generator, a const enum, `export * as ns`', [...exportsOf('export const a = 1, b = 2;\nexport function* gen() {}\nexport const enum E { A }\nexport * as ns from "./n";\nexport * from "./m";\nconst s = "src/*.wgsl"; export const after = 1;').keys()].sort(), ['E', 'a', 'after', 'b', 'gen', 'ns']);
+  t('a type or a SHOUTING constant needs only its file named; a function needs its own name', [
+    run('', 'export type Fresh = 1;\nexport const FRESH_MAX = 2;', 'The k folder: `f.ts` is here.').length,
+    run('', 'export function fresh() {}', 'The k folder: `f.ts` is here.').length,
+    run('', 'export type Fresh = 1;', 'The k folder: `g.ts` is here.').length,
+  ], [0, 1, 1]);
   t('a removed export some other code still has is green', run('export const kept = 1;', '', readmes.get('src/k'), (n) => n === 'kept'), []);
   t('a type-only export counts', run('', 'export type Fresh = 1;', readmes.get('src/k')).length, 1);
   t('a re-export counts', run('', 'export { fresh } from "./g";', readmes.get('src/k')).length, 1);

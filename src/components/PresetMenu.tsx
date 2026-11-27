@@ -5,7 +5,8 @@ import type { VisualizerSettings } from '../types';
 import type { UserPreset } from '../lib/userPresets';
 import { songLabel, type SongRef } from '../lib/songRef';
 import { LIT } from './ui';
-import { isPackLocked, openAccountSheet } from '../lib/tierGates';
+import { isPackLocked } from '../lib/tierGates';
+import { TierLockBadge, openTierLock } from './TierLock';
 import { SlideMount } from './ui/Playful';
 import { groupedShippedLooks } from '../lib/lookStills';
 
@@ -102,7 +103,7 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                 autoFocus
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
-                placeholder="Name this palette"
+                placeholder="Name this look"
                 className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40"
                 data-testid="preset-save-name"
               />
@@ -119,14 +120,14 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
               {/* It said "Save as file" and promised a download, which saving
                   stopped doing when Save and Export were split (useUserPresets):
                   a saved look goes under Yours, and the arrow beside it is the file. */}
-              <p className="text-[9px] opacity-40 leading-snug">Kept under Yours in this browser. The arrow beside a saved preset downloads it as a file to keep or share.</p>
+              <p className="text-[9px] opacity-40 leading-snug">Kept under Yours in this browser. The arrow beside a saved look downloads it as a file to keep or share.</p>
             </form>
           ) : (
             <div className="flex gap-1.5">
-              <button onClick={() => setSaving(true)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Save the current settings as a new preset" data-testid="preset-save">
-                <Save size={12} /> Save As...
+              <button onClick={() => setSaving(true)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Save the current settings as a new look" data-testid="preset-save">
+                <Save size={12} /> Save look
               </button>
-              <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a preset file" data-testid="preset-load">
+              <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a look file" data-testid="preset-load">
                 <FolderOpen size={12} /> Load file
               </button>
               <input
@@ -194,8 +195,8 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                     // Cue where the desk can, load where it cannot. A click
                     // used to put the look on the wall that instant, through
                     // the path that clears the plate first.
-                    // A pack's look without the pack opens the account sheet, where it is bought.
-                    onClick={() => { if (isPackLocked(p.pack)) openAccountSheet(); else if (onCuePreset) onCuePreset(p.id); else onApplyPreset(p.id, p.settings); onClose(); }}
+                    // A pack's look without the pack opens the lock/account sheet, where it is bought.
+                    onClick={() => { if (isPackLocked(p.pack)) openTierLock('moire', { itemName: p.name }); else if (onCuePreset) onCuePreset(p.id); else onApplyPreset(p.id, p.settings); onClose(); }}
                     className={`flex flex-1 items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left ${active ? LIT : 'text-white/75'}`}
                     title={onCuePreset ? `Cue ${p.name} — ${p.description}` : p.description}
                     data-testid={`preset-menu-${p.id}`}
@@ -205,13 +206,13 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                       <span className="text-xs font-semibold truncate">{p.name}</span>
                     </span>
                     {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
-                    {!active && isPackLocked(p.pack) && <span className="text-[8px] uppercase tracking-wider font-bold text-white/40 shrink-0" data-testid={`preset-pack-${p.id}`}>Pack</span>}
+                    {!active && isPackLocked(p.pack) && <TierLockBadge label="Pro · Pack" testId={`preset-pack-${p.id}`} />}
                   </button>
                   {onCuePreset && (
                     <button
                       // The old behaviour, kept where it belongs: landing on
                       // clean glass is the point when you are building a look.
-                      onClick={() => { if (isPackLocked(p.pack)) openAccountSheet(); else onApplyPreset(p.id, p.settings); onClose(); }}
+                      onClick={() => { if (isPackLocked(p.pack)) openTierLock('moire', { itemName: p.name }); else onApplyPreset(p.id, p.settings); onClose(); }}
                       className="px-2 rounded-r-lg text-[8px] font-bold uppercase tracking-wider text-white/30 hover:text-white hover:bg-white/10 shrink-0"
                       title={`Load ${p.name} onto a cleared plate — cuts the stage`}
                       data-testid={`preset-load-${p.id}`}

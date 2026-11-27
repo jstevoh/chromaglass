@@ -212,7 +212,7 @@ person the app is for. So it is never fixed only once (PLAN.md 50o):
 2. The same PR adds the fault to `scripts/mutants.json`: the one line the fix changed,
    written back the old way (`find` is today's text, `replace` the fault), `plan` the
    item and the date of the owner's words, `fault` what they saw in plain words, and
-   `expect` the check from step 1. The weekly mutation run (`npm run mutate`, PLAN.md 50i)
+   `expect` the check from step 1. The weekly mutation run (`npm run mutate`, PLAN.md 50l)
    then proves every week that the check still catches it; a check that went blind shows
    as MISSED in `~/cg-scratch/mutate/latest.md` on the owner's Mac.
 3. Where no check can see it (a picture only the owner's eyes judge), the PR says so, adds

@@ -8,6 +8,7 @@ import {
 } from '../lib/liveShow';
 import { probeVideoEncoders } from '../lib/liveStream';
 import { liveRates, type LiveEncodeRate } from '../lib/liveRate';
+import { TierLockBanner } from './TierLock';
 
 /**
  * The Live Show panel (PLAN.md 37x-4d): the Mac app streaming the show to
@@ -43,7 +44,7 @@ import { liveRates, type LiveEncodeRate } from '../lib/liveRate';
 const mbps = (kbps: number) => `${(kbps / 1000).toFixed(1)}`;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const field = 'h-7 min-w-0 rounded-sm border border-border bg-surface px-2 text-[13px] text-text placeholder:text-faint focus:border-border-strong focus:outline-none';
-const chip = (on: boolean) => `h-6 shrink-0 whitespace-nowrap rounded-sm border px-2 text-[11px] font-medium ${on ? 'border-lit bg-lit text-on-lit' : 'border-border text-text-2 hover:bg-hover'}`;
+const chip = (on: boolean) => `h-6 shrink-0 whitespace-nowrap rounded-sm border px-2 text-[12px] font-medium ${on ? 'border-lit bg-lit text-on-lit' : 'border-border text-text-2 hover:bg-hover'}`;
 
 export function LiveShowPanel() {
   const live = useLiveShow();
@@ -126,7 +127,7 @@ export function LiveShowPanel() {
     return <p className="text-[13px] text-text-2" data-testid="live-show-absent">The Live Show streams from the Mac app.</p>;
   }
   if (!liveAllowed()) {
-    return <p className="text-[13px] text-text-2" data-testid="live-show-pro">The Live Show comes with Home and Pro: stream the show to YouTube, Twitch, Facebook and the rest at once.</p>;
+    return <TierLockBanner feature="live-show" dataAttrs={{ 'data-testid': 'live-show-pro' }} />;
   }
 
   return (
@@ -182,7 +183,7 @@ export function LiveShowPanel() {
       <label className="flex items-center gap-1.5">
         <span className="text-text-2">Source</span>
         <select
-          className={`${field} flex-1 disabled:opacity-40`}
+          className={`${field} flex-1 disabled:opacity-65`}
           value={format.source ?? 'plate'}
           disabled={streaming}
           onChange={e => changeFormat({ ...format, source: e.target.value === 'stack' ? 'stack' : 'plate' })}
@@ -203,7 +204,7 @@ export function LiveShowPanel() {
         ))}
       </div>
       {rateLine && <p className="text-[12px] text-text-2" data-testid="live-rate" data-kbps={rates.landscape?.kbps ?? rates.portrait?.kbps ?? 0}>{rateLine}</p>}
-      <button className="self-start text-[11px] text-text-2 underline-offset-2 hover:underline disabled:opacity-40" onClick={() => { void runProbe(); }} disabled={streaming} data-testid="live-probe">Check the encoder at this size</button>
+      <button className="self-start text-[12px] text-text-2 underline-offset-2 hover:underline disabled:opacity-65" onClick={() => { void runProbe(); }} disabled={streaming} data-testid="live-probe">Check the encoder at this size</button>
       {probe && <p className="text-[12px] text-text-2" data-testid="live-probe-result">{probe}</p>}
       {advice.text && (
         <p className={`text-[12px] ${advice.level === 'short' ? 'text-warn' : 'text-text-2'}`} data-testid="live-upload" data-level={advice.level} data-need={need}>{advice.text}</p>
@@ -245,12 +246,12 @@ function DestinationRow({ d, keptAt, locked, onChange, onKey, onRemove }: {
     <li className="flex flex-col gap-1 rounded-sm border border-border p-1.5" data-testid={`live-dest-${d.id}`} data-service={d.service}>
       <div className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate text-text" title={d.url}>{d.name}</span>
-        <span className="shrink-0 text-[11px] text-faint">{d.orientation === 'portrait' ? '9:16' : '16:9'}</span>
+        <span className="shrink-0 text-[12px] text-faint">{d.orientation === 'portrait' ? '9:16' : '16:9'}</span>
         <button aria-pressed={d.on && !d.test} className={chip(d.on && !d.test)} disabled={locked} onClick={() => onChange({ ...d, on: !d.on || d.test, test: false })} data-testid={`live-dest-on-${d.id}`} title="Go live streams here">On</button>
         <button aria-pressed={d.test} className={chip(d.test)} disabled={locked} onClick={() => onChange({ ...d, test: !d.test })} data-testid={`live-dest-test-${d.id}`} title="Test streams here, Go live never does: an unlisted broadcast">For tests</button>
-        <button className="h-6 rounded-sm px-1.5 text-[13px] text-faint hover:bg-hover hover:text-text disabled:opacity-40" disabled={locked} onClick={onRemove} title="Remove it and its key" data-testid={`live-dest-remove-${d.id}`}>×</button>
+        <button className="h-6 rounded-sm px-1.5 text-[13px] text-faint hover:bg-hover hover:text-text disabled:opacity-65" disabled={locked} onClick={onRemove} title="Remove it and its key" data-testid={`live-dest-remove-${d.id}`}>×</button>
       </div>
-      <div className="flex items-center gap-1.5 text-[11px] text-text-2">
+      <div className="flex items-center gap-1.5 text-[12px] text-text-2">
         <span data-testid={`live-dest-key-${d.id}`} data-kept={has ? 'true' : 'false'}>
           {has ? `Key kept${keptAt ? ` ${new Date(keptAt).toLocaleDateString()}` : ''}` : 'No key yet'}
         </span>
@@ -301,7 +302,7 @@ function AddDestination({ onAdd }: { onAdd: (d: LiveDestination, key: string) =>
           <option value="portrait">9:16</option>
         </select>
       </div>
-      <p className="text-[11px] text-faint">{s.hint}</p>
+      <p className="text-[12px] text-faint">{s.hint}</p>
       <input className={field} placeholder={`Name (${s.name})`} value={name} onChange={e => setName(e.target.value)} data-testid="live-add-name" />
       <input className={field} placeholder="Server: rtmps://…" spellCheck={false} value={url} onChange={e => setUrl(e.target.value)} data-testid="live-add-url" />
       <input className={field} type="password" autoComplete="off" spellCheck={false} placeholder="Stream key" value={key} onChange={e => setKey(e.target.value)} data-testid="live-add-key" />

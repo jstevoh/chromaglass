@@ -5,6 +5,8 @@ import { TabStrip } from './TabStrip';
 import type { TabEdit } from '../../hooks/useDeskLayout';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
 import { AlphaBadge } from '../AlphaBadge';
+import { CrashReportButton } from '../CrashReportButton';
+import { PanelGuard } from '../PanelGuard';
 
 /**
  * The bar across the top of both desks.
@@ -203,9 +205,9 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
       />
       <StatusDot
         on={!!dots.video}
-        label="Film" tight={t}
+        label="Video" tight={t}
         onClick={onVideo}
-        title={dots.video ? 'A film is playing under the dye. Click for the Film section.' : 'No film under the dye. Click for the Film section.'}
+        title={dots.video ? 'A video is on the plate. Click for the Video panel.' : 'No video coming in. Click for the Video panel: a file, a camera or a window, shown on the plate, as the lamp, on the LED ring, or poured.'}
         testId="dot-video"
       />
       {onWall && (
@@ -382,6 +384,9 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
           <SearchIcon size={13} aria-hidden />
           <span className="hidden xl:inline">Search</span>
         </button>
+        <PanelGuard name="The crash report">
+          <CrashReportButton />
+        </PanelGuard>
         {trailing}
       </div>
     </header>

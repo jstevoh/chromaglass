@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The mutation run's own checkout (PLAN.md 50i): a git worktree of <repo> at
+# The mutation run's own checkout (PLAN.md 50l): a git worktree of <repo> at
 # <ref>, with its own node_modules, that scripts/mutate.mjs puts faults into
 # one at a time. Its own tree, not the owner's checkout: a fault written into
 # a checkout someone is working in, or a bundle built from it into a shared

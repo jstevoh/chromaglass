@@ -1,5 +1,5 @@
 // The mutation run: known faults put back one at a time, and which checks
-// catch each (PLAN.md 50i).
+// catch each (PLAN.md 50l).
 //
 //   npm run mutate                    every fault in scripts/mutants.json, in a tree of its own
 //   npm run mutate -- --only <id>     one fault (or several: --only a,b)
@@ -161,7 +161,7 @@ export function report(results, { tree, ref, started, host }) {
   const lines = [
     `# Mutation run, ${started.slice(0, 10)}`,
     '',
-    `${results.length} known faults put back one at a time at ${ref} on ${host} (PLAN.md 50i). ` +
+    `${results.length} known faults put back one at a time at ${ref} on ${host} (PLAN.md 50l). ` +
       `${count('CAUGHT')} caught, ${holes} that no check caught${holes ? ' (the holes: each is a fault this repository has had and could ship again with every check green)' : ''}, ` +
       `${count('STALE') + count('BROKEN')} to rewrite, ${count('UNSETTLED')} unsettled.`,
     '',

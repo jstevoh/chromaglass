@@ -19,8 +19,8 @@ export function Info({ children, label = 'What this does' }: { children: ReactNo
     <div className={label ? '-mt-1 mb-2' : ''}>
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex min-h-[22px] min-w-[22px] items-center justify-center gap-1 rounded-md px-1 text-[11px] transition-colors ${label ? '-ml-1' : ''} ${
-          open ? 'text-accent-text' : 'text-white/30 hover:text-white/70'
+        className={`flex min-h-[22px] min-w-[22px] items-center justify-center gap-1 rounded-md px-1 text-[12px] transition-colors ${label ? '-ml-1' : ''} ${
+          open ? 'text-accent-text' : 'text-dim hover:text-text'
         }`}
         aria-expanded={open}
         aria-label={label || 'What this does'}

@@ -103,15 +103,6 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="grainScale"
         />
         <Slider
-          label="Blob Surface Tension"
-          value={settings.blobSurfaceTension}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
-          settingKey="blobSurfaceTension"
-        />
-        <Slider
           label="Dye Budget"
           value={settings.dyeBudget ?? 0.85}
           min={0.1}
@@ -275,7 +266,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           How the show moves over minutes, not seconds: the set walking its hues, the rhythm plate pressed on the kick, a slow loop behind the live plate, and the round dish and spread of the projected clock faces. The Show Sequencer scripts these over a song.
         </Info>
         <Slider
-          label="Hue Journey (min/step)"
+          label="Hue Journey"
           value={settings.hueJourney ?? 0}
           min={0}
           max={30}
@@ -599,14 +590,14 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           settingKey="stock"
         />
         <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Stock</span>
+          <span className="text-[12px] uppercase tracking-widest font-bold text-muted">Stock</span>
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
                 aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
-                className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
+                className={`py-2 rounded-lg text-[12px] uppercase tracking-wider font-bold border transition-colors ${
                   (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[
@@ -953,7 +944,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
                 <Info>
                   Arrow keys pan the camera (Shift for a whole frame); Alt-drag (Option-drag) on the plate pans it too; Alt-click fixes it on the spot under the pointer.
                   {(settings.macroCamera ?? 'hold') === 'follow' ? ' Follow locks onto the liquid there and rides with it.' : ''}
-                  {' '}With Random Evolve on, the aim wanders slowly.
+                  {' '}With Evolve on, the aim wanders slowly.
                 </Info>
               </>
             )}

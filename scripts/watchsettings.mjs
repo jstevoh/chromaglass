@@ -27,7 +27,7 @@ export const MEASURE_SETTINGS = {
   ],
   hueSpread: [
     { key: 'hueJourney', way: 'raise', kind: 'physics', why: 'steps poured hues wider around the colour wheel' },
-    { key: 'polarity', way: 'raise', kind: 'physics', why: 'keeps immiscible dyes separate rather than merging into one hue' },
+    { key: 'holdApart', way: 'raise', kind: 'physics', why: 'keeps each colour to its own body rather than mixing into one hue' },
     { key: 'doubleDiffusion', way: 'raise', kind: 'physics', why: 'separates chemical species into distinct chromatic bands' },
   ],
   hueGap: [
@@ -36,7 +36,7 @@ export const MEASURE_SETTINGS = {
   ],
   hues: [
     { key: 'hueJourney', way: 'raise', kind: 'physics', why: 'introduces more distinct hues across pours' },
-    { key: 'polarity', way: 'raise', kind: 'physics', why: 'prevents nearby dyes from muddying into fewer hues' },
+    { key: 'holdApart', way: 'raise', kind: 'physics', why: 'keeps nearby dyes from mixing into fewer hues' },
   ],
   warm: [
     { key: 'lampWarmth', way: 'raise', kind: 'physics', why: 'shifts the projector bulb spectrum toward warm tungsten' },
@@ -68,7 +68,7 @@ export const MEASURE_SETTINGS = {
   // ─── Edges and form (compareDesign + comparePhysics) ─────────────────────
   edgeWidth: [
     { key: 'diffusionRate', way: 'raise', kind: 'physics', why: 'softens boundaries by diffusing dye across interfaces' },
-    { key: 'polarity', way: 'lower', kind: 'physics', why: 'lower immiscibility blurs sharp oil-water meniscus rims' },
+    { key: 'holdApart', way: 'lower', kind: 'physics', why: 'lets two colours mix across their edge as dyes in one water do' },
     { key: 'focus', way: 'lower', kind: 'physics', why: 'softens projector lens focus across the dish' },
     { key: 'postBlurRadius', way: 'raise', kind: 'grade', why: 'adds post gaussian blur; adjust diffusion and lens focus first' },
   ],
@@ -80,7 +80,7 @@ export const MEASURE_SETTINGS = {
   coherence: [
     { key: 'advection', way: 'raise', kind: 'physics', why: 'draws dye into long parallel flow filaments and streaks' },
     { key: 'vorticityConfinement', way: 'raise', kind: 'physics', why: 'organises shear into clean coherent streams' },
-    { key: 'blobSurfaceTension', way: 'lower', kind: 'physics', why: 'lets stretched tendrils persist instead of snapping back round' },
+    { key: 'holdApart', way: 'lower', kind: 'physics', why: 'lets stretched tendrils persist instead of drawing back round' },
   ],
   forms: [
     { key: 'beads', way: 'raise', kind: 'physics', why: 'breaks sheets into discrete oil beads and droplets' },
@@ -88,7 +88,7 @@ export const MEASURE_SETTINGS = {
     { key: 'turbulenceDetail', way: 'raise', kind: 'physics', why: 'splits large washes with fine turbulence octaves' },
   ],
   elongation: [
-    { key: 'blobSurfaceTension', way: 'raise', kind: 'physics', why: 'pulls stretched tendrils into rounder cells' },
+    { key: 'holdApart', way: 'raise', kind: 'physics', why: 'pulls stretched tendrils into rounder pools' },
     { key: 'filmHold', way: 'raise', kind: 'physics', why: 'prevents close drops from coalescing into long chains' },
     { key: 'advection', way: 'lower', kind: 'physics', why: 'reduces velocity shear stretching' },
   ],

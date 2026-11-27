@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Install the weekly mutation run on the owner's Mac (PLAN.md 50i): a copy of
+# Install the weekly mutation run on the owner's Mac (PLAN.md 50l): a copy of
 # scripts/mutate-weekly.sh in ~/cg-scratch/bin and a launchd job that starts
 # it on Sundays at 03:30 (a Mac asleep then runs it when it wakes). Run from
 # the repository: `bash scripts/mutate-install.sh`. Again to update; with
-# `--remove` to take it off. The report: ~/cg-scratch/mutate/latest.md.
+# `--remove` to take it off. The report: ~/cg-scratch/mutate/latest.md; the
+# off switch, `rm ~/cg-scratch/mutate/LIVE`.
 set -euo pipefail
 label=art.chromaglass.mutate
 plist="$HOME/Library/LaunchAgents/$label.plist"
@@ -16,6 +17,7 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$HOME/cg-scratch/bin" "$HOME/cg-scratch/mutate" "$HOME/Library/LaunchAgents"
 test -f "$HOME/cg-scratch/bin/maclock.mjs" || cp "$here/scripts/maclock.mjs" "$HOME/cg-scratch/bin/maclock.mjs"
 cp "$here/scripts/mutate-weekly.sh" "$HOME/cg-scratch/bin/mutate-weekly.sh"
+touch "$HOME/cg-scratch/mutate/LIVE"
 chmod +x "$HOME/cg-scratch/bin/mutate-weekly.sh"
 cat > "$plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

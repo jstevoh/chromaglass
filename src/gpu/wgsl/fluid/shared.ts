@@ -21,8 +21,8 @@ struct Sim {
   disp: f32,           // velocity → uv displacement for advection
   visc: f32,
   turbScale: f32,
-  free7: f32,          // was the music's eddies (PLAN 38u-5); the slot is kept so every offset after it stands
-  tension: f32,
+  holdCap: f32,        // the most Hold Apart may add in a step (HOLD_APART_CELLS in this unit, PLAN 18d-6); the music's eddies had the slot (PLAN 38u-5)
+  tension: f32,        // Hold Apart's stress coefficient for the step (holdApartPull), 0 where dyes mix as dyes do
   thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
   vibF: f32,
@@ -263,59 +263,77 @@ fn packedAt(x: i32, y: i32, n: i32) -> f32 {
 /*
   A face's velocity on a thin gap, as the thin solve made it conserve liquid
   (wgsl/thinGap.ts), for the carries that move what the liquid holds across
-  faces: the colour, the oil, and the step's count of substeps (carryCourant).
-  The ferrofluid's volume carry has used it since PLAN 15d (phaseAdvect, which
-  has the derivation): the solve's face flux is the mean of the two cells'
-  M·u* less n·M_f·ΔP, and hsGradient left each cell's h·u as the mean of its
-  two faces' M_f·ΔP, so the face is the mean of the two cells' h·u plus n/4
-  times the second difference of M_f·ΔP along the axis, over the face's gap.
+  faces: the colour, the oil, the ferrofluid's volume (phaseAdvect) and the
+  step's count of substeps (carryCourant).
 
-  What the carries had instead: the two cells' velocities filtered [1 2 1]
-  along the face, swapped back to the compact gradient with c·P (Rhie–Chow
-  on the old solve's pressure). That is exact where the drag c is even, and
-  a Finger is a solid in the solve, c forty times smaller inside the hand
-  than outside it (hsPrep): across its rim those faces gathered liquid that
-  was not there to gather. Measured in the lab on the app's Classic step,
-  a pool near the plate's cap (5.5 at its middle) and a Finger drawn through
-  it as the pointer drags one, a cell every third step: the colour
-  piled past the plate's cap of 6 a cell at the hand's rim, the cap cut it
-  (capDye), and the pool lost 43% of itself in a stroke 0.16 of the plate
-  long (40.5% on the lab's longer Classic step, `npm run fingerflow`'s
-  check 7; Mac CI's `tools` check: 222 → 161). The same flow through these
-  faces gathers nothing a converged solve did not.
+  Since PLAN 18a-8 the face velocities are the flow's own state: hsGradient
+  leaves each cell's east and north faces in `flow`, the velocity across
+  each as the solve made it conserve liquid (its volume flux over the face's
+  gap, the mean of its two cells'), and each cell's velocity is the mean of
+  its two faces on each axis. So the face is one load, where before it was
+  rebuilt from the two cells' h·u and the second difference of the solve's
+  M_f·ΔP (a dozen loads, exact only because the cells were what the solve
+  had left them).
 
-  Needs `vel` (the flow the carries ride, hsGradient's), `pr` bound to the
-  solve's own P, `sq` (the gap), `mob` (the mobility, negative past the
-  open rim, where P is held at zero) and the rest gap in A.b.w.
+  What the carries ride is not always the solve's own flow, though: the
+  tilt's slosh is added after the solve, the glass's drift is taken off when
+  the plate rides with the glass, and the ferrofluid rides its coherent
+  drop's velocity (phaseVelocity). Each is a change to the cells' velocities,
+  so each is laid onto the face as the mean of its two cells' change, h·Δu,
+  over the face's gap; Δu is the ridden cell's velocity less the one
+  hsGradient left, which is the mean of its faces rounded as the half float
+  it was stored in (quantizeToF16), so on a step with none of those the
+  change is exactly nothing and the face is exactly the solve's.
+
+  What the carries had before PLAN 15b: the two cells' velocities filtered
+  [1 2 1] along the face, swapped back to the compact gradient with c·P
+  (Rhie–Chow on the old solve's pressure). That is exact where the drag c is
+  even, and a Finger is a solid in the solve, c forty times smaller inside
+  the hand than outside it (hsPrep): across its rim those faces gathered
+  liquid that was not there to gather (the pool lost 43% of itself in one
+  stroke, `npm run fingerflow`'s check 7).
+
+  Needs `vel` (the flow the carries ride), `flow` (hsGradient's faces, a
+  vec4f a cell: its east face's velocity, its north's, and the solve's P
+  there, zero past the open rim, for the oil's lip in mixAdvect), `sq`
+  (the gap), `mob` (the mobility, zero in a bubble's core) and the rest gap
+  in the expression given (A.b.w for the carries, A.a.w for phaseAdvect).
 */
-export const THIN_FACE = /* wgsl */ `
+export function thinFaceWith(restGap: string): string {
+  return /* wgsl */ `
 fn tfIn(q: vec2i, n: i32) -> bool { return q.x >= 0 && q.y >= 0 && q.x < n && q.y < n; }
-fn tfP(q: vec2i, n: i32) -> f32 {
-  if (mob[q.x + q.y * n] < 0.0) { return 0.0; }
-  let half = n / 2;
-  return pr[((q.x + q.y) & 1) * n * half + q.y * half + (q.x >> 1)];
+fn tfGap(q: vec2i) -> f32 { return max(textureLoad(sq, q, 0).r, 0.004) / ${restGap}; }
+// The solve's velocity through the face of cell q on the axis ax (0 east, 1 north); nothing past the grid.
+fn tfFlow(q: vec2i, ax: i32, n: i32) -> f32 {
+  if (!tfIn(q, n)) { return 0.0; }
+  let f = flow[q.x + q.y * n];
+  return select(f.y, f.x, ax == 0);
 }
-// The solve's M_f·ΔP through the face q → q + e; nothing through the grid's wall.
-fn tfFace(q: vec2i, e: vec2i, n: i32) -> f32 {
-  let b = q + e;
-  if (!tfIn(q, n) || !tfIn(b, n)) { return 0.0; }
-  let ma = abs(mob[q.x + q.y * n]);
-  let mb = abs(mob[b.x + b.y * n]);
-  return 2.0 * ma * mb / max(ma + mb, 1e-20) * (tfP(b, n) - tfP(q, n));
+// The solve's P at a cell (zero past the open rim), which hsGradient keeps beside its faces.
+fn tfP(q: vec2i, n: i32) -> f32 { return flow[clamp(q.x, 0, n - 1) + clamp(q.y, 0, n - 1) * n].z; }
+// The cell's velocity on the axis as hsGradient stored it: the mean of its two faces, as a half float.
+fn tfCell(q: vec2i, ax: i32, n: i32) -> f32 {
+  let back = select(vec2i(0, 1), vec2i(1, 0), ax == 0);
+  return quantizeToF16(0.5 * (tfFlow(q, ax, n) + tfFlow(q - back, ax, n)));
 }
-fn tfGap(q: vec2i) -> f32 { return max(textureLoad(sq, q, 0).r, 0.004) / A.b.w; }
 // The velocity through the face a → a + e, both cells inside the grid.
 fn thinFaceVel(a: vec2i, e: vec2i, n: i32) -> f32 {
   let b = a + e;
   // Nothing through a bubble's core, which the solve shut (hsPrep's standingLiquid, PLAN 15g-8d).
   if (mob[a.x + a.y * n] == 0.0 || mob[b.x + b.y * n] == 0.0) { return 0.0; }
+  let ax = select(1, 0, e.x != 0);
+  let s = f32(e.x + e.y);
+  // The face is the east (north) face of whichever of the two cells lies west (south).
+  let solve = s * tfFlow(select(a, b, s < 0.0), ax, n);
   let ha = tfGap(a);
   let hb = tfGap(b);
-  let face = 0.5 * (dot(textureLoad(vel, a, 0).xy, vec2f(e)) * ha + dot(textureLoad(vel, b, 0).xy, vec2f(e)) * hb)
-           + 0.25 * f32(n) * (tfFace(a - e, e, n) - 2.0 * tfFace(a, e, n) + tfFace(b, e, n));
-  return face / (0.5 * (ha + hb));
+  let da = dot(textureLoad(vel, a, 0).xy, vec2f(e)) - s * tfCell(a, ax, n);
+  let db = dot(textureLoad(vel, b, 0).xy, vec2f(e)) - s * tfCell(b, ax, n);
+  return solve + (ha * da + hb * db) / (ha + hb);
 }
 `;
+}
+export const THIN_FACE = thinFaceWith('A.b.w');
 
 /** The same, sampled between cells, matching `bilerpN` exactly. */
 export const PACKED_BILERP = /* wgsl */ `

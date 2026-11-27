@@ -1,0 +1,233 @@
+/*
+  Keep full (PLAN 18a-22): a dish left running is topped up with the dropper.
+
+  What was reported. The owner left the player running for an evening on Lava
+  Pop with Evolve off, and the plate emptied. Two things take colour off a dish
+  over hours. The Mac app that night was 1.3.1751 (built 9:18 AM PST 11-26),
+  before the draught's uniform shear stopped sliding the thin gap's liquid out
+  over its open rim (PLAN 18a-16, #968) and before Rain Drip and the no-oil
+  rock went through the closed circulation (18a-17, #979): Lava Pop's Air of
+  0.02 was that shear. And every look's Evaporation still takes a share of the
+  dye each step (fluidSimulation.ts `perStep`, the named regulator shortcut of
+  PLAN 18g that dye.ts's decay applies): small, but over a night it is most of
+  the dish. Nothing put any back, because the only thing that pours on its own
+  is Evolve, and Evolve also blows, strokes, thins and changes the look.
+
+  What a person does. Someone minding a real dish under a lamp does not stir it
+  or change it when it runs thin; they pick up the dropper, take a drop of what
+  is already on the bench and let it fall where the dish has gone pale, then
+  another a few seconds later, until it reads full again, and then leave it
+  alone. That is all this is: the hand's own Drop (`dropBottle`, the same call
+  the remote's Drop makes), a real drop of the look's own bottle in one of the
+  look's own colours, falling with its volume onto the thin gap (so what is
+  over spills at the rim, PLAN 18c-1), aimed at the palest of a few places it
+  could land. No fade-in, no regulator reaching into the field: the dye arrives
+  as drops do and spreads as the liquid carries it.
+
+  When. It watches the dish's own measure (`meanDensity`, inside the rim on a
+  thin gap) against the amount the look is made with (`lookTarget`, the same
+  target Evolve's drops and the regulator use). It starts below KEEP_FULL_LOW
+  of it and keeps going until KEEP_FULL_HIGH, the gap between them being why a
+  person does not fuss over a dish that is nearly right: without it, each drop
+  that took the dish over the line and each pale minute after it would
+  alternate at the line, a drip every few seconds for ever. The emptier the
+  dish was when the topping up began, the sooner the next drop
+  (KEEP_FULL_SLOW_S for a dish just under the line to KEEP_FULL_FAST_S for an
+  empty one), and the bigger, up to a hand's hardest drop; and that pace holds
+  until the dish is full. It used to follow the dish as it filled, slowing and
+  shrinking the drops as it came back, and the Mac measured why that is wrong
+  (`npm run keepfullapp`, 2026-11-27): an emptied Lava Pop came back to 0.43
+  of its 0.80 in 90 s and sat there, because near the top the small slow drops
+  only matched what the dish loses on its own (about 5% in two minutes, PLAN
+  18a-23), so it never read full and the dropper never stopped. A person
+  refilling an emptied dish does not slow down as it comes back; they keep the
+  rhythm they started with until it looks right, and only a dish that has
+  just gone a little thin gets the odd unhurried drop.
+  The interval is in seconds of the wall, not steps: a person's hand keeps the
+  room's time, and the measure it reads comes back from the GPU every few
+  frames, so a drop never goes in before the last one has been seen.
+
+  What it leaves alone. A look whose dye is meant to be clear (a clear-phase
+  look, as Evolve's `clearPhase` reads it) has nothing here to top up. A plate
+  that is draining (the Drain button) or stopped is not topped up. It never
+  touches the look's settings, so it runs beside Evolve, a sequence or the
+  music without moving any of them; it is the room's switch (lookFade.ts
+  RIG_KEYS), so a look change leaves it as it was.
+*/
+import type { FluidSimulation } from './fluidSimulation';
+import type { LiquidType, VisualizerSettings } from '../types';
+import { lookTarget } from '../lib/dyeTarget';
+import { GRID_SCALE, GRID_SIZE } from './constants';
+import { DICE } from './dice';
+import { harmonyColor } from '../constants';
+import { LIQUIDS_BY_ID } from '../presetPlate';
+import { pickArea, pointInArea, type PlateArea } from '../lib/plateAreas';
+import { dropBottle } from './dropSplash';
+import { bottleDye } from './tools';
+
+/** Below this share of the look's own amount the dish is topped up. */
+export const KEEP_FULL_LOW = 0.8;
+/** And it is topped up until it is back to this share of it. */
+export const KEEP_FULL_HIGH = 0.95;
+/** Seconds between drops on a dish just under the line, and on an empty one. */
+export const KEEP_FULL_SLOW_S = 6;
+export const KEEP_FULL_FAST_S = 0.4;
+/** How steeply the run's pace rises with how short the dish was: full speed at 1 / KEEP_FULL_PACE short. */
+export const KEEP_FULL_PACE = 2.5;
+/**
+ * A drop's amount at full: the hand's own Drop with the pen pressed all the
+ * way (LiquidVisualizer's remote `drop`, 5 × amount, amount 2 at a full
+ * press). Measured on the Mac (`npm run keepfullapp`, 2026-11-27): at half of
+ * this, a drop every 1.2 s, 75 drops brought an emptied Lava Pop back to only
+ * 0.17 of its 0.80 in 90 s, slower than the dish loses it; a person refilling
+ * an empty dish presses the dropper hard and fast.
+ */
+export const KEEP_FULL_DROP = 10;
+/** How far from the middle a drop lands on a look with no areas, as a share of the plate (the thin gap's rim is at 0.5). */
+export const KEEP_FULL_REACH = 0.4;
+/** Places a drop could land, of which it takes the palest. */
+export const KEEP_FULL_TRIES = 4;
+/** Layers watched (the plate and its back plates). */
+const LAYERS = 8;
+
+export interface KeepFullState {
+  /** Wall-clock seconds of each layer's last drop. */
+  lastAt: Float64Array;
+  /**
+   * 0 while a layer is left alone; while it is being topped up (from under LOW
+   * until HIGH), 1 + 254 × the most it was short of HIGH in this run, the
+   * emptiness that sets the run's pace. A byte, so the state stays the one
+   * array `npm run keepfull` hands the dose.
+   */
+  topping: Uint8Array;
+  /** Drops laid since the show opened, for the harness. */
+  drops: number;
+  /** Where a drop lands and what falls (`keepFullHands`). */
+  hands: KeepFullHands;
+}
+
+/** A visualizer's Keep Full: its clocks and its hand, made once from what the look lends it. */
+export const keepFullState = (look: KeepFullLook): KeepFullState =>
+  ({ lastAt: new Float64Array(LAYERS).fill(-1e9), topping: new Uint8Array(LAYERS), drops: 0, hands: keepFullHands(look) });
+
+/**
+ * The size of the next top-up drop on a layer, 0..1 of a hand's full drop, or
+ * 0 for none now. Pure (no field, no clock of its own), so `npm run keepfull`
+ * can hold its sums by themselves: `mean` the dish's measure, `target` the
+ * look's own amount, `since` seconds since this layer's last drop. Updates
+ * `topping[layer]`.
+ */
+export function keepFullDose(topping: Uint8Array, layer: number, mean: number, target: number, since: number): number {
+  if (!(target > 0.01) || !Number.isFinite(mean)) { topping[layer] = 0; return 0; }
+  const full = mean / target;
+  if (full >= KEEP_FULL_HIGH) { topping[layer] = 0; return 0; }
+  const shortNow = Math.max(0, Math.min(1, 1 - full / KEEP_FULL_HIGH));
+  if (full < KEEP_FULL_LOW) topping[layer] = Math.max(topping[layer], 1 + Math.round(shortNow * 254));
+  if (!topping[layer]) return 0;
+  // The pace of the run, from the emptiest the dish was in it: full speed
+  // from 60% short of full, so a dish found half empty is refilled as an empty
+  // one is; one just under the line (about 18% short) gets a drop in 3.5 s.
+  const pace = Math.min(1, ((topping[layer] - 1) / 254) * KEEP_FULL_PACE);
+  const every = KEEP_FULL_SLOW_S - (KEEP_FULL_SLOW_S - KEEP_FULL_FAST_S) * pace;
+  if (since < every) return 0;
+  return 0.35 + 0.65 * pace;
+}
+
+/** Where a top-up lands and what falls: the component fills it in (its look's areas, harmony and bench). */
+export interface KeepFullAim {
+  x: number; y: number;
+  r: number; g: number; b: number;
+  liquid: LiquidType | undefined;
+}
+
+export interface KeepFullHands {
+  /**
+   * A place for the next drop on `layer` (in one of the look's areas when it
+   * has them, else anywhere in the dish), the colour that falls there and the
+   * bottle it comes from, written into `out`. Called KEEP_FULL_TRIES times a
+   * drop; the palest place wins and its colour and bottle go with it.
+   */
+  aim(layer: number, fluid: FluidSimulation, out: KeepFullAim): void;
+}
+
+/** What the visualizer lends the hand: a layer's areas, an area's dye, the working harmony and the bench. */
+export interface KeepFullLook {
+  areasOf(layer: number): PlateArea[] | null;
+  areaColor(layer: number, a: PlateArea): { r: number; g: number; b: number };
+  harmonyOf(layer: number): number[];
+  liquidsOf(layer: number): string[];
+}
+
+/**
+ * The visualizer's hand for Keep Full, as Evolve's drop aims: in one of the
+ * look's areas, in that area's dye and from its bottle, when the look has
+ * areas; else anywhere in the dish inside its rim (KEEP_FULL_REACH), in the
+ * working harmony, from one of the look's bottles. Its own dice (DICE.keep),
+ * so keeping the dish full draws nothing from Evolve's stream.
+ */
+export function keepFullHands(look: KeepFullLook): KeepFullHands {
+  return {
+    aim: (layer, _fluid, out) => {
+      const areas = look.areasOf(layer);
+      if (areas && areas.length > 0) {
+        const a = pickArea(areas, DICE.keep);
+        const at = pointInArea(a, GRID_SIZE, DICE.keep);
+        const c = look.areaColor(layer, a);
+        out.x = at.x; out.y = at.y; out.r = c.r; out.g = c.g; out.b = c.b;
+        out.liquid = LIQUIDS_BY_ID.get(a.liquid);
+        return;
+      }
+      const ang = DICE.keep.float() * Math.PI * 2;
+      const d = Math.sqrt(DICE.keep.float()) * KEEP_FULL_REACH * GRID_SIZE;
+      out.x = GRID_SIZE / 2 + Math.cos(ang) * d;
+      out.y = GRID_SIZE / 2 + Math.sin(ang) * d;
+      const c = harmonyColor(look.harmonyOf(layer), DICE.keep);
+      out.r = c.r; out.g = c.g; out.b = c.b;
+      const ids = look.liquidsOf(layer);
+      out.liquid = ids.length > 0 ? LIQUIDS_BY_ID.get(DICE.keep.pick(ids)) : undefined;
+    },
+  };
+}
+
+const tryAim: KeepFullAim = { x: 0, y: 0, r: 0, g: 0, b: 0, liquid: undefined };
+const bestAim: KeepFullAim = { x: 0, y: 0, r: 0, g: 0, b: 0, liquid: undefined };
+
+/**
+ * One frame of the hand that keeps the dish full: for each layer, a drop when
+ * `keepFullDose` asks for one. `now` in seconds of the wall clock; from the
+ * settings, the look's Dye Budget and its Phase Amount (a layer seeded with no
+ * dye and a phase on it is a clear-phase look, as Evolve reads it, whose dye
+ * stays clear). The caller asks `keepFull` and whether the plate is playing.
+ * Returns the drops laid this frame.
+ */
+export function stepKeepFull(k: KeepFullState, fluids: readonly (FluidSimulation | null | undefined)[], now: number, settings: Pick<VisualizerSettings, 'dyeBudget' | 'phaseAmount'>): number {
+  const dyeBudget = settings.dyeBudget ?? 0.85, phaseAmount = settings.phaseAmount ?? 0, hands = k.hands;
+  let laid = 0;
+  const n = Math.min(fluids.length, LAYERS);
+  for (let li = 0; li < n; li++) {
+    const af = fluids[li];
+    if (!af) continue;
+    if (af.seedMean === 0 && phaseAmount > 0.002) { k.topping[li] = 0; continue; }
+    const target = lookTarget(af.seedMean, dyeBudget, af.seedBudget);
+    const dose = keepFullDose(k.topping, li, af.meanDensity, target, now - k.lastAt[li]);
+    if (dose <= 0) continue;
+    // The palest of a few places: a person drops where the dish has gone thin.
+    const field = af.readDensity, N = af.size;
+    let best = Infinity;
+    for (let t = 0; t < KEEP_FULL_TRIES; t++) {
+      hands.aim(li, af, tryAim);
+      const ix = Math.max(0, Math.min(N - 1, Math.round(tryAim.x)));
+      const iy = Math.max(0, Math.min(N - 1, Math.round(tryAim.y)));
+      const here = field?.[ix + iy * N] ?? 0;
+      if (here < best) { best = here; Object.assign(bestAim, tryAim); }
+    }
+    const liq = bestAim.liquid;
+    const x = Math.round(bestAim.x), y = Math.round(bestAim.y);
+    dropBottle(af, x, y, KEEP_FULL_DROP * dose * bottleDye(liq), bestAim.r, bestAim.g, bestAim.b, 1,
+      liq?.behaviour, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), dose);
+    k.lastAt[li] = now;
+    k.drops++;
+    laid++;
+  }
+  return laid;
+}

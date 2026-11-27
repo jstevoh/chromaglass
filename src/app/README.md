@@ -14,15 +14,16 @@ comments, which moved with it.
 | `useAmbientMode` | Ambient TV mode's switch |
 | `useSoundState` | what the show listens to, as state |
 | `useSongLine` | the song's shape, the bar and the heard tempo, for the status lines |
-| `usePour` | an image or a film poured into the dish, and the one video loaded (`LoadedVideo`, `loaded`, `pourLoaded`, PLAN 14ag) |
+| `usePour` | an image or a film poured into the dish, and the one video loaded (`LoadedVideo`, `loaded`, `pourLoaded`, PLAN 14ag); a live picture poured by a clone of its stream (`pourStream`, `pourLive`, PLAN 14ag-9) |
 | `useSoundSource` | changing what the show hears; the music player; the drone |
 | `useBench` | the engine's status, Calibrate and the grid sweep (`?bench`) |
 | `useToast` | the one-line notice and rich 8 s Undo toast (`ToastItem`, `showToast`, `clearToast`, `triggerToastAction`, PLAN 49a) |
 | `usePlateUndo` | full solver + settings snapshot & 8 s Undo safety net for `clearPlate`, `drainPlate`, `luckyPlate`, `newPlate`, `randomLookPlate`, and panel-close Undo (`showPanelClosedUndo`), syncing `undoNotice` (`RemoteState.undo`) to the phone remote (PLAN 49a) |
-| `useFilm` | the film that drives the plate: a file, a camera, a window; and `video`, the row that plays and pours the video loaded (`VideoShelfProps`, PLAN 14ag) |
+| `useFilm` | the film that drives the plate: a file, a camera, a window; and `video`, the row of the input on the plate (the camera or window while one is on, else the video loaded) with its preview, where it shows and its pour (`VideoShelfProps`, PLAN 14ag, 14ag-9) |
 | `useSceneSource` | the room camera as a sensor |
 | `usePaletteLock` | the palette held across looks; since PLAN 43d also `paletteFromFile` (a picture or video file's colours as the palette, "From picture", the lock `PICTURE_LOCK`), `palettes` (the list the desk and the phone draw, the picture's last) and `pictureDyes` (sent to a projector with the lock) |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
+| `useLookDocument` | the open saved look (`docId`, `docDirty`) and save, overwrite and delete for the desk and phone |
 | `useSetListState` | the set list, the armed look, the Go's fade; publishes them to `setNow.ts` for the assistant, and its fade and cancel |
 | `usePhoneLayout` | phone or desks (the old narrow overlay is unhooked, PLAN 49c); Live or Preview |
 | `useWallLook` | Preview's copy for the wall, and Send to wall |
@@ -33,6 +34,8 @@ comments, which moved with it.
 | `useSetActions` | the set list's own edits and files; sets `editNow.ts`'s door for the owner's assistant (PLAN 44k-16a) |
 | `useLucky` | Lucky (`triggerLucky`), protected by the 8 s Undo toast in `usePlateUndo` (PLAN 49a) |
 | `useSongChangeFades` | a new song, a new look |
+| `useLookLists` | the looks' swatches (`swatchOf`), the phone's grouped list and the set's cue items with each item's `lookId` (PLAN 34b-6) |
+| `useLookThumbCapture` | photographs a saved look for its chip once, idle, six seconds after it goes up (`THUMB_AFTER_MS`, PLAN 34b-6) |
 | `useCastFeed` | the cast window, mirror and network display kept in step; the mark |
 | `useRecording` | the one Record button; in a portrait clip it also lays the wall's canvas out 9:16 for the clip (`wallRef`, `stageRef`, `phone`) and returns `phoneRecording` for the phone's More sheet |
 | `useGlides` | a setting walked to a value over seconds |
@@ -61,12 +64,13 @@ comments, which moved with it.
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption only since the ink was shelved, 37x-10m; `titleCaption` deleted); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film, and `loopRender`, a seamless Canvas loop (PLAN 43b) |
-| `useControllers` | MIDI, the gamepad, the projector window |
-| `useCommandPalette` | the palette's commands, panel/section indexing, the `?` shortcut sheet state, and the keyboard |
+| `useControllers` | MIDI, the gamepad, the projector window; takes `hand` (useHand) and `setSelectedLiquidId` for the grid's pads (PLAN 30c) |
+| `usePadHits` | The grid's pads held on the plate (PLAN 30c): lib/padHits.ts's holds stepped at 30 Hz while any is held, each pad's tool, liquid and colour filled from the hand at the hit, Track Select's picks, each tool's Amount from the device knobs, the pads' LED colours; opens lib/padDoor.ts for the phone's pads |
+| `useCommandPalette` | the palette's commands, panel/section indexing, the `?` shortcut sheet state, and the keyboard; `openPanelNow`, a desk panel opened or brought forward on the tab in view (the Video dot, PLAN 14ag-9) |
 | `useCheckHooks` | the checks' `?debug` doors (`lib/checkHooks.ts` declares them) |
 | `useCrashState` | the black box's half from here |
 
-`shared.ts` holds what App and several hooks read: the look the page opens on, `randomLook` (the phone's Surprise me and a new song's look, through `pickLook`, PLAN 45a-13), the shapes
+`shared.ts` holds what App and several hooks read: the look the page opens on, `randomLook` (the phone's Random look and a new song's look, through `pickLook`, PLAN 45a-13), the shapes
 of an armed look and the wall's look, and the keys the sound and the room camera are kept
 under (`MAC_SYSTEM_AUDIO_KEY` since PLAN 14y-2: the Mac app's System audio, kept across a
 relaunch). A check that reads App's source as text reads App and these together

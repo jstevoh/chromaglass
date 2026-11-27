@@ -5,6 +5,10 @@ import { X, Printer, Eraser, Search } from 'lucide-react';
 import { ACTION_LABELS, LEARNABLE_SETTINGS, type MidiAction, type MidiTarget } from '../lib/midi';
 import { useMidiLastEvent, type MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
+import { DEFAULT_LIQUID_TYPES } from '../types';
+import { PAD_TOOL_LABELS } from '../lib/padTarget';
+
+const liquidName = (id: string): string => DEFAULT_LIQUID_TYPES.find(l => l.id === id)?.name ?? id;
 import { controlKey, type ControllerSurface as Surface, type SurfaceControl } from '../lib/controllerSurface';
 import { livePresetId } from '../presets';
 
@@ -32,6 +36,10 @@ const KIND_COLOUR: Record<MidiTarget['kind'], string> = {
   setlist: '#34d399',
   dye: '#ffffff',
   voices: '#f472b6',
+  pad: '#fb7185',
+  hand: '#e2e8f0',
+  toolAmount: '#38bdf8',
+  padLayout: '#fbbf24',
 };
 
 /**
@@ -61,10 +69,16 @@ function shortLabel(t: MidiTarget, presetName: (id: string) => string | undefine
     case 'setlist': return `Set #${t.index + 1}`;
     case 'dye': return PALETTE[t.paletteIndex]?.name ?? `Dye ${t.paletteIndex + 1}`;
     case 'voices': return 'Voices';
+    // A pad is a tool (and a colour, which it is drawn in); its row says the liquid.
+    case 'pad': return t.tool ? PAD_TOOL_LABELS[t.tool] : (t.liquid ? liquidName(t.liquid) : 'Hand');
+    case 'hand': return t.tool ? PAD_TOOL_LABELS[t.tool] : liquidName(t.liquid ?? '');
+    case 'toolAmount': return `${PAD_TOOL_LABELS[t.tool]} Size`;
+    case 'padLayout': return t.step > 0 ? 'Layout ▶' : '◀ Layout';
   }
 }
 
 function colourOf(t: MidiTarget): string {
+  if (t.kind === 'pad' && t.dye !== undefined) return PALETTE[t.dye]?.hex ?? KIND_COLOUR.pad;
   return t.kind === 'dye' ? (PALETTE[t.paletteIndex]?.hex ?? '#ffffff') : KIND_COLOUR[t.kind];
 }
 
@@ -526,7 +540,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
               <input
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
-                placeholder="Find a preset, dye, action or control"
+                placeholder="Find a look, dye, action or control"
                 aria-label="Filter what to assign"
                 className={`w-full rounded-lg pl-7 pr-2 py-1.5 text-xs border focus:outline-none ${paper ? 'bg-black/[0.03] border-black/15 focus:border-black/40' : 'bg-white/5 border-white/10 focus:border-white/40'}`}
                 data-testid="surface-filter"
@@ -534,7 +548,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
             </div>
 
             <div className="max-h-[52vh] overflow-y-auto pr-1 scrollbar-hide">
-              {section('Preset palettes', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
+              {section('Looks', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
               {section('Dyes', PALETTE.map((p, i) => ({ key: `dye-${i}`, label: p.name, swatch: p.hex, target: { kind: 'dye', paletteIndex: i } as MidiTarget })))}
               {section('Actions', (Object.keys(ACTION_LABELS) as MidiAction[]).map(a => ({ key: `action-${a}`, label: ACTION_LABELS[a], target: { kind: 'action', action: a } as MidiTarget })))}
               {section('Controls', LEARNABLE_SETTINGS.map(s => ({ key: `setting-${s.key}`, label: s.label, target: { kind: 'setting', key: s.key, min: s.min, max: s.max } as MidiTarget })))}

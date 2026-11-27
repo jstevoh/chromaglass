@@ -6,6 +6,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 - `fluid.ts` (12 KB): `KERNELS`, `kernel(name, format)`, `SIM_STRUCT`, `NOISE_WGSL`: the solver. An index: each pass's kernels are in `fluid/` (see its README), and this file joins them into the one table a pass is asked for by name.
 - `thinGap.ts` (52 KB, grep it): `thinGapKernels`, the flow between two glasses (Hele-Shaw), and `LIFT_GRID`, where the oil lift's and the sealed bottle's Ψ is solved (`fluid/seal.ts`).
+- `thinFlow.ts`: `FACE_STAR`, used by `hsDivergence`: what each face of the thin solve would carry before the pressure turns it, predicted from the face's own last velocity (the faces are the flow's state since PLAN 18a-8; hsGradient keeps them in the solver's `hsFlow` buffer, a vec4 a cell: east, north, the solve's P).
 - `thinWarm.ts`: `thinWarmKernels(HEAD, COMMON, ROWS0)`, spread into `thinGapKernels`: the thin solve's warm start fitted to each step (`hsWarmDot`, `hsWarmFit`, `hsWarmScale`; PLAN 38r-12), and `WARM_GROUPS`, `WARM_FIT` for the solver's buffer.
 - `plate.ts` (194 KB, grep it): `DISPLAY_MAIN`, `DERIVE_WGSL`, `FINISH_WGSL`, `plateWgsl`: the composite.
 - `plateFields.ts`: `PLATE_FIELDS`, `PLATE_STRUCT`, the composite's uniforms.
@@ -25,6 +26,8 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `camera.ts`, `cameraFields.ts`: camera pass.
 - `ferroDrop.ts`: closeup drop (`gapLc(gapMetres)`). `standing.ts`: domes (`filmTop(gapMetres)`).
 - `plateFilm.ts`: `FILM_FRAME_WGSL`, the film projector's frame on the plate (`filmFrame`, `filmOver`): Video Zoom, Across and Up, the frame's edge, its key and blend (PLAN 14ag).
+- `focus.ts`: `ROWS_WGSL`, `COLS_WGSL`, `FOCUS_TAPS`: each projector's defocus box, rows then columns, in linear light, and the finish (PLAN 51b, gpu/focus.ts).
+- `projectors.ts`: `PROJECTOR_WGSL`, the projector bank on the wall (PLAN 51a): `projectorLamps()` gives each projector's lamp its gain (`U.projA`, `U.projB`, from lib/projectorBank.ts), where the old fixed halving of Two Projectors was, and `wallAdd(a, b)` adds two projectors' pictures in linear light; `wallAdd` also keeps B's share of the light in `wallShare`, the display's third output, which the focus pass splits the picture by, and `onWall(c)` adds B's light under the front plate's (PLAN 51b); built into the plate shader after `LAMP_MIX_WGSL`; `npm run projectors` and `npm run lamp` (line 5) check it.
 - `plateLamp.ts`: `LAMP_MIX_WGSL`, the lamp under the front plate (`mixLamp`, moved from `plate.ts`) with the video as one of its rows, and `lampBendAt`, the liquid's refraction of the picture under it (thin-prism, grad((n − 1)h) from the derive pass's path and the view's depth), and `VIDEO_LAMP_DEPTH_M` (PLAN 14ag-3; `npm run videolamp`).
 - `plateThinFilm.ts`: `THIN_FILM_WGSL`, Thin Film's rings over the plate, the film's amount read through a B-spline (PLAN 1i; `npm run filmrings`).
 - `platePolar.ts`: `POLAR_WGSL`, polarised light on the finished stage (`polar`, the liquid's flow birefringence through polariser, quarter-wave plates and analyser, PLAN 31p-1; and with Dish Stress the moulded dish's stress in series with the liquid, `polarSeries`, PLAN 31p-3; `npm run polar`), and `VIEW_OPTICS`, the thin film's block and it, which the display's VIEW includes.
