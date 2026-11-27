@@ -43,7 +43,7 @@ import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, dishFollow, dishFrame, lookMotor, lookMotorRate } from '../lib/turntable';
 import { pointerOnPlate } from '../lib/pointerPlate';
-import { stageClocks, turnClocks } from '../lib/stageClocks';
+import { rackStage, stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
 import { levelHandTilt, makeHandTilt, stepHandTilt, tipPlate } from '../lib/handTilt';
@@ -285,7 +285,7 @@ const c01 = (v: number) => Math.max(0, Math.min(1, v));
 export type { LiquidVisualizerHandle };
 
 
-// ─── React Component ─────────────────────────────────────────────────
+// ─── React Component ────────────────────────────────────────
 
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
@@ -404,9 +404,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     a plate that never asks for it.
 
     While the back plate has dyes of its own a front Go is the front's: its
-    handoff thins and lays plate 0 only. It thinned every plate before, which
-    was right for twins and would wipe a back plate that had just been given
-    a look of its own.
+    handoff thins and lays plate 0 only (thinning both, right for twins, wiped
+    a back plate just given a look), and a focus dissolve racks A alone.
   */
   const backLookRef = useRef(new BackLook());
   const backDyesRef = useRef<{ id: string; contract: number[] | null; harmony: number[]; styles: string[]; liquids: string[] } | null>(null);
@@ -1699,6 +1698,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const now = showNow();
       handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null, phase };
     },
+    rack: (seconds, back, two) => rackStage(clocks, seconds, !!back, !backDyesRef.current, !!two),
     sendBack: (presetId, look, seconds, name = null, extras) => {
       // Not while a render has the plate (a pad pressed mid-render): the
       // render owns both plates until it hands back (see `resetStamps`).
@@ -2060,7 +2060,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // ── The show's own frame loop ─────────────────────────────────────
+    // ── The show's own frame loop ────────────────────────────
     // Engine-free: it decides what a frame is and hands it to whichever
     // renderer started (docs/webgpu-plan.md, P3). Both branches below build
     // one and call `startWith`.
@@ -2714,7 +2714,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           stepsPerSecRef.current += (simSteps / realDt - stepsPerSecRef.current) * k;
         }
 
-        // ── Drain animation ────────────────────────────────────
+        // ── Drain animation ───────────────────────────
         if (drainTriggerRef.current > lastDrainTrigger.current) {
           lastDrainTrigger.current = drainTriggerRef.current;
           drainFrameRef.current = 1;
@@ -2741,7 +2741,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
         }
 
-        // ── Clear trigger ──────────────────────────────────────
+        // ── Clear trigger ─────────────────────────────
         if (clearTriggerRef.current > lastClearTrigger.current) {
           lastClearTrigger.current = clearTriggerRef.current;
           const af = fluidsRef.current[activeLayerRef.current];
@@ -2749,7 +2749,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (activeLayerRef.current === 0) bubblesRef.current.clear();
         }
 
-        // ── Solver engine ──────────────────────────────────────
+        // ── Solver engine ─────────────────────────────
         // The GPU solver runs the same scheme at 2-4x the grid; the CPU solver
         // stays as the fallback for contexts without float render targets.
         const governor = governorRef.current!;
@@ -4723,7 +4723,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           harmony: harmonyRef.current,
           lamp: lampRef.current,
           magnets: magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
-          gelAngle: clocks.gel, moireTurn: clocks.moire, shutters: clocks.shutters,
+          gelAngle: clocks.gel, moireTurn: clocks.moire, shutters: clocks.shutters, rack: clocks.rack.share,
           kaleidoPhase: kaleidoPhaseRef.current,
           layer1: layer1ViewRef.current,
           bubbles: bubbleDebugRef.current,

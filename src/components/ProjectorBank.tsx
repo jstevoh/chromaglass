@@ -21,6 +21,10 @@ import { bankHasTwo } from '../lib/projectorBank';
  * Each projector's Focus sits under its lamp (PLAN 51b, lib/projectorFocus.ts):
  * the head's rack, sharp at the middle, so a knob learned to it rests sharp
  * and either way softens.
+ *
+ * Focus Dissolve sits last, under both (PLAN 51c, lib/focusDissolve.ts): how
+ * far a Go racks the projectors it changes out and back, the look changing
+ * behind the blur; 0 a Go fades as it always has.
  */
 export interface ProjectorBankProps {
   settings: VisualizerSettings;
@@ -30,7 +34,7 @@ export interface ProjectorBankProps {
   testId?: string;
 }
 
-type BankKey = 'projLampA' | 'projLampB' | 'projShutterA' | 'projShutterB' | 'projCross' | 'projFocusA' | 'projFocusB';
+type BankKey = 'projLampA' | 'projLampB' | 'projShutterA' | 'projShutterB' | 'projCross' | 'projFocusA' | 'projFocusB' | 'projRack';
 
 const valueOf = (s: VisualizerSettings, k: BankKey): number => {
   const v = s[k];
@@ -84,6 +88,7 @@ export function ProjectorBank({ settings, onSetting, touch = false, chips, testI
           A second projector, its own lamp and focus and an A/B crossfade come with Two Projectors, a back plate on its own blend, and the lamp ground.
         </p>
       )}
+      {slider('projRack', 'Focus Dissolve')}
     </div>
   );
 }

@@ -37,6 +37,35 @@
  *      convolved with B's box; A alone stays the sharp A within the finish's
  *      dither; and with the crossfade at the middle the wall is half of A
  *      sharp plus half of B soft, in linear light, within 1% of the lamp.
+ *
+ * And of the two things PLAN 51c added (lib/focusDissolve.ts, the melt's
+ * smaller pictures in gpu/focus.ts):
+ *
+ *   6. a melt taken down to a quarter (and, forced, a half) of a 1024 frame, and a dissolve's glow to an eighth, is
+ *      still the sharp picture through the law's box: within 2 levels where
+ *      it moves anything, edges within 10%, the light within 1%, and within
+ *      a few levels of the same melt drawn at full size (the control, which
+ *      also says the pass really drew small: its scale read back); a sharp A
+ *      beside a melted B stays sharp to the dither, B's melt drawn small;
+ *   7. the dissolve's timing, from outside its file: the rack is still at
+ *      both ends and widest once, at the middle; the look change runs inside
+ *      the rack's wider half, and the look fade's switch (lookFade's
+ *      blendLooks, where what cannot be halfway flips) lands on the widest
+ *      blur; a second Go mid-rack carries on from the blur it has reached;
+ *   8. a dissolve drawn through the real pass, the dish's detail (a slide of
+ *      dots) swapped at once at the rack's middle (the worst case: the app's
+ *      change is spread over the middle half): the frame's sharpness falls to
+ *      one minimum at the swap and climbs back, and the swap changes the
+ *      frame by under a third of what the same swap does sharp (a hard
+ *      cut). PLAN 51c asked a quarter, before anything was measured: a blur
+ *      hides edges, not where the light lies, so dots 2 to 5% of the frame
+ *      across swapped in one frame are 57% of a cut under the focus knob's
+ *      melt (a tenth of the frame) and 29% under the dissolve's glow (a
+ *      quarter), which is why the dial ramps on to a glow. The app never
+ *      swaps a whole dish in one frame (its handover runs over the middle
+ *      half); what flips at once is what cannot be halfway. A change of
+ *      palette over the whole plate is broader than any blur and is not
+ *      claimed at all (the first build's two pools against four: 93%).
  */
 import { build } from 'esbuild';
 import { openLab } from './lab.mjs';
@@ -51,12 +80,13 @@ const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3);
 
 const out = 'node_modules/.cache/projector-focus.mjs';
 await build({
-  stdin: { contents: "export * from './src/lib/projectorFocus.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { DRIFTABLE } from './src/lib/drift.ts'; export { RIG_KEYS } from './src/lib/lookFade.ts'; export { PATCH_TARGETS } from './src/lib/sceneMap.ts'; export { PIN_RANGE } from './src/lib/deskPins.ts';", resolveDir: '.', loader: 'ts' },
+  stdin: { contents: "export * from './src/lib/projectorFocus.ts'; export * from './src/lib/focusDissolve.ts'; export { blendLooks } from './src/lib/lookFade.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { DRIFTABLE } from './src/lib/drift.ts'; export { RIG_KEYS } from './src/lib/lookFade.ts'; export { PATCH_TARGETS } from './src/lib/sceneMap.ts'; export { PIN_RANGE } from './src/lib/deskPins.ts';", resolveDir: '.', loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
 const lens = await import(`../${out}`);
-const { focusDz, focusBlur, focusBoxPx, DEFAULT_SETTINGS, DRIFTABLE, RIG_KEYS, PATCH_TARGETS, PIN_RANGE } = lens;
+const { focusDz, focusBlur, focusBoxPx, focusScale, dissolveDz, rackShare, rackClock, walkRack, startRack, LOOK_FROM, LOOK_TO, blendLooks, DEFAULT_SETTINGS, DRIFTABLE, RIG_KEYS, PATCH_TARGETS, PIN_RANGE } = lens;
 const KEYS = ['projFocusA', 'projFocusB'];
+const RACK = 'projRack';
 
 // ── 0. The law, from outside its file ────────────────────────────────
 {
@@ -79,6 +109,53 @@ const KEYS = ['projFocusA', 'projFocusB'];
     `10 mm ${(100 * at10[0]).toFixed(3)}%/${(100 * at10[1]).toFixed(3)}% (typed here ${(100 * tenMm[0]).toFixed(3)}%); rack ${(100 * atRack[0]).toFixed(2)}%; end ${(100 * atEnd[0]).toFixed(2)}%; box at 1000 px ${f2(box[0])}/${f2(box[1])}, B with one projector ${box[2]}; rig ${rig ? 'yes' : 'no'}`);
 }
 
+// ── 7. The dissolve's timing (PLAN 51c), from outside its file ───────
+{
+  const N = 400;
+  const at = (p) => rackShare(p);
+  // Still at both ends (a hand starts and stops the knob), widest once, at the middle.
+  const ends = at(0) === 0 && at(1) === 0 && at(0.01) < 0.002 && at(0.99) < 0.002 && Math.abs(at(0.5) - 1) < 1e-9;
+  let peaks = 0;
+  for (let i = 1; i < N; i++) { const a = at((i - 1) / N), b = at(i / N), c = at((i + 1) / N); if (b > a && b >= c) peaks++; }
+  // The look change inside the wider half: the share past a half throughout.
+  let least = 1;
+  for (let i = 0; i <= N; i++) least = Math.min(least, at(LOOK_FROM + (LOOK_TO - LOOK_FROM) * i / N));
+  // Where the look fade flips what cannot be halfway (a blend mode), from the real blendLooks, mapped onto the rack.
+  const from = { ...DEFAULT_SETTINGS, backBlend: 'screen' }, to = { ...DEFAULT_SETTINGS, backBlend: 'multiply' };
+  let lo = 0, hi = 1;
+  for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (blendLooks(from, to, m).backBlend === 'multiply') hi = m; else lo = m; }
+  const flipAt = LOOK_FROM + (LOOK_TO - LOOK_FROM) * hi;
+  // A Go of 4 s from rest: the rack the whole 4 s, the change a second in, over 2 s.
+  const c = rackClock();
+  const plan = startRack(c, 1000, 4, true, false);
+  walkRack(c, 3000);
+  const mid = c.share[0], restB = c.share[1];
+  walkRack(c, 5000);
+  const done = c.share[0] === 0 && c.ms[0] === 0;
+  // A second Go 1.5 s into a 4 s rack (share about 0.85, on the way out): no snap, and its change waits only what is left of its quarter.
+  const c2 = rackClock();
+  startRack(c2, 0, 4, true, false);
+  walkRack(c2, 1500);
+  const before = c2.share[0];
+  const plan2 = startRack(c2, 1500, 4, true, false);
+  walkRack(c2, 1500);
+  const after = c2.share[0];
+  const rig = RIG_KEYS.has(RACK) && !DRIFTABLE.includes(RACK) && !PATCH_TARGETS.some(t => t.key === RACK) && PIN_RANGE.get(RACK)?.min === 0 && PIN_RANGE.get(RACK)?.max === 1 && DEFAULT_SETTINGS[RACK] === 0;
+  // The dial's half is the head's real rack, as the focus knob's is; its end a glow a quarter of the frame along the bar (0.8 m, typed here); the rack never sharpens a head already softer.
+  const box = new Float32Array(4), box2 = new Float32Array(4), box3 = new Float32Array(4), box4 = new Float32Array(4);
+  focusBoxPx(box, { projRack: 0.5 }, true, 1000, 1, [1, 0]);
+  focusBoxPx(box2, { projFocusA: 0.5 }, true, 1000, 1);
+  focusBoxPx(box3, { projFocusA: 1, projRack: 0.25 }, true, 1000, 1, [1, 1]);
+  focusBoxPx(box4, { projRack: 1 }, true, 1000, 1, [1, 0]);
+  const knobEnd = new Float32Array(4); focusBoxPx(knobEnd, { projFocusA: 1 }, true, 1000, 1);
+  const glow = 2 * box4[0] / 1000, glowTyped = 0.8 * 0.032 / 0.36 / 0.285;
+  const scaleLaw = Math.abs(box[0] - box2[0]) < 1e-4 && box[2] === 0 && Math.abs(box3[0] - knobEnd[0]) < 1e-4 && Math.abs(glow - glowTyped) < 1e-6 && glow > 0.2 && glow < 0.3 && dissolveDz(0) === 0;
+  check('the dissolve\'s timing, from outside its file: the rack is still at both ends and widest once, at the middle; the look change inside its wider half; the look fade\'s switch on the widest blur; a second Go mid-rack goes on from its blur; the dial the rig\'s, 0 to 1, off by default, its half the head\'s real rack as on the focus knob and its end a glow a quarter of the frame',
+    ends && peaks === 1 && least >= 0.5 - 1e-9 && at(flipAt) > 0.99 && Math.abs(plan.delayMs - 1000) < 1e-6 && Math.abs(plan.seconds - 2) < 1e-9
+      && Math.abs(mid - 1) < 1e-9 && restB === 0 && done && Math.abs(after - before) < 1e-6 && plan2.delayMs === 0 && plan2.seconds > 0 && rig && scaleLaw,
+    `peaks ${peaks}; least share in the change ${f3(least)}; the switch at ${f3(flipAt)} of the rack, share ${f3(at(flipAt))}; 4 s: change ${plan.delayMs} ms in over ${plan.seconds} s, middle ${f3(mid)}; again at 1.5 s: ${f3(before)} → ${f3(after)}, change in ${plan2.delayMs} ms over ${f3(plan2.seconds)} s; rig ${rig ? 'yes' : 'no'}; the dial's end ${(100 * glow).toFixed(1)}% of the frame (typed here ${(100 * glowTyped).toFixed(1)}%)`);
+}
+
 // ── The plates ───────────────────────────────────────────────────────
 const S = 256;
 const NEUTRAL = { saturationBoost: 1, granulation: 0, boundaryContrast: 0, edgeRelief: 0, beads: 0, lacing: 0, cells: 0, glossiness: 0,
@@ -86,6 +163,9 @@ const NEUTRAL = { saturationBoost: 1, granulation: 0, boundaryContrast: 0, edgeR
 const TWO = { layerCount: 2, twoProjectors: 1 };
 const BACK = { backPlate: true, backRotation: Math.PI };
 const SET = [0.25, 0.5, 1];
+const BIG = 1024, FRAMES = 16;
+// The dissolve's dial where its depth is the focus knob's melt, 0.32 m (typed here: the dial's second half runs 0.075 to 0.8 m).
+const MELT_DIAL = 0.5 + (0.32 - 0.075) / (0.8 - 0.075) / 2;
 
 const lab = await openLab();
 let shots;
@@ -136,6 +216,79 @@ try {
     o.litMid = await r2({ ...TWO, ...LIT, projCross: 0.5, projFocusB: 0.75 }, BACK);
     return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.from(v)]));
   }, [S, NEUTRAL, TWO, BACK, BLUE, TEAL, SET]);
+  /*
+    A melt taken down (PLAN 51b-3): at 1024 the knob's end is a box 204 by
+    102 pixels, 51 by 26 at a quarter, so the pass draws it at a quarter; the
+    same melt forced to a half, and to full size, where its 32 taps a row lie
+    six pixels apart; with the scale each drew at. One picture a call, as
+    bytes: a frame this size as a list of numbers is more than the page holds.
+  */
+  const big = async (name, plate, over, cam = {}) => {
+    const [b64, scale] = await lab.page.evaluate(async ([BIG, N, BLUE, TEAL, TWO, BACK, plate, over, cam]) => {
+      if (plate === 'slide') {
+        await lab.create(128); lab.dye(0.75, 0.25, 0.08, BLUE, 0.9); lab.dye(0.25, 0.75, 0.08, TEAL, 0.9); lab.flush(); await lab.step(1);
+      } else if (plate === 'two') {
+        await lab.create(128); lab.dye(0.38, 0.5, 0.17, BLUE, 0.6); lab.dye(0.62, 0.36, 0.1, TEAL, 0.8); lab.flush(); await lab.step(1);
+      }
+      const slide = new OffscreenCanvas(BIG, BIG);
+      { const g = slide.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, BIG, BIG); g.fillStyle = 'hsl(220, 85%, 45%)'; g.fillRect(BIG * 0.3, BIG * 0.3, BIG * 0.4, BIG * 0.4); }
+      const px = await lab.render(BIG, plate === 'two' || plate === 'twoKeep' ? { ...N, ...TWO, ...over } : { ...N, filmMix: 1, markMix: 0, ...over },
+        plate === 'two' || plate === 'twoKeep' ? { ...BACK, ...cam } : { film: slide, ...cam });
+      const bytes = new Uint8Array(px);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return [btoa(bin), lab.focusScale()];
+    }, [BIG, NEUTRAL, BLUE, TEAL, TWO, BACK, plate, over, cam]);
+    shots[name] = Buffer.from(b64, 'base64');
+    shots.scales[name] = scale;
+  };
+  /*
+    A dissolve (PLAN 51c) through the real pass at 256, the rack's share as
+    the stage clocks hand it to the frame. What the swap changes at once is
+    the dish's detail, finer than the melt: a slide of 160 dots, blue and
+    amber on clear glass, until the middle, then another slide of as many
+    dots of the same colours laid elsewhere, swapped at once. (A change of
+    the palette over the whole plate is broader than any blur, and is not
+    what a rack hides: the look fade carries it over the middle half.)
+  */
+  await lab.page.evaluate(async () => { await lab.create(128); lab.flush(); await lab.step(1); });
+  const rack = async (name, p, slide, depth = 1) => {
+    const b64 = await lab.page.evaluate(async ([S, N, p, slide, depth]) => {
+      const c = new OffscreenCanvas(S, S), g = c.getContext('2d');
+      let x = slide ? 1234567 : 7;
+      const rnd = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+      g.fillStyle = '#fff'; g.fillRect(0, 0, S, S);
+      for (let i = 0; i < 160; i++) {
+        g.fillStyle = i % 2 ? 'hsl(220, 85%, 45%)' : 'hsl(35, 90%, 50%)';
+        g.beginPath(); g.arc(rnd() * S, rnd() * S, 3 + 4 * rnd(), 0, 2 * Math.PI); g.fill();
+      }
+      const sh = p > 0 && p < 1 ? Math.sin(Math.PI * p) ** 2 : 0;
+      const bytes = new Uint8Array(await lab.render(S, { ...N, filmMix: 1, markMix: 0, projRack: depth }, { film: c, rack: [sh, 0] }));
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(bin);
+    }, [S, NEUTRAL, p, slide, depth]);
+    shots[name] = Buffer.from(b64, 'base64');
+  };
+  for (let i = 0; i <= FRAMES; i++) await rack(`dis${i}`, i / FRAMES, i < FRAMES / 2 ? 0 : 1);
+  // The controls: the same swap with the rack at rest (a cut), and racked only to the focus knob's melt, a tenth of the frame (the dial at MELT_DIAL).
+  await rack('cutX', 0, 0);
+  await rack('cutY', 0, 1);
+  await rack('meltX', (FRAMES / 2 - 1) / FRAMES, 0, MELT_DIAL);
+  await rack('meltY', 0.5, 1, MELT_DIAL);
+  shots.scales = {};
+  await big('bigSharp', 'slide', {});
+  await big('bigMelt', 'keep', { projFocusA: 1 });
+  await big('bigHalf', 'keep', { projFocusA: 1 }, { focusMax: 2 });
+  await big('bigFull', 'keep', { projFocusA: 1 }, { focusMax: 1 });
+  // A dissolve's glow at its widest: a box a quarter of the frame along the bar, drawn at an eighth.
+  await big('bigGlow', 'keep', { projRack: 1 }, { rack: [1, 0] });
+  // Two projectors, B melted beside a sharp A.
+  await big('bigTwoA', 'two', { projCross: 0 });
+  await big('bigTwoB', 'twoKeep', { projCross: 1 });
+  await big('bigTwoAmeltB', 'twoKeep', { projCross: 0, projFocusB: 1 });
+  await big('bigTwoBmelt', 'twoKeep', { projCross: 1, projFocusB: 1 });
+  await big('bigTwoMid', 'twoKeep', { projCross: 0.5, projFocusB: 1 });
 } finally { await lab.close(); }
 
 const lin = (v) => Math.pow(Math.max(0, v) / 255, 2.2);
@@ -144,7 +297,7 @@ const maxDiff = (a, b) => { let m = 0; for (let k = 0; k < a.length; k++) if (k 
 const meanLin = (img) => { let s = 0, n = 0; for (let k = 0; k < img.length; k++) if (k % 4 !== 3) { s += lin(img[k]); n++; } return s / n; };
 
 /* The law's box over a picture, in linear light: half-widths hx, hy pixels, each pixel weighed by how much of it the box covers, the frame's edge held (as the sampler clamps). */
-function boxed(img, hx, hy) {
+function boxed(img, hx, hy, S = img.length === 4 * BIG * BIG ? BIG : 256) {
   const L = new Float64Array(S * S * 3);
   for (let p = 0; p < S * S; p++) for (let c = 0; c < 3; c++) L[p * 3 + c] = lin(img[p * 4 + c]);
   const weights = (h) => {
@@ -172,13 +325,13 @@ function boxed(img, hx, hy) {
 const edgeAbs = (a, b, sharp, want) => { let s = 0, n = 0; for (let k = 0; k < a.length; k++) if (k % 4 !== 3 && Math.abs(want[k] - sharp[k]) > 2) { s += Math.abs(a[k] - b[k]); n++; } return n ? s / n : NaN; };
 const meanAbs = (a, b) => { let s = 0, n = 0; for (let k = 0; k < a.length; k++) if (k % 4 !== 3) { s += Math.abs(a[k] - b[k]); n++; } return s / n; };
 /* The pool's 10–90% edge width on its row (axis x) or column (axis y) through the middle, its left or top edge: where the blue's red channel climbs from the pool's to the glass's. */
-function edgeWidth(img, axis) {
+function edgeWidth(img, axis, S = img.length === 4 * BIG * BIG ? BIG : 256) {
   const at = (i) => { const x = axis === 'x' ? i : S / 2, y = axis === 'x' ? S / 2 : i; return img[(y * S + x) * 4]; };
   const lo = at(S / 2), hi = at(Math.round(S * 0.18));
   const cross = (t) => { const v = hi + (lo - hi) * t; for (let i = Math.round(S * 0.18); i < S / 2; i++) { const a = at(i), b = at(i + 1); if ((a - v) * (b - v) <= 0 && a !== b) return i + (v - a) / (b - a); } return NaN; };
   return cross(0.9) - cross(0.1);
 }
-const boxOf = (k, hb = false) => { const b = new Float32Array(4); focusBoxPx(b, hb ? { projFocusB: k } : { projFocusA: k }, hb, S, 1); return hb ? [b[2], b[3]] : [b[0], b[1]]; };
+const boxOf = (k, hb = false, size = S) => { const b = new Float32Array(4); focusBoxPx(b, hb ? { projFocusB: k } : { projFocusA: k }, hb, size, 1); return hb ? [b[2], b[3]] : [b[0], b[1]]; };
 
 // ── 1. The default does nothing ──────────────────────────────────────
 {
@@ -250,6 +403,84 @@ const boxOf = (k, hb = false) => { const b = new Float32Array(4); focusBoxPx(b, 
   const flipMoved = edgeAbs(shots.flipSoft, shots.flipSharp, shots.flipSharp, boxed(shots.flipSharp, hx, hy));
   check('drawn into a texture (flipped, as for the camera or a projector), racked is the sharp picture through the same box, the right way up',
     flipErr < 2 && flipMoved > 3 * flipErr, `off the box ${f2(flipErr)} levels, sharp ${f2(flipMoved)}`);
+}
+
+// ── 6. A melt drawn at a smaller picture (PLAN 51b-3) ────────────────
+{
+  const sc = shots.scales;
+  const [hx, hy] = boxOf(1, false, BIG);
+  const want = boxed(shots.bigSharp, hx, hy);
+  const read = (name) => {
+    const got = shots[name];
+    const err = edgeAbs(got, want, shots.bigSharp, want), errSharp = edgeAbs(got, shots.bigSharp, shots.bigSharp, want);
+    const wx = edgeWidth(got, 'x'), wy = edgeWidth(got, 'y'), wantX = edgeWidth(want, 'x'), wantY = edgeWidth(want, 'y');
+    const widthOff = Math.max(Math.abs(wx - wantX) / wantX, Math.abs(wy - wantY) / wantY);
+    const light = Math.abs(meanLin(got) - meanLin(shots.bigSharp)) / meanLin(shots.bigSharp);
+    return { err, errSharp, widthOff, light, line: `${name.slice(3).toLowerCase()} (drew at ${sc[name]}): off the box ${f2(err)} levels (sharp ${f2(errSharp)}), edge ${f2(wx)}/${f2(wy)} px against ${f2(wantX)}/${f2(wantY)}, light ${(100 * light).toFixed(3)}%` };
+  };
+  const q = read('bigMelt'), h = read('bigHalf'), full = read('bigFull');
+  const good = (r) => r.err < 2 && r.errSharp > 3 * r.err && r.widthOff < 0.1 && r.light < 0.01;
+  const vsFull = Math.max(meanAbs(shots.bigMelt, shots.bigFull), meanAbs(shots.bigHalf, shots.bigFull));
+  check(`a melt on a ${BIG} frame (a box ${f2(2 * hx)} by ${f2(2 * hy)} pixels) drawn at a quarter and, forced, at a half is the sharp picture through the law's bar: within 2 levels where it moves anything, edges within 10%, the light within 1%, and within a level on average of the same melt drawn at full size; the pass says the scale it drew at`,
+    sc.bigMelt === 4 && sc.bigHalf === 2 && sc.bigFull === 1 && good(q) && good(h) && vsFull < 1,
+    `${[q.line, h.line, full.line].join('; ')}; against the full-size melt ${f2(vsFull)} levels on average`);
+  {
+    const g = new Float32Array(4); focusBoxPx(g, { projRack: 1 }, false, BIG, 1, [1, 0]);
+    const wantG = boxed(shots.bigSharp, g[0], g[1]);
+    const errG = edgeAbs(shots.bigGlow, wantG, shots.bigSharp, wantG), sharpG = edgeAbs(shots.bigGlow, shots.bigSharp, shots.bigSharp, wantG);
+    const lightG = Math.abs(meanLin(shots.bigGlow) - meanLin(shots.bigSharp)) / meanLin(shots.bigSharp);
+    check(`a dissolve's glow on a ${BIG} frame (a box ${f2(2 * g[0])} by ${f2(2 * g[1])} pixels) drawn at an eighth is the sharp picture through the law's bar within 2 levels where it moves anything, the light within 1%`,
+      sc.bigGlow === 8 && errG < 2 && sharpG > 3 * errG && lightG < 0.01, `drew at ${sc.bigGlow}; off the box ${f2(errG)} levels (sharp ${f2(sharpG)}); light ${(100 * lightG).toFixed(3)}%`);
+  }
+  // B melted beside a sharp A: A untouched (it is not taken down), B's melt drawn small and boxed.
+  const [bx, by] = boxOf(1, true, BIG);
+  const wantB = boxed(shots.bigTwoB, bx, by);
+  const errB = edgeAbs(shots.bigTwoBmelt, wantB, shots.bigTwoB, wantB), sharpB = edgeAbs(shots.bigTwoBmelt, shots.bigTwoB, shots.bigTwoB, wantB);
+  const keptA = maxDiff(shots.bigTwoAmeltB, shots.bigTwoA);
+  let worst = 0;
+  for (let k = 0; k < shots.bigTwoMid.length; k++) if (k % 4 !== 3) worst = Math.max(worst, Math.abs(shots.bigTwoMid[k] - disp(0.5 * lin(shots.bigTwoA[k]) + 0.5 * lin(shots.bigTwoBmelt[k]))));
+  check(`two projectors on a ${BIG} frame, B melted beside a sharp A: drawn at a quarter, A stays sharp to the dither, B is its box, and the crossfade's middle is half of each in linear light within 1% of the lamp`,
+    sc.bigTwoAmeltB === 4 && sc.bigTwoBmelt === 4 && keptA <= 1 && errB < 2 && sharpB > 3 * errB && worst <= 2.6,
+    `scales ${sc.bigTwoAmeltB}/${sc.bigTwoBmelt}; A ${keptA} levels from sharp; B off its box ${f2(errB)} (sharp ${f2(sharpB)}); the middle's worst ${f2(worst)} levels`);
+  // The law's choice of scale, at the sizes that matter (a 1600 frame, the Air's).
+  const at = (k, two = false, kb = 0) => { const b = new Float32Array(4); focusBoxPx(b, { projFocusA: k, projFocusB: kb }, two, 1600, 1); return focusScale(b, two); };
+  const glowAt = (two) => { const b = new Float32Array(4); focusBoxPx(b, { projRack: 1 }, two, 1600, 1, [1, 1]); return focusScale(b, two); };
+  const choice = [at(0), at(0.25), at(0.5), at(1), at(1, true, 1), at(1, true, 0), at(1, true, 0.25), glowAt(false), glowAt(true)];
+  check('the scale for a 1600 frame: sharp, a quarter rack and the rack\'s end at full size; a melt at a quarter, two melts at a quarter, a melt beside a sharp one at a quarter, a melt beside a soft one at full size; a dissolve\'s glow, one or two, at an eighth',
+    choice.join() === [1, 1, 1, 4, 4, 4, 1, 8, 8].join(), choice.join(', '));
+}
+
+// ── 8. A dissolve through the real pass (PLAN 51c) ───────────────────
+{
+  const lum = (img, k) => 0.2126 * img[k] + 0.7152 * img[k + 1] + 0.0722 * img[k + 2];
+  /* The Laplacian's variance (the watch skill's sharpness), on 4 by 4 pixel means: one pixel's own is the finish's dither once the picture is soft, a floor with no minimum to find. */
+  const B = 4, M = S / B;
+  const sharpness = (img) => {
+    const m = new Float64Array(M * M);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) m[((y / B) | 0) * M + ((x / B) | 0)] += lum(img, (y * S + x) * 4) / (B * B);
+    let s = 0, s2 = 0, n = 0;
+    for (let y = 1; y < M - 1; y++) for (let x = 1; x < M - 1; x++) {
+      const k = y * M + x;
+      const v = 4 * m[k] - m[k - 1] - m[k + 1] - m[k - M] - m[k + M];
+      s += v; s2 += v * v; n++;
+    }
+    return s2 / n - (s / n) ** 2;
+  };
+  const sh = [];
+  for (let i = 0; i <= FRAMES; i++) sh.push(sharpness(shots[`dis${i}`]));
+  const swap = FRAMES / 2;
+  const eps = 1e-6 * Math.max(...sh);
+  let down = true, up = true;
+  for (let i = 0; i < swap - 1; i++) down = down && sh[i + 1] <= sh[i] + eps;
+  for (let i = swap; i < FRAMES; i++) up = up && sh[i + 1] >= sh[i] - eps;
+  const min = sh.indexOf(Math.min(...sh));
+  const atSwap = meanAbs(shots[`dis${swap - 1}`], shots[`dis${swap}`]);
+  const cut = meanAbs(shots.cutX, shots.cutY);
+  const ends = maxDiff(shots.dis0, shots.cutX) === 0 && maxDiff(shots[`dis${FRAMES}`], shots.cutY) === 0;
+  const atMelt = meanAbs(shots.meltX, shots.meltY);
+  check('a dissolve through the real pass, the dish\'s detail swapped at once at the rack\'s middle: the frame\'s sharpness falls to one minimum at the swap and climbs back, the swap moves the frame by under a third of the same swap sharp (a cut), where racked only to the focus knob\'s melt it does not; the rack ends where it began, sharp to the byte',
+    down && up && (min === swap - 1 || min === swap) && atSwap < cut / 3 && atMelt > cut / 3 && ends,
+    `sharpness ${sh.map(v => v.toFixed(2)).join(' ')}; least at frame ${min} of ${FRAMES}; the swap ${f2(atSwap)} levels on average against a cut's ${f2(cut)} (${(100 * atSwap / cut).toFixed(0)}%); racked only to the knob's melt (the control) ${f2(atMelt)} (${(100 * atMelt / cut).toFixed(0)}%)`);
 }
 
 const failed = checks.filter(c => !c.ok).length;

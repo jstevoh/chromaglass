@@ -316,7 +316,7 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Video on LED Ring, which moves the picture under the dish (PLAN 14ag-9).
 // Nor the projector bank's lamps, shutters and crossfade, the operator's hands (PLAN 51a).
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
-  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
@@ -554,6 +554,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // Each projector's focus (PLAN 51b): the head's rack, sharp at the middle.
   { key: 'projFocusA',      label: 'Focus A',          min: -1, max: 1 },
   { key: 'projFocusB',      label: 'Focus B',          min: -1, max: 1 },
+  // A look change racked out and back (PLAN 51c): 0 off, a half the head's full rack, 1 a glow.
+  { key: 'projRack',        label: 'Focus Dissolve',   min: 0, max: 1 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },

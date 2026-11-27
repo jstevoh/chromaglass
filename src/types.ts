@@ -730,7 +730,9 @@ export interface VisualizerSettings {
     light; it fades only with Two Projectors on a back plate. Defaults are
     today's picture. Each focus is its head's rack (PLAN 51b,
     lib/projectorFocus.ts), -1 to 1, 0 sharp: the first half either way the
-    rack's real travel, past it a ramp to a melt.
+    rack's real travel, past it a ramp to a melt. The focus dissolve (PLAN
+    51c, lib/focusDissolve.ts) is how far a Go racks them out and back, on the
+    same scale, 0 off.
   */
   projLampA?: number;
   projLampB?: number;
@@ -739,6 +741,7 @@ export interface VisualizerSettings {
   projCross?: number;
   projFocusA?: number;
   projFocusB?: number;
+  projRack?: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -1271,6 +1274,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   projCross: 0.5,
   projFocusA: 0,
   projFocusB: 0,
+  projRack: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second

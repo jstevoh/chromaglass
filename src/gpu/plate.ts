@@ -558,7 +558,7 @@ export class WebGPUPlate {
     if (focusOn && aux) {
       const into = this.focus.targets(size.width, size.height, two);
       this.display(encoder, into.scene, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, true, FOCUS_SCENE_FORMAT, { view: into.share, pipe: focusPipe });
-      this.focus.run(encoder, target, toTexture, format, this.uniformBuffer, this.sampler, this.source('mark'), two);
+      this.focus.run(encoder, target, toTexture, format, this.uniformBuffer, this.sampler, this.source('mark'), two, this.pack.get('projFocus'));
       return;
     }
     this.display(encoder, target, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, toTexture, format);

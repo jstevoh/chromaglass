@@ -144,6 +144,8 @@ export interface FrameView {
   dimmerGain: number;
   /** Where each projector's shutter vane is, 0 open to 1 shut, as the loop walks it (lib/projectorBank.ts, PLAN 51a). */
   shutters?: ArrayLike<number>;
+  /** Each projector's share of a focus dissolve's rack, A's then B's (lib/focusDissolve.ts, PLAN 51c). */
+  rack?: ArrayLike<number>;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
