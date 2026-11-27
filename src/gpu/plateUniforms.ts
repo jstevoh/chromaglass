@@ -24,6 +24,7 @@ import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
+import { projectorGains } from '../lib/projectorBank';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 import { BIREF_NM_PER_STRAIN } from '../lib/polar';
@@ -83,6 +84,8 @@ export interface PlateView {
   bubblePack: { packed: Float32Array; shape: Float32Array };
   /** The flash guard's gain, from the luminance the last frame read back. */
   dimmerGain: number;
+  /** Where each projector's shutter vane is, 0 open to 1 shut, as the frame walks it (lib/projectorBank.ts); left out, where the settings put it. */
+  shutters?: ArrayLike<number>;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
@@ -165,6 +168,9 @@ export interface PlateContext {
  * Fill `pack` from `ctx`. Every one of the layout's fields is written, in the
  * order the WebGL path sets them, so the two can be read side by side.
  */
+/** The bank's gains, filled each frame (no per-frame array). */
+const bankGains = new Float32Array(8);
+
 export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   const { view, fluids, width, height } = ctx;
   const s = view.settings;
@@ -386,7 +392,14 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     // On the LED ring (PLAN 14ag-9) the video is in the lamp wherever the
     // mixer's arrows left its row: the ring is under the glass by definition.
     const videoLamp = filmOn && (pos.film < pos.front || filmRing) ? fm : 0;
-    pack.set('lampGround', !photo ? ground + (1 - ground) * videoLamp : 0);
+    const lampGround = !photo ? ground + (1 - ground) * videoLamp : 0;
+    pack.set('lampGround', lampGround);
+    // The projector bank (PLAN 51a, lib/projectorBank.ts): two projectors only
+    // where the shader adds them, on a lamp ground with a back plate.
+    const two = (s.twoProjectors ?? 0) > 0.5 && fluids.length > 1 && lampGround > 0.001;
+    projectorGains(bankGains, s, two, view.shutters);
+    pack.set('projA', bankGains[0], bankGains[1], bankGains[2], bankGains[3]);
+    pack.set('projB', bankGains[4], bankGains[5], bankGains[6], bankGains[7]);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     // The clear film's dye (PLAN 20b-13): the colour one unit lets through, and the dial.

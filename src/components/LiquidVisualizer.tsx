@@ -4536,10 +4536,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
 
         // ── What the frame is, before anything is drawn ───────
-        // These six advance once per rendered frame, and used to advance
-        // inside the draw below — which made them the renderer's business
-        // rather than the show's. They are the same numbers in the same
-        // order; the draw now only reads them. (docs/webgpu-plan.md, P3.)
+        // These advance once per rendered frame, here and not in the draw
+        // below, which made them the renderer's business rather than the
+        // show's; the draw only reads them (docs/webgpu-plan.md, P3).
 
         // How far the macro detail slides with the paint: plate-uv per unit
         // of the cell clock per unit of the solver's velocity, which the
@@ -4721,7 +4720,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           harmony: harmonyRef.current,
           lamp: lampRef.current,
           magnets: magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
-          gelAngle: clocks.gel, moireTurn: clocks.moire,
+          gelAngle: clocks.gel, moireTurn: clocks.moire, shutters: clocks.shutters,
           kaleidoPhase: kaleidoPhaseRef.current,
           layer1: layer1ViewRef.current,
           bubbles: bubbleDebugRef.current,

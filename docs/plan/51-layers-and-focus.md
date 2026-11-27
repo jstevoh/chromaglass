@@ -51,8 +51,9 @@ keys (the operating rules), and each is its own thread.
 
 ## 51a. One plate fades; projectors don't
 
-*Proposed. M on today's two plates, then L with 16d. Claude for the light and the shader,
-Antigravity for the MIDI layout and the phone.*
+*Shipped on today's two plates 2026-11-27 (Lamp A and B, Shutter A and B, A/B Crossfade at the
+top of the Mixer, so on the desk, the settings sheet, the phone and the remote; MIDI-learnable;
+`lib/projectorBank.ts`, `gpu/wgsl/projectors.ts`; `npm run projectors`). Four plates are 51a-3.*
 
 A show is several projectors with their own lamps and shutters, mixed live; ours has two
 plates and a Mixer level per row, no crossfader and no shutter. Model the wall as each
@@ -69,6 +70,36 @@ Ship first on the two plates plus the film and LED rows, then on 16d's four.
 Check first: a lab render with two projectors at known lamp levels, the wall's linear sum
 within 1% of the two alone added, the crossfade's mean light flat within 2% across its
 travel, and a dimmed lamp's white point moving warm by the law's amount.
+
+What shipped, measured (`npm run projectors`, 6 of 6, on the lab's software WebGPU): the
+defaults multiply nothing, to the byte, one projector and two; a lamp at 0.6 is the law's
+colour on clear glass to 0.005 per channel (0.506/0.448/0.338 of the lamp in display values);
+a shutter half across dims every lit pixel to 0.730 (0.5 to 1/2.2) within 0.008, the frame's
+edge as its middle; the crossfade's centre is half of each projector alone in linear light,
+worst 1.32 levels of 255, where the old display-value sum is off by 5.8 on average; the wall's
+mean light across the crossfade is linear to 0.02%, and a bare lamp flat to 0.00%. The old
+`npm run lamp` line 5 now asks for the linear sum (9 of 9). No shipped look had Two Projectors
+on, so moving the add into linear light moved no saved look.
+
+Found while building it, not done:
+
+- **51a-2 · A lamp may follow the sound** (S). A colour organ is a 1960s light show's own
+  tool: lamps on the bass, mids and highs. The bank's keys are hands only for now (sceneMap's
+  NOT_A_TARGET), as the house dimmer is; a cord on a lamp would need the flash guard's limit
+  and the lamp's thermal lag (51a-5) so a kick does not strobe the wall.
+- **51a-3 · Four projectors** (L, with 16d). Two plates are the most the plate composites
+  (`LiquidVisualizer.tsx`, `Math.min(2, …)`); each projector is one more solver. Measure the
+  frame on the Air through the film queue at three and four (numbers only), degrade to fewer
+  solver steps on the back projectors before dropping one, and expect the MacBook Pro to carry
+  more.
+- **51a-4 · The film and LED rows on a side of the crossfade** (S). The film projector and the
+  LED ring are projectors too; each could be put on A, B or neither, so one fader takes the
+  plate down and a film up.
+- **51a-5 · A lamp has thermal lag** (S). A tungsten filament takes about 0.1 to 0.3 s to heat
+  and cool (its heat capacity over the power it radiates), so a variac yanked to zero glows
+  down rather than cuts, and an overdriven lamp rises slower than it falls. The fader is
+  instantaneous today; the lag is the filament's temperature as a first-order state, walked on
+  the stage clocks as the shutters are.
 
 ## 51b. Each layer is always sharp, and focus never moves
 

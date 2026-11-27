@@ -76,8 +76,13 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   a patch or LFO must not flip it mid-song.
   Video on LED Ring (PLAN 14ag-9) moves the video under the dish; a hand's
   choice, the same way.
+  The projector bank's lamps, shutters and crossfade (PLAN 51a) are the
+  operator's hands on the rig, as the house dimmer is: a cord riding a
+  shutter or the crossfade on the beat would flash the wall between
+  projectors. Whether a lamp may follow the sound (a colour organ) is 51a-2.
 */
 const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',

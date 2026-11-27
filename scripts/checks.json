@@ -3651,6 +3651,19 @@
       ]
     },
     {
+      "name": "The projector bank",
+      "shard": "open",
+      "run": "npm run projectors",
+      "why": [
+        "Projectors that blend on the wall (PLAN 51a): a lamp on its variac dims",
+        "as v^3.4 and warms as v^0.42, a shutter at the lens dims the whole picture",
+        "evenly by the pupil's uncovered segment, two projectors add in linear",
+        "light, and the A/B crossfade keeps the wall's mean light linear in its",
+        "travel. The defaults multiply nothing, to the byte. Beside `lampfield`",
+        "in the open shard."
+      ]
+    },
+    {
       "name": "The heat",
       "shard": "open",
       "run": "npm run heat",

@@ -314,6 +314,7 @@
     "lampzero": "node scripts/lampzero.mjs",
     "moire": "node scripts/moire.mjs",
     "lampfield": "node scripts/lampfield.mjs",
+    "projectors": "node scripts/projectors.mjs",
     "litstage": "node scripts/litstage.mjs",
     "milk": "node scripts/milk.mjs",
     "colours": "node scripts/colours.mjs",

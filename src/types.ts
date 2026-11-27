@@ -698,6 +698,20 @@ export interface VisualizerSettings {
   layerCount: number;
   blendMode: BlendMode;
   twoProjectors: number;
+  /*
+    The projector bank (PLAN 51a, lib/projectorBank.ts): the operator's hands
+    on the rig, not a look's (lookFade's RIG_KEYS). Each lamp is its variac,
+    0 to VARIAC_MAX (4/3, 160 V on a 120 V lamp), 1 the rated voltage: light
+    as v^3.4, colour temperature as v^0.42. A shutter is its vane, 0 open to
+    1 shut, walked there in 80 ms. The crossfade is A at 0, B at 1, linear in
+    light; it fades only with Two Projectors on a back plate. Defaults are
+    today's picture.
+  */
+  projLampA?: number;
+  projLampB?: number;
+  projShutterA?: number;
+  projShutterB?: number;
+  projCross?: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -1224,6 +1238,11 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   layerCount: 1,
   blendMode: 'screen',
   twoProjectors: 0,
+  projLampA: 1,
+  projLampB: 1,
+  projShutterA: 0,
+  projShutterB: 0,
+  projCross: 0.5,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second

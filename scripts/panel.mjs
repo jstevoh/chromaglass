@@ -172,7 +172,25 @@ const mixerOff = [...MIX_CONTROLS, ...FADE_CONTROLS].filter(c => {
 });
 check('and every one of them is in the registry at its own range, in the Mixer section', mixerOff.length === 0,
   mixerOff.map(c => String(c.key)).join(', '));
-const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : [...MIX_CONTROLS, ...FADE_CONTROLS].map(c => String(c.key)))]);
+/*
+  And the projector bank at the Mixer's top (PLAN 51a, components/ProjectorBank.tsx):
+  each lamp and the crossfade a slider, each shutter a button, drawn by the
+  Mixer wherever it is, so they count as drawn only when the Mixer's own
+  chain holds and the bank is in it, takes its range from the registry and
+  offers the chips; the keys are the ones the bank's file names.
+*/
+const bankSrc = readFileSync(join(root, 'src/components/ProjectorBank.tsx'), 'utf8');
+const bankLinks = {
+  'the Mixer draws the bank, with its chips': /<ProjectorBank\b[^>]*chips=\{chips\}/.test(mixerSrc),
+  'at the registry\'s range': /PIN_RANGE\.get\(k\)/.test(bankSrc) && /min=\{spec\.min\}/.test(bankSrc) && /max=\{spec\.max\}/.test(bankSrc),
+  'offering the chips beside each': /chips\(k\)/.test(bankSrc),
+};
+const bankKeys = [...bankSrc.matchAll(/(?:slider|shutter)\('(proj[A-Za-z]+)'/g)].map(m => m[1]);
+const bankBroken = Object.entries(bankLinks).filter(([, ok]) => !ok).map(([k]) => k);
+check('and the projector bank at its top, from the registry', bankBroken.length === 0 && brokenLinks.length === 0 && bankKeys.length === 5,
+  bankBroken.length ? `missing: ${bankBroken.join('; ')}` : bankKeys.join(', '));
+const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : [...MIX_CONTROLS, ...FADE_CONTROLS].map(c => String(c.key))),
+  ...(bankBroken.length || brokenLinks.length ? [] : bankKeys)]);
 const ghosts = PINNABLE.filter(s => !drawn.has(String(s.key)));
 check('and nothing in the registry is invisible in the panel', ghosts.length === 0,
   ghosts.length ? ghosts.map(s => `${s.label} (${String(s.key)})`).join(', ') : 'all of them have a slider');
