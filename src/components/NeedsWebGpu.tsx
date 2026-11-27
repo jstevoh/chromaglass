@@ -86,7 +86,7 @@ export function NeedsWebGpu({ failure, onRetry }: { failure: GpuFailure['failure
             How to turn it on
           </button>
           <a
-            href="https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API#browser_compatibility"
+            href="https://github.com/jstevoh/chromaglass/blob/main/docs/guide.md#turning-webgpu-on"
             target="_blank"
             rel="noreferrer"
             className="inline-flex min-h-8 pointer-coarse:min-h-11 items-center rounded-full border border-white/15 px-3.5 text-[12px] font-medium text-white/85 underline underline-offset-2 transition-colors hover:bg-white/10"

@@ -164,6 +164,15 @@ ChromaGlass is a Progressive Web App. In Chrome or Edge, open the site (or the s
 
 With the window-management permission granted (the Cast menu's **Second display** asks for it once), the app notices a projector on load and when it is plugged in, and either offers to send the show there in one click or, in Automatic mode, sends it fullscreen on the next click (see *A projector on HDMI*).
 
+### Turning WebGPU on
+
+ChromaGlass draws the plate with WebGPU. It runs in Chrome or Edge on a desktop, Chrome on a recent Android phone, Safari 26 on macOS and iOS, and Firefox on Windows. If a supported browser says WebGPU is missing or no GPU is available:
+
+- **Chrome / Edge:** Open Settings → System, turn on **Use graphics acceleration when available**, and relaunch the browser.
+- **Safari:** Update to macOS / iOS 26+, or turn on WebGPU under **Develop → Feature Flags**.
+- **Firefox:** Update to the current Windows release with hardware acceleration enabled.
+- **Phone / tablet without WebGPU:** Choose **Be the laptop's remote** on the Needs WebGPU screen to control a show running on your Mac or laptop over Wi-Fi.
+
 ## OSC
 
 The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_PORT=0` to turn it off), from the local network only, so Resolume, TouchDesigner, Max, Ableton (Connection Kit) and phone OSC apps can drive the show. OSC has no show key, so anyone on the same Wi-Fi who sends a packet drives the show: `OSC_BIND=127.0.0.1` keeps `npm run show` to this computer. **The Mac app starts with OSC off**; *Show → OSC input* turns it on for *This Mac only* (Resolume or Ableton on the same laptop) or *From the network* (a lighting desk or a second computer), applies at once, and is kept between launches. It is a menu on the laptop and has no phone version on purpose: a phone that could open the show to the network would hand that to anyone holding its key. OSC is **Pro**: with a Home licence, or none in the Mac app, the port opens and the server ignores what arrives, and Show Server Details says so (PLAN.md 34a-7a). A `npm run show` on a developer's machine with no licence and no `CHROMAGLASS_ENFORCE_TIERS` stays open, as every local build does.
