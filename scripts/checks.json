@@ -235,6 +235,20 @@
       ]
     },
     {
+      "name": "The controller's pads play the liquid",
+      "shard": "logic",
+      "run": "npm run padhits",
+      "why": [
+        "PLAN 30c (scripts/padhits.mjs, lib/padHits.ts, lib/padLayouts.ts): the owner asked for",
+        "pads that act while held, rows combining colour, liquid and tool, and faders and knobs",
+        "that relate. A held Drip drips (Tate's drop, the squeeze over the viscosity) and stops",
+        "on note-off; Pour, Spray, Press, Blow and Stir act every tick while held and never after;",
+        "Splatter's flicks fade; the three pad layouts each answer tool, liquid and colour for all",
+        "40 pads and keep every binding off the grid; each APC40 column's knob and fader are one",
+        "pair; aftertouch parses and a map with pads survives a save. `--break` must go red."
+      ]
+    },
+    {
       "name": "The spun dish",
       "shard": "logic",
       "run": "npm run spinslosh",

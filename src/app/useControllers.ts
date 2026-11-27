@@ -20,6 +20,8 @@ import type { TempoSource } from '../lib/tempo';
 import type { TimecodeReader } from '../lib/timecode';
 import type { ScreenLike } from '../hooks/useCastSession';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
+import type { useHand } from './useHand';
+import { usePadHits } from './usePadHits';
 
 /**
  * The controllers: MIDI (`hooks/useMidi.ts`), the gamepad and the projector
@@ -58,6 +60,9 @@ interface ControllersDeps {
   startCast: (mode?: "window" | "device", screen?: ScreenLike | null | undefined) => Promise<void>;
   stopCast: () => void;
   isCasting: boolean;
+  /** The hand (useHand) and the bottle picker, for the grid's pads (PLAN 30c). */
+  hand: ReturnType<typeof useHand>;
+  setSelectedLiquidId: (id: string) => void;
 }
 
 export function useControllers({
@@ -65,7 +70,9 @@ export function useControllers({
   selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
   blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
   visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
+  hand, setSelectedLiquidId,
 }: ControllersDeps) {
+  const pads = usePadHits({ visualizerRef, wallRef, activeLayer, selectedLiquid, hand, setSelectedLiquidId, selectDye });
   const midi = useMidi(
     {
       getSetting: (key) => ride.read(String(key), settingsRef.current as unknown as Record<string, unknown>),
@@ -77,6 +84,8 @@ export function useControllers({
       // Every note plays the envelopes, whatever else that pad is for.
       noteStruck: (velocity, source) => wallRef.current?.fireEnvelopes?.(velocity, source),
       noteVoice: (e, target) => (visualizerRef.current ?? wallRef.current)?.noteVoice?.(e, target),
+      pad: pads.pad, padPressure: pads.padPressure, releasePads: pads.releasePads, pickHand: pads.pickHand,
+      toolAmount: pads.toolAmount, setToolAmount: pads.setToolAmount,
     },
     {
       activePresetId,
@@ -87,6 +96,7 @@ export function useControllers({
         return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
       },
       paletteColor: (i) => PALETTE_RGB[i] ?? null,
+      padColor: pads.padColor, inHand: pads.inHand, handKey: pads.handKey,
       toggles: { play: isActive, automate: isAutomated, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording, performance: !!musicIntel.performance.live },
     },
     allPresetIds,

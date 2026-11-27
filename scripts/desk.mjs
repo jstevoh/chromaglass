@@ -319,8 +319,11 @@ function drive({ from, to, seconds, clearing }) {
 {
   const apc = apc40Mk2Map([]);
   const kinds = (map, keys, port) => keys.map(k => controlKindOf(map, k, port));
-  const apcKnobs = kinds(apc, ['lightPlay', 'bloom', 'beatSqueeze', 'macroSync', 'granulation']);
-  const apcFaders = kinds(apc, ['audioImpact', 'saturationBoost', 'dimmer', 'sharpness']);
+  // The same controls since the strips (PLAN 30c) moved the settings on them: device knobs
+  // (Shift's lamp and lens, bank 3's granulation), track knobs, the cue encoder; track
+  // faders, the master and the crossfader.
+  const apcKnobs = kinds(apc, ['lightPlay', 'bloom', 'beatSqueeze', 'hueJourney', 'granulation', 'plateTiltY']);
+  const apcFaders = kinds(apc, ['audioImpact', 'dyeBudget', 'dimmer', 'plateTiltX']);
   check('the APC40 map\'s device and track knobs, and its cue encoder, draw as knobs', apcKnobs.every(k => k === 'encoder'), apcKnobs.join(' '));
   check('and its track faders, master and crossfader draw as sliders', apcFaders.every(k => k === 'fader'), apcFaders.join(' '));
   const lcxl = kinds(launchControlXlMap(), ['lightPlay', 'bloom', 'lumia', 'dimmer', 'bubbles']);

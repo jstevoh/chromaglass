@@ -3101,3 +3101,23 @@ Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just
    the camera still on the plate; Stop ends only the pour; Off ends both.
 5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
 
+
+## 148. The APC40's pads play the liquid (PLAN 30c)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Settings → Feed → Controller, **Set up the APC40 mkII** (again, to take the new strips).
+   Good: the grid lights as rows of colours, the bottom row dim white (Press); **Grid layout**
+   shows Tools × Colours lit.
+2. Hold a pad on the top row (Drip). Good: a drop on the hit, more while held, none after you let
+   go, landing in the pad's column of the picture. Hold a Pour or Spray pad: it pours until let go.
+   Hold Press: the glass stays pressed until let go. Tap Splatter and hold another: the held one
+   flicks again, smaller each time.
+3. Track Select 4 (Syrup), hold the same Drip pad. Good: far slower drops; Pour slower too.
+4. Turn the top-left device knob (Drip's size). Good: bigger drops at the right, smaller at the left.
+5. **Bank ▶** over the device knobs. Good: the grid relights as Liquids × Colours, then Liquids ×
+   Tools, then the looks, then round; the faders keep their jobs. Bad: Bank ◀ ▶ do nothing (PLAN
+   30c-3: they may send on another channel; Learn shows what they send).
+6. The faders and the knob over each: Dye Budget/Saturation, Speed/Turbulence, Sound
+   Drive/Beat Squeeze, Plate Rock/Slosh, Bubbles/Bubble Melt, Oil Beads/Bead Drops,
+   Iridescence/Edge Relief, Evolve Speed/Hue Journey. The crossfader tips the plate side to side.
+7. On the phone: Motion → Pads. Good: the same grid, held pads keep going.

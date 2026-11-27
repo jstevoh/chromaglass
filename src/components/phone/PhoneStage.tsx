@@ -1,3 +1,4 @@
+import { PhonePads } from './PhonePads';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
@@ -1311,6 +1312,11 @@ export function PhoneStage(p: PhoneStageProps) {
             {p.onAmbientMode && (
               <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
             )}
+          </div>
+          {/* The controller's grid on the glass (PLAN 30c): pads held as long as a finger is on them. */}
+          <div className="mt-3">
+            <p className="mb-1.5 text-[13px] font-medium text-text">Pads</p>
+            <PhonePads testId="phone-pads" />
           </div>
           {(p.show.running || p.show.paused) && (
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">

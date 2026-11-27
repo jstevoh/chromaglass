@@ -2,7 +2,7 @@
 // (PLAN 19ai, the size ratchet) so the file need not be read to learn what the app may
 // ask of it. LiquidVisualizer.tsx re-exports it, so no importer changed.
 import type { QualityGovernor } from '../lib/governor';
-import type { VisualizerSettings } from '../types';
+import type { LiquidType, VisualizerSettings } from '../types';
 import type { PaceSample } from '../lib/scenePacing';
 import type { LogoArt } from '../lib/logoMelt';
 import type { SongEvent, SongShapeState } from '../lib/songShape';
@@ -13,6 +13,23 @@ import type { MidiEvent, MidiTarget } from '../lib/midi';
 export interface PlateSnapshot {
   /** Release GPU copies held for the Undo window. */
   destroy: () => void;
+}
+
+/**
+ * A gesture from any hand: `amount` (0..1, default 0.5) how hard this hand
+ * pressed; `dx`/`dy` a direction (a blow's, a finger's drag); `color` the
+ * colour laid and `clear` a clear liquid that laid none.
+ *
+ * `liquid` and `gain` are a MIDI pad's (PLAN 30c): a pad lays its own
+ * liquid, not the bottle in hand, so the grid can pour oil on one row and
+ * syrup on the next; and its own tool's size and physics (lib/padHits.ts:
+ * a Tate drop, a spout's flow, times that tool's Amount squared, the
+ * square the mouse's Amount is used at), not the mouse tool's Amount.
+ * Absent, both are the hand's, as they always were.
+ */
+export interface PlateGesture {
+  tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number;
+  liquid?: LiquidType; gain?: number;
 }
 
 export interface LiquidVisualizerHandle {
@@ -115,7 +132,7 @@ export interface LiquidVisualizerHandle {
    * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
    * (a pen's tilt, a stick's push) instead of a radial puff.
    */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => void;
+  applyGesture: (g: PlateGesture) => void;
   /**
    * A point on the wall (the drawn picture, normalised, y up) as the plate's
    * point under it, through the camera: the plate is wider than the wall,

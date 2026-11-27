@@ -1,5 +1,6 @@
 import { Sliders, Trash2 } from 'lucide-react';
 import { FACTORY_MAPS, sourceLabel, targetLabel, type FactoryMapId } from '../../lib/midi';
+import { PAD_LAYOUTS, PAD_LAYOUT_HELP, PAD_LAYOUT_LABELS } from '../../lib/padLayouts';
 import { VOICE_DEFAULTS, type VoiceTool } from '../../lib/noteVoices';
 import { DEFAULT_LIQUID_TYPES } from '../../types';
 import { PRESETS, livePresetId } from '../../presets';
@@ -129,6 +130,31 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                     ))}
                   </div>
                 </div>
+                {/*
+                  The grid's layout (PLAN 30c, lib/padLayouts.ts): which two of
+                  tool, liquid and colour run down the APC40's rows and across
+                  its columns, the third on Track Select. The same four steps
+                  Bank ◀ ▶ take on the board, here for a hand on the laptop.
+                */}
+                {midi.padLayout !== null && (
+                  <div className="mb-3 flex flex-col gap-1.5" data-testid="settings-midi-pad-layout">
+                    <span className="text-[13px] font-medium text-text">Grid layout</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PAD_LAYOUTS.map(l => (
+                        <button
+                          key={l}
+                          onClick={() => midi.setPadLayout(l)}
+                          aria-pressed={midi.padLayout === l}
+                          className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${midi.padLayout === l ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
+                          data-testid={`settings-midi-pad-layout-${l}`}
+                        >
+                          {PAD_LAYOUT_LABELS[l]}
+                        </button>
+                      ))}
+                    </div>
+                    <span className="text-[12px] text-white/60">{PAD_LAYOUT_HELP[midi.padLayout]}</span>
+                  </div>
+                )}
                 {/*
                   Auto-map, for the controller nobody wrote a factory map for —
                   which is most of them. The full flow lives in the MIDI panel;

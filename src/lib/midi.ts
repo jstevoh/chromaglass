@@ -17,6 +17,7 @@ import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './au
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
 import { HIT_FEATURES, HIT_FEATURE_LABELS, isClassFeature, type HitFeature } from './hitSource.ts';
 import { VOICE_DEFAULTS, type VoiceTool } from './noteVoices.ts';
+import { cleanPadTarget, PAD_TOOLS, padTargetLabel, type PadFamilyTarget } from './padTarget.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 
@@ -120,7 +121,14 @@ export type MidiTarget =
    * every note on that channel places a drop on Melody Walk's line and pours
    * while held.
    */
-  | { kind: 'voices'; tool?: VoiceTool; liquid?: string; attack?: number; release?: number; cap?: number; area?: number };
+  | { kind: 'voices'; tool?: VoiceTool; liquid?: string; attack?: number; release?: number; cap?: number; area?: number }
+  /**
+   * The grid playing the liquid (PLAN 30c, lib/padTarget.ts): a pad held on
+   * the plate with a tool, a liquid and a colour; a button picking the tool
+   * or the liquid in hand; a knob on one tool's Amount; a button stepping
+   * the grid's layout.
+   */
+  | PadFamilyTarget;
 
 export interface MidiBinding {
   id: string;
@@ -471,6 +479,7 @@ export function targetLabel(
       const liq = t.liquid ? ` · ${t.liquid}` : '';
       return `Notes as voices (${tool}${liq}, cap ${t.cap ?? VOICE_DEFAULTS.cap})`;
     }
+    case 'pad': case 'hand': case 'toolAmount': case 'padLayout': return padTargetLabel(t);
   }
 }
 
@@ -781,7 +790,13 @@ export function onTodaysTravel(t: MidiTarget): MidiTarget {
 
 /** One incoming message, reduced to what a binding needs. */
 export interface MidiEvent {
-  kind: 'cc' | 'noteon' | 'noteoff' | 'program';
+  /**
+   * `pressure` is aftertouch (PLAN 30c): a held pad pressed harder or
+   * softer. Poly aftertouch names its note in `number`; channel pressure
+   * presses every note held on the channel and carries `CHANNEL_PRESSURE`
+   * there. It reaches no binding: it changes a hold a note-on started.
+   */
+  kind: 'cc' | 'noteon' | 'noteoff' | 'program' | 'pressure';
   channel: number;
   number: number;
   /** 0..127 */
@@ -818,8 +833,13 @@ export function parseMidi(data: Uint8Array | number[]): MidiEvent | null {
   if (status === 0x90) return value > 0 ? { kind: 'noteon', channel, number, value } : { kind: 'noteoff', channel, number, value: 0 };
   if (status === 0x80) return { kind: 'noteoff', channel, number, value: 0 };
   if (status === 0xc0) return { kind: 'program', channel, number, value: 0 };
+  if (status === 0xa0) return { kind: 'pressure', channel, number, value };
+  if (status === 0xd0) return { kind: 'pressure', channel, number: CHANNEL_PRESSURE, value: number };
   return null;
 }
+
+/** The `number` a channel-pressure event carries: no note has it, so no binding can be learned to it. */
+export const CHANNEL_PRESSURE = 128;
 
 export const eventSource = (e: MidiEvent): MidiSource => ({
   kind: e.kind === 'cc' ? 'cc' : e.kind === 'program' ? 'program' : 'note',
@@ -982,6 +1002,12 @@ export function parseMidiMap(text: string): MidiMap {
         };
         return true;
       }
+      if (b.target.kind === 'pad' || b.target.kind === 'hand' || b.target.kind === 'toolAmount' || b.target.kind === 'padLayout') {
+        const clean = cleanPadTarget(b.target as unknown as Record<string, unknown>);
+        if (!clean) return false;
+        b.target = clean;
+        return true;
+      }
       return true;
     });
   const map: MidiMap = { format: MIDI_FORMAT, version: 1, name: typeof o.name === 'string' ? o.name : 'MIDI map', device: typeof o.device === 'string' ? o.device : undefined, bindings };
@@ -1129,10 +1155,12 @@ export function nanoKontrol2Map(): MidiMap {
  *
  * Laid out for a hand in the dark. The 8×5 clip grid cues presets from the top
  * row down, and its bottom row — full-colour pads, so each one lights in the
- * dye it drops — is the palette. Track faders (CC 7 on channels 1–8) ride the
- * show under the master dimmer (CC 14); the device knobs (CC 16–23) are the
- * lamp and camera, the track knobs (CC 48–55) the plate, and the crossfader and
- * cue encoder take the two controls that decide how the liquid itself reads.
+ * dye it drops — is the palette; Bank ◀ ▶ swap the grid for one of the three
+ * that play the liquid instead (lib/padLayouts.ts, PLAN 30c). Each column's
+ * track knob (CC 48–55) and fader (CC 7 on channels 1–8) are one strip, one
+ * thing between them, under the master dimmer (CC 14); the device knobs
+ * (CC 16–23) size each tool's hits, with the lamp and lens a Shift away; the
+ * crossfader and cue encoder tip the plate.
  * The scene column runs the sequencer, the arrows step presets, and the two
  * destructive one-shots sit alone under the scene column, a hand's width from
  * Seed, where they cannot be hit by mistake.
@@ -1140,22 +1168,56 @@ export function nanoKontrol2Map(): MidiMap {
 export function apc40Mk2Map(presetIds: string[]): MidiMap {
   const b: MidiBinding[] = [];
   // Rows 5–2 of the grid (notes 8–39) are presets; row 1 (notes 0–7) is dyes.
+  // The other layouts (lib/padLayouts.ts, PLAN 30c) swap the grid alone.
   presetIds.slice(0, 32).forEach((id, i) => {
     const row = 4 - Math.floor(i / 8), col = i % 8;
     b.push(bind(note(row * 8 + col), { kind: 'preset', presetId: id }));
   });
   for (let i = 0; i < 8; i++) b.push(bind(note(i), { kind: 'dye', paletteIndex: i }));
-  const faders: (keyof VisualizerSettings)[] = ['audioImpact', 'automateRate', 'globalSpeed', 'dyeBudget', 'turbulenceScale', 'plateRock', 'bubbles', 'saturationBoost'];
-  faders.forEach((k, ch) => b.push(bind(cc(7, ch), setting(k))));
+  /*
+    The strips (PLAN 30c). The owner, 2026-11-27: "sliders and dials should
+    make sense and be related to each other". Each column of this board is a
+    strip, a knob at its top and a fader at its foot, and each strip is now
+    one thing: the fader how much of it, the knob above it how it goes. The
+    faders were eight settings in the order they were thought of and the
+    knobs eight others, so the knob over Speed was Iridescence.
+  */
+  const strips: [keyof VisualizerSettings, keyof VisualizerSettings][] = [
+    ['dyeBudget', 'saturationBoost'],   // Colour: how full the plate is, how strong it reads
+    ['globalSpeed', 'turbulenceScale'], // Flow: how fast, how churned
+    ['audioImpact', 'beatSqueeze'],     // Music: how hard the sound drives, how the beat presses
+    ['plateRock', 'slosh'],             // The dish: how it rocks, how the liquid sloshes in it
+    ['bubbles', 'bubbleMelt'],          // Air: how many pockets, how soon they go
+    ['beads', 'beadDrops'],             // Oil: how much in beads, how many drops of it
+    ['iridescence', 'edgeRelief'],      // The film's light: its colours, its edges
+    ['automateRate', 'hueJourney'],     // Change: how fast the show evolves, how far its colours walk
+  ];
+  strips.forEach(([fader, knob], ch) => {
+    b.push(bind(cc(7, ch), setting(fader)));
+    b.push(bind(cc(48 + ch), setting(knob)));
+  });
   b.push(bind(cc(14), setting('dimmer')));
-  const device: (keyof VisualizerSettings)[] = ['lightPlay', 'lampMotion', 'lampHotspot', 'secondLamp', 'camera', 'focus', 'aperture', 'bloom'];
-  device.forEach((k, i) => b.push(bind(cc(16 + i), setting(k))));
-  const track: (keyof VisualizerSettings)[] = ['beatSqueeze', 'edgeRelief', 'iridescence', 'hueJourney', 'backgroundLoop', 'dishVignette', 'macroZoom', 'macroSync'];
-  track.forEach((k, i) => b.push(bind(cc(48 + i), setting(k))));
-  // The crossfader's long throw suits the one control that changes how the
-  // liquid itself reads; the cue encoder is endless, so it nudges the grain.
-  b.push(bind(cc(15), setting('sharpness')));
-  b.push(bind(cc(47), setting('granulation'), 'relative'));
+  /*
+    The device knobs, the 2×4 block beside the grid, size the grid's hits:
+    each tool's Amount, Drip to Stir in the order the Liquids × Tools layout
+    lays them left to right, top row then bottom. A pad on the APC40 has no
+    velocity, so this is the hand's only say in how big a hit is. Shift
+    (bank 2) puts the lamp and the lens on them, as they were, and bank 3
+    the rest the old knobs held.
+  */
+  PAD_TOOLS.forEach((tool, i) => b.push(bind(cc(16 + i), { kind: 'toolAmount', tool })));
+  const lampLens: (keyof VisualizerSettings)[] = ['lightPlay', 'lampMotion', 'lampHotspot', 'secondLamp', 'camera', 'focus', 'aperture', 'bloom'];
+  lampLens.forEach((k, i) => b.push({ ...bind(cc(16 + i), setting(k)), bank: 1 }));
+  const more: (keyof VisualizerSettings)[] = ['backgroundLoop', 'dishVignette', 'macroZoom', 'macroSync', 'sharpness', 'granulation', 'heat', 'chemistry'];
+  more.forEach((k, i) => b.push({ ...bind(cc(16 + i), setting(k)), bank: 2 }));
+  // The crossfader slides side to side, so it tips the plate side to side
+  // (Tilt Left/Right, PLAN 18a-13m), and the endless cue encoder turns the
+  // other way of tipping it, a click at a time.
+  b.push(bind(cc(15), setting('plateTiltX')));
+  b.push(bind(cc(47), setting('plateTiltY'), 'relative'));
+  // Bank ◀ ▶ over the device knobs step the grid's layout (lib/padLayouts.ts).
+  b.push(bind(note(0x3c), { kind: 'padLayout', step: -1 }));
+  b.push(bind(note(0x3d), { kind: 'padLayout', step: 1 }));
   // Random is the one a hand goes for mid-song, so it sits at the top of the
   // column rather than directly above Drain; the button above Drain is the
   // harmless one.

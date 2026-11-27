@@ -273,7 +273,7 @@ interface LiquidVisualizerProps {
   output?: OutputConfig;
 }
 
-import type { LiquidVisualizerHandle } from './visualizerHandle';
+import type { LiquidVisualizerHandle, PlateGesture } from './visualizerHandle';
 import { rgbToHex } from './layerSwatch';
 import { NeedsWebGpu } from './NeedsWebGpu';
 
@@ -1140,7 +1140,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * of hand be added without teaching it about bubbles, beads or the squeeze
    * film all over again.
    */
-  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => {
+  const performGesture = (g: PlateGesture) => {
     // The magnet moves no fluid itself: it is held where the gesture is, and
     // the next solver step pulls the ferrofluid toward it. Ahead of the drain
     // gate, since holding it over an emptying plate is harmless.
@@ -1173,7 +1173,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     recordRemoteHold(remoteHoldsRef.current, layer, g.id, g.x, g.y);
     const S = GRID_SIZE;
     const kToolRaw = toolAmountRef.current;
-    const kTool = kToolRaw * kToolRaw;
+    // A MIDI pad brings its own tool's size and its own liquid (PlateGesture).
+    const kTool = g.gain ?? kToolRaw * kToolRaw;
+    const liqH = g.liquid ?? selectedLiquidRef.current;
     const kSoftTool = Math.sqrt(kTool);
     // Liquid laid on a pocket takes it (PLAN 38b). Nothing else here touches
     // the bubbles or the beads: they move because the hand moves the liquid
@@ -1196,7 +1198,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
     // And the amount set for this tool, on top of how hard this hand pressed.
     const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2 * kTool;
-    if (LAYING_TOOLS.has(g.tool) && (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0) handPoursFerro(af);
+    if (LAYING_TOOLS.has(g.tool) && (liqH?.behaviour?.magnetic ?? 0) > 0) handPoursFerro(af);
 
     switch (g.tool) {
       case 'blow':
@@ -1213,7 +1215,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // It lays no bubbles, as the mouse's wind lays none (lib/breath.ts).
         break;
       case 'drop': {
-        const liq = selectedLiquidRef.current;
+        const liq = liqH;
         dropBottle(af, x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), amt);
         af.addTemp(x, y, 0.6 * amt);
         break;
@@ -1222,7 +1224,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Directional smear along the recorded movement
         const dx = g.dx ?? 1, dy = g.dy ?? 0;
         const len = 8 * GRID_SCALE;
-        const liq = selectedLiquidRef.current;
+        const liq = liqH;
         const tint = dyeOf(liq);
         for (let t = -len; t <= len; t += 0.8) {
           const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
@@ -1274,26 +1276,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         of dye, not the take's colour at full.
       */
       case 'spray': {
-        const liq = selectedLiquidRef.current;
+        const liq = liqH;
         const tint = dyeOf(liq);
         af.autoInject('spray', x, y, 5 * kTool * tint, rgb.r, rgb.g, rgb.b, 0.5);
         layBottle(af, x, y, 6 * GRID_SCALE, liq, kTool * 0.5);
         break;
       }
       case 'splatter': {
-        const liq = selectedLiquidRef.current;
+        const liq = liqH;
         af.autoInject('splatter', x, y, 4 * kTool * dyeOf(liq), rgb.r, rgb.g, rgb.b, 0.5);
         layBottle(af, x, y, 3 * GRID_SCALE, liq, kTool);
         break;
       }
       case 'pour': {
-        const liq = selectedLiquidRef.current;
+        const liq = liqH;
         af.autoInject('pour', x, y, 4 * kTool * dyeOf(liq), rgb.r, rgb.g, rgb.b, 0.5, true);
         layBottle(af, x, y, 4 * GRID_SCALE, liq, kTool);
         break;
       }
       default: { // dropper
-        const liq = selectedLiquidRef.current;
+        const liq = liqH;
         dropBottle(af, x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, poured.dose, liq?.behaviour, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), kTool, af.dtSeconds);
       }
     }
