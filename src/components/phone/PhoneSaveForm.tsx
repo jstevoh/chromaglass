@@ -72,6 +72,12 @@ export function PhoneSaveForm({
   const inputCls = glass
     ? 'min-w-0 flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-3 text-[16px] text-text outline-none placeholder:text-white/40 focus:border-accent'
     : 'min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none placeholder:text-faint focus:border-accent';
+  const overwriteCls = glass
+    ? 'border-white/15 bg-white/[0.08] text-text active:bg-white/15'
+    : 'border-border-strong bg-elevated text-text active:bg-active';
+  const confirmCls = glass
+    ? 'rounded-[14px] bg-primary text-on-primary'
+    : 'rounded-lg bg-text text-bg';
 
   return (
     <div className="flex flex-col gap-2" data-testid={`${prefix}-save-panel`}>
@@ -80,9 +86,7 @@ export function PhoneSaveForm({
           type="button"
           onClick={() => { onReplace(); onDone(); }}
           data-testid={`${prefix}-save-overwrite`}
-          className={`flex h-11 w-full items-center justify-center rounded-lg border px-3 text-[14px] font-medium transition-colors ${
-            glass ? 'border-white/15 bg-white/[0.08] text-text active:bg-white/15' : 'border-border-strong bg-elevated text-text active:bg-active'
-          }`}
+          className={`flex h-11 w-full items-center justify-center rounded-lg border px-3 text-[14px] font-medium transition-colors ${overwriteCls}`}
         >
           <span className="truncate">Save “{replaceName}”</span>
         </button>
@@ -105,9 +109,7 @@ export function PhoneSaveForm({
         <button
           type="submit"
           disabled={!value.trim()}
-          className={`h-12 shrink-0 px-4 text-[14px] font-medium disabled:opacity-40 ${
-            glass ? 'rounded-[14px] bg-primary text-on-primary' : 'rounded-lg bg-text text-bg'
-          }`}
+          className={`h-12 shrink-0 px-4 text-[14px] font-medium disabled:opacity-40 ${confirmCls}`}
           data-testid={`${prefix}-save-confirm`}
         >
           Save
