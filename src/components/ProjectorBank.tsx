@@ -17,6 +17,10 @@ import { bankHasTwo } from '../lib/projectorBank';
  * drawn only when there is a B (`bankHasTwo`: Two Projectors, a back plate on
  * its own blend, the lamp ground). A row that would do nothing is worse than
  * none (a control that lies).
+ *
+ * Each projector's Focus sits under its lamp (PLAN 51b, lib/projectorFocus.ts):
+ * the head's rack, sharp at the middle, so a knob learned to it rests sharp
+ * and either way softens.
  */
 export interface ProjectorBankProps {
   settings: VisualizerSettings;
@@ -26,7 +30,7 @@ export interface ProjectorBankProps {
   testId?: string;
 }
 
-type BankKey = 'projLampA' | 'projLampB' | 'projShutterA' | 'projShutterB' | 'projCross';
+type BankKey = 'projLampA' | 'projLampB' | 'projShutterA' | 'projShutterB' | 'projCross' | 'projFocusA' | 'projFocusB';
 
 const valueOf = (s: VisualizerSettings, k: BankKey): number => {
   const v = s[k];
@@ -68,14 +72,16 @@ export function ProjectorBank({ settings, onSetting, touch = false, chips, testI
     <div className="rounded-lg border border-border px-2 pb-1 pt-1" data-testid={testId} data-two={two ? '1' : '0'}>
       <div className={`${touch ? 'text-[14px]' : 'text-[13px]'} font-medium text-text`}>Projectors</div>
       <div className="flex items-start gap-2">{slider('projLampA', two ? 'Lamp A' : 'Lamp')}{shutter('projShutterA', two ? 'Projector A' : 'The projector')}</div>
+      {slider('projFocusA', two ? 'Focus A' : 'Focus')}
       {two ? (
         <>
           <div className="flex items-start gap-2">{slider('projLampB', 'Lamp B')}{shutter('projShutterB', 'Projector B')}</div>
+          {slider('projFocusB', 'Focus B')}
           {slider('projCross', 'A/B Crossfade')}
         </>
       ) : (
         <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} pb-1 leading-snug text-muted`}>
-          A second projector, its own lamp and an A/B crossfade come with Two Projectors, a back plate on its own blend, and the lamp ground.
+          A second projector, its own lamp and focus and an A/B crossfade come with Two Projectors, a back plate on its own blend, and the lamp ground.
         </p>
       )}
     </div>
