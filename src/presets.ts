@@ -2168,7 +2168,7 @@ export const PRESETS: Preset[] = [
       */
       oilTension: 1,             // 27f-9h: all the tension the dial has, for the rounder blobs
       oilBodies: 1,
-      oilWeight: 0.6,
+      oilWeight: 0.5, // 19ak-24f
       oilThickness: 0.32, // paraffin
       plateUpright: 1,
       /*

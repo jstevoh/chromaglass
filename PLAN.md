@@ -100,7 +100,9 @@ both pages still show; restored, `npm run presskit` 58/61 → 61/61). Still owed
 own thread: `looksgrid --owed=preview` (19ak-24b fixed `scripts/lookstills.mjs` `MAX_BYTES` cap and re-shot `velvet-underground`, `moire-star`, `moire-ripple`, `moire-groove`; check-side `32x32` Rec.709 luminance spread < 20 on dark-blue `velvet-underground` and 34–50-line moiré cards owed to Claude Code, plus `49c`'s `preset-title-button`), `nolight` 9 (Beads 0.8 rims brighter than the wash), `benday` (19ak-24b found culprit `#889`/`38u-8` `3bb0899b`: `granulation` `0.5 -> 0` removed the `0.75` blank-grain factor `benday.mjs`'s `[0.10, 0.11]` washes assumed, pushing `0.11` past `0.55`; re-laying `benday.mjs`'s washes owed to Claude Code), the open-rim oil meter on WebGPU · fifth, `heldpress
 --owed=presstwist` (after 15g-18), `openingtime` (3 pipelines built on a frame:
 fluid/upsampleDelta, fluid/scaleDye, plate/packDyeBodies, after 46a and 47a), and the Lava
-Lamp wax cycle on WebGPU · show (after 27f-9q and 38w-31 met). `holeline` on lab4 was red
+Lamp wax cycle on WebGPU · show (19ak-24f shipped `lavacycle` 7/7 via `lava-lamp` `oilWeight`
+0.6 → 0.5; `scripts/lavaround.mjs` omits `oilThickness: look.oilThickness` after `#866` met
+`#954`, `2/5` at 50 mm²/s vs `5/5` with `0.32`, owed to Claude Code). `holeline` on lab4 was red
 before the sweep.
 
 ## Order of work

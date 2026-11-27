@@ -658,7 +658,18 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   - 19ak-24e, `live --codec aac`, `liveshow --stack`, `videolamp`, a show night: each run
     alone three times first (load on deploy 967, or real).
   - 19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
-    `lavaround` (after 27f-9q, #866, met 38w-31, #954).
+    `lavaround` (after 27f-9q, #866, met 38w-31, #954) (**part shipped**: `lavacycle`
+    7/7 via `lava-lamp` `oilWeight` `0.6 → 0.5` in `src/presets.ts`, `no cool glass`
+    `0.87 → 0.79` → `0.86 → 0.84`; bisected `lavacycle` `4/7` at `d8949fec` after `#946`,
+    `7/7` at `#954` `60c2a325` and `1c70d51a^`, `6/7` at `#866` `1c70d51a` `SEALED_TENSION = 4`,
+    `5/7` at `f3414ffd`, `6/7` at `b07b8eda` after `#980`; `lavaround` check-side omission
+    owed to Claude Code: `#866` `1c70d51a` was written before `#946`/`#954` and omits
+    `oilThickness: look.oilThickness` in `scripts/lavaround.mjs`'s `window.__lamp`, so it
+    runs 50 mm²/s `OIL_THICKNESS` instead of `lava-lamp`'s 9.12 mm²/s `0.32` paraffin —
+    `2/5` without it (`lip 0.21%`, `guard 0.01%`, `roundness 0.587 vs 0.505` at `oilWeight`
+    `0.5`; `0.29% / 0.27% / 0.600 vs 0.325` at `0.6`), `5/5` with `oilThickness` passed
+    (`lip 12.13%`, `guard 27.19%`, `roundness 0.828 vs 0.561` at `0.5`; `32.57% / 18.23% /
+    0.769 vs 0.577` at `0.6`)).
   - ~~19ak-24g, `filmlook`'s two camera lines~~ **shipped**: 38h-6 (#750) rightly took the
     camera's rainbow away at every Film Physics, and the lines still measured Film Physics 1
     against it (0.3 against 0.3); re-read on the film's own footprint (9/9).
