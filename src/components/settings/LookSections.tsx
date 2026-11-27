@@ -1,6 +1,7 @@
 import { Palette, Microscope, Film, Clapperboard, Lightbulb, Aperture } from 'lucide-react';
 import { VisualizerSettings } from '../../types';
 import { groupOf } from '../../lib/settingsMap';
+import { settingDisabledReason } from '../../lib/settingGate';
 import { Info } from '../Info';
 import { Segmented, LIT } from '../ui';
 import { Slider } from './controls';
@@ -487,7 +488,7 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
             gold, washing out as it thickens), and on the plate the pale
             tint a projector throws through one. Thin Film and the bubbles'
             Iridescence both draw through it. */}
-        <Slider label="Film Physics" value={settings.filmPhysics ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ filmPhysics: v })}
+        <Slider label="Film Physics" disabled={settingDisabledReason('filmPhysics', settings)} value={settings.filmPhysics ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ filmPhysics: v })}
           settingKey="filmPhysics"
         />
         {/* The frame's own soap film over the plate (PLAN 32d): a film with a
@@ -550,6 +551,9 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
         <Slider label="Tank" value={settings.tank ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ tank: v })}
           settingKey="tank"
         />
+        <Info>
+          Switches the view to a dark-water tank seen from the side: starts black until the falling dye plume spreads from the top nozzle over several seconds.
+        </Info>
         {(settings.tank ?? 0) > 0.001 && (
           <>
             <Slider label="Feed" value={settings.tankFeed ?? 1.5} min={0} max={6} step={0.1} onChange={(v: number) => onUpdate({ tankFeed: v })}
