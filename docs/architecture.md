@@ -70,5 +70,5 @@ when no open PR touches the file.
 | 19ai-7 | `src/gpu/fluid.ts` split into a class chain | shipped |
 | 19ai-8 | `App()` into domain hooks | shipped; what stayed is 19ai-8a, 8b |
 | 19ai-9 | `SettingsPanel.tsx` one file per section | shipped; its props are 19ai-9a |
-| 19ai-10 | the frame loop, one piece at a time, into `src/engine/` (PLAN 50c) | open; the pointer moved (50c-1) |
+| 19ai-10 | the frame loop, one piece at a time, into `src/engine/` (PLAN 50c) | open; the pointer (50c-1) and the debug report (50c-2) moved |
 | 19ai-5b | `docs/plan-shipped.md` (810 KB), `docs/guide.md`, `docs/judging.md` by part | open |
