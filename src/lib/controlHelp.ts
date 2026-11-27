@@ -251,6 +251,11 @@ export const CONTROL_HELP: Record<string, string> = {
 
   // Layers and the dish's motor
   twoProjectors: 'Lays the layers over each other as two projectors on one screen, so their light adds.',
+  projLampA: 'The front projector\'s lamp on its variac: down, it dims steeply and goes amber as a real lamp does; past 100% it overdrives.',
+  projLampB: 'The back projector\'s lamp on its variac (with Two Projectors): dims and warms as a real lamp does.',
+  projShutterA: 'A vane over the front projector\'s lens: closes in 80 ms and dims the whole picture evenly, the lamp staying lit.',
+  projShutterB: 'A vane over the back projector\'s lens (with Two Projectors).',
+  projCross: 'Fades the wall from projector A to projector B, linear in light so the middle is no brighter than the ends (with Two Projectors).',
   layerCount: 'How many plates are stacked, one or two.',
   rotationSpeed: 'How fast the dish turns.',
   spinImpulse: 'How hard one flick of the dish hits.',

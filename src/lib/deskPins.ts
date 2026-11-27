@@ -220,6 +220,8 @@ const SECTION_OF: Record<string, string> = {
   spinAuto: 'spin',
   spinBeats: 'spin',
   twoProjectors: 'layers',
+  // The projector bank (PLAN 51a), drawn at the top of the Mixer.
+  projLampA: 'mixer', projLampB: 'mixer', projShutterA: 'mixer', projShutterB: 'mixer', projCross: 'mixer',
   // The mixer's channel strips, all in its own section.
   ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
   // And each row's fade time (lib/mixFade.ts), beside its strip.
