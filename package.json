@@ -211,6 +211,7 @@
     "bodies": "node scripts/bodies.mjs",
     "clockglass": "node scripts/clockglass.mjs",
     "classicdish": "node scripts/classicdish.mjs",
+    "oilride": "node scripts/oilride.mjs",
     "filmhold": "node scripts/filmhold.mjs",
     "dropcolour": "node scripts/dropcolour.mjs",
     "dropwindow": "node scripts/dropwindow.mjs",

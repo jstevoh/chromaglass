@@ -928,7 +928,7 @@ export class FluidPasses extends FluidFields {
    * indirectly so one this step does not need runs no workgroups. The field
    * ends swapped once, as a single carry leaves it.
    */
-  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
+  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'bodyAdvectSharp' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
     // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
     const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
     /*

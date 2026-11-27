@@ -3620,6 +3620,19 @@
       ]
     },
     {
+      "name": "The oil's colour rides the oil",
+      "shard": "plate",
+      "run": "npm run oilride",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-29: Classic's colours washed out under a hand. With Oil Bodies",
+        "on a thin gap, Beat Squeeze kicks and Plate Rock for five seconds: the",
+        "oil keeps its share of the dye (main handed 0.54% of it to the water),",
+        "inside the oil, none stranded in open water, no oil made or lost.",
+        "About six minutes on software WebGPU at 192²."
+      ]
+    },
+    {
       "name": "Oil and water as bodies",
       "shard": "plate",
       "run": "npm run bodies",
