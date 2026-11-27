@@ -3149,6 +3149,18 @@
       ]
     },
     {
+      "name": "The draught keeps the dish's liquid in the dish",
+      "shard": "plate",
+      "run": "npm run draught",
+      "timeout": 6,
+      "why": [
+        "Air between two glasses (PLAN 18a-16): a uniform shear laid into the",
+        "open-rim solve slid Solar Flare's whole dish out over its rim (0% of",
+        "its dye left in the lab); a closed dish answers it with its pressure,",
+        "so only the gusts' curl moves the liquid, as strong as before."
+      ]
+    },
+    {
       "name": "The rock lifts the oil, not the frame",
       "shard": "plate",
       "run": "npm run oillift",
