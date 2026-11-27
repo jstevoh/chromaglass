@@ -851,9 +851,13 @@ export class FluidInputs extends FluidPasses {
       field from going below zero (bodyAdvect's floor, there for the dye),
       and one field of signed w lost every light bottle's weight on its
       first step: an alcohol drop on a rocked thin gap moved nothing
-      (`npm run liquidfall`). The polarity's sign meets the same floor;
-      on a thin gap it no longer pushes (liquidForces), and the open plate
-      keeps it as it was.
+      (`npm run liquidfall`). The polarity's sign met the same floor
+      (PLAN 15e-13): every nonpolar bottle (oil −0.9, soap −0.25, silicone
+      −0.95) read zero after its first carried step, so on the open plate
+      only the polar half of a pair ever pushed. It is split the same way: a
+      polar bottle's polarity in liquids1.r, a nonpolar one's in liquids1.b
+      (free until now), and liquidForces reads r − b. On a thin gap it still
+      does not push (an oil keeps to itself there by its own tension, 38e).
     */
     const weight = what.weight ?? 0;
     const polar = what.polarity ?? 0;
@@ -865,7 +869,7 @@ export class FluidInputs extends FluidPasses {
       this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, Math.max(0, weight)]));
     this.liquids0.swap();
     this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
-      this.arg('liquid splat 1', [x, y, radius, take, polar, Math.max(0, -weight), 0, 0]));
+      this.arg('liquid splat 1', [x, y, radius, take, Math.max(0, polar), Math.max(0, -weight), Math.max(0, -polar), 0]));
     this.liquids1.swap();
     pass.end();
     this.submit(enc);
@@ -1075,6 +1079,10 @@ export class FluidInputs extends FluidPasses {
       rxn: copy(this.rxn, this.rxnLive),
       lies: copy(this.lies, this.liesLive),
       oilPoured: this.oilPoured,
+      species: copy(this.species, this.speciesLive),
+      liquids0: copy(this.liquids0, this.liquidsLive),
+      liquids1: copy(this.liquids1, this.liquidsLive),
+      speciesPoured: this.speciesPoured ? { ...this.speciesPoured } : null,
       destroy: () => { for (const t of made.splice(0)) t.destroy(); },
     };
     this.submit(enc);
@@ -1115,6 +1123,34 @@ export class FluidInputs extends FluidPasses {
       this.mixLive = true;
       this.oilPoured = carry.oilPoured;
       this.oilDyeStale = true;
+    }
+    /*
+      The poured liquids, by area as the mix is (PLAN 18d-10). What was
+      reported: since nothing fades the species (18d), a liquid poured stays
+      for the show, and a governor's move (a new solver at a new grid) lost
+      every one: a bottle of glycerine stopped dragging the moment the
+      frame rate dipped. The species' channels are amounts per unit of plate
+      (a share, and the share times each property), and so are the forces'
+      fields (each bottle's soap, body, repel, weight and polarity times its
+      share), so an area average onto the new grid keeps every amount and
+      every ratio within a cell of the coarser grid, as the ferrofluid's and
+      the oil's. The last bottle's tension and density go with them; the
+      species' CPU snapshot is read again from the new grid.
+    */
+    if (carry.species) {
+      const s = (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species'));
+      this.run(pass, 'carryArea', s.write, [carry.species], this.arg('carry species', [carry.n, this.N, 0, 0]));
+      s.swap();
+      this.speciesLive = true;
+      this.speciesQuiet++;
+      this.speciesPoured = carry.speciesPoured ? { ...carry.speciesPoured } : null;
+    }
+    if (carry.liquids0 && carry.liquids1) {
+      this.run(pass, 'carryArea', this.liquids0.write, [carry.liquids0], this.arg('carry liquids 0', [carry.n, this.N, 0, 0]));
+      this.liquids0.swap();
+      this.run(pass, 'carryArea', this.liquids1.write, [carry.liquids1], this.arg('carry liquids 1', [carry.n, this.N, 0, 0]));
+      this.liquids1.swap();
+      this.liquidsLive = true;
     }
     pass.end();
     const same = (from: GPUTexture | null, to: PingPong) => {
