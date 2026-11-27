@@ -131,7 +131,7 @@ export function codeWords(text, file = 'x.ts', out = new Set()) {
 }
 
 // The names a README gives in backticks: `foo`, `foo()`, `foo(a, b)`,
-// `Foo.bar` (as Foo), `npm run x` and paths are not names.
+// `Foo.bar` (as Foo), `npm run readmes` and paths are not names.
 export function namesIn(readme) {
   const out = new Set();
   for (const m of readme.matchAll(/`([^`\n]+)`/g)) {
@@ -235,7 +235,7 @@ function selfTest() {
   ].join('\n'));
   t('the shapes of export the repository writes, and no comment', [...ex.keys()].sort(), ['C_MAX', 'G', 'H', 'I', 'T', 'a', 'b', 'd', 'f']);
   t('names in backticks, with calls and members, not paths or commands',
-    [...namesIn('`foo`, `bar(x, y)`, `Baz.qux`, `src/lib`, `npm run x`, `a.ts`')].sort(), ['Baz', 'bar', 'foo']);
+    [...namesIn('`foo`, `bar(x, y)`, `Baz.qux`, `src/lib`, `npm run readmes`, `a.ts`')].sort(), ['Baz', 'bar', 'foo']);
   const readmes = new Map([['src/k', 'The k folder: `kept`, `named()`; `oldName` was the old way, and `alsoOld`, `andThis` and `THIS_TOO` went with it; `kept` is here.\n']]);
   const run = (before, after, readme, gone = () => false) => drift({
     files: new Map([['src/k/deep/f.ts', { before, after }]]),
