@@ -97,9 +97,7 @@ that day; deploy 967 (main at f3414ffd) went live green, and its slow checks cam
 on lines that were green or cancelled before. ~~`presskit`: `/press` and `/pro` showed a
 broken Ferro Paint picture~~ (34a-2 removed `public/landing/looks/ferro-paint.webp`, which
 both pages still show; restored, `npm run presskit` 58/61 → 61/61). Still owed, each to its
-own thread: `looksgrid --owed=preview` (velvet-underground and a moiré card flat, spread
-under 20), `nolight` 9 (Beads 0.8 rims brighter than the wash), `benday` (dot coverage
-28.1%/33.0% against 28.3%), the open-rim oil meter on WebGPU · fifth, `heldpress
+own thread: `looksgrid --owed=preview` (19ak-24b fixed `scripts/lookstills.mjs` `MAX_BYTES` cap and re-shot `velvet-underground`, `moire-star`, `moire-ripple`, `moire-groove`; check-side `32x32` Rec.709 luminance spread < 20 on dark-blue `velvet-underground` and 34–50-line moiré cards owed to Claude Code, plus `49c`'s `preset-title-button`), `nolight` 9 (Beads 0.8 rims brighter than the wash), `benday` (19ak-24b found culprit `#889`/`38u-8` `3bb0899b`: `granulation` `0.5 -> 0` removed the `0.75` blank-grain factor `benday.mjs`'s `[0.10, 0.11]` washes assumed, pushing `0.11` past `0.55`; re-laying `benday.mjs`'s washes owed to Claude Code), the open-rim oil meter on WebGPU · fifth, `heldpress
 --owed=presstwist` (after 15g-18), `openingtime` (3 pipelines built on a frame:
 fluid/upsampleDelta, fluid/scaleDye, plate/packDyeBodies, after 46a and 47a), and the Lava
 Lamp wax cycle on WebGPU · show (after 27f-9q and 38w-31 met). `holeline` on lab4 was red
