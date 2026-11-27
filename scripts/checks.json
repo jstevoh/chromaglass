@@ -3698,7 +3698,9 @@
       "run": "npm run grating",
       "why": [
         "No grating over the dye: the grid's one-cell checkerboard goes in a",
-        "second, in every look, and edges, blobs and fine diagonals stay."
+        "second on the old plate, and edges, blobs and fine diagonals stay; on a",
+        "thin gap (PLAN 18a-8b) presses grow no more of it with no pass than with",
+        "one, and the finest diagonals keep."
       ]
     },
     {

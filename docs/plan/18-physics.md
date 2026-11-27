@@ -202,39 +202,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     pressure that takes it out reaches the middle for two steps (`npm run thingap`
     prints that first step). The rim should sit a cell or two inside the square, or the
     cells outside it count as open too.
-  - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
-    which leaves a small checkerboard at a floored dent's edge; the advections'
-    Rhie–Chow faces were given c·P, exact only where the drag is even (on a thin gap
-    the colour's and the oil's carries and carryCourant now cross the solve's own
-    faces, `THIN_FACE`, as the ferrofluid's did: a Finger's solid is where the drag is
-    least even, 15b; off a thin gap the carries keep their Rhie–Chow faces, exact on
-    the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
-    radial flow (the pressed rings in the picture). A staggered grid takes all three,
-    and `dampGrid`'s job.
-    **The third, shipped** (2026-11-27): the squaring was the carry's corner, not the
-    grid's storage. The faces moved each axis's share from the same old colour at once,
-    so a diagonal flow spread colour across itself as well as along (½|u_x|Δx along x
-    plus ½|u_y|Δx along y). The thin gap's carries now take Colella's corner transport
-    (`ACROSS` in `wgsl/fluid/carry.ts`, `cornered` in `wgsl/fluid.ts`); the old plate
-    keeps its faces. `npm run gridiso` (lab, 128², a thin ring turned by a solid swirl):
-    the fourfold part of the width it gained 0.331 → 0.218, the width gained 0.353 →
-    0.273 cells, colour +0.088% from the half-float floor on that fast ring (0.000% at
-    `dyeedge`'s speed). **The first, the checkerboard, shipped** (2026-11-27): the cell
-    kept its own predicted velocity (hsGradient wrote c·u*_cell − M∇p/h) and the faces saw
-    only the mean of two cells' u*, so a checkerboard in the flow was a mode the solve
-    never saw. The thin solve's faces are now the flow's state (Harlow and Welch's
-    staggered grid, `wgsl/thinFlow.ts`): hsGradient keeps each face's velocity in
-    `hsFlow`, hsDivergence predicts each face from its own last velocity plus the mean of
-    what the step's forces asked of its two cells, a cell's velocity is the mean of its
-    faces, and `thinFaceVel` reads the face (with the ridden flow's slosh, drift and
-    ferrofluid drop laid on as the cells' change). `npm run gridnull` (lab, 128²): a
-    checkerboard laid in water kept 0.93 of itself after a step on main (0.46 in the oil),
-    4e-8 now; an eight-cell wave keeps its inertia (0.983 of a long wave's, main 0.981);
-    a floored dent's rim under a push 0.0303 → 0.0108 sharp in the oil, 0.0115 → 0.0083
-    in water; `gridiso`'s drop window rounder (0.0092 → 0.0061). The [1 2 1] rebuild (tried first) damped
-    the eight-cell wave 0.85 a step. *Open:* 18a-8b, the dye's own grid filter
-    (`dampGrid`), which the plan named this item's to retire: measure whether the
-    thin gap's colour still grows a checkerboard without it, now that the flow has none.
+  - **18a-8c, the grid filter's kernels still compile at every opening.** No opening
+    runs `dampGridCurv`, `dampGridLimit` or `dampGrid` since 18a-8b (every look opens on
+    a thin gap), but they are still waited for (`true` in `WebGPUFluid.prepare`). Built
+    behind the show instead, `run` skips a kernel that is not ready one at a time, so
+    the stage could run `dampGrid` on a stale `scratchA` while `dampGridCurv` is still
+    compiling. Gate the stage on all three being ready, then mark them `false`, and read
+    `npm run startup` for the opening's time.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.

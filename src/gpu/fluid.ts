@@ -121,7 +121,7 @@ export class WebGPUFluid extends FluidCover {
       ['scaleDye', [dye], false],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
       ['addSlosh', [VEL], open.slosh],
-      // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
+      // The dye's grid pattern on the old plate (dampGrid; none on a thin gap since 18a-8b).
       ['dampGridCurv', [dye], true],
       ['dampGridLimit', [dye], true],
       ['dampGrid', [dye], true],
@@ -1178,12 +1178,14 @@ export class WebGPUFluid extends FluidCover {
     stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && !this.boilLive);
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Jacobi diffusion took 8a/(1+8a) of it a
+      GRID_DAMP a step on the old plate. Jacobi diffusion took 8a/(1+8a) of it a
       step; at molecular diffusion (dm ≈ 0) gridDiff is ~0, so the damping
-      runs at full GRID_DAMP in every look.
+      runs at full GRID_DAMP there.
+
+      None on a thin gap, whose faces lay no checkerboard (GRID_DAMP's note, 18a-8b).
     */
     const gridDiff = (8 * dm) / (1 + 8 * dm);
-    const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
+    const gridTop = ((p.gridDamp ?? (thin ? 0 : GRID_DAMP)) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
       const damp = (field: PingPong) => {
