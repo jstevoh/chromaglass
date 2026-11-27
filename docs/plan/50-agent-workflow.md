@@ -66,9 +66,47 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   it arrives, 2026-12-04 to 12-11). Two Antigravity lanes in separate worktrees, 50b's table
   nightly on the machine that is not deploying; the Air keeps the deploy runner. No cloud cost.
 
+- **50j** *One fix job per failure, not per red PR* (the owner, 2026-11-27; S, foreman). The
+  foreman briefed one fix job per red Antigravity PR, up to twice. When main broke a check
+  every open PR went red on the same line and each got a job, so several runs chased one
+  cause in several clones; and a fix that did not work was briefed again from the same log,
+  which never once worked.
+  - **50j-1** *The foreman groups failures by fingerprint* (shipped 2026-11-27, the foreman on
+    the owner's Mac, not in this repo). A red PR's failing logs become fingerprints (each
+    failure line with its times, shas, temp paths and numbers taken out, hashed). A
+    fingerprint holds one job: another open PR with it waits, labelled with the PR whose job
+    has it, for a day at most; the same fingerprint after a pushed fix escalates to a Claude
+    thread instead of a second brief; a PR that inherits a failure an earlier PR had is told
+    to merge main first. The foreman's `node --test` suite covers it (46 tests). The first
+    live pass found GitHub's echo of a step's script (`fail-on-cache-miss: false`, an `echo
+    "... failed"`) fingerprinted as failures, which would have made every red Mac app job one
+    failure; the stub skips those lines now, and 50j-2 must too.
+  - **50j-2** *`scripts/fingerprints.mjs` on main* (S, Antigravity). The foreman runs a stub
+    until main has this file, then runs main's copy (read hourly) and falls back to the stub
+    if it is missing or prints the wrong shape. The interface it must keep:
+    `failureShape(line)` returns the line with everything that changes between runs taken
+    out, or `null` when the line is not a failure (step-script echo, inputs, comments and
+    the generic `Process completed with exit code` lines are not failures);
+    `fingerprint(shape)` returns 12 hex characters of its sha1; `groupFailures(log, { check })`
+    returns `[{ fp, shape, check, count, sample }]`; the CLI is
+    `node scripts/fingerprints.mjs [--json] [file ...]`, reading stdin when given no file,
+    `--json` printing the `groupFailures` array. Its check: a node harness that feeds it real
+    `gh run view --log-failed` text from two runs of one failure (different times, shas and
+    durations) and two different failures, and requires one and two fingerprints.
+- **50k** *The foreman checks `Measured:` receipts before it merges* (shipped 2026-11-27, the
+  foreman on the owner's Mac). A green Antigravity PR used to merge on CI alone, which checks
+  that the `Measured:` section is well formed (`scripts/measured.mjs`), not that the command
+  prints the quoted line on that head. The foreman now runs each quoted command itself, on
+  the PR's exact head in its own clone, and merges only when every quote matches (words and
+  verdicts exact, counts exact, other numbers within 10%). Only logic and sound shard checks
+  run; an env prefix, node flags, shell, the build and the whole suite are skipped, never run.
+  A mismatch escalates `RECEIPT #n head sha`; a push starts it over. Proved on #990: lint and
+  sizes matched, `npm run rig` skipped as not a check, about a minute. Off on its own with
+  `FOREMAN_RECEIPTS=0` in the foreman's launchd environment.
+
 Parked by the owner's turn (2026-11-27), not dropped: a weekly mutation run proving checks
-can fail, a main-against-branch parity run, failures grouped by fingerprint before briefing,
-the foreman re-running `Measured:` receipts, the scorecard as a script, a README drift check.
+can fail, a main-against-branch parity run, the scorecard as a script, a README drift check
+(failures grouped by fingerprint and the foreman's receipts were taken up as 50j and 50k).
 They came from the write-up of an agent-built service port (traffic mirrored to the old and
 new systems, mismatches grouped by shape, human corrections written down as tests) and suit a
 system that already works; take them up when the plate does.
