@@ -458,6 +458,18 @@ function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
               testId="toggle-evolve"
             />
             {/*
+              Keep full (PLAN 18a-22, sim/keepFull.ts), beside Evolve because
+              both are what the plate does left alone; unlike Evolve it only
+              tops the dish up with drops of its own bottles and changes
+              nothing else. The room's switch, so a look change keeps it.
+            */}
+            <Toggle
+              label="Keep it full"
+              on={!!p.settings.keepFull}
+              onChange={on => p.onSetting({ keepFull: on })}
+              testId="toggle-keepfull"
+            />
+            {/*
               Follow beat stood here, a switch that wrote Beat Prediction as 0
               or 0.7: the same setting as the Sound section's slider, drawn
               twice, and the switch read "off" at 0.04 and set 0.7 over
@@ -568,6 +580,12 @@ function RecipeBody({ p }: { p: DeskProps }) {
                   if (on && (p.settings.automateRate ?? 0) < 0.02) p.onSetting({ automateRate: 0.15 });
                 }}
                 testId="toggle-evolve"
+              />
+              <Toggle
+                label="Keep it full"
+                on={!!p.settings.keepFull}
+                onChange={on => p.onSetting({ keepFull: on })}
+                testId="toggle-keepfull"
               />
             </div>
           )}

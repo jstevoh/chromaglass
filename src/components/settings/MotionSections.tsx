@@ -2,7 +2,7 @@ import { Waves, Zap, Hourglass, Aperture, RotateCw } from 'lucide-react';
 import { AudioFeature } from '../../types';
 import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
-import { LIT } from '../ui';
+import { LIT, Toggle } from '../ui';
 import { StrobeRing } from '../ui/Playful';
 import { TipPad } from '../ui/TipPad';
 import { Slider, PinChips } from './controls';
@@ -575,6 +575,14 @@ export const AutomationSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ automateRate: v })}
           settingKey="automateRate"
         />
+        {/*
+          Keep full (PLAN 18a-22, sim/keepFull.ts): for a plate left running.
+          When the dish runs below the amount its look is made with, the
+          dropper tops it up, a real drop of the look's own bottles at a time
+          where it has gone pale, and changes nothing else. A switch, so MIDI
+          does not learn it (as Song titles and the logo's melt).
+        */}
+        <Toggle label="Keep it full" on={!!settings.keepFull} onChange={(v) => onUpdate({ keepFull: v })} testId="keepfull-switch" />
         {/*
           Surge shapes the automation into gusts with quiet between, which is
           what a dish being worked on actually looks like — a pour, twenty

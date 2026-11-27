@@ -791,6 +791,21 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Waves size={18} />
               <span className="text-[10px] font-bold uppercase tracking-widest">Auto</span>
             </button>
+            {/* Keep full (PLAN 18a-22): the dropper tops up a dish left running. A setting, so it goes as a patch. */}
+            <button
+              aria-pressed={!!value('keepFull')}
+              onClick={() => patch({ keepFull: !value('keepFull') })}
+              disabled={!connected}
+              data-testid="remote-keepfull"
+              className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border py-5 transition-colors active:scale-95 disabled:opacity-30 ${
+                value('keepFull')
+                  ? LIT
+                  : 'border-white/10 bg-white/5 text-white/70'
+              }`}
+            >
+              <Droplets size={18} />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Full</span>
+            </button>
           </div>
 
           {/* The set list and the song shows (PLAN 12-ctl-1), their own screen */}

@@ -81,6 +81,7 @@ import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun'
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { dropBottle, layStream } from '../sim/dropSplash';
+import { keepFullState, stepKeepFull, KEEP_FULL_REACH, type KeepFullHands } from '../sim/keepFull';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
@@ -508,6 +509,37 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (areaBottlesRef.current || (layer >= 1 && backDyesRef.current)) pourLiquid(fluid, a.liquid, x, y, strength);
     else doseLiquid(fluid, liquidsOf(layer), x, y, strength);
   };
+  /*
+    Keep Full's hand (PLAN 18a-22, sim/keepFull.ts): where a top-up drop could
+    land on a layer, what colour falls and from which bottle. As Evolve's
+    drop: in one of the look's areas, in that area's dye and from its bottle,
+    when the look has areas; else anywhere in the dish inside its rim, in the
+    working harmony, from one of the look's bottles. Its own dice, so keeping
+    the dish full draws nothing from Evolve's stream. Built once: everything
+    it reads is a ref.
+  */
+  const keepFullRef = useRef(keepFullState());
+  const keepHandsRef = useRef<KeepFullHands>({
+    aim: (layer, _fluid, out) => {
+      const areas = areasOf(layer);
+      if (areas && areas.length > 0) {
+        const a = pickArea(areas, DICE.keep);
+        const at = pointInArea(a, GRID_SIZE, DICE.keep);
+        const c = areaColor(layer, a);
+        out.x = at.x; out.y = at.y; out.r = c.r; out.g = c.g; out.b = c.b;
+        out.liquid = LIQUIDS_BY_ID.get(a.liquid);
+        return;
+      }
+      const ang = DICE.keep.float() * Math.PI * 2;
+      const d = Math.sqrt(DICE.keep.float()) * KEEP_FULL_REACH * GRID_SIZE;
+      out.x = GRID_SIZE / 2 + Math.cos(ang) * d;
+      out.y = GRID_SIZE / 2 + Math.sin(ang) * d;
+      const c = harmonyColor(harmonyOf(layer), DICE.keep);
+      out.r = c.r; out.g = c.g; out.b = c.b;
+      const ids = liquidsOf(layer);
+      out.liquid = ids.length > 0 ? LIQUIDS_BY_ID.get(DICE.keep.pick(ids)) : undefined;
+    },
+  });
   /**
    * The working harmony for the current contract: the sequencer's window if
    * it set one, else the hue journey's window (one dye short of the contract,
@@ -1050,7 +1082,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     another. Two integers make the difference between "the plate moved" and
     "evolving thinned it twice and drew a finger through it once".
   */
-  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0, palettes: 0 });
+  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0, palettes: 0, kept: 0 });
   /*
     A finger the automation is drawing, over frames rather than in one.
 
@@ -3609,6 +3641,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 harmonyRef.current = contract ? harmonyFromContract(contract, true) : pickHarmony();
               }
             }
+          }
+
+          // ── Keep full (PLAN 18a-22): the dropper tops up a dish left running ──
+          if (currentSettings.keepFull && isActiveRef.current && drainFrameRef.current === 0) {
+            autoEventsRef.current.kept += stepKeepFull(keepFullRef.current, fluidsRef.current, now,
+              currentSettings.dyeBudget ?? 0.85, currentSettings.phaseAmount ?? 0, keepHandsRef.current);
           }
 
           // ── A pressed look change handing over (see `handoffRef`) ──
