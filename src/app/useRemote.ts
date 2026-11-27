@@ -288,10 +288,10 @@ export function useRemote({
     direction in the room, so it is turned and keeps its length and angle.
   */
   const onWall = (wall: unknown, x: number, y: number, layer: number, dx?: number, dy?: number,
-                  vec: 'stroke' | 'lean' = 'stroke', turned = true) => {
+                  vec: 'stroke' | 'lean' = 'stroke', turned = true, reach = false) => {
     const v = wallRef.current;
     if (wall !== true || !v) return { x, y, dx, dy };
-    const p = v.wallToPlate(x, y, layer, turned);
+    const p = v.wallToPlate(x, y, layer, turned, reach);
     if (dx === undefined || dy === undefined) return { x: p.x, y: p.y, dx, dy };
     if (vec === 'stroke') {
       const q = v.wallToPlate(x - dx, y - dy, layer, turned);
@@ -593,7 +593,8 @@ export function useRemote({
         case 'drop': {
           const g = parseRemoteGesture(message);
           if (!g || g.type !== 'drop') break;
-          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount, ...laidColour(selectedLiquid, g.color) });
+          // A drop at the pad's edge lands on the dish past the wall, as a finger's on the screen does (PLAN 18a-18).
+          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(g.wall, g.x, g.y, g.layer, undefined, undefined, 'stroke', true, true), layer: g.layer, amount: g.amount, ...laidColour(selectedLiquid, g.color) });
           break;
         }
         case 'press': {

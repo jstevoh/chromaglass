@@ -3149,6 +3149,18 @@
       ]
     },
     {
+      "name": "A pour off the screen's edge flows into the picture",
+      "shard": "plate",
+      "run": "npm run edgepour",
+      "timeout": 6,
+      "why": [
+        "Pouring past the edge (PLAN 18a-18): the bottle's tools in the screen's",
+        "edge band land on the dish past the picture, the rest of the screen",
+        "exactly as before, and the lab holds that a held pour there comes into",
+        "view by its own volume (none in view without it)."
+      ]
+    },
+    {
       "name": "The draught keeps the dish's liquid in the dish",
       "shard": "plate",
       "run": "npm run draught",
