@@ -227,7 +227,14 @@ knob's end (a box 102 by 51 pixels) at a quarter is off the law's box by 0.48 le
 moves anything (full size 0.50), its edges 82.8/40.3 pixels against 81.7/40.8, the light within
 0.011%, 0.04 levels from the full-size melt on average; the glow at an eighth 0.43 levels; A
 sharp beside B melted is A to the dither. Each scale's pictures are kept while anything is soft,
-so a rack walking through the scales allocates once. AIR_TIMES
+so a rack walking through the scales allocates once.
+On the Air (M4), 1600 × 1600, ms a plate draw, median (p90), one film-queue job at the PR's
+head, each melt beside the same draw forced to full size in the same run: one A melted 3.37
+(3.73) at a quarter against 5.04 (5.47); two both melted 4.91 (5.50) at a quarter against 9.20
+(9.58); A sharp beside B melted 5.03 (5.24) against 6.96 (7.35); both at the dissolve's glow
+6.00 (6.32) at a sixteenth; one sharp 2.84, two sharp 4.12. The 51b thread's numbers above
+came from another script (19.55 for two melted) and are not set against these; the pair that
+counts is this run's full size against its smaller picture, which halves two melted projectors.
 
 Found while building it, not done:
 
