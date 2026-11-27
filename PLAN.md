@@ -89,6 +89,25 @@ item held, ranked for the wall against GPU cost and jitter, all waiting on the o
 fingers crack, **48v** an electric field on the oil, **48w** Marangoni bursting, **48x** dancing
 droplets, **48y** drops drifting to the lamp's heat, **48z** partial coalescence in the closeup.
 
+**The physics queue (the owner's picks, 2026-11-27).** The owner rated every open
+liquid-physics theme on one board (about 230 items in 25 themes) and said "Queue it all up.
+Let's group things in testing so we can move quickly." Each batch below is one PR whose items
+the same checks prove, so a batch is built and tested once. **Next**, in this order: land the
+built PRs (#838, #662, #935, #882, #735, #664; #624 and #614 checked against main); caustics
+(31s-2, 48b, 47j); a clean grid with less jitter (18a-8 and the grid-size items); the music's
+physics (48f, 48c, 48r, the cord-only honesty items); real dye colour (18l, 38p); oil that breaks
+up (38w-27 and the bead and foam items); the ferrofluid (9aa, 9t, 38j); the new phenomena
+(48s–48z); heat (18f-2, 18e-3); tools that move liquid (18a-3, 15b, 15e); drops and pours (18c,
+18a-19); edges and glow from real optics (18b-3, 18e, 38i); each liquid by its own numbers
+(38s, RM-D); and the closeup (47a–47d, 29a–29d). Antigravity has fourteen of the batches
+(briefs in the project's files, `antigravity/physics-queue-2026-11-27/`); Claude threads take
+the rest, one PR each. **Later**: the chemical clock (48a), air fingers and ferns (38r-16 G2,
+48d, 48u), thin-film rainbows (48e, §32), bubbles (38g-2, §33), tilt and spin (18a-13, §22),
+pressing the glass (38l, 38r-18), lace (§20), polarised extras (31p), the lens (38q, 31a), the
+tank (47n, 48k, 48l) and the other ideas (48m, 48o, 15h, 15k). The owner's open questions
+marked next (18d-5, 18d-6, 18d-7, 38m, linear light, 22l, 33q-4) are with the owner; the rest
+wait on their themes.
+
 **Parked this week, kept in the plan.** The launch, the stores and the money (§12, §23,
 §37, §39, §43), the VJ software and the gig's plumbing (§13, §14, §16, §17, §24), the
 assistant (§44), the controls' polish (§35), and the efficiency hunt (§46) wait until the
