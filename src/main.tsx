@@ -369,6 +369,15 @@ function SiteGate() {
     if (phase === 'app') setLanding(false); else setAsking(true);
   };
   const signedIn = () => { setLanding(false); setPhase('app'); };
+  const dismissSignIn = () => {
+    setAsking(false);
+    setLanding(true);
+    try {
+      if (window.location.pathname.replace(/\/$/, '') === SHOW_PATH) {
+        window.history.pushState(window.history.state, '', `/${window.location.search}${window.location.hash}`);
+      }
+    } catch { /* a sandboxed frame: the address stays, landing still shows */ }
+  };
 
   // Back from the sign-in to the webpage uncovers it. Once the plate is up,
   // back changes the address and nothing else: no auth or address change
@@ -440,7 +449,7 @@ function SiteGate() {
       return (
         <>
           {landing && <LazyLanding onPlay={play} covered={asking} />}
-          {asking && <LazySignIn onSignedIn={signedIn} />}
+          {asking && <LazySignIn onSignedIn={signedIn} onClose={dismissSignIn} />}
         </>
       );
     }

@@ -247,7 +247,17 @@ function CuesBody({ p }: { p: DeskProps }) {
                 {c.id === p.liveId ? <Tag tone="live">live</Tag>
                 : c.id === p.nextId ? <Tag tone="next">next</Tag>
                 : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
-                {/* Take it off the set. A span, not a button: the row is the button. */}
+                {/* Cue options and remove. Spans with role="button" because CueRow itself is a button. */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={e => { e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); } }}
+                  title="Cue options (song link, capture, order)"
+                  aria-label={`Options for ${c.name}`}
+                  className="shrink-0 rounded px-1 text-[13px] leading-none text-faint opacity-50 hover:bg-hover hover:text-text focus:opacity-100 group-hover:opacity-100"
+                  data-testid={`cue-menu-open-${c.id}`}
+                >⋯</span>
                 <span
                   role="button"
                   tabIndex={0}
@@ -845,9 +855,8 @@ function ToolsBody({ p }: { p: DeskProps }) {
             style={{ '--fill': `${(((p.toolAmount ?? 1) - TOOL_AMOUNT.min) / (TOOL_AMOUNT.max - TOOL_AMOUNT.min)) * 100}%` } as CSSProperties}
             data-testid="tool-amount-range"
           />
-          {/* The value, and the door to the tool's own options (the Magnet's size). */}
+          {/* The value, and the door to the tool's own options (Magnet Size, Press Fingering & Thin Gap). */}
           <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />
-          <span className="shrink-0 font-mono text-[12px] text-text-2 min-[1400px]:hidden">{(p.toolAmount ?? 1).toFixed(1)}×</span>
         </div>
       )}
       {toolMenu && p.amountOf && p.onAmountFor && (
@@ -859,6 +868,10 @@ function ToolsBody({ p }: { p: DeskProps }) {
           onClose={() => setToolMenu(null)}
           magnetSize={p.magnetSize}
           onMagnetSize={p.onMagnetSize}
+          fingering={p.settings.fingering ?? 0}
+          onFingering={(v) => p.onSetting({ fingering: v })}
+          thinGap={p.settings.thinGap ?? 1}
+          onThinGap={(v) => p.onSetting({ thinGap: v })}
         />
       )}
     </div>

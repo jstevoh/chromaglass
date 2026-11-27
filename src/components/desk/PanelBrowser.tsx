@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../../lib/settingsMap';
+import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
 import { PINNABLE } from '../../lib/deskPins';
-import { PANELS, whereIs, type DeskLayout } from '../../lib/deskLayout';
+import { PANELS, panelSearchText, whereIs, type DeskLayout } from '../../lib/deskLayout';
 import { liveAvailable } from '../../lib/liveShow';
+import { useEscape } from '../../hooks/useEscape';
 
 /**
  * The panel browser (⌘P), Desk v2's way to every panel.
@@ -23,10 +24,11 @@ for (const p of PINNABLE) CONTROLS.set(p.section, (CONTROLS.get(p.section) ?? 0)
 
 const GROUP_NAME: Record<string, string> = Object.fromEntries(SETTINGS_CATEGORIES.map(c => [c.id, c.name]));
 
-export function PanelBrowser({ layout, at, onDock, onFloat, onStage, onClose }: {
+export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onStage, onClose }: {
   layout: DeskLayout;
   /** Where to hang it: under the + Panel button, right-aligned to it. */
   at: { top: number; right: number };
+  anchorRef?: RefObject<HTMLButtonElement | null>;
   onDock: (id: string) => void;
   onFloat: (id: string) => void;
   onStage: () => void;
@@ -35,19 +37,37 @@ export function PanelBrowser({ layout, at, onDock, onFloat, onStage, onClose }: 
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => { input.current?.focus(); }, []);
+  useEscape(onClose);
+  // Close on click outside without an invisible full-screen scrim that blocks header buttons.
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (boxRef.current?.contains(t) || anchorRef?.current?.contains(t)) return;
+      onClose();
+    };
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
+  }, [onClose, anchorRef]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const rank = (name: string) => {
+      if (!q) return 0;
+      const n = name.toLowerCase();
+      return n.startsWith(q) ? 0 : n.includes(q) ? 1 : 2;
+    };
     return PANELS
       .filter(p => {
         // The Live Show streams from the Mac app only (PLAN 37x-4d): not offered where it cannot.
         if (p.id === 'live' && !liveAvailable()) return false;
         if (!q) return true;
-        const sec = SECTION_BY_ID.get(p.id);
-        return sec ? sectionMatches(sec, q) : q.split(/\s+/).every(w => p.name.toLowerCase().includes(w));
+        const hay = panelSearchText(p);
+        return q.split(/\s+/).every(w => hay.includes(w));
       })
-      .sort((a, b) => SETTINGS_CATEGORIES.findIndex(c => c.id === a.category) - SETTINGS_CATEGORIES.findIndex(c => c.id === b.category));
+      .sort((a, b) => rank(a.name) - rank(b.name)
+        || SETTINGS_CATEGORIES.findIndex(c => c.id === a.category) - SETTINGS_CATEGORIES.findIndex(c => c.id === b.category));
   }, [query]);
   useEffect(() => { setSel(0); }, [query]);
 
@@ -60,19 +80,18 @@ export function PanelBrowser({ layout, at, onDock, onFloat, onStage, onClose }: 
 
   let lastGroup = '';
   return createPortal(
-    <>
-      <div className="fixed inset-0 z-[60]" onClick={onClose} data-testid="panel-browser-scrim" />
-      <div
-        className="fixed z-[61] flex max-h-[min(640px,80vh)] w-[380px] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface shadow-[0_20px_60px_rgba(0,0,0,.6)]"
-        style={{ top: at.top, right: at.right }}
-        data-testid="panel-browser"
-        onKeyDown={e => {
-          if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-          else if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(rows.length - 1, s + 1)); }
-          else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)); }
-          else if (e.key === 'Enter') { e.preventDefault(); act(sel, e.shiftKey); }
-        }}
-      >
+    <div
+      ref={boxRef}
+      className="fixed z-[61] flex max-h-[min(640px,80vh)] w-[380px] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface shadow-[0_20px_60px_rgba(0,0,0,.6)]"
+      style={{ top: at.top, right: at.right }}
+      data-testid="panel-browser"
+      onKeyDown={e => {
+        if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(rows.length - 1, s + 1)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)); }
+        else if (e.key === 'Enter') { e.preventDefault(); act(sel, e.shiftKey); }
+      }}
+    >
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
           <input
             ref={input}
@@ -123,8 +142,7 @@ export function PanelBrowser({ layout, at, onDock, onFloat, onStage, onClose }: 
             <span className="font-mono text-[11px] text-faint">⌘,</span>
           </button>
         }
-      </div>
-    </>,
+      </div>,
     document.body,
   );
 }

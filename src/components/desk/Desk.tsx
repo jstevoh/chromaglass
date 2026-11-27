@@ -17,6 +17,8 @@ import {
 } from '../../lib/deskLayout';
 import { getEffectiveTier } from '../../lib/tierGates';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
+import { useEscape } from '../../hooks/useEscape';
+import { matchesShortcut } from '../../lib/shortcuts';
 import type { DeskProps } from './deskProps';
 import { LiveFor } from './LiveFor';
 
@@ -164,13 +166,13 @@ export function Desk(p: DeskProps) {
         k.onTab(k.tabs[Number(e.key) - 1].id);
         return;
       }
-      if (mod && (e.key === 'p' || e.key === 'P') && !e.shiftKey) { e.preventDefault(); k.openBrowser(); return; }
-      if (mod && e.key === ',') { e.preventDefault(); k.onStage(); return; }
+      if (matchesShortcut(e, 'panel-browser')) { e.preventDefault(); k.openBrowser(); return; }
+      if (matchesShortcut(e, 'stage')) { e.preventDefault(); k.onStage(); return; }
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-      if (e.altKey && !mod && e.code === 'KeyD') {
+      if (matchesShortcut(e, 'deck-fold')) {
         e.preventDefault();
         k.set(x => ({ ...x, deckCollapsed: !x.deckCollapsed }));
-      } else if (e.key === 'Tab' && !mod && !e.altKey && !e.shiftKey && k.floats > 0 && (!t || t === document.body)) {
+      } else if (matchesShortcut(e, 'floats-toggle') && k.floats > 0 && (!t || t === document.body)) {
         e.preventDefault();
         setFloatsHidden(v => !v);
       }
@@ -617,6 +619,19 @@ export function Desk(p: DeskProps) {
           >
             All settings…
           </button>
+          {p.onOpenShortcuts && (
+            <button
+              type="button"
+              onClick={p.onOpenShortcuts}
+              className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="Keyboard shortcuts (?)"
+              aria-label="Keyboard shortcuts"
+              data-testid="shortcuts-button"
+            >
+              <span className="font-mono text-[11px]">?</span>
+              <span className="hidden xl:inline">Shortcuts</span>
+            </button>
+          )}
           <span className="truncate" data-testid="status-hearing">
             {p.status.audio}
             {p.status.sequence && ` · ${p.status.sequence}`}
@@ -689,6 +704,7 @@ export function Desk(p: DeskProps) {
         <PanelBrowser
           layout={l}
           at={browser}
+          anchorRef={browserButton}
           onDock={(id) => set(x => openPanel(x, id, 'deck'))}
           onFloat={(id) => set(x => openPanel(x, id, 'float'))}
           onStage={p.onStage}
@@ -709,6 +725,17 @@ function PanelMenu({ at, layout, popped, onPopOut, act, onReset, onClose }: {
   onReset: () => void;
   onClose: () => void;
 }) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEscape(onClose);
+  // Close on pointerdown outside without mounting an invisible scrim that blocks the header (H3-02).
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) onClose();
+    };
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
+  }, [onClose]);
+
   const id = at.id;
   const where = whereIs(layout, id);
   const allFolded = openPanels(layout).every(x => layout.collapsed.includes(x));
@@ -722,16 +749,18 @@ function PanelMenu({ at, layout, popped, onPopOut, act, onReset, onClose }: {
     ['Reset layout', onReset, 'reset'],
   ];
   return (
-    <>
-      <div className="fixed inset-0 z-[60]" onClick={onClose} onContextMenu={e => { e.preventDefault(); onClose(); }} />
-      <div className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface py-1 shadow-2xl" style={{ left: Math.min(at.x, window.innerWidth - 232), top: Math.min(at.y, window.innerHeight - 240) }} data-testid="panel-menu">
-        {rows.map(([label, run, key]) => (
-          <button key={key} onClick={run} className="block h-8 w-full px-3 text-left text-[13px] text-text-2 hover:bg-hover hover:text-text" data-testid={`panel-menu-${key}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-    </>
+    <div
+      ref={menuRef}
+      className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface py-1 shadow-2xl"
+      style={{ left: Math.min(at.x, window.innerWidth - 232), top: Math.min(at.y, window.innerHeight - 240) }}
+      data-testid="panel-menu"
+    >
+      {rows.map(([label, run, key]) => (
+        <button key={key} onClick={run} className="block h-8 w-full px-3 text-left text-[13px] text-text-2 hover:bg-hover hover:text-text" data-testid={`panel-menu-${key}`}>
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -812,11 +841,28 @@ function Layers({ p, report }: { p: DeskProps; report: boolean }) {
 function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const button = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const toggle = () => {
     if (at) { setAt(null); return; }
     const r = button.current?.getBoundingClientRect();
     if (r) setAt({ top: r.bottom + 4, left: r.left });
   };
+  // Close on Escape or pointerdown outside without an invisible scrim blocking the header (H3-01).
+  useEffect(() => {
+    if (!at) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAt(null); };
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (menuRef.current?.contains(t) || button.current?.contains(t)) return;
+      setAt(null);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', away);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', away);
+    };
+  }, [at]);
   return (
     <>
       <LooksGrid label={crumb} activeLookId={p.liveLookId} onSelectLook={p.onSendSaved} />
@@ -834,13 +880,12 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
         </button>
         {p.edited && <Tag>edited</Tag>}
         {at && createPortal((
-          <>
-            <div className="fixed inset-0 z-[60]" onClick={() => setAt(null)} />
-            <div
-              className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
-              style={{ top: at.top, left: at.left }}
-              data-testid="doc-menu"
-            >
+          <div
+            ref={menuRef}
+            className="fixed z-[61] w-56 overflow-hidden rounded-md border border-border-strong bg-surface shadow-2xl"
+            style={{ top: at.top, left: at.left }}
+            data-testid="doc-menu"
+          >
               {([
                 ['New — an empty plate', '', p.onNew, 'doc-new'],
                 ['Save as a new preset…', '⌘S', p.onSave, 'doc-save'],
@@ -886,7 +931,6 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
                 </div>
               )}
             </div>
-          </>
         ), document.body)}
       </div>
     </>

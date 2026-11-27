@@ -12,7 +12,7 @@ import { RailZoom } from './components/RailZoom';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
-import { GuidePanel } from './components/GuidePanel';
+import { CommandAndShortcuts } from './components/ShortcutSheet';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { CastNetworkItems, TvAsks } from './components/CastNetworkItems';
@@ -23,7 +23,6 @@ import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './li
 import { travelOfKey, valueOfKey } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
-import { CommandPalette } from './components/desk/CommandPalette';
 import { SoundPanel } from './components/SoundPanel';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
@@ -1671,8 +1670,6 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'b' || e.key === 'B') toggleBlackout();
-      if (e.key === '?') setShowHelp(h => !h);
       macroKey(e, settingsRef.current, visualizerRef.current, zoomMacro, aimMacro);
       // The tool in hand's Amount, a step at a time, at any width.
       if (e.key === '[' || e.key === ']') {
@@ -1696,7 +1693,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
-  }, [toggleBlackout, zoomMacro, aimMacro]);
+  }, [zoomMacro, aimMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.
@@ -1904,7 +1901,7 @@ export default function App() {
   });
 
   const {
-    showPalette, setShowPalette, paletteCommands,
+    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands,
   } = useCommandPalette({
     allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
     blackout, toggleBlackout, newLook, saveLook, docId, docName, replaceLook, setSeedCount,
@@ -3178,6 +3175,7 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
+            onShortcuts={() => setShowShortcuts(true)}
             recording={phoneRecording}
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
@@ -3584,6 +3582,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
+          onOpenShortcuts={() => setShowShortcuts(true)}
           onOpenAccount={openAccount}
           status={{
             audio: deskAudio,
@@ -3751,12 +3750,17 @@ export default function App() {
         </PanelGuard>
       )}
 
-      {/* ── ⌘K ─────────────────────────────────────────────────── */}
-      {showPalette && (
-        <PanelGuard name="The command palette" onClose={() => setShowPalette(false)}>
-        <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
-        </PanelGuard>
-      )}
+      {/* ── ⌘K, ? & About ──────────────────────────────────────── */}
+      <CommandAndShortcuts
+        showPalette={showPalette}
+        onClosePalette={() => setShowPalette(false)}
+        commands={paletteCommands}
+        showShortcuts={showShortcuts}
+        onCloseShortcuts={() => setShowShortcuts(false)}
+        showHelp={showHelp}
+        helpFocus={helpFocus}
+        onCloseHelp={() => { setShowHelp(false); setHelpFocus(null); }}
+      />
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
@@ -3777,18 +3781,6 @@ export default function App() {
           />
           </PanelGuard>
         )}
-      </AnimatePresence>
-
-      {/* ── About: the manual ─────────────────────────────────── */}
-      {/*
-        This used to be a five-line popover, and by the time anyone read it two
-        of the five lines were wrong — it still sent people to the settings
-        panel for presets months after the presets moved to the title. A short
-        help text that nobody owns rots; a manual with a section per control
-        group is at least somewhere the truth can be kept.
-      */}
-      <AnimatePresence>
-        {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
       {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}
