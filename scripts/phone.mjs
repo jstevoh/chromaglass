@@ -778,7 +778,7 @@ try {
       const target = await page.evaluate(() => {
         const rows = [...document.querySelectorAll('[data-testid^="phone-look-"]')].filter(el => el.getAttribute('aria-pressed') === 'false');
         const el = rows[3];
-        return el ? { id: el.dataset.testid, name: el.querySelector('span span')?.textContent ?? '' } : null;
+        return el ? { id: el.dataset.testid, name: el.textContent?.trim() ?? '' } : null;
       });
       if (target) await tap(page, target.id);
       // Asked twice: during the crossfade (two seconds by default), when the

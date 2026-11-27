@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
 import { ImagePlus, Palette, SlidersHorizontal, Video } from 'lucide-react';
 import { PicturePaletteButton } from '../PicturePaletteButton';
-import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
+import { Button, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
@@ -24,7 +24,8 @@ import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
 import { TipPad } from '../ui/TipPad';
-import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
+import { Bottle, LiveBottle } from '../ui/Playful';
+import { LookChip } from '../ui/LookChip';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
 import { clearFilmGroundNote } from '../../lib/controlHelp';
@@ -233,51 +234,52 @@ function CuesBody({ p }: { p: DeskProps }) {
         )}
       </div>
       <div className={`${scroller} px-2 pb-2`}>
-        {p.cues.map((c, i) => (
-          <CueRow
-            key={c.id}
-            index={i + 1}
-            name={c.name}
-            swatch={c.swatch}
-            state={c.id === p.liveId ? 'live' : c.id === p.nextId ? 'next' : 'idle'}
-            trailing={
-              <>
-                {c.song && <span className="shrink-0 text-[12px] text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
-                {c.kind === 'sequence' && <span className="shrink-0 text-[12px] text-faint" title="A stage sequence">seq</span>}
-                {c.missing && <span className="shrink-0 text-[12px] text-live" title="This look or sequence is not here any more">missing</span>}
-                {c.id === p.liveId ? <Tag tone="live">live</Tag>
-                : c.id === p.nextId ? <Tag tone="next">next</Tag>
-                : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
-                {/* Cue options and remove. Spans with role="button" because CueRow itself is a button. */}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={e => { e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); } }}
-                  title="Cue options (song link, capture, order)"
-                  aria-label={`Options for ${c.name}`}
-                  className="shrink-0 rounded px-1 text-[13px] leading-none text-faint opacity-50 hover:bg-hover hover:text-text focus:opacity-100 group-hover:opacity-100"
-                  data-testid={`cue-menu-open-${c.id}`}
-                >⋯</span>
-                <span
-                  role="button"
-                  tabIndex={0}
+        {/*
+          The set as round chips (PLAN 34b-6, the owner 2026-11-27: the rows
+          took a ton of room). Each chip is a picture of its look, in the
+          set's order, read left to right; the name, number, fade and song on
+          hover (or a long press, which opens the item's menu as a right-click
+          does). A click cues and a double-click sends, as the rows did; a
+          learned controller still touches the item through its midiKey. A
+          song is a note on the chip's foot, a sequence a dashed ring, a look
+          that is gone a faded chip.
+        */}
+        <div className="flex flex-wrap gap-2 px-1 pb-1 pt-1.5" data-testid="cue-chips">
+          {p.cues.map((c, i) => {
+            const state = c.id === p.liveId ? 'live' : c.id === p.nextId ? 'next' : 'idle';
+            const fade = c.fade === 0 ? 'cut' : `${c.fade}s fade`;
+            const tip = `${String(i + 1).padStart(2, '0')} · ${c.name} · ${fade}${c.song ? ` · goes up when ${c.song} plays` : ''}${c.kind === 'sequence' ? ' · a stage sequence' : ''}${c.missing ? ' · not here any more' : ''}`;
+            return (
+              <LookChip
+                key={c.id}
+                lookId={c.lookId}
+                name={c.name}
+                swatch={c.swatch}
+                size={40}
+                state={state}
+                title={`${tip}. Click cues, double-click sends now, right-click for its song, controls and order.`}
+                dim={c.missing}
+                onClick={() => p.onCue(c.id)}
+                onDoubleClick={() => p.onCueNow(c.id)}
+                onContextMenu={(e) => { e.preventDefault(); setMenuFor(c.id); }}
+                onLongPress={() => setMenuFor(c.id)}
+                midiKey={`preset:${c.id}`}
+                testId={`cue-${c.id}`}
+              >
+                {c.kind === 'sequence' && <span aria-hidden className="pointer-events-none absolute -inset-[3px] rounded-full border border-dashed border-text-2" />}
+                {c.song && <span className="pointer-events-none absolute -bottom-1 -left-1 rounded-full bg-elevated px-1 text-[11px] leading-4 text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
+                <button
+                  type="button"
                   onClick={e => { e.stopPropagation(); p.onItemAction(c.id, 'remove'); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); p.onItemAction(c.id, 'remove'); } }}
                   title="Remove from the set"
                   aria-label={`Remove ${c.name} from the set`}
-                  className="-mr-1 shrink-0 rounded px-1.5 text-[15px] leading-none text-faint opacity-0 hover:bg-hover hover:text-text focus:opacity-100 group-hover:opacity-100"
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                   data-testid={`cue-remove-${c.id}`}
-                >×</span>
-              </>
-            }
-            onClick={() => p.onCue(c.id)}
-            onDoubleClick={() => p.onCueNow(c.id)}
-            onContextMenu={(e) => { e.preventDefault(); setMenuFor(c.id); }}
-            midiKey={`preset:${c.id}`}
-            testId={`cue-${c.id}`}
-          />
-        ))}
+                >×</button>
+              </LookChip>
+            );
+          })}
+        </div>
         {menuFor && (() => {
           const c = p.cues.find(x => x.id === menuFor);
           return (
@@ -294,7 +296,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           );
         })()}
         {p.cues.length > 0 ? (
-          <p className="px-2 pt-1 text-[12px] text-faint">Right-click an item for its song, controls and order; × takes it off.</p>
+          <p className="px-2 pt-1 text-[12px] text-faint">Hover a look for its name; right-click or long-press it for its song, controls and order; × takes it off.</p>
         ) : (
           <div className="px-3 py-8 text-center text-[13px] text-muted" data-testid="set-empty">
             <p>This set is empty.</p>
@@ -321,31 +323,31 @@ function CuesBody({ p }: { p: DeskProps }) {
             <span className="font-mono text-[12px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
           </button>
           {savedOpen && (
-            <div className="max-h-[22vh] overflow-y-auto scrollbar-hide" data-testid="perform-saved-list">
+            <div className="flex max-h-[22vh] flex-wrap gap-2 overflow-y-auto px-1 pb-1 pt-1.5 scrollbar-hide" data-testid="perform-saved-list">
               {p.savedLooks.map(l => {
                 const state = l.id === p.liveLookId ? 'live' : l.id === p.cuedLook?.id ? 'next' : 'idle';
                 return (
-                  <div key={l.id} className={`group flex h-9 items-center rounded-md border ${state === 'live' ? 'border-live-border bg-live-bg' : state === 'next' ? 'border-accent-border bg-elevated' : 'border-transparent hover:bg-hover'}`}>
+                  <LookChip
+                    key={l.id}
+                    lookId={l.id}
+                    name={l.name}
+                    swatch={l.swatch}
+                    size={40}
+                    state={state}
+                    title={`${l.name}${state === 'live' ? ' (live)' : state === 'next' ? ' (next)' : ''}. Click cues it, Go sends it; double-click sends it now.`}
+                    onClick={() => p.onCueSaved(l.id)}
+                    onDoubleClick={() => p.onSendSaved(l.id)}
+                    testId={`perform-saved-${l.id}`}
+                  >
                     <button
-                      onClick={() => p.onCueSaved(l.id)}
-                      onDoubleClick={() => p.onSendSaved(l.id)}
-                      title={`Cue ${l.name}; Go sends it. Double-click sends it now.`}
-                      className="flex h-full min-w-0 flex-1 items-center gap-2.5 px-2 text-left"
-                      data-testid={`perform-saved-${l.id}`}
-                      data-state={state}
-                    >
-                      <SlideMount swatch={l.swatch} size={20} />
-                      <span className={`truncate text-[13px] ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{l.name}</span>
-                    </button>
-                    {state === 'live' ? <Tag tone="live">live</Tag> : state === 'next' ? <Tag tone="next">next</Tag> : null}
-                    <button
+                      type="button"
                       onClick={() => p.onAddSavedToSet(l.id)}
                       title={`Add ${l.name} to the set`}
                       aria-label={`Add ${l.name} to the set`}
-                      className="ml-1 mr-1 shrink-0 rounded px-1.5 py-0.5 text-[13px] text-faint hover:bg-hover hover:text-text"
+                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                       data-testid={`perform-saved-add-${l.id}`}
                     >+</button>
-                  </div>
+                  </LookChip>
                 );
               })}
             </div>
