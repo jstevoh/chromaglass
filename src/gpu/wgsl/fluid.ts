@@ -15,7 +15,7 @@ import { GRID_FILTER_KERNELS } from './fluid/gridFilter';
 import { REACTION_KERNELS } from './fluid/reactions';
 import { FIELD_KERNELS } from './fluid/fields';
 import { SEAL_KERNELS } from './fluid/seal';
-import { HEAD, NOISE_WGSL, THIN_FACE, W } from './fluid/shared';
+import { HEAD, NOISE_WGSL, PACKED, THIN_FACE, W } from './fluid/shared';
 import { thinGapKernels } from './thinGap';
 import { filmKernels } from './film';
 import { slumpKernels } from './slump';
@@ -69,8 +69,9 @@ function substepped(name: string): string {
 /*
   The same carries on a thin gap, through the faces the thin solve made
   conserve liquid (THIN_FACE) in place of faces rebuilt from the cells'
-  velocities: `pr` is bound to the solve's own P, and the gap and the
-  mobility follow everything the kernel already takes. A.b.w is the rest gap.
+  velocities: the pressure's slot holds the solve's faces (`flow`, PLAN
+  18a-8), and the gap and the mobility follow everything the kernel already
+  takes. A.b.w is the rest gap.
 */
 function thinFaced(src: string, name: string): string {
   const block = /  let t = vec2i\(e\.y, e\.x\);\n[^]*?  let ve = [^\n]*\n/;
@@ -82,6 +83,10 @@ function thinFaced(src: string, name: string): string {
   const bindings = `@group(0) @binding(${last + 1}) var sq: texture_2d<f32>;\n@group(0) @binding(${last + 2}) var<storage, read> mob: array<f32>;\n`;
   const withFace = src.slice(0, at) + `${THIN_FACE}\n` + src.slice(at);
   return withFace
+    .replace('var<storage, read> pr: array<f32>;', 'var<storage, read> flow: array<vec4f>;')
+    // The packed pressure's reader goes with it: what still asks a cell's P (the oil's lip) reads the faces' copy (tfP).
+    .replace(PACKED, '')
+    .replace(/packedAt\(([^,()]+), ([^,()]+), n\)/g, 'tfP(vec2i($1, $2), n)')
     .replace(block, '  let ve = thinFaceVel(a, e, n);\n')
     .replace(new RegExp(`(@group\\(0\\) @binding\\(${last}\\)[^\\n]*\\n)`), `$1${bindings}`);
 }
@@ -275,7 +280,7 @@ function airGiveKernel(planned: boolean): string {
   return `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var give: texture_storage_2d<r32float, write>;
-@group(0) @binding(4) var<storage, read> pr: array<f32>;
+@group(0) @binding(4) var<storage, read> flow: array<vec4f>;
 ${sub}@group(0) @binding(${b}) var sq: texture_2d<f32>;
 @group(0) @binding(${b + 1}) var<storage, read> mob: array<f32>;
 @group(0) @binding(${b + 2}) var airWas: texture_2d<f32>;
@@ -405,7 +410,7 @@ KERNELS.bodyAdvectPairSub = `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
-@group(0) @binding(5) var<storage, read> pr: array<f32>;
+@group(0) @binding(5) var<storage, read> flow: array<vec4f>;
 @group(0) @binding(6) var<storage, read> sub: array<f32>;
 @group(0) @binding(7) var sq: texture_2d<f32>;
 @group(0) @binding(8) var<storage, read> mob: array<f32>;
