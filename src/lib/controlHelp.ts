@@ -207,7 +207,7 @@ export const CONTROL_HELP: Record<string, string> = {
   oilWeight: 'How heavy the oil is against the water. Right, it sinks like a lava lamp\'s wax and the lamp lifts it. Needs Gravity.',
   filmHold: 'The water film between two oil drops holds them apart, so they crowd without merging until pressed. Needs Oil Tension.',
   oilTension: 'Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge.',
-  clearFilm: 'Pours a clear oil film over the dish. Thin spots and dust tear it open into a lace of holes (dewetting).',
+  clearFilm: 'Lays a clear oil film that tears into lace. Shows bright on Lamp Ground; darkens on black ground unless dyed.',
   clearFilmDye: 'Dyes the clear film, so the lace takes a colour, deeper where it is thick, and its holes show the water.',
   thinGap: 'Treats the plate as a thin gap between two glasses, so a push coasts and viscosity matters.',
   gapThickness: 'How thick the liquid is in the thin gap, from water to glycerine. Sets how long a push lasts.',
@@ -312,4 +312,14 @@ const ALL: Record<string, string> = { ...mixerHelp(), ...CONTROL_HELP };
 export function helpFor(key: string | null | undefined): string | undefined {
   if (!key) return undefined;
   return ALL[key.startsWith('setting:') ? key.slice('setting:'.length) : key];
+}
+
+/**
+ * Ground note for Clear Film when neither Lamp Ground nor Film Dye is raised: on a black
+ * ground there is no lamp behind the dish, so thinning the water path darkens instead of
+ * glowing white.
+ */
+export function clearFilmGroundNote(lampGround?: number, clearFilmDye?: number): string | undefined {
+  if ((lampGround ?? 0) > 0.001 || (clearFilmDye ?? 0) > 0.001) return undefined;
+  return 'Black ground has no lamp behind the plate: Clear Film thins the water path under it instead of showing white. Raise Film Dye or turn on Lamp Ground to see the lace.';
 }
