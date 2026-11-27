@@ -239,8 +239,6 @@ Found while building it, not done:
 - **51c-3 · A short dissolve's ring** (S). Under 2 s the look's fade is under a second, and the
   handover never runs shorter than one, so the ferrofluid ring's swap falls past the rack's
   middle. Hold the handover inside the rack's middle half too, or give Focus Dissolve a 2 s floor.
-- **51c-4 · Owner looks under the lens pass draw whole** (S, found by `npm run leandisplay`).
-  LEAN_NOTE
 
 ## 51d. Nothing can block the beam between the stage and the lens
 
