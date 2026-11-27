@@ -274,10 +274,10 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
       centre off true again. The sides can now give way, and the breadcrumb
       truncates instead.
     */
-    <header ref={headerRef} className="relative col-[1/-1] flex items-center justify-between gap-2 border-b border-border px-3 lg:gap-4 lg:px-4">
+    <header ref={headerRef} className="relative col-[1/-1] flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 border-b border-border px-3 py-1.5 md:h-12 md:flex-nowrap md:py-0 lg:gap-4 lg:px-4">
       <div
         ref={leftRef}
-        className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium lg:max-w-[38%]"
+        className="flex min-w-0 flex-1 basis-full items-center gap-2 text-[13px] font-medium md:basis-auto md:max-w-[30%] md:flex-initial lg:max-w-[38%]"
         style={leftMax != null ? { maxWidth: leftMax } : undefined}
       >
         {/*
@@ -323,7 +323,7 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
         used to go altogether, and a row of unlabelled dots was reported as
         impossible to read.
       */}
-      <div className="min-w-0 shrink lg:pointer-events-none lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
+      <div className="min-w-0 max-w-full shrink lg:pointer-events-none lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
         <div ref={switchRef} className="lg:pointer-events-auto">
           {/*
             The owner's tabs, each a set of panels (lib/deskTabs.ts), and the
@@ -334,7 +334,7 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
           <TabStrip tabs={tabs} tab={tab} onTab={onTab} onEdit={onTabEdit} onAddPanel={onAddPanel} />
         </div>
       </div>
-      <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`} data-testid="header-cluster" data-fold={level}>
+      <div ref={clusterRef} className={`ml-auto flex shrink-0 items-center whitespace-nowrap md:ml-0 ${tight ? 'gap-1.5' : 'gap-3'}`} data-testid="header-cluster" data-fold={level}>
         {leading}
         {folded ? (
           <div ref={foldRef} className="relative">

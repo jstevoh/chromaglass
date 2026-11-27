@@ -67,6 +67,8 @@ const UNITS: Record<string, (v: number) => string> = {
   cometAngle: v => `${Math.round(v)}°`,
   faradayHz:  v => (v > 0 ? `${Math.round(v)} Hz` : 'Off'),
   faraday:    v => `${v.toFixed(2)} g`,
+  faradayRock: v => (v > 0 ? `${v.toFixed(2)} Hz` : 'Still'),
+  faradayGain: v => `${v.toFixed(1)}×`,
   spinAuto:   v => SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(v)))] ?? 'Off',
   spinRpm:    v => `${signedZero(v, 1).toFixed(1)} rpm`,
   spinBeats:  v => `${Math.round(v)}`,

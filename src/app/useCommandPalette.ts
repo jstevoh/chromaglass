@@ -46,6 +46,8 @@ interface CommandPaletteDeps {
   setSeedCount: Dispatch<SetStateAction<number>>;
   setClearTrigger: Dispatch<SetStateAction<number>>;
   setDrainTrigger: Dispatch<SetStateAction<number>>;
+  clearPlate?: () => void;
+  drainPlate?: () => void;
   isActive: boolean;
   setIsActive: Dispatch<SetStateAction<boolean>>;
   isAutomated: boolean;
@@ -85,7 +87,7 @@ interface CommandPaletteDeps {
 export function useCommandPalette({
   allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
   blackout, toggleBlackout, newLook, saveLook, docId, docName, replaceLook, setSeedCount,
-  setClearTrigger, setDrainTrigger, isActive, setIsActive, isAutomated, setIsAutomated, settings,
+  setClearTrigger, setDrainTrigger, clearPlate, drainPlate, isActive, setIsActive, isAutomated, setIsAutomated, settings,
   updateSettings, recordingAny, recordChoice, toggleRecording, perfLive, togglePerformance,
   setShowRecordPanel, triggerLucky, hideOverlays, setSettingsSection, setShowSettings, setShowHelp,
   openAllSettings, setShowMidi, setShowSequencer, showActivity, setShowActivity, setShowSongs,
@@ -150,8 +152,8 @@ export function useCommandPalette({
       { id: 'save',      name: 'Save as a new preset…',     kind: 'Actions', kbd: SHORTCUT_KBD.save,     run: saveLook },
       ...(docId ? [{ id: 'save-over', name: `Save over “${docName}”`, kind: 'Actions' as const, run: replaceLook }] : []),
       { id: 'seed',      name: 'Seed the plate',            kind: 'Actions', run: () => setSeedCount(v => v + 1) },
-      { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => setClearTrigger(v => v + 1) },
-      { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
+      { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => (clearPlate ?? (() => setClearTrigger(v => v + 1)))() },
+      { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => (drainPlate ?? (() => setDrainTrigger(v => v + 1)))() },
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: SHORTCUT_KBD.freeze, run: () => setIsActive(v => !v) },
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'record-video',       name: recordingAny ? `Stop recording (${runningWhat})` : `Record: ${makesText(recordChoice)}`, kind: 'Actions', kbd: SHORTCUT_KBD.record, run: toggleRecording },

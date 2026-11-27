@@ -55,6 +55,7 @@ import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { mixWait } from './mixWait';
 import { rimCount, rimMask } from '../lib/rimMask';
+import { captureSimSnapshot, restoreSimSnapshot, restoreReadbackArrays, copySeedArrays, applySeedArrays, zeroSimArrays, type SimStateSnapshot } from './plateSnapshot';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
 const c01 = (v: number | undefined) => Math.max(0, Math.min(1, v ?? 0));
@@ -447,9 +448,9 @@ export class FluidSimulation {
   private coverCount = 0;
   /** Holes still closing: carried so the fill converges instead of running once. */
   private fillingHoles: { at: Float32Array; left: number }[] = [];
-  private rbDensity: Float32Array;  // downsampled readback
-  private rbVx: Float32Array;
-  private rbVy: Float32Array;
+  readonly rbDensity: Float32Array;  // downsampled readback
+  readonly rbVx: Float32Array;
+  readonly rbVy: Float32Array;
   /** What the plate is being asked to do this moment; set from outside once a frame. */
   phrase: Phrase = { drive: 1, gust: 0, drift: 0.5 };
   /** The clock's own lean, slewed so no one frame can move it far. */
@@ -686,19 +687,14 @@ export class FluidSimulation {
 
   /** The state a new solver opens on, kept for `restoreSeed`. */
   private keepSeed() {
-    const src = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
-    if (!this.seed) this.seed = src.map(() => new Float32Array(GRID_AREA));
-    for (let k = 0; k < src.length; k++) this.seed[k].set(src[k]);
+    this.seed = copySeedArrays([this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp], this.seed);
   }
 
   /** Put the attached solver's opening state back; for a solver that never handed anything back. */
   private restoreSeed(): boolean {
-    if (!this.seed) return false;
-    const dst = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
-    for (let k = 0; k < dst.length; k++) dst[k].set(this.seed[k]);
-    this.wait.putBack();
-    this.restAfterRestore();
-    return true;
+    return applySeedArrays([this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp], this.seed, () => {
+      this.wait.putBack(); this.restAfterRestore();
+    });
   }
 
   /**
@@ -707,18 +703,7 @@ export class FluidSimulation {
    * whatever broke the one before it.
    */
   private restoreFrom(dye: Float32Array, vel: Float32Array): boolean {
-    const clean = (v: number) => (Number.isFinite(v) ? v : 0);
-    for (let i = 0; i < GRID_AREA; i++) {
-      this.densityR[i] = clean(dye[i * 4]);
-      this.densityG[i] = clean(dye[i * 4 + 1]);
-      this.densityB[i] = clean(dye[i * 4 + 2]);
-      this.density[i] = clean(dye[i * 4 + 3]);
-      this.vx[i] = clean(vel[i * 4]);
-      this.vy[i] = clean(vel[i * 4 + 1]);
-      this.temp[i] = clean(vel[i * 4 + 2]);
-    }
-    this.restAfterRestore();
-    return true;
+    return restoreReadbackArrays(this, dye, vel, () => this.restAfterRestore());
   }
 
   /** The CPU arrays hold absolute state again: the gap at rest, nothing pending. */
@@ -1241,11 +1226,8 @@ export class FluidSimulation {
     this.speciesPoll.clear();
     this.gpu?.clear();
     this.clearChemistry();
-    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
-    this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
-    this.temp.fill(0);
-    this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
-    this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
+    zeroSimArrays([this.density, this.densityR, this.densityG, this.densityB, this.s, this.sR, this.sG, this.sB,
+      this.temp, this.vx, this.vy, this.vx0, this.vy0, this.cvx, this.cvy, this.cpr, this.cdv, this.rbDensity, this.rbVx, this.rbVy]);
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
@@ -1260,6 +1242,15 @@ export class FluidSimulation {
     this.seedMean = null;
     this.handBank = 0;
     this.gpu?.clear();
+  }
+
+  /** Capture live GPU + CPU fields for Undo (PLAN 49a). */
+  snapshotPlate(): SimStateSnapshot { return captureSimSnapshot(this, this.stepIndex, this.oilAdd); }
+
+  /** Restore a snapshot captured by `snapshotPlate()`. */
+  restorePlate(snap: SimStateSnapshot): void {
+    const out = restoreSimSnapshot(this, snap, () => this.restAfterRestore());
+    this.stepIndex = out.stepIndex; this.oilAdd = out.oilAdd; this.dirty = out.forceUpload;
   }
 
   private splatBlob(cx: number, cy: number, radius: number, amount: number, r: number, g: number, b: number) {

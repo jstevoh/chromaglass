@@ -138,6 +138,9 @@ export interface DeskProps {
   onCue: (id: string) => void;
   onCueNow: (id: string) => void;
   onGo: () => void;
+  /** Undo the last look fade from the Cues panel (PLAN 49a / H3-07). */
+  onBack?: () => void;
+  canBack?: boolean;
   onGoBackPlate?: () => void;
   backLook?: string | null;
   onBackFollowsFront?: () => void;
@@ -170,7 +173,8 @@ export interface DeskProps {
   recipeKeys: (keyof VisualizerSettings)[];
   onRecipeKeys: (keys: (keyof VisualizerSettings)[]) => void;
   onRandomise: () => void;
-  randomiseArmed: boolean;
+  /** Show an Undo toast when a panel is closed with × (PLAN 49a / H5-04). */
+  onPanelClosed?: (panelTitle: string, restore: () => void) => void;
   hasFilm: boolean;
   hasMark: boolean;
   takes?: MixTakes;

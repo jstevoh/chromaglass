@@ -142,6 +142,7 @@ let showServer = null;
 /** What the show server was started with, for the menu's details. */
 const show = {
   port: 0,
+  httpsPort: null,
   osc: 0,
   audioPort: 0,
   /** 'off', 'local' (this Mac only) or 'network' (anyone on the Wi-Fi); see oscSettings. */
@@ -244,7 +245,7 @@ async function serverUp(port) {
   while (Date.now() < deadline) {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/remote-info.json`, { cache: 'no-store' });
-      if (res.ok) return;
+      if (res.ok) return await res.json();
     } catch { /* not listening yet */ }
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -341,14 +342,14 @@ function grantPermissions() {
       callback({ video: request.frame });
       return;
     }
-    // A picture alone: a hand at this Mac picks the window (pickSource.js; it took the first one listed).
+    // A picture alone: a hand at this Mac picks the window or screen (pickSource.js).
     try {
       const sources = await Promise.race([
-        desktopCapturer.getSources({ types: ['window', 'screen'] }),
+        desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: true }),
         new Promise((r) => setTimeout(() => r([]), 1500)),
       ]);
       if (!sources.length) { callback({ video: request.frame }); return; }
-      const chosen = await pickSource(sources, (opts) => dialog.showMessageBox(showWindow ?? undefined, opts));
+      const chosen = await pickSource(sources, { BrowserWindow, parent: showWindow ?? undefined });
       callback(chosen ? { video: chosen } : {});
     } catch {
       callback({});
@@ -538,19 +539,55 @@ function wireWindow(win) {
 const lanAddresses = () =>
   Object.values(networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal).map((n) => n.address);
 
+/** Whether the show server / license currently permits Pro-only inputs (OSC, Ableton Link). */
+function isProTier() {
+  if (showServer?.linkTier) {
+    const lt = showServer.linkTier();
+    if (lt && lt.tier !== null) return Boolean(lt.pro);
+  }
+  if (show.license?.valid) return show.license.tier === 'pro';
+  return !show.requireSignIn;
+}
+
+function openProLearnMore() {
+  if (showWindow && !showWindow.isDestroyed()) {
+    if (showWindow.isMinimized()) showWindow.restore();
+    showWindow.show();
+    showWindow.focus();
+    const tier = showServer?.linkTier?.()?.tier ?? (show.license?.valid ? show.license.tier : 'free');
+    if (tier !== 'free') {
+      showWindow.webContents.send('chromaglass:open-account');
+      return;
+    }
+  }
+  void shell.openExternal('https://chromaglass.art/pro');
+}
+
 /** What the terminal server prints, for a show with no terminal. */
 function showDetails() {
   const hosts = lanAddresses();
+  const pro = isProTier();
   const lines = [
     `Show key: ${show.key}`,
     '',
     ...(hosts.length
-      ? hosts.flatMap((h) => [`Phone remote: http://${h}:${show.port}/?remote=1&key=${show.key}`, `Network display: http://${h}:${show.port}/?cast=true&key=${show.key}`, `TV at home: http://${h}:${show.port}/tv?key=${show.key}`])
+      ? hosts.flatMap((h) => [
+          `Phone remote: http://${h}:${show.port}/?remote=1&key=${show.key}`,
+          show.httpsPort
+            ? `Network display: https://${h}:${show.httpsPort}/?cast=true&key=${show.key}`
+            : 'Network display: https is off on this Mac (WebGPU needs https; use TV at home below, or run "npm run tunnel")',
+          `TV at home: http://${h}:${show.port}/tv?key=${show.key}`,
+        ])
       : ['No network: the phone remote and network displays need the laptop on Wi-Fi or Ethernet.']),
+    ...(hosts.length && show.httpsPort
+      ? ['(A network display’s browser warns once that the certificate is self-signed: choose Advanced, then Proceed.)']
+      : []),
     '',
-    show.oscMode === 'off'
-      ? 'OSC in: off (Show menu > OSC input turns it on)'
-      : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    !pro
+      ? 'OSC in: requires ChromaGlass Pro (UDP port 9000)'
+      : show.oscMode === 'off'
+        ? 'OSC in: off (Show menu > OSC input turns it on)'
+        : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
     // Where a VJ finds the whole address space and the starter maps (PLAN 13.4):
     // the details are the one place the app names OSC beside its port.
     'Every OSC address, with Resolume and TouchDesigner maps: github.com/jstevoh/chromaglass/blob/main/docs/osc.md',
@@ -559,7 +596,7 @@ function showDetails() {
     // dialog on the menu's pick: on a Mac a message box is a sheet on the
     // show window, and a window with a sheet up does not close, so the app
     // hung at quit in desktop.yml's packed check (no Pro key in that run).
-    ...(showServer?.linkTier && !showServer.linkTier().pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
+    ...(!pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
@@ -634,7 +671,12 @@ function startUpdater() {
  * was, so a restart, like the switch going off (remote-server.js `assistantOpenedOsc`), puts back the owner's own choice.
  */
 let oscTemporary = false;
+let lastMenuPro = null;
 async function setOscMode(mode, quiet = false, keep = true) {
+  if (!quiet && mode !== 'off' && !isProTier()) {
+    buildMenu();
+    return;
+  }
   show.oscMode = mode;
   oscTemporary = !keep;
   if (keep) writeShowFile({ osc: mode });
@@ -684,6 +726,8 @@ function outputsHook() {
 
 function buildMenu() {
   const isMac = process.platform === 'darwin';
+  const pro = isProTier();
+  lastMenuPro = pro;
   const template = [
     ...(isMac ? [{ role: 'appMenu' }] : []),
     { role: 'fileMenu' },
@@ -703,12 +747,28 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
         {
+          id: 'osc-menu',
           label: 'OSC input (Pro)',
+          enabled: pro,
           submenu: [
             ['off', 'Off'],
             ['local', 'This Mac only'],
             ['network', 'From the network'],
-          ].map(([mode, label]) => ({ id: `osc-${mode}`, label, type: 'radio', checked: show.oscMode === mode, click: () => setOscMode(mode) })),
+          ].map(([mode, label]) => ({
+            id: `osc-${mode}`,
+            label,
+            type: 'radio',
+            enabled: pro,
+            checked: pro && show.oscMode === mode,
+            click: (m) => {
+              if (!isProTier()) {
+                m.checked = false;
+                buildMenu();
+                return;
+              }
+              void setOscMode(mode);
+            },
+          })),
         },
         /*
           Ableton Link, for an operator who never opens Settings → Sound
@@ -722,22 +782,39 @@ function buildMenu() {
           id: 'link',
           label: 'Ableton Link (Pro)',
           type: 'checkbox',
-          checked: !!showServer?.linkOn?.(),
+          enabled: pro,
+          checked: pro && !!showServer?.linkOn?.(),
           click: (item) => {
+            if (!isProTier()) {
+              item.checked = false;
+              buildMenu();
+              return;
+            }
             if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send('chromaglass:link', item.checked);
             else buildMenu();
           },
         },
+        ...(!pro ? [{
+          id: 'pro-learn-more',
+          label: 'Learn More About Pro (OSC & Link)…',
+          click: openProLearnMore,
+        }] : []),
       ],
     },
   ];
   // What the updater found goes under the app's name, where a Mac app keeps
   // Check for Updates…, and is rebuilt each time that changes (updates.js).
-  // Install Updates Automatically sits under it, a tick (13-update-auto).
+  // Install Updates Automatically sits under it, a tick (13-update-auto), or
+  // an explanation on unsigned builds where Squirrel cannot install in place.
   const item = updates ? updateMenuItem(updates.state) : null;
   const autoItem = updates ? autoMenuItem(updates.state) : null;
   if (item) {
-    const entries = [{ ...item, click: () => { void updates?.act(); } }, ...(autoItem ? [{ ...autoItem, click: (m) => updates?.setAuto(m.checked) }] : [])];
+    const entries = [
+      { ...item, click: () => { void updates?.act(); } },
+      ...(autoItem
+        ? [{ ...autoItem, click: (m) => updates?.setAuto(m.checked) }]
+        : [{ id: 'auto-update-note', label: 'Automatic updates need a signed build', enabled: false }]),
+    ];
     if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, ...entries, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
     else template.push({ label: 'Help', submenu: entries });
   }
@@ -865,10 +942,16 @@ async function start() {
   // operator has open, and below Pro the page asks again every few seconds.
   showServer.onLinkChange?.((on) => {
     const item = Menu.getApplicationMenu()?.getMenuItemById('link');
-    if (item && item.checked !== on) item.checked = on;
+    const want = isProTier() && Boolean(on);
+    if (item && item.checked !== want) item.checked = want;
   });
-  await serverUp(show.port);
+  const serverInfo = await serverUp(show.port);
+  show.httpsPort = typeof serverInfo?.httpsPort === 'number' && serverInfo.httpsPort > 0 ? serverInfo.httpsPort : null;
   buildMenu();
+  // Rebuild menus if the user activates or removes a Pro key while the app is open.
+  setInterval(() => {
+    if (isProTier() !== lastMenuPro) buildMenu();
+  }, 2000).unref?.();
   // What the check reads from the main process (scripts/desktop.mjs): the choice, and what the socket did with it.
   globalThis.__chromaglassOsc = { mode: show.oscMode, state: showServer.oscState?.() };
 
