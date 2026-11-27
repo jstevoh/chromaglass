@@ -3246,6 +3246,19 @@
       ]
     },
     {
+      "name": "The ouzo clouds on its measured curve, and Louche's cloud leads",
+      "shard": "lab",
+      "run": "npm run ouzo",
+      "timeout": 15,
+      "why": [
+        "PLAN 48s-1 and 48s-6: each cell's droplets are ouzoDrops of its own",
+        "ethanol, oil and gap, none without oil or at the bottle's strength,",
+        "the oil kept through water and Alcohol and across a regrid, the plate",
+        "handed 209 x the droplets; and Louche's small seed, Ouzo-led dish and",
+        "translucent white (two control builds and a 3% control)."
+      ]
+    },
+    {
       "name": "Lava Pop's colour stays in its dish",
       "shard": "lab",
       "run": "npm run rimdye",

@@ -158,6 +158,7 @@
     "bubbles": "npm run build && node scripts/bubbles.mjs",
     "draught": "node scripts/draught.mjs",
     "rimdye": "node scripts/rimdye.mjs",
+    "ouzo": "node scripts/ouzo.mjs",
     "edgepour": "node scripts/edgepour.mjs",
     "dye": "npm run build && node scripts/dye.mjs",
     "sw": "npm run build && node scripts/sw.mjs",
