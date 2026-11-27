@@ -58,7 +58,7 @@ export function VideoShelf({ name, filming, pouring, onFilm, onPour, mixOrder, o
     <div className="flex items-center gap-1.5" data-testid={`${prefix}video-loaded`}>
       <div className="min-w-0 flex-1">
         <div className={`truncate ${phone ? 'text-[14px]' : 'text-[12px]'} text-text`} data-testid={`${prefix}video-name`}>{name}</div>
-        <div className="truncate text-[11px] text-dim">
+        <div className="truncate text-[12px] text-dim">
           {filming && lamp ? (pouring ? 'the lamp, and pouring' : 'the lamp under the dish') : filming && pouring ? 'playing and pouring' : filming ? 'playing through the dye' : pouring ? 'pouring as dye' : 'loaded'}
         </div>
       </div>

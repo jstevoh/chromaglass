@@ -51,7 +51,7 @@ export function LooksGrid({
         }`}
       >
         <span>{label}</span>
-        <span className="text-[11px] opacity-70" aria-hidden="true">▾</span>
+        <span className="text-[12px]" aria-hidden="true">▾</span>
       </button>
       {open && createPortal(
         <div
@@ -80,7 +80,7 @@ export function LooksGrid({
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {groups.map(g => (
                 <div key={g.label} className="mb-5 last:mb-0">
-                  <div className="mb-2 px-1 text-[11px] font-medium uppercase tracking-wider text-muted">
+                  <div className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider text-muted">
                     {g.label}
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -119,7 +119,7 @@ export function LooksGrid({
                               {item.name}
                             </span>
                             {locked && (
-                              <span className="shrink-0 rounded bg-black/30 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide opacity-80">
+                              <span className="shrink-0 rounded bg-black/30 px-1.5 py-0.5 text-[12px] font-medium uppercase tracking-wide">
                                 Pack
                               </span>
                             )}

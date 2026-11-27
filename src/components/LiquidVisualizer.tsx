@@ -6890,7 +6890,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       )}
       {glLost && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="gl-lost">
-          <span className="font-mono text-[11px] tracking-widest text-white/40">rebuilding the plate…</span>
+          <span className="font-mono text-[12px] tracking-widest text-dim">rebuilding the plate…</span>
         </div>
       )}
     </div>

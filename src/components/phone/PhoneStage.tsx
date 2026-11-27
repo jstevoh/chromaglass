@@ -755,7 +755,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 <ToolGlyph id={id} size={20} />
                 <span>{label}</span>
                 {on && Math.abs(p.amount - 1) > 0.01 && (
-                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[11px] text-text">{p.amount.toFixed(1)}</span>
+                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[12px] text-text">{p.amount.toFixed(1)}</span>
                 )}
               </button>
             );
@@ -973,7 +973,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 className="h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none focus:border-accent"
                 data-testid="phone-save-name"
               />
-              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-40" data-testid="phone-save-confirm">
+              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-65" data-testid="phone-save-confirm">
                 Save
               </button>
             </form>
@@ -1057,8 +1057,8 @@ export function PhoneStage(p: PhoneStageProps) {
                     >
                       <SlideMount swatch={l.swatch} still={lookStill(l.id)} size={44} />
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
-                        {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
+                        <span className={`block truncate text-[14px] ${on ? 'text-on-lit' : 'text-text'}`}>{l.name}</span>
+                        {l.description && <span className={`block truncate text-[12px] ${on ? 'text-on-lit' : 'text-dim'}`}>{l.description}</span>}
                       </span>
                     </button>
                   );
@@ -1131,9 +1131,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
           )}
           {p.audioSource !== 'none' && (
-            <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
+            <div className="mt-3">
               <Slider label="Follow the song" value={p.songFollow} {...pinSlider('songFollow', p.songFollow)} step={0.01} onChange={p.onSongFollow}
-                touch testId="phone-song-follow" />
+                disabled={!p.show.running} touch testId="phone-song-follow" />
               <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-song-follow-says">
                 {p.show.running
                   ? 'The show holds still through a build and throws its big move on the drop.'
@@ -1350,9 +1350,14 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
-          <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
+          <div className="mt-4">
             <Slider label="Evolve speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
-              touch testId="phone-evolve-speed" />
+              disabled={!p.evolving} touch testId="phone-evolve-speed" />
+            {!p.evolving && (
+              <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-evolve-speed-says">
+                Turn Evolve on above to set how fast it drifts.
+              </p>
+            )}
           </div>
           {/*
             The plates, on every look. This section was here only on a look
@@ -1401,16 +1406,16 @@ export function PhoneStage(p: PhoneStageProps) {
               </button>
             ))}
           </div>
-          <div className={`mt-3 transition-opacity ${Math.round(p.spin.auto) === 0 ? 'opacity-50' : ''}`}>
+          <div className="mt-3">
             <Slider label="Spin rate" value={p.spin.rpm} {...pinSlider('spinRpm', p.spin.rpm)} step={0.5} onChange={(v) => p.spin.onChange({ spinRpm: v })}
-              touch testId="phone-spin-rate" />
+              disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-rate" />
             {Math.round(p.spin.auto) === 2 && (
               <Slider label="Beats a turn" value={p.spin.beats} {...pinSlider('spinBeats', p.spin.beats)} step={1}
                 onChange={(v) => p.spin.onChange({ spinBeats: Math.round(v) })}
-                touch testId="phone-spin-beats" />
+                disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-beats" />
             )}
-            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} data-testid="phone-spin-reverse"
-              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active">
+            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} disabled={Math.round(p.spin.auto) === 0} data-testid="phone-spin-reverse"
+              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active disabled:cursor-not-allowed disabled:opacity-65">
               Reverse
             </button>
           </div>

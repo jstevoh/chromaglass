@@ -169,7 +169,7 @@ export function Bulb({ warmth }: { warmth: number }) {
         <path d="M8 18h6M8.6 20.4h4.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         <path d="M9 17.4V10.6l1-1.6 1 1.6 1-1.6 1 1.6v6.8" fill="none" stroke={hex} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span className="whitespace-nowrap font-mono text-[10px] leading-none text-muted">{kelvinLabel(warmth)}</span>
+      <span className="whitespace-nowrap font-mono text-[12px] leading-none text-muted">{kelvinLabel(warmth)}</span>
     </span>
   );
 }

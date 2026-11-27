@@ -80,7 +80,7 @@ export function CrashReportButton({ floating = false }: {
     >
       <span>The plate stopped — save a report?</span>
       <button onClick={() => { setOpen(true); setChip(false); }} className="min-h-[28px] rounded-full bg-amber-500 px-3 font-medium text-black hover:bg-amber-400">Report</button>
-      <button onClick={acknowledge} className="min-h-[28px] min-w-[28px] rounded-full text-white/50 hover:text-white" aria-label="Dismiss">✕</button>
+      <button onClick={acknowledge} className="min-h-[28px] min-w-[28px] rounded-full text-dim hover:text-white" aria-label="Dismiss">✕</button>
     </div>
   );
   const sheet = open && createPortal(
@@ -152,7 +152,7 @@ export function QuickReportDot() {
         }`}
       />
       {(state === 'saved' || state === 'failed') && (
-        <span className="pointer-events-none absolute bottom-7 right-0 whitespace-nowrap rounded bg-black/80 px-2 py-1 text-[11px] text-white/90" data-testid="quick-report-said">
+        <span className="pointer-events-none absolute bottom-7 right-0 whitespace-nowrap rounded bg-black/80 px-2 py-1 text-[12px] text-white/90" data-testid="quick-report-said">
           {state === 'saved' ? 'Report saved to Downloads' : 'Could not save the report'}
         </span>
       )}
@@ -227,7 +227,7 @@ function ReportSheet({ fatal, onClose, onDone }: { fatal: crashLog.CrashEntry | 
         </label>
         <div className="flex flex-col gap-1">
           <span className="text-[12px] text-muted">The last lines of the log</span>
-          <pre className="max-h-44 overflow-auto rounded-md border border-border bg-black/40 p-2 text-[11px] leading-snug text-text-2" data-testid="crash-tail">
+          <pre className="max-h-44 overflow-auto rounded-md border border-border bg-black/40 p-2 text-[12px] leading-snug text-text-2" data-testid="crash-tail">
             {tail.length ? tail.map((e) => `${e.up.toFixed(1).padStart(7)}s ${e.level.padEnd(5)} ${e.source}: ${e.msg.split('\n')[0]}${e.repeats ? ` (×${e.repeats + 1})` : ''}`).join('\n') : 'Nothing logged.'}
           </pre>
         </div>
