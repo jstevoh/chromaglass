@@ -11,6 +11,7 @@ import { VideoShelf } from '../VideoShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
+import { settingDisabledReason } from '../../lib/settingGate';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import { PINNABLE, PIN_RANGE, type DeskSpec } from '../../lib/deskPins';
 import { PANEL_BY_ID, drawnElsewhere, whereIs } from '../../lib/deskLayout';
@@ -73,6 +74,7 @@ function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: De
   const v = typeof raw === 'number' ? raw : spec.min;
   const cc = p.ccFor(key);
   const display = readSetting(String(key), v, spec.min, spec.max);
+  const disabled = settingDisabledReason(key, p.settings);
   if (asKnob) {
     return (
       <Knob
@@ -84,6 +86,7 @@ function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: De
         display={display}
         mapping={cc != null ? `CC${cc}` : null}
         resetTo={p.lookValueOf?.(key)}
+        disabled={disabled}
         onChange={n => setControl(p, key, n)}
         midiKey={`setting:${String(key)}`}
         testId={testId}
@@ -103,6 +106,7 @@ function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: De
       cc={cc}
       white={WHITE.has(String(key))}
       resetTo={p.lookValueOf?.(key)}
+      disabled={disabled}
       onChange={n => setControl(p, key, n)}
       midiKey={`setting:${String(key)}`}
       testId={testId}

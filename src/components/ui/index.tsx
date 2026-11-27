@@ -373,9 +373,11 @@ export interface SliderProps extends Keyed {
    * where the 48 px rule needs the full row.
    */
   dense?: boolean;
+  /** Disabled: pass a string to explain what turns it on in tooltips/hover. */
+  disabled?: boolean | string;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense, disabled }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -422,14 +424,19 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     it (or a hold, which a touch browser sends as the same click) opens it.
   */
   const line = help ?? helpFor(midiKey);
+  const reason = typeof disabled === 'string' ? disabled : undefined;
+  const shownValue = disabled ? 'off' : display;
   const tip = useControlTip({
-    name: label, help: line, value: display,
-    hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
+    name: label, help: line, value: shownValue,
+    disabled: disabled === true,
+    hint: reason ?? (!touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined),
   });
   const track = (
     <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
       <input
         type="range"
+        disabled={!!disabled}
+        title={reason}
         min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
         step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
         value={curve === 1 ? value : at}
@@ -439,7 +446,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
           onChange(handValueAt(raw, min, max, curve));
         }}
         aria-label={label}
-        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
+        onDoubleClick={disabled || resetTo === undefined ? undefined : () => onChange(resetTo)}
         className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''}`}
         style={{ '--fill': `${pct}%` } as CSSProperties}
       />
@@ -457,7 +464,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   if (dense && !touch) {
     return (
-      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
+      <div className={`mb-px flex h-6 items-center gap-2 ${disabled ? 'opacity-50' : ''}`} ref={el => { tip.anchor.current = el; }} title={reason} data-disabled={disabled ? 'true' : undefined} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
         {tip.card}
         <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
         <div className="min-w-0 flex-1">{track}</div>
@@ -466,12 +473,12 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             hit ? 'bg-text text-bg' : 'text-faint'
           }`}>{cc}</span>
         )}
-        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
+        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{shownValue}</span>
       </div>
     );
   }
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
+    <div className={`mb-5 ${disabled ? 'opacity-50' : ''}`} ref={el => { tip.anchor.current = el; }} title={reason} data-disabled={disabled ? 'true' : undefined} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-slider data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (
@@ -494,7 +501,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
               hit ? 'bg-text text-bg' : 'text-faint'
             }`}>CC {cc}</span>
           )}
-          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
+          <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{shownValue}</span>
         </span>
       </div>
       {track}
@@ -591,7 +598,7 @@ export interface KnobProps extends Keyed {
   mapping?: string | null;
   /** Double-click goes back to this: the look's own value. */
   resetTo?: number;
-  disabled?: boolean;
+  disabled?: boolean | string;
   midiKey?: string | null;
   testId?: string;
   /** 40 on the desk; 56 in Load-in and the Stage sheet. */
@@ -632,15 +639,16 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
     hand was on the knob, and a chip over the row above hid the next one, so
     a hand could not tell which knob it had.
   */
+  const reason = typeof disabled === 'string' ? disabled : undefined;
   const tip = useControlTip({
     name: label,
     help: help ?? helpFor(midiKey),
     value: disabled ? 'off' : display,
     held: !!drag,
-    disabled,
-    hint: drag
+    disabled: disabled === true,
+    hint: reason ?? (drag
       ? (drag.fine ? 'Fine adjust: a tenth of the travel' : '⌥ held while dragging goes fine')
-      : `Drag up or down, or round the ring. ⌥ for fine${resetTo !== undefined ? '. Double-click for the look\'s value' : ''}`,
+      : `Drag up or down, or round the ring. ⌥ for fine${resetTo !== undefined ? '. Double-click for the look\'s value' : ''}`),
   });
 
   // A wheel turns it a notch. Not passive, so the deck does not scroll as well.
@@ -695,6 +703,8 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
     <div
       ref={el => { tip.anchor.current = el; }}
       className={`relative flex w-full max-w-[72px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
+      title={reason}
+      data-disabled={disabled ? 'true' : undefined}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
@@ -742,7 +752,8 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           type="range"
           aria-label={label}
           aria-describedby={tip.open ? tip.id : undefined}
-          disabled={disabled}
+          disabled={!!disabled}
+          title={reason}
           min={curve === 1 ? min : 0}
           max={curve === 1 ? max : 1}
           step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}

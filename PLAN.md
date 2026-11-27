@@ -572,7 +572,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 44 |
 | 48 | Ideas: more compelling visuals from real phenomena (brainstormed 2026-11-21) | [`48-ideas-visuals.md`](docs/plan/48-ideas-visuals.md) |  | 15 |
 | 49 | Usability against Nielsen's ten heuristics: undo, fit, one name for one thing (asked 2026-11-26) | [`49-usability-review.md`](docs/plan/49-usability-review.md) | 49a–49l (~~49a~~ **shipped (#964)**, 49c **shipped (#963)**, 49g **shipped (#970)**, 49k **shipped (#982)**) | 24 |
-| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 3 |
+| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | ~~QA-33b-1~~ (Lens gating & Tank help) **shipped (this PR)** | 3 |
 
 ## Not doing
 

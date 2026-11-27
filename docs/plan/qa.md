@@ -20,9 +20,7 @@ area, each fix striking its own line here.
   Mac). Shipped as a report when the list is in the project's files.
 - **QA-33b** Fix threads, one per area of the list, each a QA item of its own. The
   list (2026-11-26) went to Antigravity as six briefs, the small ones batched:
-  - **QA-33b-1** Lens: Tank turns the plate black (luma 0.30 → 0.003 on Classic, 0.27 →
-    0.003 on Magnet Garden), and Focus, Aperture, Bloom, Glow, Glow Shear, Glitter and
-    Lens Stop show nothing on Classic.
+  - ~~**QA-33b-1**~~ **Shipped (this PR):** Lens: Tank is a side-view dark-water tank (`PLAN 47n`) that starts black until falling dye fills it (~9–12 s); help copy on the desk and settings/phone sheets now states this. On the desk's Lens panel and settings/phone, mode-gated dials (`Focus`, `Aperture`, `Bloom`, `Chromatic Aberration`, `Refraction`, `Film Physics`, `Soap Film` dials, `Glow Shear`/`Glow Recharge`, `Lens Stop`, `Tank` dials) now grey out as `off` with what turns them on (`settingDisabledReason`), matching the conditional hiding already on settings/phone; `Glow` and `Glitter` are documented as shear-thresholded (`glowShear`) / side-light-driven on Classic.
   - **QA-33b-2** One dial's end blacks out the picture: the Wall's Gamma (0.35 → 0.004,
     more than a gamma of 2.5 can do) and Oil & Soap's Clear Film on Magnet Garden
     (0.27 → 0.014).
