@@ -83,7 +83,9 @@ fn row(uv: vec2f, h: f32, b: f32) -> vec3f {
   var sum = vec3f(0.0);
   for (var i = 0.0; i < n; i += 1.0) {
     let at = uv + vec2f(tapAt(i, n, h) * dx, 0.0);
-    let s = tex2(share, at).rgb;
+    // One projector: no share to read (it is 0, all A's), half the reads of a row.
+    var s = vec3f(0.0);
+    if (U.projA.w > 0.5) { s = tex2(share, at).rgb; }
     sum += toLinear(tex2(scene, at).rgb) * mix(vec3f(1.0) - s, s, b);
   }
   return sum / n;

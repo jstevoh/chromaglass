@@ -118,8 +118,8 @@ function displayName(format: GPUTextureFormat, toTexture: boolean, aux = false, 
   Only into the canvas: the flipped displays (the camera's, the film stock's,
   the lens pass's scene) are built behind the show, whole, as before.
 */
-/** The display under the focus pass: half floats, flipped, the aux, and B's share. */
-const focusDisplay = displayName(FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true);
+/** The display under the focus pass: half floats, flipped, the aux, and B's share; lean or whole. */
+const focusName = (mask = WHOLE_DISPLAY) => displayName(FOCUS_SCENE_FORMAT, true, true, mask, true);
 
 function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean, aux = false, mask = WHOLE_DISPLAY, share = false): RenderRecipe {
   return (module) => {
@@ -133,7 +133,6 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
         // The fragment stage needs to know too: an override is set per stage,
         // and without it the fragment read FLIP_Y as 1 on both paths.
         module: module(code), entryPoint: 'fs', constants: toTexture ? { FLIP_Y: -1 } : undefined,
-        // The focus pass's (gpu/focus.ts) has a third, B's share of the wall.
         targets: [{ format }, ...(aux ? [{ format: 'rgba8unorm' as GPUTextureFormat }] : []), ...(share ? [{ format: FOCUS_SHARE_FORMAT }] : [])],
       },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
@@ -235,11 +234,10 @@ export class WebGPUPlate {
     const cache = PipelineCache.for(device, 'plate');
     /*
       A look that opens through the camera or the film stock draws its
-      display flipped into their picture (below) and never onto the canvas,
-      so its opening waits for no canvas display at all: the whole one is
-      built behind the show, for when the camera or the stock is turned off.
-      Its lean one would be a compile nothing draws with (Home Movie and
-      Song Groove waited for theirs on the Mac's first run of this, and
+      display flipped into their picture (below), never onto the canvas, so
+      its opening waits for no canvas display: the whole one is built behind
+      the show, for when they are turned off. Its lean one would be a compile
+      nothing draws with (Home Movie and Song Groove waited for theirs, and
       `npm run startup` named it: waited for and asked for by none).
     */
     const direct = !open.camera && !open.stock;
@@ -265,9 +263,11 @@ export class WebGPUPlate {
       // The lens pass reads the aux, so this one keeps its second target (H2c-6).
       ...(format === GLINT_SCENE_FORMAT ? []
         : [cache.renderPrep(displayName(GLINT_SCENE_FORMAT, true, true), displayRecipe(device, GLINT_SCENE_FORMAT, true, true), true)]),
-      // Each projector's focus (PLAN 51b), and the display it draws under, with B's share: behind the show too.
+      // Each projector's focus (PLAN 51b) and its displays, whole and lean: behind the show.
       ...PlateFocus.prepare(cache, device, format, picture),
-      cache.renderPrep(focusDisplay, displayRecipe(device, FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true), true),
+      cache.renderPrep(focusName(), displayRecipe(device, FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true), true),
+      ...(direct && open.display !== WHOLE_DISPLAY
+        ? [cache.renderPrep(focusName(open.display), displayRecipe(device, FOCUS_SCENE_FORMAT, true, true, open.display, true), true)] : []),
       // Into a texture rather than the canvas: the film stock's picture (and
       // the projector's) with one target, the camera's with two (H2c-6: the
       // camera pass alone reads the second, so the opening builds the variant
@@ -441,10 +441,9 @@ export class WebGPUPlate {
     this.drawBeads(encoder);
     /*
       The lens pass (gpu/glint.ts), when Glitter or Side Light is up and its
-      pipelines and the flipped display's are there: the display then draws
-      into the pass's own picture without its finish, and the pass lays the
-      finish (lensFinish, which fillPlateUniforms sets to what the display's
-      would have been). Otherwise not a byte of this frame differs.
+      pipelines and the flipped display's are there: the display draws into
+      its picture unfinished, and it lays the finish (lensFinish, set by
+      fillPlateUniforms to the display's). Otherwise no byte differs.
     */
     const wanted = PlateGlint.wanted(this.pack);
     const lensOn = wanted
@@ -452,16 +451,12 @@ export class WebGPUPlate {
       && !!this.pipelines.renderPipeline(displayName(GLINT_SCENE_FORMAT, true, true), displayRecipe(this.device, GLINT_SCENE_FORMAT, true, true));
     // Both dials back at 0: the pass's pictures and flakes go (a 4K frame's two are about 100 MB).
     if (!wanted && this.glint.holding) this.glint.release();
-    /*
-      Each projector's focus (gpu/focus.ts, PLAN 51b), when one is soft and
-      the lens pass and the tank are not drawing: the display draws into the
-      pass's pictures without its finish, and the pass lays it.
-    */
+    // Each projector's focus (gpu/focus.ts, PLAN 51b), which lays the finish.
     const two = this.pack.get('projA')[3] > 0.5;
     const soft = PlateFocus.wanted(this.pack);
-    const focusOn = soft && !lensOn && !fields[0]?.tank && this.focus.ready(format, toTexture, two)
-      && !!this.pipelines.renderPipeline(focusDisplay, displayRecipe(this.device, FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true));
-    // Sharp, or soft under the lens pass or the tank, which draw it sharp: its pictures go (130 MB at 2560 by 1600 with two).
+    const focusPipe = soft && !lensOn && !fields[0]?.tank && this.focus.ready(format, toTexture, two) ? this.focusDisplayFor(this.pack.bytes) : null;
+    const focusOn = !!focusPipe;
+    // Off: its pictures go (130 MB at 2560 by 1600 with two).
     if (!focusOn && this.focus.holding) this.focus.release();
     const finish = this.pack.get('finishInMain')[0];
     if (lensOn || focusOn) this.pack.set('finishInMain', 0);
@@ -543,12 +538,11 @@ export class WebGPUPlate {
 
     /*
       The second target holds what the camera pass reads: the normal, the
-      dye's height and the bubble mask. The lens pass (glitter, side light)
-      reads it too, and the tank's draw writes it, so the aux lives while any
-      of the three is up and not otherwise: with the camera off a frame of
-      2560x1600 no longer writes 16 MB nothing reads, and an aux made for the
-      camera is let go the frame after it (H2c-6). The camera's state is the
-      plate's own uniform, which LiquidVisualizer fills with `!!cam`.
+      dye's height and the bubble mask. The lens pass reads it too, the tank's
+      draw and the focus pass's display write it, so the aux lives while one
+      is up and not otherwise: with the camera off a 2560x1600 frame writes no
+      16 MB nothing reads, and an aux is let go the frame after (H2c-6). The
+      camera's state is the plate's own uniform (LiquidVisualizer's `!!cam`).
     */
     const tank = fields[0]?.tank;
     this.keepAux(size, this.pack.get('cameraOn')[0] > 0.5 || lensOn || focusOn || !!tank);
@@ -563,7 +557,7 @@ export class WebGPUPlate {
     }
     if (focusOn && aux) {
       const into = this.focus.targets(size.width, size.height, two);
-      this.display(encoder, into.scene, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, true, FOCUS_SCENE_FORMAT, into.share);
+      this.display(encoder, into.scene, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, true, FOCUS_SCENE_FORMAT, { view: into.share, pipe: focusPipe });
       this.focus.run(encoder, target, toTexture, format, this.uniformBuffer, this.sampler, this.source('mark'), two);
       return;
     }
@@ -651,11 +645,12 @@ export class WebGPUPlate {
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
-    /** B's share of the wall, for the focus pass: the display with a third target. */
-    shareView?: GPUTextureView,
+    /** B's share of the wall and the focus pass's display (`focusDisplayFor`). */
+    share?: { view: GPUTextureView; pipe: GPURenderPipeline },
   ): void {
     const aux = auxView !== null;
-    const display = shareView ? this.pipelines.renderPipeline(focusDisplay, displayRecipe(this.device, format, true, true, WHOLE_DISPLAY, true)) : this.displayFor(bytes, toTexture, format, aux);
+    const shareView = share?.view;
+    const display = share ? share.pipe : this.displayFor(bytes, toTexture, format, aux);
     if (!display) return;
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
@@ -711,14 +706,22 @@ export class WebGPUPlate {
     pass.end();
   }
 
+  /** The focus pass's display: lean where the canvas's covers the draw (whole 9.5 ms on the Air, lean 4.2); waits for its build. */
+  private focusDisplayFor(bytes: ArrayBuffer): GPURenderPipeline | null {
+    const lean = leans.get(this.device);
+    const behind = lean?.mode === 'behind';
+    const get = (mask: number) => (behind && !this.pipelines.hasRender(focusName(mask), true) ? null
+      : this.pipelines.renderPipeline(focusName(mask), displayRecipe(this.device, FOCUS_SCENE_FORMAT, true, true, mask, true)));
+    const fits = !!lean && lean.mask !== WHOLE_DISPLAY && (lean.mode === 'forced' || leanCovers(lean.mask, displayNeeds(bytes)));
+    return (fits ? get(lean!.mask) : null) ?? get(WHOLE_DISPLAY);
+  }
+
   /**
-   * Which display draws this one (`displayLean.ts`). The lean one while it
-   * draws this draw's uniforms exactly; else the whole one. While the whole
-   * one is still being built behind the show, the lean one goes on drawing
-   * (an effect the look reached past its opening shows a few seconds late,
-   * rather than the plate stopping for a compile on the frame), and the
-   * whole one is asked for all the same, so `npm run startup` sees a look
-   * whose first steps reach past what its opening built.
+   * Which display draws this one (`displayLean.ts`): the lean one while it
+   * draws this draw's uniforms exactly, else the whole one. While the whole
+   * one builds behind the show the lean one goes on (an effect past the
+   * opening shows a few seconds late, not a compile on the frame), and the
+   * whole one is asked for, so `npm run startup` sees a look reach past it.
    */
   private displayFor(bytes: ArrayBuffer, toTexture: boolean, format: GPUTextureFormat, aux: boolean): GPURenderPipeline | null {
     const lean = !toTexture && !aux ? leans.get(this.device) : undefined;
