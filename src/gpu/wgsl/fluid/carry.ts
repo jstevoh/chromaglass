@@ -10,6 +10,7 @@
 
 import { RIM_SIDE } from './oil';
 import { HEAD, PACKED, THIN_FACE, W } from './shared';
+import { DISH_REST_GAP } from '../../../lib/turntable';
 
 export const CARRY_KERNELS: Record<string, string> = {
   // Semi-Lagrangian advection. A.a.x is the displacement's sign and scale.
@@ -34,8 +35,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var phi1: texture_2d<f32>;
 @group(0) @binding(4) var phi0b: texture_2d<f32>;
 @group(0) @binding(5) var vel: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
-@group(0) @binding(7) var lin: sampler;
+@group(0) @binding(6) var sq: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(8) var lin: sampler;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -86,17 +88,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     was lost, as the ceiling's own cap loses it: 3 per cent in that window,
     where the backtrace alone lost 5. Over ten seconds of forty pools that
     loss came to more than half the plate, which is why the push was taken
-    out rather than carried (forcesB). The hold stays for what is left
-    that gathers: tension, the drip, a press.
+    out rather than carried (forcesB). With forcesB gone, clamping j > 1.0
+    to max(mx, o) while letting j < 1.0 shrink dye unopposed broke
+    conservation under a squeeze-film release on the old plate (30% loss).
+    And when depthDrag (A.a.z) scales velForced in forcesB, div(velForced)
+    sees the gap-edge mobility drop as fake compressibility (2.7x blowup
+    after release), so div strips pow(ratio, A.a.z) back out before taking j.
   */
   if (A.a.y > 0.5) {
-    let vR = textureLoad(vel, clampP(q + vec2i(1, 0), S.n), 0).x;
-    let vL = textureLoad(vel, clampP(q - vec2i(1, 0), S.n), 0).x;
-    let vU = textureLoad(vel, clampP(q + vec2i(0, 1), S.n), 0).y;
-    let vD = textureLoad(vel, clampP(q - vec2i(0, 1), S.n), 0).y;
+    let drag = A.a.z;
+    var vR = textureLoad(vel, clampP(q + vec2i(1, 0), S.n), 0).x;
+    var vL = textureLoad(vel, clampP(q - vec2i(1, 0), S.n), 0).x;
+    var vU = textureLoad(vel, clampP(q + vec2i(0, 1), S.n), 0).y;
+    var vD = textureLoad(vel, clampP(q - vec2i(0, 1), S.n), 0).y;
+    if (drag > 0.0) {
+      let hR = max(textureLoad(sq, clampP(q + vec2i(1, 0), S.n), 0).r, 0.0005);
+      let hL = max(textureLoad(sq, clampP(q - vec2i(1, 0), S.n), 0).r, 0.0005);
+      let hU = max(textureLoad(sq, clampP(q + vec2i(0, 1), S.n), 0).r, 0.0005);
+      let hD = max(textureLoad(sq, clampP(q - vec2i(0, 1), S.n), 0).r, 0.0005);
+      let invN = 1.0 / (${DISH_REST_GAP} * ${DISH_REST_GAP});
+      vR /= pow(clamp(hR * hR * invN, 0.04, 1.0), drag);
+      vL /= pow(clamp(hL * hL * invN, 0.04, 1.0), drag);
+      vU /= pow(clamp(hU * hU * invN, 0.04, 1.0), drag);
+      vD /= pow(clamp(hD * hD * invN, 0.04, 1.0), drag);
+    }
     let div = ((vR - vL) + (vU - vD)) * 0.5 * S.n;
     let j = exp(clamp(-A.a.x * div, -0.5, 0.5));
-    o = select(o * j, min(o * j, max(mx, o)), j > 1.0);
+    o = o * j;
   }
   textureStore(dst, q, select(vec4f(0.0), o, finite4(o)));
 }`,

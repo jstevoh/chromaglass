@@ -419,7 +419,7 @@ try {
     // ── The real laptop ───────────────────────────────────────────────
     const CALM = {
       turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0, rainDrip: 0, glassSmear: 0,
-      vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0, bubbles: 0,
+      vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0, bubbles: 0, oilTension: 0,
       audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
     };
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
