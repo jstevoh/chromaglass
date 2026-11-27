@@ -472,6 +472,8 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   one move: a PR that changes a piece of it first moves that piece to its own module (a
   function taking the frame's state, no per-frame allocation) in its own commit, held
   against the checks that read the file as text (19ai-3a), then changes it.
+  Since 2026-11-27 a programme of its own (PLAN 50c): the seam and the order of moves are
+  `src/engine/README.md`; the first piece (the pointer) moved in 50c-1.
 - **19ai-3a. Found along the way.** The review said `lib/stir`, `squish`, `plateRock` and
   `turntable` import types from the component; they only name it in comments. The one
   importer was `hooks/useSongRender.ts`. And 26 checks read `LiquidVisualizer.tsx` as text:

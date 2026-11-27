@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { groupedShippedLooks } from '../../lib/lookStills';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
 import { LIT } from '../ui';
 
 /**
@@ -94,7 +95,7 @@ export function LooksGrid({
                           aria-current={active ? 'true' : undefined}
                           data-testid={`looks-grid-${item.id}`}
                           onClick={() => {
-                            if (locked) openAccountSheet();
+                            if (locked) openTierLock('moire', { itemName: item.name });
                             else onSelectLook(item.id);
                             setOpen(false);
                           }}
@@ -118,11 +119,7 @@ export function LooksGrid({
                             <span className="truncate text-[13px] font-medium">
                               {item.name}
                             </span>
-                            {locked && (
-                              <span className="shrink-0 rounded bg-black/30 px-1.5 py-0.5 text-[12px] font-medium uppercase tracking-wide">
-                                Pack
-                              </span>
-                            )}
+                            {locked && <TierLockBadge label="Pro · Pack" />}
                           </div>
                         </button>
                       );

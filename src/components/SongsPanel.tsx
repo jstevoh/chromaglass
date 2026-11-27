@@ -194,7 +194,11 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
             <Toggle label="Follow songs" on={follow} onChange={onFollow} testId="songs-follow" />
           </div>
           <div className="max-h-[220px] min-h-0 flex-1 overflow-y-auto scrollbar-hide @[640px]:max-h-none" data-testid="songs-list">
-            {shows.length === 0 && <p className="text-[12px] text-dim">No songs yet.</p>}
+            {shows.length === 0 && (
+              <p className="text-[12px] leading-relaxed text-dim" data-testid="songs-list-empty">
+                No songs yet. Press Listen while a track plays, or enter Title and Artist below.
+              </p>
+            )}
             {shows.map((s) => {
               const live = status.showId === s.id;
               return (
@@ -221,13 +225,17 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
             <input className={`${inputCls} min-w-0 flex-1`} placeholder="Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} data-testid="songs-new-title" />
             <input className={`${inputCls} min-w-0 flex-1`} placeholder="Artist" value={newArtist} onChange={(e) => setNewArtist(e.target.value)} data-testid="songs-new-artist" />
           </div>
-          <button
-            disabled={!newTitle.trim() || !newArtist.trim()}
-            onClick={() => { addSong({ title: newTitle.trim(), artist: newArtist.trim() }); setNewTitle(''); setNewArtist(''); }}
-            className={`${smallBtn} mt-1.5 w-full`} data-testid="songs-add"
-          ><Plus size={12} /> Add a song</button>
+          {(newTitle.trim() || newArtist.trim()) && (
+            <button
+              disabled={!newTitle.trim() || !newArtist.trim()}
+              onClick={() => { addSong({ title: newTitle.trim(), artist: newArtist.trim() }); setNewTitle(''); setNewArtist(''); }}
+              className={`${smallBtn} mt-1.5 w-full`} data-testid="songs-add"
+            ><Plus size={12} /> Add a song</button>
+          )}
           <div className="mt-3 flex gap-1.5">
-            <button onClick={() => download('chromaglass-songs.json', exportShows())} disabled={!shows.length} className={`${smallBtn} flex-1`} data-testid="songs-export"><Download size={12} /> Save file</button>
+            {shows.length > 0 && (
+              <button onClick={() => download('chromaglass-songs.json', exportShows())} className={`${smallBtn} flex-1`} data-testid="songs-export"><Download size={12} /> Save file</button>
+            )}
             <button onClick={() => songsFile.current?.click()} className={`${smallBtn} flex-1`} data-testid="songs-import"><FolderOpen size={12} /> Load file</button>
             <input ref={songsFile} type="file" accept=".json,application/json" className="hidden" data-testid="songs-file-input"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); e.target.value = ''; }} />
@@ -246,7 +254,50 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
         {/* ── The song being set up ─────────────────────────────── */}
         <div className="shrink-0 p-5 @[640px]:min-h-0 @[640px]:flex-1 @[640px]:shrink @[640px]:overflow-y-auto @[640px]:scrollbar-hide">
           {!selected ? (
-            <p className="text-[12px] text-dim">Add a song, or pick one from the list.</p>
+            shows.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4" data-testid="songs-empty">
+                <p className="text-[13px] font-medium text-white">Add your first song</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/75">
+                  {currentSong
+                    ? `“${currentSong.title}” by ${currentSong.artist} is playing now.`
+                    : listen
+                      ? 'Play a track in Sound, then press Listen to name it automatically — or type a Title and Artist on the left.'
+                      : 'Type a Title and Artist on the left to add a song, or load a songs file.'}
+                </p>
+                <div className="mt-3">
+                  {currentSong ? (
+                    <button
+                      type="button"
+                      onClick={() => addSong(currentSong)}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[12px] font-semibold text-black hover:opacity-90"
+                      data-testid="songs-empty-action"
+                    >
+                      <Plus size={13} /> Add “{currentSong.title}”
+                    </button>
+                  ) : listen ? (
+                    <button
+                      type="button"
+                      onClick={listenBusy ? listen.cancel : listen.start}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[12px] font-semibold text-black hover:opacity-90"
+                      data-testid="songs-empty-action"
+                    >
+                      <Ear size={13} /> {listenBusy ? 'Stop listening' : 'Listen for a song'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => songsFile.current?.click()}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[12px] font-semibold text-black hover:opacity-90"
+                      data-testid="songs-empty-action"
+                    >
+                      <FolderOpen size={13} /> Load songs file
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[12px] text-dim">Pick a song from the list to edit its look and actions.</p>
+            )
           ) : (
             <>
               <div className="mb-4 flex items-end gap-2">
