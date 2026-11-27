@@ -215,9 +215,10 @@ export interface GpuStepParams {
   tankNozzle?: number;
   tankDrain?: number;
   tankHue?: number;
-  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), and Shake, its peak acceleration in g. The front plate's only. */
+  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), Shake, its peak acceleration in g, and Rock, the strobe's slip in Hz (48f-6). The front plate's only. */
   faradayHz?: number;
   faraday?: number;
+  faradayRock?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
@@ -293,6 +294,16 @@ export interface SolverCarry {
   /** The grid it was copied from. */
   readonly n: number;
   /** Let its copies go. */
+  destroy(): void;
+}
+
+/**
+ * Full GPU field snapshot for plate-level Undo (PLAN 49a): holds exact copies
+ * of dye, velocity, gap and active chemistry/phase fields on the same device
+ * so a drained or cleared plate returns byte-for-byte before the wipe.
+ */
+export interface SolverSnapshot {
+  /** Release copied GPU textures and buffers held by this snapshot. */
   destroy(): void;
 }
 
@@ -398,6 +409,10 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /** Copy the live GPU fields for an 8 s Undo safety net (PLAN 49a). */
+  takeSnapshot?(): SolverSnapshot | null;
+  /** Restore fields captured by `takeSnapshot` back onto this solver. */
+  restoreSnapshot?(snap: SolverSnapshot): boolean;
   /**
    * A frame of the video pour, its dye and its motion worked out on the GPU
    * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:

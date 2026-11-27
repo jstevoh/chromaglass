@@ -57,6 +57,10 @@ export function useLookDocument({
     return true;
   };
 
+  const replaceLookById = (id: string, name: string, description = '', forSong = false) => {
+    if (!replacePresetById(id)) saveCurrentPreset(name, description, forSong);
+  };
+
   const replaceLook = () => {
     if (!docId) { openSaveSheet(true); return; }
     if (!replacePresetById(docId)) { setDocId(null); openSaveSheet(true); }
@@ -70,6 +74,6 @@ export function useLookDocument({
 
   return {
     docId, setDocId, docDirty, setDocDirty,
-    saveCurrentPreset, replacePresetById, replaceLook, deleteSavedLook,
+    saveCurrentPreset, replacePresetById, replaceLookById, replaceLook, deleteSavedLook,
   };
 }

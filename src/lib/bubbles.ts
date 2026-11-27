@@ -324,6 +324,37 @@ export class BubbleField {
     this.nextId = 1;
   }
 
+  snapshot() {
+    return {
+      bubbles: this.bubbles.map((b) => ({ ...b })),
+      nextId: this.nextId,
+      areaGap: this.areaGap,
+      gapMetres: this.gapMetres,
+      liquidMu: this.liquidMu,
+      liquidSigma: this.liquidSigma,
+      liquidRho: this.liquidRho,
+      liquidOstwald: this.liquidOstwald,
+      dissolve: this.dissolve,
+    };
+  }
+
+  restore(s: ReturnType<BubbleField['snapshot']>): void {
+    this.bubbles.length = 0;
+    for (const b of s.bubbles) this.bubbles.push({ ...b });
+    this.events.length = 0;
+    this.strawBubble = null;
+    this.contactDrain.clear();
+    this.touchingNow.clear();
+    this.nextId = s.nextId;
+    this.areaGap = s.areaGap;
+    this.gapMetres = s.gapMetres;
+    this.liquidMu = s.liquidMu;
+    this.liquidSigma = s.liquidSigma;
+    this.liquidRho = s.liquidRho;
+    this.liquidOstwald = s.liquidOstwald;
+    this.dissolve = s.dissolve;
+  }
+
   /**
    * Let the look's own bubbles go and keep the ones blown by hand: a look
    * with no bubbles of its own still keeps what the straw put there.

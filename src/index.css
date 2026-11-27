@@ -310,7 +310,7 @@
   background: #FAFAFA;
   box-shadow: 0 1px 3px rgba(0,0,0,.6);
 }
-.ride-slider.is-touch { height: 32px; }
+.ride-slider.is-touch { height: 44px; }
 .ride-slider.is-touch::-webkit-slider-runnable-track { height: 12px; border-radius: 6px; }
 .ride-slider.is-touch::-webkit-slider-thumb { height: 32px; width: 32px; margin-top: -10px; }
 /*

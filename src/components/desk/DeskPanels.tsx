@@ -247,7 +247,17 @@ function CuesBody({ p }: { p: DeskProps }) {
                 {c.id === p.liveId ? <Tag tone="live">live</Tag>
                 : c.id === p.nextId ? <Tag tone="next">next</Tag>
                 : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
-                {/* Take it off the set. A span, not a button: the row is the button. */}
+                {/* Cue options and remove. Spans with role="button" because CueRow itself is a button. */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={e => { e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); } }}
+                  title="Cue options (song link, capture, order)"
+                  aria-label={`Options for ${c.name}`}
+                  className="shrink-0 rounded px-1 text-[13px] leading-none text-faint opacity-50 hover:bg-hover hover:text-text focus:opacity-100 group-hover:opacity-100"
+                  data-testid={`cue-menu-open-${c.id}`}
+                >⋯</span>
                 <span
                   role="button"
                   tabIndex={0}
@@ -342,13 +352,9 @@ function CuesBody({ p }: { p: DeskProps }) {
         </div>
       )}
       {/*
-        Fade and Go, as small as they can be and still be hit in the dark: one
-        row of fade times across the column and a Go a finger's height. They
-        were 140px of the column with Back and Freeze under them, which the
-        owner never pressed (2026-10-10: "I don't use them. We can keep the
-        shortcuts though"). Back is still ⌫ and Freeze still F, from the
-        keyboard (App's key handler), ⌘K, and a learned MIDI pad
-        (`action:revert`, `action:play-toggle` in the Controller's map).
+        Fade, Back and Go in the cue footer (PLAN 49a / H3-07): Back returns
+        as a visible control beside Go so returning from an accidental fade or
+        look change never depends on remembering ⌫ during a set.
       */}
       <div className="flex shrink-0 flex-col gap-1.5 border-t border-border px-3 py-2" data-testid="cue-go">
         <div className="flex items-center gap-2">
@@ -362,15 +368,32 @@ function CuesBody({ p }: { p: DeskProps }) {
             testId="fade-segmented"
           />
         </div>
-        <Button
-          variant="primary" full height={36} kbd="Space"
-          onClick={p.onGo}
-          disabled={!next}
-          midiKey="action:go"
-          testId="go-button"
-        >
-          <span className="min-w-0 truncate">{next ? `Go to ${next.name}` : 'Nothing cued'}</span>
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {p.onBack && (
+            <Button
+              height={36}
+              kbd="⌫"
+              onClick={p.onBack}
+              disabled={!p.canBack}
+              midiKey="action:revert"
+              testId="back-button"
+              title="Back to the previous look"
+            >
+              Back
+            </Button>
+          )}
+          <div className="min-w-0 flex-1">
+            <Button
+              variant="primary" full height={36} kbd="Space"
+              onClick={p.onGo}
+              disabled={!next}
+              midiKey="action:go"
+              testId="go-button"
+            >
+              <span className="min-w-0 truncate">{next ? `Go to ${next.name}` : 'Nothing cued'}</span>
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -570,15 +593,15 @@ function RecipeBody({ p }: { p: DeskProps }) {
           for the closeup and it always reads what the plate is doing
           (PLAN QA-32c).
         */}
-        {/* Randomise replaces every setting at once, so it asks first. */}
+        {/* Protected by the 8 s Undo toast rather than an inline "Sure?" prompt (PLAN 49a). */}
         <Button
           full height={32}
-          variant={p.randomiseArmed ? 'primary' : 'secondary'}
+          variant="secondary"
           onClick={p.onRandomise}
           midiKey="action:lucky"
           testId="randomise-button"
         >
-          {p.randomiseArmed ? 'Sure?' : 'Randomise'}
+          Randomise
         </Button>
       </div>
     </div>
@@ -845,9 +868,8 @@ function ToolsBody({ p }: { p: DeskProps }) {
             style={{ '--fill': `${(((p.toolAmount ?? 1) - TOOL_AMOUNT.min) / (TOOL_AMOUNT.max - TOOL_AMOUNT.min)) * 100}%` } as CSSProperties}
             data-testid="tool-amount-range"
           />
-          {/* The value, and the door to the tool's own options (the Magnet's size). */}
+          {/* The value, and the door to the tool's own options (Magnet Size, Press Fingering & Thin Gap). */}
           <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />
-          <span className="shrink-0 font-mono text-[12px] text-text-2 min-[1400px]:hidden">{(p.toolAmount ?? 1).toFixed(1)}×</span>
         </div>
       )}
       {toolMenu && p.amountOf && p.onAmountFor && (
@@ -859,6 +881,10 @@ function ToolsBody({ p }: { p: DeskProps }) {
           onClose={() => setToolMenu(null)}
           magnetSize={p.magnetSize}
           onMagnetSize={p.onMagnetSize}
+          fingering={p.settings.fingering ?? 0}
+          onFingering={(v) => p.onSetting({ fingering: v })}
+          thinGap={p.settings.thinGap ?? 1}
+          onThinGap={(v) => p.onSetting({ thinGap: v })}
         />
       )}
     </div>

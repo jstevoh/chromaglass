@@ -3,6 +3,7 @@ import { ChevronDown, CirclePlus, LogIn, Shuffle, User } from 'lucide-react';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { TouchSlider } from '../ui/TouchSlider';
 import { PhoneSaveForm, type ExistingLook } from './PhoneSaveForm';
+import { useEscape } from '../../hooks/useEscape';
 import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
@@ -143,6 +144,7 @@ function Pill({ onPress, label, testId, children, pressed, live = false }: { onP
 
 export function PhonePlay(p: PhonePlayProps) {
   const [sheet, setSheet] = useState(false);
+  useEscape(() => { if (sheet) setSheet(false); });
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const [picked, setPicked] = useState<PlayTool>('dropper');

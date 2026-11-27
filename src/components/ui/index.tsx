@@ -894,6 +894,19 @@ export function PanelFrame({
         <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
         {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
         {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
+        {!popped && onTitleMenu && (
+          <button
+            className={icon}
+            onClick={(e) => onTitleMenu(e)}
+            title="Panel placement and layout options (or right-click title)"
+            aria-label={`${title} panel options`}
+            data-testid={`panel-${id}-menu`}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+              <circle cx="2.5" cy="6" r="1" /><circle cx="6" cy="6" r="1" /><circle cx="9.5" cy="6" r="1" />
+            </svg>
+          </button>
+        )}
         {!popped && onPopOut && (
           <button className={icon} onClick={onPopOut} title="Open it in its own window, for a second display" aria-label={`Open ${title} in its own window`} data-testid={`panel-${id}-popout`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="1.5" y="3.5" width="7" height="6" rx="0.5" /><path d="M4 1.5h6.5V7" /></svg>
@@ -920,7 +933,7 @@ export function PanelFrame({
         </button>
         )}
         {!popped && (
-          <button className={icon} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
+          <button className={`${icon} ml-1.5`} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden><path d="M3 3l6 6M9 3l-6 6" /></svg>
           </button>
         )}

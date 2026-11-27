@@ -10,6 +10,11 @@ import type { BarNow } from '../lib/barGrid';
 import type { LookPhase, FrameDigest, VisualizerRender, SongShapeReport } from '../sim/frameTypes';
 import type { MidiEvent, MidiTarget } from '../lib/midi';
 
+export interface PlateSnapshot {
+  /** Release GPU copies held for the Undo window. */
+  destroy: () => void;
+}
+
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
@@ -116,9 +121,11 @@ export interface LiquidVisualizerHandle {
    * point under it, through the camera: the plate is wider than the wall,
    * turns with the dish and is magnified by the closeup. `turned` false
    * leaves the dish's turn out, for a hand on the dish (Spin reads its
-   * angle as the room sees it). The point itself, until the canvas is up.
+   * angle as the room sees it). `reach` carries a pouring hand in the
+   * wall's edge band onto the dish past the wall (lib/pointerPlate.ts,
+   * PLAN 18a-18). The point itself, until the canvas is up.
    */
-  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean) => { x: number; y: number };
+  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean, reach?: boolean) => { x: number; y: number };
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -192,4 +199,8 @@ export interface LiquidVisualizerHandle {
    * (the projector's pixels) and letterbox it here. Null returns to the window.
    */
   setStage: (size: { width: number; height: number } | null) => void;
+  /** Copy the live plate state (liquids, bubbles, beads, palette) before a destructive reset (PLAN 49a). */
+  takeSnapshot?: () => PlateSnapshot | null;
+  /** Restore a snapshot taken by `takeSnapshot`, cancelling any drain or handoff. */
+  restoreSnapshot?: (snap: PlateSnapshot) => void;
 }
