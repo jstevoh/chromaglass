@@ -31,13 +31,15 @@ const CHIP_MS = 12_000;
 export const OPEN_CRASH_REPORT = 'chromaglass:crash-report';
 export const openCrashReport = () => window.dispatchEvent(new Event(OPEN_CRASH_REPORT));
 
-export function CrashReportButton({ floating = false }: {
+export function CrashReportButton({ floating = false, tile = false }: {
   /**
-   * Under a desk, whose header has no room for a button that is idle nearly
-   * always: no button, only the chip when there is news, and the sheet when
-   * the palette asks for it.
+   * Where no button is drawn (Play on a phone, clean screen, or the phone
+   * stage while More is closed): no button, only the chip when there is news,
+   * and the sheet when the palette asks for it.
    */
   floating?: boolean;
+  /** Draw as a 64 px tile inside PhoneStage's More sheet rather than a header icon. */
+  tile?: boolean;
 }) {
   const [fatal, setFatal] = useState<crashLog.CrashEntry | null>(() => {
     const f = crashLog.lastFatal();
@@ -74,13 +76,13 @@ export function CrashReportButton({ floating = false }: {
 
   const chipEl = chipUp && (
     <div
-      className={`${floating ? 'fixed right-4 top-16 z-50' : 'absolute right-0 top-full mt-2'} flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-400/40 bg-[#0b0b10]/95 py-1 pl-3 pr-1 text-[12px] text-white/90 shadow-2xl backdrop-blur-xl pointer-events-auto`}
+      className={`${floating || tile ? 'fixed right-4 top-16 z-[60]' : 'absolute right-0 top-full z-50 mt-2'} flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-400/40 bg-[#0b0b10]/95 py-1 pl-3 pr-1 text-[12px] text-white/90 shadow-2xl backdrop-blur-xl pointer-events-auto`}
       style={{ animation: 'chromaglass-menu-in 0.15s ease-out' }}
       data-testid="crash-chip"
     >
       <span>The plate stopped — save a report?</span>
       <button onClick={() => { setOpen(true); setChip(false); }} className="min-h-[28px] rounded-full bg-amber-500 px-3 font-medium text-black hover:bg-amber-400">Report</button>
-      <button onClick={acknowledge} className="min-h-[28px] min-w-[28px] rounded-full text-white/50 hover:text-white" aria-label="Dismiss">✕</button>
+      <button onClick={acknowledge} className="min-h-[28px] min-w-[28px] rounded-full text-dim hover:text-white" aria-label="Dismiss">✕</button>
     </div>
   );
   const sheet = open && createPortal(
@@ -89,16 +91,25 @@ export function CrashReportButton({ floating = false }: {
   );
 
   if (floating) return <>{chipEl}{sheet}</>;
+  const label = fatal ? 'The plate stopped — save a report' : 'Save a report of what the show was doing';
+  // Separate static layout/variant classes (`tile`) from the `lit` notice ternary so `states.mjs` reads `lit` alone.
+  const layout = tile
+    ? 'flex min-h-[64px] w-full flex-col items-center justify-center gap-1.5 rounded-lg border text-[13px] transition-colors active:scale-[0.97]'
+    : 'inline-flex h-8 w-8 items-center justify-center rounded-full transition-all';
+  const litLook = tile ? 'border-amber-400 bg-amber-500 text-black' : 'bg-amber-500 text-black';
+  const idleLook = tile ? 'border-border bg-elevated text-text-2 active:bg-active' : 'hover:bg-white/10 text-white/60';
   return (
     <div className="relative">
       <button
         onClick={() => { setOpen(true); setChip(false); }}
-        className={`p-2 rounded-full transition-all ${lit ? 'bg-amber-500 text-black' : 'hover:bg-white/10 text-white/60'}`}
-        title={fatal ? 'The plate stopped — save a report' : 'Save a report of what the show was doing'}
+        className={`${layout} ${lit ? litLook : idleLook}`}
+        title={label}
+        aria-label={label}
         data-testid="crash-report-button"
         data-lit={lit ? 'true' : undefined}
       >
-        <LifeBuoy size={14} />
+        <LifeBuoy size={tile ? 20 : 14} />
+        {tile && <span>Crash report</span>}
       </button>
       {chipEl}
       {sheet}
@@ -152,7 +163,7 @@ export function QuickReportDot() {
         }`}
       />
       {(state === 'saved' || state === 'failed') && (
-        <span className="pointer-events-none absolute bottom-7 right-0 whitespace-nowrap rounded bg-black/80 px-2 py-1 text-[11px] text-white/90" data-testid="quick-report-said">
+        <span className="pointer-events-none absolute bottom-7 right-0 whitespace-nowrap rounded bg-black/80 px-2 py-1 text-[12px] text-white/90" data-testid="quick-report-said">
           {state === 'saved' ? 'Report saved to Downloads' : 'Could not save the report'}
         </span>
       )}
@@ -207,7 +218,7 @@ function ReportSheet({ fatal, onClose, onDone }: { fatal: crashLog.CrashEntry | 
   });
 
   return (
-    <Sheet title="Report what happened" onClose={onClose} width={560} height={640} testId="crash-sheet">
+    <Sheet title="Report what happened" onClose={onClose} width={560} height={640} testId="crash-sheet" zIndex="z-[60]">
       <div className="flex min-h-0 w-full flex-col gap-4 overflow-y-auto p-5">
         {fatal && (
           <p className="text-[13px] text-text-2">
@@ -227,7 +238,7 @@ function ReportSheet({ fatal, onClose, onDone }: { fatal: crashLog.CrashEntry | 
         </label>
         <div className="flex flex-col gap-1">
           <span className="text-[12px] text-muted">The last lines of the log</span>
-          <pre className="max-h-44 overflow-auto rounded-md border border-border bg-black/40 p-2 text-[11px] leading-snug text-text-2" data-testid="crash-tail">
+          <pre className="max-h-44 overflow-auto rounded-md border border-border bg-black/40 p-2 text-[12px] leading-snug text-text-2" data-testid="crash-tail">
             {tail.length ? tail.map((e) => `${e.up.toFixed(1).padStart(7)}s ${e.level.padEnd(5)} ${e.source}: ${e.msg.split('\n')[0]}${e.repeats ? ` (×${e.repeats + 1})` : ''}`).join('\n') : 'Nothing logged.'}
           </pre>
         </div>

@@ -30,12 +30,12 @@
   --color-border:        rgba(255,255,255,.08);
   --color-border-strong: rgba(255,255,255,.14);
 
-  /* Text */
+  /* Text (dark-room floor: every text token holds >= 60% white-equivalent contrast against dark surfaces) */
   --color-text:    #FAFAFA;
   --color-text-2:  #D4D4D8;
-  --color-muted:   #A1A1AA;
-  --color-dim:     #71717A;
-  --color-faint:   #52525B;
+  --color-muted:   #B0B0BA;
+  --color-dim:     #A1A1AA;
+  --color-faint:   #9A9AA4;
 
   /* Semantic. Violet = cued / next / selected / ride. Red = live / destructive. Green = connected. */
   --color-accent:        #8B5CF6;
@@ -71,7 +71,7 @@
   --text-label:   13px;  --text-label--font-weight: 500;
   --text-meta:    12px;
   --text-value:   12px;  /* mono, 500 */
-  --text-kbd:     11px;  /* mono, 500 */
+  --text-kbd:     12px;  /* mono, 500 */
 
   /* Radius */
   --radius-xs: 4px;   /* tags, kbd */

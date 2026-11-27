@@ -10,7 +10,6 @@ import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
 import { RailZoom } from './components/RailZoom';
-import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
 import { CommandAndShortcuts } from './components/ShortcutSheet';
@@ -37,14 +36,16 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
 import { clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS, findPreset, livePresetId, NEW_LOOK } from './presets';
+import { PRESETS, findPreset, NEW_LOOK } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
 import { BenchOverlay } from './components/BenchOverlay';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { ProjectorFillChip } from './components/ProjectorFillChip';
-import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
+import { PhoneStage } from './components/phone/PhoneStage';
+import { useLookLists } from './app/useLookLists';
+import { useLookThumbCapture } from './app/useLookThumbCapture';
 import { PhonePlay } from './components/phone/PhonePlay';
 import { PHONE_OFF_KEY } from './lib/phone';
 import { useDeviceTilt } from './hooks/useDeviceTilt';
@@ -209,6 +210,7 @@ export default function App() {
     musicInputRef, musicCtxRef,
   } = useSoundState();
   const [showControls, setShowControls] = useState(true);
+  const [phoneMoreOpen, setPhoneMoreOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   /** Which section the panel should open at, when it was opened from a ⌘K row. */
   const [settingsSection, setSettingsSection] = useState<string | null>(null);
@@ -271,7 +273,8 @@ export default function App() {
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
   // The tool, its amount and the plate in hand (app/useHand.ts).
-  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = useHand();
+  const hand = useHand();
+  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = hand;
   // The shelf: the bottles the app ships, then any someone made (lib/liquidFile.ts).
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]);
   useEffect(() => { saveCustomLiquids(liquidTypes); }, [liquidTypes]);
@@ -411,7 +414,7 @@ export default function App() {
 
   const {
     fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
-    pourName, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
+    pourName, live, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
   } = usePour({
     visualizerRef,
   });
@@ -507,7 +510,7 @@ export default function App() {
     filmSource, filmName, loadFilm, cameras, filmCameraId, filmCamera, filmCameraLost,
     startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, video,
   } = useFilm({
-    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour,
+    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour, live,
   });
 
   const {
@@ -1318,50 +1321,9 @@ export default function App() {
     return typeof v === 'number' ? v : undefined;
   }, [lookValues]);
 
-  /**
-   * The cue list: the looks, in order, each carrying two of its own dyes so a
-   * row is recognisable without reading it. The live one is what is on the
-   * wall; the next one is whatever is armed.
-   */
-  const swatchOf = useCallback((presetId: string | undefined): string => {
-    const contract = !presetId ? null : isUserPresetId(presetId)
-      ? userPresetsRef.current.find(u => u.id === presetId)?.contract
-      : PRESET_CONTRACTS[presetId];
-    const [a, b] = contract && contract.length
-      ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
-      : ['#52525B', '#27272A'];
-    return `linear-gradient(135deg, ${a}, ${b})`;
-  }, []);
-  /*
-    The phone's list of looks: the preset menu's groups (the projected show,
-    the photographs, the closeups) and then the ones saved here, each with
-    the two colours the desks' cue rows show for it.
-  */
-  const phoneLooks = useMemo<PhoneLook[]>(() => {
-    const groupOf = (p: { id: string; settings: Partial<VisualizerSettings> }) =>
-      isUserPresetId(p.id) ? 'Yours' : p.settings.macroMode ? 'Closeup' : p.settings.renderStyle === 'photo' ? 'Photograph' : 'Light show';
-    const order = ['Light show', 'Photograph', 'Closeup', 'Yours'];
-    return allPresets
-      .map(p => ({ id: p.id, name: p.name, description: p.description, group: groupOf(p), swatch: swatchOf(p.id) }))
-      .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
-  }, [allPresets, swatchOf]);
+  const { swatchOf, phoneLooks, cues } = useLookLists({ allPresets, userPresetsRef, setList, fadeSeconds, sequences: () => sequencerRef.current?.sequences });
+  useLookThumbCapture(activePresetId);
   const setActive = setList.items.length > 0;
-  const cues = useMemo<Cue[]>(() => {
-    return setList.items.map(item => {
-      const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
-      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
-      const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
-      return {
-        id: item.id,
-        name,
-        swatch: swatchOf(look?.id ?? seq?.stages[0]?.presetId),
-        fade: item.fade ?? fadeSeconds,
-        song: item.song ? songLabel(item.song) : undefined,
-        kind: item.kind,
-        missing: item.kind === 'sequence' ? !seq : !look,
-      };
-    });
-  }, [allPresets, fadeSeconds, setList, swatchOf]);
   cuesRef.current = cues;
 
   /**
@@ -1771,8 +1733,8 @@ export default function App() {
     const c = PALETTE[((paletteIndex % PALETTE.length) + PALETTE.length) % PALETTE.length];
     updateLiquidColor(selectedLiquidId, c.hex);
   };
-  /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
-  const selectDye = (paletteIndex: number) => { colourDye(paletteIndex); };
+  /** A hand on a dye pad: the selected liquid takes a palette colour, as colourDye. */
+  const selectDye = colourDye;
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
@@ -1834,10 +1796,11 @@ export default function App() {
     selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
     blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
     visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
+    hand, setSelectedLiquidId,
   });
 
   const {
-    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands,
+    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands, openPanelNow,
   } = useCommandPalette({
     allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
     blackout, toggleBlackout, newLook: newPlate, saveLook, docId, docName, replaceLook, setSeedCount,
@@ -1880,10 +1843,9 @@ export default function App() {
   /*
     Where each status dot goes.
 
-    One set of handlers rather than one per desk, for the same reason the
-    header itself is one component: Design and Perform must send you to the
-    same place from the same dot. Each closes whatever else is open, because
-    two panels over a plate is the state you cannot see the show through.
+    One set for both desks, as the header is one component: Design and
+    Perform send you to one place from one dot. Each closes what else is
+    open: two panels over a plate hide the show.
   */
   const openSettingsAt = useCallback((section: string) => {
     // An id from before a section was folded into another opens that one.
@@ -1895,9 +1857,9 @@ export default function App() {
   }, []);
   const deskOpen = useMemo(() => ({
     sound: () => openSettingsAt('audio-input'),
-    video: () => openSettingsAt('film'),
+    video: () => { setShowSettings(false); setShowStage(false); openPanelNow('film'); },
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
-  }), [openSettingsAt]);
+  }), [openSettingsAt, openPanelNow]);
 
   /*
     Deaf is said first and in words: listening, but nothing arriving (the
@@ -3116,6 +3078,7 @@ export default function App() {
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
             onOpenAccount={openAccount}
+            onMoreOpen={setPhoneMoreOpen}
           />
           </PanelGuard>
           )}
@@ -3447,9 +3410,6 @@ export default function App() {
               </div>
             )}
           </div>
-          <PanelGuard name="The crash report">
-          <CrashReportButton />
-          </PanelGuard>
           <button
             aria-pressed={showHelp}
             onClick={() => setShowHelp(!showHelp)}
@@ -3645,10 +3605,8 @@ export default function App() {
           <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
         </>
       )}
-      {/* The crash report, under a desk: its header has no room for a
-          button that is idle nearly always, so the chip says when there is
-          news and ⌘K opens the sheet. */}
-      {(deskUp || phone) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
+      {/* Floating chip + sheet when no button is mounted. */}
+      {((deskUp && !overlaysVisible) || (phone && !(showControls && phoneScreenUp === 'stage' && phoneMoreOpen))) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
       {overlaysVisible && <PanelGuard name="The report dot"><QuickReportDot /></PanelGuard>}
 

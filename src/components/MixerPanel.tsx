@@ -10,6 +10,7 @@ import {
 import type { FadeWay } from '../lib/mixFade';
 import { PIN_RANGE } from '../lib/deskPins';
 import { readSetting } from '../lib/readout';
+import { ProjectorBank } from './ProjectorBank';
 
 /**
  * The mixer, drawn: every picture on the wall in one stack (lib/mixer.ts).
@@ -222,7 +223,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
         title={id === 'front' ? 'The front plate is the glass the lamp shines through; the rest stack on it'
           : ok ? `Move ${name} ${dir > 0 ? 'up' : 'down'}` : dir < 0 && !lampish(id) ? 'Only the LED ring, the gel and the lumia go under the front plate' : undefined}
         data-testid={`${testId}-${id}-${dir > 0 ? 'up' : 'down'}`}
-        className={`flex items-center justify-center rounded-md text-text-2 transition-colors disabled:opacity-25 enabled:hover:bg-hover enabled:active:bg-active ${
+        className={`flex items-center justify-center rounded-md text-text-2 transition-colors disabled:opacity-65 enabled:hover:bg-hover enabled:active:bg-active ${
           touch ? 'h-12 w-12' : 'h-7 w-7'
         }`}
       >
@@ -236,6 +237,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
       <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} leading-snug text-muted`}>
         Top of the list is on top on the wall. What is under the front plate is its lamp; the LED ring and the lumia above it are beams, the gel a filter on the lens. {onFade ? 'Fade takes a row out over its fade time and back. ' : ''}Grade opens a row's blend, fade time and grade.
       </p>
+      <ProjectorBank settings={settings} onSetting={onSetting} touch={touch} chips={chips} testId={`${testId}-bank`} />
       {rows.map(id => {
         const info = MIX_SOURCE_INFO[id];
         const off = absent(id);
@@ -271,7 +273,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
                   multiply", cut "Gel Wheel" by 27 px on a 390 px phone (`npm run phone`).
                 */}
                 {(role || blend !== 'own') && (
-                  <span className="min-w-0 truncate rounded-xs bg-hover px-1.5 py-0.5 text-[11px] text-text-2">
+                  <span className="min-w-0 truncate rounded-xs bg-hover px-1.5 py-0.5 text-[12px] text-text-2">
                     {role}{role && blend !== 'own' && ' · '}
                     {blend !== 'own' && <span className="text-accent-text" data-testid={`${testId}-${id}-blendtag`}>{MIX_BLEND_LABEL[blend].toLowerCase()}</span>}
                   </span>
@@ -327,7 +329,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
                     return [c.key, c.none];
                   })) as Partial<VisualizerSettings>)}
                   disabled={!graded}
-                  className={`mb-2 flex w-full items-center justify-center gap-2 rounded-md border border-border text-[12px] text-text-2 disabled:opacity-40 enabled:hover:bg-hover ${touch ? 'h-12' : 'h-8'}`}
+                  className={`mb-2 flex w-full items-center justify-center gap-2 rounded-md border border-border text-[12px] text-text-2 disabled:opacity-65 enabled:hover:bg-hover ${touch ? 'h-12' : 'h-8'}`}
                   data-testid={`${testId}-${id}-reset`}
                 >
                   <RotateCcw size={13} /> Reset {info.name}'s grade

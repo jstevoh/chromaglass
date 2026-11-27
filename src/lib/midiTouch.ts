@@ -70,6 +70,10 @@ export function touchKey(t: MidiTarget): string {
     case 'setlist': return `setlist:${t.index}`;
     case 'dye':     return `dye:${t.paletteIndex}`;
     case 'voices':  return `voices:${t.tool ?? 'dropper'}`;
+    case 'pad':     return `pad:${t.tool ?? ''}:${t.liquid ?? ''}:${t.dye ?? ''}:${t.lane}`;
+    case 'hand':    return `hand:${t.tool ?? t.liquid ?? ''}`;
+    case 'toolAmount': return `toolAmount:${t.tool}`;
+    case 'padLayout':  return `padLayout:${t.step}`;
   }
 }
 

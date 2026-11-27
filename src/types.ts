@@ -381,6 +381,15 @@ export interface VisualizerSettings {
     until it melts into the show's first colour. Off keeps today's films.
   */
   logoMelt: boolean;
+  /*
+    Keep the dish full when it is left running (PLAN 18a-22, sim/keepFull.ts):
+    when the dish runs below the amount its look is made with, a hand tops it
+    up with the dropper, a real drop of the look's own bottle at a time where
+    it has gone pale, until it reads full. The room's switch, not a look's
+    (lookFade.ts RIG_KEYS), so a look change leaves it as it was. Off keeps
+    today's plate.
+  */
+  keepFull: boolean;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -667,7 +676,20 @@ export interface VisualizerSettings {
   glassSmear: number;
   rainDrip: number;
   viscosity: ViscosityMode;
-  polarity: number; // Repulsion between blobs
+  /*
+    Hold Apart (PLAN 18d-6), 0 to 1: how hard two waters that differ only in
+    their dye hold apart. 0 is real and every look's default: two dyes in the
+    same water are one liquid with no edge to carry a tension, and they mix
+    as dyes do (the dye's own diffusion, the flow's folding, the light taken
+    out band by band). Past 0 the dial scales the stress a steep change of
+    composition does carry (Korteweg's; gpu/fluid/constants.ts has the law
+    and the numbers), up to a cooking oil's tension against water across a
+    unit step of dye at 1: pools round, filaments draw back, colours keep to
+    bodies. It replaces Polarity and Blob Surface Tension, the two dials
+    whose product sized a push between unlike colours; a saved look that
+    still carries either reads as 0 here.
+  */
+  holdApart: number;
   
   /*
     Heat Slide.
@@ -689,6 +711,20 @@ export interface VisualizerSettings {
   layerCount: number;
   blendMode: BlendMode;
   twoProjectors: number;
+  /*
+    The projector bank (PLAN 51a, lib/projectorBank.ts): the operator's hands
+    on the rig, not a look's (lookFade's RIG_KEYS). Each lamp is its variac,
+    0 to VARIAC_MAX (4/3, 160 V on a 120 V lamp), 1 the rated voltage: light
+    as v^3.4, colour temperature as v^0.42. A shutter is its vane, 0 open to
+    1 shut, walked there in 80 ms. The crossfade is A at 0, B at 1, linear in
+    light; it fades only with Two Projectors on a back plate. Defaults are
+    today's picture.
+  */
+  projLampA?: number;
+  projLampB?: number;
+  projShutterA?: number;
+  projShutterB?: number;
+  projCross?: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -809,7 +845,6 @@ export interface VisualizerSettings {
   // Light Show Look (rendering)
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
-  blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
   boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and now only shades that step in the closeup (18e-7)
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
@@ -876,6 +911,7 @@ export interface VisualizerSettings {
   filmZoom: number;           // the film's frame on the plate: 1 fills it (cover-fit), above crops in, below shows it smaller with black round it
   filmX: number;              // the film's frame slid across, in plate widths (0 centred)
   filmY: number;              // the film's frame slid up, in plate heights (0 centred)
+  filmRing: number;           // 1: the video is the spinning LED platform under the dish, turning with LED Rotation Speed (PLAN 14ag-9); 0 off
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -1118,6 +1154,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
   logoMelt: false,
+  keepFull: false,
   beatPrediction: 0.7,
   beatLead: 80,
   /*
@@ -1205,7 +1242,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   glassSmear: 0,
   rainDrip: 0.0,
   viscosity: 'thick',
-  polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
+  holdApart: 0,             // real: two dyes in one water mix (PLAN 18d-6)
   evaporationRate: 0.003,   // very slow evaporation — colors persist
   airVelocity: 0.0,
   vibrationFrequency: 0.0,
@@ -1213,6 +1250,11 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   layerCount: 1,
   blendMode: 'screen',
   twoProjectors: 0,
+  projLampA: 1,
+  projLampB: 1,
+  projShutterA: 0,
+  projShutterB: 0,
+  projCross: 0.5,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second
@@ -1272,7 +1314,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
-  blobSurfaceTension: 0.3,  // colours hold apart loosely
   boundaryContrast: 0.45,   // the optical path's contrast; no line between two dyes (18e-5)
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
@@ -1283,7 +1324,20 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   crispEdges: 0,            // off: the oil's edge drawn as the solver's band, as every look had it
   projectorFocus: 0.5,
   lacing: 0,
-  bubbles: 0.2,
+  /*
+    No trapped air unless the look asks for it (PLAN 33q-4, the owner's
+    choice, 2026-11-27: "too many bubbles in the looks"). Air is trapped
+    when a second glass is laid or pressed onto the liquid: the clock-glass
+    sandwich of a 1960s wet show, where the top glass closes over the water
+    and a press or a kick shuts pockets under it. An open dish, a gel, a
+    film in a frame or a reaction has no glass to close over the air, so
+    those looks carried 0.2 here by inheritance, not by choice. So the base
+    every look is laid on (LOOK_BASE in lib/lookFade.ts) has none, and the
+    four looks that are the sandwich ask for their own: Lava Pop, Oil &
+    Water, Clock Glass and Splodascope. The dial still turns it on in any
+    look, on the desk, the phone and MIDI. `npm run lookair` counts them.
+  */
+  bubbles: 0,
   bubbleMelt: 0,            // nature's rate: a pocket between the glasses stays (PLAN 38b)
   plateRock: 0.45,
   frameSway: 0,             // the frame holds still; the music moves the liquid (lib/plateRock.ts)
@@ -1372,6 +1426,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmZoom: 1,
   filmX: 0,
   filmY: 0,
+  // The video is not on the LED ring until someone puts it there (PLAN 14ag-9).
+  filmRing: 0,
   lampWarmth: 0,
   transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,

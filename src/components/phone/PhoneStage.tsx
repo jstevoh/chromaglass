@@ -1,4 +1,5 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { PhonePads } from './PhonePads';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
@@ -25,6 +26,7 @@ const HAND_SLIDERS: readonly [MusicRole, string][] = [['bloom', 'Kick Pour'], ['
 import { musicShakeOf, withMusicShake } from '../../lib/shakeCord';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 function pinSlider(k: keyof VisualizerSettings, val: number) {
@@ -39,8 +41,10 @@ import { PhoneInkTitle } from './PhoneInkTitle';
 import { PhoneSaveForm, type ExistingLook } from './PhoneSaveForm';
 import { PhoneTabsBody, type PhoneTabs, type PhoneSheetKey } from './PhoneTabsBody';
 import { findPreset } from '../../presets';
-import { lookStill } from '../../lib/lookStills';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { LookChip, LookPicture } from '../ui/LookChip';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
+import { CrashReportButton } from '../CrashReportButton';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
 import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
@@ -55,7 +59,7 @@ import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import { SiteLink } from '../SiteLink';
-import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { Bottle, LiveBottle, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 import { PicturePaletteButton } from '../PicturePaletteButton';
 
 /**
@@ -372,6 +376,7 @@ export interface PhoneStageProps {
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
+  onMoreOpen?: (open: boolean) => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
   /** Desk MIDI & Learn props rendered inside the phone's MIDI sub-sheet (H4-12). */
@@ -439,6 +444,13 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone, glyph }: {
 
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  const onMoreOpenRef = useRef(p.onMoreOpen);
+  onMoreOpenRef.current = p.onMoreOpen;
+  const moreOpen = sheet === 'more';
+  useEffect(() => {
+    onMoreOpenRef.current?.(moreOpen);
+    return () => { onMoreOpenRef.current?.(false); };
+  }, [moreOpen]);
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const [amountOpen, setAmountOpen] = useState(false);
@@ -501,7 +513,7 @@ export function PhoneStage(p: PhoneStageProps) {
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
-          <SlideMount swatch={p.lookSwatch} size={36} />
+          <LookPicture lookId={p.activeLookId} swatch={p.lookSwatch} size={36} />
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
           <span className="shrink-0 text-muted"><SlideTray at={p.lookSlot ?? null} size={20} /></span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
@@ -723,7 +735,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 <ToolGlyph id={id} size={20} />
                 <span>{label}</span>
                 {on && Math.abs(p.amount - 1) > 0.01 && (
-                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[11px] text-text">{p.amount.toFixed(1)}</span>
+                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[12px] text-text">{p.amount.toFixed(1)}</span>
                 )}
               </button>
             );
@@ -810,7 +822,9 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-3">
             <Slider label="Clear Film" value={p.film.clearFilm ?? 0} {...pinSlider('clearFilm', p.film.clearFilm ?? 0)} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
               touch testId="phone-clear-film" />
-            <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+            <p className="-mt-3 text-[12px] leading-snug text-dim">
+              A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. {clearFilmGroundNote(p.lampGround, p.film.clearFilmDye) ?? 'White on the Lamp Ground.'}
+            </p>
             {(p.film.clearFilm ?? 0) > 0.001 && (
               <div className="mt-3 flex items-end gap-3">
                 <div className="flex-1">
@@ -910,8 +924,8 @@ export function PhoneStage(p: PhoneStageProps) {
               both of, and Pour's Stop is here too. */}
           {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
-              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} onMixOrder={p.mixer ? o => p.mixer!.onSetting({ mixOrder: o }) : undefined} />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Video in</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} filmRing={p.mixer?.settings.filmRing} onPlace={p.mixer ? patch => p.mixer!.onSetting(patch) : undefined} />
             </div>
           )}
           {p.deskTabs && (
@@ -1001,33 +1015,43 @@ export function PhoneStage(p: PhoneStageProps) {
           {groups.map(g => (
             <div key={g}>
               <SectionLabel>{g}</SectionLabel>
-              <div className="flex flex-col gap-1">
+              {/*
+                Round chips, a picture of each look (PLAN 34b-6, the phone's
+                half of the desk's chips): a long press tells its name, as a
+                phone's home screen does, and a tap sends it. 56 px, past the
+                44 px a finger needs, five to a row on a 390 px phone where the
+                rows of name and description were one look to 56 px.
+              */}
+              <div className="flex flex-wrap gap-3 px-1 py-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
                   const own = p.userLookIds?.has(l.id);
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
                     <div key={l.id} className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          // The switch is for one look: it goes back to Whole plate
-                          // once that look is sent, so a pick an hour later is not
-                          // sent to the back plate by a switch nobody remembers.
-                          // A pack's look without the pack opens the account sheet (PLAN 45a).
-                          if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
-                          else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
-                          else p.onLook(l.id);
-                          close();
-                        }}
-                        aria-pressed={on}
-                        data-testid={`phone-look-${l.id}`}
-                        className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
-                      >
-                        <SlideMount swatch={l.swatch} still={lookStill(l.id)} size={44} />
-                        <span className="min-w-0 flex-1">
-                          <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
-                          {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
-                        </span>
-                      </button>
+                    <LookChip
+                      lookId={l.id}
+                      name={l.name}
+                      swatch={l.swatch}
+                      size={56}
+                      state={on ? 'live' : 'idle'}
+                      pressed={on}
+                      title={l.description ? `${l.name}: ${l.description}` : l.name}
+                      onClick={() => {
+                        // The switch is for one look: it goes back to Whole plate
+                        // once that look is sent, so a pick an hour later is not
+                        // sent to the back plate by a switch nobody remembers.
+                        // A pack's look without the pack opens the lock/account sheet (PLAN 45a, 49j).
+                        if (locked) openTierLock('moire', { itemName: l.name });
+                        else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
+                        else p.onLook(l.id);
+                        close();
+                      }}
+                      testId={`phone-look-${l.id}`}
+                    >
+                      {/* A pack's look without the pack wears the lock its row wore (PLAN 49j), over the chip's foot. */}
+                      {locked && <TierLockBadge label="Pro" className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 text-[11px]" />}
+                    </LookChip>
                       {own && p.onExportLook && (
                         <button
                           type="button"
@@ -1122,9 +1146,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
           )}
           {p.audioSource !== 'none' && (
-            <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
+            <div className="mt-3">
               <Slider label="Follow the song" value={p.songFollow} {...pinSlider('songFollow', p.songFollow)} step={0.01} onChange={p.onSongFollow}
-                touch testId="phone-song-follow" />
+                disabled={!p.show.running} touch testId="phone-song-follow" />
               <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-song-follow-says">
                 {p.show.running
                   ? 'The show holds still through a build and throws its big move on the drop.'
@@ -1152,7 +1176,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.score && (
             <>
               <SectionLabel>The song</SectionLabel>
-              <SongScore {...p.score} touch />
+              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
             </>
           )}
           <SectionLabel>Tap the tempo</SectionLabel>
@@ -1310,6 +1334,11 @@ export function PhoneStage(p: PhoneStageProps) {
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
             )}
           </div>
+          {/* The controller's grid on the glass (PLAN 30c): pads held as long as a finger is on them. */}
+          <div className="mt-3">
+            <p className="mb-1.5 text-[13px] font-medium text-text">Pads</p>
+            <PhonePads testId="phone-pads" />
+          </div>
           {/*
             The desk's Tip pad under a thumb (PLAN 18a-13j): for a phone on a stand,
             an iPad, or a hand that would rather not tip the phone itself. Hidden
@@ -1340,9 +1369,14 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
-          <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
+          <div className="mt-4">
             <Slider label="Evolve speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
-              touch testId="phone-evolve-speed" />
+              disabled={!p.evolving} touch testId="phone-evolve-speed" />
+            {!p.evolving && (
+              <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-evolve-speed-says">
+                Turn Evolve on above to set how fast it drifts.
+              </p>
+            )}
           </div>
           {/*
             The plates, on every look. This section was here only on a look
@@ -1391,16 +1425,16 @@ export function PhoneStage(p: PhoneStageProps) {
               </button>
             ))}
           </div>
-          <div className={`mt-3 transition-opacity ${Math.round(p.spin.auto) === 0 ? 'opacity-50' : ''}`}>
+          <div className="mt-3">
             <Slider label="Spin rate" value={p.spin.rpm} {...pinSlider('spinRpm', p.spin.rpm)} step={0.5} onChange={(v) => p.spin.onChange({ spinRpm: v })}
-              touch testId="phone-spin-rate" />
+              disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-rate" />
             {Math.round(p.spin.auto) === 2 && (
               <Slider label="Beats a turn" value={p.spin.beats} {...pinSlider('spinBeats', p.spin.beats)} step={1}
                 onChange={(v) => p.spin.onChange({ spinBeats: Math.round(v) })}
-                touch testId="phone-spin-beats" />
+                disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-beats" />
             )}
-            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} data-testid="phone-spin-reverse"
-              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active">
+            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} disabled={Math.round(p.spin.auto) === 0} data-testid="phone-spin-reverse"
+              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active disabled:cursor-not-allowed disabled:opacity-65">
               Reverse
             </button>
           </div>
@@ -1616,6 +1650,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             {p.onShortcuts && <Tile icon={Keyboard} label="Shortcuts" onPress={() => { close(); p.onShortcuts?.(); }} testId="phone-shortcuts" />}
+            <PanelGuard name="The crash report">
+              <CrashReportButton tile />
+            </PanelGuard>
             {p.onOpenAccount && <Tile icon={signedOut ? LogIn : User} label={signedOut ? 'Sign in' : 'Account'} onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a

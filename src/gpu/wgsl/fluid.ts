@@ -6,7 +6,7 @@ import { PHASE_KERNELS } from './fluid/phase';
 import { PHASE_FORCE_KERNELS } from './fluid/phaseForces';
 import { LABYRINTH_KERNELS } from './fluid/labyrinth';
 import { PRESSURE_KERNELS } from './fluid/pressure';
-import { CARRY_KERNELS } from './fluid/carry';
+import { ACROSS, CARRY_KERNELS } from './fluid/carry';
 import { FORCE_KERNELS } from './fluid/forces';
 import { OIL_KERNELS } from './fluid/oil';
 import { CAPILLARY_KERNELS } from './fluid/capillary';
@@ -85,6 +85,27 @@ function thinFaced(src: string, name: string): string {
     .replace(block, '  let ve = thinFaceVel(a, e, n);\n')
     .replace(new RegExp(`(@group\\(0\\) @binding\\(${last}\\)[^\\n]*\\n)`), `$1${bindings}`);
 }
+/*
+  bodyAdvect with the corner's transverse share (ACROSS in wgsl/fluid/carry.ts,
+  PLAN 18a-8): the donor's colour carried along the face as well as across it
+  in the half step it crosses, so the carry spreads colour the same whichever
+  way the flow crosses the grid (`npm run gridiso`). For the thin gap's
+  carries; the old plate's bodyAdvect keeps its unsplit faces.
+*/
+function cornered(src: string, name: string): string {
+  const outA = '    return c * (mx(a, n) + 0.5 * (1.0 - c) * s);';
+  const outB = '  return c * (mx(b, n) - 0.5 * (1.0 + c) * s);';
+  const k = '  let c = clamp(ve * k, -0.45, 0.45);';
+  const at = src.indexOf('fn flux(');
+  if (src.split(outA).length !== 2 || src.split(outB).length !== 2 || !src.includes(k) || at < 0) {
+    throw new Error(`${name} cannot take the corner's share: its upwind values or its Courant number moved`);
+  }
+  return (src.slice(0, at) + `${ACROSS}\n` + src.slice(at))
+    .replace(k, `${k}\n  let side = vec2i(e.y, e.x);`)
+    .replace(outA, '    return c * (mx(a, n) + 0.5 * (1.0 - c) * s - across(a, side, k, n));')
+    .replace(outB, '  return c * (mx(b, n) - 0.5 * (1.0 + c) * s - across(b, side, k, n));');
+}
+
 /*
   The carries of what the liquid holds, with the air in the cell taking room
   from the liquid (PLAN 15g-8b): each face carries the donor cell's amount per
@@ -183,8 +204,9 @@ fn airFaces(a: vec2i, n: i32) -> vec4f {
 }
 function airLiquid(src: string, name: string, frac: string): string {
   const last = Math.max(...[...src.matchAll(/@binding\((\d+)\)/g)].map((m) => Number(m[1])));
-  const outA = /return c \* \((mx\(((?:t, )?)a, n\)) \+ 0\.5 \* \(1\.0 - c\) \* s\);/;
-  const outB = /return c \* \((mx\((?:t, )?b, n\)) - 0\.5 \* \(1\.0 \+ c\) \* s\);/;
+  // The upwind values, with the corner's transverse share where the carry has one (ACROSS, PLAN 18a-8).
+  const outA = /return c \* \((mx\(((?:t, )?)a, n\)) \+ 0\.5 \* \(1\.0 - c\) \* s( - across\w*\([^)]*\))?\);/;
+  const outB = /return c \* \((mx\((?:t, )?b, n\)) - 0\.5 \* \(1\.0 \+ c\) \* s( - across\w*\([^)]*\))?\);/;
   const at = src.indexOf('fn flux(');
   if (!outA.test(src) || !outB.test(src) || at < 0 || src.split('fn flux(').length !== 2) {
     throw new Error(`${name} cannot take the air's room: its upwind values or its flux moved`);
@@ -231,12 +253,12 @@ fn airDonor(${tParam}a: vec2i, n: i32) -> vec4f {
   return (src.slice(0, at) + liquid + src.slice(at))
     .replace(outA, `let la = liquidAt(a, n);
     let lb = liquidAt(b, n);
-    if (la >= 1.0 && lb >= 1.0) { return c * ($1 + 0.5 * (1.0 - c) * s); }
+    if (la >= 1.0 && lb >= 1.0) { return c * ($1 + 0.5 * (1.0 - c) * s$3); }
     if (la >= 1.0) { return c * $1; }
     return c * airDonor(${t}a, n);`)
     .replace(outB, `let la = liquidAt(a, n);
   let lb = liquidAt(b, n);
-  if (la >= 1.0 && lb >= 1.0) { return c * ($1 - 0.5 * (1.0 + c) * s); }
+  if (la >= 1.0 && lb >= 1.0) { return c * ($1 - 0.5 * (1.0 + c) * s$2); }
   if (lb >= 1.0) { return c * $1; }
   return c * airDonor(${t}b, n);`);
 }
@@ -351,7 +373,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`;
 KERNELS.airGiveSub = airGiveKernel(true);
 KERNELS.airGiveThin = airGiveKernel(false);
-KERNELS.bodyAdvectSub = thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub');
+KERNELS.bodyAdvectSub = cornered(thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub'), 'bodyAdvectSub');
 /*
   Each carry of amounts twice: as it was, which every step with no air on
   the plate runs, and taking the air (the Air kernels, airCarry in
@@ -402,15 +424,22 @@ fn courant(a: vec2i, e: vec2i, n: i32) -> f32 {
   return clamp(ve * A.b.y * sub[0] * f32(n), -0.45, 0.45);
 }
 fn mx(t: texture_2d<f32>, p: vec2i, n: i32) -> vec4f { return textureLoad(t, clamp(p, vec2i(0), vec2i(n - 1)), 0); }
+// The corner's transverse share of the donor d (ACROSS in wgsl/fluid/carry.ts, PLAN 18a-8).
+fn acrossPair(t: texture_2d<f32>, d: vec2i, side: vec2i, n: i32) -> vec4f {
+  let ct = clamp(dot(textureLoad(vel, d, 0).xy, vec2f(side)) * A.b.y * sub[0] * f32(n), -0.45, 0.45);
+  let up = select(mx(t, d + side, n) - mx(t, d, n), mx(t, d, n) - mx(t, d - side, n), ct >= 0.0);
+  return 0.5 * ct * up;
+}
 // bodyAdvect's flux, upwind and limited, for a face whose Courant number is c.
 fn flux(t: texture_2d<f32>, a: vec2i, e: vec2i, c: f32, n: i32) -> vec4f {
   let b = a + e;
+  let side = vec2i(e.y, e.x);
   if (c >= 0.0) {
     let s = mm(mx(t, a, n) - mx(t, a - e, n), mx(t, b, n) - mx(t, a, n));
-    return c * (mx(t, a, n) + 0.5 * (1.0 - c) * s);
+    return c * (mx(t, a, n) + 0.5 * (1.0 - c) * s - acrossPair(t, a, side, n));
   }
   let s = mm(mx(t, b, n) - mx(t, a, n), mx(t, b + e, n) - mx(t, b, n));
-  return c * (mx(t, b, n) - 0.5 * (1.0 + c) * s);
+  return c * (mx(t, b, n) - 0.5 * (1.0 + c) * s - acrossPair(t, b, side, n));
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -429,7 +458,50 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`;
 KERNELS.bodyAdvectPairSubAir = airLiquid(KERNELS.bodyAdvectPairSub, 'bodyAdvectPairSubAir', 'A.a.x * sub[0]');
 KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
-KERNELS.bodyAdvectThin = thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin');
+/*
+  The oil's colour carried as the oil is (PLAN 38w-29): bodyAdvect with the
+  oil's own limiter, superbee (mixAdvect's for the oil, and why), and none of
+  the corner's transverse share, which the oil's carry does not take.
+
+  What was reported: Classic's colours washed out under a hand (the owner,
+  round five, 2026-11-22: Beat Squeeze 0.6, Plate Rock 1.6); the oil's own
+  colour fell 10,070 to 9,250 in 41 s on the live app. With Oil Bodies the
+  plate's dye holds both liquids' colours and the oil carries its share of it
+  beside; bodyPartition reads the water's share as the dye less the oil's,
+  never less than none. Both were carried with van Leer's MC and the corner's
+  share while the oil itself is carried with superbee and none, so the oil's
+  edge and its colour's edge parted a little every substep, and where the
+  colour ran ahead of its oil or lagged it bodyPartition handed it to the
+  water. Carrying the oil's share with superbee alone (tried in PR #946) made
+  it four times worse, and that is why: the oil's share then went where the
+  oil went, but the dye still carried the oil's colour inside it the MC way,
+  so the two disagreed by more, and the share was clipped to the dye.
+
+  So the dye is carried as its two liquids: the water's share (bodyWater,
+  the dye less the oil's) the way the water's colour is, MC with the corner,
+  and the oil's share the way the oil is, then the two joined (bodyJoin).
+  Measured with `npm run oilride` (Classic's liquid at 192², the hand
+  above as Beat Squeeze kicks at 120 bpm and Plate Rock tipping round, 300
+  steps): the oil's share went 5193.2 to 5164.9 before (0.54% handed to the
+  water, about 4% over the owner's 41 s), 5193.1 to 5193.4 with this; of it,
+  inside the oil, 98.8% kept against 99.3%. Moving the oil's colour with the
+  oil's Cahn–Hilliard flux as well was tried and measured worse (5132.5,
+  1.17% lost): PLAN 38w-29 keeps the reasons. Two passes a step more, both a
+  load or two a cell; the oil's share's carry is the one it always ran.
+*/
+const MC_SLOPE = `fn mm(a: vec4f, b: vec4f) -> vec4f {
+  let l = min(min(2.0 * abs(a), 2.0 * abs(b)), 0.5 * abs(a + b));
+  return select(vec4f(0.0), sign(a) * l, a * b > vec4f(0.0));
+}`;
+if (KERNELS.bodyAdvect.split(MC_SLOPE).length !== 2) throw new Error('bodyAdvect cannot take the oil\'s limiter: its slope moved');
+KERNELS.bodyAdvectSharp = KERNELS.bodyAdvect.replace(MC_SLOPE, `fn sb1(a: f32, b: f32) -> f32 {
+  if (a * b <= 0.0) { return 0.0; }
+  return sign(a) * max(min(2.0 * abs(a), abs(b)), min(abs(a), 2.0 * abs(b)));
+}
+fn mm(a: vec4f, b: vec4f) -> vec4f { return vec4f(sb1(a.x, b.x), sb1(a.y, b.y), sb1(a.z, b.z), sb1(a.w, b.w)); }`);
+KERNELS.bodyAdvectSharpSub = thinFaced(substepped('bodyAdvectSharp'), 'bodyAdvectSharpSub');
+
+KERNELS.bodyAdvectThin = cornered(thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin'), 'bodyAdvectThin');
 KERNELS.bodyAdvectThinAir = airLiquid(KERNELS.bodyAdvectThin, 'bodyAdvectThinAir', 'A.a.x');
 
 /*

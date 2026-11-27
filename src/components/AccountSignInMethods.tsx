@@ -104,9 +104,9 @@ const AccountSignInMethods: React.FC<{ onConfirmed: () => Promise<void> }> = ({ 
     }
   };
 
-  const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const label = 'text-[12px] font-medium uppercase tracking-wider text-dim';
   const ghostBtn =
-    'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-50';
+    'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-65';
 
   return (
     <>

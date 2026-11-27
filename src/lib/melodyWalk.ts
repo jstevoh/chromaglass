@@ -51,8 +51,8 @@
  * line by its place in the key. The line is the look's: Aurora Borealis's runs
  * along the top of its curtains, where the current draws each run into a
  * ribbon, and Oil and Water's across the middle, where each note is a bead of
- * oil that rounds into a body or merges with its neighbour by the liquids' own
- * immiscibility.
+ * oil that rounds into a body or merges with its neighbour by the oil's own
+ * tension.
  *
  * Along the line the pitch is placed on a fixed scale, `SCALE_LOW` to
  * `SCALE_HIGH` (C3 to C6, the compass of the ear's pitch), a semitone being

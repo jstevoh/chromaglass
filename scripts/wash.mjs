@@ -85,10 +85,10 @@ try {
   const look = JSON.parse(readFileSync(process.env.WASH_LOOK, 'utf8'));
   await page.evaluate(([l, imm]) => {
     Object.assign(window.chromaglassDebug().settings, l);
-    if (imm !== null) window.chromaglassDebug().settings.blobSurfaceTension = imm;
+    if (imm !== null) window.chromaglassDebug().settings.holdApart = imm;
   }, [look, IMM === undefined ? null : Number(IMM)]);
 
-  console.log(`  a plate poured on almost never${IMM === undefined ? '' : `, immiscibility ${IMM}`}\n`);
+  console.log(`  a plate poured on almost never${IMM === undefined ? '' : `, Hold Apart ${IMM}`}\n`);
   console.log('   at      flat%   buckets   colours');
   console.log('  ' + '-'.repeat(38));
   for (const t of [3, 15, 30, 45, 60, 75, 90]) {

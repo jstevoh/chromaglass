@@ -121,7 +121,7 @@ const SECTIONS: Section[] = [
           ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em>. If it still will not, check the bands in Settings → Feed → Sound under What the sound moves, and check that the patches in Settings → Feed → Patches are still in place.</>],
           ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on adds automated dye drops and breaths on top of what the patches already push.</>],
           ['The plate has gone flat', <>It is saturated: there are no boundaries left to see. Lower <Em>Dye Budget</Em> — counter-intuitively that makes it look fuller, because empty glass is what makes the colour read.</>],
-          ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration and Refraction are the lens's — they do nothing with <Em>Lens</Em> (Settings → Look → Lens) at zero. A slider that cannot do anything says why in place of its label description.</>],
+          ['A slider does nothing', <>The usual cause: Focus, Aperture, Bloom, Chromatic Aberration and Refraction are the lens's — they do nothing with <Em>Lens</Em> (Settings → Look → Lens) at zero. A slider that cannot do anything says why in place of its label description.</>],
           ['The wall went dark on a look change', <>You used Load rather than Cue and Go. Load clears the plate on purpose; Go never does.</>],
           ['It got slow', <>The bottom status bar names the rung the governor settled on. Set <Em>Fluid Grid</Em> in Settings → Stage → Simulation to a fixed number rather than auto if a look depends on a particular grid, and expect the governor to step auto back down on a machine that cannot hold it.</>],
         ]} />
@@ -303,7 +303,6 @@ const SECTIONS: Section[] = [
           ['Turbulence Scale / Detail', <>Multi-octave curl noise added to the velocity field. Scale is how strong, Detail is how many octaves — structure from whole-blob motion down to ripple and filament trails.</>],
           ['Sharpness', <>How hard the boundary between two dyes is held. High values keep a boundary a boundary instead of letting diffusion soften it into a gradient.</>],
           ['Granulation / Grain Fineness', <>Pigment that separates the way real pigment does, and travels <Em>with</Em> the dye rather than sitting on the screen. Fineness up is smaller grain.</>],
-          ['Blob Surface Tension', <>How hard two colours hold apart at their edge. High keeps each colour to itself with a clean edge between; low lets them run into each other. Scaled by Polarity — see the interaction section.</>],
           ['Dye Budget', <>How full the plate is allowed to get. As it fills toward saturation, evaporation ramps up hard, so injection and removal find an equilibrium with empty glass left. A saturated plate has no boundaries and reads as a flat colour wash.</>],
           ['Edge Relief', <>The meniscus: the little bright lip where dye meets clear glass.</>],
           ['Lacing', <>The dark dendritic threads that outline a boundary, drawn by the strain across it.</>],
@@ -355,11 +354,11 @@ const SECTIONS: Section[] = [
           ['Rain Drip', <>Heavy colour runs downhill in streaks, as far as the plate is tipped (Gravity). Flat, nothing runs.</>],
           ['Fingering', <>Settings → Look → Show (or the <Em>Press</Em> tool's options chip). With it up, a press does not thin evenly: the film thins more along a ring of spokes and the outflow follows them, so the front breaks into radial fingers instead of a smooth ring. The physics is Saffman–Taylor — thin liquid shooting through thick.</>],
         ]} />
-        <H>Heat and polarity</H>
+        <H>Heat and mixing</H>
         <Rows items={[
           ['Evaporation Rate', <>How fast dye leaves the plate. Paired with Dye Budget — see the interaction section.</>],
           ['Heat Decay', <>How long warmth lingers. High keeps a gentle convection going between events.</>],
-          ['Polarity', <>How strongly the dyes refuse to mix, plate-wide. This is the global setting; milk and silicone do the same thing <Em>locally</Em>, only where they are.</>],
+          ['Hold Apart', <>How hard two colours hold apart, plate-wide. At 0, the real value and every look's start, two dyes in the same water are one liquid: they mix as dyes do, and where they overlap each takes its own light out. Turned up, the edge between two colours pulls tight the way an oil's does against water, so pools round, streaks draw back and colours keep to bodies; an edge that has blurred holds less than a sharp one. It replaces Polarity and Blob Surface Tension.</>],
         ]} />
         <H>Simulation</H>
         <P>
@@ -543,14 +542,6 @@ const SECTIONS: Section[] = [
           Evolve Speed alone.
         </P>
 
-        <H>Polarity × Blob Surface Tension</H>
-        <P>
-          Polarity is the master: it sets how hard two colours hold apart at all, and Blob
-          Surface Tension sets how much of that each edge gets — high is a clean, held
-          edge, low lets the colours bleed. With Polarity at zero, Blob Surface Tension
-          does nothing at all, which is the most common reason a slider appears dead.
-        </P>
-
         <H>Turbulence × Momentum × Advection</H>
         <P>
           Turbulence makes structure, Momentum decides how long it survives, Advection
@@ -569,9 +560,9 @@ const SECTIONS: Section[] = [
 
         <H>The liquids are local; the sliders are plate-wide</H>
         <P>
-          <Em>Polarity</Em> is immiscibility everywhere. Milk's edge-holding is immiscibility{' '}
+          <Em>Hold Apart</Em> is a tension between colours everywhere. Milk's edge-holding is{' '}
           <Em>where the milk is</Em>. They compose rather than duplicate, which is the point —
-          a plate at low Polarity with a pool of milk in it has one thing that will not
+          a plate at Hold Apart 0 with a pool of milk in it has one thing that will not
           blend and everything else that will, and that contrast is not reachable from the
           sliders alone.
         </P>
@@ -632,7 +623,7 @@ const SECTIONS: Section[] = [
       <>
         <H>1.0.0 — April 2026 — the solver</H>
         <P>
-          Real-time Navier–Stokes with squeeze-film flow, buoyancy, immiscibility and
+          Real-time Navier–Stokes with squeeze-film flow, buoyancy, dyes that mix as dyes do and
           fingering. Microphone and system audio through a 1024-point FFT split into bass,
           mid and treble. Ten presets, five compositing layers, an LED platform, the
           dropper and blow tools, automation, and a settings panel with every parameter

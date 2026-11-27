@@ -11,7 +11,7 @@ import type { SloshDrive } from '../../lib/slosh';
 import { DISH_GAP_RANGE, dragSeconds } from '../../lib/turntable';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
-import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, GAP_METRES, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
+import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, GAP_METRES, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, RGBA32, HOLD_APART_FINE, type FieldStats } from './constants';
 import { FluidCore } from './core';
 import { WARM_FIT } from '../wgsl/thinWarm';
 import { FineDye } from '../fineDye';
@@ -359,6 +359,21 @@ export class FluidFields extends FluidCore {
   prepareFilm(): Promise<void> {
     if (!this.layer) this.layer = new StandingFilm(this.device, this.pipelines, this.disposer, this.N);
     return this.layer.prepare();
+  }
+
+  /**
+   * Hold Apart's two fields (PLAN 18d-6; wgsl/fluid/forces.ts holdSoft and holdStress write them, forcesB reads the second), made the first time
+   * the dial is up: `HOLD_APART_FINE` cells to the logical cell, and 32-bit, since the stress is a small difference of the blurred dye's
+   * differences and 16 bits of it shook every straight edge (holdSoft has the number).
+   */
+  protected ensureHoldApart(): void {
+    if (this.holdSoft && this.holdForce) return;
+    const make = (label: string) => this.disposer.track(this.device.createTexture({
+      label, size: [this.L * HOLD_APART_FINE, this.L * HOLD_APART_FINE], format: RGBA32,
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    }));
+    this.holdSoft = make('hold soft');
+    this.holdForce = make('hold force');
   }
 
   /** The standing layer's window (see standOn), made once, zero until a film writes it. */

@@ -60,7 +60,6 @@ export const CONTROL_HELP: Record<string, string> = {
   particleMix: 'How far a particle\'s own colour is trusted over the grid\'s. Needs Dye Particles.',
   granulation: 'Pigment separating into a fine speckle that travels with the dye. Off by default: dye in solution is smooth.',
   grainScale: 'How fine that speckle is. Higher is a finer grain.',
-  blobSurfaceTension: 'How hard two colours hold apart at their edge, so they bead up instead of blending.',
   layerScaleVariety: 'Shows the second layer magnified and drifting, so one frame carries two scales of pattern.',
   boundaryContrast: 'How strongly edges show out of focus, and the back plate\'s bright rim. Draws no line where two colours meet, except in the closeup.',
   glossiness: 'How steep the liquid\'s surface reads to the lens. Zero is the real surface; up, ripples and edges bend more light away.',
@@ -169,6 +168,7 @@ export const CONTROL_HELP: Record<string, string> = {
   filmZoom: 'How big the video is on the plate. 1 fills it, cropping what does not fit; below 1 shows the whole frame smaller, with black round it.',
   filmX: 'Slides the video left or right on the plate. 0 is centred.',
   filmY: 'Slides the video down or up on the plate. 0 is centred.',
+  filmRing: 'Puts the video on the spinning LED platform under the dish: the picture turns with LED Rotation Speed and lights the glass from below.',
   soundImpact: 'The master depth over every patch that reads the sound.',
   shapeImpact: 'The master depth over every patch driven by a slow wave or an envelope.',
   sceneImpact: 'The master depth over every patch that reads the room.',
@@ -207,7 +207,7 @@ export const CONTROL_HELP: Record<string, string> = {
   oilWeight: 'How heavy the oil is against the water. Right, it sinks like a lava lamp\'s wax and the lamp lifts it. Needs Gravity.',
   filmHold: 'The water film between two oil drops holds them apart, so they crowd without merging until pressed. Needs Oil Tension.',
   oilTension: 'Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge.',
-  clearFilm: 'Pours a clear oil film over the dish. Thin spots and dust tear it open into a lace of holes (dewetting).',
+  clearFilm: 'Lays a clear oil film that tears into lace. Shows bright on Lamp Ground; darkens on black ground unless dyed.',
   clearFilmDye: 'Dyes the clear film, so the lace takes a colour, deeper where it is thick, and its holes show the water.',
   thinGap: 'Treats the plate as a thin gap between two glasses, so a push coasts and viscosity matters.',
   gapThickness: 'How thick the liquid is in the thin gap, from water to glycerine. Sets how long a push lasts.',
@@ -219,7 +219,7 @@ export const CONTROL_HELP: Record<string, string> = {
   plateSpring: 'How quickly the glasses spring apart again after a press.',
   glassSmear: 'Slides the top glass, dragging the liquid with it. Still at 0; a look that drifts slides it on an LFO cord.',
   rainDrip: 'Heavy drops run down the glass in streaks, as rain does on a window. Needs the plate tipped (Gravity): flat, nothing runs.',
-  polarity: 'How polar the liquid is against water. Water is zero, oil is negative, and like dissolves like, so unlike liquids repel.',
+  holdApart: 'How hard two colours hold apart. 0 is real: dyes in one water mix. Up, their edge pulls tight and pools round.',
   vorticityConfinement: 'Spins small eddies back up that a grid solver smooths away. Flair rather than physics.',
   surfactantFlow: 'Soap drops the tension and the surface streams away, carrying dye. It stays: on a plate soaped all over, more does nothing.',
   soapBreakdown: 'How fast soap on the plate is taken up by the oil or washed through the trough, as a half-life. Zero keeps all of it.',
@@ -250,6 +250,11 @@ export const CONTROL_HELP: Record<string, string> = {
 
   // Layers and the dish's motor
   twoProjectors: 'Lays the layers over each other as two projectors on one screen, so their light adds.',
+  projLampA: 'The front projector\'s lamp on its variac: down, it dims steeply and goes amber as a real lamp does; past 100% it overdrives.',
+  projLampB: 'The back projector\'s lamp on its variac (with Two Projectors): dims and warms as a real lamp does.',
+  projShutterA: 'A vane over the front projector\'s lens: closes in 80 ms and dims the whole picture evenly, the lamp staying lit.',
+  projShutterB: 'A vane over the back projector\'s lens (with Two Projectors).',
+  projCross: 'Fades the wall from projector A to projector B, linear in light so the middle is no brighter than the ends (with Two Projectors).',
   layerCount: 'How many plates are stacked, one or two.',
   rotationSpeed: 'How fast the dish turns.',
   spinImpulse: 'How hard one flick of the dish hits.',
@@ -312,4 +317,14 @@ const ALL: Record<string, string> = { ...mixerHelp(), ...CONTROL_HELP };
 export function helpFor(key: string | null | undefined): string | undefined {
   if (!key) return undefined;
   return ALL[key.startsWith('setting:') ? key.slice('setting:'.length) : key];
+}
+
+/**
+ * Ground note for Clear Film when neither Lamp Ground nor Film Dye is raised: on a black
+ * ground there is no lamp behind the dish, so thinning the water path darkens instead of
+ * glowing white.
+ */
+export function clearFilmGroundNote(lampGround?: number, clearFilmDye?: number): string | undefined {
+  if ((lampGround ?? 0) > 0.001 || (clearFilmDye ?? 0) > 0.001) return undefined;
+  return 'Black ground has no lamp behind the plate: Clear Film thins the water path under it instead of showing white. Raise Film Dye or turn on Lamp Ground to see the lace.';
 }
