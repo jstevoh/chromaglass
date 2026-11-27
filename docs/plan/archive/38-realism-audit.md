@@ -177,6 +177,14 @@ build and what it adds to the frame. S is under a day, M a few days, L a week or
 Every item here keeps today's look reachable until the Mac has judged the new one (the
 operating rules), and each ships from its own thread with the check that measures it
 written first. Line numbers are as read on main at d07ac31.
+- ~~**38u-10. The dye's refractive index is three times a stand-in**~~ — **Shipped, this PR**
+  (the owner's call, 2026-11-14: "real strength (measured dn/dc), plus a dial named as a
+  boost", in every look). The dye raises the path by tartrazine's measured dn/dc over its
+  summed absorbance (`wgsl/dyeIndex.ts`, 2e-5 for a dye that takes 96% of a channel), and
+  **Dye Index Boost** (×1 real to ×1000) is the dial that says it is past real; Boundary
+  Contrast no longer scales it. `npm run derive`'s 38u-10 line. Left: **38u-19**.
+- ~~**38u-20. The derived path is stored in half floats, so a real dye's step rounds away**~~ shipped
+  2026-11-14 with 38u-10: `.w` holds the path less clear water's. `npm run derive`'s 38u-20 line.
 - ~~**38u-8. Granulation is value noise**~~ — **Shipped** (the story is in
   `docs/plan-shipped.md`). The owner's call: default 0 in every look, the dial kept;
   `npm run glassstill`. The real grain (a concentration carried below the grid) stays 47a's.

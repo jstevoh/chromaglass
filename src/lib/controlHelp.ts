@@ -51,6 +51,7 @@ export const CONTROL_HELP: Record<string, string> = {
   bubbleMelt: 'How fast the bubbles\' air dissolves into the liquid, the small ones first. Off is nature\'s rate, where a bubble stays all night.',
   saturationBoost: 'Colour strength of the finished picture, from washed out to vivid.',
   edgeRelief: 'The curved rim where a blob of liquid meets the glass: a dark edge and a bright refracted highlight.',
+  dyeIndexBoost: 'How much the dye bends light. ×1 is real dye, too faint to see; turn it up for bright and dark lines at every dye edge out of focus.',
   crispEdges: 'Draws the line where oil meets water as sharp as a real dish shows it, instead of a soft band a few pixels wide.',
   projectorFocus: 'Moves the projector lens\'s focus through the liquid, turning edges into bright and dark Becke lines.',
   lacing: 'Pale threads along the line where two colours meet, finer where the flow pulls them apart.',

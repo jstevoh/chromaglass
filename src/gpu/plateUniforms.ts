@@ -267,6 +267,13 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('projectorFocus', clamp01(s.projectorFocus ?? 0.5));
   /*
+    The dye's refractive index at its measured strength times this (PLAN
+    38u-10): 1, real, for every look saved before the dial, which is the
+    owner's call (2026-11-14) rather than today's look. Below 1 would be less
+    than the dye does, so the floor is real; the top is the dial's.
+  */
+  pack.set('dyeIndexBoost', Math.max(1, Math.min(1000, s.dyeIndexBoost ?? 1)));
+  /*
     Glitter, the lens photographing it and the side lamp (PLAN 47e, 47d,
     47b-side; lib/glint.ts). At 0 and 0 the lens pass does not run, and the
     display is drawn as it was. Focus (projectorFocus) is the lens's focal

@@ -42,6 +42,8 @@ export const fadeBarsLabel = (v: number): string => {
 /** The settings a number reads better on than a percentage. */
 const UNITS: Record<string, (v: number) => string> = {
   macroZoom:  v => `${v.toFixed(2)}×`,
+  // How many times real: ×1 is the dye's measured index (38u-10).
+  dyeIndexBoost: v => v < 1.5 ? '×1 real' : `×${Math.round(v)}`,
   grainScale: v => `${Math.round(v)}`,
   macroHold:  v => `${v.toFixed(1)}s`,
   beatLead:   v => `${Math.round(v)} ms`,

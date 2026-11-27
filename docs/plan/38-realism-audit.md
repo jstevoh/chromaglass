@@ -674,10 +674,14 @@ Shipped with this pass (the closeup, `npm run stillcloseup`):
   `platePressure` (and Moiré Ripple), and Clock Glass's kick adds 8% to dt. Drop the terms and
   retune Speed per look. Check: dt equal under kicks and in silence; `npm run quick` green.
   (S; Medium; from RS-45.)
-- **38u-10. The dye's refractive index is three times a stand-in** (S; Medium, changes the
-  Becke lines on every dye-only look). calcOpl adds d·0.015·max(1, 3·Boundary Contrast). A
-  few percent of dye raises water's index by about 1e-3 (dn/dc near 0.15 mL/g). A measured
-  dn/dc for each dye, and any boost a dial that says so. none (beside 18e-2).
+- **38u-19. Every dye bends light as tartrazine does, at one wavelength** (S; Low, found doing
+  38u-10). `DYE_DN_PER_ABSORBANCE` is tartrazine's dn/dc (0.41 mL/g, arXiv 2503.05105) over its
+  peak absorptivity, applied to every dye's summed absorbance; and the index is one number, not
+  one per channel. A dye's dn/dc follows its own absorption band (Kramers–Kronig): red light
+  is bent more beside a blue-absorbing dye's band than blue light is, a coloured fringe on a
+  defocused edge. Measured dn/dc for the palette's dyes (food dyes, ink) and an index per
+  channel carried through the derive pass (it writes one path today). Check: `derive` asks two
+  dyes of equal absorbance to step the path by their own ratio. none.
 - ~~**38u-11. Glass Smear slides the cover glass along a noise path, always**~~ — **Shipped
   2026-11-15** (the story is in `docs/plan-shipped.md`). Default 0; the 22 looks that slid
   carry the slide as an LFO 1 cord whose top is their old speed; `npm run glassstill`. The

@@ -50,7 +50,8 @@ fn gelFilter(uv: vec2f) -> vec3f {
   slope of the optical path through the column, OPL = n·h, and a plane Δz
   past the plate sees the light gathered where that path is curved: the
   transport 1 - Δz·∇²OPL, whose first order exp(-Δz ∇²OPL/n) stays positive
-  as light must. The derive pass writes the whole column's OPL (.w), so this
+  as light must. The derive pass writes the whole column's OPL (.w, less clear water's 1.333,
+  PLAN 38u-20), so this
   is one term for all of it. It was two: refractionOptics drew the dye's
   from the derive pass's ∇²OPL, masked to the dye's own slope and only over
   dye, so a pour that moved only the index drew nothing; and the oil block

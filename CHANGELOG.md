@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their sides (the lit liquid round them, mirrored) and a glint on each top, where they were
   flat black blobs. The plate at 1x is unchanged.
 
+### Changed — the dye bends light at its real strength (PLAN 38u-10)
+
+- The dye's refractive index is its measured one (tartrazine's dn/dc over its absorbance),
+  about 2e-5 for a deep dye, where it was a stand-in 300 to 600 times that scaled by Boundary
+  Contrast. A dye-only look no longer shows bright and dark lines at its edges out of focus.
+- **Dye Index Boost** (Settings → Look, MIDI, the desks, the phone) brings them back: ×1 is
+  real, up to ×1000. The phone remote has it too, and Evolve leaves it alone.
+- The optical path is stored less clear water's, so a real dye's step is kept and not rounded
+  to ten times its size (PLAN 38u-20).
+
 ### Added — the standing waves move (PLAN 48f-6, 48f-9)
 
 - **Rock** (`faradayRock`, 0–2 Hz): the strobe slips off the Faraday waves so crests and
@@ -20,11 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flow, and at a hard shake breaks up and re-forms as a new pattern. **Strength** (`faradayGain`, 1–8):
   the lens's throw past real water, so a bass pulse reads on the wall. Settings → Tilt & Rock,
   MIDI, the desks, the remote, the phone's Sound sheet. `npm run faraday`.
+
 ### Fixed — a picture palette recolours the plate (PLAN 43d-6)
 
 - **Palette from a picture or video** now changes the colours on the plate, not only the dyes
   still to come: the plate takes the picture's colours over eight seconds, as does any palette
   picked by hand. A look opened while a palette is locked is laid in that palette's dyes.
+
 ### Added — Dish Stress: moulded dishes between the polarisers (PLAN 31p-3)
 
 - **Dish Stress** (under Polarisers in Settings → Lamp & Light, MIDI, the desks and the
@@ -32,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the liquid. Coloured rings round the middle and a pale rim; with Quarter Wave down, the dark
   cross and lit diagonals of the owner's photograph; where the liquid flows, its colours add
   to the dish's and the rings shift. 0 leaves the look as it was.
+
 ### Changed — the glass still and the dye smooth unless someone moves them (PLAN 38u-8, 38u-11)
 
 - **Granulation** rests at 0 in every look (it was 0.5): a dye in solution has no grain. The
@@ -40,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moves it. The 19 looks that slid it all the time carry the slide as a cord, LFO 1 on Glass
   Smear, whose top is the look's old speed; the phone's Sound sheet has a **Glass Slide**
   slider for it, and Glass Smear is now MIDI-learnable.
+
 ### Changed — The liquid moves what floats in it (PLAN 15g-17, 15g-18, 18c-14)
 
 - **Bubbles and beads ride the liquid.** A stroke or a drop no longer kicks the bubbles and
@@ -53,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A plate left alone stays as it is.** The hidden seeding that laid colour and heat from
   three orbits on every frame is gone, so a quiet passage settles; a plate that is
   entirely empty is still woken by its emergency seed.
+
 ### Added — the water's glow (PLAN 48c)
 
 - **Glow** (Settings → Camera, MIDI, the desks, the remote and the phone's Sound sheet): the
@@ -106,6 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A clear oil drop** is drawn with the same dark ring as in dyed liquid (it was a third of it);
   the clear oil's tint fades over the meniscus.
 - **Polarity** pushes unlike colours apart the same everywhere; a noise had pulled them together in patches.
+
 ### Added — Polarised light (PLAN 31p-1)
 
 - **Polarisers** (Settings → Lamp & Light, MIDI, the desks and the phone): sheets under the
@@ -128,6 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   knob left near its centre does not drain the plate. Right stays the screen's right on a look
   whose dish turns. Not Gravity: the plate stays flat and is not stood up as a bottle. The sound,
   the patch bay and Evolve never move them. `npm run handtilt`.
+
 ### Changed — Your own video: played, poured, read and framed (PLAN 14ag)
 
 - **The demo videos are gone**: the three demo loops and the cartoon shelf no longer ship.
@@ -246,6 +263,7 @@ frame's mean, 0 now; the ground beside a pool was 20% darker on one side, 0.004%
   thickness (Beer–Lambert), so the lace takes the colour, deeper where the film is thick,
   and the holes show the water's. On the desk, the phone's Dye sheet, the remote and MIDI.
   0 in every look, which leaves the plate exactly as it was (`npm run lace` 8).
+
 ### Added — Bubble Melt, the bubbles' air dissolving away (PLAN 38b-2)
 
 - A new dial under Bubbles (Settings → Look, the desks, MIDI, the phone): how fast a

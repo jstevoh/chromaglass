@@ -148,6 +148,15 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="projectorFocus"
         />
         <Slider
+          label="Dye Index Boost"
+          value={settings.dyeIndexBoost ?? 1}
+          min={1}
+          max={1000}
+          step={1}
+          onChange={(v: number) => onUpdate({ dyeIndexBoost: v })}
+          settingKey="dyeIndexBoost"
+        />
+        <Slider
           label="Lacing"
           value={settings.lacing ?? 0}
           min={0}

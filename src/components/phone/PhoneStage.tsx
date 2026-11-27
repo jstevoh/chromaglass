@@ -1005,6 +1005,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
           </div>
           <div className="mt-3">
+            <Slider label="Dye Index Boost" value={p.mixer.settings.dyeIndexBoost ?? 1} {...pinSlider('dyeIndexBoost', p.mixer.settings.dyeIndexBoost ?? 1)} step={1} onChange={(v) => p.mixer.onSetting({ dyeIndexBoost: v })}
+              touch testId="phone-dye-index-boost" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">How much the dye bends light: ×1 is real dye, too faint to see. Turn it up for the bright and dark lines at a dye&apos;s edge.</p>
+          </div>
+          <div className="mt-3">
             <Slider label="Heat" value={p.mixer.settings.heat ?? 0} {...pinSlider('heat', p.mixer.settings.heat ?? 0)} step={0.05} onChange={(v) => p.mixer.onSetting({ heat: v })}
               touch testId="phone-heat" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">The projector lamp&apos;s heat in the dish: hold a finger on the glass to block the fan&apos;s air and boil the spot.</p>

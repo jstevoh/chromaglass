@@ -41,6 +41,7 @@ import { FILM_FRAME_WGSL } from './plateFilm';
 import { LAMP_MIX_WGSL } from './plateLamp';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 import { FINE_WINDOW_WGSL } from './fineWindow';
+import { DYE_INDEX_WGSL } from './dyeIndex';
 import { SLOPE_WGSL } from './plateSlope';
 
 /** Bindings every plate shader shares. */
@@ -1209,7 +1210,7 @@ export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 // The bubbles' air, 1x1 blank with none, read as missing dye (plateSlope.ts).
 @group(0) @binding(5) var airSrc: texture_2d<f32>;
 
-// The plate's clear liquid: water, n 1.333 at 589 nm and room temperature.
+// Water, n 1.333 (589 nm, room temperature); .w holds the path less it (38u-20).
 const N_CLEAR: f32 = 1.333;
 
 fn viewProps(uv: vec2f) -> vec3f {
@@ -1240,27 +1241,25 @@ fn pouredDn(uv: vec2f) -> f32 {
   return sp.a - sp.r * N_CLEAR;
 }
 
+${DYE_INDEX_WGSL}
 /*
   The optical path through the column, OPL = n·h, with h in rest gaps
   (DISH_REST_GAP, 6 mm on the 0.2 m dish), so a column of clear water at
-  rest reads 1.333. v is viewProps' (oil, gap, film); dn is pouredDn's.
-  The dye's own term, d·0.06·dyeGain, is a named stand-in (refractionOptics
-  note 6): a dilute dye barely moves water's index, and this is what gives
-  a dye-only look its edges.
+  rest reads 1.333. dyeN is dyeDn's (dyeIndex.ts), v is viewProps' (oil,
+  gap, film), dn is pouredDn's: every term an index rise, so they add.
 */
-fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
-  let deltaDye = d * (0.06 * dyeGain);
+fn calcOpl(dyeN: f32, v: vec3f, dn: f32) -> f32 {
   let deltaOil = v.x * 0.137;
   let deltaFilm = v.z * 0.087;
-  let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
+  let n = N_CLEAR + dyeN + deltaOil + deltaFilm + dn;
   let gap = v.y;
   let h = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
   return n * h;
 }
 
 // One tap's optical path, from its own view and its own poured index.
-fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
-  return calcOpl(d, viewProps(uv), pouredDn(uv), dyeGain);
+fn oplAt(dyeN: f32, uv: vec2f) -> f32 {
+  return calcOpl(dyeN, viewProps(uv), pouredDn(uv));
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
@@ -1268,25 +1267,24 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
   // The camera's views keep their own slope. The closeup's .w is the dye's
-  // path alone, its stand-in index at 0.015 (gain 0.25 against the projector's
-  // retuned 0.06 in 18e-2; the dial moves nothing up close), for camLap
-  // (PLAN 18e-7; plateTransmit.ts says why).
+  // path alone, whole, its stand-in index at 0.015 (no dial moves it), for
+  // camLap (PLAN 18e-7; plateTransmit.ts says why).
   if (isCamera) {
     var path = 0.0;
-    if (closeup) { path = calcOpl(decodeDensity(tex2(src, in.uv).a), vec3f(0.0, 0.03, 0.0), 0.0, 0.25); }
+    if (closeup) { path = calcOpl(decodeDensity(tex2(src, in.uv).a) * 0.015, vec3f(0.0, 0.03, 0.0), 0.0); }
     return vec4f(sobelGrad(src, airSrc, in.uv), 0.0, path);
   }
 
   let cell = 1.0 / U.logicalGrid;
-  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
 
   // Every density here is the mean of its whole cell, the bubbles' air held
   // at the middle's own (cellDensity, PLAN 31s-8: one read per cell at 768
   // saw one texel in four and drew the flower again).
   let hasAir = textureDimensions(airSrc).x > 1u;
-  let dC = cellDensity(src, airSrc, in.uv, 0.0, false);
+  let cC = cellDye(src, airSrc, in.uv, vec2f(0.0), false);
+  let dC = cC.x;
   let vC = viewProps(in.uv);
-  let oC = calcOpl(dC, vC, pouredDn(in.uv), dyeGain);
+  let oC = calcOpl(cC.y, vC, pouredDn(in.uv));
 
   // Each tap's own view and poured index wherever either can differ from
   // the middle's: oil, a film, or any liquid poured (the species is 1×1
@@ -1297,9 +1295,8 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   // The slope and the optical path's gradient from the same taps, at one
   // cell apart with Gaussian weights, each the mean of its cell (sobelGrad
   // says why: taps that see only part of the plate copy every narrow drop
-  // to where they stand, eight times round it). The path gradient is
-  // computed with dyeGain = 1.0 so Boundary Contrast does not move pixels
-  // in focus (PLAN 18e-2), while .w (oC) keeps dyeGain for defocusShadow.
+  // to where they stand, eight times round it). No dial is in the path
+  // (38u-10): Boundary Contrast is defocusShadow's gain, not an index.
   var gs = vec2f(0.0);
   var go = vec2f(0.0);
   var m2 = 0.0;
@@ -1310,9 +1307,10 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
       let w = slopeWeight(r2);
       let k = vec2f(f32(i), f32(j));
       let uv = in.uv + k * cell;
-      let d = cellDensity(src, airSrc, uv, dC, hasAir);
+      let c = cellDye(src, airSrc, uv, cC, hasAir);
+      let d = c.x;
       var o: f32;
-      if (perTap) { o = oplAt(d, uv, 1.0); } else { o = calcOpl(d, vC, 0.0, 1.0); }
+      if (perTap) { o = oplAt(c.y, uv); } else { o = calcOpl(c.y, vC, 0.0); }
       gs += k * (w * d);
       go += k * (w * o);
       m2 += f32(i * i) * w;
@@ -1323,7 +1321,7 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let g = gs * (3.0 / m2) * dyeHere;
   let oplGrad = length(go * (3.0 / m2) * dyeHere);
 
-  return vec4f(g, oplGrad, oC);
+  return vec4f(g, oplGrad, oC - N_CLEAR);
 }
 `;
 
@@ -1781,8 +1779,7 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      poured species. A second term stood beside it until 18e-5, a deflection at a hue-gated
      two-dye boundary (PLAN 33a): two dyes in one liquid have no index step between them and no
      surface to slope, so it is gone (the comment where boundaryDiff was, above).
-  2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step
-     in .w (the out-of-focus shadowgraph).
+  2. (Boundary Contrast scaled the dye's index until 38u-10; it is defocusShadow's gain now.)
   3. Pupil overlap is approximated by a smoothstep with a 0.15 extinction floor (0.85 max loss),
      weighted by reliefK (Edge Relief × plateAmt) on the path slope.
   4. (The shadowgraph, once here and masked to the dye's edges, is defocusShadow's.)
@@ -1794,9 +1791,9 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      the 90th-percentile thin-dye rim in mixer's mid-grey contrast check (129.5 → 136.4
      without it, 130.9 → 134.7 with it). Tracked in PLAN 18e-1 (with 31a) to replace once
      the two dishes sit at separate heights in the projector's focal cone.
-  6. The dye's index, d · 0.06 · dyeGain in calcOpl (0.35 / (DISH_REST_GAP · logicalGrid), retuned
-     in 18e-2 so a dye's in-focus rim through oplPupilLoss matches main), is still a stand-in:
-     dilute dye moves water's index by far less, and nothing in the shelf's table gives a dye one.
+  6. The dye's index is tartrazine's measured dn/dc times each dye's absorbance (dyeDn, PLAN
+     38u-10) times Dye Index Boost: at 1, real, a dye-only look's rims, in focus and out, are
+     too faint to see, as a real dilute dye's are. One dn/dc and one wavelength: 38u-19.
      Poured liquids' indices are real (PLAN 18d-9): glycerine reads 1.4746 from the shelf, and
      npm run derive measures it.
   7. Clear pours (glycerine into water, no dye) and clear oil drops now deflect by |∇OPL| in
