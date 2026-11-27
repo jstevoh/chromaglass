@@ -353,6 +353,22 @@ its frame rate live. "Free" means no new passes or texture reads.
     look's first seconds, until hsLiftSource and hsLiftRelax are built, still lay the weight
     into the open rim; widen the wait if `npm run startup` has the slack. A Blow's breath is local
     and stays open: its liquid comes back.
+  - **18a-22, Keep full: a dish left running is topped up with the dropper: shipped** (the
+    owner, 2026-11-27: "We also need an automatically apply liquid option if I decide to leave
+    the player running. I left it going and the plate just emptied eventually"). Why it
+    emptied: the Mac app that evening was 1.3.1751 (9:18 AM PST 11-26), before 18a-16 (#968,
+    Lava Pop's Air 0.02 was the draught's uniform shear sliding the dish out over the open
+    rim) and 18a-17 (#979); and every look's Evaporation still takes dye a step, a night's
+    worth of it most of the dish (18g-3 is the real fix: solvent leaves, the dye stays).
+    Nothing poured any back with Evolve off. Keep Full (`keepFull`, a room switch beside
+    Random Evolve on both desk rows, the settings sheet, the phone and the phone remote) is
+    the hand on the dropper and nothing else: below 80% of the look's own amount it lets a
+    real drop of the look's own bottle, in the look's colours, fall where the dish is
+    palest (the hand's own Drop, with its volume on the thin gap), every 6 s just under the
+    line to 1.2 s on an empty dish, until 95%. sim/keepFull.ts; the hue journey moved to
+    sim/hueJourney.ts beside it to keep the visualizer's size. `npm run keepfull` (node: the
+    sums, the wiring, every surface), `npm run keepfullapp` (the Mac: Lava Pop's leak, an
+    emptied dish refilled and the hand stopping).
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

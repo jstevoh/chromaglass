@@ -168,6 +168,17 @@
       ]
     },
     {
+      "name": "Keep Full tops up a dish left running, and only when it runs low",
+      "shard": "logic",
+      "run": "npm run keepfull",
+      "why": [
+        "The owner left Lava Pop running with Evolve off and the plate emptied (PLAN 18a-22).",
+        "Keep Full's sums in node: an empty dish gets a full drop, paced, a full one nothing,",
+        "topped up from 80% to 95% of the look's amount; and its wiring: only with the switch",
+        "on, through the hand's own Drop on its own dice, a room key, on every surface."
+      ]
+    },
+    {
       "name": "The desk's layouts",
       "shard": "logic",
       "run": "npm run desklayout",
@@ -3170,6 +3181,17 @@
         "open-rim solve slid Solar Flare's whole dish out over its rim (0% of",
         "its dye left in the lab); a closed dish answers it with its pressure,",
         "so only the gusts' curl moves the liquid, as strong as before."
+      ]
+    },
+    {
+      "name": "Keep Full refills an emptied dish in the app",
+      "shard": "plate",
+      "run": "npm run keepfullapp",
+      "timeout": 8,
+      "why": [
+        "Lava Pop on Metal (PLAN 18a-22): left alone it keeps its dye (the leak printed as a",
+        "half-life), a cleared dish stays empty with Keep Full off, and with it on the",
+        "dropper brings it back to 60% of the look's amount by its own drops, then stops."
       ]
     },
     {

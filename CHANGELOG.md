@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Keep it full, for a plate left running (PLAN 18a-22)
+
+- **Keep it full** (`keepFull`): when the dish runs below the amount its look is made with,
+  the dropper tops it up with real drops of the look's own bottles, where it has gone pale,
+  until it reads full. Nothing else about the look moves. On the desk beside Random Evolve,
+  the settings sheet, the phone and the phone remote; it stays on across look changes.
+
 ### Added — the standing waves move (PLAN 48f-6, 48f-9)
 
 - **Rock** (`faradayRock`, 0–2 Hz): the strobe slips off the Faraday waves so crests and
