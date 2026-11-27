@@ -104,8 +104,13 @@ up (38w-27 and the bead and foam items); the ferrofluid (9aa, 9t, 38j); the new 
 the rest, one PR each. **Later**: the chemical clock (48a), air fingers and ferns (38r-16 G2,
 48d, 48u), thin-film rainbows (48e, §32), bubbles (38g-2, §33), tilt and spin (18a-13, §22),
 pressing the glass (38l, 38r-18), lace (§20), polarised extras (31p), the lens (38q, 31a), the
-tank (47n, 48k, 48l) and the other ideas (48m, 48o, 15h, 15k). The owner's open questions
-marked next (18d-5, 18d-6, 18d-7, 38m, linear light, 22l, 33q-4) are with the owner; the rest
+tank (47n, 48k, 48l) and the other ideas (48m, 48o, 15h, 15k). The owner's answers, 2026-11-27
+(decision cards): **18d-6** dyes in water mix as real dyes do, with a Hold Apart dial past real;
+**18d-7** milk blends like milk, no held edge; **18d-5** Surfactant Flow scales soap's real
+spreading strength (1 is real); **38m**, **38n-2** bubble films show their true interference
+colours, Iridescence a boost past real; **38p**, **18k** every look re-baselined for light added
+in linear light; **22l** the middle glass turned against the dish is built as a control;
+**33q-4** air bubbles are on by default only in looks made for them. The other open questions
 wait on their themes.
 
 **Parked this week, kept in the plan.** The launch, the stores and the money (§12, §23,
