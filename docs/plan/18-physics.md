@@ -365,10 +365,22 @@ its frame rate live. "Free" means no new passes or texture reads.
     the hand on the dropper and nothing else: below 80% of the look's own amount it lets a
     real drop of the look's own bottle, in the look's colours, fall where the dish is
     palest (the hand's own Drop, with its volume on the thin gap), every 6 s just under the
-    line to 1.2 s on an empty dish, until 95%. sim/keepFull.ts; the hue journey moved to
+    line to 0.6 s on an empty dish, until 95%. sim/keepFull.ts; the hue journey moved to
     sim/hueJourney.ts beside it to keep the visualizer's size. `npm run keepfull` (node: the
     sums, the wiring, every surface), `npm run keepfullapp` (the Mac: Lava Pop's leak, an
     emptied dish refilled and the hand stopping).
+  - **18a-23, Lava Pop's dye leaks out with nothing driving it.** Measured on the owner's
+    Mac 2026-11-27 (a scratch run of the app, the dish's own measure inside the rim, every
+    15 s): today's Lava Pop loses 4–5% of its dye in 120 s, about half in half an hour, and
+    the same with Evaporation 0, Air 0, Plate Rock 0 and all three at 0 (0.823 → 0.778).
+    Its dt is 0.00047, so evaporation is nothing. The whole field's mean falls with the
+    dish's, so the dye leaves the grid: the open rim (decayDye zeroes past OPEN_RIM) is the
+    one sink left, and the dish is dye right to the rim, so whatever carries dye across it
+    (diffusion, dispersion, the carries' stencil, the beat's hand press) drains it. A wall
+    lets no dye diffuse through it; only liquid pushed out takes dye with it. Find which
+    pass carries it (run the variants with dispersion and the press off) and make the rim
+    no-flux for everything but the volume's own outflow. Keep Full (18a-22) covers it
+    meanwhile.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

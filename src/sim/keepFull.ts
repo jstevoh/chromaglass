@@ -32,7 +32,7 @@
   that took the dish over the line and each pale minute after it would
   alternate at the line, a drip every few seconds for ever. The emptier the
   dish, the sooner the next drop (KEEP_FULL_SLOW_S just under the line to
-  KEEP_FULL_FAST_S on an empty one), and the bigger, up to a hand's full drop.
+  KEEP_FULL_FAST_S on an empty one), and the bigger, up to a hand's hardest drop.
   The interval is in seconds of the wall, not steps: a person's hand keeps the
   room's time, and the measure it reads comes back from the GPU every few
   frames, so a drop never goes in before the last one has been seen.
@@ -61,9 +61,16 @@ export const KEEP_FULL_LOW = 0.8;
 export const KEEP_FULL_HIGH = 0.95;
 /** Seconds between drops on a dish just under the line, and on an empty one. */
 export const KEEP_FULL_SLOW_S = 6;
-export const KEEP_FULL_FAST_S = 1.2;
-/** A drop's amount at full, the hand's own Drop with the pen pressed all the way (LiquidVisualizer's remote `drop`, 5 × amount). */
-export const KEEP_FULL_DROP = 5;
+export const KEEP_FULL_FAST_S = 0.6;
+/**
+ * A drop's amount at full: the hand's own Drop with the pen pressed all the
+ * way (LiquidVisualizer's remote `drop`, 5 × amount, amount 2 at a full
+ * press). Measured on the Mac (`npm run keepfullapp`, 2026-11-27): at half of
+ * this, a drop every 1.2 s, 75 drops brought an emptied Lava Pop back to only
+ * 0.17 of its 0.80 in 90 s, slower than the dish loses it; a person refilling
+ * an empty dish presses the dropper hard and fast.
+ */
+export const KEEP_FULL_DROP = 10;
 /** How far from the middle a drop lands on a look with no areas, as a share of the plate (the thin gap's rim is at 0.5). */
 export const KEEP_FULL_REACH = 0.4;
 /** Places a drop could land, of which it takes the palest. */
