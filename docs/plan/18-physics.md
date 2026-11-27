@@ -316,8 +316,32 @@ its frame rate live. "Free" means no new passes or texture reads.
     closed dish's circulation, as the oil's lift is (hsLiftSource, hsLiftRelax on the
     colour alone; `A.b.w` 2). `npm run draught` 5–8: Rain Drip keeps 99.8% and its colour's
     middle falls 0.14 of the plate; Plate Rock keeps 100% and moves 0.18 downhill; the
-    control (the weight laid straight again) keeps 1.8% and 0.5%. Open: 18a-18.
-  - **18a-18, the rest through the open rim.** (a) Rain Drip on a standing plate with oil
+    control (the weight laid straight again) keeps 1.8% and 0.5%. Open: 18a-21.
+  - **18a-18, pour off screen and watch it flow in: shipped** (2026-11-27; the owner: "pour
+    things off screen and have them flow into the visible canvas"). The dish always ran past
+    the picture (the wall's long side is the plate over 1.5, so on 16:9 the open rim is a sixth
+    of the plate past the sides and nearly a third past the top and bottom), but no hand could
+    reach it. lib/pointerPlate.ts (fluidPointAt moved out of the visualizer, unchanged off the
+    band) carries the bottle's tools (Dropper, Pour, Spray, Splatter, Streak) in the outer 16%
+    of each half of the screen out to 0.05 of the plate past the edge (1 cm of the dish), held
+    inside 0.46 of the rim; the mouse, a finger on the phone's stage and the remote pad's drops
+    all reach. What brings it in is the pour's own volume (18c-1). `npm run edgepour`: the
+    mapping (identity off the band to the bit, each edge 0.0500 past, no pixel moving it over
+    0.0027 of the plate) and the lab (128², a Pour held 5 s at the 16:9 wall's right and top
+    edge: 0% in view after a step, 18.1% and 18.9% in view at 5 s; the same colour with no
+    volume 0.00%). Open: 18a-19, 18a-20.
+  - **18a-19, the pushed liquid's share over the rim beside an edge pour.** Next to the open rim
+    a pour's push takes the short way out (p = 0 past it); at 0.05 past the 16:9 wall's top the
+    rim is 0.26 away and little leaves, but past the sides it is 0.12. Measure what a held edge
+    pour sends over the rim against what comes into view, per side, and whether the floating
+    glass's rise (38r-5) should take more of it.
+  - **18a-20, a jug's stream lands with its own momentum.** A real pour from a tipped jug or
+    bottle lands moving (the stream's horizontal speed), so pouring from off screen toward the
+    middle throws the liquid in rather than only spreading it. Ours lands still and spreads
+    radially (the hand loop's 0.12 outward push and the volume source). Model the stream's
+    impact momentum from its height and angle, aimed by the hand's drag, the way 18c-2 models
+    a drop's landing.
+  - **18a-21, the rest through the open rim.** (a) Rain Drip on a standing plate with oil
     still lays its colour's whole weight directly (κ is the lift over the tilt's weight;
     a standing plate's oil is 27f-6), so a standing oil look's colour can still leave over
     the bottom rim. (b) 18a-16's gust noise χ is a new noise, not the Hodge projection of a

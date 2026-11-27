@@ -225,9 +225,10 @@ const NOT_THE_LOOK = new Set([
   /*
     The dish on a speaker (PLAN 48f): whether there is a shaker and how
     hard it shakes are the performer's and the music's (through its cord),
-    never a wander of Evolve's.
+    never a wander of Evolve's; and how the strobe rocks it and how
+    strongly its light reads are the performer's look of it (48f-6).
   */
-  'faradayHz', 'faraday',
+  'faradayHz', 'faraday', 'faradayRock', 'faradayGain',
   /*
     Polarised light (PLAN 31p-1): the sheets are put into the beam and the
     analyser turned by a hand at the projector. Wandering in, the sheets
