@@ -159,14 +159,6 @@ The owner: "too many bubbles in looks", and "the bubbles still aren't very good"
 was the oil beads, not the air: a look's air field holds 0 to 8 bubbles (a probe of 33
 looks), the bead field held 60 + 360 x Beads, 125 at the default 0.18, 312 at Macro Bead's
 0.7, and refilled every merge, so a field held its count while its oil grew.
-- ~~**33q-1. The Beads dial is oil, not a count.**~~ **Shipped** (this PR): the dial sets
-  how much of the glass the oil covers (5% at full, `BEAD_COVER` in `src/lib/beads.ts`),
-  `beadPopulation` turns that into a count for the beads' size, and the field is held to
-  that oil (`populate(..., byOil)`): a merge keeps its r squared, so the field coarsens
-  into fewer, bigger beads instead of being refilled. The default holds 44 beads where it
-  held 125, Macro Bead 112 where it held 312, and the closeup a quarter of the count at
-  twice the size. `npm run drops`: held by count for 1200 frames the plate carried 2.16 x
-  the dial's oil, held by oil 1.09 x, in 62 beads instead of 119.
 - **33q-2. The oil takes the dye's place, but not all of it.** Tried in this PR and taken
   out before it shipped: a bead drawn as oil filling 98% of the gap, the dye under it
   thinned to what is left (T^(1-f) on the lamp, 1-(1-a)^(1-f) on black). `npm run droplens`
@@ -182,6 +174,9 @@ looks), the bead field held 60 + 360 x Beads, 125 at the default 0.18, 312 at Ma
   a moving drop does.
   The real one is the beads as moving solid inclusions in the thin-gap solve (15g-8d did
   it for the air bubbles), the dye advected round them and the oil's area conserved.
-- **33q-4. The air bubbles' amount in looks.** Most looks still carry Bubbles 0.2 by
-  inheritance, not by choice; at 0 to 8 at a time they were not the crowd, but a pass over
-  which looks want air at all is owed once the owner has judged 33q-1.
+- **33q-5. A designed show's stages still set air over any look.** `songDesign.ts` gives every
+  section Bubbles 0.15 to 0.6 with its energy (checked by `npm run listen`, "more bubbles than
+  the verse"), and the built-in sequences (`sequencer.ts`: Slow Build, Verse Chorus) ride it
+  0.15 to 0.65, so a song's designed show puts air back into a galaxy or a gel. The real one
+  is a stage that scales the look's own air (none stays none), not an absolute amount; it
+  changes what `listen` asks of a chorus, so it is the owner's call.
