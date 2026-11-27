@@ -340,7 +340,8 @@ export class FluidPasses extends FluidFields {
     if (!this.glowPlate) this.glowPlate = new GlowPlate(this.device);
     // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
     const travel = p.dt * p.advection * ((this.N - 2) / this.N);
-    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE);
+    // The shaken dish's wave too, stepped just before (stepBeside), so its strain lights the cells (48c-6).
+    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE, this.faradayPlate?.field ?? null, p.faradayHz ?? 0);
   }
 
   /**
