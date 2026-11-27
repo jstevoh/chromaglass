@@ -23,6 +23,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { bankDrawn } from './panelBank.mjs';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, DEFAULT_RIDES, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { THEMES, moveTargets } from '../src/lib/drift.ts';
@@ -142,15 +143,13 @@ const chipped = [...panel.matchAll(/<PinChips settingKey="([A-Za-z0-9_]+)"/g)].m
 /*
   And the mixer's, which are drawn from a list.
 
-  The Mixer (lib/mixer.ts) is one component in three places, the Perform
-  desk, this sheet and the phone, so its twenty-three sliders are not typed
-  out here: \`MixerPanel\` draws one per source for the level and one per grade,
-  from \`MIX_CONTROLS\`, at the registry's range. A reader of this file's
-  markup would call all of them invisible. So they count as drawn only when
-  each link in that chain is there to read: the sheet renders the panel in the
-  Mixer section with its pin chips, and the panel draws the level and every
-  grade through one slider that takes its range from the registry and offers
-  the chips.
+  The Mixer (lib/mixer.ts) is one component on the Perform desk, this sheet
+  and the phone, so its sliders are not typed out here: \`MixerPanel\` draws
+  one per source's level and one per grade from \`MIX_CONTROLS\` (the bank:
+  panelBank.mjs), at the registry's range. They count as
+  drawn only when each link of that chain is there to read: the sheet renders
+  the panel in the Mixer section with its pin chips, and the panel draws each
+  through one slider that takes the registry's range and offers the chips.
 */
 const mixerSrc = readFileSync(join(root, 'src/components/MixerPanel.tsx'), 'utf8');
 const mixerSection = panel.match(/<section id="settings-mixer"[\s\S]*?<\/section>/)?.[0] ?? '';
@@ -172,7 +171,8 @@ const mixerOff = [...MIX_CONTROLS, ...FADE_CONTROLS].filter(c => {
 });
 check('and every one of them is in the registry at its own range, in the Mixer section', mixerOff.length === 0,
   mixerOff.map(c => String(c.key)).join(', '));
-const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : [...MIX_CONTROLS, ...FADE_CONTROLS].map(c => String(c.key)))]);
+const drawn = new Set([...sliders.map(s => s.key), ...chipped, ...(brokenLinks.length ? [] : [...MIX_CONTROLS, ...FADE_CONTROLS].map(c => String(c.key))),
+  ...bankDrawn(root, mixerSrc, !brokenLinks.length, check)]);
 const ghosts = PINNABLE.filter(s => !drawn.has(String(s.key)));
 check('and nothing in the registry is invisible in the panel', ghosts.length === 0,
   ghosts.length ? ghosts.map(s => `${s.label} (${String(s.key)})`).join(', ') : 'all of them have a slider');
@@ -1278,8 +1278,8 @@ check('and neither starts over the limit',
 // which it hands to the params object as `p.surfaceTension`. An audit looking
 // for `.surfaceTension` finds those and calls the setting live. It was not:
 // the presets' own comments for it describe what `blobSurfaceTension` does,
-// and each preset that set both said the same thing twice. The local is now
-// called `immiscibility` so the name cannot lie again, and this check is here
+// and each preset that set both said the same thing twice. The local went
+// with both dials (Hold Apart, PLAN 18d-6), and this check is here
 // so the next one does not need the name to be honest.
 //
 // Two things this had to learn the hard way, both of them the same rule —
@@ -2040,14 +2040,11 @@ check('and neither starts over the limit',
 
 // ── Looks as slides in a tray (PLAN 35g) ───────────────────────────────
 //
-// A look is a 35 mm slide and the stage takes one at a time from a round tray
-// that clicks one slot. Held to the real mount (2 x 2 in, a 24 x 36 mm frame
-// shown through a 22.5 x 34 mm aperture), to the changer's one slot a push
-// whatever the distance, and to every place a look is shown.
+// A look is a 35 mm slide from a round tray that clicks one slot: held to the
+// real mount (24 x 36 mm frame, 22.5 x 34 mm aperture) and one slot a push.
 {
   const read = (f) => readFileSync(join(root, f), 'utf8');
   const ui = read('src/components/ui/Playful.tsx');
-  const uiIndex = read('src/components/ui/index.tsx');
   const css = read('src/index.css');
   const cueSrc = read('src/components/CueBar.tsx');
   const menuSrc = read('src/components/PresetMenu.tsx');
@@ -2072,10 +2069,11 @@ check('and neither starts over the limit',
   check('the drum is the sum of its pushes: out and back leaves it home, three forward leaves it three slots on',
     drum === 0 && trayDeg(drum) === 0 && drum2 === 3 && trayDeg(drum2) === 3 * SLOT_DEG, `net ${drum}, then ${drum2}`);
 
-  check('a look is a slide on the set list rows, the cue bar, the preset menu, the performer\'s saved list and both phone surfaces',
-    /<SlideMount swatch=\{swatch\}/.test(uiIndex) && /<SlideMount swatch=\{liveSwatch\}/.test(cueSrc) && /<SlideMount swatch=\{cuedSwatch\}/.test(cueSrc) &&
-    (menuSrc.match(/<SlideMount swatch=\{swatchOf\(p\.id\)\}/g) ?? []).length === 2 && /<SlideMount swatch=\{l\.swatch\}/.test(deskPanelsSrc) &&
-    /<SlideMount swatch=\{p\.lookSwatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\} size=\{60\}/.test(playSrc));
+  const chip = (who) => new RegExp(`<LookChip\\s+key=\\{${who}\\.id\\}\\s+lookId=\\{${who}\\.(lookId|id)\\}[^>]*swatch=\\{${who}\\.swatch\\}`);
+  check('a look is a slide on the cue bar and preset menu, a chip of its picture on the Cues panel and the phone (34b-6)',
+    /<SlideMount swatch=\{liveSwatch\}/.test(cueSrc) && /<SlideMount swatch=\{cuedSwatch\}/.test(cueSrc) && (menuSrc.match(/<SlideMount swatch=\{swatchOf\(p\.id\)\}/g) ?? []).length === 2 &&
+    chip('c').test(deskPanelsSrc) && chip('l').test(deskPanelsSrc) && chip('l').test(stageSrc) && /<LookPicture lookId=\{p\.activeLookId\} swatch=\{p\.lookSwatch\}/.test(stageSrc) &&
+    /<LookPicture lookId=\{l\.id\} swatch=\{l\.swatch\} size=\{60\}/.test(playSrc) && !/SlideMount/.test(deskPanelsSrc + stageSrc + playSrc));
   check('the tray is on the cue bar and the phone\'s look button and Looks strip, each given the look\'s place in its own list',
     /<SlideTray at=\{liveAt\}/.test(cueSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(stageSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(playSrc) &&
     /liveAt=\{deskLookSlot\}/.test(panel0app) && (panel0app.match(/lookSlot=\{phoneLookSlot\}/g) ?? []).length === 2);

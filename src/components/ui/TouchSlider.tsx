@@ -109,7 +109,7 @@ export function TouchSlider({ label, value, min, max, setting, onChange, display
           />
         </PaceTrack>
       </div>
-      <span className="w-11 shrink-0 text-right font-mono text-[12px] text-muted">{display}</span>
+      <span className="min-w-11 shrink-0 text-right font-mono text-[12px] text-muted">{display}</span>
     </div>
   );
 }

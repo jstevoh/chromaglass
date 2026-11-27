@@ -252,3 +252,106 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   pattern), a chord change to 48a's light. Check: a sweep from a sine to a sawtooth at one
   pitch raises the timbre source and leaves `pitch` alone; a chord change moves the harmony
   source and a held chord does not.
+
+## Second pass: the real phenomena still missing (2026-11-27)
+
+*Asked 2026-11-27: "Are there any liquid physics we're missing that could make things even
+more realistic and visually awesome?" Research only, nothing built. Checked against §18, §20,
+§31, §32, §38 (all passes), §47, the ideas above and the solver's own kernels, so each line
+below is something no item already holds. The owner's priorities that day weigh the ranking:
+beautiful pictures with as little jitter as possible, and clean code, so GPU cost counts and a
+phenomenon that grows smoothly from a field beats one that needs random nucleation or
+sub-cell droplets. Ranked by what a person watching the wall would see against what it costs.*
+
+| Rank | Item | On the wall | GPU cost | Build |
+|---|---|---|---|---|
+| 1 | 48s ouzo clouding | a clear pour blooms into opal clouds where it mixes | low: per-cell, no new pass | Claude's check, then AG |
+| 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
+| 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
+| 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |
+| 5 | 48w Marangoni bursting | an alcohol drop explodes into a firework of droplets | medium, short bursts | Claude |
+| 6 | 48x dancing droplets | food-colour drops on dry glass chase and flee each other | low: one coarse vapour field | Claude |
+| 7 | 48y thermocapillary drift | drops creep slowly into the lamp's hot spot | low: a term in a force pass | Claude's check, then AG |
+| 8 | 48z partial coalescence | a drop merges in steps, shrinking by half each time (closeup) | medium, closeup only | Claude |
+
+Looked at and left out, so a later pass does not raise them again: von Kármán vortex streets
+(the gap's Reynolds number is far below shedding, so a street there would be a fake);
+Rayleigh–Taylor fingers on a tilted plate (the Boussinesq density force in `forces.ts` already
+makes them when the dish tilts); dispersion of the oil's index (§31, per band in 18e's
+shadowgraph); the Cheerios effect (needs a free surface the sandwiched gap does not have; the
+bubbles' crowding is 38g); the coffee ring (in §18 with evaporation as solvent loss); Bénard
+cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
+
+- **48s. Ouzo clouding: a clear pour turns milky where it mixes** (S–M; builds on **18j**
+  milk's scattering and **48n** its Tyndall colours). Anise oil dissolves in ethanol and not
+  in water; pour water into the mix (or the mix into water) and wherever the ethanol fraction
+  falls below the oil's solubility the oil comes out as micron droplets all at once, and the
+  liquid turns opal white exactly along the mixing front (spontaneous emulsification; Vitale
+  and Katz 2003). It needs a solvent fraction carried like any scalar and a solubility curve
+  (the ternary diagram's binodal) per cell; the droplets are never resolved, only their
+  volume fraction, which feeds the scattering 18j already draws. No random seeds: the cloud
+  grows from the mixing itself, so it is as smooth as the dye. *Check:* a water pour into a
+  clear ouzo layer gives a cloud only where the solvent fraction crosses the binodal, its
+  white fraction grows with mixing and never appears in an unmixed region, and the oil it
+  takes out of solution is conserved.
+- **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
+  `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
+  membrane of precipitate at the front, and the front's speed against its reaction sets the
+  shape: spirals, flowers, worms and filaments (Haudin, Cartwright, Brau and De Wit 2014,
+  confined chemical gardens). The precipitate becomes solid: the cell's permeability falls to
+  zero and the liquid flows around what it grew, so the picture builds coral the flow then
+  works around. Slow and continuous, so no jitter. *Check:* the same pour at two injection
+  rates gives the paper's two regimes (spirals at low, filaments at high), no liquid crosses a
+  grown wall, and the reactants are conserved.
+- **48u. A shear-thinning gum: fingers that crack** (M; sharpens **37x-10h**, which names the
+  gum, and **48d**, the glass lifted). A polymer or clay in the liquid thins where it is
+  sheared, so the viscous fingers of a pour or a lift narrow from round tulips into sharp,
+  branched cracks, and at strong thinning the pattern looks like fracture (Lemaire, Levitz,
+  Daccord and Van Damme 1991; Lindner, Bonn and Meunier 2000). In the gap it is a viscosity
+  per cell from the local shear rate (a power law with an index n set by the dial), which the
+  Hele-Shaw drag already takes cell by cell. *Check:* the same lift with n = 1 and n = 0.5,
+  the finger width falls as the papers measure and the branch count rises; n = 1 is today's
+  plate to the bit.
+- **48v. An electric field on the oil** (M; builds on the ferrofluid's magnetic stress,
+  **38d**, **38k**). Electrodes at the dish's rim and a voltage: a leaky dielectric drop
+  stretches along the field (or flattens across it, by the ratio of its charge-relaxation
+  time to the oil's), and past a threshold tip-streams fine jets from its ends; under DC some
+  drops spin by Quincke rotation (G. I. Taylor 1966; the leaky dielectric model of Melcher and
+  Taylor; in a Hele-Shaw cell, Mirzadeh and Bazant 2017 on electric control of fingering). The
+  maths is the magnet's with permittivity for permeability, so the stress kernel is shared. A
+  new instrument for any oil look, a knob or a cord, the way the magnet is for ferrofluid.
+  *Check:* a drop's aspect ratio against Taylor's small-deformation law at three fields, and
+  the sign flips with the conductivity ratio as the theory says.
+- **48w. Marangoni bursting: a drop explodes into droplets** (M; builds on the oil's
+  Cahn–Hilliard field, the Marangoni stress and evaporation). A water and alcohol drop laid
+  on an oil layer spreads, the alcohol evaporates fastest at its rim, the surface tension
+  gradient pulls the rim outward, and the rim breaks into hundreds of droplets that fly out
+  in a ring (Keiser, Bense, Colinet, Bico and Reyssat 2017). A firework on every drop; a cord
+  can lay one on a kick. The droplets are near the cell size, so it wants the closeup's finer
+  grid or the fine dye; on the wall at 1x it reads as a radial spray. *Check:* the burst's
+  radius grows as the paper's law in time, the number of droplets rises with the alcohol
+  fraction, and the oil and water are conserved.
+- **48x. Dancing droplets on dry glass** (S–M; builds on the dewetting of **20b** and the
+  Marangoni stress). Two-component drops of water and propylene glycol with food colouring,
+  on clean glass, sense each other through the vapour they give off: a neighbour's vapour
+  slows evaporation on a drop's near side, which raises its surface tension there and pulls
+  it closer, so drops pair, line up, and (of unequal mix) chase and flee, all on their own
+  and slowly (Cira, Benusiglio and Prakash 2015). One vapour field on a coarse grid
+  (one diffusion pass) and the Marangoni force at the drop's rim. A plate that is alive
+  without any noise, and calm enough for a quiet look. *Check:* two drops of equal mix
+  attract, two of unequal mix chase in the direction the paper measured, and with the
+  vapour turned off nothing moves.
+- **48y. Drops drift towards the lamp's heat** (S; sharpens **18f-2** and **38f**). A drop
+  in a temperature gradient moves to the hot side, because the surface tension is lower
+  there and its surface flows to the cold (Young, Goldstein and Block 1959). 18f-2 puts the
+  thermal Marangoni stress inside a layer; this is the same stress on every oil drop's rim,
+  so drops gather slowly round the lamp's hot spot and wander as it moves. A term in a force
+  pass the plate already runs. *Check:* a drop's drift speed against the Young–Goldstein–Block
+  law at two gradients, and none on a uniform plate.
+- **48z. Partial coalescence: a drop merges in steps** (M; closeup and tank only, **§47**,
+  builds on **33f** and **38r**). A drop resting on a layer of its own liquid across a thin
+  film of the other merges only partly: the neck pinches and a daughter about half its size
+  springs back, rests, and merges again, four to six times (Thoroddsen and Takehara 2000;
+  Blanchette and Bigioni 2006). A rhythmic shrinking blink, small on the wall, striking in
+  the macro view. *Check:* the daughter's radius ratio near 0.5 over the cascade and the
+  cascade stops at the Ohnesorge number the papers give.

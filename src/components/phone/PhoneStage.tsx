@@ -1,20 +1,21 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { PhonePads } from './PhonePads';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
   Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
-  Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
+  Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus, Keyboard,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
   Crosshair, LayoutGrid, Plus, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
+import { makesText } from '../../lib/recordChoice';
 import { ToolGlyph } from '../ui/ToolGlyph';
 import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
-import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import { musicStirOf, withMusicStir } from '../../lib/stir';
 import { glassSlideOf, withGlassSlide } from '../../lib/glassSlide';
 import { musicHandOf, withMusicHand } from '../../lib/musicCords';
@@ -25,13 +26,22 @@ const HAND_SLIDERS: readonly [MusicRole, string][] = [['bloom', 'Kick Pour'], ['
 import { musicShakeOf, withMusicShake } from '../../lib/shakeCord';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
+
+const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
+function pinSlider(k: keyof VisualizerSettings, val: number) {
+  const { min, max } = rangeOf(k);
+  return { min, max, display: readSetting(k, val, min, max), midiKey: `setting:${k}` };
+}
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
-import { lookStill } from '../../lib/lookStills';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { LookChip, LookPicture } from '../ui/LookChip';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
+import { CrashReportButton } from '../CrashReportButton';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
 import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
@@ -50,7 +60,7 @@ import type { TabEdit } from '../../hooks/useDeskLayout';
 import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
 import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
 import { SiteLink } from '../SiteLink';
-import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { Bottle, LiveBottle, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 import { PicturePaletteButton } from '../PicturePaletteButton';
 
 /**
@@ -150,6 +160,9 @@ export interface PhoneStageProps {
    * on the phone. It lands under Yours in this same sheet.
    */
   onSaveLook?: (name: string) => void;
+  /** Existing saved looks, so saving a duplicate name offers Replace or Keep both (PLAN 49a). */
+  existingLooks?: { id: string; name: string }[];
+  onReplaceLook?: (id: string, name: string) => void;
   /** The name the save field starts with. */
   saveSuggestion?: string;
   /**
@@ -372,6 +385,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
+  onShortcuts?: () => void;
   recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void; shape: ClipShape; onShape: (s: ClipShape) => void; take: { blob: Blob; filename: string; url: string } | null };
   onHide: () => void;
   onFullLayout: () => void;
@@ -380,6 +394,7 @@ export interface PhoneStageProps {
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
+  onMoreOpen?: (open: boolean) => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
 }
@@ -438,6 +453,13 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone, glyph }: {
 
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  const onMoreOpenRef = useRef(p.onMoreOpen);
+  onMoreOpenRef.current = p.onMoreOpen;
+  const moreOpen = sheet === 'more';
+  useEffect(() => {
+    onMoreOpenRef.current?.(moreOpen);
+    return () => { onMoreOpenRef.current?.(false); };
+  }, [moreOpen]);
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const [amountOpen, setAmountOpen] = useState(false);
@@ -453,13 +475,30 @@ export function PhoneStage(p: PhoneStageProps) {
   const [lookTo, setLookTo] = useState<'all' | 'back'>('all');
   /** The Looks sheet's name field, while a save is being named; null when it is not. */
   const [saveName, setSaveName] = useState<string | null>(null);
-  const saveNamed = () => {
+  const [saveDup, setSaveDup] = useState<{ id: string; name: string } | null>(null);
+  const keepSave = () => {
     const name = saveName?.trim();
     if (!name || !p.onSaveLook) return;
     p.onSaveLook(name);
+    setSaveDup(null);
     setSaveName(null);
   };
-  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
+  const replaceSave = () => {
+    const name = saveName?.trim();
+    if (!name || !saveDup) return;
+    if (p.onReplaceLook) p.onReplaceLook(saveDup.id, name);
+    else p.onSaveLook?.(name);
+    setSaveDup(null);
+    setSaveName(null);
+  };
+  const saveNamed = () => {
+    const name = saveName?.trim();
+    if (!name || !p.onSaveLook) return;
+    const hit = (p.existingLooks ?? []).find(l => l.name.trim().toLowerCase() === name.toLowerCase());
+    if (hit && !saveDup) { setSaveDup(hit); return; }
+    keepSave();
+  };
+  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); setSaveDup(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
   /*
@@ -506,7 +545,7 @@ export function PhoneStage(p: PhoneStageProps) {
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
-          <SlideMount swatch={p.lookSwatch} size={36} />
+          <LookPicture lookId={p.activeLookId} swatch={p.lookSwatch} size={36} />
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
           <span className="shrink-0 text-muted"><SlideTray at={p.lookSlot ?? null} size={20} /></span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
@@ -559,14 +598,11 @@ export function PhoneStage(p: PhoneStageProps) {
           <Slider
             label="Macro Zoom"
             value={Math.max(1, p.zoom)}
-            min={1}
-            max={16}
+            {...pinSlider('macroZoom', Math.max(1, p.zoom))}
             step={0.1}
             onChange={p.onZoom}
-            display={`${Math.max(1, p.zoom).toFixed(1)}×`}
             touch
             testId="phone-zoom-slider"
-            midiKey="setting:macroZoom"
           />
         </div>
       )}
@@ -643,38 +679,29 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider
               label="Press · fingers as it lifts"
               value={p.fingering}
-              min={0}
-              max={1}
+              {...pinSlider('fingering', p.fingering)}
               step={0.01}
               onChange={p.onFingering}
-              display={`${Math.round(p.fingering * 100)}%`}
               touch
               testId="phone-press-fingering"
-              midiKey="setting:fingering"
             />
             <Slider
               label="Press · thin gap"
               value={p.thinGap}
-              min={0}
-              max={1}
+              {...pinSlider('thinGap', p.thinGap)}
               step={1}
               onChange={p.onThinGap}
-              display={p.thinGap > 0.5 ? 'On' : 'Off'}
               touch
               testId="phone-press-thin"
-              midiKey="setting:thinGap"
             />
             <Slider
               label="Press · glass lifts"
               value={p.pressLift}
-              min={0}
-              max={1}
+              {...pinSlider('plateSpring', p.pressLift)}
               step={0.05}
               onChange={p.onPressLift}
-              display={`${Math.round(p.pressLift * 100)}%`}
               touch
               testId="phone-press-lift"
-              midiKey="setting:plateSpring"
             />
             </div>
           )}
@@ -682,14 +709,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider
               label="Magnet · size"
               value={p.magnetSize}
-              min={0}
-              max={PIN_RANGE.get('magnetSize')?.max ?? 1}
+              {...pinSlider('magnetSize', p.magnetSize)}
               step={0.05}
               onChange={p.onMagnetSize}
-              display={`${Math.round(p.magnetSize * 100)}%`}
               touch
               testId="phone-magnet-size"
-              midiKey="setting:magnetSize"
             />
           )}
         </div>
@@ -743,7 +767,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 <ToolGlyph id={id} size={20} />
                 <span>{label}</span>
                 {on && Math.abs(p.amount - 1) > 0.01 && (
-                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[11px] text-text">{p.amount.toFixed(1)}</span>
+                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[12px] text-text">{p.amount.toFixed(1)}</span>
                 )}
               </button>
             );
@@ -810,7 +834,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       {on
                         ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} height={24} testId="phone-bottle-in-hand" />
                         : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} height={24} />}
-                      <span className="truncate">{l.name}</span>
+                      <span className="line-clamp-2 text-left leading-tight">{l.name}</span>
                     </button>
                   );
                 })}
@@ -821,22 +845,23 @@ export function PhoneStage(p: PhoneStageProps) {
 
           {(liquid?.id === 'soap' || (p.mixer?.settings.soapBreakdown ?? 0) > 0.001) && p.mixer && (
             <div className="mt-3">
-              <Slider label="Soap Breakdown" value={p.mixer.settings.soapBreakdown ?? 0} min={0} max={1} step={0.01}
+              <Slider label="Soap Breakdown" value={p.mixer.settings.soapBreakdown ?? 0} {...pinSlider('soapBreakdown', p.mixer.settings.soapBreakdown ?? 0)} step={0.01}
                 onChange={v => p.mixer!.onSetting({ soapBreakdown: v })}
-                display={readSetting('soapBreakdown', p.mixer.settings.soapBreakdown ?? 0, 0, 1)}
-                touch testId="phone-soap-breakdown" midiKey="setting:soapBreakdown" />
+                touch testId="phone-soap-breakdown" />
             </div>
           )}
 
           <div className="mt-3">
-            <Slider label="Clear Film" value={p.film.clearFilm ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
-              display={`${Math.round((p.film.clearFilm ?? 0) * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
-            <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+            <Slider label="Clear Film" value={p.film.clearFilm ?? 0} {...pinSlider('clearFilm', p.film.clearFilm ?? 0)} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
+              touch testId="phone-clear-film" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">
+              A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. {clearFilmGroundNote(p.lampGround, p.film.clearFilmDye) ?? 'White on the Lamp Ground.'}
+            </p>
             {(p.film.clearFilm ?? 0) > 0.001 && (
               <div className="mt-3 flex items-end gap-3">
                 <div className="flex-1">
-                  <Slider label="Film Dye" value={p.film.clearFilmDye ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.onFilm({ clearFilmDye: v })}
-                    display={`${Math.round((p.film.clearFilmDye ?? 0) * 100)}%`} touch testId="phone-film-dye" midiKey="setting:clearFilmDye" />
+                  <Slider label="Film Dye" value={p.film.clearFilmDye ?? 0} {...pinSlider('clearFilmDye', p.film.clearFilmDye ?? 0)} step={0.05} onChange={(v) => p.onFilm({ clearFilmDye: v })}
+                    touch testId="phone-film-dye" />
                 </div>
                 <input type="color" aria-label="Film dye colour" data-testid="phone-film-dye-colour" value={p.film.clearFilmDyeColor ?? '#ffd21a'}
                   onChange={(e) => p.onFilm({ clearFilmDyeColor: e.target.value })} className="mb-5 h-11 w-11 cursor-pointer rounded-lg border-0 bg-transparent p-0" />
@@ -880,7 +905,7 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
 
           <SectionLabel>Palette</SectionLabel>
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-4 flex gap-1.5 overflow-x-auto cg-scroll px-4 pb-1">
             <button
               onClick={() => p.onPalette(null)}
               aria-pressed={p.paletteLock == null}
@@ -931,8 +956,8 @@ export function PhoneStage(p: PhoneStageProps) {
               both of, and Pour's Stop is here too. */}
           {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
-              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} onMixOrder={p.mixer ? o => p.mixer!.onSetting({ mixOrder: o }) : undefined} />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Video in</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} filmRing={p.mixer?.settings.filmRing} onPlace={p.mixer ? patch => p.mixer!.onSetting(patch) : undefined} />
             </div>
           )}
           </PanelGuard>
@@ -947,65 +972,76 @@ export function PhoneStage(p: PhoneStageProps) {
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
             {/* The desk's Save, here: a new preset from what is on the plate,
                 under a name, listed under Yours below as soon as it is saved. */}
-            {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} testId="phone-save-look" />}
+            {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => { setSaveDup(null); setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null)); }} testId="phone-save-look" />}
           </div>
           {saveName !== null && (
+            <>
             <form className="mt-2 flex gap-1.5" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="phone-save-form">
               <input
                 autoFocus
                 onFocus={e => e.currentTarget.select()}
                 value={saveName}
-                onChange={e => setSaveName(e.target.value)}
+                onChange={e => { setSaveName(e.target.value); setSaveDup(null); }}
                 aria-label="Name for the new preset"
                 // 16 px: under it, iOS zooms the page in on focus.
                 className="h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none focus:border-accent"
                 data-testid="phone-save-name"
               />
-              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-40" data-testid="phone-save-confirm">
+              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-65" data-testid="phone-save-confirm">
                 Save
               </button>
             </form>
+            {saveDup && (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="phone-save-duplicate">
+                <span>“{saveDup.name}” already exists.</span>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={keepSave} className="h-10 rounded-lg border border-border bg-elevated px-3 text-[13px] font-medium text-text" data-testid="phone-save-keep-both">Keep both</button>
+                  <button type="button" onClick={replaceSave} className="h-10 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary" data-testid="phone-save-replace">Replace</button>
+                </div>
+              </div>
+            )}
+            </>
           )}
           <div className="mt-3">
-            <Slider label="Lamp Ground" value={p.lampGround} min={0} max={1} step={0.05} onChange={p.onLampGround}
-              display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
+            <Slider label="Lamp Ground" value={p.lampGround} {...pinSlider('lampGround', p.lampGround)} step={0.05} onChange={p.onLampGround}
+              touch testId="phone-lamp-ground" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
           <PhoneMoire settings={p.mixer.settings} onSetting={p.mixer.onSetting} />
           <div className="mt-3">
-            <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
-              display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
+            <Slider label="Two Projectors" value={p.twoProjectors} {...pinSlider('twoProjectors', p.twoProjectors)} step={1} onChange={p.onTwoProjectors}
+              touch testId="phone-two-projectors" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Each plate has its own lamp on the screen, so its clear parts wash the other's colour.</p>
           </div>
           <div className="mt-3">
-            <Slider label="Projector Focus" value={p.projectorFocus} min={0} max={1} step={0.05} onChange={p.onProjectorFocus}
-              display={`${Math.round(p.projectorFocus * 100)}%`} touch testId="phone-projector-focus" midiKey="setting:projectorFocus" />
+            <Slider label="Projector Focus" value={p.projectorFocus} {...pinSlider('projectorFocus', p.projectorFocus)} step={0.05} onChange={p.onProjectorFocus}
+              touch testId="phone-projector-focus" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
           </div>
           <div className="mt-3">
-            <Slider label="Heat" value={p.mixer.settings.heat ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.mixer.onSetting({ heat: v })}
-              display={`${Math.round((p.mixer.settings.heat ?? 0) * 100)}%`} touch testId="phone-heat" midiKey="setting:heat" />
+            <Slider label="Heat" value={p.mixer.settings.heat ?? 0} {...pinSlider('heat', p.mixer.settings.heat ?? 0)} step={0.05} onChange={(v) => p.mixer.onSetting({ heat: v })}
+              touch testId="phone-heat" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">The projector lamp&apos;s heat in the dish: hold a finger on the glass to block the fan&apos;s air and boil the spot.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">
-              <Slider label="Ben-Day Dots" value={p.benDay} min={0} max={1} step={0.05} onChange={p.onBenDay}
-                display={`${Math.round(p.benDay * 100)}%`} touch testId="phone-ben-day" midiKey="setting:benDay" />
+              <Slider label="Ben-Day Dots" value={p.benDay} {...pinSlider('benDay', p.benDay)} step={0.05} onChange={p.onBenDay}
+                touch testId="phone-ben-day" />
               <p className="-mt-3 text-[12px] leading-snug text-dim">The plate printed as a comic: flat inks, black lines, the pale washes in dots.</p>
             </div>
           )}
           {(reacting || p.reaction.on) && (
             <div className="mt-3" data-testid="phone-reaction">
-              <Slider label="Pattern" value={p.reaction.pattern} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ chemistryPattern: v })}
-                display={p.reaction.pattern < 0.34 ? 'Spots' : p.reaction.pattern < 0.67 ? 'Worms' : 'Labyrinth'} touch testId="phone-reaction-pattern" midiKey="setting:chemistryPattern" />
-              <Slider label="Pattern Width" value={p.reaction.width} min={0.1} max={1} step={0.01} onChange={(v) => p.onReaction({ chemistryWidth: v })}
-                display={`${Math.round(p.reaction.width * 100)}%`} touch testId="phone-reaction-width" midiKey="setting:chemistryWidth" />
-              <Slider label="Turing Print" value={p.reaction.print} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingPrint: v })}
-                display={`${Math.round(p.reaction.print * 100)}%`} touch testId="phone-turing-print" midiKey="setting:turingPrint" />
-              <Slider label="Print Ink" value={p.reaction.ink} min={0} max={1} step={0.01} onChange={(v) => p.onReaction({ turingInk: v })}
-                display={p.reaction.ink > 0 ? `${Math.round(p.reaction.ink * 360)}°` : 'Starch'} touch testId="phone-turing-ink" midiKey="setting:turingInk" />
-              <Slider label="Print Drift" value={p.reaction.drift} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingDrift: v })}
-                display={p.reaction.drift > 0 ? `${Math.round(p.reaction.drift * 100)}%` : 'Still'} touch testId="phone-turing-drift" midiKey="setting:turingDrift" />
+              <Slider label="Pattern" value={p.reaction.pattern} {...pinSlider('chemistryPattern', p.reaction.pattern)} step={0.05} onChange={(v) => p.onReaction({ chemistryPattern: v })}
+                touch testId="phone-reaction-pattern" />
+              <Slider label="Pattern Width" value={p.reaction.width} {...pinSlider('chemistryWidth', p.reaction.width)} step={0.01} onChange={(v) => p.onReaction({ chemistryWidth: v })}
+                touch testId="phone-reaction-width" />
+              <Slider label="Turing Print" value={p.reaction.print} {...pinSlider('turingPrint', p.reaction.print)} step={0.05} onChange={(v) => p.onReaction({ turingPrint: v })}
+                touch testId="phone-turing-print" />
+              <Slider label="Print Ink" value={p.reaction.ink} {...pinSlider('turingInk', p.reaction.ink)} step={0.01} onChange={(v) => p.onReaction({ turingInk: v })}
+                touch testId="phone-turing-ink" />
+              <Slider label="Print Drift" value={p.reaction.drift} {...pinSlider('turingDrift', p.reaction.drift)} step={0.05} onChange={(v) => p.onReaction({ turingDrift: v })}
+                touch testId="phone-turing-drift" />
               <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp, or another indicator's colour.</p>
             </div>
           )}
@@ -1013,32 +1049,42 @@ export function PhoneStage(p: PhoneStageProps) {
           {groups.map(g => (
             <div key={g}>
               <SectionLabel>{g}</SectionLabel>
-              <div className="flex flex-col gap-1">
+              {/*
+                Round chips, a picture of each look (PLAN 34b-6, the phone's
+                half of the desk's chips): a long press tells its name, as a
+                phone's home screen does, and a tap sends it. 56 px, past the
+                44 px a finger needs, five to a row on a 390 px phone where the
+                rows of name and description were one look to 56 px.
+              */}
+              <div className="flex flex-wrap gap-3 px-1 py-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
-                    <button
+                    <LookChip
                       key={l.id}
+                      lookId={l.id}
+                      name={l.name}
+                      swatch={l.swatch}
+                      size={56}
+                      state={on ? 'live' : 'idle'}
+                      pressed={on}
+                      title={l.description ? `${l.name}: ${l.description}` : l.name}
                       onClick={() => {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        // A pack's look without the pack opens the account sheet (PLAN 45a).
-                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        // A pack's look without the pack opens the lock/account sheet (PLAN 45a, 49j).
+                        if (locked) openTierLock('moire', { itemName: l.name });
                         else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
                       }}
-                      aria-pressed={on}
-                      data-testid={`phone-look-${l.id}`}
-                      className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
+                      testId={`phone-look-${l.id}`}
                     >
-                      <SlideMount swatch={l.swatch} still={lookStill(l.id)} size={44} />
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
-                        {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
-                      </span>
-                    </button>
+                      {/* A pack's look without the pack wears the lock its row wore (PLAN 49j), over the chip's foot. */}
+                      {locked && <TierLockBadge label="Pro" className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 text-[11px]" />}
+                    </LookChip>
                   );
                 })}
               </div>
@@ -1109,9 +1155,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
           )}
           {p.audioSource !== 'none' && (
-            <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
-              <Slider label="Follow the song" value={p.songFollow} min={0} max={1} step={0.01} onChange={p.onSongFollow}
-                display={`${Math.round(p.songFollow * 100)}%`} touch testId="phone-song-follow" midiKey="setting:songFollow" />
+            <div className="mt-3">
+              <Slider label="Follow the song" value={p.songFollow} {...pinSlider('songFollow', p.songFollow)} step={0.01} onChange={p.onSongFollow}
+                disabled={!p.show.running} touch testId="phone-song-follow" />
               <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-song-follow-says">
                 {p.show.running
                   ? 'The show holds still through a build and throws its big move on the drop.'
@@ -1121,8 +1167,8 @@ export function PhoneStage(p: PhoneStageProps) {
           )}
           {p.audioSource !== 'none' && (
             <div className="mt-3">
-              <Slider label="Accent the one" value={p.beatAccent} min={0} max={1} step={0.01} onChange={p.onBeatAccent}
-                display={`${Math.round(p.beatAccent * 100)}%`} touch testId="phone-beat-accent" midiKey="setting:beatAccent" />
+              <Slider label="Accent the one" value={p.beatAccent} {...pinSlider('beatAccent', p.beatAccent)} step={0.01} onChange={p.onBeatAccent}
+                touch testId="phone-beat-accent" />
               <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-beat-accent-says">
                 {p.barLine ? `${p.barLine}.` : 'Listening for the beat.'}
               </p>
@@ -1163,8 +1209,8 @@ export function PhoneStage(p: PhoneStageProps) {
             <div className="mt-2"><OscOutRow oscOut={p.oscOut} onOscOut={p.onOscOut} touch testId="phone-osc-out" /></div>
           )}
           <div className="mt-4">
-            <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
-              display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
+            <Slider label="Sound Drive" value={p.soundDrive} {...pinSlider('audioImpact', p.soundDrive)} step={0.01} onChange={p.onSoundDrive}
+              touch testId="phone-sound-drive" />
           </div>
           {/*
             Music Stir: the depth of the look's cord from the sound's mids
@@ -1226,14 +1272,20 @@ export function PhoneStage(p: PhoneStageProps) {
           */}
           {p.mixer && (
             <div className="mt-3">
-              <Slider label="Shaker" value={p.mixer.settings.faradayHz ?? 0} min={0} max={150} step={1}
+              <Slider label="Shaker" value={p.mixer.settings.faradayHz ?? 0} {...pinSlider('faradayHz', p.mixer.settings.faradayHz ?? 0)} step={1}
                 onChange={(v) => p.mixer!.onSetting({ faradayHz: v })}
-                display={(p.mixer.settings.faradayHz ?? 0) > 0 ? `${Math.round(p.mixer.settings.faradayHz ?? 0)} Hz` : 'Off'} touch testId="phone-shaker" midiKey="setting:faradayHz" />
+                touch testId="phone-shaker" />
               {(p.mixer.settings.faradayHz ?? 0) > 0 && (
                 <>
-                  <Slider label="Shake" value={p.mixer.settings.faraday ?? 0} min={0} max={2} step={0.01}
+                  <Slider label="Shake" value={p.mixer.settings.faraday ?? 0} {...pinSlider('faraday', p.mixer.settings.faraday ?? 0)} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ faraday: v })}
-                    display={`${(p.mixer.settings.faraday ?? 0).toFixed(2)} g`} touch testId="phone-shake" midiKey="setting:faraday" />
+                    touch testId="phone-shake" />
+                  <Slider label="Rock" value={p.mixer.settings.faradayRock ?? 0} {...pinSlider('faradayRock', p.mixer.settings.faradayRock ?? 0)} step={0.01}
+                    onChange={(v) => p.mixer!.onSetting({ faradayRock: v })}
+                    touch testId="phone-rock" />
+                  <Slider label="Wave Strength" value={p.mixer.settings.faradayGain ?? 1} {...pinSlider('faradayGain', p.mixer.settings.faradayGain ?? 1)} step={0.05}
+                    onChange={(v) => p.mixer!.onSetting({ faradayGain: v })}
+                    touch testId="phone-wave-strength" />
                   <Slider label="Music Shake" value={musicShakeOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
                     onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicShake(p.mixer!.settings.sceneMappings, v) })}
                     display={`${Math.round(musicShakeOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-shake" />
@@ -1249,17 +1301,17 @@ export function PhoneStage(p: PhoneStageProps) {
           */}
           {p.mixer && (
             <div className="mt-3">
-              <Slider label="Glow" value={p.mixer.settings.glow ?? 0} min={0} max={2} step={0.05}
+              <Slider label="Glow" value={p.mixer.settings.glow ?? 0} {...pinSlider('glow', p.mixer.settings.glow ?? 0)} step={0.05}
                 onChange={(v) => p.mixer!.onSetting({ glow: v })}
-                display={`${Math.round((p.mixer.settings.glow ?? 0) * 100)}%`} touch testId="phone-glow" midiKey="setting:glow" />
+                touch testId="phone-glow" />
               {(p.mixer.settings.glow ?? 0) > 0.001 && (
                 <>
-                  <Slider label="Glow Shear" value={p.mixer.settings.glowShear ?? 30} min={5} max={200} step={1}
+                  <Slider label="Glow Shear" value={p.mixer.settings.glowShear ?? 30} {...pinSlider('glowShear', p.mixer.settings.glowShear ?? 30)} step={1}
                     onChange={(v) => p.mixer!.onSetting({ glowShear: v })}
-                    display={`${Math.round(p.mixer.settings.glowShear ?? 30)}/s`} touch testId="phone-glow-shear" midiKey="setting:glowShear" />
-                  <Slider label="Glow Recharge" value={p.mixer.settings.glowRecharge ?? 8} min={0.5} max={60} step={0.5}
+                    touch testId="phone-glow-shear" />
+                  <Slider label="Glow Recharge" value={p.mixer.settings.glowRecharge ?? 8} {...pinSlider('glowRecharge', p.mixer.settings.glowRecharge ?? 8)} step={0.5}
                     onChange={(v) => p.mixer!.onSetting({ glowRecharge: v })}
-                    display={`${(p.mixer.settings.glowRecharge ?? 8).toFixed(1)} s`} touch testId="phone-glow-recharge" midiKey="setting:glowRecharge" />
+                    touch testId="phone-glow-recharge" />
                 </>
               )}
             </div>
@@ -1281,6 +1333,11 @@ export function PhoneStage(p: PhoneStageProps) {
               <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
             )}
           </div>
+          {/* The controller's grid on the glass (PLAN 30c): pads held as long as a finger is on them. */}
+          <div className="mt-3">
+            <p className="mb-1.5 text-[13px] font-medium text-text">Pads</p>
+            <PhonePads testId="phone-pads" />
+          </div>
           {(p.show.running || p.show.paused) && (
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
               {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
@@ -1289,7 +1346,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.score && (
             <>
               <SectionLabel>The song</SectionLabel>
-              <SongScore {...p.score} touch />
+              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
             </>
           )}
           {/*
@@ -1306,8 +1363,8 @@ export function PhoneStage(p: PhoneStageProps) {
           )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
           <div className="mt-3">
-            <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
-              display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+            <Slider label="Slosh" value={p.slosh} {...pinSlider('slosh', p.slosh)} step={0.05} onChange={p.onSlosh}
+              touch testId="phone-slosh" />
           </div>
           {/*
             The desk's two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a hand's tip of
@@ -1315,16 +1372,21 @@ export function PhoneStage(p: PhoneStageProps) {
             phone's own Tilt, which stands the plate up (Gravity), so both can be on.
           */}
           <div className="mt-3">
-            <Slider label="Tilt left/right" value={p.mixer.settings.plateTiltX ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltX: v })}
-              display={`${Math.round((p.mixer.settings.plateTiltX ?? 0) * 100)}%`} touch testId="phone-tilt-x" midiKey="setting:plateTiltX" />
-            <Slider label="Tilt up/down" value={p.mixer.settings.plateTiltY ?? 0} min={-1} max={1} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltY: v })}
-              display={`${Math.round((p.mixer.settings.plateTiltY ?? 0) * 100)}%`} touch testId="phone-tilt-y" midiKey="setting:plateTiltY" />
+            <Slider label="Tilt left/right" value={p.mixer.settings.plateTiltX ?? 0} {...pinSlider('plateTiltX', p.mixer.settings.plateTiltX ?? 0)} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltX: v })}
+              touch testId="phone-tilt-x" />
+            <Slider label="Tilt up/down" value={p.mixer.settings.plateTiltY ?? 0} {...pinSlider('plateTiltY', p.mixer.settings.plateTiltY ?? 0)} step={0.01} onChange={(v) => p.mixer.onSetting({ plateTiltY: v })}
+              touch testId="phone-tilt-y" />
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
-          <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
-            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={PIN_RANGE.get('automateRate')?.max ?? 1} step={0.01} onChange={p.onEvolveSpeed}
-              display={`${Math.round(p.evolveSpeed * 100)}%`} touch testId="phone-evolve-speed" midiKey="setting:automateRate" />
+          <div className="mt-4">
+            <Slider label="Evolve speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
+              disabled={!p.evolving} touch testId="phone-evolve-speed" />
+            {!p.evolving && (
+              <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-evolve-speed-says">
+                Turn Evolve on above to set how fast it drifts.
+              </p>
+            )}
           </div>
           {/*
             The plates, on every look. This section was here only on a look
@@ -1373,16 +1435,16 @@ export function PhoneStage(p: PhoneStageProps) {
               </button>
             ))}
           </div>
-          <div className={`mt-3 transition-opacity ${Math.round(p.spin.auto) === 0 ? 'opacity-50' : ''}`}>
-            <Slider label="Spin rate" value={p.spin.rpm} min={-SPIN_RPM_MAX} max={SPIN_RPM_MAX} step={0.5} onChange={(v) => p.spin.onChange({ spinRpm: v })}
-              display={`${p.spin.rpm.toFixed(1)} rpm`} touch testId="phone-spin-rate" midiKey="setting:spinRpm" />
+          <div className="mt-3">
+            <Slider label="Spin rate" value={p.spin.rpm} {...pinSlider('spinRpm', p.spin.rpm)} step={0.5} onChange={(v) => p.spin.onChange({ spinRpm: v })}
+              disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-rate" />
             {Math.round(p.spin.auto) === 2 && (
-              <Slider label="Beats a turn" value={p.spin.beats} min={SPIN_BEATS_RANGE[0]} max={SPIN_BEATS_RANGE[1]} step={1}
+              <Slider label="Beats a turn" value={p.spin.beats} {...pinSlider('spinBeats', p.spin.beats)} step={1}
                 onChange={(v) => p.spin.onChange({ spinBeats: Math.round(v) })}
-                display={`${Math.round(p.spin.beats)}`} touch testId="phone-spin-beats" midiKey="setting:spinBeats" />
+                disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-beats" />
             )}
-            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} data-testid="phone-spin-reverse"
-              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active">
+            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} disabled={Math.round(p.spin.auto) === 0} data-testid="phone-spin-reverse"
+              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active disabled:cursor-not-allowed disabled:opacity-65">
               Reverse
             </button>
           </div>
@@ -1446,7 +1508,7 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
-              label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
+              label={p.recording.on ? `${makesText(p.recording.choice)} · ${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
               on={p.recording.on}
               tone="live"
               onPress={p.recording.onToggle}
@@ -1457,6 +1519,10 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
+            {p.onShortcuts && <Tile icon={Keyboard} label="Shortcuts" onPress={() => { close(); p.onShortcuts?.(); }} testId="phone-shortcuts" />}
+            <PanelGuard name="The crash report">
+              <CrashReportButton tile />
+            </PanelGuard>
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
             {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}

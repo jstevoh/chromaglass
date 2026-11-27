@@ -102,7 +102,7 @@ try {
     // Warm: the thin gap's pipelines, the bind groups and the args buffers are
     // made on a solver's first steps and kept; what is asked for is a step
     // after those, the one a show runs for hours.
-    await lab.step(12, { thinGap: 1, immiscibility: 0.5 });
+    await lab.step(12, { thinGap: 1, holdApart: 0.5 });
     const s = lab.solver();
     const q = s.device.queue;
     const counts = { writes: 0, dispatches: 0, groups: 0, same: 0, on: false };
@@ -177,7 +177,7 @@ try {
     const step = s.step.bind(s);
     s.step = (...a) => { const t = performance.now(); const r = step(...a); ms.push(performance.now() - t); return r; };
     counts.writes = 0; counts.dispatches = 0; counts.indirect = 0; counts.groups = 0; counts.same = 0; counts.by = {}; counts.on = true;
-    await lab.step(steps, { thinGap: 1, immiscibility: 0.5 });
+    await lab.step(steps, { thinGap: 1, holdApart: 0.5 });
     counts.on = false;
     s.step = step;
     GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch;
@@ -193,7 +193,7 @@ try {
     counts.writes = 0; counts.dispatches = 0; counts.on = true;
     s.device.queue.writeBuffer(s.sim, 0, new Float32Array(4));
     const hand = counts.writes;
-    await lab.step(steps, { thinGap: 1, immiscibility: 0.5 });
+    await lab.step(steps, { thinGap: 1, holdApart: 0.5 });
     counts.on = false;
     GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch;
     return { hand, writes: counts.writes, dispatches: counts.dispatches, steps };

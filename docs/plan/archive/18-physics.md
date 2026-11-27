@@ -34,3 +34,9 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   fine as before and two thirds of a turn is the phone's full tip. Phone and knobs
   together stop at the knobs' corner. `npm run handtilt` (reach). Films on the Mac for
   the owner's judging.
+- **18a-13m. Tilt the plate from two knobs: shipped** (2026-11-15; the owner: "control
+  the tilt of the plate from my midi controller. Maybe two knobs?"). Tilt Left/Right
+  and Tilt Up/Down (`plateTiltX`, `plateTiltY`): the flat plate tipped by a hand, the
+  remote phone's rock path, eased and turned into the dish (`lib/handTilt.ts`); MIDI,
+  Tilt & Rock, the desks, the remote and the phone's Motion sheet. `npm run handtilt`.
+  Story in `docs/plan-shipped.md` §18a-13m. 18a-13n (a full knob past the phone, archived) shipped; open: 18a-13o.

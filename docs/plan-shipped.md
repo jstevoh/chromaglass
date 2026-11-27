@@ -15286,6 +15286,57 @@ owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a vid
 colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
 row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).
 
+
+## 47a. The closeup's fine dye: a fine window, with the dye finer than the flow (2026-11-13)
+
+Asked 2026-11-11 from a macro artist's films; approved with the rest of §47 on 2026-11-13. At 6x
+a solver cell covers tens of screen pixels, and the closeup was a magnified blur: fine over coarse
+(the mean luminance gradient at a fine scale over a four-times-coarser one) 1.08 to 1.2 where the
+films read 2.2 to 3.1.
+
+Built: `gpu/closeupWindow.ts` (where the camera looks, screen-aligned, turning with the layer,
+square texels at two screen pixels each, margin 1.1, none at 1x, under the kaleidoscope or the
+dish spread, or when a cell is under three texels), `gpu/fineDye.ts` and `wgsl/fineDye.ts` (two
+fine fields over the window, carried every step through the solver's velocity by a clamped
+Catmull-Rom semi-Lagrangian step, no diffusion, the Batchelor limit; each born again from the grid
+every three time units, half a life apart, crossfaded by a triangle on age, stepped about once
+a frame; a camera that pans,
+turns or zooms is the same remap as the flow; dye from past the window's edge is the grid's), and
+`wgsl/fineWindow.ts` (the plate multiplies the grid's raw dye by the fine dye's ratio to it, in
+the dye's encoded space, through the same warp and defocus taps). Setting Fine Detail
+(`macroFine`, Macro section, desks, phone, MIDI, default 1).
+
+What the lab taught on the way, each a form dropped: the fine field nudged to the grid lost the
+detail (CPU toy 1.03); particles born in the window made 2.8 on the measure as Poisson grain; a
+difference added (fine less its cell mean) drew black beads on thin arms (thickness to nothing,
+colour left); a ratio per channel drew pale wisps in dark gaps. The shipped form scales each fine
+field by one number so its mean round each cell has the grid's thickness, keeps the colour it
+carried, and trusts it only as far as it holds the grid's dye (a pour since it was born shows at
+once). A seed sharpened by one backward heat step was tried and taken out: on the owner's Mac
+it drew a still poured column's edge as regular teeth (the grid's cell staircase, given back).
+Stepping the fine dye at every solver step cost a third of the frame rate on held closeups
+(Acid Trip 28 to 16 fps, Classic 27 to 17, filmed 2026-11-13), so it gathers the steps to about
+one a frame (`FINE_TICK`), and the window's edge is capped at 1024 texels.
+
+The owner then saw still drops in the closeup with toothed edges and a faint grid of squares
+(2026-11-13). Three causes, each found on the finedye check's still plate and fixed: the scale was
+the plate's dye at the texel over the field's block mean, which is not 1 even for a field equal
+to the plate's dye, so blocks straddling a pool's edge dimmed one side and lifted the other (now
+the field's block mean against the plate's over the same texels); the field was seeded from and
+divided by a full sixteen-tap Catmull-Rom where the plate draws a five-tap one, a dark rim round
+every pool (now `plateRead`, the plate's own read); and the fields were 16-bit, read back and
+stored again every step, so each store snapped a still pool's gentle slope into flat runs and the
+slope became a stair of blocks a cell across (now 32-bit). The block means are read Catmull-Rom,
+clamped: bilinear's creases were a screen-aligned grid the per-cell mass line read as 0.27 at the
+p90 against 0.11.
+
+Measured (`npm run finedye`, lab, 256², 6x, a forced vortex over three dyes, 600 steps): fine over
+coarse 1.099 to 1.121 stirred against no rise still; dyed cells' thickness off the grid's by a
+median 0.023 (nine in ten under 0.11); still pools' texture 0.004 at the 99th percentile (bar
+0.02; 0.025 before the fixes). Open: 47a-2 (diffusion at real
+D, capillary forces, the back plate), 47a-3 (a carried interface), 47a-4 (the plate folds little
+below a cell; more detail needs more stirring), 47a-5 (bars after a camera whip), 47a-6 (a characteristic map in place of resampling every step).
+
 ## 47z-5. Foam Cells: a packed foam whose films meet at 120° (2026-11-13)
 
 The owner asked for every finding of the Microlab films (2026-11-13, "Ok let's do this all"),
@@ -15933,6 +15984,38 @@ the standing-wave patterns for example." §48's idea 48f; its open items are in 
   9.73 and 5.87 mm at 20, 50 and 100 Hz; saturated at k u 0.19 to 0.22; the ring-down
   1.01/s against the damping's 1.07/s; at the dial's top (2 g) k u 0.83 at 10 Hz and
   0.25 at 150 Hz, held for 4 s, and the same at 10 Hz stepped in tenths of a second.
+
+#### 48f-6 and 48f-9. The standing waves move (shipped 2026-11-21)
+
+*The owner, 2026-11-21: "are we able to have the standing waves start moving as well?",
+and chose all three ways, and a strength past real water because a bass pulse reads faint.*
+
+- **Rock (48f-6)** (`faradayRock`, Hz 0..2). The strobe slipped off the wave: the solver
+  carries φ += 2π·rock·dt a substep and writes the surface the plate draws as
+  eta = u cos φ (gpu/faraday.ts), so crests and troughs trade places at the slip's rate
+  without a flicker. The liquid is not touched: the field stepped under the rock is the
+  one stepped without it to the bit.
+- **Riding the flow.** The wave field is carried by the plate's own velocity (the solver's
+  velocity texture, metres a second by the plate's size) and by the waves' own mean flow,
+  a semi-Lagrangian departure in the step's cubic pass, capped at two cells a substep.
+  A stripe on a plate flowing 2 mm/s went 3.89 mm in 2 s against 4.00.
+- **Breaking into motion.** The waves' mean flow is the streaming push −Γ∇²u∇u,
+  Leray-projected and held by the floor's friction r = ν(π/2h)². On the critical ring the
+  push is a pure gradient, so a perfect stripe streams nothing (0.15 µm/s, 3e-5 of
+  ω k u²) and neither does a square laid down (9e-4 of its own scale); grown 3 s, the
+  square's off-ring harmonics stream 155 µm/s, and a grown pattern's defects 350 µm/s at
+  4× the threshold and 830 at 12×. That flow carries the pattern: the dish with it differs
+  from the dish without it by 8.6% of the r.m.s. at 4×, 40% at 12×. The pattern holds at
+  4× (corr 0.95 over 4 s); at 12× it grows past where it can stand, breaks up and is a
+  different one 4 s later (0.61), then locks into a new one (0.99 ten seconds on, 0.9997
+  at the dial's 2 g). A real dish that far past threshold stays in defect chaos; ours
+  settles, so lasting motion is the Rock's and the plate's flow, and lasting chaos is
+  48f-12. Γ is a scale, not a derivation: 48f-8.
+- **Strength** (`faradayGain`, 1..8). The projector's throw past the dye, a real lens
+  racked back: the same waves bend the light harder (13.9 levels against 3.3 at 4) and
+  the mean holds within 5% (the aperture's loss and the dark folds, 48f-11).
+- Settings → Tilt & Rock, MIDI, the desk pins, the drift, the sequencer, the remote, and
+  the phone's Sound sheet (Rock and Wave strength). `npm run faraday`, 31 lines on Metal.
 
 ## 15e-10. A bottle's weight slides it down a rocked thin gap (shipped 2026-11-14)
 

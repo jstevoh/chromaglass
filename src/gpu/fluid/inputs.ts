@@ -8,14 +8,16 @@
 import { PingPong, bindGroup } from '../kit';
 import { splatKernel } from '../wgsl/splat';
 import { kernel } from '../wgsl/fluid';
-import { SPLAT_FLOATS, type SplatList } from '../splats';
+import { SPLAT_FLOATS, SplatList } from '../splats';
 import type { SolverCarry } from '../solverTypes';
 import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
 import { pouredOf } from '../../lib/bubbleLiquid';
 import { LIQUID_SIGMA } from '../../lib/bubbles';
-import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RGBA32, type FieldCarry } from './constants';
+import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
 import { FluidPasses } from './passes';
+import type { CoverState } from '../../lib/cover';
+import { captureFluidSnapshot, restoreFluidSnapshot, type FieldSnapshot, type SnapshotScalars, type SnapshotTargets } from './snapshot';
 
 export class FluidInputs extends FluidPasses {
   /**
@@ -105,7 +107,11 @@ export class FluidInputs extends FluidPasses {
     }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
-    this.writeSplatArgs(0);
+    // The presses' bowls since the last flush, as records (pressBowl).
+    const bowls = !this.bowls.empty;
+    if (bowls) this.splatRecords(this.bowls);
+    this.writeSplatArgs(this.bowls.count);
+    this.bowls.clear();
     const enc = this.device.createCommandEncoder({ label: 'deltas' });
     const pass = enc.beginComputePass({ label: 'deltas' });
     // Onto the full grid, the same bilinear the delta passes used to do
@@ -114,11 +120,14 @@ export class FluidInputs extends FluidPasses {
     const bodyMul = !!((oilAdd || this.oilLayPending || (this.bodiesWanted && !this.oilDyeStale)) && this.mix && this.mixLive);
     if (this.videoPending) {
       this.upsampleSum(pass, this.cpuDyeTex, this.videoDye!.read, this.deltaDyeTex);
-      this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
+      if (!bowls || !this.splatRun(pass, 'upsampleDeltaSumPress', RGBA32, [this.cpuVelTex, this.videoVel!.read, this.splatBuf!, this.deltaVelTex], this.N))
+        this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
       this.videoPending = false;
     } else {
       this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
-      this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
+      // The gap rides in the velocity's delta (.w), and the bowls with it.
+      if (!bowls || !this.splatRun(pass, 'upsampleDeltaPress', RGBA32, [this.cpuVelTex, this.splatBuf!, this.deltaVelTex], this.N))
+        this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
     }
     if (bodyMul) this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
@@ -139,6 +148,20 @@ export class FluidInputs extends FluidPasses {
   applySplats(list: SplatList, dt: number): void {
     if (list.empty) return;
     const q = this.device.queue;
+    this.splatRecords(list);
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
+    q.writeBuffer(this.sim, 0, this.simData);
+    this.writeSplatArgs(list.count);
+    const enc = this.device.createCommandEncoder({ label: 'splats' });
+    const pass = enc.beginComputePass({ label: 'splats' });
+    this.splatPass(pass);
+    this.foldDeltas(pass);
+    pass.end();
+    this.submit(enc);
+  }
+
+  /** The records into the splat buffer, grown to hold them. */
+  private splatRecords(list: SplatList): void {
     const bytes = Math.max(64, list.count * SPLAT_FLOATS * 4);
     if (!this.splatBuf || this.splatBuf.size < bytes) {
       if (this.splatBuf) this.disposer.release(this.splatBuf);
@@ -149,16 +172,21 @@ export class FluidInputs extends FluidPasses {
       this.groups.clear();
       this.groupRoot = { kids: new Map() };
     }
-    q.writeBuffer(this.splatBuf, 0, list.records);
-    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
-    q.writeBuffer(this.sim, 0, this.simData);
-    this.writeSplatArgs(list.count);
-    const enc = this.device.createCommandEncoder({ label: 'splats' });
-    const pass = enc.beginComputePass({ label: 'splats' });
-    this.splatPass(pass);
-    this.foldDeltas(pass);
-    pass.end();
-    this.submit(enc);
+    this.device.queue.writeBuffer(this.splatBuf, 0, list.records);
+  }
+
+  /** The presses' bowls waiting for the next flush (pressBowl). */
+  private readonly bowls = new SplatList(16);
+
+  /**
+   * A press on a thin gap, laid as the glass's own bowl at the solver's
+   * resolution (PLAN 18a-14; the reason is upsampleDeltaPress's, in
+   * wgsl/splat.ts). In logical cells, as the splat records are, with the
+   * centre and radius unrounded. It lands with the next applyDeltas, which
+   * the caller owes (the simulation's foldDue).
+   */
+  pressBowl(x: number, y: number, radius: number, amount: number): void {
+    this.bowls.disc(x, y, radius, { gap: -3 * amount, falloff: 'plate' });
   }
 
   /**
@@ -823,9 +851,13 @@ export class FluidInputs extends FluidPasses {
       field from going below zero (bodyAdvect's floor, there for the dye),
       and one field of signed w lost every light bottle's weight on its
       first step: an alcohol drop on a rocked thin gap moved nothing
-      (`npm run liquidfall`). The polarity's sign meets the same floor;
-      on a thin gap it no longer pushes (liquidForces), and the open plate
-      keeps it as it was.
+      (`npm run liquidfall`). The polarity's sign met the same floor
+      (PLAN 15e-13): every nonpolar bottle (oil −0.9, soap −0.25, silicone
+      −0.95) read zero after its first carried step, so on the open plate
+      only the polar half of a pair ever pushed. It is split the same way: a
+      polar bottle's polarity in liquids1.r, a nonpolar one's in liquids1.b
+      (free until now), and liquidForces reads r − b. On a thin gap it still
+      does not push (an oil keeps to itself there by its own tension, 38e).
     */
     const weight = what.weight ?? 0;
     const polar = what.polarity ?? 0;
@@ -837,7 +869,7 @@ export class FluidInputs extends FluidPasses {
       this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, Math.max(0, weight)]));
     this.liquids0.swap();
     this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
-      this.arg('liquid splat 1', [x, y, radius, take, polar, Math.max(0, -weight), 0, 0]));
+      this.arg('liquid splat 1', [x, y, radius, take, Math.max(0, polar), Math.max(0, -weight), Math.max(0, -polar), 0]));
     this.liquids1.swap();
     pass.end();
     this.submit(enc);
@@ -1047,6 +1079,10 @@ export class FluidInputs extends FluidPasses {
       rxn: copy(this.rxn, this.rxnLive),
       lies: copy(this.lies, this.liesLive),
       oilPoured: this.oilPoured,
+      species: copy(this.species, this.speciesLive),
+      liquids0: copy(this.liquids0, this.liquidsLive),
+      liquids1: copy(this.liquids1, this.liquidsLive),
+      speciesPoured: this.speciesPoured ? { ...this.speciesPoured } : null,
       destroy: () => { for (const t of made.splice(0)) t.destroy(); },
     };
     this.submit(enc);
@@ -1088,6 +1124,34 @@ export class FluidInputs extends FluidPasses {
       this.oilPoured = carry.oilPoured;
       this.oilDyeStale = true;
     }
+    /*
+      The poured liquids, by area as the mix is (PLAN 18d-10). What was
+      reported: since nothing fades the species (18d), a liquid poured stays
+      for the show, and a governor's move (a new solver at a new grid) lost
+      every one: a bottle of glycerine stopped dragging the moment the
+      frame rate dipped. The species' channels are amounts per unit of plate
+      (a share, and the share times each property), and so are the forces'
+      fields (each bottle's soap, body, repel, weight and polarity times its
+      share), so an area average onto the new grid keeps every amount and
+      every ratio within a cell of the coarser grid, as the ferrofluid's and
+      the oil's. The last bottle's tension and density go with them; the
+      species' CPU snapshot is read again from the new grid.
+    */
+    if (carry.species) {
+      const s = (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species'));
+      this.run(pass, 'carryArea', s.write, [carry.species], this.arg('carry species', [carry.n, this.N, 0, 0]));
+      s.swap();
+      this.speciesLive = true;
+      this.speciesQuiet++;
+      this.speciesPoured = carry.speciesPoured ? { ...carry.speciesPoured } : null;
+    }
+    if (carry.liquids0 && carry.liquids1) {
+      this.run(pass, 'carryArea', this.liquids0.write, [carry.liquids0], this.arg('carry liquids 0', [carry.n, this.N, 0, 0]));
+      this.liquids0.swap();
+      this.run(pass, 'carryArea', this.liquids1.write, [carry.liquids1], this.arg('carry liquids 1', [carry.n, this.N, 0, 0]));
+      this.liquids1.swap();
+      this.liquidsLive = true;
+    }
     pass.end();
     const same = (from: GPUTexture | null, to: PingPong) => {
       if (!from || from.width !== to.size[0] || from.format !== to.format) return false;
@@ -1098,6 +1162,140 @@ export class FluidInputs extends FluidPasses {
     if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
     this.submit(enc);
     return true;
+  }
+
+  private snapshotTargets(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): SnapshotTargets {
+    return {
+      device: this.device,
+      n: this.N,
+      m: this.M,
+      disposed: this.disposed,
+      submit: (enc) => this.submit(enc),
+      dye: this.dye,
+      vel: this.vel,
+      velForced: this.velForced,
+      squeeze: this.squeeze,
+      cur: this.cur,
+      swirl: this.swirl,
+      phase: this.phase,
+      mix: this.mix,
+      ensureMix: () => this.ensureMix(),
+      oilDye: this.oilDye,
+      ensureOilDye: () => this.ensureOilDye(),
+      liquids0: this.liquids0,
+      liquids1: this.liquids1,
+      species: this.species,
+      ensureSpecies: () => (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species')),
+      chem: this.chem,
+      activeMat: this.activeMat,
+      rxn: this.rxn,
+      ensureRxn: () => this.ensureRxn(),
+      lies: this.lies,
+      ensureLies: () => this.ensureLies(),
+      boilAlpha: this.boilAlpha,
+      ensureBoilAlpha: () => (this.boilAlpha ??= new PingPong(this.device, this.disposer, [this.N, this.N], RG32, 'boil alpha')),
+      film: this.film,
+      ensureFilm: () => this.ensureFilm(),
+      hsGap: this.hsGap,
+      hsP: this.hsP,
+      hsP2: this.hsP2,
+      ensureThinGap: () => this.ensureThinGap(),
+      scalars: {
+        phaseLive: this.phaseLive,
+        mixLive: this.mixLive,
+        oilPoured: this.oilPoured,
+        oilDyeStale: this.oilDyeStale,
+        bodiesWanted: this.bodiesWanted,
+        oilLayPending: this.oilLayPending,
+        liquidsLive: this.liquidsLive,
+        speciesLive: this.speciesLive,
+        speciesClears: this.speciesClears,
+        speciesPoured: this.speciesPoured,
+        speciesSnap: this.speciesSnap,
+        speciesDisp: this.speciesDisp,
+        lastSpeciesCarry: this.lastSpeciesCarry,
+        chemLive: this.chemLive,
+        reagentLive: this.reagentLive,
+        rxnLive: this.rxnLive,
+        liesLive: this.liesLive,
+        swirlLive: this.swirlLive,
+        swirlTail: this.swirlTail,
+        boilLive: this.boilLive,
+        boilFresh: this.boilFresh,
+        boilTail: this.boilTail,
+        airPush: this.airPush,
+        airCover: this.airCover,
+        airCoverPrev: this.airCoverPrev,
+        airQuietSeconds: this.airQuietSeconds,
+        filmLaid: this.filmLaid,
+        grainAge: this.grainAge,
+        heatSeconds: this.heatSeconds,
+        coverGap: this.coverGap,
+        lastCurve: this.lastCurve,
+        thinLive: this.thinLive,
+        hsPrimed: this.hsPrimed,
+        phaseGapPrimed: this.phaseGapPrimed,
+        glassFlow: this.glassFlow,
+        ...cover,
+      },
+    };
+  }
+
+  protected captureFieldSnapshot(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): FieldSnapshot | null {
+    return captureFluidSnapshot(this.snapshotTargets(cover));
+  }
+
+  protected applyFieldSnapshot(snap: FieldSnapshot): SnapshotScalars | null {
+    if (!restoreFluidSnapshot(this.snapshotTargets({
+      cover: null, coverMl: 0, coverPoured: 0, coverLaid: 0,
+    }), snap)) return null;
+    const s = snap.scalars;
+    this.phaseLive = s.phaseLive;
+    this.mixLive = s.mixLive;
+    this.oilPoured = s.oilPoured;
+    this.oilDyeStale = s.oilDyeStale;
+    this.bodiesWanted = s.bodiesWanted;
+    this.oilLayPending = s.oilLayPending;
+    this.liquidsLive = s.liquidsLive;
+    this.speciesLive = s.speciesLive;
+    this.speciesClears = s.speciesClears;
+    this.speciesPoured = s.speciesPoured ? { ...s.speciesPoured } : null;
+    this.speciesSnap = s.speciesSnap
+      ? { L: s.speciesSnap.L, data: new Float32Array(s.speciesSnap.data), poured: { ...s.speciesSnap.poured } }
+      : null;
+    this.speciesDisp = s.speciesDisp;
+    this.lastSpeciesCarry = s.lastSpeciesCarry;
+    this.chemLive = s.chemLive;
+    this.reagentLive = s.reagentLive;
+    this.rxnLive = s.rxnLive;
+    this.liesLive = s.liesLive;
+    this.swirlLive = s.swirlLive;
+    this.swirlTail = s.swirlTail;
+    this.boilLive = s.boilLive;
+    this.boilFresh = s.boilFresh;
+    this.boilTail = s.boilTail;
+    this.airPush = s.airPush;
+    this.airCover = s.airCover;
+    this.airCoverPrev = s.airCoverPrev;
+    this.airQuietSeconds = s.airQuietSeconds;
+    this.air?.setBoilAlpha(this.boilLive && this.boilAlpha ? this.boilAlpha.read : null);
+    this.filmLaid = s.filmLaid;
+    this.grainAge = s.grainAge;
+    this.heatSeconds = s.heatSeconds;
+    this.coverGap = s.coverGap;
+    this.lastCurve = s.lastCurve;
+    this.thinLive = s.thinLive;
+    this.hsPrimed = s.hsPrimed;
+    this.phaseGapPrimed = s.phaseGapPrimed;
+    this.glassFlow = [s.glassFlow[0], s.glassFlow[1]];
+    this.printLive = false;
+    this.videoPending = false;
+    this.rbDyeSeq = -1;
+    return s;
   }
 
   /** One frame of the drain: inward spiral, transport, evaporate. */

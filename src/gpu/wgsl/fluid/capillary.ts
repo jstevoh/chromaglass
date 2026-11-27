@@ -353,7 +353,7 @@ fn sampleAt(g: vec2f, n: f32) -> vec3f {
     from the centre, downhill, where a standing plate goes out of view; or,
     where the wax is the oil, the warm glass floor (LAMP_GLASS) it lies on.
   */
-  mixForce: `${HEAD}${CAPILLARY}
+  mixForce: `${HEAD}${CAPILLARY}${RIM_SIDE}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
@@ -380,8 +380,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var v = textureLoad(vel, p, 0);
   var capillary = capillaryAt(p, n);
   // On a thin gap, the rim held at the oil's own pressure (CAPILLARY says why).
+  // Past the open rim there is no cover glass and no pressure solve (hsPrep
+  // holds p = 0 there): a body straddling the rim must not feed an unopposed
+  // trough capillary force into hsDivergence, which raised pressure inside the
+  // rim and pumped an unpoured lens out over it (PLAN 19ak-24d).
   if (S.thinGap > 0.5) {
-    capillary -= 0.5 * vec2f(rimHeld(p + vec2i(1, 0), n) - rimHeld(p - vec2i(1, 0), n), rimHeld(p + vec2i(0, 1), n) - rimHeld(p - vec2i(0, 1), n));
+    if (rimSide(p, n)) {
+      capillary = vec2f(0.0);
+    } else {
+      capillary -= 0.5 * vec2f(rimHeld(p + vec2i(1, 0), n) - rimHeld(p - vec2i(1, 0), n), rimHeld(p + vec2i(0, 1), n) - rimHeld(p - vec2i(0, 1), n));
+    }
   }
   let wax = textureLoad(dye, p, 0).a;
   let oil = textureLoad(mix, p, 0).r;

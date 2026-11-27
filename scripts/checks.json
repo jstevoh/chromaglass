@@ -168,6 +168,17 @@
       ]
     },
     {
+      "name": "Keep Full tops up a dish left running, and only when it runs low",
+      "shard": "logic",
+      "run": "npm run keepfull",
+      "why": [
+        "The owner left Lava Pop running with Evolve off and the plate emptied (PLAN 18a-22).",
+        "Keep Full's sums in node: an empty dish gets a full drop, paced, a full one nothing,",
+        "topped up from 80% to 95% of the look's amount; and its wiring: only with the switch",
+        "on, through the hand's own Drop on its own dice, a room key, on every surface."
+      ]
+    },
+    {
       "name": "The desk's layouts",
       "shard": "logic",
       "run": "npm run desklayout",
@@ -235,6 +246,20 @@
       ]
     },
     {
+      "name": "The controller's pads play the liquid",
+      "shard": "logic",
+      "run": "npm run padhits",
+      "why": [
+        "PLAN 30c (scripts/padhits.mjs, lib/padHits.ts, lib/padLayouts.ts): the owner asked for",
+        "pads that act while held, rows combining colour, liquid and tool, and faders and knobs",
+        "that relate. A held Drip drips (Tate's drop, the squeeze over the viscosity) and stops",
+        "on note-off; Pour, Spray, Press, Blow and Stir act every tick while held and never after;",
+        "Splatter's flicks fade; the three pad layouts each answer tool, liquid and colour for all",
+        "40 pads and keep every binding off the grid; each APC40 column's knob and fader are one",
+        "pair; aftertouch parses and a map with pads survives a save. `--break` must go red."
+      ]
+    },
+    {
       "name": "The spun dish",
       "shard": "logic",
       "run": "npm run spinslosh",
@@ -270,7 +295,7 @@
     {
       "name": "What the clear controls left, owed",
       "shard": "logic",
-      "run": "npm run clearleft -- --owed=pace,spin,tray,dimmed",
+      "run": "npm run clearleft -- --owed=pace,spin,tray",
       "why": [
         "PLAN 35a-2, 35d-2, 35f-2, 35g-2 written ahead of their build (scripts/clearleft.mjs):",
         "the remote's Speed and Evolve Speed draw the snail and hare, Auto Spin and",
@@ -380,6 +405,21 @@
         "timeout cleanup, CG_FILM_LOCK_HELD nesting, stale-rename race protection,",
         "--max-wait exit 75 with no leftover ticket, deploy-mark priority, and",
         "scripts/macbusy.sh refusing a live film.lock."
+      ]
+    },
+    {
+      "name": "The parity run compares numbers, not noise",
+      "shard": "logic",
+      "run": "npm run sameapp -- --selftest",
+      "why": [
+        "The nightly main-against-branch comparison (scripts/sameapp.mjs, PLAN.md 50i)",
+        "on made-up sweeps, no browser: the same numbers give nothing, a change the",
+        "size of noise gives nothing, a look darker at one moment only gives nothing,",
+        "and each regression a merge could make gives its line (a look darker at both",
+        "moments, half its frame rate, a dial that stopped moving its setting or",
+        "reaching the plate, a look gone, a new finding); a noisy night raises only",
+        "the floor it is noisy on, and the launchd agent runs main's script from its",
+        "own clone. The run itself is a report on the owner's Mac, never a gate."
       ]
     },
     {
@@ -893,6 +933,14 @@
         "The back plate's own look (PLAN.md §16a): the fold hands plate 1 the",
         "look's solver keys under the live patches and leaves the picture the",
         "front's, the fade is a Go's, Follow lets go, and the pours are wired."
+      ]
+    },
+    {
+      "name": "Which looks carry trapped air",
+      "shard": "logic",
+      "run": "npm run lookair",
+      "why": [
+        "Air on by default only in the looks made for it, the clock-glass sandwich (PLAN 33q-4, scripts/lookair.mjs)."
       ]
     },
     {
@@ -1845,6 +1893,18 @@
       ]
     },
     {
+      "name": "The colour's carry spreads it the same whichever way the flow crosses the grid",
+      "shard": "lab2",
+      "run": "npm run gridiso",
+      "why": [
+        "PLAN.md 18a-8 and 18c-8 (scripts/gridiso.mjs): a thin ring on Galaxy's gap turned two",
+        "hundred steps by a fast solid swirl widens evenly (the fourfold part of its gained",
+        "variance under 0.27: 0.331 with unsplit faces, 0.218 with the corner's transverse",
+        "share) and no more than 0.33 cells, keeping its colour; a small clear drop's window",
+        "opens round. About a minute on SwiftShader (cloud, 2026-11-27)."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
@@ -2556,7 +2616,7 @@
     {
       "name": "The Live Show panel",
       "shard": "browser2",
-      "run": "npm run liveshow -- --owed=narrow",
+      "run": "npm run liveshow",
       "why": [
         "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
         "its sums in node against numbers worked by hand, then the built app",
@@ -2565,8 +2625,8 @@
         "the public, the upload warning, and the phone's Stop. No GPU: the",
         "encoder is WebCodecs' software H.264. Through npm run, which builds",
         "dist/ first and puts esbuild on the PATH (a bare esbuild in the",
-        "shard's shell is not found: exit 127 on the first CI run). The narrow",
-        "window's chip (37x-4d-4, scripts/liveshownarrow.mjs) is owed until built."
+        "shard's shell is not found: exit 127 on the first CI run). Narrowed to",
+        "900 x 800 the folded desk keeps the panel live (49c-3, scripts/liveshownarrow.mjs)."
       ]
     },
     {
@@ -3020,7 +3080,7 @@
     {
       "name": "A held press moves only its own neighbourhood",
       "shard": "plate",
-      "run": "npm run heldpress -- --owed=presstwist",
+      "run": "npm run heldpress",
       "why": [
         "A press held in one place (each bubble's) moves the liquid around it,",
         "not the whole plate: the projection's source sums to zero exactly."
@@ -3076,6 +3136,16 @@
       ]
     },
     {
+      "name": "A light press is round, not the grid's facets",
+      "shard": "plate",
+      "run": "npm run pressfacets",
+      "why": [
+        "A light press on a thin gap lays its bowl as a smooth plate contact",
+        "patch at the solver's own resolution: the bowl is as deep as asked,",
+        "and its curvature carries no creases one CPU cell apart (PLAN 18a-14)."
+      ]
+    },
+    {
       "name": "The Finger drags the liquid",
       "shard": "plate",
       "run": "npm run fingerflow",
@@ -3119,7 +3189,9 @@
         "The plate's forces as forces on a thin gap (PLAN 18a-2): a body force",
         "(Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity",
         "says, Glass Smear is the glass sliding and Updraft a draught's shear,",
-        "each against the old reading it replaced."
+        "each against the old reading it replaced. And two dyes in one water",
+        "mix with no force between them, Hold Apart past that a tension that",
+        "rounds a pool and leaves a straight edge alone (PLAN 18d-6)."
       ]
     },
     {
@@ -3136,6 +3208,41 @@
         "On tools since PLAN 19k: plate ran 19.1 to 20.4 minutes on the PR runs of",
         "2026-10-26 against its 20, and #502's was stopped there with one check left;",
         "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14."
+      ]
+    },
+    {
+      "name": "A pour off the screen's edge flows into the picture",
+      "shard": "plate",
+      "run": "npm run edgepour",
+      "timeout": 6,
+      "why": [
+        "Pouring past the edge (PLAN 18a-18): the bottle's tools in the screen's",
+        "edge band land on the dish past the picture, the rest of the screen",
+        "exactly as before, and the lab holds that a held pour there comes into",
+        "view by its own volume (none in view without it)."
+      ]
+    },
+    {
+      "name": "The draught keeps the dish's liquid in the dish",
+      "shard": "plate",
+      "run": "npm run draught",
+      "timeout": 6,
+      "why": [
+        "Air between two glasses (PLAN 18a-16): a uniform shear laid into the",
+        "open-rim solve slid Solar Flare's whole dish out over its rim (0% of",
+        "its dye left in the lab); a closed dish answers it with its pressure,",
+        "so only the gusts' curl moves the liquid, as strong as before."
+      ]
+    },
+    {
+      "name": "Keep Full refills an emptied dish in the app",
+      "shard": "plate",
+      "run": "npm run keepfullapp",
+      "timeout": 8,
+      "why": [
+        "Lava Pop on Metal (PLAN 18a-22): left alone it keeps its dye (the leak printed as a",
+        "half-life), a cleared dish stays empty with Keep Full off, and with it on the",
+        "dropper brings it back to 60% of the look's amount by its own drops, then stops."
       ]
     },
     {
@@ -3272,7 +3379,7 @@
       "run": "npm run filmlook",
       "why": [
         "Film Physics on the plate: nothing but the film changes; the projector's bubbles take the",
-        "faint tint the light through a film is, the closeup's the soap's own reflected gold."
+        "faint tint the light through a film is, the closeup's the light through the film too, at every Film Physics (38h-6)."
       ]
     },
     {
@@ -3515,6 +3622,19 @@
       ]
     },
     {
+      "name": "The oil's colour rides the oil",
+      "shard": "plate",
+      "run": "npm run oilride",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-29: Classic's colours washed out under a hand. With Oil Bodies",
+        "on a thin gap, Beat Squeeze kicks and Plate Rock for five seconds: the",
+        "oil keeps its share of the dye (main handed 0.54% of it to the water),",
+        "inside the oil, none stranded in open water, no oil made or lost.",
+        "About six minutes on software WebGPU at 192²."
+      ]
+    },
+    {
       "name": "Oil and water as bodies",
       "shard": "plate",
       "run": "npm run bodies",
@@ -3569,6 +3689,19 @@
         "pixel is above the lamp, the condenser's colour edge is the law's, and",
         "a second bulb adds light. Beside `lamp` in the open shard, about a",
         "minute on SwiftShader."
+      ]
+    },
+    {
+      "name": "The projector bank",
+      "shard": "open",
+      "run": "npm run projectors",
+      "why": [
+        "Projectors that blend on the wall (PLAN 51a): a lamp on its variac dims",
+        "as v^3.4 and warms as v^0.42, a shutter at the lens dims the whole picture",
+        "evenly by the pupil's uncovered segment, two projectors add in linear",
+        "light, and the A/B crossfade keeps the wall's mean light linear in its",
+        "travel. The defaults multiply nothing, to the byte. Beside `lampfield`",
+        "in the open shard."
       ]
     },
     {
@@ -3934,6 +4067,21 @@
         "opening's check, so a timing check never follows four minutes of",
         "renders: with this one before it, startup's first frame waited 2.27 s",
         "on two of the PR's runs, against 1.65-2.00 s on other PRs' runs."
+      ]
+    },
+    {
+      "name": "The closeup's fine dye draws threads from the flow",
+      "shard": "open",
+      "run": "npm run finedye",
+      "timeout": 8,
+      "why": [
+        "The closeup's fine dye (PLAN 47a, gpu/fineDye.ts): at 6x Fine Detail",
+        "raises fine over coarse more on a stirred swirl than on still dye, the",
+        "rise is structure on the dye's edges and not grain, every dyed cell",
+        "keeps the grid's thickness, a still pool grows no texture, and at 1x",
+        "nothing runs. The lab only, beside macroview on the runner's own",
+        "adapter: 600 steps and eight 768-pixel frames, minutes on SwiftShader",
+        "and seconds on Metal."
       ]
     },
     {

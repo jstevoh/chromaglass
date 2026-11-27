@@ -38,7 +38,9 @@ import { BEAD_SHAPE_WGSL } from './beadShape';
 import { FILM_DYE_WGSL } from './filmDye';
 import { FILM_FRAME_WGSL } from './plateFilm';
 import { LAMP_MIX_WGSL } from './plateLamp';
+import { PROJECTOR_WGSL } from './projectors';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
+import { FINE_WINDOW_WGSL } from './fineWindow';
 import { SLOPE_WGSL } from './plateSlope';
 
 /** Bindings every plate shader shares. */
@@ -191,6 +193,7 @@ fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t
 var<private> lampBg: vec3f = vec3f(1.0);
 var<private> milkScatter: f32 = 0.0;
 var<private> milkGap: f32 = 1.0;
+${PROJECTOR_WGSL}
 
 /**
  * Milky liquids scatter light (Mie / Kubelka-Munk, PLAN 18j).
@@ -229,13 +232,13 @@ fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
     painted = mix(effBg, f.rgb, f.a);
   }
   if (U.lampGround <= 0.001) { return painted; }
-  return mix(painted, lampBg * through, U.lampGround);
+  return onWall(mix(painted, lampBg * through, U.lampGround));
 }
 
 /* The bare ground, where no plate is: the black one, the lamp, or between. */
 fn groundOf(bg: vec3f) -> vec3f {
   if (U.lampGround <= 0.001) { return bg; }
-  return mix(bg, lampBg, U.lampGround);
+  return onWall(mix(bg, lampBg, U.lampGround));
 }
 
 /*
@@ -1333,7 +1336,7 @@ export function plateWgsl(main: string, bindings = DISPLAY_BINDINGS): string {
   // binds its own shorter list has no `parts0` for it to read. It goes after
   // MACRO because WGSL wants a function declared before it is called and
   // `decodeFluidDof`, which it falls back to, is declared in there.
-  const particles = bindings === DISPLAY_BINDINGS ? PARTICLE_FOLD : '';
+  const particles = bindings === DISPLAY_BINDINGS ? FINE_WINDOW_WGSL + PARTICLE_FOLD : '';
   // The closeup's ferrofluid drop reads the packed flow and the dye, so it comes with the display's own bindings.
   const view = bindings === DISPLAY_BINDINGS ? VIEW + FERRO_DROP_WGSL : '';
   return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${particles}${view}${FINISH_WGSL}${VERT}${main}`;
@@ -1687,12 +1690,11 @@ ${VIEW_OPTICS}
 
   **In the dye's own space, before the decode, and that is the whole point.**
   The first version folded after it and washed the plate out to a pale cyan,
-  for a reason worth writing down: what comes back from `decodeFluid` is
+  because what comes back from `decodeFluid` is
   `lt`, the light *transmitted* through the dye, and an opacity already put
   through `1 − exp(−thickness)`. A particle carries the opposite — a per
-  channel *absorbance*, which is what the raw texture stores. Mixing one into
-  the other is not a wrong weighting, it is a category error, and it looks
-  exactly like one.
+  channel *absorbance*, as the raw texture stores. Mixing the two is
+  a category error, and it looks like one.
 
   So the fold happens on the raw sample. The splat holds the sum of every
   particle that landed on a texel: its carried spectrum times its weight in
@@ -1702,18 +1704,16 @@ ${VIEW_OPTICS}
   an encoded rgb that decodes through the same Beer–Lambert path as anything
   else on the plate.
 
-  Two things come out of it. The spectrum is pulled toward what the particles
+  Two things follow. The spectrum is pulled toward what the particles
   carry, which is the part that does not smear: a filament the grid has
   blurred away is still a line of particles holding the colour they were born
   with. And the total is modulated by how they have piled up, mean preserving
   — `cov − 1` is zero where coverage is what it should be — so the plate
-  gains structure at the texel scale without getting brighter or dimmer
-  overall. The modulation is gentle because `raw.a` is the *square root* of
+  gains structure at the texel scale and no brightness. The modulation is gentle because `raw.a` is the *square root* of
   density (`decodeDensity` squares it), so a tenth here is a fifth of the
   density it stands for.
 
-  Gated on weight rather than on the setting, because a texel with nothing on
-  it has nothing to say and dividing by its zero would say it loudly.
+  Gated on weight, not the setting: an empty texel would divide by zero.
 */
 export const PARTICLE_FOLD = /* wgsl */ `
 fn foldRaw(raw: vec4f, pt: texture_2d<f32>, uv: vec2f) -> vec4f {
@@ -1745,29 +1745,26 @@ fn foldRaw(raw: vec4f, pt: texture_2d<f32>, uv: vec2f) -> vec4f {
 }
 
 /*
-  The decode, with the particles in it.
-
-  It fetches what decodeFluidDof would have fetched — bicubic and the gooey
-  blur below the defocus threshold, five taps above it — folds, and hands the
-  result to the shared tail. Off, it is decodeFluidDof and nothing else, so
-  a look with no particles goes down exactly the path it always did.
-
-  The neighbour samples that lacing, the edge and the relief take are left on
-  the plain decode: they are asking about the dye's shape, and a boundary
-  found on particle speckle would be a noisy boundary rather than a finer one.
+  The decode, with the particles in it, or in the closeup the front plate's
+  fine dye detail, which takes their slot (fineWindow.ts). It fetches what
+  decodeFluidDof would (bicubic and the gooey blur, or five defocus taps),
+  folds or adds, and decodes. With neither it is decodeFluidDof. Lacing, the
+  edge and the relief keep the plain decode: they ask about the dye's shape.
 */
-fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
-  if (U.particles <= 0.001) { return decodeFluidDof(t, fuv, blurFluid, useBlur, dof); }
+fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32, layer: i32) -> vec4f {
+  let fine = layer == 0 && U.fineWin.z > 0.0;
+  if (U.particles <= 0.001 && !fine) { return decodeFluidDof(t, fuv, blurFluid, useBlur, dof); }
   var raw: vec4f;
-  if (dof < 0.02) {
+  let r = select(dof * 0.022 / (1.5 * U.camZoom), 0.0, dof < 0.02);
+  if (r == 0.0) {
     raw = textureBicubic(t, fuv);
     if (useBlur) { raw.a = blurAlpha(t, fuv, blurFluid); }
   } else {
-    let r = dof * 0.022 / (1.5 * U.camZoom);
     raw = (tex2(t, fuv)
          + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0))
          + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
   }
+  if (fine) { return decodeFluidRaw(fineRaw(raw, pt, fuv, r)); }
   return decodeFluidRaw(foldRaw(raw, pt, fuv));
 }
 
@@ -2218,7 +2215,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   gapScale *= 1.0 - view.film;
   let layerGap0 = gapScale;
   filmWater = 1.0 - view.film;
-  var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
+  var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof, 0);
   gapScale = 1.0;
   filmWater = 1.0;
   // What the lamp gets through, and the decode it came with (onGround).
@@ -2382,7 +2379,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // One line each, as scripts/lampcontrol.mjs finds them (a video in the lamp
   // always has a lamp ground, plateUniforms.ts, so its bend needs no test of it).
   if (videoInLamp() && sharp0 && !isCamera && U.derivedOn > 0.5 && U.dishSpread <= 0.001) { lampBend = lampBendAt(fuv0, c0, s0); }
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); }
   /*
     No substrate grain and no contact shadow (PLAN 38u-2). Until 2026-11-13
     the closeup laid a paper's fibre over the ground (value noise at 230
@@ -2400,9 +2397,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     Depth up close is the camera's own: its depth of field (Depth / Focus,
     still) and the shadowgraph of the liquid's curvature (Relief / 3D).
     The screen's lamp is kept apart for the second projector's beam, which
-    meets the screen and never the front plate (PLAN 18b-10).
+    meets the screen and never the front plate (PLAN 18b-10); each lamp has
+    its projector's gain (PLAN 51a, projectors.ts).
   */
-  let lampScreen = lampBg;
+  let lampScreen = projectorLamps();
 
   var outColor = bgColor;
   if (U.photo > 0.5) {
@@ -2827,7 +2825,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (closeup) {
       flow1 = fluidFlow(vel1, fuv1) * macroAmt;
     }
-    var fluid1 = decodeFluidParts(layer1, parts1, fuv1, blurFluid, useBlur, dof);
+    var fluid1 = decodeFluidParts(layer1, parts1, fuv1, blurFluid, useBlur, dof, 1);
     let through1 = dyeThrough;
     let tint1 = fluid1.rgb;
     let alpha1 = fluid1.a;
@@ -2937,14 +2935,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
-        On a lamp ground, when Two Projectors is on (PLAN 18b-10), the plates are
-        separate projectors: their light adds on the screen, each filtered by its
-        own plate from a lamp dimmed to half (lampScreen, kept before the front
-        plate's contact shadow). Halving each lamp is an exposure normalisation
-        shortcut so clear glass stays at one lamp's level; outside the back plate's
-        disc its share of the lamp's path (dish1.x times the grain's factor, what
-        lampMore1 held before PLAN 18e) is 0, so the second projector still lights
-        the screen there.
+        On a lamp ground with Two Projectors (PLAN 18b-10, 51a) the plates are
+        two projectors, each through its own plate from its own lamp, added in
+        linear light (projectors.ts). Outside the back plate's disc its filter
+        is 1 (PLAN 18e), so the second projector still lights the screen there.
         For other looks, they are stacked dishes on one lamp: a second filter in the
         light's path. A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
         The grain is pigment, T^grain, as on the front plate (PLAN 38h-4): this
@@ -2956,7 +2950,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let filt1 = throughScaled(t1, dish1.x * lampGrain1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         var lit1 = outColor * filt1;
         if (U.twoProjectors > 0.5 && U.layerCount > 1) {
-          lit1 = outColor + lampScreen * filt1;
+          wallB = lampScreen * filt1;
+          lit1 = wallAdd(outColor, wallB);
         }
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
@@ -3322,6 +3317,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Over both plates: the film projector, and whatever else the mixer put there ──
+  if (U.projA.w < 0.5) { outColor *= U.projA.rgb; }
   outColor = mixSourcesAt(polar(outColor, fuv0), U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
 
   // ── Lamp warmth ──────────────────────────────────────────────────

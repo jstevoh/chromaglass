@@ -53,10 +53,6 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   the two looks that set it, Crowd Plate with its `dirX` patch and Soap Film), or give it a real
   thing that moves, such as the gel wheel's hand.
 
-- ~~**38b-2. An Air Dissolves dial**~~ **Shipped** as **Bubble Melt** (the owner, 2026-10-31:
-  "a bubble dial for them to melt away"): a factor on air's diffusivity in the Henry's-law
-  shrink, 1 at 0, then 10^(6 + 5v), very gentle to very extreme (`meltFactor`, `lib/bubbles.ts`); Settings → Look, desks,
-  MIDI, patches, the phone. `npm run bubblephysics` 28/28. Story in `docs/plan-shipped.md` §38b-2.
 - **38b-3. Music air reaches the rim** (S; Medium). With no clock a look's bubbles hold at its
   Bubbles count (`room` in `LiquidVisualizer.tsx`) and new ones come only as old ones leave,
   so how fast they turn over is now how fast the flow takes them to the rim and how often they
@@ -484,7 +480,7 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
       checks written 2026-11-08*. ~~**G1** (the ledger and the pinch, `npm run gap` lines 1–23,
       `puddle`, `settle`, `lift`, `pinch` all green)~~ built on `antigravity/38r-16-pinch`
       (Liquid range 1–150 mL, `lib/cover.ts` puddle ledger + RK4 substepping, `lib/playGesture.ts`
-      `pinchHand`/`PINCH_SPAN`/`playHand` span, `components/coverPinch.ts`, `PhonePlay.tsx`).
+      `pinchHand`/`PINCH_SPAN`/`playHand` span, `engine/coverPinch.ts`, `PhonePlay.tsx`).
       **G2** (`npm run airedge -- --owed=rim,front,fingers`, the Saffman–Taylor fingers on the
       GPU solver) remains open.
       - *The pinch.* A two-finger pinch on the desk (trackpad: wheel + ctrlKey over the plate,

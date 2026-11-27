@@ -41,14 +41,14 @@ export function RemotePourText({ send, connected, trackName }: {
   return (
     <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-pour-text">
       <div className="mb-3 flex items-center justify-between">
-        <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+        <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
           <Type size={15} /> Song title
         </span>
         {trackName && (
           <button
             onClick={() => setText(trackName)}
             disabled={!connected}
-            className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60 disabled:opacity-30"
+            className="min-h-11 min-w-11 rounded-full border border-white/10 px-3.5 text-[12px] font-bold uppercase tracking-widest text-text-2 disabled:opacity-65"
             data-testid="remote-pour-text-track"
           >
             This song
@@ -67,7 +67,7 @@ export function RemotePourText({ send, connected, trackName }: {
       <button
         onClick={show}
         disabled={!connected || !card}
-        className={`flex min-h-12 w-full items-center justify-center rounded-2xl border text-[11px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-30 ${LIT}`}
+        className={`flex min-h-12 w-full items-center justify-center rounded-2xl border text-[12px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-65 ${LIT}`}
         data-testid="remote-pour-text-go"
       >
         {card ? `Show ${[card.title, card.artist].filter(Boolean).join(' / ').slice(0, 40)}` : 'Show'}

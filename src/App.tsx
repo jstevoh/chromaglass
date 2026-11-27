@@ -9,10 +9,9 @@ import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
 import { RailZoom } from './components/RailZoom';
-import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
-import { GuidePanel } from './components/GuidePanel';
+import { CommandAndShortcuts } from './components/ShortcutSheet';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { CastNetworkItems, TvAsks } from './components/CastNetworkItems';
@@ -23,7 +22,6 @@ import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './li
 import { travelOfKey, valueOfKey } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
-import { CommandPalette } from './components/desk/CommandPalette';
 import { SoundPanel } from './components/SoundPanel';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
@@ -37,14 +35,16 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
 import { clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS, findPreset, livePresetId, NEW_LOOK } from './presets';
+import { PRESETS, findPreset, NEW_LOOK } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
 import { BenchOverlay } from './components/BenchOverlay';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { ProjectorFillChip } from './components/ProjectorFillChip';
-import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
+import { PhoneStage } from './components/phone/PhoneStage';
+import { useLookLists } from './app/useLookLists';
+import { useLookThumbCapture } from './app/useLookThumbCapture';
 import { PhonePlay } from './components/phone/PhonePlay';
 import { PHONE_OFF_KEY } from './lib/phone';
 import { useDeviceTilt } from './hooks/useDeviceTilt';
@@ -93,24 +93,6 @@ const DRIFT_STEP_MS = 500;
  */
 const RIDE_VIEW_MS = 100;
 
-// Detect which preset (if any) matches the current settings. Only the look is
-// compared: a look does not set the room (see RIG_KEYS).
-function detectActivePreset(settings: VisualizerSettings): string | null {
-  for (const preset of PRESETS) {
-    const ps = preset.settings;
-    const match = Object.keys(ps).filter(key => !RIG_KEYS.has(key as keyof VisualizerSettings)).every(key => {
-      const pv = (ps as any)[key];
-      const sv = (settings as any)[key];
-      if (typeof pv === 'object' && pv !== null) {
-        return JSON.stringify(pv) === JSON.stringify(sv);
-      }
-      return pv === sv;
-    });
-    if (match) return preset.id;
-  }
-  return null;
-}
-
 import AccountSheet from './components/AccountSheet';
 import { LIT, LIVE } from './components/ui';
 import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
@@ -125,6 +107,8 @@ import { usePour } from './app/usePour';
 import { useSoundSource } from './app/useSoundSource';
 import { useBench } from './app/useBench';
 import { useToast } from './app/useToast';
+import { usePlateUndo } from './app/usePlateUndo';
+import { AppToast } from './components/ui/AppToast';
 import { useFilm } from './app/useFilm';
 import { useSceneSource } from './app/useSceneSource';
 import { usePaletteLock } from './app/usePaletteLock';
@@ -155,20 +139,7 @@ import { useControllers } from './app/useControllers';
 import { useCommandPalette } from './app/useCommandPalette';
 import { useCheckHooks } from './app/useCheckHooks';
 import { useCrashState } from './app/useCrashState';
-import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSettings, randomLook } from './app/shared';
-
-const hasAccountOrLicenseUI =
-  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
-  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
-  (typeof window !== 'undefined' &&
-    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
-      new URLSearchParams(window.location.search).get('tierGates') === '1'));
-
-const isProfileRoute = () =>
-  typeof window !== 'undefined' &&
-  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
-    new URLSearchParams(window.location.search).has('profile') ||
-    new URLSearchParams(window.location.search).has('unsubscribe'));
+import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSettings, randomLook, detectActivePreset, hasAccountOrLicenseUI, isProfileRoute } from './app/shared';
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
@@ -238,6 +209,7 @@ export default function App() {
     musicInputRef, musicCtxRef,
   } = useSoundState();
   const [showControls, setShowControls] = useState(true);
+  const [phoneMoreOpen, setPhoneMoreOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   /** Which section the panel should open at, when it was opened from a ⌘K row. */
   const [settingsSection, setSettingsSection] = useState<string | null>(null);
@@ -300,7 +272,8 @@ export default function App() {
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
   // The tool, its amount and the plate in hand (app/useHand.ts).
-  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = useHand();
+  const hand = useHand();
+  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = hand;
   // The shelf: the bottles the app ships, then any someone made (lib/liquidFile.ts).
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]);
   useEffect(() => { saveCustomLiquids(liquidTypes); }, [liquidTypes]);
@@ -440,7 +413,7 @@ export default function App() {
 
   const {
     fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
-    pourName, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
+    pourName, live, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
   } = usePour({
     visualizerRef,
   });
@@ -530,13 +503,13 @@ export default function App() {
     setSettings,
   });
 
-  const { toast, setToast } = useToast({ setToastRef });
+  const { toastItem, setToast, showToast, triggerToastAction } = useToast({ setToastRef });
 
   const {
     filmSource, filmName, loadFilm, cameras, filmCameraId, filmCamera, filmCameraLost,
     startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, video,
   } = useFilm({
-    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour,
+    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour, live,
   });
 
   const {
@@ -1002,6 +975,12 @@ export default function App() {
     setDocDirty(false);
     setToast(`Saved over “${saved.name}”`);
   };
+  const replaceLookById = (id: string, name: string, description = '', forSong = false) => {
+    const p = visualizerRef.current?.describePlate();
+    const s = userPresets.saveOver(id, settingsRef.current, p?.contract ?? null, p?.injectStyles ?? null, p?.liquids ?? null);
+    if (!s) { saveCurrentPreset(name, description, forSong); return; }
+    setPinnedPresetId(s.id); setDocId(s.id); setDocDirty(false); setToast(`Saved over “${s.name}”`);
+  };
   /** A saved look taken out of the library; the plate keeps what is on it. */
   const deleteSavedLook = (id: string) => {
     userPresets.remove(id);
@@ -1029,7 +1008,6 @@ export default function App() {
     setDocId(null);
     setDocDirty(false);
     setCued(null);
-    setToast('Empty plate');
   };
   /** The song playing now, as a file would remember it. */
   const currentSong = useMemo<SongRef | null>(() => (musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null), [musicIntel.state.track]);
@@ -1387,50 +1365,9 @@ export default function App() {
     return typeof v === 'number' ? v : undefined;
   }, [lookValues]);
 
-  /**
-   * The cue list: the looks, in order, each carrying two of its own dyes so a
-   * row is recognisable without reading it. The live one is what is on the
-   * wall; the next one is whatever is armed.
-   */
-  const swatchOf = useCallback((presetId: string | undefined): string => {
-    const contract = !presetId ? null : isUserPresetId(presetId)
-      ? userPresetsRef.current.find(u => u.id === presetId)?.contract
-      : PRESET_CONTRACTS[presetId];
-    const [a, b] = contract && contract.length
-      ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
-      : ['#52525B', '#27272A'];
-    return `linear-gradient(135deg, ${a}, ${b})`;
-  }, []);
-  /*
-    The phone's list of looks: the preset menu's groups (the projected show,
-    the photographs, the closeups) and then the ones saved here, each with
-    the two colours the desks' cue rows show for it.
-  */
-  const phoneLooks = useMemo<PhoneLook[]>(() => {
-    const groupOf = (p: { id: string; settings: Partial<VisualizerSettings> }) =>
-      isUserPresetId(p.id) ? 'Yours' : p.settings.macroMode ? 'Closeup' : p.settings.renderStyle === 'photo' ? 'Photograph' : 'Light show';
-    const order = ['Light show', 'Photograph', 'Closeup', 'Yours'];
-    return allPresets
-      .map(p => ({ id: p.id, name: p.name, description: p.description, group: groupOf(p), swatch: swatchOf(p.id) }))
-      .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
-  }, [allPresets, swatchOf]);
+  const { swatchOf, phoneLooks, cues } = useLookLists({ allPresets, userPresetsRef, setList, fadeSeconds, sequences: () => sequencerRef.current?.sequences });
+  useLookThumbCapture(activePresetId);
   const setActive = setList.items.length > 0;
-  const cues = useMemo<Cue[]>(() => {
-    return setList.items.map(item => {
-      const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
-      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
-      const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
-      return {
-        id: item.id,
-        name,
-        swatch: swatchOf(look?.id ?? seq?.stages[0]?.presetId),
-        fade: item.fade ?? fadeSeconds,
-        song: item.song ? songLabel(item.song) : undefined,
-        kind: item.kind,
-        missing: item.kind === 'sequence' ? !seq : !look,
-      };
-    });
-  }, [allPresets, fadeSeconds, setList, swatchOf]);
   cuesRef.current = cues;
 
   /**
@@ -1552,11 +1489,15 @@ export default function App() {
     sequencerRef, setShowSongs, currentSong, rideKeys, settingsRef,
   });
 
-  const {
-    luckyArmed, setLuckyArmed, triggerLucky,
-  } = useLucky({
+  const { triggerLucky } = useLucky({
     settings, liquidTypes, previousLook, pinnedPresetId, settingsRef, lookTakesLevels, setSettings,
     setPinnedPresetId, visualizerRef, setSeedCount,
+  });
+  const { undoNotice, clearPlate, drainPlate, luckyPlate, newPlate, randomLookPlate, restorePlateUndo, showPanelClosedUndo } = usePlateUndo({
+    visualizerRef, settingsRef, pinnedPresetId, docId, docDirty, cued, liveItemId,
+    isAutomated, previousLook, setSettings, setPinnedPresetId, setDocId, setDocDirty,
+    setCued, setLiveItemId, setIsAutomated, setClearTrigger, setDrainTrigger, triggerLucky,
+    rawNewLook: newLook, goLookNow, showToast,
   });
 
   const {
@@ -1671,8 +1612,6 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'b' || e.key === 'B') toggleBlackout();
-      if (e.key === '?') setShowHelp(h => !h);
       macroKey(e, settingsRef.current, visualizerRef.current, zoomMacro, aimMacro);
       // The tool in hand's Amount, a step at a time, at any width.
       if (e.key === '[' || e.key === ']') {
@@ -1696,7 +1635,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
-  }, [toggleBlackout, zoomMacro, aimMacro]);
+  }, [zoomMacro, aimMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.
@@ -1776,9 +1715,9 @@ export default function App() {
       case 'spin-back':       flickPlate(1); break;
       case 'spin-reverse':    updateSettings({ spinRpm: -(settingsRef.current.spinRpm ?? 6) }); break;
       case 'spin-auto':       updateSettings({ spinAuto: (Math.round(settingsRef.current.spinAuto ?? 0) + 1) % 3 }); break;
-      case 'clear':           setClearTrigger(prev => prev + 1); break;
-      case 'drain':           setDrainTrigger(prev => prev + 1); break;
-      case 'lucky':           triggerLucky(); break;
+      case 'clear':           clearPlate(); break;
+      case 'drain':           drainPlate(); break;
+      case 'lucky':           luckyPlate(); break;
       case 'play-toggle':     setIsActive(v => !v); break;
       case 'automate-toggle': setIsAutomated(v => !v); break;
       case 'overlays-toggle': if (overlaysVisible) hideOverlays(); else setOverlaysVisible(true); break;
@@ -1838,8 +1777,8 @@ export default function App() {
     const c = PALETTE[((paletteIndex % PALETTE.length) + PALETTE.length) % PALETTE.length];
     updateLiquidColor(selectedLiquidId, c.hex);
   };
-  /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
-  const selectDye = (paletteIndex: number) => { colourDye(paletteIndex); };
+  /** A hand on a dye pad: the selected liquid takes a palette colour, as colourDye. */
+  const selectDye = colourDye;
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
@@ -1850,7 +1789,7 @@ export default function App() {
     allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
     updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
     cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypes, setSelectedLiquidId,
-    setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
+    setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky: luckyPlate, clearPlate, drainPlate, luckyPlate, undoNotice, restorePlateUndo, setIsAutomated,
     hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
     togglePerformance, goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName,
     runActionRef, runAction, tempoRef, oscOutHearRef,
@@ -1901,16 +1840,17 @@ export default function App() {
     selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
     blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
     visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
+    hand, setSelectedLiquidId,
   });
 
   const {
-    showPalette, setShowPalette, paletteCommands,
+    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands, openPanelNow,
   } = useCommandPalette({
     allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
-    blackout, toggleBlackout, newLook, saveLook, docId, docName, replaceLook, setSeedCount,
-    setClearTrigger, setDrainTrigger, isActive, setIsActive, isAutomated, setIsAutomated, settings,
+    blackout, toggleBlackout, newLook: newPlate, saveLook, docId, docName, replaceLook, setSeedCount,
+    setClearTrigger, setDrainTrigger, clearPlate, drainPlate, isActive, setIsActive, isAutomated, setIsAutomated, settings,
     updateSettings, recordingAny, recordChoice, toggleRecording, perfLive, togglePerformance,
-    setShowRecordPanel, triggerLucky, hideOverlays, setSettingsSection, setShowSettings,
+    setShowRecordPanel, triggerLucky: luckyPlate, hideOverlays, setSettingsSection, setShowSettings,
     setShowHelp, openAllSettings, setShowMidi, setShowSequencer, showActivity, setShowActivity,
     setShowSongs, startCast, deskTabs, setDeskTab, setShowStage, recorder, deskUp, sendToWallRef,
     setActiveTool, designing, cuesRef, cueAny,
@@ -1947,10 +1887,9 @@ export default function App() {
   /*
     Where each status dot goes.
 
-    One set of handlers rather than one per desk, for the same reason the
-    header itself is one component: Design and Perform must send you to the
-    same place from the same dot. Each closes whatever else is open, because
-    two panels over a plate is the state you cannot see the show through.
+    One set for both desks, as the header is one component: Design and
+    Perform send you to one place from one dot. Each closes what else is
+    open: two panels over a plate hide the show.
   */
   const openSettingsAt = useCallback((section: string) => {
     // An id from before a section was folded into another opens that one.
@@ -1962,9 +1901,9 @@ export default function App() {
   }, []);
   const deskOpen = useMemo(() => ({
     sound: () => openSettingsAt('audio-input'),
-    video: () => openSettingsAt('film'),
+    video: () => { setShowSettings(false); setShowStage(false); openPanelNow('film'); },
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
-  }), [openSettingsAt]);
+  }), [openSettingsAt, openPanelNow]);
 
   /*
     Deaf is said first and in words: listening, but nothing arriving (the
@@ -2413,15 +2352,7 @@ export default function App() {
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
       <AnimatePresence>
 
-        {toast && (
-          <div
-            key="toast"
-            className={`pointer-events-none absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl`}
-            data-testid="toast"
-          >
-            {toast}
-          </div>
-        )}
+        <AppToast toast={toastItem} onAction={triggerToastAction} phone={phone} />
         {/*
           The room camera was on when they left, so the app offers it back
           rather than taking it.
@@ -2855,23 +2786,13 @@ export default function App() {
 
                 {/* Randomize */}
                 <button
-                  aria-pressed={luckyArmed}
-                  onClick={() => {
-                    if (performing && !luckyArmed) { setLuckyArmed(true); return; }
-                    setLuckyArmed(false);
-                    triggerLucky();
-                  }}
+                  onClick={luckyPlate}
                   data-testid="lucky-button"
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    // Armed to confirm is pressed, not live: red is only blackout and recording (PLAN 35a).
-                    luckyArmed ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title={luckyArmed
-                    ? 'Click again to replace every setting with a random one. Revert brings this look back.'
-                    : 'Randomize all settings — the look it replaces is kept, so Revert brings it back'}
+                  className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full bg-white/5 hover:bg-white/10 border-white/10"
+                  title="Randomize all settings — undo toast brings the plate and settings back"
                 >
-                  <Shuffle size={16} className={luckyArmed ? '' : 'text-yellow-400 group-hover:scale-110 transition-transform'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">{luckyArmed ? 'Sure?' : 'Random'}</span>
+                  <Shuffle size={16} className="text-yellow-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">Random</span>
                 </button>
 
                 <div className="w-full h-px bg-white/10" />
@@ -2897,7 +2818,7 @@ export default function App() {
                     ))}
                   </div>
                   <button
-                    onClick={() => setDrainTrigger(prev => prev + 1)}
+                    onClick={drainPlate}
                     className="py-1.5 px-2 rounded-lg text-[11px] uppercase tracking-widest font-bold opacity-70 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
                     title="Drain — swirls all dye down the drain"
                   >
@@ -2998,8 +2919,10 @@ export default function App() {
           activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
           lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
-          onShuffle={triggerLucky}
+          onShuffle={luckyPlate}
           onSave={(name) => saveCurrentPreset(name, '', false)}
+          existingLooks={userPresets.presets}
+          onReplaceLook={(id, name) => replaceLookById(id, name)}
           saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           dyes={DROPPER_COLORS.slice(0, 8)}
           dye={liquidTypes.find(t => t.id === selectedLiquidId)?.color ?? DROPPER_COLORS[0]}
@@ -3024,7 +2947,7 @@ export default function App() {
           }}
           wandering={isAutomated}
           onWander={setIsAutomated}
-          onClear={() => setClearTrigger(n => n + 1)}
+          onClear={clearPlate}
           recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
           onOpenAccount={openAccount}
@@ -3058,9 +2981,11 @@ export default function App() {
             // A look from the phone crossfades in, as Go does on the desk: a
             // thumb in front of a room should never cut the plate to clean glass.
             onLook={(id) => goLookNow(id)}
-            onRandomLook={() => { const next = randomLook(activePresetId, stream('phone.look').float); if (next) goLookNow(next.id); }}
+            onRandomLook={() => randomLookPlate(randomLook(activePresetId, stream('phone.look').float) ?? null)}
             onRevert={previousLook.current ? revertLook : null}
             onSaveLook={(name) => saveCurrentPreset(name, '', false)}
+            existingLooks={userPresets.presets}
+            onReplaceLook={(id, name) => replaceLookById(id, name)}
             saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
             onBackLook={(id) => backLookNow(id)}
             backLook={backLookName}
@@ -3093,11 +3018,11 @@ export default function App() {
             onLayer={setActiveLayer}
             onAddLayer={addLayer}
             onRemoveLayer={removeLayer}
-            onClear={() => setClearTrigger(n => n + 1)}
-            onDrain={() => setDrainTrigger(n => n + 1)}
+            onClear={clearPlate}
+            onDrain={drainPlate}
             onSpin={() => flickPlate(activeLayer)}
             spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, bpm: tempoLabel.source ? tempoLabel.bpm : heardBpm, onChange: updateSettings }}
-            onLucky={triggerLucky}
+            onLucky={luckyPlate}
             zoom={settings.macroZoom ?? 1}
             onZoom={pinchZoom}
             camera={settings.macroCamera ?? 'hold'}
@@ -3178,6 +3103,7 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
+            onShortcuts={() => setShowShortcuts(true)}
             recording={phoneRecording}
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
@@ -3188,13 +3114,10 @@ export default function App() {
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
             onOpenAccount={openAccount}
+            onMoreOpen={setPhoneMoreOpen}
           />
           </PanelGuard>
           )}
-          {/* The song-file picker the Sound sheet reaches for; on the laptop it
-              lives in the overlay's audio column, which a phone does not draw. */}
-          <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
-            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
         </>
       )}
 
@@ -3523,9 +3446,6 @@ export default function App() {
               </div>
             )}
           </div>
-          <PanelGuard name="The crash report">
-          <CrashReportButton />
-          </PanelGuard>
           <button
             aria-pressed={showHelp}
             onClick={() => setShowHelp(!showHelp)}
@@ -3584,10 +3504,11 @@ export default function App() {
           onMidi={deskOpen.midi}
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
+          onOpenShortcuts={() => setShowShortcuts(true)}
           onOpenAccount={openAccount}
           status={{
             audio: deskAudio,
-            engine: engineStatus?.label ?? '',
+            engine: engineStatus,
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,
@@ -3606,7 +3527,7 @@ export default function App() {
           onSendToWall={() => sendToWallRef.current()}
           onSave={saveLook}
           onSaveOver={docId ? replaceLook : undefined}
-          onNew={newLook}
+          onNew={newPlate}
           savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
           openLookId={docId}
           onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
@@ -3644,6 +3565,8 @@ export default function App() {
             if (look) sendLook(look, look.fade ?? fadeSeconds);
           }}
           onGo={() => goLook()}
+          onBack={revertLook}
+          canBack={!!previousLook.current}
           onGoBackPlate={() => goBackPlate()}
           backLook={backLookName}
           onBackFollowsFront={backFollowsFront}
@@ -3654,7 +3577,7 @@ export default function App() {
           onCueSaved={cueLook}
           onSendSaved={(id) => goLookNow(id)}
           onAddSavedToSet={(id) => addToSet('saved', id)}
-          onDrain={() => setDrainTrigger(v => v + 1)}
+          onDrain={drainPlate}
           settings={settings}
           onSetting={updateSettings}
           automated={isAutomated}
@@ -3665,8 +3588,8 @@ export default function App() {
           onRideKeys={setRideKeys}
           recipeKeys={recipeKeys}
           onRecipeKeys={setRecipeKeys}
-          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
-          randomiseArmed={luckyArmed}
+          onRandomise={luckyPlate}
+          onPanelClosed={showPanelClosedUndo}
           hasFilm={filmSource !== 'none'}
           hasMark={markLoaded}
           takes={mixTakes}
@@ -3708,19 +3631,18 @@ export default function App() {
         <AccountSheet onClose={closeProfileSheet} />
       )}
 
-      {/* The file input the bench's Image dye button reaches for. It lives
-          in the narrow-screen toolbar, which is not rendered under a desk. */}
+      {/* The file inputs the bench and Sound reach for (kept once for both desk and phone). */}
       {(deskUp || phone) && (
         <>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
           <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+          <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
           <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
         </>
       )}
-      {/* The crash report, under a desk: its header has no room for a
-          button that is idle nearly always, so the chip says when there is
-          news and ⌘K opens the sheet. */}
-      {(deskUp || phone) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
+      {/* Floating chip + sheet when no button is mounted. */}
+      {((deskUp && !overlaysVisible) || (phone && !(showControls && phoneScreenUp === 'stage' && phoneMoreOpen))) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
       {overlaysVisible && <PanelGuard name="The report dot"><QuickReportDot /></PanelGuard>}
 
@@ -3744,6 +3666,8 @@ export default function App() {
           suggested={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           replaceName={docId ? docName : null}
           onReplace={replaceLook}
+          existingLooks={userPresets.presets}
+          onReplaceExisting={replaceLookById}
           songName={musicIntel.state.track?.title ?? null}
           onSave={saveCurrentPreset}
           onClose={() => setShowSave(false)}
@@ -3751,12 +3675,17 @@ export default function App() {
         </PanelGuard>
       )}
 
-      {/* ── ⌘K ─────────────────────────────────────────────────── */}
-      {showPalette && (
-        <PanelGuard name="The command palette" onClose={() => setShowPalette(false)}>
-        <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
-        </PanelGuard>
-      )}
+      {/* ── ⌘K, ? & About ──────────────────────────────────────── */}
+      <CommandAndShortcuts
+        showPalette={showPalette}
+        onClosePalette={() => setShowPalette(false)}
+        commands={paletteCommands}
+        showShortcuts={showShortcuts}
+        onCloseShortcuts={() => setShowShortcuts(false)}
+        showHelp={showHelp}
+        helpFocus={helpFocus}
+        onCloseHelp={() => { setShowHelp(false); setHelpFocus(null); }}
+      />
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
@@ -3777,18 +3706,6 @@ export default function App() {
           />
           </PanelGuard>
         )}
-      </AnimatePresence>
-
-      {/* ── About: the manual ─────────────────────────────────── */}
-      {/*
-        This used to be a five-line popover, and by the time anyone read it two
-        of the five lines were wrong — it still sent people to the settings
-        panel for presets months after the presets moved to the title. A short
-        help text that nobody owns rots; a manual with a section per control
-        group is at least somewhere the truth can be kept.
-      */}
-      <AnimatePresence>
-        {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
       {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}

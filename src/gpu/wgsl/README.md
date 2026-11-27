@@ -21,10 +21,11 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 ## Files
 
-- `air.ts`: air splat (`AIR_SPLAT_WGSL`, `AIR_BOIL_WGSL`), and `AIR_RIM_WGSL`, shared with the plate: a bubble's fingered rim (`rimAt`) and what the field's fourth channel says, which bubble of the list a texel is (`AIR_LOOK_*`, `AIR_LOOK_SPAN` exported, PLAN 38h-15). `splat.ts`: pours. `stats.ts`: field summaries.
+- `air.ts`: air splat (`AIR_SPLAT_WGSL`, `AIR_BOIL_WGSL`), and `AIR_RIM_WGSL`, shared with the plate: a bubble's fingered rim (`rimAt`) and what the field's fourth channel says, which bubble of the list a texel is (`AIR_LOOK_*`, `AIR_LOOK_SPAN` exported, PLAN 38h-15). `splat.ts`: pours, and the upsample of the CPU's deltas (`upsampleDeltaPress`, `upsampleDeltaSumPress` add a press's bowls, falloff mode 4, at the solver's cells: PLAN 18a-14). `stats.ts`: field summaries.
 - `camera.ts`, `cameraFields.ts`: camera pass.
 - `ferroDrop.ts`: closeup drop (`gapLc(gapMetres)`). `standing.ts`: domes (`filmTop(gapMetres)`).
 - `plateFilm.ts`: `FILM_FRAME_WGSL`, the film projector's frame on the plate (`filmFrame`, `filmOver`): Video Zoom, Across and Up, the frame's edge, its key and blend (PLAN 14ag).
+- `projectors.ts`: `PROJECTOR_WGSL`, the projector bank on the wall (PLAN 51a): `projectorLamps()` gives each projector's lamp its gain (`U.projA`, `U.projB`, from lib/projectorBank.ts), where the old fixed halving of Two Projectors was, and `wallAdd(a, b)` adds two projectors' pictures in linear light; built into the plate shader after `LAMP_MIX_WGSL`; `npm run projectors` and `npm run lamp` (line 5) check it.
 - `plateLamp.ts`: `LAMP_MIX_WGSL`, the lamp under the front plate (`mixLamp`, moved from `plate.ts`) with the video as one of its rows, and `lampBendAt`, the liquid's refraction of the picture under it (thin-prism, grad((n − 1)h) from the derive pass's path and the view's depth), and `VIDEO_LAMP_DEPTH_M` (PLAN 14ag-3; `npm run videolamp`).
 - `plateThinFilm.ts`: `THIN_FILM_WGSL`, Thin Film's rings over the plate, the film's amount read through a B-spline (PLAN 1i; `npm run filmrings`).
 - `platePolar.ts`: `POLAR_WGSL`, polarised light on the finished stage (`polar`, the liquid's flow birefringence through polariser, quarter-wave plates and analyser, PLAN 31p-1; and with Dish Stress the moulded dish's stress in series with the liquid, `polarSeries`, PLAN 31p-3; `npm run polar`), and `VIEW_OPTICS`, the thin film's block and it, which the display's VIEW includes.
@@ -44,6 +45,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `output.ts`, `outputFields.ts`: projector pass.
 - `pack.ts`: fields to the 8-bit plate (`PACK_KERNELS`); where Oil Bodies keeps the oil's share, `packDyeBodies` lets a part-oil cell's two liquids pass the light side by side, at the composite's rest path `DYE_PATH` (PLAN 47z-1; `npm run dropcolour`).
 - `particles.ts`: particle dye.
+- `fineDye.ts`: the closeup's fine dye (PLAN 47a): `FINE_ADVECT_WGSL`, `FINE_REDUCE_WGSL`, `FINE_DETAIL_WGSL`, `FINE_LAYOUT`, `FINE_EPS`, `FINE_MOST`. `fineWindow.ts`: `FINE_WINDOW_WGSL`, how the plate multiplies the grid's dye by it (`fineRaw`, read through `U.fineWin`/`U.fineTurn`).
 - `post.ts`, `postFields.ts`: post chain.
 - `probe.ts`: brightness probe.
 - `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `slump.ts`: slosh, soap film, lamp-boiling dish, ink slump. `soapFilm.ts`'s setup reads an `ext` face push (binding 8), zero unless written.
@@ -55,4 +57,4 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 ## Checks
 
-`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `stillcloseup` (the closeup: nothing drawn moves on the clock or lights the plate from above), `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `boilgpu`, `particles`. A changed constant: `checkguard`.
+`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `stillcloseup` (the closeup: nothing drawn moves on the clock or lights the plate from above), `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `boilgpu`, `particles`, `finedye`. A changed constant: `checkguard`.

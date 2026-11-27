@@ -184,7 +184,7 @@ download, once more, and update in place from then on.
 - `updates.js`: finds new releases and offers or installs them (above), with
   electron-updater; `npm run updates` checks it in plain Node, and `npm run
   desktop -- --packaged` checks the packed app against a feed of its own.
-- `pickSource.js`: Film → a window asks the person at the Mac which window or screen, a sheet of their names (it took the first one listed; the security review of 2026-11-13). `npm run assistant`'s `pick-window`.
+- `pickSource.js`: Film → a window opens a visual picker with previews, app icons and search over every window and screen (replacing the 12-button message box; 49k / H5-03). `npm run assistant`'s `pick-window`.
 - `preload.cjs`: tells the page it is in the app (`isDesktopApp()` in
   `src/lib/platform.ts`), which is what lets `useProjector` send the show to a
   projector without waiting for a click.

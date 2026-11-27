@@ -26,7 +26,11 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { macroAmountOf } from '../sim/constants';
+import { closeupFine } from './closeupWindow';
 import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
+import { COVER_FULL_ML, coverNew } from '../lib/cover';
+import { DISH_GAP_FIELD_METRES, carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 /**
  * `?lean=0` opens on the whole display, as before `displayLean.ts`: the
@@ -34,8 +38,6 @@ import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
  * against, on one build and interleaved.
  */
 const LEAN_OFF = (() => { try { return new URLSearchParams(window.location.search).get('lean') === '0'; } catch { return false; } })();
-import { COVER_FULL_ML, coverNew } from '../lib/cover';
-import { DISH_GAP_FIELD_METRES, carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -143,6 +145,15 @@ export interface Opening {
    */
   soap: boolean;
   /**
+   * The closeup's fine dye (PLAN 47a-1): its three kernels from the first
+   * step, when the look opens zoomed into the plate with Fine Detail up
+   * (macro-bead, cell-bloom, lace-run). Added with the fine dye's first
+   * kernels: the open check found those three looks asking for all three in
+   * their first steps with no list naming them. A look that opens at the
+   * plate builds them behind the show, for the hand that zooms in mid-set.
+   */
+  closeup: boolean;
+  /**
    * Faraday waves (PLAN 48f, gpu/faraday.ts): the shaken dish's four
    * kernels, from the first step when the look opens with its shaker on
    * (Shaker above nought Hz); every other look builds them behind the show.
@@ -242,6 +253,8 @@ export function openingOf(s: Partial<VisualizerSettings>, oilWaiting = false): O
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: thin && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
+    closeup: closeupFine(s, macroAmountOf({ ...DEFAULT_SETTINGS, ...s })) > 0.001
+      && Math.round(s.kaleidoscope ?? 0) < 2 && !((s.dishSpread ?? 0) > 0.001),
     faraday: (s.faradayHz ?? 0) > 0,
     glow: (s.glow ?? 0) > 0.001,
     display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),

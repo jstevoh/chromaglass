@@ -32,7 +32,16 @@
  * must never throw. Every photograph of Faraday waves is taken with the
  * camera or a strobe locked to the wave, which freezes it at one phase; so is
  * this, at the crest (cos = 1): the pattern holds still and grows and fades
- * with the drive, as the step's u does.
+ * with the drive, as the step's u does. Rock (PLAN 48f-6) slips the strobe
+ * off the wave by up to 2 Hz, the beat a slightly slow strobe makes, so the
+ * crests and troughs trade places slowly: the solver draws that as its
+ * surface, eta = u cos φ (gpu/faraday.ts), and this reads eta.
+ *
+ * Strength (U.faraday, 1 at real water): the lens's throw, how far past the
+ * dye the projector's focus sits, so the same waves bend the wall's light
+ * more. A deeper defocus is a real projector's (a longer throw, the lens
+ * racked back); the liquid is not touched, and the light is still only
+ * moved, never made, so the plate's mean brightness holds at any strength.
  *
  * In linear light, like the lamp: the plate's colour is display-encoded at
  * this point (the soap film beside it encodes its own the same way), so the
@@ -44,7 +53,7 @@ import { PLATE_METRES } from '../fluid/constants';
 const LENS = FARADAY_DEPTH * (1 - 1 / FARADAY_INDEX);
 
 export const FARADAY_PLATE_WGSL = /* wgsl */ `
-/* The standing wave's amplitude, metres, n × n over the plate (gpu/faraday.ts); a 4-float stand-in while there is no shaker. The display's seventh storage buffer in its fragment stage, of the eight every device gives without asking (gpu/device.ts asks for no more): an eighth fits, a ninth needs the limit raised. */
+/* The standing wave's surface as the strobe sees it, metres, n × n over the plate (gpu/faraday.ts); a 4-float stand-in while there is no shaker. The display's seventh storage buffer in its fragment stage, of the eight every device gives without asking (gpu/device.ts asks for no more): an eighth fits, a ninth needs the limit raised. */
 @group(0) @binding(25) var<storage, read> faradayH: array<f32>;
 
 const FARADAY_LENS: f32 = ${LENS};
@@ -78,9 +87,10 @@ fn faradayLight(fuv: vec2f) -> f32 {
   let d11 = faradayDerivs(b.x + 1, b.y + 1, n, dx);
   var d = array<f32, 5>();
   for (var k = 0; k < 5; k++) { d[k] = mix(mix(d00[k], d10[k], f.x), mix(d01[k], d11[k], f.x), f.y); }
-  let axx = FARADAY_LENS * d[0];
-  let ayy = FARADAY_LENS * d[1];
-  let axy = FARADAY_LENS * d[2];
+  let lens = FARADAY_LENS * max(U.faraday, 1.0);
+  let axx = lens * d[0];
+  let ayy = lens * d[1];
+  let axy = lens * d[2];
   let gather = clamp((1.0 + axx) * (1.0 + ayy) - axy * axy, 0.0, 4.0);
   let tilt = FARADAY_TILT * sqrt(d[3] * d[3] + d[4] * d[4]);
   let kept = 1.0 - smoothstep(0.6 * DROP_NA, DROP_NA, tilt);

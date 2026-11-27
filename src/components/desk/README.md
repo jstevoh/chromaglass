@@ -5,7 +5,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 ## Start here
 
 - `Desk.tsx` (44 KB, grep it): `Desk`, the layout, its slots and panels.
-- `deskProps.ts`: `DeskProps`, `Cue`, `SetAction`, `SetItemAction`: everything `App.tsx` passes in.
+- `deskProps.ts`: `DeskProps`, `Cue`, `SetAction`, `SetItemAction`: everything `App.tsx` passes in. `Cue.lookId` is the look an item's chip pictures (PLAN 34b-6); the Cues panel draws the set and the saved looks as `LookChip`s (`../ui/LookChip.tsx`), shared with the phone.
 - `DeskPanels.tsx` (54 KB, grep it): `PanelBody`, `panelMeta`: what each panel draws.
 - `DeskHeader.tsx`: `DeskHeader`, `DeskDots`, the top bar and status dots.
 - `TabStrip.tsx`: `TabStrip`, the tabs and their editor.
@@ -15,7 +15,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 - `App.tsx` owns settings and show state, with the hooks in `src/app/`, and hands them down through `DeskProps`; the desk changes them only through those callbacks.
 - One panel, one kind of control (PLAN 8d-3): `RidesBody` draws sliders, `ControlGrid` (the Recipe and every section's knobs panel) draws knobs, whatever a control is learned to. `DeskProps.kindFor` is gone with that rule; `controlKindOf` in `lib/midi.ts` still names a board's faders but nothing draws by it.
 - Layout and tabs come from `lib/deskLayout`, `lib/deskTabs` via `hooks/useDeskLayout`.
-- Imports `src/lib`, `src/types`, `src/brand`, `../ui` and a few siblings (`MixerPanel`, `VideoShelf`, `SongScore`, `PanelGuard`, `ToolAmount`, `AlphaBadge`, `portalBody`). Never `src/gpu` or `LiquidVisualizer`.
+- Imports `src/lib`, `src/types`, `src/brand`, `../ui` and a few siblings (`MixerPanel`, `VideoShelf`, `SongScore`, `PanelGuard`, `CrashReportButton`, `ToolAmount`, `AlphaBadge`, `portalBody`). Never `src/gpu` or `LiquidVisualizer`.
 - `phone/PhoneStage.tsx` reuses `TabStrip`. `App.tsx` and the hooks in `src/app/` import the desk's types (`Cue`, `SetAction`, `Command`).
 
 ## Files
@@ -30,7 +30,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 - `SaveLookSheet.tsx`: save a look, tied to a song.
 - `tools.ts`: `DESK_TOOLS`, tools and their letters.
 - `LiveFor.tsx`: `LiveFor`, the plate bar's "live for m:ss" clock on its own one-second tick (`DeskProps.liveSince`; PLAN 46f: it was a string from `App()`, which rendered once a second for it).
-- `Desk.tsx`, `deskProps.ts`, `DeskPanels.tsx`, `DeskHeader.tsx`, `TabStrip.tsx`: above. `DeskProps.status.audio` is a node, not a string: the level in it is `EarPercent`, which renders itself.
+- `Desk.tsx`, `deskProps.ts`, `DeskPanels.tsx`, `DeskHeader.tsx`, `TabStrip.tsx`: above. `DeskProps.status.audio` is a node, not a string: the level in it is `EarPercent`, which renders itself. `DeskProps` includes `onBack`/`canBack` (Cues panel Back button) and `onPanelClosed` (panel close Undo toast, PLAN 49a); `SaveLookSheet` warns on duplicate names (`existingLooks`, `onReplaceExisting`).
 
 ## Checks
 

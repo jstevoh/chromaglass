@@ -196,7 +196,7 @@ function SurfacePad({ surfaces, selected, onSelect, onChange, aspect }: {
         </button>
       ))}
       {surfaces.length === 0 && (
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[12px] text-white/30">
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[12px] text-dim">
           No shapes — the whole frame is the picture
         </span>
       )}
@@ -323,7 +323,7 @@ const Row = ({ label, value, min, max, step, onChange, format, resetTo, help, te
   <div className="mb-3 flex flex-col gap-1.5" data-slider data-testid={testId} title={help}>
     <div className="flex items-center justify-between">
       <span className="text-xs font-bold uppercase tracking-widest opacity-70">{label}</span>
-      <span className="font-mono text-[10px] opacity-50">{format ? format(value) : value.toFixed(2)}</span>
+      <span className="font-mono text-[12px] text-dim">{format ? format(value) : value.toFixed(2)}</span>
     </div>
     <input
       type="range" min={min} max={max} step={step} value={value} aria-label={label}
@@ -384,7 +384,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
           disabled={identity}
           data-testid="output-reset"
           className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all ${
-            identity ? 'cursor-not-allowed border-white/5 opacity-30' : 'border-white/15 hover:bg-white/10'
+            identity ? 'cursor-not-allowed border-white/5 opacity-65' : 'border-white/15 hover:bg-white/10'
           }`}
         >
           Reset
@@ -467,13 +467,13 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
       <div className="mb-3" data-testid="output-grade">
         <Row label="Output gain" help="Overall brightness of what goes to the projector. One leaves the picture as drawn." value={output.gain} min={0.2} max={3} step={0.05} format={v => `${v.toFixed(2)}×`}
           onChange={v => set({ gain: v })} resetTo={1} testId="output-gain" />
-        <Row label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05}
+        <Row label="Gamma" help="Output power curve pow(c * gain, gamma) on the projected picture. 1 leaves it unchanged; 2.5 deepens shadows and mid-tones to counter ambient room washout." value={output.gamma} min={0.5} max={2.5} step={0.05}
           onChange={v => set({ gamma: v })} resetTo={1} testId="output-gamma" />
       </div>
 
       {/* Not a switch: the one Flash Limit switch is in Master. A state line only,
           because the wall is where someone checking the safety is standing. */}
-      <p className={`mb-3 mt-1 text-[12px] ${output.flashGuard ? 'text-white/50' : 'text-amber-200/90'}`} data-testid="output-flash-guard-state">
+      <p className={`mb-3 mt-1 text-[12px] ${output.flashGuard ? 'text-muted' : 'text-amber-200/90'}`} data-testid="output-flash-guard-state">
         {output.flashGuard ? 'Flash Limit is on.' : 'Flash Limit is off.'} Its switch is in Master.
       </p>
 
@@ -482,7 +482,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
         {' '}<span className="text-white/70">Rear</span> mirrors the picture for projection through a screen or a gauze from behind, which is how most of these shows were rigged and the surest way to keep the light off the band’s faces.
         {' '}<span className="text-white/70">The corners</span> square up a projector that could not be hung on axis: drag them until the grid’s lines are straight on the wall, or nudge with the arrow keys.
         {' '}<span className="text-white/70">The masks</span> are tape on the light: pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, and <span className="text-white/70">Mask Edge</span> decides whether that stop is a hard line or a fade.
-        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
+        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift <span className="text-white/70">Gamma</span> (up to 2.5, darkening shadows and mid-tones by a power curve after gain) when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
         {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and its switch is in Master (the one place it is, so there is never a second copy to leave in the other state), and like everything on this panel it is not saved in a preset, so no look can switch off a safety and no fader can knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
         {wakeLock && (
           wakeLock.supported
@@ -529,7 +529,7 @@ export function MappingPanel({ output, onChange }: {
 
   return (
     <div className="mb-6 flex flex-col gap-2" data-testid="mapping-panel">
-      <p className="mb-3 text-[12px] leading-relaxed text-white/40">
+      <p className="mb-3 text-[12px] leading-relaxed text-dim">
         Cut the picture into shapes on the wall, with the dark left dark between them.
         Add a shape, then drag its corners onto whatever the projector is pointed at —
         a panel, a pillar, a stack of boxes. With no shapes the whole frame is the picture.
@@ -549,7 +549,7 @@ export function MappingPanel({ output, onChange }: {
             key={shape}
             onClick={() => addSurfaces([makeSurface(shape, surfaces.length)])}
             disabled={surfaces.length >= MAX_SURFACES}
-            className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+            className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-65"
             data-testid={`add-surface-${shape}`}
           >
             + {SHAPE_LABELS[shape]}
@@ -558,7 +558,7 @@ export function MappingPanel({ output, onChange }: {
         <button
           onClick={() => addSurfaces(makeCube())}
           disabled={surfaces.length + 3 > MAX_SURFACES}
-          className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+          className="rounded border border-white/20 px-2.5 py-1 text-[12px] hover:bg-white/10 disabled:opacity-65"
           title="Three faces, arranged as a box. Each is an ordinary shape afterwards."
           data-testid="add-surface-cube"
         >
@@ -567,7 +567,7 @@ export function MappingPanel({ output, onChange }: {
         {surfaces.length > 0 && (
           <button
             onClick={() => { setSurfaces([]); setSelected(null); }}
-            className="ml-auto text-[12px] text-white/35 hover:text-white/70"
+            className="ml-auto text-[12px] text-dim hover:text-white/70"
             data-testid="surfaces-clear"
           >
             Clear all
@@ -596,7 +596,7 @@ export function MappingPanel({ output, onChange }: {
             <button
               onClick={() => addSurfaces([{ ...active, id: `${active.id}-copy-${surfaces.length}` }])}
               disabled={surfaces.length >= MAX_SURFACES}
-              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10 disabled:opacity-30"
+              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10 disabled:opacity-65"
               data-testid="surface-duplicate"
             >
               Duplicate
@@ -616,7 +616,7 @@ export function MappingPanel({ output, onChange }: {
               the rest of this editor is laid out for a mouse, but the source
               is the one choice here someone at a gig makes from a phone. */}
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-[12px] text-white/40">Source</span>
+            <span className="text-[12px] text-dim">Source</span>
             <div className="flex flex-1 gap-1" role="radiogroup" aria-label="What this surface shows" data-testid="surface-source">
               {SURFACE_SOURCES.map(k => (
                 <button
@@ -635,7 +635,7 @@ export function MappingPanel({ output, onChange }: {
           </div>
           {/* How its light meets the wall (§16c): over, or added as a beam. */}
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-[12px] text-white/40">Light</span>
+            <span className="text-[12px] text-dim">Light</span>
             <div className="flex flex-1 gap-1" role="radiogroup" aria-label="How this surface's light meets the wall" data-testid="surface-blend">
               {SURFACE_BLENDS.map(k => (
                 <button
@@ -657,10 +657,10 @@ export function MappingPanel({ output, onChange }: {
           <Row label="Edge" value={active.feather} min={0} max={0.5} step={0.005}
             onChange={v => patchSurface(active.id, { feather: v })} />
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-[12px] text-white/40">Shows</span>
+            <span className="text-[12px] text-dim">Shows</span>
             <button
               onClick={() => patchSurface(active.id, { src: [0, 0, 1, 1] })}
-              className="rounded border border-white/20 px-2 py-1 text-[11px] hover:bg-white/10"
+              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10"
               data-testid="surface-src-all"
             >
               Whole picture
@@ -673,7 +673,7 @@ export function MappingPanel({ output, onChange }: {
                 const i = surfaces.findIndex(s => s.id === active.id);
                 patchSurface(active.id, { src: [i / n, 0, 1 / n, 1] });
               }}
-              className="rounded border border-white/20 px-2 py-1 text-[11px] hover:bg-white/10"
+              className="rounded border border-white/20 px-2 py-1 text-[12px] hover:bg-white/10"
               title="Give each shape its own vertical slice of the plate"
               data-testid="surface-src-slice"
             >
@@ -695,9 +695,9 @@ export function MappingPanel({ output, onChange }: {
               }`}
               data-testid={`surface-row-${i}`}
             >
-              <span className="w-4 text-white/30">{i + 1}</span>
-              <span className={s.enabled ? '' : 'text-white/30 line-through'}>{SHAPE_LABELS[s.shape]}</span>
-              {s.opacity < 1 && <span className="text-white/30">{Math.round(s.opacity * 100)}%</span>}
+              <span className="w-4 text-dim">{i + 1}</span>
+              <span className={s.enabled ? '' : 'text-dim line-through'}>{SHAPE_LABELS[s.shape]}</span>
+              {s.opacity < 1 && <span className="text-dim">{Math.round(s.opacity * 100)}%</span>}
             </button>
           ))}
         </div>

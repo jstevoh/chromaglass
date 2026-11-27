@@ -5,6 +5,7 @@ import { ViscosityDrip } from '../ui/Playful';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 import { COVER_FULL_ML, COVER_GLASS_G } from '../../lib/cover';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 /*
   Chemistry: the liquid itself. The squish plate, oil and soap, the ferrofluid and
@@ -266,6 +267,11 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ clearFilm: v })}
           settingKey="clearFilm"
         />
+        {clearFilmGroundNote(settings.lampGround, settings.clearFilmDye) && (
+          <p className="text-[11px] leading-snug text-white/50" data-testid="clear-film-ground-note">
+            {clearFilmGroundNote(settings.lampGround, settings.clearFilmDye)}
+          </p>
+        )}
         {/*
           The film's own dye (PLAN 20b-13): the lamp filtered over the film's
           thickness, so the lace is a colour and the holes the water's. Shown
@@ -294,13 +300,13 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           </div>
         )}
         <Slider
-          label="Polarity (Repulsion)"
-          value={settings.polarity}
+          label="Hold Apart"
+          value={settings.holdApart ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ polarity: v })}
-          settingKey="polarity"
+          onChange={(v: number) => onUpdate({ holdApart: v })}
+          settingKey="holdApart"
         />
       </section>
       )}
@@ -512,7 +518,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistry"
         />
         <Slider
-          label="↳ Pattern (Spots to Labyrinth)"
+          label="Pattern"
           value={settings.chemistryPattern ?? 0}
           min={0}
           max={1.0}
@@ -521,7 +527,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryPattern"
         />
         <Slider
-          label="↳ Pattern Width"
+          label="Pattern Width"
           value={settings.chemistryWidth ?? 0.5}
           min={0.1}
           max={1.0}
@@ -530,7 +536,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryWidth"
         />
         <Slider
-          label="↳ Turing Print"
+          label="Turing Print"
           value={settings.turingPrint ?? 0}
           min={0}
           max={1.0}
@@ -539,7 +545,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingPrint"
         />
         <Slider
-          label="↳ Print Ink (0 is Starch)"
+          label="Print Ink"
           value={settings.turingInk ?? 0}
           min={0}
           max={1.0}
@@ -548,7 +554,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingInk"
         />
         <Slider
-          label="↳ Print Drift (0 is Still)"
+          label="Print Drift"
           value={settings.turingDrift ?? 0}
           min={0}
           max={1.0}

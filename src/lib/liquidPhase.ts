@@ -216,6 +216,40 @@ export class LiquidPhase {
     this.live = false;
   }
 
+  /** Copy channels and scalars so destructive resets can restore exact liquid properties. */
+  snapshot() {
+    return {
+      soap: new Float32Array(this.soap),
+      body: new Float32Array(this.body),
+      repel: new Float32Array(this.repel),
+      weight: new Float32Array(this.weight),
+      polarity: new Float32Array(this.polarity),
+      totals: { ...this.totals },
+      kindsHeld: this.kindsHeld,
+      live: this.live,
+      gpuNative: this.gpuNative,
+      tiltX: this.tiltX,
+      tiltY: this.tiltY,
+    };
+  }
+
+  /** Restore a snapshot taken by `snapshot()`. */
+  restore(s: ReturnType<LiquidPhase['snapshot']>): void {
+    this.soap.set(s.soap);
+    this.body.set(s.body);
+    this.repel.set(s.repel);
+    this.weight.set(s.weight);
+    this.polarity.set(s.polarity);
+    this.totals.soap = s.totals.soap;
+    this.totals.body = s.totals.body;
+    this.totals.repel = s.totals.repel;
+    this.kindsHeld = s.kindsHeld;
+    this.live = s.live;
+    this.gpuNative = s.gpuNative;
+    this.tiltX = s.tiltX;
+    this.tiltY = s.tiltY;
+  }
+
   /**
    * How much room is left for a deposit of this shape, 0..1.
    *

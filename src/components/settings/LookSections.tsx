@@ -103,15 +103,6 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           settingKey="grainScale"
         />
         <Slider
-          label="Blob Surface Tension"
-          value={settings.blobSurfaceTension}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
-          settingKey="blobSurfaceTension"
-        />
-        <Slider
           label="Dye Budget"
           value={settings.dyeBudget ?? 0.85}
           min={0.1}
@@ -599,14 +590,14 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           settingKey="stock"
         />
         <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Stock</span>
+          <span className="text-[12px] uppercase tracking-widest font-bold text-muted">Stock</span>
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
                 aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
-                className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
+                className={`py-2 rounded-lg text-[12px] uppercase tracking-wider font-bold border transition-colors ${
                   (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[
@@ -1033,6 +1024,15 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               step={0.05}
               onChange={(v: number) => onUpdate({ macroRelief: v })}
           settingKey="macroRelief"
+        />
+            <Slider
+              label="Fine Detail"
+              value={settings.macroFine}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroFine: v })}
+          settingKey="macroFine"
         />
           </>
         )}
