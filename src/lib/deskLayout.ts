@@ -116,7 +116,8 @@ const OWN: PanelSpec[] = [
   { id: 'bottles', name: 'Bottles', category: 'pour', kind: 'own', deckWidth: 312, terms: 'liquids pour drop viscosity' },
   { id: 'dyes',    name: 'Dyes',    category: 'pour', kind: 'own', deckWidth: 360, terms: 'palette colour color swatches image video pour' },
   { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340, terms: 'dropper spray splatter pour streak blow press finger magnet spin tip slosh amount' },
-  { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 304, terms: 'ipad remote qr pair link mobile controller' },
+  // Side-by-side QR code and full "Phone · iPad / not linked" header need 400 px.
+  { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 400, terms: 'ipad remote qr pair link mobile controller' },
   /*
     The Mac app's stream to YouTube, Twitch and the rest (PLAN 37x-4d). In
     Play because it is run during the show, beside the cues, not set up once
@@ -144,15 +145,19 @@ const WHOLE = new Set(['audio-input', 'room', 'film', 'patches', 'midi', 'liquid
 /** Wider in the deck: the patch bay's rows and the Wall's corner pin need the room. */
 const WIDE: Record<string, number> = { patches: 340, projectors: 340, mapping: 312, midi: 312, 'audio-input': 340, simulation: 304, mixer: 312 };
 
-const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => ({
-  id: s.id,
-  name: s.name,
-  category: s.category,
-  kind: s.id === 'mixer' ? 'mixer' : WHOLE.has(s.id) || !PINNABLE.some(p => p.section === s.id) ? 'section' : 'knobs',
-  deckWidth: WIDE[s.id] ?? 266,
-  // Sound holds the player and the drone since PLAN 35c-7: the column they had as Music & Drone.
-  ...(s.id === 'audio-input' && { columnWidth: 340 }),
-}));
+const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => {
+  const kind: PanelKind = s.id === 'mixer' ? 'mixer' : WHOLE.has(s.id) || !PINNABLE.some(p => p.section === s.id) ? 'section' : 'knobs';
+  return {
+    id: s.id,
+    name: s.name,
+    category: s.category,
+    kind,
+    // Knobs panels hold four columns; 304 px gives each cell 66 px so knob names wrap cleanly instead of truncating.
+    deckWidth: WIDE[s.id] ?? (kind === 'knobs' ? 304 : 266),
+    // Sound holds the player and the drone since PLAN 35c-7: the column they had as Music & Drone.
+    ...(s.id === 'audio-input' && { columnWidth: 340 }),
+  };
+});
 
 export const PANELS: PanelSpec[] = [...OWN, ...FROM_SECTIONS];
 export const PANEL_BY_ID = new Map(PANELS.map(p => [p.id, p]));

@@ -24,13 +24,15 @@ for (const p of PINNABLE) CONTROLS.set(p.section, (CONTROLS.get(p.section) ?? 0)
 
 const GROUP_NAME: Record<string, string> = Object.fromEntries(SETTINGS_CATEGORIES.map(c => [c.id, c.name]));
 
-export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onStage, onClose }: {
+export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onReveal, onStage, onClose }: {
   layout: DeskLayout;
   /** Where to hang it: under the + Panel button, right-aligned to it. */
   at: { top: number; right: number };
   anchorRef?: RefObject<HTMLButtonElement | null>;
   onDock: (id: string) => void;
   onFloat: (id: string) => void;
+  /** Scroll an already-open panel into view when picked from the browser. */
+  onReveal?: (id: string) => void;
   onStage: () => void;
   onClose: () => void;
 }) {
@@ -74,7 +76,9 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onStage, 
   const act = (i: number, float: boolean) => {
     const r = rows[i];
     if (!r) return;
-    (float ? onFloat : onDock)(r.id);
+    const where = whereIs(layout, r.id);
+    if (where && !float) onReveal?.(r.id);
+    else (float ? onFloat : onDock)(r.id);
     onClose();
   };
 
@@ -108,6 +112,7 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onStage, 
           {rows.length === 0 && <p className="px-3 py-3 text-[13px] text-dim">Nothing matches “{query}”.</p>}
           {rows.map((r, i) => {
             const where = whereIs(layout, r.id);
+            const whereLabel = where === 'float' ? 'floating' : where;
             const head = r.category !== lastGroup ? (lastGroup = r.category, GROUP_NAME[r.category] ?? r.category) : null;
             const count = r.kind === 'own' ? null : CONTROLS.get(r.id) ?? null;
             return (
@@ -116,11 +121,12 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onStage, 
                 <div
                   className={`mx-1 flex h-8 items-center gap-2 rounded-md px-2 ${i === sel ? 'bg-hover' : ''}`}
                   onMouseEnter={() => setSel(i)}
+                  onClick={() => { if (where) act(i, false); }}
                   data-testid={`panel-browser-row-${r.id}`}
                 >
                   <span className="min-w-0 flex-1 truncate text-[13px] text-text-2">{r.name}</span>
                   {count != null && <span className="shrink-0 font-mono text-[11px] text-faint">{count}</span>}
-                  {where && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">{where === 'float' ? 'floating' : 'docked'}</span>}
+                  {whereLabel && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">{whereLabel}</span>}
                   {i === sel && !where && (
                     <>
                       <button onClick={() => act(i, false)} className="h-6 shrink-0 rounded-sm bg-primary px-2 text-[11px] font-medium text-on-primary" data-testid={`panel-browser-dock-${r.id}`}>Dock ⏎</button>

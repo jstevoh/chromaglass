@@ -3582,7 +3582,7 @@ export default function App() {
           onOpenAccount={openAccount}
           status={{
             audio: deskAudio,
-            engine: engineStatus?.label ?? '',
+            engine: engineStatus,
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,

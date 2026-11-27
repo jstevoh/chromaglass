@@ -8,11 +8,11 @@ import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { PIN_RANGE } from '../../lib/deskPins';
+import { readSetting } from '../../lib/readout';
 import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 
-/** Evolve's top, the registry's: the dial runs on past 1 to its extreme on every surface. */
-const EVOLVE_MAX = PIN_RANGE.get('automateRate')?.max ?? 1;
+const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
 import { shareClip } from '../../lib/shareClip';
@@ -115,7 +115,6 @@ export interface PhonePlayProps {
 }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 /** The zoom the plate is drawn at: the Macro Zoom alone, as LiquidVisualizer's macroZoomOf reads it (PLAN QA-32c). */
 const zoomOf = (s: PhonePlayProps['settings']) => Math.max(1, s.macroZoom ?? 1);
@@ -460,19 +459,18 @@ export function PhonePlay(p: PhonePlayProps) {
             )}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1 landscape:grid landscape:grid-cols-2 landscape:content-start landscape:gap-x-6">
               <div>
-              <TouchSlider glass label="Speed" setting="globalSpeed" min={0} max={0.3} value={s.globalSpeed ?? 0}
-                display={(s.globalSpeed ?? 0) < 0.1 ? (s.globalSpeed ?? 0).toFixed(3) : (s.globalSpeed ?? 0).toFixed(2)} resetTo={p.lookValueOf?.('globalSpeed')} onChange={v => p.onSetting({ globalSpeed: v })} testId="play-slider-speed" />
-              <TouchSlider glass label="Turbulence" setting="turbulenceScale" min={0} max={1} value={s.turbulenceScale ?? 0}
-                display={pct(s.turbulenceScale ?? 0)} resetTo={p.lookValueOf?.('turbulenceScale')} onChange={v => p.onSetting({ turbulenceScale: v })} testId="play-slider-turbulence" />
-              <TouchSlider glass label="Swirl" setting="vorticityConfinement" min={0} max={2} value={s.vorticityConfinement ?? 0}
-                display={pct(s.vorticityConfinement ?? 0)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
-              <TouchSlider glass label="Soap" setting="surfactantFlow" min={0} max={1} value={s.surfactantFlow ?? 0}
-                display={pct(s.surfactantFlow ?? 0)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
-              {/* To 8×, not the pinch's 16: past 8 a phone's plate is a few cells across, and the slider's travel is better spent below. */}
-              <TouchSlider glass label="Zoom" help="How close the camera looks into the plate. One is the whole plate." min={1} max={8} value={Math.min(8, zoom)}
-                display={`${zoom.toFixed(1)}×`} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
-              <TouchSlider glass label="Evolve" setting="automateRate" min={0} max={EVOLVE_MAX} value={s.automateRate ?? 0}
-                display={pct(s.automateRate ?? 0)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
+              <TouchSlider glass label="Speed" setting="globalSpeed" {...rangeOf('globalSpeed')} value={s.globalSpeed ?? 0}
+                display={readSetting('globalSpeed', s.globalSpeed ?? 0, rangeOf('globalSpeed').min, rangeOf('globalSpeed').max)} resetTo={p.lookValueOf?.('globalSpeed')} onChange={v => p.onSetting({ globalSpeed: v })} testId="play-slider-speed" />
+              <TouchSlider glass label="Turbulence" setting="turbulenceScale" {...rangeOf('turbulenceScale')} value={s.turbulenceScale ?? 0}
+                display={readSetting('turbulenceScale', s.turbulenceScale ?? 0, rangeOf('turbulenceScale').min, rangeOf('turbulenceScale').max)} resetTo={p.lookValueOf?.('turbulenceScale')} onChange={v => p.onSetting({ turbulenceScale: v })} testId="play-slider-turbulence" />
+              <TouchSlider glass label="Swirl" setting="vorticityConfinement" {...rangeOf('vorticityConfinement')} value={s.vorticityConfinement ?? 0}
+                display={readSetting('vorticityConfinement', s.vorticityConfinement ?? 0, rangeOf('vorticityConfinement').min, rangeOf('vorticityConfinement').max)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
+              <TouchSlider glass label="Soap" setting="surfactantFlow" {...rangeOf('surfactantFlow')} value={s.surfactantFlow ?? 0}
+                display={readSetting('surfactantFlow', s.surfactantFlow ?? 0, rangeOf('surfactantFlow').min, rangeOf('surfactantFlow').max)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
+              <TouchSlider glass label="Zoom" setting="macroZoom" help="How close the camera looks into the plate. One is the whole plate." {...rangeOf('macroZoom')} value={zoom}
+                display={readSetting('macroZoom', zoom, rangeOf('macroZoom').min, rangeOf('macroZoom').max)} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
+              <TouchSlider glass label="Evolve" setting="automateRate" {...rangeOf('automateRate')} value={s.automateRate ?? 0}
+                display={readSetting('automateRate', s.automateRate ?? 0, rangeOf('automateRate').min, rangeOf('automateRate').max)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
               </div>
               <div className="min-w-0">
 

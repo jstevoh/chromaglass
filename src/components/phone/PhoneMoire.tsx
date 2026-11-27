@@ -1,4 +1,6 @@
 import { Slider } from '../ui';
+import { PIN_RANGE } from '../../lib/deskPins';
+import { readSetting } from '../../lib/readout';
 import { MOIRE_SHEETS } from '../../lib/moire';
 import { useMoirePreview } from '../../hooks/useMoirePreview';
 import { openAccountSheet } from '../../lib/tierGates';
@@ -36,6 +38,11 @@ export function PhoneMoire({ settings, onSetting }: {
   const amount = settings.moireAmount ?? 0;
   const angle = settings.moireAngle ?? 4;
   const spin = settings.moireSpin ?? 0;
+  const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
+  const pin = (k: keyof VisualizerSettings, v: number) => {
+    const { min, max } = rangeOf(k);
+    return { min, max, display: readSetting(k, v, min, max), midiKey: `setting:${k}` };
+  };
   return (
     <div className="mt-3" data-testid="phone-moire">
       <div className="mb-2 text-[13px] font-medium text-text">Moiré Sheets</div>
@@ -62,12 +69,9 @@ export function PhoneMoire({ settings, onSetting }: {
       </div>
       {pack.live && (
         <>
-          <Slider label="Moiré Sheets" value={amount} min={0} max={1} step={0.05} onChange={v => onSetting({ moireAmount: v })}
-            display={`${Math.round(amount * 100)}%`} touch testId="phone-moire-amount" midiKey="setting:moireAmount" />
-          <Slider label="Moiré Turn" value={angle} min={-180} max={180} step={0.1} onChange={v => onSetting({ moireAngle: v })}
-            display={`${angle.toFixed(1)}°`} touch testId="phone-moire-turn" midiKey="setting:moireAngle" />
-          <Slider label="Moiré Spin" value={spin} min={-30} max={30} step={0.1} onChange={v => onSetting({ moireSpin: v })}
-            display={`${spin.toFixed(1)} rpm`} touch testId="phone-moire-spin" midiKey="setting:moireSpin" />
+          <Slider label="Moiré Sheets" value={amount} {...pin('moireAmount', amount)} step={0.05} onChange={v => onSetting({ moireAmount: v })} touch testId="phone-moire-amount" />
+          <Slider label="Moiré Turn" value={angle} {...pin('moireAngle', angle)} step={0.1} onChange={v => onSetting({ moireAngle: v })} touch testId="phone-moire-turn" />
+          <Slider label="Moiré Spin" value={spin} {...pin('moireSpin', spin)} step={0.1} onChange={v => onSetting({ moireSpin: v })} touch testId="phone-moire-spin" />
         </>
       )}
       <p className="-mt-3 text-[12px] leading-snug text-dim">Two printed sheets on the stage. Turn the upper one a few degrees and the fringes sweep; the liquid bends the lower one.</p>
