@@ -512,7 +512,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistry"
         />
         <Slider
-          label="↳ Pattern (Spots to Labyrinth)"
+          label="Pattern"
           value={settings.chemistryPattern ?? 0}
           min={0}
           max={1.0}
@@ -521,7 +521,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryPattern"
         />
         <Slider
-          label="↳ Pattern Width"
+          label="Pattern Width"
           value={settings.chemistryWidth ?? 0.5}
           min={0.1}
           max={1.0}
@@ -530,7 +530,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryWidth"
         />
         <Slider
-          label="↳ Turing Print"
+          label="Turing Print"
           value={settings.turingPrint ?? 0}
           min={0}
           max={1.0}
@@ -539,7 +539,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingPrint"
         />
         <Slider
-          label="↳ Print Ink (0 is Starch)"
+          label="Print Ink"
           value={settings.turingInk ?? 0}
           min={0}
           max={1.0}
@@ -548,7 +548,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingInk"
         />
         <Slider
-          label="↳ Print Drift (0 is Still)"
+          label="Print Drift"
           value={settings.turingDrift ?? 0}
           min={0}
           max={1.0}

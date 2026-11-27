@@ -67,7 +67,7 @@ import { makeNoteVoices, readNoteFeature, resetNoteVoices, type VoiceDrop, type 
 import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
-import { openCamera } from '../lib/cameras';
+import { captureFilmCamera, captureFilmWindow } from '../lib/filmCapture';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
 import { Modulators } from '../lib/modulators';
@@ -80,7 +80,7 @@ import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun'
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { dropBottle, layStream } from '../sim/dropSplash';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter, runThemePour } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, kickCenter } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles, syncBubblesGpu } from '../sim/speciesPoll';
@@ -1798,119 +1798,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       Nothing is requested until the button is pressed, and the browser's
       picker, not this app, decides what is shared.
     */
-    startFilmWindow: async (onEnded?: () => void, onBlank?: () => void) => {
-      const media = navigator.mediaDevices as MediaDevices & {
-        getDisplayMedia?: (c: DisplayMediaStreamOptions) => Promise<MediaStream>;
-      };
-      if (!media?.getDisplayMedia) throw new Error('This browser cannot capture a window.');
-      // Asked for before `stopFilm`, so a picker the operator cancels leaves
-      // whatever was already playing alone rather than putting the projector
-      // out on the way to a dialog they changed their mind about.
-      /*
-        What the picker is told, and why each part of it.
-
-        `displaySurface: 'browser'` opens the picker on its Tab list. It is a
-        hint, not a restriction — a whole window or a screen is still one
-        click away — and it is the right default for this feature twice over.
-        A film is usually a video playing in a tab, and capturing the *tab*
-        composites through the renderer, while capturing the *window* around
-        it does not always: a video handed to a hardware overlay plane is
-        drawn past the window's own surface, and window capture then yields
-        black frames with the audio and the controls coming through perfectly.
-        That is the most likely reading of a black plate from a playing movie,
-        and the tab is the capture that does not have the problem.
-
-        `selfBrowserSurface: 'exclude'` takes ChromaGlass out of the list.
-        Offering it invites capturing the plate into the plate, and it is the
-        one choice that can only ever be a mistake.
-
-        `surfaceSwitching: 'exclude'` drops the "Share this tab instead"
-        control Chrome otherwise puts up, which is a question about the app's
-        own tab asked in the middle of choosing a film.
-      */
-      const stream = await media.getDisplayMedia({
-        video: { frameRate: { ideal: 30 }, displaySurface: 'browser' },
-        // The plate is driven by the room's sound, not by the captured window,
-        // and asking for audio makes the picker offer a checkbox that does
-        // nothing here.
-        audio: false,
-        selfBrowserSurface: 'exclude',
-        surfaceSwitching: 'exclude',
-      } as DisplayMediaStreamOptions);
-      stopFilm();
-      const f = filmRef.current;
-      const v = filmVideo();
-      f.stream = stream;
-      v.srcObject = stream;
-      f.kind = 'window';
-      filmEndedRef.current = onEnded ?? null;
-      for (const t of stream.getVideoTracks()) {
-        t.addEventListener('ended', () => {
-          const cb = filmEndedRef.current;
-          stopFilm();
-          cb?.();
-        });
-      }
-      try { await v.play(); } catch { /* as above */ }
-
-      /*
-        Say so when the capture is coming through black.
-
-        A window that yields nothing but black pixels is indistinguishable, on
-        the plate, from a film that is simply very dark — and from the feature
-        being broken. So the frames are looked at: a few samples over a second
-        and a half, and if every pixel of every one of them is black the
-        operator is told, because the remedy (share the tab rather than the
-        window) is not something anybody would guess.
-
-        Sampled, not watched: one 32x32 read every 300ms, stopped as soon as
-        anything lights up, on a machine that is also running a fluid solver.
-      */
-      if (onBlank) {
-        const probe = document.createElement('canvas');
-        probe.width = 32; probe.height = 32;
-        const pctx = probe.getContext('2d', { willReadFrequently: true });
-        let looks = 0;
-        const timer = setInterval(() => {
-          looks++;
-          if (!pctx || filmRef.current.kind !== 'window' || v.readyState < 2) {
-            if (looks >= 5) clearInterval(timer);
-            return;
-          }
-          try {
-            pctx.drawImage(v, 0, 0, probe.width, probe.height);
-            const { data } = pctx.getImageData(0, 0, probe.width, probe.height);
-            for (let i = 0; i < data.length; i += 4) {
-              if (data[i] > 8 || data[i + 1] > 8 || data[i + 2] > 8) { clearInterval(timer); return; }
-            }
-          } catch { clearInterval(timer); return; }   // tainted: not ours to read, and not black either
-          if (looks >= 5) { clearInterval(timer); onBlank(); }
-        }, 300);
-      }
-    },
-    startFilmCamera: async (deviceId = '', onEnded) => {
-      stopFilm();
-      const f = filmRef.current;
-      const v = filmVideo();
-      const opened = await openCamera(deviceId, 'environment', { width: 1280 });
-      const stream = opened.stream;
-      f.stream = stream;
-      v.srcObject = stream;
-      f.kind = 'camera';
-      // Unplugged, the same way a captured window is taken away: the film
-      // comes off and the panel is told, rather than the plate holding the
-      // camera's last frame with the source still reading "live".
-      filmEndedRef.current = onEnded ?? null;
-      for (const t of stream.getVideoTracks()) {
-        t.addEventListener('ended', () => {
-          const cb = filmEndedRef.current;
-          stopFilm();
-          cb?.();
-        });
-      }
-      try { await v.play(); } catch { /* as above */ }
-      return { label: opened.label, fellBack: opened.fellBack };
-    },
+    startFilmWindow: (onEnded?: () => void, onBlank?: () => void) =>
+      captureFilmWindow({ film: filmRef.current, video: filmVideo, stop: stopFilm, setEnded: cb => { filmEndedRef.current = cb; }, getEnded: () => filmEndedRef.current }, onEnded, onBlank),
+    startFilmCamera: (deviceId = '', onEnded) =>
+      captureFilmCamera({ film: filmRef.current, video: filmVideo, stop: stopFilm, setEnded: cb => { filmEndedRef.current = cb; }, getEnded: () => filmEndedRef.current }, deviceId, onEnded),
     clearFilm: () => stopFilm(),
     loadMark: (source, width, height) => {
       markRef.current = { source, aspect: width > 0 && height > 0 ? width / height : 1, dirty: true };
@@ -1930,7 +1821,67 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       autoEventsRef.current.palettes = (autoEventsRef.current.palettes ?? 0) + 1;
     },
     triggerTheme: (theme: string, energy = 0.6) => {
-      if (drainFrameRef.current === 0) runThemePour(fluidsRef.current[activeLayerRef.current], harmonyOf(activeLayerRef.current), theme, energy);
+      const af = fluidsRef.current[activeLayerRef.current];
+      if (!af || drainFrameRef.current > 0) return;
+      const S = GRID_SIZE;
+      const rx = () => Math.floor(S * 0.2 + DICE.hands.float() * S * 0.6);
+      const pick = (idxs: number[]) => PALETTE_RGB[DICE.hands.pick(idxs)];
+      const amt = 4 + energy * 8;
+
+      switch (theme) {
+        case 'fire': { // warm palette, low placement, heat drives it upward
+          const c = pick([0, 1, 3]);
+          const x = rx(), y = Math.floor(S * 0.75);
+          af.autoInject('splatter', x, y, amt, c.r, c.g, c.b, energy);
+          af.addTemp(x, y, 3 + energy * 4);
+          break;
+        }
+        case 'water': { // cool palette pours downward from the top
+          const c = pick([7, 8, 9]);
+          const x = rx(), y = Math.floor(S * 0.2);
+          af.autoInject('pour', x, y, amt, c.r, c.g, c.b, energy);
+          for (let d = 0; d < 10; d++) af.addVelocity(x, Math.min(S - 2, y + d), 0, 0.08);
+          break;
+        }
+        case 'sky': { // icy blue + white mist high in the frame
+          const c = pick([7, 15]);
+          af.autoInject('spray', rx(), Math.floor(S * 0.25), amt, c.r, c.g, c.b, energy);
+          break;
+        }
+        case 'earth': { // heavy warm browns settle low
+          const c = pick([12, 13, 1]);
+          af.autoInject('pour', rx(), Math.floor(S * 0.8), amt, c.r, c.g, c.b, energy * 0.6);
+          break;
+        }
+        case 'love': { // pink bloom from the center
+          const c = pick([2, 11]);
+          af.autoInject('drop', Math.floor(S / 2), Math.floor(S / 2), amt * 1.2, c.r, c.g, c.b, energy);
+          af.addTemp(Math.floor(S / 2), Math.floor(S / 2), 1.5);
+          break;
+        }
+        case 'dark': { // ink splatter
+          const c = pick([14, 4]);
+          af.autoInject('splatter', rx(), rx(), amt, c.r * 0.4, c.g * 0.4, c.b * 0.4, energy);
+          break;
+        }
+        case 'light': { // white-gold radial burst
+          const c = pick([15, 0]);
+          const x = Math.floor(S / 2), y = Math.floor(S / 2);
+          af.autoInject('drop', x, y, amt, c.r, c.g, c.b, energy);
+          af.applyRadialImpulse(x, y, Math.round(20 * GRID_SCALE), 0.3 + energy * 0.4);
+          af.addTemp(x, y, 2 + energy * 2);
+          break;
+        }
+        case 'motion': { // fast streaks in the current harmony
+          const c = harmonyColor(harmonyOf(activeLayerRef.current));
+          af.autoInject('streak', rx(), rx(), amt, c.r, c.g, c.b, Math.min(1, energy + 0.3));
+          break;
+        }
+        default: {
+          const c = harmonyColor(harmonyOf(activeLayerRef.current));
+          af.autoInject('drop', rx(), rx(), amt, c.r, c.g, c.b, energy);
+        }
+      }
     },
     applyGesture: (g) => performGestureBanked(g),
     wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },

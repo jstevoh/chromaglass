@@ -202,7 +202,6 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- ~~**12-ctl-2**~~ *(shipped 2026-11-12)*: Scan on the Laptop remote form, in both apps; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
   when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,

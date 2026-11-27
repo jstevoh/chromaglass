@@ -13,7 +13,6 @@ import { LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { type FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE, GRID_SIZE } from './constants';
 import { DICE } from './dice';
-import { PALETTE_RGB, harmonyColor } from '../constants';
 import { fluidSink, type AreaSink } from '../lib/areaCords';
 import { areaCentre, type PlateArea } from '../lib/plateAreas';
 import { showNow } from '../lib/showClock';
@@ -292,56 +291,4 @@ export function kickCenter(
   const sqAt = sqArea ? areaCentre(sqArea, GRID_SIZE) : { x: GRID_SIZE / 2, y: GRID_SIZE / 2 };
   const sqSpread = sqArea ? sqArea.r * GRID_SIZE : (sheet ? GRID_SIZE / 2 : 30 * GRID_SCALE);
   return { x: sqAt.x + dice.centred() * sqSpread, y: sqAt.y + dice.centred() * sqSpread };
-}
-
-/** One themed pour on the active plate layer (lyrics/music triggers). */
-export function runThemePour(
-  af: FluidSimulation | undefined,
-  harmonyIndices: number[],
-  theme: string,
-  energy = 0.6,
-): void {
-  if (!af) return;
-  const S = GRID_SIZE;
-  const rx = () => Math.floor(S * 0.2 + DICE.hands.float() * S * 0.6);
-  const pick = (idxs: number[]) => PALETTE_RGB[DICE.hands.pick(idxs)];
-  const amt = 4 + energy * 8;
-  switch (theme) {
-    case 'fire': {
-      const c = pick([0, 1, 3]); const x = rx(), y = Math.floor(S * 0.75);
-      af.autoInject('splatter', x, y, amt, c.r, c.g, c.b, energy); af.addTemp(x, y, 3 + energy * 4); break;
-    }
-    case 'water': {
-      const c = pick([7, 8, 9]); const x = rx(), y = Math.floor(S * 0.2);
-      af.autoInject('pour', x, y, amt, c.r, c.g, c.b, energy);
-      for (let d = 0; d < 10; d++) af.addVelocity(x, Math.min(S - 2, y + d), 0, 0.08);
-      break;
-    }
-    case 'sky': {
-      const c = pick([7, 15]); af.autoInject('spray', rx(), Math.floor(S * 0.25), amt, c.r, c.g, c.b, energy); break;
-    }
-    case 'earth': {
-      const c = pick([12, 13, 1]); af.autoInject('pour', rx(), Math.floor(S * 0.8), amt, c.r, c.g, c.b, energy * 0.6); break;
-    }
-    case 'love': {
-      const c = pick([2, 11]);
-      af.autoInject('drop', Math.floor(S / 2), Math.floor(S / 2), amt * 1.2, c.r, c.g, c.b, energy);
-      af.addTemp(Math.floor(S / 2), Math.floor(S / 2), 1.5); break;
-    }
-    case 'dark': {
-      const c = pick([14, 4]); af.autoInject('splatter', rx(), rx(), amt, c.r * 0.4, c.g * 0.4, c.b * 0.4, energy); break;
-    }
-    case 'light': {
-      const c = pick([15, 0]); const x = Math.floor(S / 2), y = Math.floor(S / 2);
-      af.autoInject('drop', x, y, amt, c.r, c.g, c.b, energy);
-      af.applyRadialImpulse(x, y, Math.round(20 * GRID_SCALE), 0.3 + energy * 0.4);
-      af.addTemp(x, y, 2 + energy * 2); break;
-    }
-    case 'motion': {
-      const c = harmonyColor(harmonyIndices); af.autoInject('streak', rx(), rx(), amt, c.r, c.g, c.b, Math.min(1, energy + 0.3)); break;
-    }
-    default: {
-      const c = harmonyColor(harmonyIndices); af.autoInject('drop', rx(), rx(), amt, c.r, c.g, c.b, energy);
-    }
-  }
 }

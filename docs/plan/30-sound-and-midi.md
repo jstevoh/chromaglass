@@ -135,12 +135,6 @@ story is in `docs/plan-shipped.md` under 48f. Open:
   §140).
 
 ## ~~48c. Bioluminescent trails: the water glows where it is sheared~~ (shipped 2026-11-21)
-
-Shipped behind Glow, Glow Shear and Glow Recharge (`npm run glow` 15/15 on the lab's software
-WebGPU). Story in `docs/plan-shipped.md` §48c; written here beside the cords because the music
-plays it through them. Not yet seen on the Mac (`docs/judging.md` §145). Three shortcuts are
-named in the code and each is an item:
-
 - **48c-1. The plankton are spread evenly.** Every cell of the plate's water holds the same
   population, so a stroke anywhere lights the same. A real bloom is patchy and is carried: a
   concentration field over the plate, carried and diffused with the water as the dye is,

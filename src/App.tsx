@@ -3157,10 +3157,6 @@ export default function App() {
           />
           </PanelGuard>
           )}
-          {/* The song-file picker the Sound sheet reaches for; on the laptop it
-              lives in the overlay's audio column, which a phone does not draw. */}
-          <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
-            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
         </>
       )}
 
@@ -3553,7 +3549,7 @@ export default function App() {
           onOpenAccount={openAccount}
           status={{
             audio: deskAudio,
-            engine: engineStatus?.label ?? '',
+            engine: engineStatus,
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,
@@ -3676,12 +3672,13 @@ export default function App() {
         <AccountSheet onClose={closeProfileSheet} />
       )}
 
-      {/* The file input the bench's Image dye button reaches for. It lives
-          in the narrow-screen toolbar, which is not rendered under a desk. */}
+      {/* The file inputs the bench and Sound reach for (kept once for both desk and phone). */}
       {(deskUp || phone) && (
         <>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
           <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+          <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
           <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
         </>
       )}
