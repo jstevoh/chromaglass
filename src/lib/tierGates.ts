@@ -32,6 +32,7 @@ interface NativeBridgeWindow {
     platform?: string;
     requireSignIn?: boolean;
     license?: NativeLicenseBridge;
+    onOpenAccount?: (fn: () => void) => () => void;
   };
 }
 
@@ -45,6 +46,10 @@ export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cg-open-account'));
   }
+}
+
+if (typeof window !== 'undefined') {
+  (window as unknown as NativeBridgeWindow).__CHROMAGLASS_NATIVE__?.onOpenAccount?.(openAccountSheet);
 }
 
 const MARKETING_OPTIN_KEY = 'chromaglass-marketing-optin';
@@ -109,12 +114,6 @@ export interface AppTileSpec {
 }
 
 export const APP_FEATURE_TILES: AppTileSpec[] = [
-  {
-    id: 'song-id',
-    title: 'Song ID & timed lyrics',
-    tier: 'home',
-    summary: 'In the ChromaGlass app — identifies the room’s music and steps through the song’s look script.',
-  },
   {
     id: 'phone-remote',
     title: 'Phone remote & network stage',

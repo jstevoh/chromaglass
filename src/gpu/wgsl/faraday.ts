@@ -61,9 +61,12 @@ export const FARADAY_N = 256;
     drive: the acceleration (m/s²), the drive's frequency (Hz), the depth (m), ν (m²/s)
     layer: g, σ/ρ, the cubic's scale g3 (1/(s m²)), the capillary share
     more:  the pattern's k_c (1/m), the noise (m/√s), the step's seed, 0
+    flow:  m/s a unit of the plate's velocity carries (0 with no plate), the
+           mean flow's push Γ (m²/s²), its floor friction r (1/s), and the
+           strobe's cos φ the plate draws the wave at (src/gpu/faraday.ts)
 */
 const FP = /* wgsl */ `
-struct FP { grid: vec4f, drive: vec4f, layer: vec4f, more: vec4f };
+struct FP { grid: vec4f, drive: vec4f, layer: vec4f, more: vec4f, flow: vec4f };
 @group(0) @binding(0) var<uniform> F: FP;
 fn nOf() -> u32 { return u32(F.grid.x); }
 `;
@@ -124,12 +127,101 @@ fn main(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) t: u3
 @group(0) @binding(1) var<storage, read> z: array<vec2f>;
 @group(0) @binding(2) var<storage, read_write> h: array<f32>;
 @group(0) @binding(3) var<storage, read_write> stiff: array<atomic<u32>, 4>;
+@group(0) @binding(4) var<storage, read_write> eta: array<f32>;
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = nOf();
   if (id.x == 0u) { atomicStore(&stiff[0], 0u); atomicStore(&stiff[1], 0u); }
   if (id.x >= n * n) { return; }
-  h[id.x] = z[id.x].x;
+  let u = z[id.x].x;
+  h[id.x] = u;
+  // The surface as the strobe catches it: η = u cos φ, φ the strobe's slip from the wave's half-frequency (gpu/faraday.ts).
+  eta[id.x] = u * F.flow.w;
+}`,
+
+  /*
+    The push the waves give the liquid under them, in real space, packed as
+    one complex field (Fx + i Fy) for one forward transform: F = −Γ ∇²u ∇u.
+
+    Why that form. The waves' momentum flux (their radiation stress, a
+    quadratic form in ∇u) has a divergence of two parts, ∇u ∇²u and the
+    gradient ∇(|∇u|²/2); the liquid is incompressible, so the gradient is
+    taken up by its pressure and only the first can stir it, and only where
+    its curl, ∇(∇²u) × ∇u, is not nought. For a lattice of one wavelength
+    everywhere ∇²u = −k²u and that curl is nought: a perfect pattern pushes
+    nothing and stands. Where the pattern is not perfect, at a dislocation,
+    a grain boundary, a cell squeezed or stretched, it does push, and the
+    flow it makes carries the pattern (faradayCubic), which moves the defect,
+    which moves the flow: past a second, higher drive, the pattern that
+    stood starts to drift and tear. That is the mean-flow coupling of the
+    generalised Swift–Hohenberg model (Siggia and Zippelius 1981; Greenside
+    and Cross 1985), whose spiral-defect chaos is that, and the same ∝ u²
+    makes it the defect chaos Kudrolli and Gollub saw in shaken dishes past
+    a few times the threshold. Its size, Γ, is set in gpu/faraday.ts to the
+    waves' own streaming scale, ω k u², and not derived for Faraday waves
+    (PLAN 48f-8).
+  */
+  faradayForce: /* wgsl */ `${FP}
+@group(0) @binding(1) var<storage, read> h: array<f32>;
+@group(0) @binding(2) var<storage, read_write> zf: array<vec2f>;
+fn at(x: i32, y: i32, n: i32) -> f32 {
+  return h[u32(((y % n) + n) % n) * u32(n) + u32(((x % n) + n) % n)];
+}
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = i32(nOf());
+  if (id.x >= u32(n) || id.y >= u32(n)) { return; }
+  let x = i32(id.x);
+  let y = i32(id.y);
+  let dx = F.grid.y / f32(n);
+  let c = at(x, y, n);
+  let e = at(x + 1, y, n); let w = at(x - 1, y, n);
+  let s = at(x, y + 1, n); let q = at(x, y - 1, n);
+  let lap = (e + w + s + q - 4.0 * c) / (dx * dx);
+  let g = vec2f(e - w, s - q) / (2.0 * dx);
+  let f = -F.flow.y * lap * g;
+  zf[u32(y * n + x)] = vec2f(f.x, f.y);
+}`,
+
+  /*
+    The flow that push makes, in Fourier space: the push's forward transform
+    in, the flow's spectrum out, for one back transform. The two real
+    components come apart from their packed transform by the pair at k and
+    −k (F̂x = (C(k) + C̄(−k))/2, F̂y = (C(k) − C̄(−k))/2i); the part along k
+    (the gradient, which the pressure takes up) is projected off; and what is
+    left drives a layer h deep over a floor it cannot slip on, the steady
+    balance of the push with the floor's friction r = ν (π/2h)² and the
+    liquid's own viscosity ν k², a Stokes flow and not a jet. Packed again as
+    Ux + i Uy, the back transform gives both components at once.
+  */
+  faradayStream: /* wgsl */ `${FP}
+@group(0) @binding(1) var<storage, read> zf: array<vec2f>;
+@group(0) @binding(2) var<storage, read_write> zu: array<vec2f>;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let n = nOf();
+  if (id.x >= n * n) { return; }
+  let fx = id.x % n;
+  let fy = id.x / n;
+  let sx = select(i32(fx), i32(fx) - i32(n), fx >= n / 2u);
+  let sy = select(i32(fy), i32(fy) - i32(n), fy >= n / 2u);
+  let cut = i32(n) / 3;
+  if ((sx == 0 && sy == 0) || abs(sx) > cut || abs(sy) > cut) { zu[id.x] = vec2f(0.0); return; }
+  let j = ((n - fx) % n) + ((n - fy) % n) * n;
+  let c = zf[id.x];
+  let d = vec2f(zf[j].x, -zf[j].y);
+  let ax = 0.5 * (c + d);
+  let m = 0.5 * (c - d);
+  let ay = vec2f(m.y, -m.x);
+  let dk = 6.28318531 / F.grid.y;
+  let kv = vec2f(f32(sx), f32(sy)) * dk;
+  let k2 = dot(kv, kv);
+  let along = (kv.x * ax + kv.y * ay) / k2;
+  let resp = 1.0 / (F.flow.z + F.drive.w * k2);
+  let ux = (ax - kv.x * along) * resp;
+  let uy = (ay - kv.y * along) * resp;
+  // Ux + i Uy, i times (a, b) being (−b, a).
+  zu[id.x] = ux + vec2f(-uy.y, uy.x);
 }`,
 
   /*
@@ -153,10 +245,47 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(1) var<storage, read> h: array<f32>;
 @group(0) @binding(2) var<storage, read_write> z: array<vec2f>;
 @group(0) @binding(3) var<storage, read_write> stiff: array<atomic<u32>, 4>;
+@group(0) @binding(4) var<storage, read> zu: array<vec2f>;
+@group(0) @binding(5) var vel: texture_2d<f32>;
 var<workgroup> wu: atomic<u32>;
 var<workgroup> ws: atomic<u32>;
 fn at(x: i32, y: i32, n: i32) -> f32 {
   return h[u32(((y % n) + n) % n) * u32(n) + u32(((x % n) + n) % n)];
+}
+/* Catmull-Rom's weights at fraction t: the cubic through four samples, which keeps a wave's height where a bilinear one would flatten it every step. */
+fn cr(t: f32) -> vec4f {
+  let t2 = t * t;
+  let t3 = t2 * t;
+  return 0.5 * vec4f(-t3 + 2.0 * t2 - t, 3.0 * t3 - 5.0 * t2 + 2.0, -3.0 * t3 + 4.0 * t2 + t, t3 - t2);
+}
+/* The amplitude at a point between cells (in cells), by Catmull-Rom both ways, the grid wrapped. */
+fn between(p: vec2f, n: i32) -> f32 {
+  let b = vec2i(floor(p));
+  let f = p - floor(p);
+  let wx = cr(f.x);
+  let wy = cr(f.y);
+  var out = 0.0;
+  for (var j = 0; j < 4; j++) {
+    let y = b.y + j - 1;
+    let row = wx.x * at(b.x - 1, y, n) + wx.y * at(b.x, y, n) + wx.z * at(b.x + 1, y, n) + wx.w * at(b.x + 2, y, n);
+    out += wy[j] * row;
+  }
+  return out;
+}
+/* The plate's flow at a cell's middle, m/s, between its texels (the plate's uv and this grid's are the same square). */
+fn plateFlow(x: i32, y: i32, n: i32) -> vec2f {
+  let size = vec2f(textureDimensions(vel));
+  if (size.x < 2.0 || F.flow.x == 0.0) { return vec2f(0.0); }
+  let uv = (vec2f(f32(x), f32(y)) + 0.5) / f32(n);
+  let p = clamp(uv * size - 0.5, vec2f(0.0), size - 1.0);
+  let i = vec2i(floor(p));
+  let f = p - floor(p);
+  let hi = min(i + 1, vec2i(size) - 1);
+  let a = textureLoad(vel, i, 0).xy;
+  let b = textureLoad(vel, vec2i(hi.x, i.y), 0).xy;
+  let c = textureLoad(vel, vec2i(i.x, hi.y), 0).xy;
+  let d = textureLoad(vel, hi, 0).xy;
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y) * F.flow.x;
 }
 fn hash(a: u32) -> f32 {
   var x = a * 747796405u + 2891336453u;
@@ -202,7 +331,23 @@ fn cell(id: vec3u, n: i32) {
   // White noise of F.more.y m/√s: a variance of noise² dt a substep, so N carries noise / √dt.
   let i = u32(y * n + x);
   let xi = (hash(i ^ (u32(F.more.z) * 2654435761u)) * 2.0 - 1.0) * 1.7320508;
-  z[i] = vec2f(cubic + F.more.y * xi / sqrt(F.grid.z), 0.0);
+  /*
+    And carried: the pattern is the liquid's, so where the liquid moves it
+    goes with it (∂u/∂t + U·∇u), U the plate's own flow (a stir, a pour, the
+    tilt) and the waves' own mean flow (faradayStream). Semi-Lagrangian, the
+    amplitude this substep's flow brings from upstream less the one here,
+    over the substep: in N, so the exact step (faradayAdvance) lands it as
+    the amplitude brought, for a wave neither growing nor dying. Held to two
+    cells a substep, past which a flow is a step that failed.
+  */
+  let dt = F.grid.z;
+  let flow = zu[i] + plateFlow(x, y, n);
+  var go = flow * dt / dx;
+  let far = length(go);
+  if (far > 2.0) { go = go * (2.0 / far); }
+  var carry = 0.0;
+  if (far > 1e-6) { carry = (between(vec2f(f32(x), f32(y)) - go, n) - c) / dt; }
+  z[i] = vec2f(cubic + carry + F.more.y * xi / sqrt(F.grid.z), 0.0);
 }`,
 
   /*

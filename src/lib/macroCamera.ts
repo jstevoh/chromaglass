@@ -775,6 +775,16 @@ export function panAim(
 const ARROWS: Record<string, [number, number] | undefined> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
 /**
+ * The closeup's real keyboard bindings, exported beside `macroKey` so the
+ * `?` shortcut sheet reads them from the module that executes them.
+ */
+export const MACRO_SHORTCUTS: readonly { kbd: string; label: string }[] = [
+  { kbd: '+ / =', label: 'Zoom in (Macro Closeup)' },
+  { kbd: '− / _', label: 'Zoom out (Macro Closeup)' },
+  { kbd: '← ↑ ↓ →', label: 'Pan closeup when zoomed in (⇧ for larger step)' },
+];
+
+/**
  * The closeup's keys: + and - zoom, the arrows pan (`panAim`), only with the
  * closeup in for the arrows. The pan is the aim Alt-drag moves, from where the
  * camera is looking now, so a Follow or an Auto pans on from its own frame

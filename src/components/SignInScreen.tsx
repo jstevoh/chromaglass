@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
+import { useEscape } from '../hooks/useEscape';
 import {
   getFirebaseAuth,
   signInWithProvider,
@@ -33,6 +35,8 @@ interface SignInScreenProps {
    * one more block in a sheet the owner called "really cluttered" (2026-11-10).
    */
   compact?: boolean;
+  /** Back out to the landing page (Escape, backdrop tap, or × button). */
+  onClose?: () => void;
 }
 
 // Initialize Firebase Auth as soon as this lazy chunk loads so popup handlers fire synchronously.
@@ -587,21 +591,39 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
   );
 };
 
-export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => (
-  <div
-    data-cg-signin=""
-    className="fixed inset-0 z-50 flex items-center justify-center p-2.5 overflow-y-auto"
-    style={{ background: 'rgba(5, 5, 8, 0.55)', backdropFilter: 'blur(12px)' }}
-  >
-    <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-3.5 text-neutral-100 shadow-2xl">
-      <div className="mb-2.5 text-center">
-        <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
-        <p className="mt-0.5 text-xs text-neutral-400">
-          Sign in to enter the studio
-        </p>
+const NOOP = () => {};
+
+export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn, onClose }) => {
+  useEscape(onClose ?? NOOP);
+  return (
+    <div
+      data-cg-signin=""
+      onClick={(e) => { if (onClose && e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 overflow-y-auto"
+      style={{ background: 'rgba(5, 5, 8, 0.55)', backdropFilter: 'blur(12px)' }}
+    >
+      <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-3.5 text-neutral-100 shadow-2xl">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close sign in"
+            title="Back to ChromaGlass (Esc)"
+            data-cg-signin-close=""
+            className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-white/10 hover:text-neutral-100"
+          >
+            <X size={18} />
+          </button>
+        )}
+        <div className="mb-2.5 text-center">
+          <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
+          <p className="mt-0.5 text-xs text-neutral-400">
+            Sign in to enter the studio
+          </p>
+        </div>
+        <SignInForm onSignedIn={onSignedIn} />
       </div>
-      <SignInForm onSignedIn={onSignedIn} />
     </div>
-  </div>
-);
+  );
+};
 export default SignInScreen;

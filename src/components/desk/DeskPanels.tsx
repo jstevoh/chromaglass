@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
 import { ImagePlus, Palette, SlidersHorizontal, Video } from 'lucide-react';
 import { PicturePaletteButton } from '../PicturePaletteButton';
-import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
+import { Button, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
@@ -24,9 +24,11 @@ import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
 import { TipPad } from '../ui/TipPad';
-import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
+import { Bottle, LiveBottle } from '../ui/Playful';
+import { LookChip } from '../ui/LookChip';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 /**
  * The bodies of the desk's panels (Desk v2).
@@ -132,13 +134,13 @@ function ControlGrid({ keys, p, prefix }: { keys: (keyof VisualizerSettings)[]; 
   const specs = keys.map(k => RANGE.get(String(k))).filter((s): s is DeskSpec => !!s);
   if (specs.length === 0) return null;
   return (
-    <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-2 pt-1">
+    <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-1.5 pt-1">
       {specs.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob />)}
     </div>
   );
 }
 
-const scroller = 'min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide';
+const scroller = 'min-h-0 flex-1 overflow-y-auto overflow-x-hidden cg-scroll';
 
 // ── Cues ─────────────────────────────────────────────────────────────
 
@@ -188,7 +190,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           <span className="ml-auto shrink-0 whitespace-nowrap pl-2 font-mono text-[12px] text-faint" data-testid="set-count">{p.cues.length} {p.cues.length === 1 ? 'item' : 'items'}</span>
         </div>
         <span className="flex items-center gap-1 whitespace-nowrap [&>*]:flex-1">
-          <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a preset palette, a saved one, a sequence or a file to the set">+ Add</Button>
+          <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a look, a saved look, a sequence or a file to the set">+ Add</Button>
           <Button
             height={28}
             onClick={() => { setAct('save'); setSaved(true); window.setTimeout(() => setSaved(false), 1400); }}
@@ -204,7 +206,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           <div className="absolute right-3 top-full z-30 w-56 rounded-md border border-border-strong bg-elevated p-1 shadow-lg" data-testid="set-menu-list">
             {p.savedSets.length > 0 && (
               <>
-                <p className="px-2 pb-1 pt-1.5 text-[11px] uppercase tracking-wide text-faint">Open a saved set</p>
+                <p className="px-2 pb-1 pt-1.5 text-[12px] uppercase tracking-wide text-faint">Open a saved set</p>
                 {p.savedSets.map(n => (
                   <div key={n} className="flex items-center">
                     <MenuItem onClick={() => setAct('open', n)} testId={`set-open-${n}`}>{n}</MenuItem>
@@ -220,7 +222,7 @@ function CuesBody({ p }: { p: DeskProps }) {
               </>
             )}
             <MenuItem onClick={() => setAct('new')} testId="set-new">New empty set</MenuItem>
-            <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all preset palettes</MenuItem>
+            <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all looks</MenuItem>
             <div className="my-1 h-px bg-border" />
             <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
             <MenuItem onClick={() => setAct('export')} testId="set-export">Export this set</MenuItem>
@@ -232,41 +234,52 @@ function CuesBody({ p }: { p: DeskProps }) {
         )}
       </div>
       <div className={`${scroller} px-2 pb-2`}>
-        {p.cues.map((c, i) => (
-          <CueRow
-            key={c.id}
-            index={i + 1}
-            name={c.name}
-            swatch={c.swatch}
-            state={c.id === p.liveId ? 'live' : c.id === p.nextId ? 'next' : 'idle'}
-            trailing={
-              <>
-                {c.song && <span className="shrink-0 text-[12px] text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
-                {c.kind === 'sequence' && <span className="shrink-0 text-[11px] text-faint" title="A stage sequence">seq</span>}
-                {c.missing && <span className="shrink-0 text-[11px] text-live" title="This look or sequence is not here any more">missing</span>}
-                {c.id === p.liveId ? <Tag tone="live">live</Tag>
-                : c.id === p.nextId ? <Tag tone="next">next</Tag>
-                : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
-                {/* Take it off the set. A span, not a button: the row is the button. */}
-                <span
-                  role="button"
-                  tabIndex={0}
+        {/*
+          The set as round chips (PLAN 34b-6, the owner 2026-11-27: the rows
+          took a ton of room). Each chip is a picture of its look, in the
+          set's order, read left to right; the name, number, fade and song on
+          hover (or a long press, which opens the item's menu as a right-click
+          does). A click cues and a double-click sends, as the rows did; a
+          learned controller still touches the item through its midiKey. A
+          song is a note on the chip's foot, a sequence a dashed ring, a look
+          that is gone a faded chip.
+        */}
+        <div className="flex flex-wrap gap-2 px-1 pb-1 pt-1.5" data-testid="cue-chips">
+          {p.cues.map((c, i) => {
+            const state = c.id === p.liveId ? 'live' : c.id === p.nextId ? 'next' : 'idle';
+            const fade = c.fade === 0 ? 'cut' : `${c.fade}s fade`;
+            const tip = `${String(i + 1).padStart(2, '0')} · ${c.name}${c.note ? ` (${c.note})` : ''} · ${fade}${c.song ? ` · goes up when ${c.song} plays` : ''}${c.kind === 'sequence' ? ' · a stage sequence' : ''}${c.missing ? ' · not here any more' : ''}`;
+            return (
+              <LookChip
+                key={c.id}
+                lookId={c.lookId}
+                name={c.name}
+                swatch={c.swatch}
+                size={40}
+                state={state}
+                title={`${tip}. Click cues, double-click sends now, right-click for its song, controls and order.`}
+                dim={c.missing}
+                onClick={() => p.onCue(c.id)}
+                onDoubleClick={() => p.onCueNow(c.id)}
+                onContextMenu={(e) => { e.preventDefault(); setMenuFor(c.id); }}
+                onLongPress={() => setMenuFor(c.id)}
+                midiKey={`preset:${c.id}`}
+                testId={`cue-${c.id}`}
+              >
+                {c.kind === 'sequence' && <span aria-hidden className="pointer-events-none absolute -inset-[3px] rounded-full border border-dashed border-text-2" />}
+                {c.song && <span className="pointer-events-none absolute -bottom-1 -left-1 rounded-full bg-elevated px-1 text-[11px] leading-4 text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
+                <button
+                  type="button"
                   onClick={e => { e.stopPropagation(); p.onItemAction(c.id, 'remove'); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); p.onItemAction(c.id, 'remove'); } }}
                   title="Remove from the set"
                   aria-label={`Remove ${c.name} from the set`}
-                  className="-mr-1 shrink-0 rounded px-1.5 text-[15px] leading-none text-faint opacity-0 hover:bg-hover hover:text-text focus:opacity-100 group-hover:opacity-100"
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                   data-testid={`cue-remove-${c.id}`}
-                >×</span>
-              </>
-            }
-            onClick={() => p.onCue(c.id)}
-            onDoubleClick={() => p.onCueNow(c.id)}
-            onContextMenu={(e) => { e.preventDefault(); setMenuFor(c.id); }}
-            midiKey={`preset:${c.id}`}
-            testId={`cue-${c.id}`}
-          />
-        ))}
+                >×</button>
+              </LookChip>
+            );
+          })}
+        </div>
         {menuFor && (() => {
           const c = p.cues.find(x => x.id === menuFor);
           return (
@@ -283,11 +296,11 @@ function CuesBody({ p }: { p: DeskProps }) {
           );
         })()}
         {p.cues.length > 0 ? (
-          <p className="px-2 pt-1 text-[11px] text-faint">Right-click an item for its song, controls and order; × takes it off.</p>
+          <p className="px-2 pt-1 text-[12px] text-faint">Hover a look for its name; right-click or long-press it for its song, controls and order; × takes it off.</p>
         ) : (
           <div className="px-3 py-8 text-center text-[13px] text-muted" data-testid="set-empty">
             <p>This set is empty.</p>
-            <p className="mt-1 text-[12px] text-faint">+ Add preset palettes to it, or start from all of them in the ⋯ menu.</p>
+            <p className="mt-1 text-[12px] text-faint">+ Add looks to it, or start from all of them in the ⋯ menu.</p>
           </div>
         )}
       </div>
@@ -306,35 +319,35 @@ function CuesBody({ p }: { p: DeskProps }) {
             className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[12px] text-muted hover:text-text"
             data-testid="perform-saved-toggle"
           >
-            <span>Your preset palettes</span>
-            <span className="font-mono text-[11px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
+            <span>Your saved looks</span>
+            <span className="font-mono text-[12px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
           </button>
           {savedOpen && (
-            <div className="max-h-[22vh] overflow-y-auto scrollbar-hide" data-testid="perform-saved-list">
+            <div className="flex max-h-[22vh] flex-wrap gap-2 overflow-y-auto px-1 pb-1 pt-1.5 scrollbar-hide" data-testid="perform-saved-list">
               {p.savedLooks.map(l => {
                 const state = l.id === p.liveLookId ? 'live' : l.id === p.cuedLook?.id ? 'next' : 'idle';
                 return (
-                  <div key={l.id} className={`group flex h-9 items-center rounded-md border ${state === 'live' ? 'border-live-border bg-live-bg' : state === 'next' ? 'border-accent-border bg-elevated' : 'border-transparent hover:bg-hover'}`}>
+                  <LookChip
+                    key={l.id}
+                    lookId={l.id}
+                    name={l.name}
+                    swatch={l.swatch}
+                    size={40}
+                    state={state}
+                    title={`${l.name}${l.description ? ` (${l.description})` : ''}${state === 'live' ? ' (live)' : state === 'next' ? ' (next)' : ''}. Click cues it, Go sends it; double-click sends it now.`}
+                    onClick={() => p.onCueSaved(l.id)}
+                    onDoubleClick={() => p.onSendSaved(l.id)}
+                    testId={`perform-saved-${l.id}`}
+                  >
                     <button
-                      onClick={() => p.onCueSaved(l.id)}
-                      onDoubleClick={() => p.onSendSaved(l.id)}
-                      title={`Cue ${l.name}; Go sends it. Double-click sends it now.`}
-                      className="flex h-full min-w-0 flex-1 items-center gap-2.5 px-2 text-left"
-                      data-testid={`perform-saved-${l.id}`}
-                      data-state={state}
-                    >
-                      <SlideMount swatch={l.swatch} size={20} />
-                      <span className={`truncate text-[13px] ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{l.name}</span>
-                    </button>
-                    {state === 'live' ? <Tag tone="live">live</Tag> : state === 'next' ? <Tag tone="next">next</Tag> : null}
-                    <button
+                      type="button"
                       onClick={() => p.onAddSavedToSet(l.id)}
                       title={`Add ${l.name} to the set`}
                       aria-label={`Add ${l.name} to the set`}
-                      className="ml-1 mr-1 shrink-0 rounded px-1.5 py-0.5 text-[13px] text-faint hover:bg-hover hover:text-text"
+                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                       data-testid={`perform-saved-add-${l.id}`}
                     >+</button>
-                  </div>
+                  </LookChip>
                 );
               })}
             </div>
@@ -342,13 +355,9 @@ function CuesBody({ p }: { p: DeskProps }) {
         </div>
       )}
       {/*
-        Fade and Go, as small as they can be and still be hit in the dark: one
-        row of fade times across the column and a Go a finger's height. They
-        were 140px of the column with Back and Freeze under them, which the
-        owner never pressed (2026-10-10: "I don't use them. We can keep the
-        shortcuts though"). Back is still ⌫ and Freeze still F, from the
-        keyboard (App's key handler), ⌘K, and a learned MIDI pad
-        (`action:revert`, `action:play-toggle` in the Controller's map).
+        Fade, Back and Go in the cue footer (PLAN 49a / H3-07): Back returns
+        as a visible control beside Go so returning from an accidental fade or
+        look change never depends on remembering ⌫ during a set.
       */}
       <div className="flex shrink-0 flex-col gap-1.5 border-t border-border px-3 py-2" data-testid="cue-go">
         <div className="flex items-center gap-2">
@@ -362,15 +371,32 @@ function CuesBody({ p }: { p: DeskProps }) {
             testId="fade-segmented"
           />
         </div>
-        <Button
-          variant="primary" full height={36} kbd="Space"
-          onClick={p.onGo}
-          disabled={!next}
-          midiKey="action:go"
-          testId="go-button"
-        >
-          <span className="min-w-0 truncate">{next ? `Go to ${next.name}` : 'Nothing cued'}</span>
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {p.onBack && (
+            <Button
+              height={36}
+              kbd="⌫"
+              onClick={p.onBack}
+              disabled={!p.canBack}
+              midiKey="action:revert"
+              testId="back-button"
+              title="Back to the previous look"
+            >
+              Back
+            </Button>
+          )}
+          <div className="min-w-0 flex-1">
+            <Button
+              variant="primary" full height={36} kbd="Space"
+              onClick={p.onGo}
+              disabled={!next}
+              midiKey="action:go"
+              testId="go-button"
+            >
+              <span className="min-w-0 truncate">{next ? `Go to ${next.name}` : 'Nothing cued'}</span>
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -383,7 +409,7 @@ export const RIDES_WIDTH = 312;
 /** The left column's width (the cue list's, in Gig). */
 export const LEFT_WIDTH = 272;
 
-function RidesBody({ p }: { p: DeskProps }) {
+function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
   const portalBody = usePortalBody();
   const [picking, setPicking] = useState(false);
   const [mixerOpen, setMixerOpen] = useState(false);
@@ -391,10 +417,12 @@ function RidesBody({ p }: { p: DeskProps }) {
     The Mixer sheet lies over the rides, on whichever side they are, at that
     column's width, so it covers none of the plate. With the Mixer out as a
     panel of its own the button goes: one Mixer on screen, not two.
+    When the desk folds into one column below 1024 px, that column is on the
+    right, so a Rides panel from `left` docks its Mixer on the right too.
   */
   const where = whereIs(p.layout, 'rides');
   const mixerOut = whereIs(p.layout, 'mixer') !== null;
-  const side = where === 'left' ? 'left' : 'right';
+  const side = !narrow && where === 'left' ? 'left' : 'right';
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="rides">
       {picking ? (
@@ -421,7 +449,7 @@ function RidesBody({ p }: { p: DeskProps }) {
           })}
           <div className="mt-1.5 border-t border-border pt-1.5">
             <Toggle
-              label="Random evolve"
+              label="Evolve"
               // The real switch. This used to write automateRate between 0 and
               // 0.15, which only sets how often an evolving plate does something:
               // with evolving off (the default) it showed "on" and did nothing.
@@ -431,6 +459,18 @@ function RidesBody({ p }: { p: DeskProps }) {
                 if (on && (p.settings.automateRate ?? 0) < 0.02) p.onSetting({ automateRate: 0.15 });
               }}
               testId="toggle-evolve"
+            />
+            {/*
+              Keep full (PLAN 18a-22, sim/keepFull.ts), beside Evolve because
+              both are what the plate does left alone; unlike Evolve it only
+              tops the dish up with drops of its own bottles and changes
+              nothing else. The room's switch, so a look change keeps it.
+            */}
+            <Toggle
+              label="Keep it full"
+              on={!!p.settings.keepFull}
+              onChange={on => p.onSetting({ keepFull: on })}
+              testId="toggle-keepfull"
             />
             {/*
               Follow beat stood here, a switch that wrote Beat Prediction as 0
@@ -464,11 +504,11 @@ function RidesBody({ p }: { p: DeskProps }) {
         start at the panel's top and keep the column's height: Choose stood in
         a row of its own above them until 2026-11-07.
       */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-border p-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-t border-border px-2.5 py-1.5">
         <button
           aria-pressed={picking}
           onClick={() => setPicking(v => !v)}
-          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+          className={`inline-flex h-[32px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
             picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
           }`}
           title="Choose which controls ride here"
@@ -476,8 +516,8 @@ function RidesBody({ p }: { p: DeskProps }) {
         >
           <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
         </button>
-        {!mixerOut && <Button full height={34} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
-        <Button full height={34} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
+        {!mixerOut && <Button full height={32} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
+        <Button full height={32} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
       </div>
       {mixerOpen && !mixerOut && createPortal(
         /*
@@ -522,19 +562,6 @@ function RecipeBody({ p }: { p: DeskProps }) {
   const elsewhere = drawnElsewhere(p.layout, 'recipe', p.recipeKeys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="recipe">
-      <div className="flex h-7 shrink-0 items-center justify-end px-3">
-        <button
-          aria-pressed={picking}
-          onClick={() => setPicking(v => !v)}
-          className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
-            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
-          }`}
-          title="Choose which controls are on the recipe"
-          data-testid="recipe-pick"
-        >
-          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
-        </button>
-      </div>
       {picking ? (
         <PickList chosen={p.recipeKeys} onChange={p.onRecipeKeys} testId="recipe-picker" />
       ) : (
@@ -549,7 +576,7 @@ function RecipeBody({ p }: { p: DeskProps }) {
           {!ridesOut && (
             <div className="mt-2 border-t border-border pt-1">
               <Toggle
-                label="Random evolve"
+                label="Evolve"
                 on={p.automated}
                 onChange={on => {
                   p.onAutomate(on);
@@ -557,12 +584,29 @@ function RecipeBody({ p }: { p: DeskProps }) {
                 }}
                 testId="toggle-evolve"
               />
+              <Toggle
+                label="Keep it full"
+                on={!!p.settings.keepFull}
+                onChange={on => p.onSetting({ keepFull: on })}
+                testId="toggle-keepfull"
+              />
             </div>
           )}
         </div>
       )}
-      {/* Pinned rather than at the end of a list that scrolls. */}
-      <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
+      {/* Pinned rather than at the end of a list that scrolls; Choose shares the row so knobs start at the top. */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5">
+        <button
+          aria-pressed={picking}
+          onClick={() => setPicking(v => !v)}
+          className={`inline-flex h-[32px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
+          }`}
+          title="Choose which controls are on the recipe"
+          data-testid="recipe-pick"
+        >
+          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
+        </button>
         {/*
           A Close-up button sat here, beside Randomise: one press to 4x and
           one back to the plate. The owner asked for it gone (2026-11-14):
@@ -570,15 +614,15 @@ function RecipeBody({ p }: { p: DeskProps }) {
           for the closeup and it always reads what the plate is doing
           (PLAN QA-32c).
         */}
-        {/* Randomise replaces every setting at once, so it asks first. */}
+        {/* Protected by the 8 s Undo toast rather than an inline "Sure?" prompt (PLAN 49a). */}
         <Button
           full height={32}
-          variant={p.randomiseArmed ? 'primary' : 'secondary'}
+          variant="secondary"
           onClick={p.onRandomise}
           midiKey="action:lucky"
           testId="randomise-button"
         >
-          {p.randomiseArmed ? 'Sure?' : 'Randomise'}
+          Randomise
         </Button>
       </div>
     </div>
@@ -589,14 +633,14 @@ function RecipeBody({ p }: { p: DeskProps }) {
 
 function BottlesBody({ p }: { p: DeskProps }) {
   return (
-    <div className="grid grid-cols-3 gap-1.5" data-testid="bench-left">
+    <div className="grid grid-cols-3 gap-1" data-testid="bench-left">
       {[...p.dyeBottles, ...p.behaviourBottles].map(l => (
         <button
           aria-pressed={p.bottleId === l.id}
           key={l.id}
           onClick={() => p.onBottle(l.id)}
           title={l.behaviour ? `${l.name}: changes the plate where it lands` : l.name}
-          className={`flex h-8 min-w-0 items-center gap-2 rounded-md border px-2 text-left transition-colors ${
+          className={`flex min-h-[28px] min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition-colors ${
             p.bottleId === l.id ? LIT : 'border-transparent text-muted hover:bg-hover hover:text-text'
           }`}
           data-testid={`bottle-${l.id}`}
@@ -610,7 +654,7 @@ function BottlesBody({ p }: { p: DeskProps }) {
           {p.bottleId === l.id
             ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} testId="bottle-in-hand" />
             : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} />}
-          <span className="truncate text-[13px] font-medium">{l.name}</span>
+          <span className="min-w-0 flex-1 text-[12px] font-medium leading-[1.15] line-clamp-2">{l.name}</span>
         </button>
       ))}
     </div>
@@ -729,7 +773,7 @@ function DyesBody({ p }: { p: DeskProps }) {
       {p.onPicturePalette && (
         <PicturePaletteButton
           onFile={p.onPicturePalette}
-          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-60"
+          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-65"
           testId="picture-palette"
         >
           <Palette size={13} className="mr-1.5 inline" /> Palette from a picture or video…
@@ -755,8 +799,8 @@ function DyesBody({ p }: { p: DeskProps }) {
           in the Video panel: one row, Play and Pour, either or both. */}
       {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
-          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
+          <span className="text-[12px] uppercase tracking-wider text-dim">Video in</span>
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} filmRing={p.settings.filmRing} onPlace={patch => p.onSetting(patch)} />
         </div>
       )}
     </div>
@@ -796,7 +840,7 @@ function ToolsBody({ p }: { p: DeskProps }) {
               title={`${label} (${k}). Right-click for its options.`}
               data-testid={`tool-segmented-${id}`}
               aria-keyshortcuts={k}
-              className={`relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border pt-0.5 text-[11px] font-medium transition-[transform,box-shadow,background-color] duration-[120ms] ${
+              className={`relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border pt-0.5 text-[12px] font-medium transition-[transform,box-shadow,background-color] duration-[120ms] ${
                 held
                   ? `${LIT} translate-y-[2px] shadow-none`
                   : 'border-border bg-elevated text-muted shadow-[0_2px_0_0_rgba(0,0,0,.6)] hover:bg-hover hover:text-text-2'
@@ -804,7 +848,7 @@ function ToolsBody({ p }: { p: DeskProps }) {
             >
               <ToolGlyph id={id} size={18} />
               <span className="max-w-full truncate px-0.5 leading-none">{label}</span>
-              <kbd className={`pointer-events-none absolute right-1 top-0.5 font-mono text-[9px] leading-none ${held ? 'text-on-lit/80' : 'text-faint'}`}>{k}</kbd>
+              <kbd className={`pointer-events-none absolute right-1 top-0.5 font-mono text-[12px] leading-none ${held ? 'text-on-lit' : 'text-faint'}`}>{k}</kbd>
             </button>
           );
         })}
@@ -823,9 +867,9 @@ function ToolsBody({ p }: { p: DeskProps }) {
           title="Tip the dish: drag the dot toward an edge and the liquid runs there; let go and it sloshes back. A first grab turns Slosh up to half if it was off."
         >
           <TipPad settings={p.settings} onSetting={p.onSetting} size={40} reach={72} testId="tip-pad" />
-          <span className="min-w-0 truncate text-[11px] font-medium leading-tight text-muted">
+          <span className="min-w-0 truncate text-[12px] font-medium leading-tight text-muted">
             Tip
-            <span className="block font-mono text-[10px] font-normal text-faint" data-testid="tip-slosh">slosh {Math.round((p.settings.slosh ?? 0) * 100)}%</span>
+            <span className="block font-mono text-[12px] font-normal text-faint" data-testid="tip-slosh">slosh {Math.round((p.settings.slosh ?? 0) * 100)}%</span>
           </span>
         </div>
       </div>
@@ -845,9 +889,8 @@ function ToolsBody({ p }: { p: DeskProps }) {
             style={{ '--fill': `${(((p.toolAmount ?? 1) - TOOL_AMOUNT.min) / (TOOL_AMOUNT.max - TOOL_AMOUNT.min)) * 100}%` } as CSSProperties}
             data-testid="tool-amount-range"
           />
-          {/* The value, and the door to the tool's own options (the Magnet's size). */}
+          {/* The value, and the door to the tool's own options (Magnet Size, Press Fingering & Thin Gap). */}
           <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />
-          <span className="shrink-0 font-mono text-[12px] text-text-2 min-[1400px]:hidden">{(p.toolAmount ?? 1).toFixed(1)}×</span>
         </div>
       )}
       {toolMenu && p.amountOf && p.onAmountFor && (
@@ -859,6 +902,10 @@ function ToolsBody({ p }: { p: DeskProps }) {
           onClose={() => setToolMenu(null)}
           magnetSize={p.magnetSize}
           onMagnetSize={p.onMagnetSize}
+          fingering={p.settings.fingering ?? 0}
+          onFingering={(v) => p.onSetting({ fingering: v })}
+          thinGap={p.settings.thinGap ?? 1}
+          onThinGap={(v) => p.onSetting({ thinGap: v })}
         />
       )}
     </div>
@@ -891,10 +938,16 @@ function KnobsBody({ id, p }: { id: string; p: DeskProps }) {
   const name = PANEL_BY_ID.get(id)?.name ?? id;
   // A knob the Rides or the Recipe have out is drawn there, not here as well (`drawnElsewhere`).
   const elsewhere = drawnElsewhere(p.layout, id, keys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
+  const oilGroundNote = id === 'oil' ? clearFilmGroundNote(p.settings.lampGround, p.settings.clearFilmDye) : undefined;
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid={`section-knobs-${id}`}>
       <div className={scroller}>
         <ControlGrid keys={keys.filter(k => !elsewhere.has(String(k)))} p={p} prefix="knob" />
+        {oilGroundNote && (
+          <p className="mt-2 text-[11px] leading-snug text-dim" data-testid="desk-clear-film-ground-note">
+            {oilGroundNote}
+          </p>
+        )}
         <Elsewhere held={elsewhere} testId={`panel-${id}-elsewhere`} />
       </div>
       {/*
@@ -989,7 +1042,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
   const showCode = p.status.phone === 0 || moreOpen;
 
   return (
-    <div className="flex flex-col gap-2 text-[13px]" data-testid="phone-link">
+    <div className="flex flex-col gap-1.5 text-[13px]" data-testid="phone-link">
       <p className="flex items-center gap-2 text-text-2" data-testid="phone-link-status">
         <span
           className="h-2 w-2 shrink-0 rounded-full"
@@ -999,7 +1052,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
       </p>
       {accountShows.length > 0 && (
         <div className="flex flex-col gap-1" data-testid="account-shows">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Running shows on your account</span>
+          <span className="text-[12px] uppercase tracking-wider text-dim">Running shows on your account</span>
           {accountShows.map((show) => (
             <button
               key={show.id}
@@ -1013,7 +1066,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
                 <span className="truncate">{show.name}</span>
               </span>
-              <span className="shrink-0 text-[11px] font-medium text-accent-text">Join</span>
+              <span className="shrink-0 text-[12px] font-medium text-accent-text">Join</span>
             </button>
           ))}
         </div>
@@ -1036,24 +1089,26 @@ function PhoneBody({ p }: { p: DeskProps }) {
             </Button>
           )}
           {showCode && (
-            <>
-              {hasRelay ? (
-                <p className="text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
-              ) : (
-                <p className="leading-relaxed text-dim">
-                  This page has no show server behind it, so the code opens the show on the phone itself. A phone that drives this show links through the show server, which runs with the Mac app (or <span className="font-mono text-[12px]">npm run remote</span> on this machine).
-                </p>
-              )}
-              <QrCodeImage text={url} />
-              <code className="break-all rounded-md bg-elevated px-2 py-1.5 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
-              <Button
-                height={32}
-                onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }); }}
-                testId="phone-link-copy"
-              >
-                {copied ? 'Copied' : 'Copy the address'}
-              </Button>
-            </>
+            <div className="flex items-start gap-3">
+              <QrCodeImage text={url} maxPx={120} />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                {hasRelay ? (
+                  <p className="text-[12px] leading-snug text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
+                ) : (
+                  <p className="text-[12px] leading-snug text-dim">
+                    No show server behind this page, so the code opens the show on the phone itself. Open the show in the ChromaGlass Mac app to pair a phone remote.
+                  </p>
+                )}
+                <code className="break-all rounded-md bg-elevated px-2 py-1 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
+                <Button
+                  height={28}
+                  onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }); }}
+                  testId="phone-link-copy"
+                >
+                  {copied ? 'Copied' : 'Copy the address'}
+                </Button>
+              </div>
+            </div>
           )}
         </>
       )}
@@ -1069,18 +1124,18 @@ function PhoneBody({ p }: { p: DeskProps }) {
   the dark-on-light polarity, so it is white in a dark panel on purpose, and
   sized in whole pixels per module so no module blurs across two.
 */
-function QrCodeImage({ text }: { text: string }) {
+function QrCodeImage({ text, maxPx = 168 }: { text: string; maxPx?: number }) {
   const code = useMemo(() => encodeQr(text), [text]);
   if (!code) return null;
   const span = code.size + 8;
-  const px = Math.max(2, Math.floor(168 / span)) * span;
+  const px = Math.max(2, Math.floor(maxPx / span)) * span;
   return (
     <svg
       viewBox={`0 0 ${span} ${span}`}
       width={px}
       height={px}
       shapeRendering="crispEdges"
-      className="self-center rounded-sm"
+      className="shrink-0 rounded-sm"
       role="img"
       aria-label="QR code of the address"
       data-testid="phone-link-qr"
@@ -1094,17 +1149,17 @@ function QrCodeImage({ text }: { text: string }) {
 
 // ── Which body ───────────────────────────────────────────────────────
 
-export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
+export function PanelBody({ id, p, narrow = false }: { id: string; p: DeskProps; narrow?: boolean }): ReactNode {
   switch (id) {
     case 'cues': return <CuesBody p={p} />;
-    case 'rides': return <RidesBody p={p} />;
+    case 'rides': return <RidesBody p={p} narrow={narrow} />;
     case 'recipe': return <RecipeBody p={p} />;
     case 'bottles': return <BottlesBody p={p} />;
     case 'dyes': return <DyesBody p={p} />;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
     case 'live': return <LiveShowPanel />;
-    case 'score': return p.score ? <SongScore {...p.score} /> : null;
+    case 'score': return p.score ? <SongScore {...p.score} onOpenSound={p.onSound} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;
   }
@@ -1143,7 +1198,7 @@ function MenuItem({ children, onClick, disabled, testId }: { children: ReactNode
     <button
       onClick={onClick}
       disabled={disabled}
-      className="block w-full truncate rounded-sm px-2 py-1.5 text-left text-[13px] text-text-2 hover:bg-hover disabled:opacity-40"
+      className="block w-full truncate rounded-sm px-2 py-1.5 text-left text-[13px] text-text-2 hover:bg-hover disabled:opacity-65"
       data-testid={testId}
     >
       {children}

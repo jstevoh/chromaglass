@@ -7,7 +7,7 @@
 // so past visualizations can be replayed exactly.
 
 import { COLOR_HARMONIES } from '../constants';
-import { TrackEvolutionState, ListenRecord, LyricTheme } from './musicTypes';
+import { TrackEvolutionState, ListenRecord, LyricTheme, TrackIdentity } from './musicTypes';
 
 /** FNV-1a 32-bit — stable across sessions, good enough distribution for seeding. */
 export function hashString(str: string): number {
@@ -23,6 +23,23 @@ export function hashString(str: string): number {
 export function pseudoIsrc(artist: string, title: string): string {
   const h = hashString(`${artist.toLowerCase().trim()}::${title.toLowerCase().trim()}`);
   return `LOCAL-${h.toString(16).padStart(8, '0')}`;
+}
+
+/**
+ * A song named by hand (the Track panel's Tag, the Songs panel's Name it, the
+ * assistant's listen with a name): since automatic song identification was
+ * retired (2026-11-27, archive/song-id/) the only way a song gets a name. It
+ * lived in the identification module, `fingerprint.ts`, until then.
+ */
+export function manualIdentity(artist: string, title: string): TrackIdentity {
+  return {
+    isrc: pseudoIsrc(artist, title),
+    title: title.trim(),
+    artist: artist.trim(),
+    identifiedAtMs: performance.now(),
+    offsetSec: 0,
+    source: 'manual',
+  };
 }
 
 /** Deterministic mulberry32 PRNG from a seed. */
@@ -136,7 +153,6 @@ export interface MusicVisualParams {
   harmonyIndex: number;
   turbulenceScale: number;
   turbulenceDetail: number;
-  blobSurfaceTension: number;
   saturationBoost: number;
   boundaryContrast: number;
   densityBias: number;
@@ -149,7 +165,7 @@ export interface MusicVisualParams {
 export function buildVisualParams(
   seed: TrackSeed,
   state: TrackEvolutionState | null,
-  base: { turbulenceScale: number; blobSurfaceTension: number; saturationBoost: number; boundaryContrast: number },
+  base: { turbulenceScale: number; saturationBoost: number; boundaryContrast: number },
   snapshot?: Record<string, number>,
 ): MusicVisualParams {
   if (snapshot) {
@@ -157,7 +173,6 @@ export function buildVisualParams(
       harmonyIndex: snapshot.harmonyIndex ?? seed.harmonyIndex,
       turbulenceScale: snapshot.turbulenceScale ?? base.turbulenceScale,
       turbulenceDetail: snapshot.turbulenceDetail ?? 3,
-      blobSurfaceTension: snapshot.blobSurfaceTension ?? base.blobSurfaceTension,
       saturationBoost: snapshot.saturationBoost ?? base.saturationBoost,
       boundaryContrast: snapshot.boundaryContrast ?? base.boundaryContrast,
       densityBias: snapshot.densityBias ?? seed.densityBias,
@@ -170,7 +185,6 @@ export function buildVisualParams(
     harmonyIndex,
     turbulenceScale: clamp01(base.turbulenceScale + seed.turbulenceOffset + complexity * 0.25),
     turbulenceDetail: complexity > 0.6 ? 4 : 3,
-    blobSurfaceTension: clamp01(base.blobSurfaceTension + seed.tensionOffset),
     // The Saturation dial's own range (0, grey, to 3: PLAN 27h-1), so a look set past
     // the old 0.5..2 keeps its grey or its blaze while the music leads.
     saturationBoost: Math.max(0, Math.min(3, base.saturationBoost + seed.saturationOffset)),
@@ -187,7 +201,6 @@ export function paramsToSnapshot(p: MusicVisualParams): Record<string, number> {
     harmonyIndex: p.harmonyIndex,
     turbulenceScale: p.turbulenceScale,
     turbulenceDetail: p.turbulenceDetail,
-    blobSurfaceTension: p.blobSurfaceTension,
     saturationBoost: p.saturationBoost,
     boundaryContrast: p.boundaryContrast,
     densityBias: p.densityBias,

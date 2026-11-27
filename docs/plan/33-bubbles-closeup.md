@@ -153,3 +153,30 @@ window and milk a bright middle.
   distance 1.21 to 3.11, half-turned crop least 9.25, 1x chroma least 7.62. These match
   SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
   line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
+
+## 33q. Fewer beads, and the oil in the dye's place (asked 2026-11-26)
+The owner: "too many bubbles in looks", and "the bubbles still aren't very good". The crowd
+was the oil beads, not the air: a look's air field holds 0 to 8 bubbles (a probe of 33
+looks), the bead field held 60 + 360 x Beads, 125 at the default 0.18, 312 at Macro Bead's
+0.7, and refilled every merge, so a field held its count while its oil grew.
+- **33q-2. The oil takes the dye's place, but not all of it.** Tried in this PR and taken
+  out before it shipped: a bead drawn as oil filling 98% of the gap, the dye under it
+  thinned to what is left (T^(1-f) on the lamp, 1-(1-a)^(1-f) on black). `npm run droplens`
+  went from green to 11 of 22: a projected drop's middle fell to 20% of the plate (the
+  check, from the owner's macro photographs, wants the plate seen through the drop, "multiple
+  background colors" in one bead), and the lensed picture, the right-way-round small drop
+  and the turned-over closeup, vanished with the dye it was a picture of. So the dish is not
+  a Hele-Shaw gap the beads fill: the dye layer runs under and over a drop and the drop is a
+  lens in it. What displacement there is wants f from the drop's height over the dye
+  layer's depth, not the gap, measured against the photographs before it is drawn.
+- **33q-3. The beads as obstacles in the solver.** The solver's dye runs on under a bead
+  as if it were not there, so it never piles against the bead's rim the way dye pushed by
+  a moving drop does.
+  The real one is the beads as moving solid inclusions in the thin-gap solve (15g-8d did
+  it for the air bubbles), the dye advected round them and the oil's area conserved.
+- **33q-5. A designed show's stages still set air over any look.** `songDesign.ts` gives every
+  section Bubbles 0.15 to 0.6 with its energy (checked by `npm run listen`, "more bubbles than
+  the verse"), and the built-in sequences (`sequencer.ts`: Slow Build, Verse Chorus) ride it
+  0.15 to 0.65, so a song's designed show puts air back into a galaxy or a gel. The real one
+  is a stage that scales the look's own air (none stays none), not an absolute amount; it
+  changes what `listen` asks of a chorus, so it is the owner's call.

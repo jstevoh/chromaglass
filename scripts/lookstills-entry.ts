@@ -642,7 +642,7 @@ const lookStillsApi = {
           const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
           const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
           return fluid.readDensity[ix + iy * GRID_SIZE];
-        });
+        }, true);
         plate.setBeads(beads);
       }
 

@@ -83,19 +83,33 @@ a grid of generic stock thumbnails: ours are the plate itself.
     all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
     about 30 days). Until one is won, a visitor in a blocked country who opens
     that card gets YouTube's own notice in the player, not the film.
-  - ~~**34a-6b. Later:** the hero could cross-fade the loops instead of the stills.~~ *Shipped as 34a-2's filmed loop (2026-11-21).*
   - **34a-6d. The films to modern ambient music.** *(The owner, 2026-11-21: "we need to move
     all of the demo videos off of the old recordings. The quality is just too low.")*
     **Shipped (2026-11-22):** the webpage's six loops, the TV samples (release `tv-films-1`)
     and four of their channel copies on Scott Buckley's CC BY 4.0 library, each on the look its
     record had. `public/landing/films/SOURCES.md` has each page, licence line and checksum.
     The 1920s films stay on the channel and 34a-6c's disputes stand.
-  - **34a-6f. Open: the last three channel films.** Hymn to the Dawn and Permafrost are
-    rendered (`/Volumes/Media/ChromaGlass/renders/ambient-2026-11/`) but YouTube's daily upload
-    limit refused them, so their cards loop and do not open; and the long film of Chris
-    Zabriskie's *Cylinders* (CC BY 4.0, a look a piece, `npm run sitefilms -- --album
-    cylinders`) has 7 of 9 pieces. Upload them, then put the ids in `siteFilms.ts`
-    (`SITE_FILMS`, `CHANNEL_ALBUMS`) and `Sample.FILMS`.
+  - **34a-6f. The last three channel films, and the four re-filmed after the flower.**
+    *(Shipped in part, 2026-11-23.)* Effervescence, The Distant Sun, Undertow and Machina
+    were filmed again from a build with 31s-8..10's flower fix (#949) and replace the copies
+    #943 put up; Permafrost is up (`EaETAQuSdS0`). A long film read back as one base64 string
+    passed V8's string limit, so `chromaglassRender({ raw: true })` now leaves the bytes on
+    `window.chromaglassRenderBytes` and `sitefilms.mjs` reads them in 8 MB slices; and the
+    flower gate checked the main checkout instead of the tree it ran in (fixed the same way by
+    #944; the shared bundle cache behind it is 31s-13).
+  - **34a-6g. Open: Hymn to the Dawn.** Its new film drains to an empty plate by about 160 s
+    (mean brightness 51 falling to 28, against 90 to 144 for the 2026-11-21 film), so it is not
+    uploaded and its card keeps the old loop. It waits on 34a-6i.
+  - **34a-6h. Open: the Cylinders long film.** Chris Zabriskie's *Cylinders* (CC BY 4.0, a look
+    a piece, `npm run sitefilms -- --album cylinders`): render all nine pieces from main now
+    that a long film reads back (Cylinder 7 failed on the string limit), check every piece's
+    frames (the flower and 34a-6i's drain), join, upload, and set `CHANNEL_ALBUMS`' id.
+  - **34a-6i. Open: Solar Flare drains to an empty plate in a song film.** Filmed at about
+    `a3a42823` (2026-11-21) the look held; at `62568d42` it empties by 160 s. Bisect that range
+    with `npm run sitefilms -- --only hymn-to-the-dawn`, compare brightness every 20 s.
+  - **34a-6j. Open: the film check passes an empty plate.** `sitefilms.mjs`' "the plate never
+    goes dark" test compares brightness to black, so a drained plate on a lit backdrop passes.
+    It wants a dye-coverage gate measured against the look's own backdrop.
   - **34a-6e. Open: a TV build with the new films.** The Android TV app names its sample films
     in `Sample.java`; a TV on build 24 or older keeps playing the 1920s films (they stay in the
     `tv-films-1` release) until the next build reaches Play.
@@ -177,6 +191,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
   Perform desk's new Looks grid (`LooksGrid`, opened from `looks-grid-open` in the desk breadcrumb),
   the narrow window's `PresetMenu` (`preset-menu-<id>`) and the phone's Looks sheet (`phone-look-<id>`),
   with `<img loading="lazy">` inside `SlideMount` on the narrow menu and phone cards; `npm run looksgrid -- --owed=preview` green (39 looks on 3 surfaces, 240 px, 2936–16754 bytes, closest pair 26.9 apart). Left: 34b-2 (live preview on hover/hold).
+  *34b-6 shipped* (2026-11-27, the owner: "the presets take up a ton of room with the colored icons
+  next to them ... maybe a round chip that shows a sample from each look"): the Cues panel's set and
+  Your preset palettes, the phone's Looks sheet and its Play strip draw each look as a round chip of
+  its still (`components/ui/LookChip.tsx`), the name on hover or a long press. Shipped looks use
+  their 34b-1 stills; a saved look is photographed off the plate once, six seconds after it goes up,
+  when the browser is idle (`app/useLookThumbCapture.ts`, `lib/lookThumbs.ts`, a 96 px WebP kept in
+  the browser), never live, so the frame loop pays one readback per look per machine. The set's
+  44 rows of 48 px became chips 40 px across, many to a row. The live preview (34b-2) stays open.
+  *34b-7 shipped* (2026-11-27, the owner: "add those to the pre saved ones we can share"): the
+  owner's saved Classical Vibe, Mushy Mushy and Soapy Mess ship as house looks (`src/presetsOwner.ts`,
+  laid last in `presetsLay.ts` since they carry their cords), read from the Mac app's show server as
+  each played. Changed from the saved look: Soapy Mess's trapped air off (33q-4) and its two music
+  hands wired to nothing taken out; Mushy Mushy's Turbulence 0.99 to 0.8 so its music stir has
+  room to move (`npm run soundpatch` found both), its name capitalised. All three keep the house rules as they are laid (`houseRules`): no sound on the frame's rotation (`framesway`), Glass Smear and Granulation at rest (`glassstill`), the stir cord at its Turbulence's depth (`musicstir`). Their dyes are picks (44k-19 says why); the owner judges them.
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the

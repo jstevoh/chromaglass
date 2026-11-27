@@ -202,7 +202,9 @@ export function luckyLook(
     // The glass rests and a roll that slides it does so on its cord (PLAN 38u-11, lib/glassSlide.ts):
     // the same draw as the dial it used to set, so the stream after it rolls what it always did.
     platePressure: rand(), glassSmear: 0, sceneMappings: withGlassSlide(current.sceneMappings, rand() / GLASS_TRAVEL), rainDrip: rand(),
-    viscosity: rand() > 0.5 ? 'thick' : 'thin', polarity: rand(),
+    // Hold Apart stays at its real 0 on a roll (PLAN 18d-6: two dyes in one water mix; the dial is a hand's). The draw that
+    // rolled Polarity is still taken, and Blob Surface Tension's below, so the stream after each rolls what it always did.
+    viscosity: rand() > 0.5 ? 'thick' : 'thin', holdApart: rand() * 0,
     evaporationRate: rand() * 0.05,
     airVelocity: rand() * 0.5, vibrationFrequency: rand(),
     layerCount: rand() > 0.5 ? 2 : 1,
@@ -247,12 +249,14 @@ export function luckyLook(
     audioImpact: current.audioImpact,
     turbulenceScale: rand() * 0.7,
     turbulenceDetail: 1 + Math.floor(rand() * 4),
-    blobSurfaceTension: rand(),
-    boundaryContrast: rand() * 0.7,
+    boundaryContrast: rand() * 0 + rand() * 0.7,   // the first draw was Blob Surface Tension's (PLAN 18d-6, above)
     saturationBoost: 1.0 + rand() * 0.8,
     dyeBudget: 0.4 + rand() * 0.6,
     edgeRelief: rand() * 0.8,
-    bubbles: rand() < 0.2 ? 0 : 0.2 + rand() * 0.8,
+    // Air one roll in five, and a few bubbles when it comes, not the plate
+    // full: a roll is not a look made for air (PLAN 33q-4). It was four in
+    // five at 0.2 to 1.
+    bubbles: rand() < 0.8 ? 0 : 0.1 + rand() * 0.2,
     plateRock: rand() * 0.9,
     layerScaleVariety: rand(),
     macroSync: rand(),
@@ -305,6 +309,7 @@ export function luckyLook(
     filmZoom: current.filmZoom,
     filmX: current.filmX,
     filmY: current.filmY,
+    filmRing: current.filmRing,
     glossiness: rand() < 0.8 ? 0 : rand() * 0.4,
     postBlurRadius: rand() * 0.7,
     // One roll in four goes closeup — a magnified chase is its own happy

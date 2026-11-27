@@ -67,7 +67,7 @@ export function AreaPicker({ areas, colours, value, onChange, testId }: {
         >
           Whole plate
         </button>
-        <span className="text-[11px] text-white/45 leading-snug">
+        <span className="text-[12px] text-dim leading-snug">
           {value === undefined
             ? 'Tap an area to work there alone'
             : `Area ${value + 1}: the ${areas[value]?.liquid ?? ''}, which takes the ${BAND[areas[value]?.band ?? 'any']}`}

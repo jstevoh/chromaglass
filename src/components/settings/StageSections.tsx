@@ -4,8 +4,10 @@ import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { MappingPanel, OutputPanel } from '../OutputPanel';
 import { SwitchPill, Toggle, LIT } from '../ui';
+import { readEngineStatus } from '../../lib/readout';
 import { isProLicenseUnlocked } from '../../lib/platform';
-import { CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../../lib/tierGates';
+import { isFreeTierGated, isTierGatingEnforced } from '../../lib/tierGates';
+import { TierLockBanner } from '../TierLock';
 import { Slider, PinChips } from './controls';
 import type { SectionCtx } from './props';
 
@@ -115,23 +117,14 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
         </h3>
         {isFreeTierGated() ? (
           <div className="mb-5 flex flex-col gap-2.5">
-            <div
-              data-cg-free-logo-mark="ChromaGlass"
-              data-cg-app-tile="custom-logo"
-              onClick={openAccountSheet}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
-              className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
-            >
-              <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
-                <span>In the ChromaGlass app · Custom band logo &amp; text layer</span>
-                <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
-              </div>
-              <p className="mt-0.5 text-amber-100/90">
-                On the free site, the logo layer displays the ChromaGlass mark. Unlock Home or Pro to load your own band mark or SVG.
-              </p>
-            </div>
+            <TierLockBanner
+              feature="custom-logo"
+              summary="On the free site, the logo layer displays the ChromaGlass mark. Unlocked by ChromaGlass Home or Pro to load your own band mark or SVG."
+              dataAttrs={{
+                'data-cg-free-logo-mark': 'ChromaGlass',
+                'data-cg-app-tile': 'custom-logo',
+              }}
+            />
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -146,7 +139,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
               <button
                 onClick={() => onMarkClear?.()}
                 disabled={!markLoaded}
-                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
                 data-testid="mark-clear"
               >
                 Take it off
@@ -174,20 +167,20 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             <button
               onClick={() => onMarkClear?.()}
               disabled={!markLoaded}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
               data-testid="mark-clear"
             >
               Take it off
             </button>
           </div>
         )}
-        <Slider label="Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
+        <Slider label="Logo Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
           onChange={(v: number) => onUpdate({ markMix: v })} settingKey="markMix" />
-        <Slider label="Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
+        <Slider label="Logo Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
           onChange={(v: number) => onUpdate({ markScale: v })} settingKey="markScale" />
-        <Slider label="Across" value={settings.markX ?? 0.5} min={0} max={1} step={0.005}
+        <Slider label="Logo Across" value={settings.markX ?? 0.5} min={0} max={1} step={0.005}
           onChange={(v: number) => onUpdate({ markX: v })} settingKey="markX" />
-        <Slider label="Up" value={settings.markY ?? 0.12} min={0} max={1} step={0.005}
+        <Slider label="Logo Up" value={settings.markY ?? 0.12} min={0} max={1} step={0.005}
           onChange={(v: number) => onUpdate({ markY: v })} settingKey="markY" />
         <Info>
           Laid over the finished frame, so it reaches the projector window, a cast to another screen, a recording and
@@ -216,7 +209,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             the picture, on this screen and burned into the live stream; the plate under it is untouched.
           </Info>
           {/* The logo melted at the start of a film (PLAN 37x-11, lib/logoMelt.ts): the same ink and rinse as a title. */}
-          <Toggle label="Melt the logo at the start" on={!!settings.logoMelt} onChange={(v) => onUpdate({ logoMelt: v })} testId="logo-melt-switch"
+          <Toggle label="Logo melt" on={!!settings.logoMelt} onChange={(v) => onUpdate({ logoMelt: v })} testId="logo-melt-switch"
             title="When the Live Show goes on air or a recording starts, the ChromaGlass logo is poured big across the plate as ink, then melts into the show" />
         </div>
       </section>
@@ -241,31 +234,14 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
         <div className="flex flex-col gap-2 mb-3">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-text">Fluid Grid</span>
-            {engineStatus && (
-              <span className="text-[12px] font-mono opacity-50">
-                {engineStatus.label} · {(live ?? engineStatus).frameMs > 0 ? Math.round(1000 / (live ?? engineStatus).frameMs) : '–'} fps
-                {/*
-                  The speed, when it is not full speed. A frame rate says the
-                  frames are arriving; it cannot say the liquid inside them is
-                  advancing slower than the clock, which is what happens when a
-                  solver step costs more than a frame and the catch-up gives up.
-                  Shown only when it is true, because on a machine with room it
-                  is always 60 and would be noise.
-                */}
-                {(() => {
-                  const st = live ?? engineStatus;
-                  const sps = st.stepsPerSec;
-                  // Against what the loop asked for, not a hard sixty. Thirty
-                  // steps at twice the timestep is the same liquid at the same
-                  // speed, and this read it as "50% speed" in amber — the one
-                  // warning that catches a plate silently running slow, fired
-                  // at a plate running exactly on time.
-                  const want = st.stepRate > 0 ? st.stepRate : 60;
-                  if (!(sps > 0) || sps >= want * 0.95) return null;
-                  return <span className="text-amber-300/80"> · {Math.round((sps / want) * 100)}% speed</span>;
-                })()}
-              </span>
-            )}
+            {engineStatus && (() => {
+              const info = readEngineStatus(live ?? engineStatus);
+              return (
+                <span className={`text-[12px] font-mono ${info.tone === 'warn' ? 'text-amber-300/80 opacity-90' : 'opacity-60'}`} title={info.tooltip} data-testid="stage-engine-status">
+                  {info.text}
+                </span>
+              );
+            })()}
           </div>
           {/*
             Where a frame actually goes, on a `?debug` visit. Cost that does
@@ -279,7 +255,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             timestamp queries instead.
           */}
           {showFrameSplit && engineStatus && (
-            <div className="text-[11px] font-mono opacity-40 leading-relaxed">
+            <div className="text-[12px] font-mono text-dim leading-relaxed">
               solver {(live ?? engineStatus).simMs.toFixed(1)} ms/step
               {' · '}other {(live ?? engineStatus).otherMs.toFixed(1)} ms/frame
               {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of {Math.round((live ?? engineStatus).stepRate || 60)} steps/s
@@ -309,34 +285,11 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </Info>
           {((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
-            <div
-              data-cg-grid-upgrade-pro=""
-              className="mt-1 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] p-3 text-[12px] leading-snug text-amber-100/90"
-            >
-              <div className="font-semibold text-amber-200">
-                Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
-              </div>
-              <p className="mt-1 text-[11px] text-white/75">
-                Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <a
-                  href={getEffectiveTier() === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-amber-300"
-                >
-                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $170' : 'Get Pro — $199'}
-                </a>
-                <button
-                  type="button"
-                  onClick={openAccountSheet}
-                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/85 hover:bg-white/[0.12]"
-                >
-                  Enter licence key
-                </button>
-              </div>
-            </div>
+            <TierLockBanner
+              feature="grid-1024"
+              className="mt-1"
+              dataAttrs={{ 'data-cg-grid-upgrade-pro': '' }}
+            />
           )}
         </div>
       </section>

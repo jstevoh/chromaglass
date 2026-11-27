@@ -280,6 +280,30 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   for (var i = 0; i < 4; i++) {
     let q = p + offs[i];
     if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
+    /*
+      No face across the thin gap's open rim (PLAN 18a-23). What was
+      reported (the owner, 2026-11-27): Lava Pop left running emptied; on the
+      owner's Mac it lost 4 to 5% of its dye every two minutes with nothing
+      driving it, Evaporation, Air and Rock each ruled out. These exchanges
+      read their neighbours past the rim as if the rim were not there, and
+      past it is the reservoir round the cover glass, where decayDye clears
+      the colour every step and the oil is cleared too (rimSide). So every
+      cell of water at the rim had a neighbour holding no colour and no oil:
+      the evening-out levelled the water's colour into it, and the drift
+      back to its own liquid, down the oil's blur, which falls off past the
+      rim where the oil is gone, pushed it there; and each step decay took
+      it off. Measured in the lab (Lava Pop's own step and the app's own lay
+      of its oil cells, 128², \`npm run rimdye\`): with Oil Bodies on the
+      dish lost 1.15% in 600 steps, with it off 0.03%; and a pool past the
+      rim that counted and gave back every colour the step's carry moved
+      across it took in a hundredth of a unit while the dish lost 121, so
+      almost none of it was liquid crossing: it was this. A rim is not a
+      place a colour levels through: the dye's own dispersion stops there
+      (dyeDisperse) and the oil's relaxation does (18g-7, mixMu and
+      mixUpdate). Liquid pushed over the rim still takes its colour with it,
+      in the carries.
+    */
+    if (S.thinGap > 0.5 && pastOpenRim(p) != pastOpenRim(q)) { continue; }
     let s = share(q);
     let edge = max(band(h.f), band(s.f));
     // A fifth of what the giver holds, at most, to each of four: never more
@@ -332,6 +356,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   o += toOil - toWater;
   let out = select(w + o, o, A.a.w > 0.5);
   textureStore(dst, p, select(vec4f(0.0), max(out, vec4f(0.0)), finite4(out)));
+}`,
+
+  /*
+    Oil Bodies (the thin gap's carry and the old plate's, PLAN 38w-32): the plate's dye split into its two liquids'
+    shares for the carry, and joined again after it (PLAN 38w-29, the
+    advect dye stage says why). bodyWater writes the water's share, the
+    dye less the oil's (never more of the oil's than the dye holds, as
+    bodyPartition's share() reads it); bodyJoin writes the water's share
+    carried plus the oil's carried. Both read the dye's texture and the
+    oil's share.
+  */
+  bodyWater: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var oil: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let t = max(textureLoad(dye, p, 0), vec4f(0.0));
+  let w = t - clamp(textureLoad(oil, p, 0), vec4f(0.0), t);
+  textureStore(dst, p, select(vec4f(0.0), w, finite4(w)));
+}`,
+  bodyJoin: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var oil: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let t = max(textureLoad(dye, p, 0), vec4f(0.0)) + max(textureLoad(oil, p, 0), vec4f(0.0));
+  textureStore(dst, p, select(vec4f(0.0), t, finite4(t)));
 }`,
 
   /*

@@ -39,7 +39,8 @@ export interface GpuStepParams {
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
-  immiscibility: number;
+  /** Hold Apart, 0 to 1 (PLAN 18d-6): 0 is real, two dyes in one water with no tension between them; past it the Korteweg stress of an edge of composition, an oil's tension across a unit step of dye at 1 (`holdApartPull`). */
+  holdApart: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
   /*
     The second phase and the magnet under the glass (H7).
@@ -217,9 +218,10 @@ export interface GpuStepParams {
   tankNozzle?: number;
   tankDrain?: number;
   tankHue?: number;
-  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), and Shake, its peak acceleration in g. The front plate's only. */
+  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), Shake, its peak acceleration in g, and Rock, the strobe's slip in Hz (48f-6). The front plate's only. */
   faradayHz?: number;
   faraday?: number;
+  faradayRock?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
@@ -299,6 +301,16 @@ export interface SolverCarry {
 }
 
 /**
+ * Full GPU field snapshot for plate-level Undo (PLAN 49a): holds exact copies
+ * of dye, velocity, gap and active chemistry/phase fields on the same device
+ * so a drained or cleared plate returns byte-for-byte before the wipe.
+ */
+export interface SolverSnapshot {
+  /** Release copied GPU textures and buffers held by this snapshot. */
+  destroy(): void;
+}
+
+/**
  * What the plate needs of a solver, whichever API it runs on
  * (docs/webgpu-plan.md, P3).
  *
@@ -347,13 +359,15 @@ export interface PlateSolver {
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
    * over the rim, and, for a liquid that mixes with the clear one (`sp`),
-   * its share into the species field. Plate units.
+   * its share into the species field. Plate units. A liquid with `ethanol`
+   * or `anise` in it (volume fractions of the bottle, lib/liquidProps.ts)
+   * lays those too, for the ouzo's cloud (PLAN 48s, lib/ouzo.ts).
    */
   /** The cover glass's gap on its liquid, metres (PLAN 38r-5): what a pour's share and the cover's drag are taken at. */
   readonly coverMetres?: number;
   /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
   readonly coverUnits?: number;
-  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
+  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; ethanol?: number; anise?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
   /** Whether a pour's volume can be laid now without compiling on the frame that asks: its kernel is built behind the show (fluid.ts), and until it is, a drop is laid as a stamp (sim/dropSplash.ts). */
   pourReady?(): boolean;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
@@ -377,6 +391,13 @@ export interface PlateSolver {
    * (lib/squish.ts). Optional because only the WebGPU solver has one.
    */
   readonly thinGapLive?: boolean;
+  /**
+   * A press's bowl in the glass on a thin gap, at the solver's own cells
+   * (PLAN 18a-14): centre and radius in logical cells, unrounded, the bowl
+   * (1 − d²/r²)² deep 3·amount, folded at the next flush. Laid on the CPU's
+   * 192² grid it came up through the bilinear upsample as facets.
+   */
+  pressBowl?(x: number, y: number, radius: number, amount: number): void;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */
@@ -393,6 +414,10 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /** Copy the live GPU fields for an 8 s Undo safety net (PLAN 49a). */
+  takeSnapshot?(): SolverSnapshot | null;
+  /** Restore fields captured by `takeSnapshot` back onto this solver. */
+  restoreSnapshot?(snap: SolverSnapshot): boolean;
   /**
    * A frame of the video pour, its dye and its motion worked out on the GPU
    * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:

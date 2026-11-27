@@ -6,7 +6,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 
 - `useAudioAnalyzer.ts`: `useAudioAnalyzer`, `AudioData`, `Ear`: the show's ear. `Ear.view` is its ten-a-second reading as a store, not state (PLAN 46f): `useEarView.ts` has `EarView` (`get`, `subscribe`), `createEarView` and `useEarView(view, select)`, which renders the component that calls it only when what it selects changes. `Ear.live` is every reading, for readers on their own clock. Nothing above a readout renders for a reading: a new reader of the level is a leaf with `useEarView`, never state in `App()`.
 - `useMidi.ts` (37 KB, grep it): `useMidi`, `MidiHost` (`playSetItem`), `MidiDevice`, controller maps, clock and timecode. Its result's `open` (PLAN 44k-14) says Web MIDI answered, what the assistant's MIDI switch waits for.
-- `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances. Its second argument is the ear's `live` ref, read on the hook's own timers (it was the ear's state, PLAN 46f). `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms). `listenNow()` asks the song ID to try at once, and `state.heardMap` keeps the map a first listen made after its song ends (Listen, PLAN 28h-8).
+- `useMusicIntelligence.ts` (33 KB, grep it): the song named by hand (`manualTag`; automatic song ID, `listenNow`, `identifying` and `fingerprintEnabled` were retired 2026-11-27 to `archive/song-id/`), song maps, performances. Its second argument is the ear's `live` ref, read on the hook's own timers (it was the ear's state, PLAN 46f). `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms). `state.heardMap` keeps the map a first listen made after its song ends (Listen, PLAN 28h-8).
 - `useShowSequencer.ts`: transport over a `ShowSequence`'s stages. `upsertSequence` and `removeSequence` change the owner's list through its own updater (several in one go all land: a set list file's sequences), and `putSequences` replaces it whole (the assistant's edits and their Undo, `app/editNow.ts`, PLAN 44k-16a).
 - `useProjector.ts`: `useProjector`, `pickProjector`, `ProjectorMode`.
 
@@ -30,7 +30,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useMidiTouch.ts`: flash on a controller touch.
 - `usePreviewFrame.ts`: where the plate is painted.
 - `useRecorder.ts`: record the canvas. `videoFormats(includeAudio)` lists the containers this browser's encoder writes (PLAN 44k-11, for the owner's assistant to be refused one it lacks). `RecorderOptions.shape` (`'plate' | 'portrait'`, PLAN 34f) makes a clip 9:16 (`lib/clipFrame.ts`); `start` returns whether it began, and `useRecorder(defaults)` takes the starting options.
-- `useRemoteLink.ts`: laptop side of the phone remote; also a network display's, and a TV's at home (role `tv`, PLAN 12-tv).
+- `useRemoteLink.ts`: laptop side of the phone remote (returns `{ status, send, retry }`); also a network display's, and a TV's at home (role `tv`, PLAN 12-tv).
 - `useSceneCamera.ts`: the room camera.
 - `useSongChange.ts`: a new song, on a beat.
 - `useSongRender.ts`: render a song.

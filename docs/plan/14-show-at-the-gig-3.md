@@ -93,6 +93,39 @@ effect). `npm run music` only feeds it synthetic level traces.
   gravity; give the view the oil's thickness from that, in the solver, and the drops become
   magnifiers over the lamp (and the plate's own `refractionOptics` reads them too). Not a plate
   shader fake: the path is the solver's.
+- **14ag-9** (M) *The video coming in, clear and on the desk: one row per input, four uses, and the camera poured* (shipped 2026-11-27). Asked 2026-11-27: "using the camera input. It is generally hard to
+  understand and control what is on screen ... I would also like to more fully control the video
+  inputs on the main app vs just in settings. I want to be able to see things on the canvas as I
+  change them. Also, I want to bring back the ability to pour the video on as well as playing it as
+  a plate, as the light, or as the spinning led light background"). Git history: the pour never
+  went away for a file (14ag kept Play and Pour on the file's row); what was missing was the pour
+  for anything else, and the row itself was the file's alone, so with the camera on it named the
+  file, Play unlit. Now `VideoShelf` is the input on the plate (the camera or window while one is
+  on, else the file loaded) with a little live screen of it, Plate / Lamp / LED ring (where it
+  shows, one lit) and Pour; a camera or window pours through a clone of the film's stream
+  (`usePour` `pourStream`), stopped with the film. LED ring is a new setting, `filmRing` (MIDI
+  "Video on LED Ring", rig key, off by default): the ring's row in the lamp draws the picture turned
+  by the ring's angle (`videoRing`, wgsl/plateLamp.ts), LED Rotation Speed its spin. The desk's
+  Video dot (was Film) opens the Video panel beside the plate, not the Settings sheet. Checks:
+  `npm run myvideo` (the ring switch, the camera's row, its pour, Stop, off; the dot),
+  `npm run videolamp` (the ring lights clear water with the picture, turns it half a turn at
+  LED Rotation Speed 2π, ignores the film's row, Film Mix 0 is the look to the byte).
+- **14ag-10** (S) *LED Rotation Speed is two panels from the ring's picture.* With the video on the
+  ring its spin is the Lamp section's LED Rotation Speed; a second slider in Video would be two
+  controls of one setting under one test id in the sheet (`npm run layout`). Give the Video panel a
+  way to it (a "Spin" link to the Lamp section, or the ring's speed as a pin) once the owner has
+  turned it in a show.
+- **14ag-12** (S) *A pour swapped for another keeps the last one's frame as its motion's reference.*
+  The pour reuses one hidden <video>, so `pourVideo` sees the same element and returns before
+  resetting `videoFlowRef.current.source`: the first optical-flow frame after a file-to-file or
+  file-to-camera swap compares two different pictures (one hard stir). Reset it in that early
+  return (LiquidVisualizer.tsx is over budget: the line goes with a move out of it).
+- **14ag-13** (S) *The mixer's Film row says nothing while the video is on the ring.* Its arrows,
+  Level and Blend do nothing then (the ring takes the LED row's); dim the row and say "on the LED
+  ring" there.
+- **14ag-11** (S) *The lean display does not compile the ring out.* `U.filmRing != 0` is not one of
+  `displayLean.ts`'s tests, so the ring's branch is always compiled (a few lines, one texture read).
+  Add it with `may: val(s, 'filmRing')` if `npm run openingtime` shows it.
 - **14ag-4** (S) *The framing's pixels have no check.* `npm run myvideo` holds the controls and
   their settings, not where the frame lands: on software WebGPU the app's plate was still
   rebuilding thirty seconds in, so a corner read there measured nothing. Give the lab a film

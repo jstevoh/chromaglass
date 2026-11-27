@@ -63,6 +63,14 @@ export const FARADAY_HZ_MIN = 10;
 export const FARADAY_HZ_MAX = 150;
 /** The Shake dial's top, in g: four to twenty times the threshold, past which a real dish throws droplets. */
 export const FARADAY_SHAKE_MAX = 2;
+/** Rock's top, Hz: the strobe slipped further than this from the wave is a flicker, not a rock (PLAN 48f-6). */
+export const FARADAY_ROCK_MAX = 2;
+/**
+ * Strength's top: the projector's throw past the dye at eight times real
+ * water's (wgsl/plateFaraday.ts). Past real on purpose (the owner,
+ * 2026-11-21): a pattern a bass pulse raises for a moment reads faint at 1.
+ */
+export const FARADAY_GAIN_MAX = 8;
 
 /** A surface wave's angular frequency, rad/s, at wavenumber k (1/m) on a layer h deep. */
 export function faradayOmega(k: number, h = FARADAY_DEPTH): number {

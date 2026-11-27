@@ -89,6 +89,8 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'clock-glass':        [10, 3, 17, 9, 21, 16], // purple water; red, amber, cobalt, coral and teal oil (the seed lays the first as the water; 28i-7: a second family)
   'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 47z-1: cobalt filmed on the Mac 2026-11-13 read darker, colourfulness 62 against 131, the frame 0.40 near black: vivid colour wants a bright ground)
   'foam-cells':         [12, 7, 17, 23],           // rust water (sienna) in the films; pale icy blue, amber and lavender cells (47z-5)
+  'night-sea':          [18, 17, 16],              // a few ultramarine, amber and teal drops in the dark water, the glow's cyan the brightest thing (48c-5)
+  'louche':             [18, 16, 10],              // a few ultramarine, teal and purple drops in the dark water, deep enough that the cloud's white is the brightest thing (48s)
   // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
   // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
   // under a yellow film laid an olive-black blot in the lab.
@@ -112,6 +114,15 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // look stops reading as one: Waves goes to the sea, Ripple to a pond.
   'moire-waves':        [7, 16, 9, 19, 18, 23], // ice, teal, cobalt, jade, ultramarine, lavender
   'moire-ripple':       [16, 7, 2, 0],          // teal water; ice, hot pink and yellow oil
+  // The owner's saved looks (presetsOwner.ts, PLAN 34b-7). Their saved dyes
+  // could not be read off the Mac (the app's storage is closed to this, and a
+  // set's file carries only looks in the set), so each is the family the
+  // owner's own papers and LED already named: Classical Vibe's sienna and ice,
+  // Mushy Mushy's lavender, cobalt and jade, Soapy Mess's amber and blue,
+  // with the neighbours that keep a mix from going to mud.
+  'classical-vibe':     [17, 16, 12, 7, 21],    // amber, teal, sienna, ice, coral: warm and cool, the plate as it played
+  'mushy-mushy':        [23, 9, 19, 20, 18],    // lavender, cobalt, jade, magenta, ultramarine
+  'soapy-mess':         [17, 8, 20, 16, 7],     // amber, blue, magenta, teal, ice: a soap film's own orders of colour
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
@@ -150,7 +161,12 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
   'splodascope':        ['drop'],                 // a drop at a time into the crowd, as an eyedropper does
   'foam-cells':         ['drop'],                 // a drop into the foam presses its neighbours aside
+  'night-sea':          ['drop'],                 // a drop now and then into the dark sea (48c-5)
+  'louche':             ['drop'],                 // a dropper's drops: each one a bloom or a window (48s)
   'saffron-lace':       ['drop'],                 // an eyedropper's drops: each one a hole in the film, or more film
+  'classical-vibe':     ['pour', 'drop'],
+  'mushy-mushy':        ['drop', 'splatter'],
+  'soapy-mess':         ['pour', 'drop'],
 };
 
 /**
@@ -249,10 +265,20 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'splodascope':        ['oil', 'oil', 'water'],
   // More oil presses a new cell in among the others; the water wets the films.
   'foam-cells':         ['oil', 'water'],
+  // Sea water: the glow's threshold is a shear rate at its viscosity (PLAN 48c-2).
+  'night-sea':          ['water', 'water'],
+  // A third of the drops are Ouzo, which bloom white in the water; a third Alcohol, which thins a
+  // bloom it lands on and clears it at the second drop (presetsOuzo.ts has the sums; PLAN 48s).
+  'louche':             ['water', 'ouzo', 'alcohol'],
   // Oil poured onto a clear film joins it (it thickens where it lands, and tears again);
   // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
   // is the lavender wash's body, which holds its place under the film.
   'saffron-lace':       ['glycerine', 'soap', 'oil', 'alcohol'],
+  // The owner's looks: Classical Vibe a thin water, nothing but dye; Mushy Mushy
+  // thick, with the activator that sets its reaction going; Soapy Mess soap on water.
+  'classical-vibe':     ['water'],
+  'mushy-mushy':        ['syrup', 'water', 'activator'],
+  'soapy-mess':         ['soap', 'water', 'water'],
 };
 
 /**

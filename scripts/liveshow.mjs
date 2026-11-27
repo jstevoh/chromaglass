@@ -395,7 +395,7 @@ try {
   check('the page\'s encoder is handing the bridge real packets, the first frame a keyframe', packets?.packets > 30 && packets.empty === 0 && packets.firstVideo === true,
     packets ? `${packets.packets} packets, ${packets.empty} empty, first frame a keyframe ${packets.firstVideo}` : 'none');
 
-  // ── The Mac app's narrow window (37x-4d-4; scripts/liveshownarrow.mjs) ──
+  // ── The Mac app's narrow window keeps the panel (49c-3; scripts/liveshownarrow.mjs) ──
   await narrowLines({ page, until, check });
 
   // ── The phone ───────────────────────────────────────────────────

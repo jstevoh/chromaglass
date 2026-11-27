@@ -22,3 +22,4 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 - **34a-8a. The films themselves on the page.** *Shipped with 34a-6 (PR #679, carried from #729): the row
   "Six records from the 1920s" sits under the looks, and each card opens its film from the
   channel on the page itself.*
+- ~~**34a-6b. Later:** the hero could cross-fade the loops instead of the stills.~~ *Shipped as 34a-2's filmed loop (2026-11-21).*

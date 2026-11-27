@@ -29,6 +29,9 @@ every sound reading is a fast one (the owner's rules).
 
 ## 31a. Both dishes are always in focus
 
+*2026-11-27: §51 builds this as **51b**, one focus per projector with the lamp's image as the
+pupil, and uses it for a focus dissolve (51c). Build it from there.*
+
 The plate's two layers are drawn sharp, as if they sat in one plane. The camera looks
 have a focus, but over the dye's painted height (`camera.ts`, the circle of confusion from
 `h − U.focus`), which 18e says is not a real height. On an overhead the two dishes sit at
@@ -333,6 +336,11 @@ lens-shaped drop, no shadow beside it.*
   gate checking the main checkout's source from a worktree whose node_modules links there
   (refused for a missing `flower.mjs`); #944 fixed that by checking the working directory's
   checkout first, the one whose `dist` is filmed.
+- **31s-13. Open: linked worktrees share one bundle cache.** Found 2026-11-22 (34a-6f): a
+  worktree whose `node_modules` links to another checkout writes every harness's bundle
+  (`sitefilms`, `film`, `showreel` …) to that checkout's `node_modules/.cache/<name>.mjs`, so two
+  sessions running the same harness from two trees overwrite each other's bundle between build
+  and start. Bundle into the tree's own `scratch/` (git-ignored), or name the bundle by the tree.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see

@@ -88,7 +88,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     Video. `MERGED_SECTIONS` below sends its old id here.
   */
   { id: 'audio-input', name: 'Sound', category: 'feed',
-    terms: 'sound source music player shelf drone instrument plate plays itself ambient tv silent microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation impact' },
+    terms: 'audio inputs sound source music player shelf drone instrument plate plays itself ambient tv silent microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation impact' },
   /*
     Called by what it does (PLAN 14ad, the owner 2026-10-24: "what the room
     control is vs. showing video on the plate"). "The Room" said where the
@@ -183,7 +183,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'squish', name: 'Squish Plate', category: 'chemistry',
     terms: 'plate pressure press squeeze film hele-shaw gap thin gap thickness plate shape dome depth drag press lift viscosity thick thin smear glass drip rain' },
   { id: 'oil', name: 'Oil & Soap', category: 'chemistry',
-    terms: 'oil tension bodies soap bursts breakdown half-life surfactant clear film lace polarity repulsion repel immiscible water alcohol surface tension' },
+    terms: 'oil tension bodies soap bursts breakdown half-life surfactant clear film lace hold apart polarity repulsion repel immiscible mix dyes water alcohol surface tension' },
   { id: 'ferro', name: 'Ferrofluid', category: 'chemistry',
     terms: 'ferrofluid magnet magnetic domain size phase edge pushes dye labyrinth maze detail spikes walk strength height lattice' },
   { id: 'reactions', name: 'Reactions', category: 'chemistry',
@@ -210,7 +210,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   // Rate, Heat Decay): the heat they set is the heat Heat Spread spreads and
   // Buoyancy lifts, which were already here.
   { id: 'physics', name: 'Fluid Physics', category: 'motion',
-    terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction heat slide temperature buoyancy convection evaporation' },
+    terms: 'viscosity diffusion vorticity fingering advection damping friction heat slide temperature buoyancy convection evaporation' },
   // The bottles themselves: design one, load one from a file, save them.
   { id: 'liquids', name: 'Liquids', category: 'pour',
     terms: 'liquid liquids bottle bottles shelf custom design make create own import upload load export save file json ferrofluid magnetic oil water soap polarity weight' },

@@ -303,7 +303,7 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ shared b
   */
   check('the phone\'s tilt lifts the oil too: the step lifts by its rockX, and the frame loop\'s rockX carries the phone\'s tilt',
     /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX : 0, rockOn \? ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockY : 0, \.\.\.closed\]/.test(fluid) && /tipPlate\(fluid, hand, swingX, swingY\)/.test(vis)
-      && /h\[PHONE_X\] = ext\.x \* k/.test(hand) && /let x = h\[PHONE_X\] \+/.test(hand) && /p\.rockX = swingX \+ x \* 1\.1/.test(hand)
+      && /h\[PHONE_X\] = ext\.x \* k/.test(hand) && /let x = h\[PHONE_X\] \+/.test(hand) && /p\.rockX = swingX \+ x \* PHONE_ROCK/.test(hand) && /PHONE_ROCK = 1\.1\b/.test(hand)
       && /rockStep\(this\.tiltX, this\.tiltY, this\.rockX, this\.rockY/.test(solver) && /rockX: plateSin\(holdX, swingX\)/.test(rock),
     'fluid.ts hands hsBody the tilt × rockGain × p.rockX, which turns the circulation of the oil and the colour together; LiquidVisualizer: tipPlate(fluid, hand, swingX, swingY), lib/handTilt.ts: rockX = swingX + (phone + knobs) × 1.1; sim/fluidSimulation.ts: the step rockStep(tiltX, …, rockX, …), lib/plateRock.ts: rockX = plateSin(tiltX, rockX)');
 }

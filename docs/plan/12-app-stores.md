@@ -202,7 +202,6 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- ~~**12-ctl-2**~~ *(shipped 2026-11-12)*: Scan on the Laptop remote form, in both apps; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
   when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,
@@ -434,6 +433,63 @@ after 12-tv-hls (below).
   too still over half an hour, the fix is a slower or quicker `automateRate` for
   that loop in `tvLoops.ts` (a field it does not have yet), never a change to the
   look the show plays.
+
+**12-tv-lg and 12-tv-samsung: the LG and Samsung TV stores (asked 2026-11-27, plan only;
+nothing built).** The owner asked what it would take. Both TVs run web apps, so the
+receiver is one web app, not a port; the plate stays off the TV (their browsers have no
+WebGPU, see 12-tv above), so these are receivers like the Android TV and Apple TV apps:
+the six calm loops with no Mac, the Mac's live plate when there is one. Read from the
+stores' own pages on 2026-11-27 (the owner has the short version as the "LG and Samsung TV
+Plan" page):
+
+- *LG (webOS).* Seller Lounge (a separate site, seller.lgappstv.com) takes an Individual
+  or a Corporate Seller ("a licensed business title", so the LLC). Fees and any country
+  limit are on that site and **not read**. Review: pretest, function test, content test;
+  a rejected app comes back with a list; every update is reviewed again; no time is
+  published. Submission needs the `.ipk` (`ares-package`), the images (icon 80 and 130 px,
+  splash 1920 by 1080, store icon 400 by 400, name up to 20 characters), a UX scenario and
+  the **current** self-checklist (an old one is rejected without testing). Mandatory UX:
+  arrows, OK and Back all work, the Magic Remote cursor selects, every object has a
+  selection effect, Back on the first screen asks to exit (webOS 6+, key 461). A packaged
+  app has no cookies. Chromium: webOS 6 is 79, 22 is 87, 23 is 94, 24 is 108, 25 is 120.
+- *Samsung (Tizen).* Seller Office: a new seller is a **Public Seller, which launches in
+  the United States only**; other countries need an offline contract with Samsung and a
+  content manager's approval (Partner). Fees and a D-U-N-S number are not on the pages
+  read (a registration number is asked for under the EU's Digital Services Act). Package:
+  `.wgt` with `config.xml`, signed in Tizen Studio; the same Tizen ID and author
+  certificate for every update. Assets: icons 1920 by 1080 and 512 by 423, four JPEG
+  screenshots under 500 kB, an English privacy-policy URL, a contact email, a UI
+  description file, test logins. No review time is published. Chromium: 2020 is 69, 2021
+  is 76, 2022 is 85, 2023 is 94, 2024 is 108. Samsung's development checklist and the
+  partner page were **not read**.
+- *Unknown, and decisive:* WebRTC on both. LG's forum says WebRTC is for contracted
+  partners, other posts have it working on webOS 6.3; Samsung's pages are silent and a
+  2017 forum post had a data channel failing. Hence 12-tv-web-0.
+
+Items, in order:
+
+- **12-tv-web-0: does WebRTC work on the TVs? (S, first).** Run the existing `/tv` page in
+  LG's webOS emulator and Samsung's Tizen emulator; one real TV of each brand to confirm
+  if an emulator says yes. A no means both TV apps ship as loops only. The owner's spare
+  TV of each brand helps and is not required.
+- **12-tv-web: one web receiver for both TVs (M).** `webtv/`, built from the `/tv` page
+  and `tvLoops.ts`: the six loops as looping H.264 video (no sign-in, so a reviewer has
+  something to see, as on Apple TV, 12-tv-apple-9), the Mac stream if 12-tv-web-0 passed,
+  the TV's code sign-in (12-tv-signin), arrows, OK and Back only, a visible focus ring, a
+  splash that is never black. Packaged, not hosted: a page on https cannot open the Mac's
+  `ws://` link. A web view has no Bonjour, so the Mac's address is typed, as on Apple TV
+  (12-tv-apple-1). No price and no buy button, so neither store's billing applies. No
+  phone part: the phone is the controller. `npm run presskit` holds its loop list to
+  `tvLoops.ts` as it does the other two apps'.
+- **12-tv-lg: the LG listing (S, after 12-tv-web).** The `.ipk` from one script, icons,
+  splash, the UX scenario and the self-checklist, then submit. The owner opens the Seller
+  Lounge account as the LLC (a forum post says the country cannot be changed later: the
+  United States). Expect a rejection round.
+- **12-tv-samsung: the Samsung listing, United States (S, after 12-tv-lg).** The `.wgt`,
+  assets, the UI description file; submit for the US model groups from 2020. The owner
+  opens the seller account.
+- **12-tv-samsung-partner: Samsung outside the US (the owner's call).** The offline
+  contract; only worth starting if the US launch shows demand.
 
 Progress (2026-11-08): the transport is settled without HLS. LiveKit's
 `webrtc-xcframework` (MIT, a binary Swift package of Google's libwebrtc, tag

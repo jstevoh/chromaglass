@@ -33,7 +33,7 @@ export const SITE_WORDS = 'Try more free visuals at chromaglass.art';
  * `sheet`: the same button in the theme's colours, for the phone's More sheet.
  */
 const LOOK = {
-  bar: 'flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-white/70 underline-offset-2 active:underline',
+  bar: 'flex min-h-[44px] min-w-0 items-center gap-1.5 text-[11px] font-semibold text-white/70 underline-offset-2 active:underline',
   dark: 'flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-semibold text-white/85 active:bg-white/10',
   sheet: 'flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-elevated px-3 py-2 text-[13px] font-semibold text-text active:bg-active',
 } as const;

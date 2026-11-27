@@ -111,7 +111,7 @@ export const MIX_SOURCE_INFO: Record<MixSource, MixSourceInfo> = {
   led:   { id: 'led',   name: 'LED Ring',    level: 'ledLevel',   hint: 'The spinning LED platform. At the bottom it is the lamp under the glass; higher up it is a beam of its own.' },
   front: { id: 'front', name: 'Front Plate', level: 'frontLevel', hint: 'The lead plate, lit from beneath. Everything else stacks on it.' },
   back:  { id: 'back',  name: 'Back Plate',  level: 'backLevel',  hint: 'The second plate, when the look has two.' },
-  film:  { id: 'film',  name: 'Film',        level: 'filmMix',    hint: 'A loaded video, a window or the camera. Under the glass it is the lamp, seen through the dye; above it, laid over the plate.' },
+  film:  { id: 'film',  name: 'Video',       level: 'filmMix',    hint: 'A loaded video, a window or the camera. Under the glass it is the lamp, seen through the dye; above it, laid over the plate.' },
   mark:  { id: 'mark',  name: 'Logo',        level: 'markMix',    hint: 'The logo or title card.' },
   gel:   { id: 'gel',   name: 'Gel Wheel',   level: 'gelWheel',   hint: 'A turning four-colour gel. In the lamp it colours the lamp; above the glass it colours everything under it.' },
   lumia: { id: 'lumia', name: 'Lumia',       level: 'lumia',      hint: 'Slow folded sheets of light. In the lamp they light the glass; above it they are a beam of their own.' },
@@ -297,6 +297,26 @@ export function mixStack(raw: unknown): MixSource[] {
   }
   return stack;
 }
+
+/**
+ * Where the video shows (PLAN 14ag-9): over the plate, as the lamp under the
+ * dish, or as the spinning LED platform. Not a setting of its own: the film's
+ * row in the stack says plate or lamp, and `filmRing` says the ring (which is
+ * in the lamp whatever the row, wgsl/plateLamp.ts `videoInLamp`).
+ */
+export type FilmPlace = 'plate' | 'lamp' | 'ring';
+export const filmPlaceOf = (mixOrder: unknown, filmRing: unknown): FilmPlace =>
+  (Number(filmRing) || 0) > 0.5 ? 'ring' : filmInLamp(mixOrder) ? 'lamp' : 'plate';
+/** The settings that put the video there, the rest of the stack where it was. The ring takes the film's row into the lamp too, so the mixer shows it under the glass. */
+export const filmPlacePatch = (mixOrder: unknown, to: FilmPlace): { mixOrder: string; filmRing: number } => {
+  let order = filmAsLamp(mixOrder, to !== 'plate');
+  // The ring is the LED row's: one moved above the glass as a beam comes back to the bottom of the lamp with it.
+  if (to === 'ring') {
+    const st = mixStack(order);
+    if (st.indexOf('led') > st.indexOf('front')) order = mixOrderString(['led', ...st.filter(m => m !== 'led')]);
+  }
+  return { mixOrder: order, filmRing: to === 'ring' ? 1 : 0 };
+};
 
 /** Whether the film is under the front plate: the video as the lamp (PLAN 14ag-3). */
 export const filmInLamp = (raw: unknown): boolean => {

@@ -90,12 +90,23 @@ import { HAND_GRIP } from '../../lib/handSolid';
 import { DISH_GAP_FIELD_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
 import { thinWarmKernels } from './thinWarm';
+import { FACE_STAR } from './thinFlow';
 
 /**
  * The kernels, built on the solver's own head (the Sim and Args structs) and
  * its packed-plane reader, which are passed in rather than imported so this
  * file does not import the module that spreads it into its kernel table.
  */
+/**
+ * The draught's gusts on a thin gap (hsBody, PLAN 18a-16): the stress laid as
+ * ∇⊥χ, χ a noise of about unit size, times Air and this. 14 lays gusts as
+ * strong as the two noises it replaces (Air × 4 each): in the lab at Air
+ * 0.35 the old flow's rms about its mean was 1.73e-2 (its mean, 6.90e-2, was
+ * the slide out of the dish) and at 50 this laid 6.02e-2, so 50 × 1.73/6.02.
+ * The draught's uniform part is gone: a closed dish answers it with its own
+ * pressure, and nothing moves.
+ */
+const AIR_GUST = 14;
 /** The least share of its mobility a cell part air keeps (standingLiquid in hsPrep, PLAN 15g-8d). */
 const AIR_RIM_LEAST = 0.05;
 
@@ -318,15 +329,34 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32, openWall: bool) -> vec2f {
       plain mean (\`npm run oillift\`, bar 3%). A closed dish cannot move its
       contents as a whole however its colour lies, and the circulation is
       that. Past LIFT_MOST the circulation's grid is coarser than the
-      solver's and the colour's finest swirl is lost (PLAN 27f-7). Rain
-      Drip's weight and the comet's pull keep the colour's whole weight over
-      the app's mean, as they were: a standing plate's oil is PLAN 27f-6.
+      solver's and the colour's finest swirl is lost (PLAN 27f-7).
+
+      **With no oil the colour's weight is the same circulation** (PLAN
+      18a-17, A.b.w 2, Ψ relaxed on the colour alone, κ 0, B 1). What was
+      found: with the treble's sparks gone (PLAN 38v-1) and the draught
+      closed (18a-16), Rain Drip on a standing plate still emptied its dish,
+      1.8% of its dye left after 600 lab steps, and Plate Rock tipped with
+      no oil 0.5%. Both were laid as A.b.xy·w and S.up·A.a.x·w straight into
+      the gap's solve, whose rim is open; with no oil the solve takes off
+      the force's gradient part, but what reaches the rim downhill is a
+      weight pressing on a free edge, and the colour poured out over it as a
+      drop off a tilted plate's edge. A clock glass's colour falls to its
+      bottom and lies in a pool there, the clear liquid rising past it: the
+      closed circulation, Rain Drip's pull down S.up added to the tilt's,
+      both one in-plane weight on the one colour. \`npm run draught\`: Rain
+      Drip keeps 99.8% and its colour's middle falls 0.14 of the plate;
+      Plate Rock keeps 100% and moves 0.18 downhill. With oil Rain Drip stays
+      laid directly, its colour's whole weight over the app's mean (a
+      standing plate's oil is PLAN 27f-6, and κ is the lift over the tilt's
+      weight, not Rain Drip's); the comet's pull is an explicit push and
+      stays one.
 
       A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
       AIR_SHEAR), the rest gap h0, the breath's pascals to the flow's speed);
       A.b = (Plate Rock's pull on the colour, x and y; with the oil, its
-      ln B per unit of oil and 1, zero without, when the colour's weight is
-      laid directly). \`psi\` is hsLiftRelaxOil's (Ψ_x, Ψ_y) of φ, on its
+      ln B per unit of oil and 1; with no oil and the circulation built, 0
+      and 2 (Rain Drip's pull joins it); zero until it is built, when the
+      colour's weight is laid directly). \`psi\` is hsLiftRelaxOil's (Ψ_x, Ψ_y) of φ, on its
       own square grid (its side the buffer's length's square root).
     */
     hsBody: `${HEAD}${NOISE}${COMMON}
@@ -350,6 +380,12 @@ fn liftAt(q: vec2i, m: i32) -> vec2f {
   if (!liftIn(q, m)) { return vec2f(0.0); }
   return psi[q.x + q.y * m];
 }
+// The draught's stream function at a point (the air, below): its gusts drifting down the plate, nothing over the dish's outer tenth.
+fn airChi(uv: vec2f) -> f32 {
+  let p = uv * S.l;
+  let r = length(uv - vec2f(0.5));
+  return snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * (1.0 - smoothstep(${(OPEN_RIM - 0.1).toFixed(2)}, ${OPEN_RIM.toFixed(2)} - 2.0 / S.n, r));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -366,6 +402,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let dq = textureLoad(dye, qDish, 0).a;
     let w = dq - S.meanD;
     var rock = A.b.xy * w;
+    // With no oil (A.b.w 2, PLAN 18a-17) Rain Drip's pull down the standing plate joins the tilt's in the circulation.
+    let dripClosed = A.b.w > 1.5;
+    let pull = A.b.xy - select(vec2f(0.0), S.up * A.a.x, dripClosed);
     if (A.b.w > 0.0) {
       // u = ∇⊥ψ = (∂ψ/∂y, −∂ψ/∂x), ψ = L_y Ψ_x − L_x Ψ_y with L the colour's pull, by differences a cell of Ψ's grid apart:
       // on every cell, the rim's and past it too, so its divergence is zero on all of them (LIFT_GRID).
@@ -377,15 +416,61 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       // Times B, which hsPrep's drag divides out again (above): the same oilBody, from the same oil.
       let md = vec2i(textureDimensions(mixT));
       let oilB = exp(clamp(clamp(textureLoad(mixT, min(q * md / i32(S.n), md - 1), 0).r, 0.0, 1.0) * A.b.z, -9.0, 9.0));
-      rock = oilB * vec2f(A.b.y * dy.x - A.b.x * dy.y, -A.b.y * dx.x + A.b.x * dx.y);
+      rock = oilB * vec2f(pull.y * dy.x - pull.x * dy.y, -pull.y * dx.x + pull.x * dx.y);
     }
-    v = vec4f(v.xy - S.up * (A.a.x * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
+    v = vec4f(v.xy - S.up * (select(A.a.x, 0.0, dripClosed) * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
   }
   if (S.air > 0.1) {
-    let p = uvOf(id) * S.l;
-    let gx = snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * S.air * 4.0 * S.dt;
-    let gy = -S.air * 8.0 * S.dt + snoise(vec2f(p.y * 0.05, p.x * 0.05 + S.time)) * S.air * 4.0 * S.dt;
-    v = vec4f(v.xy + vec2f(gx, gy) * A.a.y / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
+    /*
+      The draught's gusts as a closed circulation (PLAN 18a-16).
+
+      What was reported: Solar Flare, filmed to Hymn to the Dawn on main,
+      faded to an empty dish by about 2:40. What was measured, on the
+      owner's Mac (Metal, gpu=mid, no music): every build since 11-21
+      drains the dish to 5 to 7% of its opening dye in 150 s, the middle
+      first, then the rim. Before PLAN 38v-1 the treble's white sparks
+      poured 1200 to 3900 of dye a ten seconds back in and hid it; with
+      them gone (rightly: no projectionist has that hand) the leak showed.
+      On a thin gap the one place dye leaves is the open rim (decayDye),
+      so something was carrying the liquid out over it.
+
+      It was the draught. Its push was a uniform −y shear, S.air × 8 a
+      second, plus two noises, laid here straight into the gap's solve,
+      which holds p = 0 past the rim. Between two glasses whose rim is
+      open to the air that is a through-flow: the whole dish slides down
+      and out, and clear liquid comes in at the top. In the lab (128², dt
+      0.05, a disc of dye to r 0.44, 600 steps) Air 0.35 left 0% of the
+      dish's dye against 100% with it off.
+
+      A dish does not do that. Wind on a liquid in a basin piles it a
+      little against the downwind wall, and that set-up's pressure carries
+      the shear's mean back under it: the depth-averaged flow of a uniform
+      stress over an even layer in a closed basin is zero (Darcy's
+      u = (h²/12μ)(−∇p) + τh/2μ with no flux through the wall gives
+      ∇p = 6τ/h and u = 0). What a draught does move is its curl: gusts,
+      stronger here than there, turn the liquid in gyres that close inside
+      the rim. So the stress laid here is that part alone, made closed by
+      construction: τ = ∇⊥χ, χ a noise drifting down the plate as the old
+      gusts did (the draught still goes somewhere, its eddies travel with
+      it), held to zero over the outer tenth of the dish. ∇⊥χ has no
+      divergence, and with χ = 0 at the rim no flux through it, so the gap's
+      solve has nothing to push out. AIR_GUST sets the gusts as strong as the
+      old noises were (the lab: their rms flow 1.69e-2 against 1.73e-2,
+      \`npm run draught\`), and the dish now keeps 100% of its dye.
+
+      The shortcut named: χ is a new noise, not the Hodge projection of the
+      old field onto closed flows, which would need the Ψ solve the oil's
+      lift uses (hsLiftRelax); PLAN 18a-17 has it, with the colour's weight
+      on a rocked plate with no oil and Rain Drip on a standing plate, which
+      still go through the open rim the same way.
+    */
+    let e = 1.0 / S.n;
+    let uv = uvOf(id);
+    let cx = airChi(uv + vec2f(e, 0.0)) - airChi(uv - vec2f(e, 0.0));
+    let cy = airChi(uv + vec2f(0.0, e)) - airChi(uv - vec2f(0.0, e));
+    // ∇⊥χ in the plate's cells (S.l of them across), the differences 2e apart in uv.
+    let g = vec2f(cy, -cx) / (2.0 * e * S.l) * S.air * ${AIR_GUST.toFixed(1)} * S.dt;
+    v = vec4f(v.xy + g * A.a.y / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
   }
   if (A.a.w > 0.0) {
     let tau = textureLoad(breath, min(q, vec2i(textureDimensions(breath)) - 1), 0).xy;
@@ -831,38 +916,32 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(7) var<storage, read> mob: array<f32>;
 @group(0) @binding(8) var<storage, read_write> gapBefore: array<f32>;
 @group(0) @binding(9) var<storage, read_write> poured: array<f32>;
-@group(0) @binding(10) var<storage, read> wetJump: array<f32>;
+@group(0) @binding(10) var<storage, read> flow: array<vec4f>;
+@group(0) @binding(11) var<storage, read_write> flowStar: array<vec2f>;
+@group(0) @binding(12) var<storage, read> wetJump: array<f32>;
 const DRY_FACES = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
-fn flux(p: vec2i, n: i32) -> vec2f {
-  let c = clamp(p, vec2i(0), vec2i(n - 1));
-  var w = textureLoad(vel, c, 0).xy * abs(mob[c.x + c.y * n]);
-  if (p.x < 0 || p.x > n - 1) { w.x = -w.x; }
-  if (p.y < 0 || p.y > n - 1) { w.y = -w.y; }
-  return w;
-}
+${FACE_STAR}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
-  var div = 0.5 * (flux(p + vec2i(1, 0), n).x - flux(p - vec2i(1, 0), n).x
-                 + flux(p + vec2i(0, 1), n).y - flux(p - vec2i(0, 1), n).y);
   /*
-    A face of a cell the air fills (no mobility, hsPrep) carries nothing:
-    not the pressure's flux, whose coefficient is zero there, and not u*'s
-    either, which the centred sum above takes as the mean of the two cells
-    and so half the liquid's beside it. Left in, that half pushed liquid
-    into the air with nothing to answer it, and the air's pressure rose
-    without bound. So each such face is taken back out, and the dry cell's
-    own equation is p = anything, b = 0. With no air every face stays and
-    the sum is the one it was.
+    What the step's u* would carry through each face, M·u* (FACE_STAR in
+    wgsl/thinFlow.ts, PLAN 18a-8): the face's own velocity from the last
+    step plus what this step's forces asked of its two cells. A face of a
+    cell the air fills (no mobility, hsPrep) carries nothing: not the
+    pressure's flux, whose coefficient is zero there, and not u*'s either.
+    Left in, half the liquid's beside it pushed into the air with nothing
+    to answer it, and the air's pressure rose without bound; so the dry
+    cell's own equation is p = anything, b = 0. The grid's wall carries
+    nothing either. This cell's east and north faces are kept for
+    hsGradient, which takes the solve's correction from them.
   */
+  let east = starFace(p, 0, n);
+  let north = starFace(p, 1, n);
+  flowStar[p.x + p.y * n] = vec2f(east, north);
+  let div = east - starFace(p - vec2i(1, 0), 0, n) + north - starFace(p - vec2i(0, 1), 1, n);
   let dry = mob[p.x + p.y * n] == 0.0;
-  for (var k = 0; k < 4; k++) {
-    let e = DRY_FACES[k];
-    let q = p + e;
-    if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
-    if (dry || mob[q.x + q.y * n] == 0.0) { div -= 0.5 * dot(flux(p, n) + flux(q, n), vec2f(e)); }
-  }
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
   let g = textureLoad(sq, p, 0).r;
@@ -904,7 +983,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     for (var fk = 0; fk < 4; fk++) {
       let nb = p + DRY_FACES[fk];
       if (!hsIn(nb.x, nb.y, n)) {
-        div += 0.5 * dot(flux(p, n), vec2f(DRY_FACES[fk]));
         edgeJump += hsHarm(mi, 55.0 * mi) * wetJump[k];
         continue;
       }
@@ -1163,15 +1241,26 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
     /*
-      The velocity the step ends with: u = c u* − M∇p / h.
+      The velocity the step ends with: u = c u* − M∇p / h, face by face.
 
-      Each face's correction is its own coefficient times the pressure step
-      across it, and the cell takes the mean of its two faces on each axis,
-      over its own gap. On a plate of one gap and one liquid that is exactly
-      c u* − c∇p by central differences, the old gradientSubtract with the
-      drag in it; where the gap changes, the face beside a tight cell carries
-      what a tight cell can. A face on the grid's wall carries nothing, and a
-      neighbour past the rim is at p = 0. A.a.x is h0.
+      Each face's flux is what u* would carry through it (hsDivergence's
+      flowStar) less its own coefficient times the pressure step across it,
+      M_f·ΔP, which is what the solve made conserve liquid; its velocity is
+      that over the face's gap (the mean of its two cells'), and it is kept
+      as the flow's state for the next step and for the carries (\`flow\`,
+      PLAN 18a-8). The cell's velocity is the mean of its two faces on each
+      axis, for everything that reads the flow at a cell. On a plate of one
+      gap and one liquid that is c u* − c∇p by central differences, the old
+      gradientSubtract with the drag in it; where the gap changes, the face
+      beside a tight cell carries what a tight cell can. A face on the
+      grid's wall carries nothing, and a neighbour past the rim is at p = 0.
+      A.a.x is h0.
+
+      Before 18a-8 the cell kept its own M·u* less the mean of its faces'
+      corrections, and the faces saw only the mean of two cells' u*: a
+      checkerboard in the cells' velocities was a mode the solve never saw,
+      which only the drag took out (a laid one kept 93% of itself through
+      a step of water, \`npm run gridnull\`; 4e-8 now).
     */
     hsGradient: `${HEAD}${COMMON}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -1180,28 +1269,44 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(5) var<storage, read> pr: array<f32>;
 @group(0) @binding(6) var<storage, read> mob: array<f32>;
 @group(0) @binding(7) var<storage, read_write> seen: array<f32>;
-@group(0) @binding(8) var<storage, read> wetJump: array<f32>;
+@group(0) @binding(8) var<storage, read> flowStar: array<vec2f>;
+@group(0) @binding(9) var<storage, read_write> flow: array<vec4f>;
+@group(0) @binding(10) var<storage, read> wetJump: array<f32>;
 fn pAt(x: i32, y: i32, n: i32) -> f32 {
   if (mob[x + y * n] < 0.0) { return 0.0; }
   return pr[hsPacked(x, y, n)];
 }
-// The flux correction through the face from this cell toward (dx, dy), as M_f (p_nb − p + jump).
-fn face(x: i32, y: i32, dx: i32, dy: i32, n: i32, mi: f32, pi: f32) -> f32 {
-  let qx = x + dx;
-  let qy = y + dy;
-  let mp = mob[x + y * n];
-  if (!hsIn(qx, qy, n)) {
-    if (arrayLength(&wetJump) >= u32(n * n) && mp >= 0.0) {
-      return hsHarm(mi, 55.0 * mi) * (wetJump[x + y * n] - pi);
-    }
-    return 0.0;
+// The velocity through the east (ax 0) or north (ax 1) face of cell q, as the solve made it conserve liquid.
+// A face that is not a finite number carries nothing, decided by the face alone, so both cells beside it
+// read the same face (the cell's velocity is safeVel's, a cell blown past VEL_BOUND asks to come back next step).
+fn faceVel(q: vec2i, ax: i32, n: i32) -> f32 {
+  let e = select(vec2i(0, 1), vec2i(1, 0), ax == 0);
+  let b = q + e;
+  let qIn = hsIn(q.x, q.y, n);
+  let bIn = hsIn(b.x, b.y, n);
+  if (!qIn && !bIn) { return 0.0; }
+  if (!qIn || !bIn) {
+    if (arrayLength(&wetJump) < u32(n * n)) { return 0.0; }
+    let inC = select(b, q, qIn);
+    let mIn = mob[inC.x + inC.y * n];
+    if (mIn < 0.0) { return 0.0; }
+    let f = S.n * hsHarm(mIn, 55.0 * mIn) * select(-1.0, 1.0, qIn) * (wetJump[inC.x + inC.y * n] - pAt(inC.x, inC.y, n));
+    let v = f / hsGap(textureLoad(sq, inC, 0).r, A.a.x);
+    return select(0.0, v, abs(v) < 1e30);
   }
-  let mq = mob[qx + qy * n];
+  let mp = mob[q.x + q.y * n];
+  let mq = mob[b.x + b.y * n];
+  let ma = abs(mp);
+  let mb = abs(mq);
+  let star = flowStar[q.x + q.y * n];
   var jump = 0.0;
   if (arrayLength(&wetJump) >= u32(n * n) && (mp < 0.0) != (mq < 0.0)) {
-    jump = select(-1.0, 1.0, mp >= 0.0) * (wetJump[x + y * n] + wetJump[qx + qy * n]);
+    jump = select(-1.0, 1.0, mp >= 0.0) * (wetJump[q.x + q.y * n] + wetJump[b.x + b.y * n]);
   }
-  return hsHarm(mi, abs(mq)) * (pAt(qx, qy, n) - pi + jump);
+  let f = select(star.y, star.x, ax == 0) - S.n * hsHarm(ma, mb) * (pAt(b.x, b.y, n) - pAt(q.x, q.y, n) + jump);
+  let h = 0.5 * (hsGap(textureLoad(sq, q, 0).r, A.a.x) + hsGap(textureLoad(sq, b, 0).r, A.a.x));
+  let v = f / h;
+  return select(0.0, v, abs(v) < 1e30);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -1210,12 +1315,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, q, 0);
   let mi = abs(mob[q.x + q.y * n]);
   let pi = pAt(q.x, q.y, n);
-  // Toward +x the face gives M(p_R − p); toward −x, M(p_L − p), which is minus the gradient's face.
-  let gx = face(q.x, q.y, 1, 0, n, mi, pi) - face(q.x, q.y, -1, 0, n, mi, pi);
-  let gy = face(q.x, q.y, 0, 1, n, mi, pi) - face(q.x, q.y, 0, -1, n, mi, pi);
-  let h = hsGap(textureLoad(sq, q, 0).r, A.a.x);
-  let u = (mi * v.xy - 0.5 * S.n * vec2f(gx, gy)) / h;
+  let east = faceVel(q, 0, n);
+  let north = faceVel(q, 1, n);
+  let u = 0.5 * vec2f(east + faceVel(q - vec2i(1, 0), 0, n), north + faceVel(q - vec2i(0, 1), 1, n));
+  flow[q.x + q.y * n] = vec4f(east, north, pi, 0.0);
   textureStore(dst, q, safeVel(vec4f(u, v.z, v.w)));
+  let h = hsGap(textureLoad(sq, q, 0).r, A.a.x);
   /*
     The pressure the rest of the step sees. bodyAdvect, phaseAdvect and
     mixAdvect correct their face velocities with the last projection's
@@ -1231,8 +1336,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     On a thin gap the colour's and the oil's carries, carryCourant and the
     ferrofluid's volume carry no longer read it: they cross the solve's own
-    faces from P and the mobility (THIN_FACE in wgsl/fluid.ts, PLAN 15b),
-    which are exact where c is not flat, at a hand's rim above all. What
+    faces (THIN_FACE in wgsl/fluid.ts, PLAN 15b; since 18a-8 the faces this
+    writes to \`flow\`), which are exact where c is not flat, at a hand's
+    rim above all. What
     still reads c·P here is phaseAdvect's area form (Phase Volume off, or
     the step before it is primed) and the old plate's carries.
   */

@@ -69,7 +69,8 @@ export const HeroLoop: React.FC = () => {
       <img
         src={shape.poster}
         alt=""
-        decoding="async"
+        decoding="sync"
+        fetchPriority="high"
         data-cg-hero-still=""
         onLoad={() => setArrived(true)}
         onError={() => setArrived(true)}

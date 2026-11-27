@@ -53,6 +53,8 @@ export function stepPlateBeads(
     beads.populate(
       ...beadPopulation(beadAmt, settings.macroMode),
       dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined,
+      // Held to the dial's oil, not its count: merges coarsen the field.
+      true,
     );
   }
   if (running) {

@@ -11,7 +11,7 @@ import type { SloshDrive } from '../../lib/slosh';
 import { DISH_GAP_RANGE, dragSeconds } from '../../lib/turntable';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
-import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, GAP_METRES, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
+import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, GAP_METRES, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, RGBA32, HOLD_APART_FINE, type FieldStats } from './constants';
 import { FluidCore } from './core';
 import { WARM_FIT } from '../wgsl/thinWarm';
 import { FineDye } from '../fineDye';
@@ -361,6 +361,21 @@ export class FluidFields extends FluidCore {
     return this.layer.prepare();
   }
 
+  /**
+   * Hold Apart's two fields (PLAN 18d-6; wgsl/fluid/forces.ts holdSoft and holdStress write them, forcesB reads the second), made the first time
+   * the dial is up: `HOLD_APART_FINE` cells to the logical cell, and 32-bit, since the stress is a small difference of the blurred dye's
+   * differences and 16 bits of it shook every straight edge (holdSoft has the number).
+   */
+  protected ensureHoldApart(): void {
+    if (this.holdSoft && this.holdForce) return;
+    const make = (label: string) => this.disposer.track(this.device.createTexture({
+      label, size: [this.L * HOLD_APART_FINE, this.L * HOLD_APART_FINE], format: RGBA32,
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    }));
+    this.holdSoft = make('hold soft');
+    this.holdForce = make('hold force');
+  }
+
   /** The standing layer's window (see standOn), made once, zero until a film writes it. */
   protected ensureStand(): GPUTexture {
     if (!this.stand) {
@@ -379,7 +394,7 @@ export class FluidFields extends FluidCore {
         label: 'thin gap before forces', size: [this.N, this.N], format: VEL,
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
-      const buf = (label: string, n: number) => this.disposer.track(this.device.createBuffer({ label, size: Math.max(16, n * n * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      const buf = (label: string, n: number) => this.disposer.track(this.device.createBuffer({ label, size: Math.max(16, n * n * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
       this.hsMid = this.disposer.track(this.device.createTexture({
         label: 'thin gap after body forces', size: [this.N, this.N], format: VEL,
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
@@ -394,9 +409,12 @@ export class FluidFields extends FluidCore {
       this.hsSealSrc = this.disposer.track(this.device.createBuffer({ label: 'seal source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
       // The thin solve's own P, packed as the old solver's pressure is. The thin
-      // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
+      // carries read the faces since 18a-8 (hsFlow); hsGradient hands phaseAdvect's area form c·P
       // in that one (wgsl/thinGap.ts, hsGradient).
       this.hsP = buf('thin gap pressure', this.N);
+      // The solve's faces, the flow's state, and what u* would carry through them (PLAN 18a-8, wgsl/thinFlow.ts).
+      this.hsFlow = this.disposer.track(this.device.createBuffer({ label: 'thin gap faces', size: Math.max(16, 4 * this.N * this.N * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+      this.hsFlowStar = this.disposer.track(this.device.createBuffer({ label: 'thin gap faces before', size: Math.max(16, 2 * this.N * this.N * 4), usage: GPUBufferUsage.STORAGE }));
       // The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12).
       this.hsWarm = this.disposer.track(this.device.createBuffer({ label: 'thin warm start', size: (WARM_FIT + 4) * 4, usage: GPUBufferUsage.STORAGE }));
       this.hsP2 = buf('thin gap pressure before', this.N);
@@ -492,8 +510,8 @@ export class FluidFields extends FluidCore {
         side by side (packDyeBodies in wgsl/pack.ts, PLAN 47z-1).
       */
       oilDye: this.bodiesWanted && !this.oilDyeStale && this.oilDye && !(this.printLive && this.printDye) && this.mixLive && this.mix ? this.oilDye.read : null,
-      /** The poured species field (carries scatter in b channel). */
-      species: this.speciesLive && this.species ? this.species.read : null,
+      /** The poured species field (carries scatter in b channel); with ouzo on the plate, the same with its cloud's scatter added (PLAN 48s, `cloudView`). */
+      species: !this.speciesLive || !this.species ? null : this.solventLive && this.cloudFresh && this.cloudView ? this.cloudView : this.species.read,
       /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */
       soapFilm: this.soapPlate?.field ?? null,
       /** The tank's dye (PLAN 47n), or null when Tank is off: the plate draws it in its own place. */
