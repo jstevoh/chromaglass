@@ -12,8 +12,6 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
-import { SPIN_AUTO_NAMES } from '../lib/turntable';
-import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
 import { RemotePourText } from './RemotePourText';
@@ -785,10 +783,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
 
           {/* The dials that change the mood most */}
           <div ref={(el) => { sectionRefs.current.sliders = el; }} id="remote-sec-sliders" data-testid="remote-sliders">
-          <Slider label="Sound Drive" field="audioImpact" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Speed" field="globalSpeed" step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Evolve Speed" field="automateRate" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Dimmer" field="dimmer" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Sound Drive" field="audioImpact" step={0.01} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Speed" field="globalSpeed" step={0.005} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Evolve Speed" field="automateRate" step={0.01} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dimmer" field="dimmer" step={0.01} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
           {/* One Blackout on the remote: the one in the bar under the thumb (PLAN 35f). */}
           <div className="mb-6 flex gap-3">
             <button
@@ -804,17 +802,17 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               {state?.recording != null ? `${Math.floor(state.recording / 60)}:${String(state.recording % 60).padStart(2, '0')}` : 'Rec'}
             </button>
           </div>
-          <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Projector Focus" field="projectorFocus" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Heat" field="heat" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('heat') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Melody Walk" field="melodyWalk" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dye Budget" field="dyeBudget" step={0.05} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Projector Focus" field="projectorFocus" step={0.05} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Heat" field="heat" step={0.05} value={value('heat') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Plate Rock" field="plateRock" step={0.01} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Melody Walk" field="melodyWalk" step={0.05} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Kick Bloom" field="kickBloom" step={0.01} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Slosh" field="slosh" step={0.05} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
           {/* The two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a look saved before them reads level, not the slider's −1. */}
-          <Slider label="Tilt Left/Right" field="plateTiltX" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltX') ?? 0) as number} {...sliderProps} connected={connected} />
-          <Slider label="Tilt Up/Down" field="plateTiltY" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltY') ?? 0) as number} {...sliderProps} connected={connected} />
-          <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Tilt Left/Right" field="plateTiltX" step={0.01} value={(value('plateTiltX') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Tilt Up/Down" field="plateTiltY" step={0.01} value={(value('plateTiltY') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Frame Sway" field="frameSway" step={0.01} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The dish's own turning (PLAN.md §22): Auto Spin's mode and its
             rate, so the phone in a hand across the room can set the plate
@@ -822,9 +820,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             Turn stays on the laptop and the phone's Play sheet: it is set
             once for a set, not played.
           */}
-          <Slider label="Auto Spin" field="spinAuto" step={1} format={(v) => SPIN_AUTO_NAMES[Math.round(v)] ?? 'Off'} value={value('spinAuto') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Spin Rate" field="spinRpm" step={0.5} format={(v) => `${v.toFixed(1)} rpm`} value={value('spinRpm') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Accent the One" field="beatAccent" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('beatAccent') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Auto Spin" field="spinAuto" step={1} value={value('spinAuto') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Spin Rate" field="spinRpm" step={0.5} value={value('spinRpm') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Accent the One" field="beatAccent" step={0.05} value={value('beatAccent') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             Only while a maze is on the plate, as the macro dials are only
             there with the closeup on: the phone is a surface for the show,
@@ -832,7 +830,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             Labyrinth. With it, how fine the fingers are is worth a thumb.
           */}
           {(settings?.ferroLabyrinth ?? 0) > 0.001 && (
-            <Slider label="Maze Detail" field="mazeDetail" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('mazeDetail') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Maze Detail" field="mazeDetail" step={0.05} value={value('mazeDetail') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             Only while there is a film to colour (Thin Film on the dye, or the
@@ -840,61 +838,61 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             Film Physics does nothing without one.
           */}
           {((settings?.thinFilm ?? 0) > 0.001 || (settings?.iridescence ?? 0) > 0.001) && (
-            <Slider label="Film Physics" field="filmPhysics" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Film Physics" field="filmPhysics" step={0.05} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* The frame's soap film (PLAN 32d), and while it is up its clock and the angle it is seen at, as on the desk. */}
-          <Slider label="Soap Film" field="soapFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('soapFilm') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Soap Film" field="soapFilm" step={0.05} value={value('soapFilm') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.soapFilm ?? 0) > 0.001 && (
             <>
-              <Slider label="Drain Rate" field="soapFilmRate" step={0.25} format={(v) => `${v.toFixed(2)}×`} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Film Angle" field="soapFilmAngle" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Frame Tilt" field="soapFilmTilt" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Drain Rate" field="soapFilmRate" step={0.25} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Film Angle" field="soapFilmAngle" step={1} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Frame Tilt" field="soapFilmTilt" step={1} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The water's glow (PLAN 48c), and while it is up the shear it fires at and how fast it refills, as on the desk. */}
-          <Slider label="Glow" field="glow" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glow') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Glow" field="glow" step={0.05} value={value('glow') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.glow ?? 0) > 0.001 && (
             <>
-              <Slider label="Glow Shear" field="glowShear" step={1} format={(v) => `${Math.round(v)}/s`} value={value('glowShear') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Glow Recharge" field="glowRecharge" step={0.5} format={(v) => `${v.toFixed(1)} s`} value={value('glowRecharge') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Shear" field="glowShear" step={1} value={value('glowShear') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Recharge" field="glowRecharge" step={0.5} value={value('glowRecharge') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
-          <Slider label="Glitter" field="glitter" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Glitter" field="glitter" step={0.05} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.glitter ?? 0) > 0.001 && (
-            <Slider label="Lens Stop" field="lensStop" step={0.1} format={(v) => `f/${v.toFixed(1)}`} value={value('lensStop') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Lens Stop" field="lensStop" step={0.1} value={value('lensStop') as number | undefined} {...sliderProps} connected={connected} />
           )}
-          <Slider label="Side Light" field="sideLight" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('sideLight') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Side Light" field="sideLight" step={0.05} value={value('sideLight') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.sideLight ?? 0) > 0.001 && (
             <>
-              <Slider label="Side Colour" field="sideLightHue" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Side Colour" field="sideLightHue" step={5} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Side Angle" field="sideLightAngle" step={5} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The dish on a speaker (PLAN 48f): Shaker's frequency, and while it is on, how hard it shakes. */}
-          <Slider label="Shaker" field="faradayHz" step={1} format={(v) => (v > 0 ? `${Math.round(v)} Hz` : 'Off')} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Shaker" field="faradayHz" step={1} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.faradayHz ?? 0) > 0 && (
-            <Slider label="Shake" field="faraday" step={0.01} format={(v) => `${v.toFixed(2)} g`} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Shake" field="faraday" step={0.01} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* Polarised light (PLAN 31p-1), and while the sheets are in the analyser's turn and the liquid's strength, as on the desk. */}
-          <Slider label="Polarisers" field="polariser" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Polarisers" field="polariser" step={0.05} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.polariser ?? 0) > 0.001 && (
             <>
-              <Slider label="Analyser" field="analyserAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('analyserAngle') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Quarter Wave" field="quarterWave" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('quarterWave') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Birefringence" field="birefringence" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('birefringence') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Dish Stress" field="dishStress" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dishStress') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Analyser" field="analyserAngle" step={5} value={value('analyserAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Quarter Wave" field="quarterWave" step={0.05} value={value('quarterWave') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Birefringence" field="birefringence" step={0.05} value={value('birefringence') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Dish Stress" field="dishStress" step={0.05} value={value('dishStress') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
-          <Slider label="Tank" field="tank" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Tank" field="tank" step={0.05} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.tank ?? 0) > 0.001 && (
             <>
-              <Slider label="Feed" field="tankFeed" step={0.1} format={(v) => `${v.toFixed(1)} cm/s`} value={value('tankFeed') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Dye Weight" field="tankWeight" step={0.05} format={(v) => `${v.toFixed(2)}%`} value={value('tankWeight') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Nozzle" field="tankNozzle" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('tankNozzle') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Drain" field="tankDrain" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tankDrain') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Glow Hue" field="tankHue" step={1} format={(v) => `${Math.round(v)}°`} value={value('tankHue') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Feed" field="tankFeed" step={0.1} value={value('tankFeed') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Dye Weight" field="tankWeight" step={0.05} value={value('tankWeight') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Nozzle" field="tankNozzle" step={0.01} value={value('tankNozzle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Drain" field="tankDrain" step={0.05} value={value('tankDrain') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Hue" field="tankHue" step={1} value={value('tankHue') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/*
@@ -902,76 +900,76 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             on the plate to do the pushing.
           */}
           {(settings?.phaseAmount ?? 0) > 0.001 && (
-            <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             Lamp Ground (PLAN 18b), always: the ground the dye is seen on,
             black or the lamp through it, which turns a look over and is
             worth a thumb from across the room.
           */}
-          <Slider label="Lamp Ground" field="lampGround" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('lampGround') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Lamp Ground" field="lampGround" step={0.05} value={value('lampGround') as number | undefined} {...sliderProps} connected={connected} />
           {/* Two projectors (PLAN 18b-10), optionally combining lamp inputs. */}
-          <Slider label="Two Projectors" field="twoProjectors" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={(value('twoProjectors') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Two Projectors" field="twoProjectors" step={1} value={(value('twoProjectors') ?? 0) as number} {...sliderProps} connected={connected} />
 
           {/*
             And Ben-Day Dots while the plate prints (the Roy look): how much
             of a comic it is, for a thumb.
           */}
           {printed.current && (
-            <Slider label="Ben-Day Dots" field="benDay" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('benDay') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Ben-Day Dots" field="benDay" step={0.05} value={value('benDay') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             And Turing Print while the reaction runs (PLAN 26d): starch in the
             dish, the pattern printed black on the lamp.
           */}
           {((settings?.chemistry ?? 0) > 0.001 || (settings?.turingPrint ?? 0) > 0.001) && (
-            <Slider label="Turing Print" field="turingPrint" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('turingPrint') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Turing Print" field="turingPrint" step={0.05} value={value('turingPrint') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {((settings?.turingPrint ?? 0) > 0.001) && (
-            <Slider label="Print Ink" field="turingInk" step={0.01} format={(v) => (v > 0 ? `${Math.round(v * 360)}°` : 'Starch')} value={value('turingInk') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Print Ink" field="turingInk" step={0.01} value={value('turingInk') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {((settings?.turingPrint ?? 0) > 0.001) && (
-            <Slider label="Print Drift" field="turingDrift" step={0.05} format={(v) => (v > 0 ? `${Math.round(v * 100)}%` : 'Still')} value={value('turingDrift') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Print Drift" field="turingDrift" step={0.05} value={value('turingDrift') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             The plate as a thin gap (PLAN §18a), a switch on the slider's two
             stops, and its liquid's Thickness only while it is on.
           */}
-          <Slider label="Thin Gap" field="thinGap" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={(value('thinGap') ?? 1) as number} {...sliderProps} connected={connected} />
+          <Slider label="Thin Gap" field="thinGap" step={1} value={(value('thinGap') ?? 1) as number} {...sliderProps} connected={connected} />
           {(settings?.thinGap ?? 1) > 0.5 && (
-            <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Thickness" field="gapThickness" step={0.05} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* The liquid under the cover and the glass on it (PLAN 38r-5), as on the desk. */}
-          <Slider label="Liquid" field="liquidMl" step={1} format={(v) => `${Math.round(v)} mL`} value={value('liquidMl') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Cover Weight" field="coverWeight" step={5} format={(v) => `${Math.round(v)} g`} value={value('coverWeight') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Liquid" field="liquidMl" step={1} value={value('liquidMl') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Cover Weight" field="coverWeight" step={5} value={value('coverWeight') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The clear film that tears into lace (PLAN §20b), always: laying it
             and thickening it is a pour, worth a thumb from across the room.
           */}
-          <Slider label="Clear Film" field="clearFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Clear Film" field="clearFilm" step={0.05} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
           {/* Its dye (PLAN 20b-13), while there is a film to dye. */}
           {(settings?.clearFilm ?? 0) > 0.001 && (
-            <Slider label="Film Dye" field="clearFilmDye" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilmDye') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Film Dye" field="clearFilmDye" step={0.05} value={value('clearFilmDye') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Oil Bodies" field="oilBodies" step={0.05} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Film Hold, which keeps the drops of that oil apart, likewise. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Film Hold" field="filmHold" step={0.05} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Weight, how heavy that oil is: a lava lamp's wax on a standing plate (PLAN 27f-9c). */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Oil Weight" field="oilWeight" step={0.05} format={(v) => (v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2))} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Oil Weight" field="oilWeight" step={0.05} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Thickness, how thick that oil is: a lamp's thin molten wax against a thick oil (PLAN 38w-31). */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Oil Thickness" field="oilThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilThickness') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Oil Thickness" field="oilThickness" step={0.05} value={value('oilThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
           {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
-            <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
 
           {/* Song titles in a live set (PLAN 37x-10), the phone's Title switch. */}
@@ -990,12 +988,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <span className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
               <Microscope size={15} /> Macro Closeup
             </span>
-            <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Macro Zoom" field="macroZoom" step={0.5} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
             {((value('macroZoom') as number | undefined) ?? 1) > 1.05 && (
               <div>
-                <Slider label="Chase Speed" field="macroChase" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
-                <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
-                <Slider label="Shot Length" field="macroHold" step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Chase Speed" field="macroChase" step={0.05} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Music Sync" field="macroSync" step={0.05} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Shot Length" field="macroHold" step={0.5} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
               </div>
             )}
           </div>

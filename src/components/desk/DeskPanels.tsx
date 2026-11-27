@@ -132,13 +132,13 @@ function ControlGrid({ keys, p, prefix }: { keys: (keyof VisualizerSettings)[]; 
   const specs = keys.map(k => RANGE.get(String(k))).filter((s): s is DeskSpec => !!s);
   if (specs.length === 0) return null;
   return (
-    <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-2 pt-1">
+    <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-1.5 pt-1">
       {specs.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob />)}
     </div>
   );
 }
 
-const scroller = 'min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide';
+const scroller = 'min-h-0 flex-1 overflow-y-auto overflow-x-hidden cg-scroll';
 
 // ── Cues ─────────────────────────────────────────────────────────────
 
@@ -247,7 +247,17 @@ function CuesBody({ p }: { p: DeskProps }) {
                 {c.id === p.liveId ? <Tag tone="live">live</Tag>
                 : c.id === p.nextId ? <Tag tone="next">next</Tag>
                 : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
-                {/* Take it off the set. A span, not a button: the row is the button. */}
+                {/* Cue options and remove. Spans with role="button" because CueRow itself is a button. */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={e => { e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setMenuFor(cur => (cur === c.id ? null : c.id)); } }}
+                  title="Cue options (song link, capture, order)"
+                  aria-label={`Options for ${c.name}`}
+                  className="shrink-0 rounded px-1 text-[13px] leading-none text-faint opacity-50 hover:bg-hover hover:text-text focus:opacity-100 group-hover:opacity-100"
+                  data-testid={`cue-menu-open-${c.id}`}
+                >⋯</span>
                 <span
                   role="button"
                   tabIndex={0}
@@ -466,11 +476,11 @@ function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
         start at the panel's top and keep the column's height: Choose stood in
         a row of its own above them until 2026-11-07.
       */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-border p-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-t border-border px-2.5 py-1.5">
         <button
           aria-pressed={picking}
           onClick={() => setPicking(v => !v)}
-          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+          className={`inline-flex h-[32px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
             picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
           }`}
           title="Choose which controls ride here"
@@ -478,8 +488,8 @@ function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
         >
           <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
         </button>
-        {!mixerOut && <Button full height={34} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
-        <Button full height={34} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
+        {!mixerOut && <Button full height={32} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
+        <Button full height={32} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
       </div>
       {mixerOpen && !mixerOut && createPortal(
         /*
@@ -524,19 +534,6 @@ function RecipeBody({ p }: { p: DeskProps }) {
   const elsewhere = drawnElsewhere(p.layout, 'recipe', p.recipeKeys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="recipe">
-      <div className="flex h-7 shrink-0 items-center justify-end px-3">
-        <button
-          aria-pressed={picking}
-          onClick={() => setPicking(v => !v)}
-          className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
-            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
-          }`}
-          title="Choose which controls are on the recipe"
-          data-testid="recipe-pick"
-        >
-          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
-        </button>
-      </div>
       {picking ? (
         <PickList chosen={p.recipeKeys} onChange={p.onRecipeKeys} testId="recipe-picker" />
       ) : (
@@ -563,8 +560,19 @@ function RecipeBody({ p }: { p: DeskProps }) {
           )}
         </div>
       )}
-      {/* Pinned rather than at the end of a list that scrolls. */}
-      <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
+      {/* Pinned rather than at the end of a list that scrolls; Choose shares the row so knobs start at the top. */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5">
+        <button
+          aria-pressed={picking}
+          onClick={() => setPicking(v => !v)}
+          className={`inline-flex h-[32px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
+          }`}
+          title="Choose which controls are on the recipe"
+          data-testid="recipe-pick"
+        >
+          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
+        </button>
         {/*
           A Close-up button sat here, beside Randomise: one press to 4x and
           one back to the plate. The owner asked for it gone (2026-11-14):
@@ -591,14 +599,14 @@ function RecipeBody({ p }: { p: DeskProps }) {
 
 function BottlesBody({ p }: { p: DeskProps }) {
   return (
-    <div className="grid grid-cols-3 gap-1.5" data-testid="bench-left">
+    <div className="grid grid-cols-3 gap-1" data-testid="bench-left">
       {[...p.dyeBottles, ...p.behaviourBottles].map(l => (
         <button
           aria-pressed={p.bottleId === l.id}
           key={l.id}
           onClick={() => p.onBottle(l.id)}
           title={l.behaviour ? `${l.name}: changes the plate where it lands` : l.name}
-          className={`flex h-8 min-w-0 items-center gap-2 rounded-md border px-2 text-left transition-colors ${
+          className={`flex min-h-[28px] min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition-colors ${
             p.bottleId === l.id ? LIT : 'border-transparent text-muted hover:bg-hover hover:text-text'
           }`}
           data-testid={`bottle-${l.id}`}
@@ -612,7 +620,7 @@ function BottlesBody({ p }: { p: DeskProps }) {
           {p.bottleId === l.id
             ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} testId="bottle-in-hand" />
             : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} />}
-          <span className="truncate text-[13px] font-medium">{l.name}</span>
+          <span className="min-w-0 flex-1 text-[11.5px] font-medium leading-[1.15] line-clamp-2">{l.name}</span>
         </button>
       ))}
     </div>
@@ -847,9 +855,8 @@ function ToolsBody({ p }: { p: DeskProps }) {
             style={{ '--fill': `${(((p.toolAmount ?? 1) - TOOL_AMOUNT.min) / (TOOL_AMOUNT.max - TOOL_AMOUNT.min)) * 100}%` } as CSSProperties}
             data-testid="tool-amount-range"
           />
-          {/* The value, and the door to the tool's own options (the Magnet's size). */}
+          {/* The value, and the door to the tool's own options (Magnet Size, Press Fingering & Thin Gap). */}
           <ToolAmountChip tool={p.tool} value={p.toolAmount ?? 1} onOpen={(at) => setToolMenu({ tool: p.tool, at })} />
-          <span className="shrink-0 font-mono text-[12px] text-text-2 min-[1400px]:hidden">{(p.toolAmount ?? 1).toFixed(1)}×</span>
         </div>
       )}
       {toolMenu && p.amountOf && p.onAmountFor && (
@@ -861,6 +868,10 @@ function ToolsBody({ p }: { p: DeskProps }) {
           onClose={() => setToolMenu(null)}
           magnetSize={p.magnetSize}
           onMagnetSize={p.onMagnetSize}
+          fingering={p.settings.fingering ?? 0}
+          onFingering={(v) => p.onSetting({ fingering: v })}
+          thinGap={p.settings.thinGap ?? 1}
+          onThinGap={(v) => p.onSetting({ thinGap: v })}
         />
       )}
     </div>
@@ -991,7 +1002,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
   const showCode = p.status.phone === 0 || moreOpen;
 
   return (
-    <div className="flex flex-col gap-2 text-[13px]" data-testid="phone-link">
+    <div className="flex flex-col gap-1.5 text-[13px]" data-testid="phone-link">
       <p className="flex items-center gap-2 text-text-2" data-testid="phone-link-status">
         <span
           className="h-2 w-2 shrink-0 rounded-full"
@@ -1038,24 +1049,26 @@ function PhoneBody({ p }: { p: DeskProps }) {
             </Button>
           )}
           {showCode && (
-            <>
-              {hasRelay ? (
-                <p className="text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
-              ) : (
-                <p className="leading-relaxed text-dim">
-                  This page has no show server behind it, so the code opens the show on the phone itself. A phone that drives this show links through the show server, which runs with the Mac app (or <span className="font-mono text-[12px]">npm run remote</span> on this machine).
-                </p>
-              )}
-              <QrCodeImage text={url} />
-              <code className="break-all rounded-md bg-elevated px-2 py-1.5 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
-              <Button
-                height={32}
-                onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }); }}
-                testId="phone-link-copy"
-              >
-                {copied ? 'Copied' : 'Copy the address'}
-              </Button>
-            </>
+            <div className="flex items-start gap-3">
+              <QrCodeImage text={url} maxPx={120} />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                {hasRelay ? (
+                  <p className="text-[11.5px] leading-snug text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
+                ) : (
+                  <p className="text-[11.5px] leading-snug text-dim">
+                    No show server behind this page, so the code opens the show on the phone itself. Link to this show via the Mac app (or <span className="font-mono text-[11px]">npm run remote</span>).
+                  </p>
+                )}
+                <code className="break-all rounded-md bg-elevated px-2 py-1 font-mono text-[11px] text-text-2" data-testid="phone-link-url">{url}</code>
+                <Button
+                  height={28}
+                  onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }); }}
+                  testId="phone-link-copy"
+                >
+                  {copied ? 'Copied' : 'Copy the address'}
+                </Button>
+              </div>
+            </div>
           )}
         </>
       )}
@@ -1071,18 +1084,18 @@ function PhoneBody({ p }: { p: DeskProps }) {
   the dark-on-light polarity, so it is white in a dark panel on purpose, and
   sized in whole pixels per module so no module blurs across two.
 */
-function QrCodeImage({ text }: { text: string }) {
+function QrCodeImage({ text, maxPx = 168 }: { text: string; maxPx?: number }) {
   const code = useMemo(() => encodeQr(text), [text]);
   if (!code) return null;
   const span = code.size + 8;
-  const px = Math.max(2, Math.floor(168 / span)) * span;
+  const px = Math.max(2, Math.floor(maxPx / span)) * span;
   return (
     <svg
       viewBox={`0 0 ${span} ${span}`}
       width={px}
       height={px}
       shapeRendering="crispEdges"
-      className="self-center rounded-sm"
+      className="shrink-0 rounded-sm"
       role="img"
       aria-label="QR code of the address"
       data-testid="phone-link-qr"

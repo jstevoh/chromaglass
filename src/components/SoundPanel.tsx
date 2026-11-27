@@ -98,7 +98,7 @@ export function SoundPanel({
   const chosen = sources.find(s => s.id === source) ?? sources[0];
 
   return (
-    <div className="@container mb-4" data-testid="sound-panel-box">
+    <div className="@container mb-0" data-testid="sound-panel-box">
       <div>
         <input
           ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="sound-file-input"
@@ -110,11 +110,11 @@ export function SoundPanel({
           rise (PLAN 35f). Today's dot only says listening or deaf; a needle
           that moves with the kick says the band is getting in.
         */}
-        <div className="mb-2 flex items-end justify-between gap-3">
+        <div className="mb-1.5 flex items-end justify-between gap-3">
           <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
           <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
         </div>
-        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3 @4xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-1.5 @lg:grid-cols-3 @4xl:grid-cols-6">
           {sources.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
@@ -123,7 +123,7 @@ export function SoundPanel({
                 aria-pressed={on}
                 key={s.id}
                 onClick={() => (s.id === 'file' ? fileRef.current?.click() : onSource(s.id))}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors ${
+                className={`flex flex-col items-center gap-1 rounded-xl border px-2.5 py-2 transition-colors ${
                   on ? LIT : 'border-border text-muted hover:bg-hover hover:text-text'
                 }`}
                 data-testid={`sound-source-${s.id}`}
@@ -134,13 +134,13 @@ export function SoundPanel({
             );
           })}
         </div>
-        <p className="mt-2 min-h-[32px] text-[12px] leading-relaxed text-muted">{chosen.blurb}</p>
+        <p className="mt-1.5 min-h-[28px] text-[12px] leading-snug text-muted">{chosen.blurb}</p>
 
         {onAmbientMode && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border px-3.5 py-2.5" data-testid="sound-ambient-row">
+          <div className="mt-1.5 flex items-center justify-between gap-2.5 rounded-xl border border-border px-3 py-1.5" data-testid="sound-ambient-row">
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-text">Ambient TV mode (cool &amp; quiet)</p>
-              <p className="text-[11px] text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
+              <p className="text-[11px] leading-tight text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
             </div>
             <button
               type="button"

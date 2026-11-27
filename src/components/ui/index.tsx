@@ -466,7 +466,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             hit ? 'bg-text text-bg' : 'text-faint'
           }`}>{cc}</span>
         )}
-        <span className="w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
+        <span className="min-w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
       </div>
     );
   }
@@ -694,7 +694,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   return (
     <div
       ref={el => { tip.anchor.current = el; }}
-      className={`relative flex w-[58px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
+      className={`relative flex w-full max-w-[72px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
@@ -792,7 +792,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
       {/* A finger has no hover: the name is the button there, marked like the phone's sliders. */}
       <span
         onClick={tip.toggle}
-        className={`mt-1 max-w-full truncate text-[11px] font-medium [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
+        className={`mt-1 w-full text-center text-[11px] font-medium leading-[1.15] line-clamp-2 break-words [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
       >{label}</span>
       <span className="max-w-full truncate font-mono text-[10px] leading-tight">
         <span className={drag ? 'text-text-2' : 'text-dim'}>{disabled ? 'off' : display}</span>
@@ -864,7 +864,7 @@ export function PanelFrame({
       data-collapsed={collapsed ? 'true' : undefined}
     >
       <header
-        className={`flex h-8 shrink-0 items-center gap-1.5 pl-1.5 pr-1 ${floating ? 'cursor-move border-b border-border bg-elevated' : ''}`}
+        className={`flex h-8 shrink-0 items-center gap-1.5 pl-0.5 pr-1 ${floating ? 'cursor-move border-b border-border bg-elevated' : ''}`}
         onPointerDown={floating ? onHeaderDown : undefined}
         onContextMenu={onTitleMenu}
         data-panel-head
@@ -875,7 +875,7 @@ export function PanelFrame({
             aria-label={`Move ${title}`}
             title="Drag to move"
             onPointerDown={e => { e.stopPropagation(); onGripDown?.(e); }}
-            className="inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center text-faint"
+            className="inline-flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-faint hover:text-muted"
           >
             <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
               {[0, 1, 2].map(r => [0, 1].map(c => <circle key={`${r}${c}`} cx={1.5 + c * 5} cy={1.5 + r * 4.5} r="1.2" />))}
@@ -886,6 +886,19 @@ export function PanelFrame({
         <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
         {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
         {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
+        {!popped && onTitleMenu && (
+          <button
+            className={icon}
+            onClick={(e) => onTitleMenu(e)}
+            title="Panel placement and layout options (or right-click title)"
+            aria-label={`${title} panel options`}
+            data-testid={`panel-${id}-menu`}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+              <circle cx="2.5" cy="6" r="1" /><circle cx="6" cy="6" r="1" /><circle cx="9.5" cy="6" r="1" />
+            </svg>
+          </button>
+        )}
         {!popped && onPopOut && (
           <button className={icon} onClick={onPopOut} title="Open it in its own window, for a second display" aria-label={`Open ${title} in its own window`} data-testid={`panel-${id}-popout`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="1.5" y="3.5" width="7" height="6" rx="0.5" /><path d="M4 1.5h6.5V7" /></svg>
@@ -927,7 +940,7 @@ export function PanelFrame({
         moves when theirs cannot. Never sideways: a body is laid out to its
         panel's width, and `npm run layout` holds every control to it.
       */}
-      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-2.5 ${bodyClassName}`} data-panel-body>{children}</div>}
+      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden cg-scroll px-3 pb-2.5 ${bodyClassName}`} data-panel-body>{children}</div>}
       {floating && !collapsed && onResizeDown && (
         <span
           onPointerDown={onResizeDown}

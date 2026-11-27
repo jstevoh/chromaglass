@@ -6,6 +6,7 @@ import type { DeskLayout } from '../../lib/deskLayout';
 import type { TabEdit } from '../../hooks/useDeskLayout';
 import type { DeskDots } from './DeskHeader';
 import type { SongScoreProps } from '../SongScore';
+import type { EngineStatus } from '../../lib/platform';
 
 /**
  * A cue: one row of the set list.
@@ -76,9 +77,10 @@ export interface DeskProps {
   onMidi: () => void;
   onSearch: () => void;
   onOpenSettings: () => void;
+  onOpenShortcuts?: () => void;
   onOpenAccount?: () => void;
   /** `song`: following a known song's map by ear, and how sure (lib/followedPlace.ts `followLine`; PLAN.md 28g-2). */
-  status: { audio: ReactNode; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null };
+  status: { audio: ReactNode; engine: EngineStatus | null; sequence: string | null; phone: number; rec: string | null; song?: string | null };
   onBlackout: () => void;
   blackout: boolean;
 
