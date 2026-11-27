@@ -95,7 +95,7 @@ fn addLight(c: vec3f, l: vec3f) -> vec3f {
   times it and the summed light is encoded once. Encoded, a channel whose
   bands pass very unequally (one clear, one nearly shut) read darker than
   the light it passes: a deep yellow's green came out 0.33 where its light
-  is 0.40 (`npm run linearlight` line 5), so deep dyes went darker and more
+  is 0.40 (\`npm run linearlight\` line 5), so deep dyes went darker and more
   saturated than they are.
 */
 fn spectralThrough(unit: vec3f, path: f32) -> vec3f {
