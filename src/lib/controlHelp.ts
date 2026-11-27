@@ -35,7 +35,7 @@ export const CONTROL_HELP: Record<string, string> = {
   beatLead: 'How far ahead of a heard beat a predicted kick fires, to make up for the sound\'s trip through the room and the mic.',
 
   // Look
-  dyeBudget: 'How full the plate runs, from mostly clear glass to wall to wall colour. The picked bottle shows what is left.',
+  dyeBudget: 'How full the plate runs, from mostly clear glass to wall to wall colour. The picked bottle leans as room drops.',
   turbulenceScale: 'Adds stirring to the flow: swirls at many sizes, from lazy to churning.',
   turbulenceDetail: 'How many sizes of swirl are stirred in, from broad eddies only to fine curls on top.',
   plateRock: 'A hand tips the dish with the beat, and the heavier colour runs downhill each way.',
@@ -60,7 +60,6 @@ export const CONTROL_HELP: Record<string, string> = {
   particleMix: 'How far a particle\'s own colour is trusted over the grid\'s. Needs Dye Particles.',
   granulation: 'Pigment separating into a fine speckle that travels with the dye. Off by default: dye in solution is smooth.',
   grainScale: 'How fine that speckle is. Higher is a finer grain.',
-  blobSurfaceTension: 'How hard two colours hold apart at their edge, so they bead up instead of blending.',
   layerScaleVariety: 'Shows the second layer magnified and drifting, so one frame carries two scales of pattern.',
   boundaryContrast: 'How strongly edges show out of focus, and the back plate\'s bright rim. Draws no line where two colours meet, except in the closeup.',
   glossiness: 'How steep the liquid\'s surface reads to the lens. Zero is the real surface; up, ripples and edges bend more light away.',
@@ -220,7 +219,7 @@ export const CONTROL_HELP: Record<string, string> = {
   plateSpring: 'How quickly the glasses spring apart again after a press.',
   glassSmear: 'Slides the top glass, dragging the liquid with it. Still at 0; a look that drifts slides it on an LFO cord.',
   rainDrip: 'Heavy drops run down the glass in streaks, as rain does on a window. Needs the plate tipped (Gravity): flat, nothing runs.',
-  polarity: 'How polar the liquid is against water. Water is zero, oil is negative, and like dissolves like, so unlike liquids repel.',
+  holdApart: 'How hard two colours hold apart. 0 is real: dyes in one water mix. Up, their edge pulls tight and pools round.',
   vorticityConfinement: 'Spins small eddies back up that a grid solver smooths away. Flair rather than physics.',
   surfactantFlow: 'Soap drops the tension and the surface streams away, carrying dye. It stays: on a plate soaped all over, more does nothing.',
   soapBreakdown: 'How fast soap on the plate is taken up by the oil or washed through the trough, as a half-life. Zero keeps all of it.',
@@ -251,6 +250,13 @@ export const CONTROL_HELP: Record<string, string> = {
 
   // Layers and the dish's motor
   twoProjectors: 'Lays the layers over each other as two projectors on one screen, so their light adds.',
+  projLampA: 'The front projector\'s lamp on its variac: down, it dims steeply and goes amber as a real lamp does; past 100% it overdrives.',
+  projLampB: 'The back projector\'s lamp on its variac (with Two Projectors): dims and warms as a real lamp does.',
+  projShutterA: 'A vane over the front projector\'s lens: closes in 80 ms and dims the whole picture evenly, the lamp staying lit.',
+  projShutterB: 'A vane over the back projector\'s lens (with Two Projectors).',
+  projFocusA: 'Racks the front projector\'s head out of focus: sharp at the middle, either way a soft glow the lamp\'s shape, past halfway a melt.',
+  projFocusB: 'Racks the back projector\'s head out of focus (with Two Projectors), so one layer can go soft while the other stays sharp.',
+  projCross: 'Fades the wall from projector A to projector B, linear in light so the middle is no brighter than the ends (with Two Projectors).',
   layerCount: 'How many plates are stacked, one or two.',
   rotationSpeed: 'How fast the dish turns.',
   spinImpulse: 'How hard one flick of the dish hits.',

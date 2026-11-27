@@ -3101,7 +3101,69 @@ Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just
    the camera still on the plate; Stop ends only the pour; Off ends both.
 5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
 
-## 148. The Magnet's domes in the closeup (PLAN 29a-13)
+
+## 148. The APC40's pads play the liquid (PLAN 30c)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Settings → Feed → Controller, **Set up the APC40 mkII** (again, to take the new strips).
+   Good: the grid lights as rows of colours, the bottom row dim white (Press); **Grid layout**
+   shows Tools × Colours lit.
+2. Hold a pad on the top row (Drip). Good: a drop on the hit, more while held, none after you let
+   go, landing in the pad's column of the picture. Hold a Pour or Spray pad: it pours until let go.
+   Hold Press: the glass stays pressed until let go. Tap Splatter and hold another: the held one
+   flicks again, smaller each time.
+3. Track Select 4 (Syrup), hold the same Drip pad. Good: far slower drops; Pour slower too.
+4. Turn the top-left device knob (Drip's size). Good: bigger drops at the right, smaller at the left.
+5. **Bank ▶** over the device knobs. Good: the grid relights as Liquids × Colours, then Liquids ×
+   Tools, then the looks, then round; the faders keep their jobs. Bad: Bank ◀ ▶ do nothing (PLAN
+   30c-3: they may send on another channel; Learn shows what they send).
+6. The faders and the knob over each: Dye Budget/Saturation, Speed/Turbulence, Sound
+   Drive/Beat Squeeze, Plate Rock/Slosh, Bubbles/Bubble Melt, Oil Beads/Bead Drops,
+   Iridescence/Edge Relief, Evolve Speed/Hue Journey. The crossfader tips the plate side to side.
+7. On the phone: Motion → Pads. Good: the same grid, held pads keep going.
+
+## 149. Dyes mix as real dyes do, and Hold Apart (PLAN 18d-6)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Open **Macro Bead**, **Roy, 1963**, **Poster, 1969**, **Milk Marbling** and **Lens Pools**, the
+   five looks that had Polarity highest, and your own **Soapy Mess**, saved with it at 0.83. Good: each still reads as itself, and where two colours
+   meet they blend across the edge as two inks in water do. Bad: a look that has gone to one
+   muddy colour within a minute where it used to keep its colours for the whole song.
+2. On any look with a few colours, Settings → Chemistry → Oil & Soap → **Hold Apart** to 1.
+   Good: over ten or twenty seconds long streaks draw back, small pools round up and the
+   colours keep to bodies, like oil paint in water; a long straight edge between two colours
+   stays put. Bad: speckle, a comb along the edges, or colour pushed off into the clear water.
+3. Back to 0. Good: the colours go back to running into each other.
+4. The same slider on the phone, in Settings under Oil & Soap, where Polarity was.
+To put it back: a look that should keep its colours apart gets `holdApart` in `src/presets.ts`
+(0.3 to 1); the old push itself is not coming back, it was not a tension (`npm run forces` 6).
+
+## 150. The ouzo's cloud (PLAN 48s)
+
+The Ouzo bottle is anise oil in alcohol, clear in the bottle; where water mixes into it the
+oil comes out as a white cloud. Measured in the lab (the cloud sits only where the mix
+crosses the solubility curve, the oil is conserved); how it looks in a show is the owner's.
+
+1. Any look with colour on the plate, on a black ground. Pick **Ouzo** on the shelf and hold
+   the Dropper in one place. Good: the first second is milky (the drops are mostly water),
+   then the middle clears as the bottle's own liquid fills it and an opal white ring stands
+   where it meets the plate's water, soft-edged, moving out with the pour. Bad: a white disc
+   with no clear middle, a ring that flickers or is stepped along the grid, white where
+   nothing was poured.
+2. Pour **Water** into the middle of the clear pool. Good: a second white front where the
+   water meets the ouzo, moving out. Stir with the Finger: the white follows the folds.
+3. Pour **Alcohol** on part of the ring. Good: the white there fades to clear and stays
+   clear while the alcohol is there. Bad: no change, or the whole ring going at once.
+4. On a lamp ground the cloud is a warm grey shadow, as milk's is, not white.
+5. A plate that never sees the bottle looks exactly as before.
+6. The look **Louche** (the bottle's own, added because `npm run plate` holds that every
+   bottle with physics is poured by some look). Good: a dark dish; about one drop in three
+   blooms white as it lands and drifts with the flow, some blooms thin or open a clear
+   window where a later drop of Alcohol lands, the blues of the other drops stay deep. Bad:
+   the whole plate white inside a few minutes, blooms that are hard-edged discs for as long
+   as they last, a grey veil over the dark ground.
+
+## 151. The Magnet's domes in the closeup (PLAN 29a-13)
 
 The domes a magnet stands were black blobs in the macro view. Their sides now mirror the lit
 liquid round them as a camera records a dark gloss under water, with the light's glint on

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Sheet, LIT } from './ui';
+import { Sheet, LIT, SwitchPill, Toggle } from './ui';
 import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
 import { PRESETS, livePresetId, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
@@ -60,7 +60,7 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </label>
 );
 
-const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40';
+const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 pointer-coarse:min-h-11 pointer-coarse:text-[16px] text-xs text-white outline-none focus:border-white/40';
 
 export const SequencerPanel: React.FC<SequencerPanelProps> = ({
   sequences, selectedId, onSelect, status, onPlay, onPause, onStop, onNext, onPrev, onGoTo, onSave, onRemove, hasSections, onClose, embed = false,
@@ -124,7 +124,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
   // over the cue list it is about to drive.
   return (
     <Sheet embed={embed} title={<><Clapperboard size={16} /> Sequence</>} onClose={onClose} testId="sequencer-panel">
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
+      <div className={`min-h-0 flex-1 overflow-y-auto scrollbar-hide ${embed ? 'p-1' : 'p-6'}`}>
       <p className="text-[12px] leading-relaxed text-dim mb-5">
         A script for the show instead of dice: stages that change the plate over a song or a set, each gliding into the next on a clock or when the song moves to a new section.
       </p>
@@ -186,17 +186,17 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
       {/* Transport: while idle, only the one Play button rather than greyed Prev/Next/Stop. */}
       <div className="flex items-center gap-2 mb-4" data-testid="seq-transport">
         {isRunningThis && (
-          <button onClick={onPrev} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Previous stage" data-testid="seq-prev"><SkipBack size={14} /></button>
+          <button onClick={onPrev} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Previous stage" data-testid="seq-prev"><SkipBack size={14} /></button>
         )}
         {isRunningThis && status.running ? (
-          <button onClick={onPause} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-pause"><Pause size={14} /> Pause</button>
+          <button onClick={onPause} className="flex-1 flex items-center justify-center gap-2 py-2 pointer-coarse:min-h-11 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-pause"><Pause size={14} /> Pause</button>
         ) : (
-          <button onClick={() => onPlay(selected.id)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
+          <button onClick={() => onPlay(selected.id)} className="flex-1 flex items-center justify-center gap-2 py-2 pointer-coarse:min-h-11 rounded-lg bg-white text-black font-bold text-[12px]" data-testid="seq-play"><Play size={14} /> {isRunningThis ? 'Resume' : 'Play'}</button>
         )}
         {isRunningThis && (
           <>
-            <button onClick={onNext} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Next stage" data-testid="seq-next"><SkipForward size={14} /></button>
-            <button onClick={onStop} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Stop the sequencer and hand the show back" data-testid="seq-stop"><Square size={14} /></button>
+            <button onClick={onNext} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Next stage" data-testid="seq-next"><SkipForward size={14} /></button>
+            <button onClick={onStop} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10" title="Stop the sequencer and hand the show back" data-testid="seq-stop"><Square size={14} /></button>
           </>
         )}
       </div>
@@ -250,8 +250,8 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
 
       {/* Files: a sequence is a JSON file you can keep and share */}
       <div className="flex gap-2 mb-2">
-        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium disabled:opacity-65" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
-        <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
+        <button onClick={() => selected && onExport?.(selected)} disabled={!selected} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium disabled:opacity-65" title="Save this sequence as a file (with any of your presets it uses)" data-testid="seq-export"><Download size={12} /> Save file</button>
+        <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Load a sequence file" data-testid="seq-import"><FolderOpen size={12} /> Load file</button>
         <input
           ref={fileRef}
           type="file"
@@ -270,10 +270,10 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
 
       {/* Sequence actions */}
       <div className="flex gap-2 mb-3">
-        <button onClick={makeCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Copy this sequence so you can edit it"><Copy size={12} /> Copy</button>
-        <button onClick={makeNew} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Start a new sequence"><Plus size={12} /> New</button>
+        <button onClick={makeCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Copy this sequence so you can edit it"><Copy size={12} /> Copy</button>
+        <button onClick={makeNew} className="flex-1 flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium" title="Start a new sequence"><Plus size={12} /> New</button>
         {editable && (
-          <button onClick={() => { onRemove(selected.id); setEditIndex(null); }} className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-400/40" title="Delete this sequence"><Trash2 size={12} /></button>
+          <button onClick={() => { onRemove(selected.id); setEditIndex(null); }} className="flex items-center justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-lg bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-400/40" title="Delete this sequence"><Trash2 size={12} /></button>
         )}
       </div>
       {selected.builtIn && (
@@ -289,10 +289,9 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
           <Field label="Name">
             <input value={selected.name} onChange={(e) => update(seq => ({ ...seq, name: e.target.value }))} className={inputCls} />
           </Field>
-          <label className="flex items-center justify-between mb-4">
-            <span className="text-[13px] font-medium opacity-60">Loop</span>
-            <input type="checkbox" checked={selected.loop} onChange={(e) => update(seq => ({ ...seq, loop: e.target.checked }))} className="accent-white" />
-          </label>
+          <div className="mb-4">
+            <Toggle label="Loop" on={selected.loop} onChange={(v) => update(seq => ({ ...seq, loop: v }))} />
+          </div>
           <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="text-[13px] font-medium opacity-60 mb-1.5">Song</div>
             {selected.song ? (
@@ -308,16 +307,16 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <p className="text-[12px] text-dim">Identify a song (the Track panel) and you can make this sequence for it: it will start with the song and stop when it ends.</p>
             )}
           </div>
-          <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"><Plus size={12} /> Add stage</button>
+          <button onClick={addStage} className="w-full flex items-center justify-center gap-1.5 py-2 pointer-coarse:min-h-11 mb-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[13px] font-medium"><Plus size={12} /> Add stage</button>
           {!stage && selected.stages.length > 0 && <p className="text-[12px] text-dim">Tap a stage above to edit it.</p>}
           {stage && editIndex !== null && (
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold">Stage {editIndex + 1}</span>
                 <span className="flex gap-1">
-                  <button onClick={() => moveStage(editIndex, -1)} className="p-1 rounded hover:bg-white/10" title="Move up"><ChevronUp size={12} /></button>
-                  <button onClick={() => moveStage(editIndex, 1)} className="p-1 rounded hover:bg-white/10" title="Move down"><ChevronDown size={12} /></button>
-                  <button onClick={() => removeStage(editIndex)} className="p-1 rounded hover:bg-red-500/20" title="Remove stage"><Trash2 size={12} /></button>
+                  <button onClick={() => moveStage(editIndex, -1)} className="flex items-center justify-center p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded hover:bg-white/10" title="Move up"><ChevronUp size={12} /></button>
+                  <button onClick={() => moveStage(editIndex, 1)} className="flex items-center justify-center p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded hover:bg-white/10" title="Move down"><ChevronDown size={12} /></button>
+                  <button onClick={() => removeStage(editIndex)} className="flex items-center justify-center p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded hover:bg-red-500/20" title="Remove stage"><Trash2 size={12} /></button>
                 </span>
               </div>
               <Field label="Name">
@@ -336,7 +335,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <Field label="Transition (seconds)">
                 <input type="number" min={0} max={300} value={stage.transition} onChange={(e) => updateStage(editIndex, { transition: Math.max(0, Number(e.target.value) || 0) })} className={inputCls} />
               </Field>
-              <Field label="Preset palette">
+              <Field label="Look">
                 <select value={stage.presetId ? livePresetId(stage.presetId) : ''} onChange={(e) => updateStage(editIndex, { presetId: e.target.value || undefined })} className={inputCls}>
                   <option value="">Keep the current one</option>
                   {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -357,7 +356,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               </div>
               <Field label="Macro camera">
                 <select value={stage.macro === undefined ? '' : stage.macro ? 'on' : 'off'} onChange={(e) => updateStage(editIndex, { macro: e.target.value === '' ? undefined : e.target.value === 'on' })} className={inputCls}>
-                  <option value="">As the preset says</option>
+                  <option value="">As the look says</option>
                   <option value="on">On</option>
                   <option value="off">Off</option>
                 </select>
@@ -395,7 +394,17 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
                 const on = typeof v === 'number';
                 return (
                   <div key={f.key} className="flex items-center gap-2 mb-2">
-                    <input type="checkbox" checked={on} onChange={(e) => updateOverride(editIndex, f.key, e.target.checked ? onStep(f.spec, (f.min + f.max) / 2) : undefined)} className="accent-white" title={`Glide ${f.label} in this stage`} />
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={on}
+                      aria-label={`Glide ${f.label} in this stage`}
+                      title={`Glide ${f.label} in this stage`}
+                      onClick={() => updateOverride(editIndex, f.key, on ? undefined : onStep(f.spec, (f.min + f.max) / 2))}
+                      className="flex shrink-0 items-center py-1"
+                    >
+                      <SwitchPill on={on} />
+                    </button>
                     <span className="text-[12px] w-24 shrink-0 opacity-70">{f.label}</span>
                     <input type="range" min={f.min} max={f.max} step={f.step} value={on ? (v as number) : f.min} disabled={!on} onChange={(e) => updateOverride(editIndex, f.key, parseFloat(e.target.value))} className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white disabled:opacity-65" />
                     <span className="text-[12px] font-mono text-muted w-8 text-right">{on ? (v as number).toFixed(2) : '—'}</span>

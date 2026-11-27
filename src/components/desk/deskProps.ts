@@ -14,6 +14,10 @@ import type { EngineStatus } from '../../lib/platform';
 export interface Cue {
   id: string;
   name: string;
+  /** Performer note ("What it is for" when saving a look). */
+  note?: string;
+  /** The look the item's chip pictures (a sequence's first stage's); absent when it is gone. */
+  lookId?: string;
   /** Two of the look's own dyes, so a row is recognisable at a glance. */
   swatch: string;
   /** Seconds, or 0 for a cut. */
@@ -104,7 +108,7 @@ export interface DeskProps {
   onSave: () => void;
   onSaveOver?: () => void;
   onNew: () => void;
-  savedLooks: { id: string; name: string; swatch: string }[];
+  savedLooks: { id: string; name: string; swatch: string; description?: string }[];
   openLookId: string | null;
   onOpenSaved: (id: string) => void;
   onDeleteSaved: (id: string) => void;

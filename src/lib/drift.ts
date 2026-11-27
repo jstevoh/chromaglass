@@ -119,6 +119,8 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
 const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle']);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
+  // The projector bank (PLAN 51a): the operator's lamps, shutters and crossfade; a wandered lamp is the wall amber or overdriven.
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB',
   // Where the video sits on the plate (PLAN 14ag): a hand frames it, nothing wanders it.
   'filmZoom', 'filmX', 'filmY', 'filmRing',
   // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
@@ -172,6 +174,10 @@ const NOT_THE_LOOK = new Set([
   // speckle is invented noise. The owner kept the dial for the performer to turn up; Evolve walking
   // it up from 0 would lay the speckle over every look by itself, which is the default taken back.
   'granulation',
+  // Hold Apart (PLAN 18d-6): 0 is real, two dyes in one water mixing as dyes do, and the owner chose that
+  // for every look (2026-11-27) with the dial kept for a hand to turn past real. Evolve walking it up
+  // from 0 would put a tension between the colours of every look by itself, which is the default taken back.
+  'holdApart',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*
@@ -278,8 +284,8 @@ export const DRIFTABLE: readonly string[] = PINNABLE
 export const THEMES: readonly { name: string; keys: Readonly<Record<string, 1 | -1>> }[] = (() => {
   const named: { name: string; keys: Record<string, 1 | -1> }[] = [
     { name: 'flow', keys: { globalSpeed: 1, advection: 1, turbulenceScale: 1, vorticityConfinement: 1, damping: 1, depthDrag: -1, platePressure: 1, airVelocity: 1, gooeyEffect: -1 } },
-    { name: 'dye', keys: { dyeBudget: 1, colourBody: 1, diffusionRate: 1, granulation: 1, grainScale: -1, layerScaleVariety: 1, boundaryContrast: 1, polarity: 1, particles: 1, particleMix: 1 } },
-    { name: 'surface', keys: { cells: 1, lacing: 1, bubbles: 1, beads: 1, beadDrops: 1, microDroplets: 1, blobSurfaceTension: -1, oilTension: 1, surfactantFlow: 1, fingering: 1, dropHeight: 1, edgeRelief: 1, oilBodies: 1 } },
+    { name: 'dye', keys: { dyeBudget: 1, colourBody: 1, diffusionRate: 1, granulation: 1, grainScale: -1, layerScaleVariety: 1, boundaryContrast: 1, particles: 1, particleMix: 1 } },
+    { name: 'surface', keys: { cells: 1, lacing: 1, bubbles: 1, beads: 1, beadDrops: 1, microDroplets: 1, oilTension: 1, surfactantFlow: 1, fingering: 1, dropHeight: 1, edgeRelief: 1, oilBodies: 1 } },
     { name: 'heat', keys: { buoyancy: 1, solutalBuoyancy: 1, doubleDiffusion: 1, heatDecay: 1, centerGravity: -1, plateUpright: 1, evaporationRate: 1, vibrationFrequency: 1 } },
     { name: 'glass', keys: { glossiness: 1, refraction: 1, chromaticAberration: 1, thinFilm: 1, focus: 1, aperture: 1, sharpness: 1, postBlurRadius: -1, lampWarmth: 1, lampHotspot: 1, lightPlay: 1, dishVignette: -1, gelSpeed: 1, glassSmear: -1, backgroundLoop: 1 } },
     { name: 'chemistry', keys: { chemistry: 1, chemistryPattern: 1, chemistryWidth: 1, phIndicator: 1, bzReaction: 1, liesegang: 1 } },

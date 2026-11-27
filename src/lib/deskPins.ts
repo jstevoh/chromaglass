@@ -220,6 +220,8 @@ const SECTION_OF: Record<string, string> = {
   spinAuto: 'spin',
   spinBeats: 'spin',
   twoProjectors: 'layers',
+  // The projector bank (PLAN 51a), drawn at the top of the Mixer.
+  projLampA: 'mixer', projLampB: 'mixer', projShutterA: 'mixer', projShutterB: 'mixer', projCross: 'mixer', projFocusA: 'mixer', projFocusB: 'mixer',
   // The mixer's channel strips, all in its own section.
   ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
   // And each row's fade time (lib/mixFade.ts), beside its strip.
@@ -238,7 +240,6 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'beatPrediction', label: "Beat Prediction", min: 0, max: 1, section: 'audio-input' },
   { key: 'turbulenceDetail', label: "Turbulence Detail", min: 1, max: 4, section: 'look', step: 1 },
   { key: 'grainScale', label: "Grain Fineness", min: 20, max: 1200, section: 'look', wanderSpan: 840 },
-  { key: 'blobSurfaceTension', label: "Blob Surface Tension", min: 0, max: 1, section: 'look' },
   { key: 'layerScaleVariety', label: "Layer Scale Variety", min: 0, max: 2, section: 'look', wanderSpan: 1 },
   { key: 'boundaryContrast', label: "Boundary Glow", min: 0, max: 1, section: 'look' },
   { key: 'glossiness', label: "Glossiness", min: 0, max: 1, section: 'look' },
@@ -305,7 +306,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'spectralOptics', label: "Spectral Mix", min: 0, max: 1, section: 'lamp' },
   { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'squish' },
   { key: 'rainDrip', label: "Rain Drip", min: 0, max: 2, section: 'squish', wanderSpan: 1 },
-  { key: 'polarity', label: "Polarity (Repulsion)", min: 0, max: 1, section: 'oil' },
+  { key: 'holdApart', label: "Hold Apart", min: 0, max: 1, section: 'oil' },
   { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.5, section: 'physics', wanderSpan: 0.08 },
   { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'physics' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },

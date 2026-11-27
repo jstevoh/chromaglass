@@ -51,8 +51,9 @@ keys (the operating rules), and each is its own thread.
 
 ## 51a. One plate fades; projectors don't
 
-*Proposed. M on today's two plates, then L with 16d. Claude for the light and the shader,
-Antigravity for the MIDI layout and the phone.*
+*Shipped on today's two plates 2026-11-27 (Lamp A and B, Shutter A and B, A/B Crossfade at the
+top of the Mixer, so on the desk, the settings sheet, the phone and the remote; MIDI-learnable;
+`lib/projectorBank.ts`, `gpu/wgsl/projectors.ts`; `npm run projectors`). Four plates are 51a-3.*
 
 A show is several projectors with their own lamps and shutters, mixed live; ours has two
 plates and a Mixer level per row, no crossfader and no shutter. Model the wall as each
@@ -70,10 +71,52 @@ Check first: a lab render with two projectors at known lamp levels, the wall's l
 within 1% of the two alone added, the crossfade's mean light flat within 2% across its
 travel, and a dimmed lamp's white point moving warm by the law's amount.
 
+What shipped, measured (`npm run projectors`, 9 of 9, on the lab's software WebGPU): the
+defaults multiply nothing, to the byte, one projector and two, written out or left out, where
+a lamp at 99.5% moves 3 levels (and one projector's gains are exactly 1, 1, 1); a lamp at 0.6 is the law's
+colour on clear glass to 0.005 per channel (0.506/0.448/0.338 of the lamp in display values);
+a shutter half across dims every lit pixel to 0.730 (0.5 to 1/2.2) within 0.008, the frame's
+edge as its middle; the crossfade's centre is half of each projector alone in linear light,
+worst 1.32 levels of 255, where the old display-value sum is off by 5.8 on average; the wall's
+mean light across the crossfade is linear to 0.02%, and a bare lamp flat to 0.00%; with the back
+plate on a blend of its own there is no B and the crossfade moves nothing (it blacked the wall
+out before the pre-push review: `bankHasTwo` is the one question the plate and the Mixer ask);
+a front-plate bubble is no black disc at the crossfade's B end. Evolve never wanders the bank
+(drift's NOT_THE_LOOK; it did, the pre-push review found). The old
+`npm run lamp` line 5 now asks for the linear sum (9 of 9). No shipped look had Two Projectors
+on, so moving the add into linear light moved no saved look.
+
+Found while building it, not done:
+
+- **51a-2 · A lamp may follow the sound** (S). A colour organ is a 1960s light show's own
+  tool: lamps on the bass, mids and highs. The bank's keys are hands only for now (sceneMap's
+  NOT_A_TARGET), as the house dimmer is; a cord on a lamp would need the flash guard's limit
+  and the lamp's thermal lag (51a-5) so a kick does not strobe the wall.
+- **51a-3 · Four projectors** (L, with 16d). Two plates are the most the plate composites
+  (`LiquidVisualizer.tsx`, `Math.min(2, …)`); each projector is one more solver. Measure the
+  frame on the Air through the film queue at three and four (numbers only), degrade to fewer
+  solver steps on the back projectors before dropping one, and expect the MacBook Pro to carry
+  more.
+- **51a-4 · The film and LED rows on a side of the crossfade** (S). The film projector and the
+  LED ring are projectors too; each could be put on A, B or neither, so one fader takes the
+  plate down and a film up.
+- **51a-6 · A projector's own output and the shutter's light** (S). The per-surface sources
+  (`lib/plateSources.ts`, a projector cast its own plate) take the crossfade's weight for the
+  back plate, and still lay A's bare lamp under it, as before 51a; a surface for each projector
+  should carry that projector's light alone. And the shutter button does not light when a
+  controller learned to it moves it (it has no `midiKey`, as the Mixer's take buttons have none).
+- **51a-5 · A lamp has thermal lag** (S). A tungsten filament takes about 0.1 to 0.3 s to heat
+  and cool (its heat capacity over the power it radiates), so a variac yanked to zero glows
+  down rather than cuts, and an overdriven lamp rises slower than it falls. The fader is
+  instantaneous today; the lag is the filament's temperature as a first-order state, walked on
+  the stage clocks as the shutters are.
+
 ## 51b. Each layer is always sharp, and focus never moves
 
-*Proposed. M. Claude. Builds 31a (the same disc blur), which this replaces in the running
-order.*
+*Shipped 2026-11-27: Focus A and B under each lamp in the Mixer's Projectors box (so the desk,
+the settings sheet, the phone's Mix sheet and the remote; MIDI-learnable, −1 to 1, sharp at the
+middle); `lib/projectorFocus.ts`, `gpu/focus.ts`, `gpu/wgsl/focus.ts`; `npm run focus`. Builds 31a,
+which this replaces in the running order.*
 
 Players ride focus by feel ("a little out of focus there, there we go"; "manual focus, then
 you can blend it"), and Epic Rig holds one layer soft while racking another. Thin lens: an
@@ -90,6 +133,47 @@ existing `projectorFocus`, so nothing is told two things about one lens (31f-1).
 
 Check first: a lab plate with a sharp step edge on each glass, the edge width at each focus
 setting within 10% of the thin-lens disc, the total light unchanged within 1% as focus moves.
+
+What shipped, measured (`npm run focus`, 6 of 6, on the lab's software WebGPU at 256 pixels):
+the law from numbers typed in the check (10 mm of rack 0.312% of the frame along the lamp's
+bar, the rack's end 2.34%, the knob's end 9.98%); sharp is the plate to the byte (keys at 0,
+left out, or under half a pixel), where a rack 1.4 pixels wide moves 23 levels; racked a
+quarter, to the rack's end and to the knob's end, the plate is the sharp plate through the
+law's box in linear light within 1.05, 0.96 and 0.75 levels where the box moves anything (the
+bar turned a quarter, the control, 12.4, 8.0 and 8.3), a slide's step edge 10–90% wide within
+7% of the box's along x and 5% down y (20.5 by 9.9 pixels at the knob's end, against 20.4 by
+10.2); the light kept within 0.003% (a blur of display values, the control, 0.30%); with two
+projectors B soft and A sharp, B is its box within 0.43 levels, A within the dither of sharp,
+and the crossfade's middle half of each in light, worst 1.45 levels.
+
+How it is built: a pass after the plate (`gpu/focus.ts`, as the lens pass is), because a
+defocus blurs the light on the wall and the display works a pixel at a time. The display draws
+unfinished into a half-float picture with B's share of the wall, channel by channel, in a third
+target (`noteShare`, taken where both plates are on the wall, before the mixer's rows); the
+rows pass splits the light by it and boxes each along x, the columns pass down y, adds, and lays
+the finish. The pupil is the lamp's image, a filled bar 32 by 16 mm (an FXL or ENX coil and its
+reflector's image, magnified about 3.6 by the Fresnel), so the soft edges are twice as long
+across the frame as down it. Its cost: nothing at the default (the pass sits out and allocates
+nothing); one projector soft at the rack's end on a 2560-wide frame, about 75 texture reads a
+pixel in the two passes, and 24 bytes a pixel of pictures while soft (released when sharp).
+The frame time on the Air is owed with 51a-3's measurements (no filming this week).
+
+Found while building it, not done:
+
+- **51b-2 · The rack moves the shadowgraph too** (S). The same Δz is the Becke lines' distance
+  (plateTransmit's `defocusShadow`, the look's Projector Focus, a depth inside the 2 mm gap): a
+  head racked 10 mm is five gaps off the liquid, where the lines would be strongest, and they
+  are drawn at the look's Focus alone. One lens told two things until the rack is added to that
+  Δz; it wants a lab look at the lines' strength at a few millimetres before it ships, as the
+  clamp (0.2 to 2.5) would bind.
+- **51b-3 · Soft with the lens pass, the tank and a projector's own source** (S). With Glitter
+  or Side Light up (the lens pass), on the tank's side view, and in a projector's own plate
+  source (16b), the plate draws sharp whatever the focus; and the mixer's rows over both plates
+  (the film, the LED ring, the lumia) are blurred with A's share, being drawn in the display
+  before the split. Each wants the pass to run after the lens pass, and the film to be its own
+  projector with its own focus (51a-4). And a melt past about 31 pixels of half-width (the knob
+  past the rack on a 2560-wide frame) spreads its taps more than two pixels apart; take it at
+  half resolution there.
 
 ## 51c. A look change is a fade or a cut, never hidden in the blur
 

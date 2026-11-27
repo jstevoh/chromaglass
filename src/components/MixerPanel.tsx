@@ -10,6 +10,7 @@ import {
 import type { FadeWay } from '../lib/mixFade';
 import { PIN_RANGE } from '../lib/deskPins';
 import { readSetting } from '../lib/readout';
+import { ProjectorBank } from './ProjectorBank';
 
 /**
  * The mixer, drawn: every picture on the wall in one stack (lib/mixer.ts).
@@ -140,7 +141,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
     // A back plate with a look of its own is on the stage whatever the look's
     // plate count says (App raises it for the visualizer), so it is not absent.
     if (id === 'back' && (settings.layerCount ?? 1) < 2 && !backLook) return { why: 'This look has one plate.', fix: { label: 'Add it', patch: { layerCount: 2 } } };
-    if (id === 'film' && !hasFilm) return { why: 'No film loaded. Settings → Film loads a reel, a window or the camera.' };
+    if (id === 'film' && !hasFilm) return { why: 'No video loaded. Settings → Video loads a file, a window or a webcam.' };
     if (id === 'mark' && !hasMark) return { why: 'No logo loaded. Settings → Logo & Titles loads one.' };
     return null;
   };
@@ -236,6 +237,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
       <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} leading-snug text-muted`}>
         Top of the list is on top on the wall. What is under the front plate is its lamp; the LED ring and the lumia above it are beams, the gel a filter on the lens. {onFade ? 'Fade takes a row out over its fade time and back. ' : ''}Grade opens a row's blend, fade time and grade.
       </p>
+      <ProjectorBank settings={settings} onSetting={onSetting} touch={touch} chips={chips} testId={`${testId}-bank`} />
       {rows.map(id => {
         const info = MIX_SOURCE_INFO[id];
         const off = absent(id);

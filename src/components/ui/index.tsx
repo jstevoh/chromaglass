@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { Info as InfoIcon } from 'lucide-react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { useEscape } from '../../hooks/useEscape';
 import { curveOf, handValueAt, travelOf } from '../../lib/midi';
@@ -486,9 +487,12 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             aria-expanded={tip.open}
             aria-describedby={tip.open ? tip.id : undefined}
             data-info="name"
-            /* 48 px each way, the touch rule, taken from the margins so the row keeps its height; the slider below sits over the overlap. */
-            className="-mx-3 -my-[14px] select-none px-3 py-[14px] text-left [-webkit-touch-callout:none] text-[13px] font-medium text-text underline decoration-dotted decoration-white/25 underline-offset-4"
-          >{label}</button>
+            /* 44 px minimum touch target without inflating the row above. */
+            className="-mx-2 -my-2.5 inline-flex min-h-[44px] select-none items-center gap-1.5 px-2 py-2.5 text-left text-[13px] font-medium text-text [-webkit-touch-callout:none]"
+          >
+            <span>{label}</span>
+            <InfoIcon size={13} className="shrink-0 text-dim" aria-hidden />
+          </button>
         ) : (
           <span className="text-[13px] font-medium text-text">{label}</span>
         )}
@@ -548,7 +552,7 @@ export function Toggle({ label, on, onChange, testId, title, disabled }: {
       aria-checked={on}
       data-testid={testId}
       title={title}
-      className={`flex min-h-[36px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
+      className={`flex min-h-[36px] pointer-coarse:min-h-[44px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
         disabled ? 'opacity-65 cursor-not-allowed' : ''
       }`}
     >
@@ -636,9 +640,10 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
     hand was on the knob, and a chip over the row above hid the next one, so
     a hand could not tell which knob it had.
   */
+  const knobHelp = help ?? helpFor(midiKey);
   const tip = useControlTip({
     name: label,
-    help: help ?? helpFor(midiKey),
+    help: knobHelp,
     value: disabled ? 'off' : display,
     held: !!drag,
     disabled,
@@ -793,11 +798,14 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           className="absolute inset-0 h-full w-full cursor-ns-resize touch-none appearance-none rounded-full opacity-0"
         />
       </span>
-      {/* A finger has no hover: the name is the button there, marked like the phone's sliders. */}
+      {/* A finger has no hover: the name is the button there, with an info mark on touch. */}
       <span
         onClick={tip.toggle}
-        className={`mt-1 w-full text-center text-[12px] font-medium leading-[1.15] line-clamp-2 break-words [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
-      >{label}</span>
+        className={`mt-1 inline-flex w-full items-center justify-center gap-0.5 text-center text-[12px] font-medium leading-[1.15] ${drag ? 'text-text' : 'text-text-2'}`}
+      >
+        <span className="line-clamp-2 break-words">{label}</span>
+        {knobHelp && <InfoIcon size={12} className="hidden shrink-0 text-dim pointer-coarse:inline" aria-hidden />}
+      </span>
       <span className="max-w-full truncate font-mono text-[12px] leading-tight">
         <span className={drag ? 'text-text-2' : 'text-dim'}>{disabled ? 'off' : display}</span>
         {mapping && <span className="text-faint"> {mapping}</span>}
@@ -972,6 +980,8 @@ export interface Keyed { key?: string | number }
 export interface CueRowProps extends Keyed {
   index: number;
   name: string;
+  /** Optional performer note ("What it is for" from saving a look). */
+  note?: string;
   /** A two-colour smear standing in for the look, from its palette contract. */
   swatch: string;
   state: 'live' | 'next' | 'idle';
@@ -985,7 +995,7 @@ export interface CueRowProps extends Keyed {
   midiKey?: string | null;
 }
 
-export function CueRow({ index, name, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId, midiKey }: CueRowProps) {
+export function CueRow({ index, name, note, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId, midiKey }: CueRowProps) {
   const hit = useMidiTouch(midiKey ?? null);
   const shell = state === 'live' ? 'bg-live-bg border-live-border'
     : state === 'next' ? 'bg-elevated border-accent-border'
@@ -995,6 +1005,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
+      title={note || undefined}
       data-testid={testId}
       data-state={state}
       data-midi-hit={hit ? 'true' : undefined}
@@ -1002,7 +1013,10 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
       <SlideMount swatch={swatch} size={28} />
-      <span className={`flex-1 truncate text-[13px] font-medium ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-[13px] font-medium leading-tight ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
+        {note && <span className="block truncate text-[11px] leading-tight text-muted">{note}</span>}
+      </span>
       {trailing}
     </button>
   );
@@ -1012,7 +1026,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
 
 const NOOP = () => {};
 
-export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right', embed = false }: {
+export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right', embed = false, zIndex = 'z-50' }: {
   title: ReactNode; onClose: () => void; children: ReactNode; width?: number; height?: number; testId?: string;
   /**
    * Drawn inside a desk panel rather than over the window: no scrim, no
@@ -1034,6 +1048,8 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
    * which is ridden while the desk around it is still being played.
    */
   docked?: boolean;
+  /** Override the modal backdrop z-index when a sheet opens above PhoneSheet (`z-[55]`). */
+  zIndex?: string;
 }) {
   // Listened for once: an effect keyed on onClose could drop the key (useEscape).
   // An embedded one is a panel, which Escape does not close.
@@ -1051,7 +1067,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
         // Between the desk's 48 px header and its 28 px status bar, so the
         // header's buttons and lights stay in reach and in view beside it.
         ? `pointer-events-none fixed bottom-7 top-12 z-50 flex items-stretch p-2 ${dockSide === 'left' ? 'left-0 justify-start' : 'right-0 justify-end'}`
-        : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6'}
+        : `fixed inset-0 ${zIndex} flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6`}
       onClick={docked ? undefined : onClose}
       data-testid={testId ? `${testId}-scrim` : undefined}
     >
@@ -1063,7 +1079,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
       >
         <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-2 text-[16px] font-medium text-text">{title}</div>
-          <button onClick={onClose} className="rounded-md p-2 text-muted transition-colors hover:bg-hover hover:text-text" aria-label="Close">
+          <button onClick={onClose} className="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text" aria-label="Close">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         </div>

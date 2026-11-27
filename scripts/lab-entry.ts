@@ -40,7 +40,7 @@ import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, r
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
   advection: 1, sharpness: 0, damping: 0.99, heatDecay: 0.98, turbScale: 0, turbDetail: 3,
-  immiscibility: 0, phaseSharp: 0.35, phaseTension: 0.18, magnetX: 0.5, magnetY: 0.5, magnetHeight: 0.2,
+  holdApart: 0, phaseSharp: 0.35, phaseTension: 0.18, magnetX: 0.5, magnetY: 0.5, magnetHeight: 0.2,
   magnetStrength: 0, magnetSeconds: 1 / 60, plateCurve: 0, depthDrag: 0, gapSpring: 0.02, gapMemory: 0,
   platePressure: 0.4, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
   air: 0, evapFactor: 1, time: 0, currentDamp: 0.98, currentBuoy: 0, rockX: 0, rockY: 0, currentGrav: 0,
@@ -800,6 +800,8 @@ const api = {
         (PLAN 38h).
       */
       gelAngle?: number;
+      /** The plate drawn this many times into the frame before the one read back, for a timing that the readback does not swamp (the focus pass's cost, PLAN 51b). */
+      repeat?: number;
       /** The upper moiré sheet's spin, turns (PLAN 45a). */
       moireTurn?: number;
       /*
@@ -911,6 +913,7 @@ const api = {
       flipped too (`flip`).
     */
     const flipped = cam.flip || !!cam.sources?.length;
+    for (let i = 1; i < (cam.repeat ?? 1); i++) plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
     plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
     // As the app fills them: the frame's settings with the other rows at
     // nothing, no camera and no chain, so each display does its own finish.

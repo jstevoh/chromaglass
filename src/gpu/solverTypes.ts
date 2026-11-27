@@ -40,7 +40,8 @@ export interface GpuStepParams {
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
-  immiscibility: number;
+  /** Hold Apart, 0 to 1 (PLAN 18d-6): 0 is real, two dyes in one water with no tension between them; past it the Korteweg stress of an edge of composition, an oil's tension across a unit step of dye at 1 (`holdApartPull`). */
+  holdApart: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
   /*
     The second phase and the magnet under the glass (H7).
@@ -358,13 +359,15 @@ export interface PlateSolver {
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
    * over the rim, and, for a liquid that mixes with the clear one (`sp`),
-   * its share into the species field. Plate units.
+   * its share into the species field. Plate units. A liquid with `ethanol`
+   * or `anise` in it (volume fractions of the bottle, lib/liquidProps.ts)
+   * lays those too, for the ouzo's cloud (PLAN 48s, lib/ouzo.ts).
    */
   /** The cover glass's gap on its liquid, metres (PLAN 38r-5): what a pour's share and the cover's drag are taken at. */
   readonly coverMetres?: number;
   /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
   readonly coverUnits?: number;
-  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
+  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; ethanol?: number; anise?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
   /** Whether a pour's volume can be laid now without compiling on the frame that asks: its kernel is built behind the show (fluid.ts), and until it is, a drop is laid as a stamp (sim/dropSplash.ts). */
   pourReady?(): boolean;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */

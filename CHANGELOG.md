@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   until it reads full. Nothing else about the look moves. On the desk beside Random Evolve,
   the settings sheet, the phone and the phone remote; it stays on across look changes.
 
+### Changed — dyes mix as real dyes do, and Hold Apart is the dial past that (PLAN 18d-6)
+
+- Two dyes in the same water are one liquid, and the plate now treats them as one: there is no
+  force between unlike colours. They mix by the dye's own diffusion and the flow, and where they
+  overlap each takes its own light out. Every look opens this way.
+- **Hold Apart** (`holdApart`, 0–1, 0 in every look; Settings → Chemistry → Oil & Soap, MIDI, the
+  desks, the remote, the phone) scales the tension a steep change of composition carries
+  (Korteweg's stress), up to a cooking oil's against water at 1: pools round, streaks draw back,
+  a straight edge stays where it is.
+- **Polarity** and **Blob Surface Tension** are gone. Their product sized a push between unlike
+  colours that was on in every look and was no tension. A saved look that carries them opens
+  with Hold Apart at 0. `npm run forces`.
+
 ### Added — the video coming in, clear and on the desk (PLAN 14ag-9)
 
 - The video row is the input on the plate: the camera or a window while one is on, else the file

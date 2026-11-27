@@ -3,7 +3,7 @@ import { unhandled } from '../lib/unhandled';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, liveBindings, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, pressedBy, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover, sameSoundBinding, withLoadedMap,
-  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, MIDI_MAP_KEY, settingLed, curveOf, valueAt, travelOf,
+  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, MIDI_MAP_KEY, settingLed, curveOf, valueAt, travelOf, CHANNEL_PRESSURE,
   type FactoryMapId,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
   type SoundBinding,
@@ -16,6 +16,8 @@ import { touch, touchKey } from '../lib/midiTouch';
 import { downloadText } from '../lib/userPresets';
 import type { VisualizerSettings } from '../types';
 import { livePresetId } from '../presets';
+import { amountOfKnob, knobOfAmount, type HandTarget, type PadTarget, type PadTool } from '../lib/padTarget';
+import { padLayoutOf, steppedLayout, withPadLayout, type PadLayout } from '../lib/padLayouts';
 
 /**
  * The MIDI controller on the desk.
@@ -49,6 +51,21 @@ export interface MidiHost {
   noteStruck?: (velocity: number, source?: 'note' | 'pad') => void;
   /** A note-on or note-off on a channel bound as Notes as voices (PLAN 24.3). */
   noteVoice?: (e: MidiEvent, target: Extract<MidiTarget, { kind: 'voices' }>) => void;
+  /**
+   * The grid playing the liquid (PLAN 30c): a pad's note-on and note-off,
+   * its aftertouch (`note` null for channel pressure, every pad held on the
+   * channel), a button picking the tool or the liquid in hand, and a knob
+   * on one tool's Amount.
+   */
+  pad?: (e: MidiEvent, target: PadTarget) => void;
+  padPressure?: (channel: number, note: number | null, value01: number) => void;
+  /** Let go of the hold on this note, whatever the note is bound to now. */
+  padLift?: (channel: number, note: number) => void;
+  pickHand?: (target: HandTarget) => void;
+  toolAmount?: (tool: PadTool) => number;
+  setToolAmount?: (tool: PadTool, amount: number) => void;
+  /** Let go of every held pad: the grid's layout changed under them. */
+  releasePads?: () => void;
 }
 
 /** What the LEDs should show. Changes here are pushed to the controller. */
@@ -61,6 +78,12 @@ export interface MidiFeedback {
   /** Palette colour (0..1 RGB) by index, for the dye pads. */
   paletteColor: (index: number) => { r: number; g: number; b: number } | null;
   toggles: { play: boolean; automate: boolean; overlays: boolean; sequencer: boolean; blackout: boolean; record: boolean; performance?: boolean };
+  /** A pad's colour (0..1 RGB) as it would lay now, with the hand's picks; null for one that lays none (PLAN 30c). */
+  padColor?: (t: PadTarget) => { r: number; g: number; b: number } | null;
+  /** Whether a Track Select button's tool or liquid is the one in hand. */
+  inHand?: (t: HandTarget) => boolean;
+  /** Changes whenever the hand's tool, liquid or a tool's Amount does, so the LEDs are sent again. */
+  handKey?: string;
 }
 
 export interface MidiDevice { id: string; name: string; }
@@ -194,7 +217,22 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   }, []);
 
   // ── Handling a message ─────────────────────────────────────────
+  /** Bank ◀ ▶'s layout step, set below once `setPadLayout` exists. */
+  const stepPadLayoutRef = useRef((step: 1 | -1) => { void step; });
   const handle = useCallback((e: MidiEvent) => {
+    // Aftertouch reaches no binding: it presses harder on a hold a note-on began (PLAN 30c).
+    if (e.kind === 'pressure') {
+      if (!watchRef.current) hostRef.current.padPressure?.(e.channel, e.number === CHANNEL_PRESSURE ? null : e.number, e.value / 127);
+      return;
+    }
+    /*
+      A note-off lets go of its pad's hold ahead of everything else. The
+      binding that started the hold may not be the one live now: Shift
+      pressed mid-hold changes bank, a learn or a clear changes the map,
+      auto-map swallows every message. A hold whose note-off went elsewhere
+      would pour at 30 Hz until the page closed.
+    */
+    if (e.kind === 'noteoff') hostRef.current.padLift?.(e.channel, e.number);
     const src = eventSource(e);
     const now = performance.now();
     heardRef.current.set(sourceKey(src), now);
@@ -338,6 +376,17 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         case 'setlist': if (pressed) h.playSetItem?.(t.index); break;
         case 'dye':     if (pressed) h.selectDye(t.paletteIndex); break;
         case 'voices':  if (e.kind === 'noteon' || e.kind === 'noteoff') h.noteVoice?.(e, t); break;
+        // A pad is a hold: its note-off is its hand let go, not nothing.
+        case 'pad':     if (e.kind === 'noteon' || e.kind === 'noteoff') h.pad?.(e, t); break;
+        case 'hand':    if (pressed) h.pickHand?.(t); break;
+        case 'toolAmount': {
+          if (e.kind !== 'cc') break;
+          const cur = h.toolAmount?.(t.tool) ?? 1;
+          const v01 = b.mode === 'relative' ? knobOfAmount(cur) + relativeDelta(e.value) / 100 : e.value / 127;
+          h.setToolAmount?.(t.tool, amountOfKnob(v01));
+          break;
+        }
+        case 'padLayout': if (pressed) stepPadLayoutRef.current(t.step); break;
         // A binding whose kind has no case here is a control that does
         // nothing when it is touched, and says nothing about why.
         default: unhandled('a MIDI binding', t);
@@ -351,7 +400,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         that is a fader moving, which is exactly when you want to see which
         one you have hold of.
       */
-      if (!held && (t.kind === 'setting' ? e.kind !== 'noteoff' : pressed)) {
+      if (!held && (t.kind === 'setting' || t.kind === 'toolAmount' ? e.kind !== 'noteoff' : pressed)) {
         // The value goes with it, so the activity view can say where a fader
         // landed without reading the setting back and racing the update.
         touch(touchKey(t), t.kind === 'setting' ? hostRef.current.getSetting(t.key) : undefined);
@@ -407,6 +456,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
 
   useEffect(() => {
     if (!enabled || !supported) {
+      // MIDI going away takes its note-offs with it: let go of every held pad.
+      hostRef.current.releasePads?.();
       if (accessRef.current) {
         for (const input of accessRef.current.inputs.values()) input.onmidimessage = null;
         accessRef.current.onstatechange = null;
@@ -424,7 +475,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         accessRef.current = access;
         setError(null);
         setOpen(true);
-        access.onstatechange = () => { refreshPorts(); wireInputs(); };
+        // A port coming or going (the APC40 unplugged mid-pour) can strand a hold's note-off.
+        access.onstatechange = () => { hostRef.current.releasePads?.(); refreshPorts(); wireInputs(); };
         refreshPorts();
         wireInputs();
       })
@@ -553,6 +605,17 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         level = c ? padVelocityFor(c.r, c.g, c.b, f.activePresetId !== live) : (f.activePresetId === live ? 3 : 1);
       } else if (t.kind === 'setlist') {
         level = b.source.kind === 'cc' ? 127 : 1;
+      } else if (t.kind === 'pad') {
+        // Lit in what it lays; a hand that lays nothing (Press, Blow, Stir) a dim white.
+        const c = f.padColor?.(t) ?? null;
+        level = c ? padVelocityFor(c.r, c.g, c.b, true) : padVelocityFor(0.5, 0.5, 0.5, true);
+      } else if (t.kind === 'hand') {
+        level = f.inHand?.(t) ? 1 : 0;
+      } else if (t.kind === 'toolAmount' && b.source.kind === 'cc' && b.mode !== 'relative') {
+        level = Math.round(knobOfAmount(hostRef.current.toolAmount?.(t.tool) ?? 1) * 127);
+      } else if (t.kind === 'dye' && b.source.kind === 'note' && b.source.number === 0x33) {
+        // Track Select's LEDs are one colour: lit for the dye in hand, dark for the rest (Liquids × Tools).
+        level = f.dyeIndex === t.paletteIndex ? 1 : 0;
       } else if (t.kind === 'dye') {
         const c = f.paletteColor(t.paletteIndex);
         level = c ? padVelocityFor(c.r, c.g, c.b, f.dyeIndex !== t.paletteIndex) : 0;
@@ -583,7 +646,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     }
   }, [outputFor]);
 
-  const fbKey = `${feedback.activePresetId}|${feedback.dyeIndex}|${Object.values(feedback.toggles).map(Number).join('')}|${bank}`;
+  const fbKey = `${feedback.activePresetId}|${feedback.dyeIndex}|${Object.values(feedback.toggles).map(Number).join('')}|${bank}|${feedback.handKey ?? ''}`;
   useEffect(() => {
     if (!enabled) return;
     const t = setTimeout(sendFeedback, 60);
@@ -639,13 +702,22 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const loadFactory = useCallback((which: FactoryMapId) => {
     const next =
       which === 'apc-mini-mk2' ? apcMiniMk2Map(presetIds)
-      : which === 'apc40-mk2' ? apc40Mk2Map(presetIds)
+      // The APC40 comes up playing the liquid (PLAN 30c); Bank ◀ ▶ reach its Looks grid.
+      : which === 'apc40-mk2' ? withPadLayout(apc40Mk2Map(presetIds), 'tools-colours', presetIds)
       : which === 'launchpad' ? launchpadMap(presetIds)
       : which === 'launch-control-xl' ? launchControlXlMap()
       : nanoKontrol2Map();
     setMap(prev => withLoadedMap(prev, next));
     takeover.reset();
+    hostRef.current.releasePads?.();
   }, [presetIds, setMap, takeover]);
+  /** The grid laid as `layout` (lib/padLayouts.ts), everything off it kept: the faders, the knobs, what was learned. */
+  const setPadLayout = useCallback((layout: PadLayout) => {
+    setMap(prev => withPadLayout(prev, layout, presetIds));
+    hostRef.current.releasePads?.();
+  }, [presetIds, setMap]);
+  stepPadLayoutRef.current = (step) => setPadLayout(steppedLayout(padLayoutOf(mapRef.current), step));
+  const padLayout = useMemo(() => padLayoutOf(map), [map]);
   /*
     Auto-map: start listening, stop listening, keep what was heard.
 
@@ -655,6 +727,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     attention.
   */
   const startAutoMap = useCallback(() => {
+    hostRef.current.releasePads?.();
     watchRef.current = new SurfaceWatcher();
     setWatched({ continuous: 0, encoder: 0, button: 0 });
   }, []);
@@ -723,6 +796,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     lastEvent,
     clocked,
     bank, setBank, stepBank, banks: MIDI_BANKS,
+    padLayout, setPadLayout,
     startAutoMap, cancelAutoMap, finishAutoMap, watched,
   };
 }
