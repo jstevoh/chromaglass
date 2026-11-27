@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
-import { LIT } from './ui';
+import { LIT, SwitchPill } from './ui';
 import {
   DEFAULT_OUTPUT, IDENTIFY_MS, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
@@ -342,15 +342,16 @@ const Switch = ({ label, on, onChange, hint, testId }: {
 }) => (
   <button
     type="button"
+    role="switch"
+    aria-checked={on}
     aria-pressed={on}
     onClick={() => onChange(!on)}
     title={hint}
     data-testid={testId}
-    className={`flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 text-[13px] font-medium transition-all ${
-      on ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'
-    }`}
+    className="flex min-h-11 flex-1 items-center justify-between gap-2 rounded-lg border border-border px-3 text-left text-[13px] font-medium text-text transition-colors hover:bg-hover"
   >
-    {label}
+    <span>{label}</span>
+    <SwitchPill on={on} />
   </button>
 );
 

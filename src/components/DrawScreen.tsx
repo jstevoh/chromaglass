@@ -47,7 +47,7 @@ const TILES: { tool: PadTool; name: string; hint: string }[] = [
   { tool: 'drop', name: 'Drop', hint: 'tap · drag' },
   { tool: 'blow', name: 'Blow', hint: 'drag' },
   { tool: 'press', name: 'Press', hint: 'hold' },
-  { tool: 'finger', name: 'Stir', hint: 'finger' },
+  { tool: 'finger', name: 'Finger', hint: 'stir' },
 ];
 
 /** The Amount slider's travel, as a multiple of a finger's own amount (see RemoteControl's padSend). */
@@ -548,7 +548,7 @@ export function DrawScreen(p: DrawScreenProps) {
         <footer data-testid="draw-footer" className="col-span-3 flex items-center gap-4 border-t border-border px-6">
           {amountRow(420)}
           <div className="ml-auto flex gap-3">
-            {button('Lucky', () => p.action('lucky'), 'draw-lucky', { h: 56 })}
+            {button('Randomise', () => p.action('lucky'), 'draw-lucky', { h: 56 })}
             {button('Clear', () => p.action('clear'), 'draw-clear', { h: 56 })}
             {button(frozen ? 'Frozen' : 'Freeze', () => p.action(frozen ? 'play' : 'pause'), 'draw-freeze', { h: 56, on: frozen })}
             {blackout(56, false)}
@@ -637,7 +637,7 @@ export function DrawScreen(p: DrawScreenProps) {
         <footer data-testid="draw-footer" className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/85 to-transparent px-4 pb-3 ${side ? 'flex items-center gap-4 pt-3' : 'pt-6'}`}>
           {side ? <div className="min-w-0 flex-1">{amountRow()}</div> : amountRow()}
           <div className={side ? 'flex w-[420px] shrink-0 gap-2.5' : 'mt-2 flex gap-2.5'}>
-            {button('Lucky', () => p.action('lucky'), 'draw-lucky', { h: 52, flex: true })}
+            {button('Randomise', () => p.action('lucky'), 'draw-lucky', { h: 52, flex: true })}
             {button(frozen ? 'Frozen' : 'Freeze', () => p.action(frozen ? 'play' : 'pause'), 'draw-freeze', { h: 52, on: frozen, flex: true })}
             {blackout(52, true)}
           </div>

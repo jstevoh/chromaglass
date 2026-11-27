@@ -1007,7 +1007,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
           ref={button}
           onClick={toggle}
           className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
-          title="New, Save, and your saved preset palettes"
+          title="New, Save, and your saved looks"
           data-testid="doc-menu-button"
         >
           <span className="truncate">{p.lookName ?? 'Untitled'}</span>
@@ -1023,7 +1023,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
           >
               {([
                 ['New — an empty plate', '', p.onNew, 'doc-new'],
-                ['Save as a new preset…', '⌘S', p.onSave, 'doc-save'],
+                ['Save as a new look…', '⌘S', p.onSave, 'doc-save'],
                 ...(p.onSaveOver ? [[`Save over “${p.lookName ?? 'Untitled'}”`, '', p.onSaveOver, 'doc-save-over']] : []),
               ] as [string, string, () => void, string][]).map(([label, kbd, run, id]) => (
                 <button
@@ -1038,7 +1038,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
               ))}
               {p.savedLooks.length > 0 && (
                 <div className="border-t border-border py-1" data-testid="doc-saved">
-                  <div className="px-3 pb-1 pt-1.5 text-[11px] text-faint">Your preset palettes</div>
+                  <div className="px-3 pb-1 pt-1.5 text-[11px] text-faint">Your saved looks</div>
                   <div className="max-h-[50vh] overflow-y-auto">
                     {p.savedLooks.map(sl => (
                       <div key={sl.id} className={`group flex items-center ${sl.id === p.openLookId ? 'bg-active' : 'hover:bg-hover'}`}>
@@ -1054,7 +1054,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
                         <button
                           onClick={() => p.onDeleteSaved(sl.id)}
                           className="mr-1 rounded p-1.5 text-faint opacity-60 hover:bg-hover hover:text-text group-hover:opacity-100"
-                          title={`Remove ${sl.name} from your presets`}
+                          title={`Remove ${sl.name} from your saved looks`}
                           aria-label={`Remove ${sl.name}`}
                           data-testid={`doc-saved-remove-${sl.id}`}
                         >

@@ -140,7 +140,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
     // A back plate with a look of its own is on the stage whatever the look's
     // plate count says (App raises it for the visualizer), so it is not absent.
     if (id === 'back' && (settings.layerCount ?? 1) < 2 && !backLook) return { why: 'This look has one plate.', fix: { label: 'Add it', patch: { layerCount: 2 } } };
-    if (id === 'film' && !hasFilm) return { why: 'No film loaded. Settings → Film loads a reel, a window or the camera.' };
+    if (id === 'film' && !hasFilm) return { why: 'No video loaded. Settings → Video loads a file, a window or a webcam.' };
     if (id === 'mark' && !hasMark) return { why: 'No logo loaded. Settings → Logo & Titles loads one.' };
     return null;
   };

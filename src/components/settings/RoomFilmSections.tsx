@@ -244,9 +244,9 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
             warning is the kind of control that makes someone doubt the rest
             of the panel.
           */}
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Film source" data-testid="film-source">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Video source" data-testid="film-source">
             {([
-              ['none', 'Off', null, 'film-off', 'No film under the dye', () => onFilmClear?.()],
+              ['none', 'Off', null, 'film-off', 'No video under the dye', () => onFilmClear?.()],
               ['file', 'Video file', Film, 'film-file', 'Load a video file from this machine and play it through the dye, looping; Pour, below, lays it in as dye too', () => filmInputRef.current?.click()],
               ['camera', 'Webcam', Camera, 'film-camera', 'Point a camera at a real dish of oil and composite it through the solver', () => onFilmCamera?.()],
               ['window', 'Window', MonitorPlay, 'film-window', canCaptureWindow
@@ -291,7 +291,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
             />
             {filmCameraLost && (
               <p className="-mt-1 mb-2 text-[12px] leading-relaxed text-amber-300/80" data-testid="film-camera-lost">
-                The camera was unplugged. The film comes back on when it is plugged in again.
+                The camera was unplugged. The video comes back on when it is plugged in again.
               </p>
             )}
           </div>

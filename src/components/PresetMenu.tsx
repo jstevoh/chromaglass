@@ -102,7 +102,7 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                 autoFocus
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
-                placeholder="Name this palette"
+                placeholder="Name this look"
                 className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40"
                 data-testid="preset-save-name"
               />
@@ -119,14 +119,14 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
               {/* It said "Save as file" and promised a download, which saving
                   stopped doing when Save and Export were split (useUserPresets):
                   a saved look goes under Yours, and the arrow beside it is the file. */}
-              <p className="text-[9px] opacity-40 leading-snug">Kept under Yours in this browser. The arrow beside a saved preset downloads it as a file to keep or share.</p>
+              <p className="text-[9px] opacity-40 leading-snug">Kept under Yours in this browser. The arrow beside a saved look downloads it as a file to keep or share.</p>
             </form>
           ) : (
             <div className="flex gap-1.5">
-              <button onClick={() => setSaving(true)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Save the current settings as a new preset" data-testid="preset-save">
-                <Save size={12} /> Save As...
+              <button onClick={() => setSaving(true)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Save the current settings as a new look" data-testid="preset-save">
+                <Save size={12} /> Save look
               </button>
-              <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a preset file" data-testid="preset-load">
+              <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a look file" data-testid="preset-load">
                 <FolderOpen size={12} /> Load file
               </button>
               <input

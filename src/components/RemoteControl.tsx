@@ -524,7 +524,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       data-testid="remote-pad"
     >
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[10px] uppercase tracking-[0.25em] text-white/25">
-        {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : padTool === 'spin' ? 'drag round the middle to turn the dish; hold still to stop it' : 'tap or drag to drop dye'}
+        {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : padTool === 'finger' ? 'drag to stir through the liquid' : padTool === 'spin' ? 'drag round the middle to turn the dish; hold still to stop it' : 'tap or drag to drop dye'}
         {penSeen ? ' · pen: press for more, lean to steer' : ''}
       </span>
       {padTouchCount > 0 && (
@@ -568,7 +568,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               className={`min-h-11 min-w-11 rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-widest disabled:opacity-30 ${padTool === t ? LIT : 'border-white/10 text-white/50'}`}
               data-testid={`remote-tool-${t}`}
             >
-              {t}
+              {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
           <button
@@ -789,7 +789,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               }`}
             >
               <Waves size={18} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Auto</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest">Evolve</span>
             </button>
           </div>
 
@@ -1133,17 +1133,17 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* One-shot gestures */}
           <div className="mb-7 flex gap-3">
             <ActionButton label="Seed" icon={Droplets} onPress={() => action('seed')} connected={connected} />
-            <ActionButton label="Random" icon={Shuffle} onPress={() => action('lucky')} connected={connected} />
+            <ActionButton label="Randomise" icon={Shuffle} onPress={() => action('lucky')} connected={connected} />
             <ActionButton label="Drain" icon={Waves} onPress={() => action('drain')} connected={connected} />
             <ActionButton label="Clear" icon={Eraser} onPress={() => action('clear')} tone="warn" connected={connected} />
           </div>
 
           {/* Presets */}
           <div ref={(el) => { sectionRefs.current.looks = el; }} id="remote-sec-looks" className="mb-3 flex items-center justify-between">
-            <h2 className="text-[11px] uppercase tracking-[0.25em] text-white/45">Preset palettes — tap to arm, Go sends</h2>
+            <h2 className="text-[11px] uppercase tracking-[0.25em] text-white/45">Looks — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
-              <button onClick={() => action('preset-prev')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={16} /></button>
-              <button onClick={() => action('preset-next')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={16} /></button>
+              <button onClick={() => action('preset-prev')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Previous look" data-testid="remote-preset-prev"><ChevronLeft size={16} /></button>
+              <button onClick={() => action('preset-next')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Next look" data-testid="remote-preset-next"><ChevronRight size={16} /></button>
             </div>
           </div>
           {presetGroups.map(({ label, presets }) => (

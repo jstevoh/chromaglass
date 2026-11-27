@@ -33,7 +33,7 @@ export function PhoneInkTitle({ settings, onSetting, disabled = false, testId = 
         className="flex min-h-11 w-full items-center justify-between gap-3 text-left disabled:opacity-30"
       >
         <span className="flex flex-col">
-          <span className="text-[13px] font-semibold text-text">Title</span>
+          <span className="text-[13px] font-semibold text-text">Song titles</span>
           <span className="text-[12px] text-dim">Each new song&apos;s credit in the corner, then gone</span>
         </span>
         <SwitchPill on={on} />

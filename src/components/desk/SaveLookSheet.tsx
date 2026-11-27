@@ -62,7 +62,7 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
   };
 
   return (
-    <Sheet title="Save as a new palette" onClose={onClose} width={480} height={380} testId="save-sheet">
+    <Sheet title="Save look" onClose={onClose} width={480} height={380} testId="save-sheet">
       {/* w-full: the sheet's body is a row, and without it this column took
           only its content's width, the fields 200 px wide in a 480 px sheet. */}
       <div className="flex h-full w-full flex-col gap-4 p-5">
@@ -115,7 +115,7 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
           )}
           <span className="flex-1" />
           <Button height={40} onClick={onClose} testId="save-cancel">Cancel</Button>
-          <Button height={40} variant="primary" onClick={save} testId="save-confirm">Save As...</Button>
+          <Button height={40} variant="primary" onClick={save} testId="save-confirm">{replaceName ? 'Save as new' : 'Save look'}</Button>
         </div>
       </div>
     </Sheet>

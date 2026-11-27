@@ -526,7 +526,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
               <input
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
-                placeholder="Find a preset, dye, action or control"
+                placeholder="Find a look, dye, action or control"
                 aria-label="Filter what to assign"
                 className={`w-full rounded-lg pl-7 pr-2 py-1.5 text-xs border focus:outline-none ${paper ? 'bg-black/[0.03] border-black/15 focus:border-black/40' : 'bg-white/5 border-white/10 focus:border-white/40'}`}
                 data-testid="surface-filter"
@@ -534,7 +534,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
             </div>
 
             <div className="max-h-[52vh] overflow-y-auto pr-1 scrollbar-hide">
-              {section('Preset palettes', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
+              {section('Looks', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
               {section('Dyes', PALETTE.map((p, i) => ({ key: `dye-${i}`, label: p.name, swatch: p.hex, target: { kind: 'dye', paletteIndex: i } as MidiTarget })))}
               {section('Actions', (Object.keys(ACTION_LABELS) as MidiAction[]).map(a => ({ key: `action-${a}`, label: ACTION_LABELS[a], target: { kind: 'action', action: a } as MidiTarget })))}
               {section('Controls', LEARNABLE_SETTINGS.map(s => ({ key: `setting-${s.key}`, label: s.label, target: { kind: 'setting', key: s.key, min: s.min, max: s.max } as MidiTarget })))}

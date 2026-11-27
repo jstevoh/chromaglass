@@ -182,13 +182,13 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             </button>
           </div>
         )}
-        <Slider label="Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
+        <Slider label="Logo Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
           onChange={(v: number) => onUpdate({ markMix: v })} settingKey="markMix" />
-        <Slider label="Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
+        <Slider label="Logo Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
           onChange={(v: number) => onUpdate({ markScale: v })} settingKey="markScale" />
-        <Slider label="Across" value={settings.markX ?? 0.5} min={0} max={1} step={0.005}
+        <Slider label="Logo Across" value={settings.markX ?? 0.5} min={0} max={1} step={0.005}
           onChange={(v: number) => onUpdate({ markX: v })} settingKey="markX" />
-        <Slider label="Up" value={settings.markY ?? 0.12} min={0} max={1} step={0.005}
+        <Slider label="Logo Up" value={settings.markY ?? 0.12} min={0} max={1} step={0.005}
           onChange={(v: number) => onUpdate({ markY: v })} settingKey="markY" />
         <Info>
           Laid over the finished frame, so it reaches the projector window, a cast to another screen, a recording and
@@ -217,7 +217,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             the picture, on this screen and burned into the live stream; the plate under it is untouched.
           </Info>
           {/* The logo melted at the start of a film (PLAN 37x-11, lib/logoMelt.ts): the same ink and rinse as a title. */}
-          <Toggle label="Melt the logo at the start" on={!!settings.logoMelt} onChange={(v) => onUpdate({ logoMelt: v })} testId="logo-melt-switch"
+          <Toggle label="Logo melt" on={!!settings.logoMelt} onChange={(v) => onUpdate({ logoMelt: v })} testId="logo-melt-switch"
             title="When the Live Show goes on air or a recording starts, the ChromaGlass logo is poured big across the plate as ink, then melts into the show" />
         </div>
       </section>

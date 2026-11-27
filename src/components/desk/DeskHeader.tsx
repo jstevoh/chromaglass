@@ -203,9 +203,9 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
       />
       <StatusDot
         on={!!dots.video}
-        label="Film" tight={t}
+        label="Video" tight={t}
         onClick={onVideo}
-        title={dots.video ? 'A film is playing under the dye. Click for the Film section.' : 'No film under the dye. Click for the Film section.'}
+        title={dots.video ? 'Video is playing under the dye. Click for the Video section.' : 'No video under the dye. Click for the Video section.'}
         testId="dot-video"
       />
       {onWall && (

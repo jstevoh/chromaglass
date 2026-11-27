@@ -1396,13 +1396,9 @@ export default function App() {
       const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
       const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
       return {
-        id: item.id,
-        name,
-        swatch: swatchOf(look?.id ?? seq?.stages[0]?.presetId),
-        fade: item.fade ?? fadeSeconds,
-        song: item.song ? songLabel(item.song) : undefined,
-        kind: item.kind,
-        missing: item.kind === 'sequence' ? !seq : !look,
+        id: item.id, name, note: look?.description, swatch: swatchOf(look?.id ?? seq?.stages[0]?.presetId),
+        fade: item.fade ?? fadeSeconds, song: item.song ? songLabel(item.song) : undefined,
+        kind: item.kind, missing: item.kind === 'sequence' ? !seq : !look,
       };
     });
   }, [allPresets, fadeSeconds, setList, swatchOf]);
@@ -2368,7 +2364,7 @@ export default function App() {
               (`macroHold`, the same `max(0.5, … ?? 5)` LiquidVisualizer gives MacroCamera). */}
           <span className="mx-1 h-3 w-px bg-white/20" />
           {([
-            ['hold', 'Hold', 'Hold still where it is aimed. Alt-drag on the plate to pan, Alt-click to fix on a spot; Random Evolve wanders it slowly.'],
+            ['hold', 'Hold', 'Hold still where it is aimed. Alt-drag on the plate to pan, Alt-click to fix on a spot; Evolve wanders it slowly.'],
             ['follow', 'Follow', 'Locked on: rides the liquid where it is aimed and never cuts away. Alt-click on something to follow it.'],
             ['auto', 'Auto', `Picks its own subjects: rides one for Shot Length (${shotLabel(settings.macroHold)}), then cuts to another.`],
           ] as const).map(([mode, label, title]) => (
@@ -2721,9 +2717,9 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* Random Evolve */}
+                {/* Evolve */}
                 <div className="flex flex-col items-center gap-1.5 w-full">
-                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Random Evolve</span>
+                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Evolve</span>
                   <button
                     role="switch"
                     aria-checked={isAutomated}
@@ -2753,7 +2749,7 @@ export default function App() {
                       onChange={e => updateSettings({ automateRate: valueOfKey('automateRate', +e.target.value) })}
                       className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
                       style={{ background: `linear-gradient(to right, rgb(192,132,252) ${evolveAt * 100}%, rgba(255,255,255,0.1) ${evolveAt * 100}%)` }}
-                      title="How busy Random Evolve is: how often it pours, thins and strokes"
+                      title="How busy Evolve is: how often it pours, thins and strokes"
                       data-testid="evolve-speed"
                     />
                   </div>
@@ -3364,11 +3360,11 @@ export default function App() {
             <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
             <AlphaBadge className="hidden sm:inline-block" />
           </h1>
-          {/* The preset's name is the menu: one click from the top of the screen. */}
+          {/* The look's menu, one click from the top. */}
           <button
             onClick={() => setPresetMenu(presetMenu === 'title' ? 'none' : 'title')}
             className="flex items-center gap-2 mt-0.5 py-1.5 -mx-1 px-1 rounded-lg group"
-            title="Choose a preset palette"
+            title="Choose a look"
             aria-haspopup="menu"
             aria-expanded={presetMenu === 'title'}
             data-testid="preset-title-button"
@@ -3377,7 +3373,7 @@ export default function App() {
               {activePresetName ? activePresetName : 'Custom'}
             </p>
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase tracking-wider font-bold flex items-center gap-1 group-hover:bg-white/20 transition-colors">
-              Preset <ChevronDown size={9} />
+              Look <ChevronDown size={9} />
             </span>
           </button>
           {presetMenu === 'title' && (
@@ -3568,7 +3564,7 @@ export default function App() {
           onSave={saveLook}
           onSaveOver={docId ? replaceLook : undefined}
           onNew={newPlate}
-          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
+          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id), description: u.description }))}
           openLookId={docId}
           onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
           onDeleteSaved={deleteSavedLook}

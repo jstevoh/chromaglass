@@ -188,7 +188,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           <span className="ml-auto shrink-0 whitespace-nowrap pl-2 font-mono text-[12px] text-faint" data-testid="set-count">{p.cues.length} {p.cues.length === 1 ? 'item' : 'items'}</span>
         </div>
         <span className="flex items-center gap-1 whitespace-nowrap [&>*]:flex-1">
-          <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a preset palette, a saved one, a sequence or a file to the set">+ Add</Button>
+          <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a look, a saved look, a sequence or a file to the set">+ Add</Button>
           <Button
             height={28}
             onClick={() => { setAct('save'); setSaved(true); window.setTimeout(() => setSaved(false), 1400); }}
@@ -220,7 +220,7 @@ function CuesBody({ p }: { p: DeskProps }) {
               </>
             )}
             <MenuItem onClick={() => setAct('new')} testId="set-new">New empty set</MenuItem>
-            <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all preset palettes</MenuItem>
+            <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all looks</MenuItem>
             <div className="my-1 h-px bg-border" />
             <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
             <MenuItem onClick={() => setAct('export')} testId="set-export">Export this set</MenuItem>
@@ -237,6 +237,7 @@ function CuesBody({ p }: { p: DeskProps }) {
             key={c.id}
             index={i + 1}
             name={c.name}
+            note={c.note}
             swatch={c.swatch}
             state={c.id === p.liveId ? 'live' : c.id === p.nextId ? 'next' : 'idle'}
             trailing={
@@ -297,7 +298,7 @@ function CuesBody({ p }: { p: DeskProps }) {
         ) : (
           <div className="px-3 py-8 text-center text-[13px] text-muted" data-testid="set-empty">
             <p>This set is empty.</p>
-            <p className="mt-1 text-[12px] text-faint">+ Add preset palettes to it, or start from all of them in the ⋯ menu.</p>
+            <p className="mt-1 text-[12px] text-faint">+ Add looks to it, or start from all of them in the ⋯ menu.</p>
           </div>
         )}
       </div>
@@ -316,7 +317,7 @@ function CuesBody({ p }: { p: DeskProps }) {
             className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[12px] text-muted hover:text-text"
             data-testid="perform-saved-toggle"
           >
-            <span>Your preset palettes</span>
+            <span>Your saved looks</span>
             <span className="font-mono text-[11px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
           </button>
           {savedOpen && (
@@ -324,17 +325,20 @@ function CuesBody({ p }: { p: DeskProps }) {
               {p.savedLooks.map(l => {
                 const state = l.id === p.liveLookId ? 'live' : l.id === p.cuedLook?.id ? 'next' : 'idle';
                 return (
-                  <div key={l.id} className={`group flex h-9 items-center rounded-md border ${state === 'live' ? 'border-live-border bg-live-bg' : state === 'next' ? 'border-accent-border bg-elevated' : 'border-transparent hover:bg-hover'}`}>
+                  <div key={l.id} className={`group flex min-h-9 items-center rounded-md border ${state === 'live' ? 'border-live-border bg-live-bg' : state === 'next' ? 'border-accent-border bg-elevated' : 'border-transparent hover:bg-hover'}`}>
                     <button
                       onClick={() => p.onCueSaved(l.id)}
                       onDoubleClick={() => p.onSendSaved(l.id)}
-                      title={`Cue ${l.name}; Go sends it. Double-click sends it now.`}
-                      className="flex h-full min-w-0 flex-1 items-center gap-2.5 px-2 text-left"
+                      title={l.description ? `${l.description} — Cue ${l.name}; Go sends it. Double-click sends it now.` : `Cue ${l.name}; Go sends it. Double-click sends it now.`}
+                      className="flex min-h-9 min-w-0 flex-1 items-center gap-2.5 px-2 py-1 text-left"
                       data-testid={`perform-saved-${l.id}`}
                       data-state={state}
                     >
                       <SlideMount swatch={l.swatch} size={20} />
-                      <span className={`truncate text-[13px] ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{l.name}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate text-[13px] leading-tight ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{l.name}</span>
+                        {l.description && <span className="block truncate text-[11px] leading-tight text-faint">{l.description}</span>}
+                      </span>
                     </button>
                     {state === 'live' ? <Tag tone="live">live</Tag> : state === 'next' ? <Tag tone="next">next</Tag> : null}
                     <button
@@ -446,7 +450,7 @@ function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
           })}
           <div className="mt-1.5 border-t border-border pt-1.5">
             <Toggle
-              label="Random evolve"
+              label="Evolve"
               // The real switch. This used to write automateRate between 0 and
               // 0.15, which only sets how often an evolving plate does something:
               // with evolving off (the default) it showed "on" and did nothing.
@@ -561,7 +565,7 @@ function RecipeBody({ p }: { p: DeskProps }) {
           {!ridesOut && (
             <div className="mt-2 border-t border-border pt-1">
               <Toggle
-                label="Random evolve"
+                label="Evolve"
                 on={p.automated}
                 onChange={on => {
                   p.onAutomate(on);

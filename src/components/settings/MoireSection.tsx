@@ -4,6 +4,7 @@ import { MOIRE_SHEETS } from '../../lib/moire';
 import { useMoirePreview } from '../../hooks/useMoirePreview';
 import { openAccountSheet } from '../../lib/tierGates';
 import { Info } from '../Info';
+import { Toggle } from '../ui';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 
@@ -68,11 +69,15 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
       {sheetPicker('moireSheetA', 'Lower sheet', 'The sheet under the glass, seen through the liquid', (v) => onUpdate({ moireSheetA: v }))}
       {sheetPicker('moireSheetB', 'Upper sheet', 'The sheet laid on the cover glass, the one a hand turns', (v) => onUpdate({ moireSheetB: v }))}
       {/* Face down: the same print mirrored, which crosses two spoke or spiral sheets into diamonds and flowers. */}
-      <label className="mb-3 flex items-center gap-2 text-[12px] text-white/60">
-        <input type="checkbox" checked={settings.moireFlip ?? true} disabled={!pack.live}
-          onChange={(e) => onUpdate({ moireFlip: e.target.checked })} data-testid="moire-flip" />
-        <span>Flip the upper sheet face down</span>
-      </label>
+      <div className="mb-3">
+        <Toggle
+          label="Flip the upper sheet face down"
+          on={settings.moireFlip ?? true}
+          disabled={!pack.live}
+          onChange={(v) => onUpdate({ moireFlip: v })}
+          testId="moire-flip"
+        />
+      </div>
       <Slider label="Moiré Sheets" disabled={off} value={settings.moireAmount ?? 0} min={0} max={1} step={0.05}
         onChange={(v: number) => onUpdate({ moireAmount: v })} settingKey="moireAmount" />
       <Slider label="Moiré Turn" disabled={off} value={settings.moireAngle ?? 4} min={-180} max={180} step={0.1}

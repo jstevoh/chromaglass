@@ -2,7 +2,7 @@ import { HIT_FEATURES } from '../lib/hitSource';
 import { VOICE_DEFAULTS, type VoiceTool } from '../lib/noteVoices';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { useEffect, useRef, useState } from 'react';
-import { Sheet, LIT } from './ui';
+import { Sheet, LIT, Toggle } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Music } from 'lucide-react';
 import {
   ACTION_LABELS, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
@@ -236,7 +236,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
       )}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6 text-white">
       <p className="text-[12px] leading-relaxed opacity-40 mb-4">
-        Faders ride the show, pads cue presets and dyes, buttons fire the one-shots. Teach your controller here: choose what a control should do, then touch it.
+        Faders ride the show, pads cue looks and dyes, buttons fire the one-shots. Teach your controller here: choose what a control should do, then touch it.
         Or teach it to the music with the note beside Learn: a slider follows a drum or a band, a button fires on its hits.
         Both are kept in the same map and the same file.
       </p>
@@ -354,8 +354,8 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
             ))}
           </div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">
-            Nine faders cannot reach forty settings. Learn a control while a layer is chosen and it belongs to that layer;
-            learn it on <span className="text-white/60">1</span> and it is live on all of them, which is where presets, dyes and the transport belong.
+            nine faders cannot reach forty settings. Learn a control while a layer is chosen and it belongs to that layer;
+            learn it on <span className="text-white/60">1</span> and it is live on all of them, which is where looks, dyes and the transport belong.
             Put <span className="text-white/60">Bank +</span> on a button to step them in the dark.
             Changing layer drops every fader out of soft takeover, so nothing jumps to where the hardware happens to be standing.
           </p>
@@ -370,24 +370,37 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
         slot on it or riding blind. This puts a running list of what changed
         and where it landed in the corner instead.
       */}
-      <label className="mb-3 flex items-center gap-2 text-[12px]" data-testid="midi-activity-toggle">
-        <input type="checkbox" checked={activity} onChange={e => onActivity(e.target.checked)} />
-        Show what the controller is doing, on the desk
-      </label>
+      <div className="mb-2">
+        <Toggle
+          label="Show what the controller is doing, on the desk"
+          on={activity}
+          onChange={onActivity}
+          testId="midi-activity-toggle"
+        />
+      </div>
 
       {/* Fader manners */}
-      <div className="flex items-center gap-2 mb-4 text-[12px]">
-        <label
-          className="flex items-center gap-1.5 flex-1"
-          title="A fader does nothing until it passes through the value the setting is already at, so one left at the top does not slam the look back the moment it twitches — after a preset loads, or after a bank change hands it a different setting. The cost is that a fader out of position waits, and the activity readout says which one and what it is waiting for. Turn this off and every fader takes hold the instant it moves."
-        ><input type="checkbox" checked={midi.softTakeover} onChange={e => midi.setSoftTakeover(e.target.checked)} data-testid="midi-soft" /> Soft takeover</label>
-        <label className="flex items-center gap-1.5 flex-1" title="Learn the next setting as an endless encoder (relative nudges)"><input type="checkbox" checked={encoder} onChange={e => setEncoder(e.target.checked)} data-testid="midi-encoder" /> <Zap size={10} /> Endless encoder</label>
+      <div className="mb-4 flex flex-col gap-1">
+        <Toggle
+          label="Soft takeover"
+          on={midi.softTakeover}
+          onChange={midi.setSoftTakeover}
+          title="A fader does nothing until it passes through the value the setting is already at, so one left at the top does not slam the look back the moment it twitches — after a look loads, or after a bank change hands it a different setting. The cost is that a fader out of position waits, and the activity readout says which one and what it is waiting for. Turn this off and every fader takes hold the instant it moves."
+          testId="midi-soft"
+        />
+        <Toggle
+          label="Endless encoder"
+          on={encoder}
+          onChange={setEncoder}
+          title="Learn the next setting as an endless encoder (relative nudges)"
+          testId="midi-encoder"
+        />
       </div>
 
       {/* Learn targets */}
       <div className="flex flex-wrap gap-1 mb-3" role="tablist" aria-label="Learn targets">
         {(['settings', 'actions', 'presets', 'setlist', 'dyes', 'voices'] as const).map(t => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t === 'setlist' ? 'set list' : t}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t === 'setlist' ? 'set list' : t === 'presets' ? 'looks' : t}</button>
         ))}
       </div>
       {midi.learning && (

@@ -275,7 +275,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           How the show moves over minutes, not seconds: the set walking its hues, the rhythm plate pressed on the kick, a slow loop behind the live plate, and the round dish and spread of the projected clock faces. The Show Sequencer scripts these over a song.
         </Info>
         <Slider
-          label="Hue Journey (min/step)"
+          label="Hue Journey"
           value={settings.hueJourney ?? 0}
           min={0}
           max={30}
@@ -953,7 +953,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
                 <Info>
                   Arrow keys pan the camera (Shift for a whole frame); Alt-drag (Option-drag) on the plate pans it too; Alt-click fixes it on the spot under the pointer.
                   {(settings.macroCamera ?? 'hold') === 'follow' ? ' Follow locks onto the liquid there and rides with it.' : ''}
-                  {' '}With Random Evolve on, the aim wanders slowly.
+                  {' '}With Evolve on, the aim wanders slowly.
                 </Info>
               </>
             )}

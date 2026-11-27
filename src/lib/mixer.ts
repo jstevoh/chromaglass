@@ -111,7 +111,7 @@ export const MIX_SOURCE_INFO: Record<MixSource, MixSourceInfo> = {
   led:   { id: 'led',   name: 'LED Ring',    level: 'ledLevel',   hint: 'The spinning LED platform. At the bottom it is the lamp under the glass; higher up it is a beam of its own.' },
   front: { id: 'front', name: 'Front Plate', level: 'frontLevel', hint: 'The lead plate, lit from beneath. Everything else stacks on it.' },
   back:  { id: 'back',  name: 'Back Plate',  level: 'backLevel',  hint: 'The second plate, when the look has two.' },
-  film:  { id: 'film',  name: 'Film',        level: 'filmMix',    hint: 'A loaded video, a window or the camera. Under the glass it is the lamp, seen through the dye; above it, laid over the plate.' },
+  film:  { id: 'film',  name: 'Video',       level: 'filmMix',    hint: 'A loaded video, a window or the camera. Under the glass it is the lamp, seen through the dye; above it, laid over the plate.' },
   mark:  { id: 'mark',  name: 'Logo',        level: 'markMix',    hint: 'The logo or title card.' },
   gel:   { id: 'gel',   name: 'Gel Wheel',   level: 'gelWheel',   hint: 'A turning four-colour gel. In the lamp it colours the lamp; above the glass it colours everything under it.' },
   lumia: { id: 'lumia', name: 'Lumia',       level: 'lumia',      hint: 'Slow folded sheets of light. In the lamp they light the glass; above it they are a beam of their own.' },

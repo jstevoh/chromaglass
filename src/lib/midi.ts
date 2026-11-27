@@ -459,7 +459,7 @@ export function targetLabel(
   switch (t.kind) {
     case 'setting': return SETTING_LABELS[t.key] ?? String(t.key);
     case 'action': return ACTION_LABELS[t.action];
-    case 'preset': return `Preset palette: ${presetName?.(t.presetId) ?? t.presetId}`;
+    case 'preset': return `Look: ${presetName?.(t.presetId) ?? t.presetId}`;
     case 'setlist': {
       const item = setItemName?.(t.index);
       return item ? `Set list #${t.index + 1}: ${item}` : `Set list #${t.index + 1}`;
@@ -477,9 +477,9 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'seed': 'Seed', 'clear': 'Clear', 'drain': 'Drain', 'lucky': 'Randomise',
   'spin-front': 'Spin Front Plate', 'spin-back': 'Spin Back Plate',
   'spin-reverse': 'Reverse Spin', 'spin-auto': 'Auto Spin: Next',
-  'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen',
+  'play-toggle': 'Play / Pause', 'automate-toggle': 'Evolve', 'overlays-toggle': 'Clean Screen',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
-  'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
+  'preset-next': 'Next Look', 'preset-prev': 'Previous Look',
   'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record a Take',
   'scene-toggle': 'Watch the Room',
   'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
@@ -487,14 +487,14 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'tap-tempo': 'Tap Tempo', 'tempo-clear': 'Tempo: Listen Again',
   'bank-next': 'Bank +', 'bank-prev': 'Bank \u2212',
   'mix-raise-led': 'Mixer: Raise LED Ring', 'mix-raise-back': 'Mixer: Raise Back Plate',
-  'mix-raise-film': 'Mixer: Raise Film', 'mix-raise-mark': 'Mixer: Raise Logo',
+  'mix-raise-film': 'Mixer: Raise Video', 'mix-raise-mark': 'Mixer: Raise Logo',
   'mix-raise-gel': 'Mixer: Raise Gel Wheel', 'mix-raise-lumia': 'Mixer: Raise Lumia',
   'mix-blend-led': 'Mixer: Next Blend, LED Ring', 'mix-blend-gel': 'Mixer: Next Blend, Gel Wheel',
   'mix-blend-lumia': 'Mixer: Next Blend, Lumia', 'mix-blend-back': 'Mixer: Next Blend, Back Plate',
-  'mix-blend-film': 'Mixer: Next Blend, Film', 'mix-blend-mark': 'Mixer: Next Blend, Logo',
+  'mix-blend-film': 'Mixer: Next Blend, Video', 'mix-blend-mark': 'Mixer: Next Blend, Logo',
   'mix-fade-led': 'Mixer: Fade In/Out, LED Ring', 'mix-fade-gel': 'Mixer: Fade In/Out, Gel Wheel',
   'mix-fade-lumia': 'Mixer: Fade In/Out, Lumia', 'mix-fade-front': 'Mixer: Fade In/Out, Front Plate',
-  'mix-fade-back': 'Mixer: Fade In/Out, Back Plate', 'mix-fade-film': 'Mixer: Fade In/Out, Film',
+  'mix-fade-back': 'Mixer: Fade In/Out, Back Plate', 'mix-fade-film': 'Mixer: Fade In/Out, Video',
   'mix-fade-mark': 'Mixer: Fade In/Out, Logo',
 };
 

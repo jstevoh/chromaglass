@@ -369,7 +369,7 @@ export function PhonePlay(p: PhonePlayProps) {
             )
           ) : (
             <>
-              <Pill onPress={p.onShuffle} label="Shuffle the look" testId="play-shuffle"><Shuffle size={18} /></Pill>
+              <Pill onPress={p.onShuffle} label="Randomise the look" testId="play-shuffle"><Shuffle size={18} /></Pill>
               {p.recording.supported && (
                 <Pill onPress={p.recording.onToggle} label={p.recording.on ? 'Stop recording' : 'Record a clip'} testId="play-record" pressed={p.recording.on} live>
                   {/*
@@ -499,9 +499,9 @@ export function PhonePlay(p: PhonePlayProps) {
                 display={readSetting('vorticityConfinement', s.vorticityConfinement ?? 0, rangeOf('vorticityConfinement').min, rangeOf('vorticityConfinement').max)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
               <TouchSlider glass label="Soap" setting="surfactantFlow" {...rangeOf('surfactantFlow')} value={s.surfactantFlow ?? 0}
                 display={readSetting('surfactantFlow', s.surfactantFlow ?? 0, rangeOf('surfactantFlow').min, rangeOf('surfactantFlow').max)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
-              <TouchSlider glass label="Zoom" setting="macroZoom" help="How close the camera looks into the plate. One is the whole plate." {...rangeOf('macroZoom')} value={zoom}
+              <TouchSlider glass label="Macro Zoom" setting="macroZoom" help="How close the camera looks into the plate. One is the whole plate." {...rangeOf('macroZoom')} value={zoom}
                 display={readSetting('macroZoom', zoom, rangeOf('macroZoom').min, rangeOf('macroZoom').max)} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
-              <TouchSlider glass label="Evolve" setting="automateRate" {...rangeOf('automateRate')} value={s.automateRate ?? 0}
+              <TouchSlider glass label="Evolve Speed" setting="automateRate" {...rangeOf('automateRate')} value={s.automateRate ?? 0}
                 display={readSetting('automateRate', s.automateRate ?? 0, rangeOf('automateRate').min, rangeOf('automateRate').max)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
               </div>
               <div className="min-w-0">
@@ -542,7 +542,7 @@ export function PhonePlay(p: PhonePlayProps) {
               </div>
               <div className="mt-3 flex gap-2 pb-1">
                 <button onClick={p.onShuffle} data-testid="play-sheet-shuffle"
-                  className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Shuffle</button>
+                  className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Randomise</button>
                 <button onClick={p.onClear} data-testid="play-clear"
                   className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Clear plate</button>
                 {p.recording.supported && (

@@ -1,6 +1,6 @@
 import React, { useRef, type ReactNode } from 'react';
 import { Mic, Monitor, FileAudio, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
-import { LIT } from './ui';
+import { LIT, SwitchPill } from './ui';
 import { VuMeter } from './ui/Playful';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
@@ -144,16 +144,14 @@ export function SoundPanel({
             </div>
             <button
               type="button"
+              role="switch"
+              aria-checked={ambientMode}
               onClick={() => onAmbientMode(!ambientMode)}
-              aria-pressed={ambientMode}
               data-testid="sound-ambient-toggle"
-              className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors ${
-                ambientMode
-                  ? LIT
-                  : 'border-border text-muted hover:bg-hover hover:text-text'
-              }`}
+              className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1"
+              title={ambientMode ? 'On: caps draw at 60 Hz and liquid at 30 Hz' : 'Off: normal rate'}
             >
-              {ambientMode ? 'On · 30 Hz' : 'Off'}
+              <SwitchPill on={ambientMode} />
             </button>
           </div>
         )}

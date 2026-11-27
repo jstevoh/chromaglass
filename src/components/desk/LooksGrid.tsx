@@ -44,7 +44,7 @@ export function LooksGrid({
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="Browse all preset palettes"
+        title="Browse all looks"
         data-testid="looks-grid-open"
         className={`flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[13px] font-medium transition-colors ${
           open ? LIT : 'text-text-2 hover:bg-hover hover:text-text'
@@ -60,17 +60,17 @@ export function LooksGrid({
         >
           <div
             role="dialog"
-            aria-label="Preset palettes"
+            aria-label="Looks"
             data-testid="looks-grid"
             onClick={e => e.stopPropagation()}
             className="flex max-h-[82vh] w-full max-w-[960px] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-              <span className="text-[14px] font-medium text-text">Preset palettes</span>
+              <span className="text-[14px] font-medium text-text">Looks</span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close preset palettes"
+                aria-label="Close looks"
                 data-testid="looks-grid-close"
                 className="flex h-7 w-7 items-center justify-center rounded-md text-[14px] text-text-2 hover:bg-hover hover:text-text"
               >

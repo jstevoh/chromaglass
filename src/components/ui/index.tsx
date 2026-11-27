@@ -968,6 +968,8 @@ export interface Keyed { key?: string | number }
 export interface CueRowProps extends Keyed {
   index: number;
   name: string;
+  /** Optional performer note ("What it is for" from saving a look). */
+  note?: string;
   /** A two-colour smear standing in for the look, from its palette contract. */
   swatch: string;
   state: 'live' | 'next' | 'idle';
@@ -981,7 +983,7 @@ export interface CueRowProps extends Keyed {
   midiKey?: string | null;
 }
 
-export function CueRow({ index, name, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId, midiKey }: CueRowProps) {
+export function CueRow({ index, name, note, swatch, state, trailing, onClick, onDoubleClick, onContextMenu, testId, midiKey }: CueRowProps) {
   const hit = useMidiTouch(midiKey ?? null);
   const shell = state === 'live' ? 'bg-live-bg border-live-border'
     : state === 'next' ? 'bg-elevated border-accent-border'
@@ -991,6 +993,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
+      title={note || undefined}
       data-testid={testId}
       data-state={state}
       data-midi-hit={hit ? 'true' : undefined}
@@ -998,7 +1001,10 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
       <SlideMount swatch={swatch} size={28} />
-      <span className={`flex-1 truncate text-[13px] font-medium ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-[13px] font-medium leading-tight ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
+        {note && <span className="block truncate text-[11px] leading-tight text-muted">{note}</span>}
+      </span>
       {trailing}
     </button>
   );

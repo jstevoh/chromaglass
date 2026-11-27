@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Sheet, LIT } from './ui';
+import { Sheet, LIT, SwitchPill, Toggle } from './ui';
 import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
 import { PRESETS, livePresetId, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
@@ -229,10 +229,9 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
           <Field label="Name">
             <input value={selected.name} onChange={(e) => update(seq => ({ ...seq, name: e.target.value }))} className={inputCls} />
           </Field>
-          <label className="flex items-center justify-between mb-4">
-            <span className="text-[13px] font-medium opacity-60">Loop</span>
-            <input type="checkbox" checked={selected.loop} onChange={(e) => update(seq => ({ ...seq, loop: e.target.checked }))} className="accent-white" />
-          </label>
+          <div className="mb-4">
+            <Toggle label="Loop" on={selected.loop} onChange={(v) => update(seq => ({ ...seq, loop: v }))} />
+          </div>
           <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="text-[13px] font-medium opacity-60 mb-1.5">Song</div>
             {selected.song ? (
@@ -276,7 +275,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <Field label="Transition (seconds)">
                 <input type="number" min={0} max={300} value={stage.transition} onChange={(e) => updateStage(editIndex, { transition: Math.max(0, Number(e.target.value) || 0) })} className={inputCls} />
               </Field>
-              <Field label="Preset palette">
+              <Field label="Look">
                 <select value={stage.presetId ? livePresetId(stage.presetId) : ''} onChange={(e) => updateStage(editIndex, { presetId: e.target.value || undefined })} className={inputCls}>
                   <option value="">Keep the current one</option>
                   {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -297,7 +296,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               </div>
               <Field label="Macro camera">
                 <select value={stage.macro === undefined ? '' : stage.macro ? 'on' : 'off'} onChange={(e) => updateStage(editIndex, { macro: e.target.value === '' ? undefined : e.target.value === 'on' })} className={inputCls}>
-                  <option value="">As the preset says</option>
+                  <option value="">As the look says</option>
                   <option value="on">On</option>
                   <option value="off">Off</option>
                 </select>
@@ -335,7 +334,17 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
                 const on = typeof v === 'number';
                 return (
                   <div key={f.key} className="flex items-center gap-2 mb-2">
-                    <input type="checkbox" checked={on} onChange={(e) => updateOverride(editIndex, f.key, e.target.checked ? onStep(f.spec, (f.min + f.max) / 2) : undefined)} className="accent-white" title={`Glide ${f.label} in this stage`} />
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={on}
+                      aria-label={`Glide ${f.label} in this stage`}
+                      title={`Glide ${f.label} in this stage`}
+                      onClick={() => updateOverride(editIndex, f.key, on ? undefined : onStep(f.spec, (f.min + f.max) / 2))}
+                      className="flex shrink-0 items-center py-1"
+                    >
+                      <SwitchPill on={on} />
+                    </button>
                     <span className="text-[10px] w-24 shrink-0 opacity-70">{f.label}</span>
                     <input type="range" min={f.min} max={f.max} step={f.step} value={on ? (v as number) : f.min} disabled={!on} onChange={(e) => updateOverride(editIndex, f.key, parseFloat(e.target.value))} className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white disabled:opacity-30" />
                     <span className="text-[9px] font-mono opacity-50 w-8 text-right">{on ? (v as number).toFixed(2) : '—'}</span>

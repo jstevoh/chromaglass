@@ -951,12 +951,12 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
 
       {sheet === 'looks' && (
-        <PhoneSheet title="Preset palettes" onClose={close} testId="phone-sheet-looks">
-          <PanelGuard name="The preset palettes sheet" inline onClose={close}>
+        <PhoneSheet title="Looks" onClose={close} testId="phone-sheet-looks">
+          <PanelGuard name="The Looks sheet" inline onClose={close}>
           <div className={`grid gap-1.5 ${[p.onRevert, p.onSaveLook].filter(Boolean).length === 2 ? 'grid-cols-3' : [p.onRevert, p.onSaveLook].some(Boolean) ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
-            {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
-            {/* The desk's Save, here: a new preset from what is on the plate,
+            <Tile icon={Shuffle} label="Random look" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
+            {p.onRevert && <Tile icon={Undo2} label="Back" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
+            {/* The desk's Save, here: a new look from what is on the plate,
                 under a name, listed under Yours below as soon as it is saved. */}
             {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => { setSaveDup(null); setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null)); }} testId="phone-save-look" />}
           </div>
@@ -968,7 +968,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 onFocus={e => e.currentTarget.select()}
                 value={saveName}
                 onChange={e => { setSaveName(e.target.value); setSaveDup(null); }}
-                aria-label="Name for the new preset"
+                aria-label="Name for the new look"
                 // 16 px: under it, iOS zooms the page in on focus.
                 className="h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none focus:border-accent"
                 data-testid="phone-save-name"
@@ -1079,9 +1079,9 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Mic} label="Microphone" on={p.audioSource === 'microphone'} onPress={() => p.onAudioSource(p.audioSource === 'microphone' ? 'none' : 'microphone')} testId="phone-sound-mic" />
-            <Tile icon={Music} label="Band" on={p.audioSource === 'simulated'} onPress={() => p.onAudioSource(p.audioSource === 'simulated' ? 'none' : 'simulated')} testId="phone-sound-band" />
+            <Tile icon={Music} label="A band in a box" on={p.audioSource === 'simulated'} onPress={() => p.onAudioSource(p.audioSource === 'simulated' ? 'none' : 'simulated')} testId="phone-sound-band" />
             <Tile icon={Waves} label="The shelf" on={shelfOpen || !!(p.nowPlaying?.src)} onPress={() => setShelfOpen(v => !v)} testId="phone-sound-shelf" />
-            <Tile icon={FileAudio} label="A song file" on={p.audioSource === 'file' && !p.nowPlaying?.src} onPress={() => { p.onMusicFile(); }} testId="phone-sound-file" />
+            <Tile icon={FileAudio} label="Your file" on={p.audioSource === 'file' && !p.nowPlaying?.src} onPress={() => { p.onMusicFile(); }} testId="phone-sound-file" />
           </div>
           {p.nowPlaying && (
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-elevated p-2" data-testid="phone-now-playing">
@@ -1298,9 +1298,9 @@ export function PhoneStage(p: PhoneStageProps) {
 
       {sheet === 'play' && (
         <PhoneSheet title="Motion" onClose={close} testId="phone-sheet-play">
-          <PanelGuard name="The Play sheet" inline onClose={close}>
+          <PanelGuard name="The Motion sheet" inline onClose={close}>
           <div className="grid grid-cols-2 gap-1.5">
-            <Tile icon={Hourglass} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
+            <Tile icon={Hourglass} label="Evolve" on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
             <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
             {p.tilt.supported && (
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
@@ -1351,7 +1351,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
-            <Slider label="Evolve speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
+            <Slider label="Evolve Speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
               touch testId="phone-evolve-speed" />
           </div>
           {/*
@@ -1417,7 +1417,7 @@ export function PhoneStage(p: PhoneStageProps) {
           <SectionLabel>Do something to it</SectionLabel>
           <div className="grid grid-cols-4 gap-1.5">
             <Tile icon={RotateCw} label="Flick" onPress={p.onSpin} testId="phone-spin" />
-            <Tile icon={Shuffle} label="Random" onPress={() => { p.onLucky(); close(); }} testId="phone-lucky" />
+            <Tile icon={Shuffle} label="Randomise" onPress={() => { p.onLucky(); close(); }} testId="phone-lucky" />
             <Tile icon={Waves} label="Drain" onPress={() => { p.onDrain(); close(); }} testId="phone-drain" />
             <Tile icon={Trash2} label="Clear" onPress={() => { p.onClear(); close(); }} testId="phone-clear" />
           </div>
@@ -1488,8 +1488,8 @@ export function PhoneStage(p: PhoneStageProps) {
             {p.onShortcuts && <Tile icon={Keyboard} label="Shortcuts" onPress={() => { close(); p.onShortcuts?.(); }} testId="phone-shortcuts" />}
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
-            {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
-            {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
+            {p.onPlayScreen && <Tile icon={Waves} label="Play" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
+            {p.onOpenAccount && <Tile icon={User} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
@@ -1558,7 +1558,7 @@ export function PhoneStage(p: PhoneStageProps) {
           )}
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
-            {p.onPlayScreen && ' Simple screen is the plain one: the plate, the dyes and three hands.'}
+            {p.onPlayScreen && ' Play is the plain one: the plate, the dyes and three hands.'}
             {isPhoneApp() && ' Laptop remote makes this phone the remote for a show running on the laptop; Play here brings it back.'}
           </p>
           </PanelGuard>
