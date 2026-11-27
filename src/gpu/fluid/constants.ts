@@ -30,6 +30,7 @@ export interface FieldCarry extends SolverCarry {
   readonly mix: GPUTexture | null;
   readonly rxn: GPUTexture | null;
   readonly lies: GPUTexture | null;
+  readonly surfaceHeight: GPUTexture | null;
   /** Oil Bodies' tally of the oil poured: the oil is carried, so its tally is. */
   readonly oilPoured: number;
 }

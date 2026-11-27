@@ -60,6 +60,7 @@ import { WebGPUAir } from './air';
 import { WebGPUSlosh } from './slosh';
 import { SoapFilmPlate } from './soapFilmPlate';
 import { FaradayPlate } from './faraday';
+import { SurfaceHeight } from './surfaceHeight';
 import { GlowPlate } from './glow';
 import { WebGPUParticles } from './particles';
 import { FineDye } from './fineDye';
@@ -526,6 +527,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUSlosh.prepare(device, open),
     ...SoapFilmPlate.prepare(device, open),
     ...FaradayPlate.prepare(device, open),
+    ...SurfaceHeight.prepare(device, open),
     ...GlowPlate.prepare(device, open),
     ...WebGPUParticles.prepare(device, open),
     ...FineDye.prepare(device, open),

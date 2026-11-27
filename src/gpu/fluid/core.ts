@@ -12,6 +12,7 @@ import { WebGPUSlosh } from '../slosh';
 import type { SoapFilmPlate } from '../soapFilmPlate';
 import type { TankPlate } from '../tankPlate';
 import type { FaradayPlate } from '../faraday';
+import { SurfaceHeight } from '../surfaceHeight';
 import type { GlowPlate } from '../glow';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
@@ -111,6 +112,8 @@ export class FluidCore {
   protected tankPlate: TankPlate | null = null;
   /** The shaken dish's standing waves (PLAN 48f), made while Shaker is up. */
   protected faradayPlate: FaradayPlate | null = null;
+  /** Free-surface and oil-layer height field `h` in metres (PLAN 31s-1). */
+  protected surfaceHeight: SurfaceHeight | null = null;
   /** The water's glow (PLAN 48c, gpu/glow.ts), made while Glow is up. */
   protected glowPlate: GlowPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
@@ -805,6 +808,7 @@ export class FluidCore {
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.liquidsLive = false;
+    if (this.surfaceHeight) this.surfaceHeight.clear(pass);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     this.speciesClears++;

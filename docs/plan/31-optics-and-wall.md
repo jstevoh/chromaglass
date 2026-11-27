@@ -244,16 +244,6 @@ how much dye sits in a cell, not from the shape of the oil and water surface, an
 only darkened where it is, never moved, so there are no caustics: no bright rims focused by a
 lens-shaped drop, no shadow beside it.*
 
-- **31s-1. The liquid's surface height as a solver field.** A height field h (the oil layer's
-  thickness over the water, and the water's own free surface) advected by the flow and levelled
-  by the thin-film (lubrication) equation: dh/dt + div(h u) = -div( h^3/(3 mu) grad(p) ), with
-  p = -sigma lap(h) + rho g h. Surface tension pulls a drop's edge into a meniscus whose width is
-  the capillary length (about 2 mm for oil on water, sqrt(sigma/(rho g))); gravity levels a
-  wide pool. Interfacial tension between oil and water sets the contact shape where the phases
-  meet (the phase field already knows where). *Measure (lab):* a still lens of oil keeps the
-  meniscus profile set by the capillary length (within 10%); a sine ripple of wavenumber k on a
-  layer h0 decays on tau = 3 mu / (h0^3 (sigma k^4 + rho g k^2)) (within 15%); mass of h is
-  kept to 0.1% over 600 steps.
 - **31s-2. Light traced through the surface, gathered on the wall.** Each lamp ray leaves the
   lamp, bends at the surface by Snell's law (air, oil, water and glass indices, the slope from
   31s-1), and lands on the wall where its new direction takes it; the wall's brightness is how

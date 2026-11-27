@@ -11,6 +11,16 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 
 ## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
 
+- **31s-1. The liquid's surface height as a solver field.** **Shipped.** A height field h (the oil layer's
+  thickness over the water, and the water's own free surface) advected by the flow and levelled
+  by the thin-film (lubrication) equation: dh/dt + div(h u) = -div( h^3/(3 mu) grad(p) ), with
+  p = -sigma lap(h) + rho g h. Surface tension pulls a drop's edge into a meniscus whose width is
+  the capillary length (about 2 mm for oil on water, sqrt(sigma/(rho g))); gravity levels a
+  wide pool. Interfacial tension between oil and water sets the contact shape where the phases
+  meet (the phase field already knows where). *Measure (lab):* a still lens of oil keeps the
+  meniscus profile set by the capillary length (within 10%); a sine ripple of wavenumber k on a
+  layer h0 decays on tau = 3 mu / (h0^3 (sigma k^4 + rho g k^2)) (within 15%); mass of h is
+  kept to 0.1% over 600 steps (`PW_WEBGPU=1 npm run surfaceheight`).
 - ~~**31s-8. The flower's second life: four texels a cell.**~~ **Shipped** (`npm run flower`).
   #933's dense stencil still drew the flower at headed 2x Chrome on Galaxy at tier=local: its
   taps sit a cell apart (logicalGrid 192) but the dye is 768², four texels a cell, and each tap
