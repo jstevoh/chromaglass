@@ -794,6 +794,8 @@ const api = {
         (PLAN 38h).
       */
       gelAngle?: number;
+      /** The plate drawn this many times into the frame before the one read back, for a timing that the readback does not swamp (the focus pass's cost, PLAN 51b). */
+      repeat?: number;
       /** The upper moiré sheet's spin, turns (PLAN 45a). */
       moireTurn?: number;
       /*
@@ -905,6 +907,7 @@ const api = {
       flipped too (`flip`).
     */
     const flipped = cam.flip || !!cam.sources?.length;
+    for (let i = 1; i < (cam.repeat ?? 1); i++) plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
     plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
     // As the app fills them: the frame's settings with the other rows at
     // nothing, no camera and no chain, so each display does its own finish.
