@@ -1898,7 +1898,7 @@
         "PLAN.md 18a-8 (scripts/gridnull.mjs): with the faces as the flow's state, a checkerboard",
         "laid in the flow is gone in a step on water and the oil and leaves no flow elsewhere, an",
         "eight-cell wave of water keeps its inertia against a long one, and a floored dent's rim",
-        "under a steady push is smooth. About two minutes on SwiftShader (cloud, 2026-11-27)."
+        "under a steady push is smooth, its faces too. About 90 s on SwiftShader (cloud, 2026-11-27)."
       ]
     },
     {

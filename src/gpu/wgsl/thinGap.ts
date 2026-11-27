@@ -1254,6 +1254,8 @@ fn pAt(x: i32, y: i32, n: i32) -> f32 {
   return pr[hsPacked(x, y, n)];
 }
 // The velocity through the east (ax 0) or north (ax 1) face of cell q, as the solve made it conserve liquid.
+// A face that is not a finite number carries nothing, decided by the face alone, so both cells beside it
+// read the same face (the cell's velocity is safeVel's, a cell blown past VEL_BOUND asks to come back next step).
 fn faceVel(q: vec2i, ax: i32, n: i32) -> f32 {
   let e = select(vec2i(0, 1), vec2i(1, 0), ax == 0);
   let b = q + e;
@@ -1263,7 +1265,8 @@ fn faceVel(q: vec2i, ax: i32, n: i32) -> f32 {
   let star = flowStar[q.x + q.y * n];
   let f = select(star.y, star.x, ax == 0) - S.n * hsHarm(ma, mb) * (pAt(b.x, b.y, n) - pAt(q.x, q.y, n));
   let h = 0.5 * (hsGap(textureLoad(sq, q, 0).r, A.a.x) + hsGap(textureLoad(sq, b, 0).r, A.a.x));
-  return f / h;
+  let v = f / h;
+  return select(0.0, v, abs(v) < 1e30);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -1275,9 +1278,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let east = faceVel(q, 0, n);
   let north = faceVel(q, 1, n);
   let u = 0.5 * vec2f(east + faceVel(q - vec2i(1, 0), 0, n), north + faceVel(q - vec2i(0, 1), 1, n));
-  // A face the cell's own velocity could not hold (not finite, past the bound) is none, as safeVel makes the cell.
-  let ok = finite4(vec4f(east, north, u)) && length(u) <= VEL_BOUND;
-  flow[q.x + q.y * n] = vec4f(select(vec2f(0.0), vec2f(east, north), ok), pi, 0.0);
+  flow[q.x + q.y * n] = vec4f(east, north, pi, 0.0);
   textureStore(dst, q, safeVel(vec4f(u, v.z, v.w)));
   let h = hsGap(textureLoad(sq, q, 0).r, A.a.x);
   /*
@@ -1295,8 +1296,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     On a thin gap the colour's and the oil's carries, carryCourant and the
     ferrofluid's volume carry no longer read it: they cross the solve's own
-    faces from P and the mobility (THIN_FACE in wgsl/fluid.ts, PLAN 15b),
-    which are exact where c is not flat, at a hand's rim above all. What
+    faces (THIN_FACE in wgsl/fluid.ts, PLAN 15b; since 18a-8 the faces this
+    writes to \`flow\`), which are exact where c is not flat, at a hand's
+    rim above all. What
     still reads c·P here is phaseAdvect's area form (Phase Volume off, or
     the step before it is primed) and the old plate's carries.
   */

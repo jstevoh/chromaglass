@@ -196,7 +196,7 @@ export class FluidPasses extends FluidFields {
 
   /**
    * phaseAdvect: runPressed's bindings, then the gap, the gap the phase last
-   * saw, and the thin solve's pressure and mobility (a stand-in for each until
+   * saw, and the thin solve's faces (hsFlow, PLAN 18a-8) and mobility (a stand-in for each until
    * Thin Gap has run: the kernel reads them only under it).
    */
   protected runPhaseAdvect(pass: GPUComputePassEncoder, args: GPUBuffer): void {
