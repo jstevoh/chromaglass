@@ -699,7 +699,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   return (
     <div
       ref={el => { tip.anchor.current = el; }}
-      className={`relative flex w-[58px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
+      className={`relative flex w-full max-w-[72px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
@@ -797,9 +797,9 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
       {/* A finger has no hover: the name is the button there, with an info mark on touch. */}
       <span
         onClick={tip.toggle}
-        className={`mt-1 inline-flex max-w-full items-center gap-0.5 text-[11px] font-medium ${drag ? 'text-text' : 'text-text-2'}`}
+        className={`mt-1 inline-flex w-full items-center justify-center gap-0.5 text-center text-[11px] font-medium leading-[1.15] ${drag ? 'text-text' : 'text-text-2'}`}
       >
-        <span className="truncate">{label}</span>
+        <span className="line-clamp-2 break-words">{label}</span>
         {knobHelp && <InfoIcon size={10} className="hidden shrink-0 text-white/45 pointer-coarse:inline" aria-hidden />}
       </span>
       <span className="max-w-full truncate font-mono text-[10px] leading-tight">
@@ -872,7 +872,7 @@ export function PanelFrame({
       data-collapsed={collapsed ? 'true' : undefined}
     >
       <header
-        className={`flex h-8 shrink-0 items-center gap-1.5 pl-1.5 pr-1 ${floating ? 'cursor-move border-b border-border bg-elevated' : ''}`}
+        className={`flex h-8 shrink-0 items-center gap-1.5 pl-0.5 pr-1 ${floating ? 'cursor-move border-b border-border bg-elevated' : ''}`}
         onPointerDown={floating ? onHeaderDown : undefined}
         onContextMenu={onTitleMenu}
         data-panel-head
@@ -883,7 +883,7 @@ export function PanelFrame({
             aria-label={`Move ${title}`}
             title="Drag to move"
             onPointerDown={e => { e.stopPropagation(); onGripDown?.(e); }}
-            className="inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center text-faint"
+            className="inline-flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-faint hover:text-muted"
           >
             <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
               {[0, 1, 2].map(r => [0, 1].map(c => <circle key={`${r}${c}`} cx={1.5 + c * 5} cy={1.5 + r * 4.5} r="1.2" />))}
@@ -935,7 +935,7 @@ export function PanelFrame({
         moves when theirs cannot. Never sideways: a body is laid out to its
         panel's width, and `npm run layout` holds every control to it.
       */}
-      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-2.5 ${bodyClassName}`} data-panel-body>{children}</div>}
+      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden cg-scroll px-3 pb-2.5 ${bodyClassName}`} data-panel-body>{children}</div>}
       {floating && !collapsed && onResizeDown && (
         <span
           onPointerDown={onResizeDown}

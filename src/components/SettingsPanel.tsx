@@ -6,6 +6,7 @@ import { PRESET_CONTRACTS } from '../presetPlate';
 import { PALETTE } from '../constants';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import { Sheet } from './ui';
+import { useScrollEdges } from './ui/ScrollCue';
 import type { EngineStatus } from '../lib/platform';
 import { APP_FEATURE_TILES, getEffectiveTier, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
 import { MasterSection, MixerSection } from './settings/PlaySections';
@@ -190,6 +191,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     .filter(g => g.rows.length > 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [q, scope]);
+  const railScroll = useScrollEdges('y', [railGroups.length, scope, embed]);
   /*
     A section in a panel is narrow, and the sheet's card (its border, its
     24 px padding, its two-column grid from 768 px of *window*) is drawn for a
@@ -318,67 +320,82 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* ── Where you are ─────────────────────────────────── */}
         {/* Stacked vertically on <640 px so groups and section pills wrap cleanly inside 390 px without horizontal clipping (H8-02). */}
         <nav
-          className="flex max-h-[38%] shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden border-b border-white/10 bg-black/20 p-2.5 sm:max-h-none sm:w-[220px] sm:gap-1 sm:border-b-0 sm:border-r sm:px-3 sm:py-3"
+          className="flex max-h-[38%] shrink-0 flex-col border-b border-white/10 bg-black/20 sm:max-h-none sm:w-[220px] sm:border-b-0 sm:border-r"
           aria-label="Settings sections"
           data-testid="settings-rail"
         >
-          {railGroups.length === 0 && (
-            <p className="p-2 text-[12px] text-white/60">Nothing matches.</p>
-          )}
-          {railGroups.map(group => (
-            <div key={group.id} className="shrink-0" data-testid={`rail-group-${group.id}`} data-group={group.id}>
-              {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
-              <div className="whitespace-nowrap px-2 pb-1 pt-0.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-white/60 sm:px-3 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
-                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
-                {group.name}
+          <div
+            ref={railScroll.ref}
+            className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden cg-scroll p-2.5 sm:gap-1 sm:px-3 sm:py-2.5"
+          >
+            {railGroups.length === 0 && (
+              <p className="p-2 text-[12px] text-white/60">Nothing matches.</p>
+            )}
+            {railGroups.map(group => (
+              <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
+                {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
+                <div className="whitespace-nowrap px-2 pb-1 pt-0.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-white/60 sm:px-3 sm:pb-1 sm:pt-2.5" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                  <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
+                  {group.name}
+                </div>
+                <div className="flex flex-wrap gap-1.5 sm:flex-col sm:flex-nowrap sm:gap-0.5">
+                  {group.rows.map(row => (
+                    <button
+                      key={row.id}
+                      onClick={() => { setSection(row.id); setQuery(''); }}
+                      aria-current={!q && section === row.id ? 'page' : undefined}
+                      className={`min-h-[44px] sm:min-h-0 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] transition-colors sm:w-full sm:py-[5px] sm:whitespace-normal ${
+                        !q && section === row.id
+                          ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
+                          : 'bg-white/[0.03] sm:bg-transparent text-white/70 hover:bg-white/[0.05] hover:text-white'
+                      }`}
+                      data-testid={`settings-nav-${row.id}`}
+                    >
+                      {row.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5 sm:flex-col sm:flex-nowrap sm:gap-0.5">
-                {group.rows.map(row => (
-                  <button
-                    key={row.id}
-                    onClick={() => { setSection(row.id); setQuery(''); }}
-                    aria-current={!q && section === row.id ? 'page' : undefined}
-                    className={`min-h-[44px] sm:min-h-0 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] transition-colors sm:w-full sm:py-[7px] sm:whitespace-normal ${
-                      !q && section === row.id
-                        ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
-                        : 'bg-white/[0.03] sm:bg-transparent text-white/70 hover:bg-white/[0.05] hover:text-white'
-                    }`}
-                    data-testid={`settings-nav-${row.id}`}
-                  >
-                    {row.name}
-                  </button>
-                ))}
+            ))}
+            {/*
+              Feedback, under the seven groups and apart from them: it is not a
+              setting, so it is not a row of `SETTINGS_SECTIONS` (no desk panel,
+              no pin, no search hit), and its test id is not `settings-nav-…`,
+              which the checks count as sections with markup. Not in the Stage
+              sheet, which is the room and the machine, and not while a search
+              has turned the rail into a result list.
+            */}
+            {scope !== 'stage' && !q && (
+              <div className="shrink-0 border-t border-white/[0.06] pt-2 sm:mt-auto" data-testid="rail-feedback">
+                <button
+                  onClick={() => setSection(FEEDBACK_PANE)}
+                  aria-current={section === FEEDBACK_PANE ? 'page' : undefined}
+                  className={`min-h-[44px] sm:min-h-0 w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] transition-colors sm:py-[5px] ${
+                    section === FEEDBACK_PANE
+                      ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
+                      : 'text-white/70 hover:bg-white/[0.05] hover:text-white'
+                  }`}
+                  data-testid="settings-feedback-nav"
+                >
+                  Feedback
+                </button>
               </div>
-            </div>
-          ))}
-          {/*
-            Feedback, under the seven groups and apart from them: it is not a
-            setting, so it is not a row of `SETTINGS_SECTIONS` (no desk panel,
-            no pin, no search hit), and its test id is not `settings-nav-…`,
-            which the checks count as sections with markup. Not in the Stage
-            sheet, which is the room and the machine, and not while a search
-            has turned the rail into a result list.
-          */}
-          {scope !== 'stage' && !q && (
-            <div className="shrink-0 border-t border-white/[0.06] pt-2 sm:mt-auto" data-testid="rail-feedback">
-              <button
-                onClick={() => setSection(FEEDBACK_PANE)}
-                aria-current={section === FEEDBACK_PANE ? 'page' : undefined}
-                className={`min-h-[44px] sm:min-h-0 w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] transition-colors sm:py-[7px] ${
-                  section === FEEDBACK_PANE
-                    ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
-                    : 'text-white/70 hover:bg-white/[0.05] hover:text-white'
-                }`}
-                data-testid="settings-feedback-nav"
-              >
-                Feedback
-              </button>
-            </div>
+            )}
+          </div>
+          {railScroll.end && (
+            <button
+              type="button"
+              onClick={() => railScroll.scrollBy(180)}
+              className="hidden h-7 shrink-0 items-center justify-center gap-1 border-t border-white/10 bg-black/40 text-[11px] font-medium text-text-2 transition-colors hover:bg-white/[0.06] hover:text-white sm:flex"
+              data-testid="settings-rail-more"
+            >
+              More sections ↓
+            </button>
           )}
         </nav>
 
         {/* ── What is in it ─────────────────────────────────── */}
-        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-4 py-4 sm:px-7 sm:py-6">
+        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto cg-scroll px-4 py-4 sm:px-7 sm:py-6">
 
       {/*
         A box to type into.
