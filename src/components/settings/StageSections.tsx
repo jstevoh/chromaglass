@@ -139,7 +139,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
               <button
                 onClick={() => onMarkClear?.()}
                 disabled={!markLoaded}
-                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
                 data-testid="mark-clear"
               >
                 Take it off
@@ -167,7 +167,7 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             <button
               onClick={() => onMarkClear?.()}
               disabled={!markLoaded}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-65"
               data-testid="mark-clear"
             >
               Take it off
@@ -255,7 +255,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             timestamp queries instead.
           */}
           {showFrameSplit && engineStatus && (
-            <div className="text-[11px] font-mono opacity-40 leading-relaxed">
+            <div className="text-[12px] font-mono text-dim leading-relaxed">
               solver {(live ?? engineStatus).simMs.toFixed(1)} ms/step
               {' · '}other {(live ?? engineStatus).otherMs.toFixed(1)} ms/frame
               {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of {Math.round((live ?? engineStatus).stepRate || 60)} steps/s

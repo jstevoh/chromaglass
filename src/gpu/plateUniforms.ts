@@ -215,6 +215,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
   // The film projector's frame, if one is playing.
   let filmOn = 0;
+  const filmRing = (s.filmRing ?? 0) > 0.5 ? 1 : 0;
   let filmScaleX = 1, filmScaleY = 1;
   {
     const f = view.film;
@@ -382,7 +383,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     // and a look already on the lamp stays there. Only while a film plays.
     const ground = Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0;
     const fm = Number.isFinite(s.filmMix) ? clamp01(s.filmMix as number) : 0.7;
-    const videoLamp = filmOn && pos.film < pos.front ? fm : 0;
+    // On the LED ring (PLAN 14ag-9) the video is in the lamp wherever the
+    // mixer's arrows left its row: the ring is under the glass by definition.
+    const videoLamp = filmOn && (pos.film < pos.front || filmRing) ? fm : 0;
     pack.set('lampGround', !photo ? ground + (1 - ground) * videoLamp : 0);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
@@ -444,6 +447,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('dishSpread', clamp01(s.dishSpread ?? 0) * (1 - clamp01(view.macroAmount)));
     pack.set('cells', clamp01(s.cells ?? 0));
     pack.set('filmOn', filmOn);
+    pack.set('filmRing', filmOn ? filmRing : 0);
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
     pack.set('filmKey', clamp(s.filmKey ?? 0.18, 0, 0.9));
     pack.set('filmScale', filmScaleX, filmScaleY);

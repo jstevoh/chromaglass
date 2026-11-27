@@ -28,7 +28,7 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
         value={settings[side] ?? 'spokes'}
         disabled={!pack.live}
         onChange={(e) => set(e.target.value)}
-        className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/85 disabled:opacity-40"
+        className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/85 disabled:opacity-65"
         data-testid={`moire-${side === 'moireSheetA' ? 'lower' : 'upper'}`}
         title={title}
       >
@@ -61,7 +61,7 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
             <button
               type="button"
               onClick={pack.start}
-              className="inline-flex min-h-7 items-center rounded-full bg-white/10 px-3 text-[11px] font-medium text-white/90 hover:bg-white/20"
+              className="inline-flex min-h-7 items-center rounded-full bg-white/10 px-3 text-[12px] font-medium text-white/90 hover:bg-white/20"
               data-testid="moire-try"
             >
               Try for 60 s

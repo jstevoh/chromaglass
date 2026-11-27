@@ -89,7 +89,7 @@ export function SongScore(p: SongScoreProps) {
   const laneH = p.touch ? 72 : 56;
   const btnH = p.touch ? 'h-11 text-[14px]' : 'h-8 text-[12px]';
   // One or the other set of colours, never both: which of two classes wins is the stylesheet's order, not the list's.
-  const btnOf = (on: boolean) => `${btnH} rounded-md border px-2.5 disabled:opacity-40 ${on
+  const btnOf = (on: boolean) => `${btnH} rounded-md border px-2.5 disabled:opacity-65 ${on
     ? 'border-accent-border bg-accent-bg text-accent-text'
     : 'border-border bg-elevated text-text-2 hover:bg-hover active:bg-active'}`;
   const btn = btnOf(false);
@@ -139,7 +139,7 @@ export function SongScore(p: SongScoreProps) {
               />
             ))}
             {score.sections.map(s => (s.x1 - s.x0 > 0.07 ? (
-              <span key={`l${s.index}`} className="pointer-events-none absolute top-1 truncate px-1 text-[11px] text-text"
+              <span key={`l${s.index}`} className="pointer-events-none absolute top-1 truncate px-1 text-[12px] text-text"
                 style={{ left: `${s.x0 * 100}%`, width: `${(s.x1 - s.x0) * 100}%` }}>
                 {sectionName(s, score.sections)}
               </span>

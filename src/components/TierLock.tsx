@@ -145,7 +145,7 @@ export function TierLockBadge({ label, className = '', testId = 'tier-lock-badge
   return (
     <span
       data-testid={testId}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/35 bg-amber-400/15 px-2 py-0.5 text-[11px] font-medium text-amber-200 ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/35 bg-amber-400/15 px-2 py-0.5 text-[12px] font-medium text-amber-200 ${className}`}
     >
       <Lock size={10} aria-hidden="true" />
       <span>{label}</span>
@@ -199,7 +199,7 @@ export function TierLockBanner({
           onClick={handleUnlock}
           data-testid={`tier-lock-open-${feature}`}
           className={`inline-flex items-center justify-center rounded-full border border-amber-400/40 bg-amber-400/20 px-3 font-medium text-amber-100 transition-colors hover:bg-amber-400/30 ${
-            touch ? 'min-h-11 text-[13px]' : 'min-h-7 text-[11px]'
+            touch ? 'min-h-11 text-[13px]' : 'min-h-7 text-[12px]'
           }`}
         >
           {actionLabel ?? 'See unlock options →'}

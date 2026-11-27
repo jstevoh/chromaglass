@@ -271,11 +271,11 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
       ? `Your account holds a ${TIER_NAME[accountKey.tier]} licence this app could not verify. Write to support and it will be reissued.`
       : null;
 
-  const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const label = 'text-[12px] font-medium uppercase tracking-wider text-dim';
   const section = 'border-t border-border pt-4';
   const ghostBtn =
-    'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-50';
-  const textBtn = 'text-[12px] text-muted underline decoration-faint underline-offset-2 hover:text-text disabled:opacity-50';
+    'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-65';
+  const textBtn = 'text-[12px] text-muted underline decoration-faint underline-offset-2 hover:text-text disabled:opacity-65';
 
   useEffect(() => () => clearTierLock(), []);
 
@@ -362,7 +362,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
             </div>
             <span
               data-cg-license-tier={currentTier}
-              className={`shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-medium uppercase tracking-wider ${
+              className={`shrink-0 rounded-md px-2 py-1 font-mono text-[12px] font-medium uppercase tracking-wider ${
                 currentTier === 'free'
                   ? 'border border-border-strong text-muted'
                   : 'border border-accent-border bg-accent-bg text-accent-text'
@@ -595,7 +595,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                       data-cg-account-signout-confirm=""
                       disabled={busy}
                       onClick={handleConfirmSignOut}
-                      className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
+                      className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-65"
                     >
                       Sign out
                     </button>
@@ -615,7 +615,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                       data-cg-account-delete-confirm=""
                       disabled={busy}
                       onClick={handleConfirmDelete}
-                      className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-live px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
+                      className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-live px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-65"
                     >
                       Delete account
                     </button>
@@ -646,7 +646,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                       setConfirmMode('delete');
                       setError(null);
                     }}
-                    className="min-h-10 pointer-coarse:min-h-12 px-2 text-[12px] text-dim underline decoration-faint underline-offset-2 hover:text-live disabled:opacity-50"
+                    className="min-h-10 pointer-coarse:min-h-12 px-2 text-[12px] text-dim underline decoration-faint underline-offset-2 hover:text-live disabled:opacity-65"
                   >
                     Delete account
                   </button>

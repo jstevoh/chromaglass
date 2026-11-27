@@ -27,6 +27,7 @@ import { TipPad } from '../ui/TipPad';
 import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 /**
  * The bodies of the desk's panels (Desk v2).
@@ -204,7 +205,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           <div className="absolute right-3 top-full z-30 w-56 rounded-md border border-border-strong bg-elevated p-1 shadow-lg" data-testid="set-menu-list">
             {p.savedSets.length > 0 && (
               <>
-                <p className="px-2 pb-1 pt-1.5 text-[11px] uppercase tracking-wide text-faint">Open a saved set</p>
+                <p className="px-2 pb-1 pt-1.5 text-[12px] uppercase tracking-wide text-faint">Open a saved set</p>
                 {p.savedSets.map(n => (
                   <div key={n} className="flex items-center">
                     <MenuItem onClick={() => setAct('open', n)} testId={`set-open-${n}`}>{n}</MenuItem>
@@ -242,8 +243,8 @@ function CuesBody({ p }: { p: DeskProps }) {
             trailing={
               <>
                 {c.song && <span className="shrink-0 text-[12px] text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
-                {c.kind === 'sequence' && <span className="shrink-0 text-[11px] text-faint" title="A stage sequence">seq</span>}
-                {c.missing && <span className="shrink-0 text-[11px] text-live" title="This look or sequence is not here any more">missing</span>}
+                {c.kind === 'sequence' && <span className="shrink-0 text-[12px] text-faint" title="A stage sequence">seq</span>}
+                {c.missing && <span className="shrink-0 text-[12px] text-live" title="This look or sequence is not here any more">missing</span>}
                 {c.id === p.liveId ? <Tag tone="live">live</Tag>
                 : c.id === p.nextId ? <Tag tone="next">next</Tag>
                 : <span className="font-mono text-[12px] text-faint">{c.fade === 0 ? 'cut' : `${c.fade}s`}</span>}
@@ -293,7 +294,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           );
         })()}
         {p.cues.length > 0 ? (
-          <p className="px-2 pt-1 text-[11px] text-faint">Right-click an item for its song, controls and order; × takes it off.</p>
+          <p className="px-2 pt-1 text-[12px] text-faint">Right-click an item for its song, controls and order; × takes it off.</p>
         ) : (
           <div className="px-3 py-8 text-center text-[13px] text-muted" data-testid="set-empty">
             <p>This set is empty.</p>
@@ -317,7 +318,7 @@ function CuesBody({ p }: { p: DeskProps }) {
             data-testid="perform-saved-toggle"
           >
             <span>Your preset palettes</span>
-            <span className="font-mono text-[11px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
+            <span className="font-mono text-[12px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
           </button>
           {savedOpen && (
             <div className="max-h-[22vh] overflow-y-auto scrollbar-hide" data-testid="perform-saved-list">
@@ -633,7 +634,7 @@ function BottlesBody({ p }: { p: DeskProps }) {
           {p.bottleId === l.id
             ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} testId="bottle-in-hand" />
             : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} />}
-          <span className="min-w-0 flex-1 text-[11.5px] font-medium leading-[1.15] line-clamp-2">{l.name}</span>
+          <span className="min-w-0 flex-1 text-[12px] font-medium leading-[1.15] line-clamp-2">{l.name}</span>
         </button>
       ))}
     </div>
@@ -752,7 +753,7 @@ function DyesBody({ p }: { p: DeskProps }) {
       {p.onPicturePalette && (
         <PicturePaletteButton
           onFile={p.onPicturePalette}
-          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-60"
+          className="h-8 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-65"
           testId="picture-palette"
         >
           <Palette size={13} className="mr-1.5 inline" /> Palette from a picture or video…
@@ -778,8 +779,8 @@ function DyesBody({ p }: { p: DeskProps }) {
           in the Video panel: one row, Play and Pour, either or both. */}
       {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
-          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} onMixOrder={o => p.onSetting({ mixOrder: o })} />
+          <span className="text-[12px] uppercase tracking-wider text-dim">Video in</span>
+          <VideoShelf {...p.video} prefix="dyes-" mixOrder={p.settings.mixOrder} filmRing={p.settings.filmRing} onPlace={patch => p.onSetting(patch)} />
         </div>
       )}
     </div>
@@ -819,7 +820,7 @@ function ToolsBody({ p }: { p: DeskProps }) {
               title={`${label} (${k}). Right-click for its options.`}
               data-testid={`tool-segmented-${id}`}
               aria-keyshortcuts={k}
-              className={`relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border pt-0.5 text-[11px] font-medium transition-[transform,box-shadow,background-color] duration-[120ms] ${
+              className={`relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border pt-0.5 text-[12px] font-medium transition-[transform,box-shadow,background-color] duration-[120ms] ${
                 held
                   ? `${LIT} translate-y-[2px] shadow-none`
                   : 'border-border bg-elevated text-muted shadow-[0_2px_0_0_rgba(0,0,0,.6)] hover:bg-hover hover:text-text-2'
@@ -827,7 +828,7 @@ function ToolsBody({ p }: { p: DeskProps }) {
             >
               <ToolGlyph id={id} size={18} />
               <span className="max-w-full truncate px-0.5 leading-none">{label}</span>
-              <kbd className={`pointer-events-none absolute right-1 top-0.5 font-mono text-[9px] leading-none ${held ? 'text-on-lit/80' : 'text-faint'}`}>{k}</kbd>
+              <kbd className={`pointer-events-none absolute right-1 top-0.5 font-mono text-[12px] leading-none ${held ? 'text-on-lit' : 'text-faint'}`}>{k}</kbd>
             </button>
           );
         })}
@@ -846,9 +847,9 @@ function ToolsBody({ p }: { p: DeskProps }) {
           title="Tip the dish: drag the dot toward an edge and the liquid runs there; let go and it sloshes back. A first grab turns Slosh up to half if it was off."
         >
           <TipPad settings={p.settings} onSetting={p.onSetting} size={40} reach={72} testId="tip-pad" />
-          <span className="min-w-0 truncate text-[11px] font-medium leading-tight text-muted">
+          <span className="min-w-0 truncate text-[12px] font-medium leading-tight text-muted">
             Tip
-            <span className="block font-mono text-[10px] font-normal text-faint" data-testid="tip-slosh">slosh {Math.round((p.settings.slosh ?? 0) * 100)}%</span>
+            <span className="block font-mono text-[12px] font-normal text-faint" data-testid="tip-slosh">slosh {Math.round((p.settings.slosh ?? 0) * 100)}%</span>
           </span>
         </div>
       </div>
@@ -917,10 +918,16 @@ function KnobsBody({ id, p }: { id: string; p: DeskProps }) {
   const name = PANEL_BY_ID.get(id)?.name ?? id;
   // A knob the Rides or the Recipe have out is drawn there, not here as well (`drawnElsewhere`).
   const elsewhere = drawnElsewhere(p.layout, id, keys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
+  const oilGroundNote = id === 'oil' ? clearFilmGroundNote(p.settings.lampGround, p.settings.clearFilmDye) : undefined;
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid={`section-knobs-${id}`}>
       <div className={scroller}>
         <ControlGrid keys={keys.filter(k => !elsewhere.has(String(k)))} p={p} prefix="knob" />
+        {oilGroundNote && (
+          <p className="mt-2 text-[11px] leading-snug text-dim" data-testid="desk-clear-film-ground-note">
+            {oilGroundNote}
+          </p>
+        )}
         <Elsewhere held={elsewhere} testId={`panel-${id}-elsewhere`} />
       </div>
       {/*
@@ -1025,7 +1032,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
       </p>
       {accountShows.length > 0 && (
         <div className="flex flex-col gap-1" data-testid="account-shows">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Running shows on your account</span>
+          <span className="text-[12px] uppercase tracking-wider text-dim">Running shows on your account</span>
           {accountShows.map((show) => (
             <button
               key={show.id}
@@ -1039,7 +1046,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
                 <span className="truncate">{show.name}</span>
               </span>
-              <span className="shrink-0 text-[11px] font-medium text-accent-text">Join</span>
+              <span className="shrink-0 text-[12px] font-medium text-accent-text">Join</span>
             </button>
           ))}
         </div>
@@ -1066,13 +1073,13 @@ function PhoneBody({ p }: { p: DeskProps }) {
               <QrCodeImage text={url} maxPx={120} />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 {hasRelay ? (
-                  <p className="text-[11.5px] leading-snug text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
+                  <p className="text-[12px] leading-snug text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
                 ) : (
-                  <p className="text-[11.5px] leading-snug text-dim">
+                  <p className="text-[12px] leading-snug text-dim">
                     No show server behind this page, so the code opens the show on the phone itself. Open the show in the ChromaGlass Mac app to pair a phone remote.
                   </p>
                 )}
-                <code className="break-all rounded-md bg-elevated px-2 py-1 font-mono text-[11px] text-text-2" data-testid="phone-link-url">{url}</code>
+                <code className="break-all rounded-md bg-elevated px-2 py-1 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
                 <Button
                   height={28}
                   onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }); }}
@@ -1171,7 +1178,7 @@ function MenuItem({ children, onClick, disabled, testId }: { children: ReactNode
     <button
       onClick={onClick}
       disabled={disabled}
-      className="block w-full truncate rounded-sm px-2 py-1.5 text-left text-[13px] text-text-2 hover:bg-hover disabled:opacity-40"
+      className="block w-full truncate rounded-sm px-2 py-1.5 text-left text-[13px] text-text-2 hover:bg-hover disabled:opacity-65"
       data-testid={testId}
     >
       {children}

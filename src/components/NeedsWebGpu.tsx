@@ -23,7 +23,7 @@ export function NeedsWebGpu({ failure, onRetry }: { failure: GpuFailure['failure
       <div className="pointer-events-auto absolute inset-0 flex items-center justify-center p-6" data-testid="app-no-webgpu">
         <div className="max-w-sm text-center font-mono text-[12px] leading-relaxed text-white/70">
           <div className="mb-3 text-[15px] tracking-wide text-white">This phone can't draw the plate in the app</div>
-          <div className="mb-6 text-white/50">Android's web view has no WebGPU on this phone. Chrome often does, and the app can still be the remote for a show on your laptop.</div>
+          <div className="mb-6 text-white/70">Android's web view has no WebGPU on this phone. Chrome often does, and the app can still be the remote for a show on your laptop.</div>
           <div className="flex flex-col gap-3">
             <button
               onClick={() => openInChrome()}

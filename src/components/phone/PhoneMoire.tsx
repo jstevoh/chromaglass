@@ -28,7 +28,7 @@ export function PhoneMoire({ settings, onSetting }: {
         value={settings[side] ?? 'spokes'}
         disabled={!pack.live}
         onChange={e => set(e.target.value)}
-        className="h-11 min-w-0 rounded-lg border border-border-strong bg-elevated px-2 text-[16px] text-text disabled:opacity-40"
+        className="h-11 min-w-0 rounded-lg border border-border-strong bg-elevated px-2 text-[16px] text-text disabled:opacity-65"
         data-testid={`phone-moire-${side === 'moireSheetA' ? 'lower' : 'upper'}`}
       >
         {MOIRE_SHEETS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}

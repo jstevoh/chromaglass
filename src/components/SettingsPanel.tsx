@@ -329,12 +329,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             className="flex min-h-0 flex-1 gap-1 overflow-x-auto overflow-y-auto cg-scroll p-2 sm:flex-col sm:px-3 sm:py-2.5"
           >
             {railGroups.length === 0 && (
-              <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
+              <p className="p-2 text-[12px] text-dim">Nothing matches.</p>
             )}
             {railGroups.map(group => (
               <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
                 {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
-                <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1 sm:pt-2.5" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-dim sm:pb-1 sm:pt-2.5" title={group.hint} data-testid={`rail-heading-${group.id}`}>
                   <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
                   {group.name}
                 </div>
@@ -347,7 +347,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[5px] text-left text-[13px] transition-colors sm:w-full sm:whitespace-normal ${
                         !q && section === row.id
                           ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
-                          : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
+                          : 'text-text-2 hover:bg-white/[0.05] hover:text-white'
                       }`}
                       data-testid={`settings-nav-${row.id}`}
                     >
@@ -373,7 +373,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                   className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[5px] text-left text-[13px] transition-colors sm:w-full ${
                     section === FEEDBACK_PANE
                       ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
-                      : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
+                      : 'text-text-2 hover:bg-white/[0.05] hover:text-white'
                   }`}
                   data-testid="settings-feedback-nav"
                 >
@@ -386,7 +386,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <button
               type="button"
               onClick={() => railScroll.scrollBy(180)}
-              className="hidden h-7 shrink-0 items-center justify-center gap-1 border-t border-white/10 bg-black/40 text-[11px] font-medium text-text-2 transition-colors hover:bg-white/[0.06] hover:text-white sm:flex"
+              className="hidden h-7 shrink-0 items-center justify-center gap-1 border-t border-white/10 bg-black/40 text-[12px] font-medium text-text-2 transition-colors hover:bg-white/[0.06] hover:text-white sm:flex"
               data-testid="settings-rail-more"
             >
               More sections ↓
@@ -423,14 +423,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <button
             onClick={() => setQuery('')}
             aria-label="Clear the search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[12px] text-white/40 hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[12px] text-dim hover:text-white"
           >
             Clear
           </button>
         )}
       </div>
       {q && visibleCount === 0 && (
-        <p className="mb-6 text-[12px] text-white/40" data-testid="settings-no-match">
+        <p className="mb-6 text-[12px] text-dim" data-testid="settings-no-match">
           Nothing here matches “{query}”.
         </p>
       )}
@@ -450,7 +450,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <button
               type="button"
               onClick={openAccountSheet}
-              className="text-[11px] font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100"
+              className="text-[12px] font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100"
             >
               {getEffectiveTier() === 'home' ? 'Upgrade to Pro →' : 'Get Home or Pro →'}
             </button>
@@ -471,7 +471,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                   <span>{tile.title}</span>
                   <TierLockBadge label={tile.tier === 'pro' ? 'Pro' : 'Home · Pro'} />
                 </div>
-                <p className="mt-1 text-[11px] text-neutral-400">{tile.summary}</p>
+                <p className="mt-1 text-[12px] text-neutral-400">{tile.summary}</p>
               </div>
             ))}
           </div>

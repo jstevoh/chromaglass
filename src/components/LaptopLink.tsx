@@ -87,7 +87,7 @@ export function LaptopLinkForm() {
           ))}
         </div>
       )}
-      <p className="mt-2 text-[13px] leading-relaxed text-white/55">
+      <p className="mt-2 text-[13px] leading-relaxed text-white/65">
         Open the show in the ChromaGlass Mac app on the laptop, then scan its Phone · iPad code or paste the address
         shown there. The phone and the laptop must be on the same Wi-Fi.
       </p>

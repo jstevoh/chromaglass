@@ -70,13 +70,13 @@ export function ProMakerUpsell({ id, what, children }: { id: string; what: strin
       <div className="flex flex-wrap items-center gap-2 mt-2">
         <a href={buildCheckoutUrl(tier === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL, email)}
           target="_blank" rel="noreferrer" data-cg-pro-upsell-buy
-          className="inline-flex min-h-7 pointer-coarse:min-h-11 items-center rounded-full border border-amber-400/40 bg-amber-400/20 px-3 text-[11px] font-medium text-amber-100 hover:bg-amber-400/30">
+          className="inline-flex min-h-7 pointer-coarse:min-h-11 items-center rounded-full border border-amber-400/40 bg-amber-400/20 px-3 text-[12px] font-medium text-amber-100 hover:bg-amber-400/30">
           {tier === 'home' ? 'Upgrade to Pro' : 'Get Pro'}
         </a>
         <button
           type="button"
           onClick={() => openTierLock(id === 'liquids' ? 'liquids' : 'pro-io', { itemName: what })}
-          className="inline-flex min-h-7 pointer-coarse:min-h-11 items-center rounded-full bg-white/10 px-3 text-[11px] font-medium text-white/90 hover:bg-white/20"
+          className="inline-flex min-h-7 pointer-coarse:min-h-11 items-center rounded-full bg-white/10 px-3 text-[12px] font-medium text-white/90 hover:bg-white/20"
         >
           See unlock options →
         </button>

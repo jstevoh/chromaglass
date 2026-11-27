@@ -111,7 +111,7 @@ export function SoundPanel({
           that moves with the kick says the band is getting in.
         */}
         <div className="mb-1.5 flex items-end justify-between gap-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
+          <p className="text-[12px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
           <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
         </div>
         <div className="grid grid-cols-2 gap-1.5 @lg:grid-cols-3 @4xl:grid-cols-6">
@@ -129,7 +129,7 @@ export function SoundPanel({
                 data-testid={`sound-source-${s.id}`}
               >
                 <Icon size={16} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{s.label}</span>
+                <span className="text-[12px] font-bold uppercase tracking-wider">{s.label}</span>
               </button>
             );
           })}
@@ -140,14 +140,14 @@ export function SoundPanel({
           <div className="mt-1.5 flex items-center justify-between gap-2.5 rounded-xl border border-border px-3 py-1.5" data-testid="sound-ambient-row">
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-text">Ambient TV mode (cool &amp; quiet)</p>
-              <p className="text-[11px] leading-tight text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
+              <p className="text-[12px] leading-tight text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
             </div>
             <button
               type="button"
               onClick={() => onAmbientMode(!ambientMode)}
               aria-pressed={ambientMode}
               data-testid="sound-ambient-toggle"
-              className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors ${
+              className={`shrink-0 rounded-full border px-3 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${
                 ambientMode
                   ? LIT
                   : 'border-border text-muted hover:bg-hover hover:text-text'
@@ -176,8 +176,8 @@ export function SoundPanel({
                 {droneRunning ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                 {droneRunning ? 'Stop' : 'Play'}
               </button>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-muted">The instrument</p>
-              <span className="ml-auto text-[11px] text-faint">{droneRunning ? 'playing the plate' : 'stopped'}</span>
+              <p className="text-[12px] font-bold uppercase tracking-widest text-muted">The instrument</p>
+              <span className="ml-auto text-[12px] text-faint">{droneRunning ? 'playing the plate' : 'stopped'}</span>
             </div>
             <div className="grid gap-3 @lg:grid-cols-2">
               <label className="flex items-center gap-2 text-[12px] text-muted">
@@ -235,7 +235,7 @@ export function SoundPanel({
                     className="h-6 flex-1 accent-white"
                     data-testid={`drone-${key}`}
                   />
-                  <span className="w-14 text-right font-mono text-[10px] text-faint">{fmt(drone[key] as number)}</span>
+                  <span className="w-14 text-right font-mono text-[12px] text-faint">{fmt(drone[key] as number)}</span>
                 </label>
               ))}
             </div>
@@ -243,7 +243,7 @@ export function SoundPanel({
               Said out loud, because it is the one surprising thing about this
               source: it listens to the plate it is driving.
             */}
-            <p className="mt-3 text-[11px] leading-relaxed text-faint">
+            <p className="mt-3 text-[12px] leading-relaxed text-faint">
               Four parts, all played by the plate: a pad keyed by the colour on the glass, a bass
               that pulses faster as the plate is stirred, bells rung wherever fresh dye arrives round
               the ring, and air that breathes with the flow. The plate voices this and this drives the
@@ -267,8 +267,8 @@ export function SoundPanel({
         <div className="my-5 border-t border-border" />
 
         <div className="mb-2 flex items-baseline justify-between">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-muted">The shelf</p>
-          <span className="font-mono text-[10px] text-faint">{clock(librarySeconds())} · plays from this tab</span>
+          <p className="text-[12px] font-bold uppercase tracking-widest text-muted">The shelf</p>
+          <span className="font-mono text-[12px] text-faint">{clock(librarySeconds())} · plays from this tab</span>
         </div>
         <div className="rounded-xl border border-border">
           {LIBRARY.map((t, i) => {
@@ -286,8 +286,8 @@ export function SoundPanel({
                 {on && playing ? <Pause size={13} /> : <Play size={13} />}
                 <span className="text-[13px] font-medium">{t.title}</span>
                 <span className="text-[12px] text-faint">{t.artist}</span>
-                <span className="ml-auto font-mono text-[10px] text-faint">{clock(t.seconds)}</span>
-                <span className="w-24 text-right font-mono text-[10px] text-faint">{t.licence}</span>
+                <span className="ml-auto font-mono text-[12px] text-faint">{clock(t.seconds)}</span>
+                <span className="w-24 text-right font-mono text-[12px] text-faint">{t.licence}</span>
               </button>
             );
           })}
@@ -296,7 +296,7 @@ export function SoundPanel({
           The credit is on screen because the licence asks for it where the work
           is used, and a projector in a room full of people is where it is used.
         */}
-        <p className="mt-2 text-[11px] leading-relaxed text-faint">
+        <p className="mt-2 text-[12px] leading-relaxed text-faint">
           Music by {credits()}, and public-domain pieces by Thomas Park. Re-encoded and level-matched
           for a room. Sources on <a href="https://archive.org/details/netlabels" target="_blank" rel="noreferrer" className="inline-flex min-h-6 items-center underline hover:text-muted">archive.org</a>.
           Nothing here carries a non-commercial or no-derivatives restriction.
@@ -312,23 +312,23 @@ export function SoundPanel({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] text-text">{nowPlaying.name}</p>
                 {nowPlaying.track?.mustCredit && (
-                  <p className="truncate text-[11px] text-faint" data-testid="sound-credit">
+                  <p className="truncate text-[12px] text-faint" data-testid="sound-credit">
                     {nowPlaying.track.artist} · {nowPlaying.track.licence}
                   </p>
                 )}
               </div>
-              <span className="font-mono text-[10px] text-faint">{clock(time.t)}</span>
+              <span className="font-mono text-[12px] text-faint">{clock(time.t)}</span>
               <input
                 type="range" min={0} max={Math.max(1, time.d)} step={0.1}
                 value={Math.min(time.t, time.d || 0)}
                 onChange={e => onSeek(parseFloat(e.target.value))}
                 className="h-6 w-48 accent-white" aria-label="Seek" data-testid="sound-seek"
               />
-              <span className="font-mono text-[10px] text-faint">{clock(time.d)}</span>
+              <span className="font-mono text-[12px] text-faint">{clock(time.d)}</span>
               <button
                 aria-pressed={loop}
                 onClick={() => onLoop(!loop)}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-bold uppercase tracking-wider ${
                   loop ? LIT : 'border-border text-faint hover:text-muted'
                 }`}
                 title={nowPlaying.track

@@ -74,8 +74,10 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   holes in on every bar. A pour is a hand's gesture.
   Two Projectors (PLAN §18b-10) switches the rig between one lamp and two, so
   a patch or LFO must not flip it mid-song.
+  Video on LED Ring (PLAN 14ag-9) moves the video under the dish; a hand's
+  choice, the same way.
 */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
