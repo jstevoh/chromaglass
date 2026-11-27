@@ -10,7 +10,8 @@ import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import { findPreset } from '../../presets';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
 
 const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -514,12 +515,14 @@ export function PhonePlay(p: PhonePlayProps) {
               <div ref={stripRef} className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1" data-testid="play-looks">
                 {p.looks.map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
-                    <button key={l.id} onClick={() => (isPackLocked(findPreset(l.id)?.pack) ? openAccountSheet() : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
-                      className="flex w-[76px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
+                    <button key={l.id} onClick={() => (locked ? openTierLock('moire', { itemName: l.name }) : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
+                      className="flex w-[84px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
                       {/* Lit like every other chosen thing (PLAN 35a): the picture takes a lit ring and its name the lit chip. The picture is the look on the plate (PLAN 34b-6, lib/lookThumbs.ts), round as the desk's and the Looks sheet's chips are; a slide a flick, snapping one at a time (35g). */}
                       <span className="flex w-full justify-center py-1"><span className={`rounded-full ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><LookPicture lookId={l.id} swatch={l.swatch} size={60} /></span></span>
                       <span className={`w-full truncate rounded-[6px] px-1.5 text-[12px] ${on ? `${LIT} font-medium` : 'text-text-2'}`}>{l.name}</span>
+                      {locked && <TierLockBadge label="Pro · Pack" className="self-start whitespace-nowrap" />}
                     </button>
                   );
                 })}

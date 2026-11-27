@@ -1,4 +1,5 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { PhonePads } from './PhonePads';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
@@ -38,7 +39,9 @@ import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
 import { LookChip, LookPicture } from '../ui/LookChip';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
+import { CrashReportButton } from '../CrashReportButton';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
 import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
@@ -391,6 +394,7 @@ export interface PhoneStageProps {
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
+  onMoreOpen?: (open: boolean) => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
 }
@@ -449,6 +453,13 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone, glyph }: {
 
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  const onMoreOpenRef = useRef(p.onMoreOpen);
+  onMoreOpenRef.current = p.onMoreOpen;
+  const moreOpen = sheet === 'more';
+  useEffect(() => {
+    onMoreOpenRef.current?.(moreOpen);
+    return () => { onMoreOpenRef.current?.(false); };
+  }, [moreOpen]);
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const [amountOpen, setAmountOpen] = useState(false);
@@ -1048,6 +1059,7 @@ export function PhoneStage(p: PhoneStageProps) {
               <div className="flex flex-wrap gap-3 px-1 py-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
                     <LookChip
                       key={l.id}
@@ -1062,14 +1074,17 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        // A pack's look without the pack opens the account sheet (PLAN 45a).
-                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        // A pack's look without the pack opens the lock/account sheet (PLAN 45a, 49j).
+                        if (locked) openTierLock('moire', { itemName: l.name });
                         else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
                       }}
                       testId={`phone-look-${l.id}`}
-                    />
+                    >
+                      {/* A pack's look without the pack wears the lock its row wore (PLAN 49j), over the chip's foot. */}
+                      {locked && <TierLockBadge label="Pro" className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 text-[11px]" />}
+                    </LookChip>
                   );
                 })}
               </div>
@@ -1318,6 +1333,11 @@ export function PhoneStage(p: PhoneStageProps) {
               <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
             )}
           </div>
+          {/* The controller's grid on the glass (PLAN 30c): pads held as long as a finger is on them. */}
+          <div className="mt-3">
+            <p className="mb-1.5 text-[13px] font-medium text-text">Pads</p>
+            <PhonePads testId="phone-pads" />
+          </div>
           {(p.show.running || p.show.paused) && (
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
               {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
@@ -1326,7 +1346,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.score && (
             <>
               <SectionLabel>The song</SectionLabel>
-              <SongScore {...p.score} touch />
+              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
             </>
           )}
           {/*
@@ -1500,6 +1520,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             {p.onShortcuts && <Tile icon={Keyboard} label="Shortcuts" onPress={() => { close(); p.onShortcuts?.(); }} testId="phone-shortcuts" />}
+            <PanelGuard name="The crash report">
+              <CrashReportButton tile />
+            </PanelGuard>
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
             {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}

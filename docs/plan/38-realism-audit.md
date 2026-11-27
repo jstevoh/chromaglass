@@ -480,7 +480,7 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
       checks written 2026-11-08*. ~~**G1** (the ledger and the pinch, `npm run gap` lines 1–23,
       `puddle`, `settle`, `lift`, `pinch` all green)~~ built on `antigravity/38r-16-pinch`
       (Liquid range 1–150 mL, `lib/cover.ts` puddle ledger + RK4 substepping, `lib/playGesture.ts`
-      `pinchHand`/`PINCH_SPAN`/`playHand` span, `components/coverPinch.ts`, `PhonePlay.tsx`).
+      `pinchHand`/`PINCH_SPAN`/`playHand` span, `engine/coverPinch.ts`, `PhonePlay.tsx`).
       **G2** (`npm run airedge -- --owed=rim,front,fingers`, the Saffman–Taylor fingers on the
       GPU solver) remains open.
       - *The pinch.* A two-finger pinch on the desk (trackpad: wheel + ctrlKey over the plate,

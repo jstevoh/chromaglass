@@ -59,9 +59,6 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   it is not darker round the window; the reference's collar is an open pool's crater rim, the
   liquid heaped where the crater pushed it. Needs the crater as a free surface (with 18a), not
   the glass's bowl the thin gap lays now.
-- **18c-8** A small window is square-ish on the grid: a source a few cells wide on the
-  collocated grid piles the pushed dye on its four diagonals (dark lobes at 192² for a drop of
-  amount 10, gone by amount 30). With 18a-8's carry.
 - **18c-11** The held stream's strength. A stream held on the plate lays its colour at the
   strength of a column of the same bottle's drop (`dropColumnDye`), which at the default bottle is
   about three quarters of the old stamp's dye a step, spread flatter; the old stamp was a number
@@ -112,9 +109,6 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   15e-10's 0.002, and the floor at `liquidProps.ts:84-99` never engages; the comment at
   `bottles.ts:51` has the sign backwards. Check: an edge's width within 15% at 128², 256² and
   512², with no axis bias. (From RS-8, RS-19.)
-- **18d-10** The species is not in FieldCarry, so a rebuilt solver loses it, and now that
-  nothing fades it the loss shows: a governor's move drops every poured liquid. Carry it.
-  On the old plate (Thin Gap off), the CPU body drag is still the thickness.
 - **18d-11** The cost on the Mac. ~~**18d-11a**~~ shipped: the species rides the colour's
   own carry (`bodyAdvectPairSub`, `npm run thick`; story in `docs/plan-shipped.md`).
   On CI's Mac it halved: 6.73 ms a step at 768² against 13.54 alone, half the colour's

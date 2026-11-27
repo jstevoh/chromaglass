@@ -56,6 +56,8 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   'logoMelt',
   // Keep full (PLAN 18a-22): the operator's hand on the dropper, left running, not a look's.
   'keepFull',
+  // The projector bank (PLAN 51a): the operator's hands on the lamps, shutters and crossfade.
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross',
   'filmMix', 'filmKey',
   // How the video is framed for this wall (PLAN 14ag): the operator's, as the logo's place is.
   'filmZoom', 'filmX', 'filmY',
