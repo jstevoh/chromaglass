@@ -15985,6 +15985,38 @@ the standing-wave patterns for example." §48's idea 48f; its open items are in 
   1.01/s against the damping's 1.07/s; at the dial's top (2 g) k u 0.83 at 10 Hz and
   0.25 at 150 Hz, held for 4 s, and the same at 10 Hz stepped in tenths of a second.
 
+#### 48f-6 and 48f-9. The standing waves move (shipped 2026-11-21)
+
+*The owner, 2026-11-21: "are we able to have the standing waves start moving as well?",
+and chose all three ways, and a strength past real water because a bass pulse reads faint.*
+
+- **Rock (48f-6)** (`faradayRock`, Hz 0..2). The strobe slipped off the wave: the solver
+  carries φ += 2π·rock·dt a substep and writes the surface the plate draws as
+  eta = u cos φ (gpu/faraday.ts), so crests and troughs trade places at the slip's rate
+  without a flicker. The liquid is not touched: the field stepped under the rock is the
+  one stepped without it to the bit.
+- **Riding the flow.** The wave field is carried by the plate's own velocity (the solver's
+  velocity texture, metres a second by the plate's size) and by the waves' own mean flow,
+  a semi-Lagrangian departure in the step's cubic pass, capped at two cells a substep.
+  A stripe on a plate flowing 2 mm/s went 3.89 mm in 2 s against 4.00.
+- **Breaking into motion.** The waves' mean flow is the streaming push −Γ∇²u∇u,
+  Leray-projected and held by the floor's friction r = ν(π/2h)². On the critical ring the
+  push is a pure gradient, so a perfect stripe streams nothing (0.15 µm/s, 3e-5 of
+  ω k u²) and neither does a square laid down (9e-4 of its own scale); grown 3 s, the
+  square's off-ring harmonics stream 155 µm/s, and a grown pattern's defects 350 µm/s at
+  4× the threshold and 830 at 12×. That flow carries the pattern: the dish with it differs
+  from the dish without it by 8.6% of the r.m.s. at 4×, 40% at 12×. The pattern holds at
+  4× (corr 0.95 over 4 s); at 12× it grows past where it can stand, breaks up and is a
+  different one 4 s later (0.61), then locks into a new one (0.99 ten seconds on, 0.9997
+  at the dial's 2 g). A real dish that far past threshold stays in defect chaos; ours
+  settles, so lasting motion is the Rock's and the plate's flow, and lasting chaos is
+  48f-12. Γ is a scale, not a derivation: 48f-8.
+- **Strength** (`faradayGain`, 1..8). The projector's throw past the dye, a real lens
+  racked back: the same waves bend the light harder (13.9 levels against 3.3 at 4) and
+  the mean holds within 5% (the aperture's loss and the dark folds, 48f-11).
+- Settings → Tilt & Rock, MIDI, the desk pins, the drift, the sequencer, the remote, and
+  the phone's Sound sheet (Rock and Wave strength). `npm run faraday`, 31 lines on Metal.
+
 ## 15e-10. A bottle's weight slides it down a rocked thin gap (shipped 2026-11-14)
 
 What a bottle's liquid pushes (`liquidForces`: a heavy liquid's slide down a rocked plate, a

@@ -60,25 +60,18 @@ export function usePhoneLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** What the desk should say is on stage. */
   /**
-   * Is there room for a desk?
+   * Is the desk up?
    *
-   * Perform puts a preview and a control column side by side, which needs a
-   * laptop's width. On a narrow window the two columns leave the plate a few
-   * pixels and the whole thing is unusable — found by the QA harness, which
-   * happened to run the desk check at phone width after the small-screen
-   * check had resized the window, and reported a 420px preview in a 420px
-   * page. Below this, Perform quietly behaves as Design; a phone has a
-   * layout of its own (above), and the remote when it drives a laptop's show.
+   * Previously windows narrower than 1024 px dropped out of the desk into the
+   * old floating overlay, so snapping a laptop window to half a screen mid-set
+   * replaced Perform, Cues, and the tabs with retired controls (PLAN 49c).
+   * Now every window that is not in the phone layout keeps the desk: from
+   * 1024 px up it draws both side columns; from 768 px to 1023 px it folds
+   * into one column; below 768 px on a non-touch window `wantsPhoneLayout`
+   * selects the phone layout instead. The old floating overlay is unhooked.
    */
-  const [roomForDesk, setRoomForDesk] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 1024));
-  useEffect(() => {
-    const onResize = () => setRoomForDesk(window.innerWidth >= 1024);
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+  const deskUp = !phone;
   // A phone is never a desk, whatever its width turned sideways.
   /*
     "Performing" was the Gig desk being up: Space is Go, a look picked from
@@ -86,7 +79,7 @@ export function usePhoneLayout({
     the tabs the owner's to make, it is the tab's plate being Live: the show,
     whichever panels are round it. Preview is building (below).
   */
-  const performing = deskLayout.plateMode === 'live' && roomForDesk && !phone;
+  const performing = deskLayout.plateMode === 'live' && deskUp;
   /*
     "Designing" was the Design desk being up. It is now the plate in Preview,
     which is what it always meant to the show: while a look is being built
@@ -95,18 +88,10 @@ export function usePhoneLayout({
     Preview, so the bench behaves as it did; Gig and Load-in ship Live, and
     either can be put in Preview from the plate bar.
   */
-  const designing = deskLayout.plateMode === 'preview' && roomForDesk && !phone;
+  const designing = deskLayout.plateMode === 'preview' && deskUp;
 
-  /*
-    Below that width neither desk lays out, and the floating overlay UI — the
-    bottle rail, the toolbar, the title bar — is what the app shows instead.
-    It is not legacy so much as the narrow-screen surface: a phone has its own
-    (PhoneStage), and a small laptop window gets the one that does not need
-    three columns.
-  */
-  const deskUp = roomForDesk && !phone;
-  /** The laptop's floating overlay: below the desks' width, and not on a phone. */
-  const overlayUp = !deskUp && !phone;
+  /** The old floating overlay is retired and unhooked (PLAN 49c). */
+  const overlayUp = false;
 
   return {
     phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,

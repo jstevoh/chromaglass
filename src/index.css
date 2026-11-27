@@ -141,6 +141,21 @@
    focus ring               0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent)
 */
 
+/* Visible slim scrollbars for overflowing desk columns, decks, and rails on macOS/desktop. */
+.cg-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.cg-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+.cg-scroll::-webkit-scrollbar-track { background: transparent; }
+.cg-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
+}
+.cg-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
+}
+
 /* Clean screen: nothing over the liquid, not even the pointer. Everything in
    it, not only the canvas: in clean screen the window is the show, and the
    arrow came back over anything that is not the plate (the letterbox, the
@@ -295,7 +310,7 @@
   background: #FAFAFA;
   box-shadow: 0 1px 3px rgba(0,0,0,.6);
 }
-.ride-slider.is-touch { height: 32px; }
+.ride-slider.is-touch { height: 44px; }
 .ride-slider.is-touch::-webkit-slider-runnable-track { height: 12px; border-radius: 6px; }
 .ride-slider.is-touch::-webkit-slider-thumb { height: 32px; width: 32px; margin-top: -10px; }
 /*

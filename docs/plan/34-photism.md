@@ -83,7 +83,6 @@ a grid of generic stock thumbnails: ours are the plate itself.
     all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
     about 30 days). Until one is won, a visitor in a blocked country who opens
     that card gets YouTube's own notice in the player, not the film.
-  - ~~**34a-6b. Later:** the hero could cross-fade the loops instead of the stills.~~ *Shipped as 34a-2's filmed loop (2026-11-21).*
   - **34a-6d. The films to modern ambient music.** *(The owner, 2026-11-21: "we need to move
     all of the demo videos off of the old recordings. The quality is just too low.")*
     **Shipped (2026-11-22):** the webpage's six loops, the TV samples (release `tv-films-1`)

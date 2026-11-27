@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Kbd } from '../ui';
+import { useEscape } from '../../hooks/useEscape';
 
 /**
  * ⌘K: one box that reaches everything.
@@ -57,6 +58,7 @@ function score(q: string, text: string): number {
 }
 
 export function CommandPalette({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
+  useEscape(onClose);
   const [q, setQ] = useState('');
   const [at, setAt] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);

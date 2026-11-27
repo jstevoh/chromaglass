@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ListMusic, Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
+import { ListMusic, Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
@@ -12,19 +12,17 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
-import { SPIN_AUTO_NAMES } from '../lib/turntable';
-import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
 import { RemotePourText } from './RemotePourText';
 import { PhoneInkTitle } from './phone/PhoneInkTitle';
 import { Slider } from './RemoteSlider';
-import { LOCKUP_URL } from '../brand';
-import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
 import { RemoteSongs } from './RemoteSongs';
+import { AppToast } from './ui/AppToast';
+import { REMOTE_SECTIONS, RemoteLinkBanner, RemoteNav, RemoteSectionJumper, type RemoteSectionId, type RemoteView } from './RemoteChrome';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -112,7 +110,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
 
   /** Draw's painter for the wall's picture, when Draw is up: handed each one without a render here. */
   const pictureSink = useRef<((m: PadPictureMessage) => void) | null>(null);
-  const { status, send } = useRemoteLink({
+  const { status, send, retry } = useRemoteLink({
     role: 'controller',
     onMessage: (message) => {
       if (message.type === 'picture') { pictureSink.current?.(message); return; }
@@ -202,7 +200,33 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   }, [patchThrottled]);
   useEffect(() => () => { if (mixerHoldRef.current) clearTimeout(mixerHoldRef.current); }, []);
 
-  const action = useCallback((a: RemoteAction) => send({ type: 'action', action: a }), [send]);
+  const [localUndo, setLocalUndo] = useState<{ id: number; title: string } | null>(null);
+  const prevServerUndoRef = useRef<RemoteState['undo']>(null);
+  useEffect(() => {
+    const srv = state?.undo ?? null;
+    if (srv) setLocalUndo(null);
+    else if (prevServerUndoRef.current && !srv) setLocalUndo(null);
+    prevServerUndoRef.current = srv;
+  }, [state?.undo]);
+  useEffect(() => {
+    if (!localUndo) return;
+    const t = setTimeout(() => setLocalUndo(null), 8000);
+    return () => clearTimeout(t);
+  }, [localUndo]);
+
+  const action = useCallback((a: RemoteAction) => {
+    send({ type: 'action', action: a });
+    if (a === 'lucky' || a === 'drain' || a === 'clear') {
+      const title = a === 'lucky' ? 'Look randomised' : a === 'drain' ? 'Plate drained' : 'Plate cleared';
+      setLocalUndo({ id: Date.now(), title });
+    } else if (a === 'undo-reset') {
+      setLocalUndo(null);
+    }
+  }, [send]);
+  const activeUndo = state?.undo ?? localUndo;
+  const undoToast = activeUndo
+    ? { id: activeUndo.id, title: activeUndo.title, actionLabel: 'Undo', durationMs: 8000 }
+    : null;
 
   // The laptop's own preset list when it sends one (the user's files included); the built-ins until then.
   const presetGroups = useMemo(() => {
@@ -240,9 +264,46 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   const [view, setView] = useState<'draw' | 'controls' | 'songs'>(() => {
     try { const v = localStorage.getItem(REMOTE_VIEW_KEY); return v === 'controls' || v === 'songs' ? v : 'draw'; } catch { return 'draw'; }
   });
-  // Where Songs' Back goes: the screen it was opened from (PLAN 12-ctl-1).
-  const [songsFrom, setSongsFrom] = useState<'draw' | 'controls'>('draw');
   useEffect(() => { try { localStorage.setItem(REMOTE_VIEW_KEY, view); } catch { /* private mode */ } }, [view]);
+  const [activeSection, setActiveSection] = useState<RemoteSectionId>('pad');
+  const headerRef = useRef<HTMLElement>(null);
+  const sectionRefs = useRef<Record<RemoteSectionId, HTMLElement | null>>({
+    pad: null,
+    bottles: null,
+    dyes: null,
+    sliders: null,
+    looks: null,
+  });
+  const jumpTo = useCallback((id: RemoteSectionId) => {
+    setActiveSection(id);
+    const el = sectionRefs.current[id];
+    if (!el) return;
+    const headerH = headerRef.current?.getBoundingClientRect().height ?? 0;
+    const stickyParent = el.closest('section');
+    const isSticky = stickyParent && getComputedStyle(stickyParent).position === 'sticky';
+    if (isSticky && window.scrollY > headerH) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    const top = window.scrollY + el.getBoundingClientRect().top - headerH - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+  }, []);
+  useEffect(() => {
+    if (view !== 'controls') return;
+    const onScroll = () => {
+      const headerH = headerRef.current?.getBoundingClientRect().height ?? 0;
+      const cutoff = headerH + 40;
+      let current: RemoteSectionId = 'pad';
+      for (const { id } of REMOTE_SECTIONS) {
+        const el = sectionRefs.current[id];
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= cutoff) current = id;
+      }
+      setActiveSection(prev => (prev === current ? prev : current));
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [view]);
   /*
     Draw's Amount, a multiple of how much a touch lays (1× is today's). The
     display reads a pad's amount as 0.05–1 with 0.5 for a finger, and doubles
@@ -400,11 +461,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     setView('controls');
     try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
   };
-  const openSongs = async (from: 'draw' | 'controls') => {
+  const openSongs = async () => {
     letGo();
-    setSongsFrom(from);
     setView('songs');
     try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
+  };
+  const selectView = (next: RemoteView) => {
+    if (next === 'draw') void openDraw();
+    else if (next === 'controls') void openControls();
+    else void openSongs();
   };
 
   // ── Tilt ─────────────────────────────────────────────────────────
@@ -480,7 +545,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={i}
               onClick={() => setPadLayer(i)}
               disabled={!connected}
-              className={`h-9 w-9 rounded-full border text-[11px] font-bold disabled:opacity-30 ${padLayer === i ? LIT : 'border-white/10 text-white/50'}`}
+              className={`h-11 w-11 rounded-full border text-[12px] font-bold disabled:opacity-30 ${padLayer === i ? LIT : 'border-white/10 text-white/50'}`}
               title={`This device works plate ${i + 1}`}
             >
               {i + 1}
@@ -500,7 +565,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={t}
               onClick={() => setPadTool(t)}
               disabled={!connected}
-              className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${padTool === t ? LIT : 'border-white/10 text-white/50'}`}
+              className={`min-h-11 min-w-11 rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-widest disabled:opacity-30 ${padTool === t ? LIT : 'border-white/10 text-white/50'}`}
               data-testid={`remote-tool-${t}`}
             >
               {t}
@@ -510,7 +575,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             aria-pressed={tiltOn}
             onClick={toggleTilt}
             disabled={!connected}
-            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest disabled:opacity-30 ${tiltOn ? LIT : 'border-white/10 text-white/60'}`}
+            className={`flex min-h-11 min-w-11 items-center gap-2 rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-widest disabled:opacity-30 ${tiltOn ? LIT : 'border-white/10 text-white/60'}`}
             title="Tilting the device tilts the plate"
           >
             <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
@@ -524,8 +589,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         which meant the most performable gesture in the app — a drop of soap
         on a full plate — was reachable from the laptop and nowhere else.
       */}
-      <div className="mt-3" data-testid="remote-liquids">
-        <div className="text-[9px] uppercase tracking-widest font-bold text-white/40 mb-1.5">Bottle</div>
+      <div className="mt-4" ref={(el) => { sectionRefs.current.bottles = el; }} id="remote-sec-bottles" data-testid="remote-liquids">
+        <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Bottle</div>
         <div className="flex flex-wrap gap-1.5">
           {DEFAULT_LIQUID_TYPES.map((liq) => {
             const on = padLiquid === liq.id;
@@ -535,7 +600,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 key={liq.id}
                 onClick={() => chooseLiquid(liq.id)}
                 disabled={!connected}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-30 ${
+                className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-30 ${
                   on ? LIT : 'border-white/10 text-white/55'
                 }`}
                 title={liq.description}
@@ -550,14 +615,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         </div>
       </div>
       {/* Dye colours: a tap picks the colour this pad drops and the laptop's dropper with it */}
-      <div className="mt-3 flex flex-wrap gap-1.5" data-testid="remote-dyes">
+      <div className="mt-4 flex flex-wrap gap-2" ref={(el) => { sectionRefs.current.dyes = el; }} id="remote-sec-dyes" data-testid="remote-dyes">
         {/* The bottle as it is, with no dye in it: its own colour, or clear. */}
         {padBottle?.own && (
           <button
             aria-pressed={padColor?.toLowerCase() === padBottle.own.toLowerCase()}
             onClick={() => chooseColor(padBottle.own!)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/40'}`}
+            className={`h-11 w-11 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-30 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/40'}`}
             style={isClearLiquid(padBottle) ? { backgroundColor: 'transparent' } : { backgroundColor: padBottle.own }}
             title={`Natural: ${padBottle.name.toLowerCase()} with no dye`}
             aria-label={`Natural ${padBottle.name}`}
@@ -570,7 +635,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             key={c.hex}
             onClick={() => chooseColor(c.hex)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'}`}
+            className={`h-11 w-11 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-30 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'}`}
             style={{ backgroundColor: c.hex }}
             title={c.name}
             aria-label={c.name}
@@ -580,24 +645,32 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     </>
   );
 
+  const linkDetail = status === 'denied'
+    ? (inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key: open the address the show server printed, key included')
+    : status === 'locked'
+      ? LOCKED_WORDS
+      : status === 'connecting'
+        ? 'Finding laptop…'
+        : 'Waiting for the laptop. Make sure the show is open there and both devices are on the same network.';
+  const changeLaptopAction = inApp && !connected ? (
+    <a href="/?remote=1" className="inline-flex min-h-11 min-w-11 items-center rounded-full border border-white/20 px-3.5 text-[12px] font-medium text-text" data-testid="app-change-laptop">Change laptop</a>
+  ) : null;
+
   if (view === 'draw') {
     const look = state?.activePresetId ? presetGroups.flatMap(g => g.presets).find(pr => pr.id === state.activePresetId)?.name : null;
     return (
       <DrawScreen
         connected={connected}
-        waiting={status === 'denied'
-          ? (inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key: open the address the show server printed, key included')
-          : status === 'locked' ? LOCKED_WORDS
-          : status === 'connecting' ? 'Finding laptop' : 'Offline: is the show open on the laptop, on this network?'}
+        status={status}
+        onRetry={retry}
+        waiting={linkDetail}
         /*
           In the app the way out of a wrong key or a laptop that is not there
           is Change laptop, which lives in Controls' app bar; a remote that
           opens on Draw would otherwise make the fix two screens away from
           the words that ask for it (`npm run applink`, "wrong key").
         */
-        waitingAction={inApp && !connected ? (
-          <a href="/?remote=1" className="rounded-full border border-white/20 px-4 py-2 text-[13px] font-medium text-text" data-testid="app-change-laptop">Change laptop</a>
-        ) : null}
+        waitingAction={changeLaptopAction}
         state={state}
         lookName={look ?? 'Your look'}
         tool={padTool}
@@ -618,8 +691,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         onPadMove={onPadMove}
         onPadUp={onPadUp}
         action={action}
+        undoToast={undoToast}
+        onUndoToast={() => action('undo-reset')}
+        onDraw={openDraw}
         onControls={openControls}
-        onSongs={() => openSongs('draw')}
+        onSongs={openSongs}
       />
     );
   }
@@ -630,8 +706,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         state={state}
         send={send}
         connected={connected}
-        onBack={songsFrom === 'controls' ? openControls : openDraw}
-        backLabel={songsFrom === 'controls' ? 'Controls' : 'Draw'}
+        status={status}
+        onRetry={retry}
+        onSelectView={selectView}
+        linkDetail={!connected ? linkDetail : null}
+        linkAction={changeLaptopAction}
+        inApp={inApp}
       />
     );
   }
@@ -649,43 +729,33 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       }}
     >
       {inApp && <AppModeBar />}
-      {/* Status */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0a0a0a]/95 px-5 py-4 backdrop-blur">
-        <div>
-          <h1>
-            <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-8 w-auto" draggable={false} />
-          </h1>
-          {/* The Alpha label on the line under the name, not beside it: beside
-              it, on a 390 phone it crowded the connection status on the right. */}
-          <div className="mt-1 flex items-center gap-2">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
-            <AlphaBadge />
-          </div>
+      {/* Shared top nav, link banner, and section jumper */}
+      <header ref={headerRef} className="sticky top-0 z-20 flex flex-col gap-2 border-b border-white/10 bg-[#0a0a0a]/95 px-4 py-2.5 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <RemoteNav view="controls" onSelect={selectView} compact />
+          {state?.trackName && (
+            <span className="hidden truncate text-[12px] text-white/55 md:inline">{state.trackName}</span>
+          )}
         </div>
-        <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
-          {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-          {status === 'denied' && <span className="ml-2 text-red-300">{inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key — open the address the show server printed, key included'}</span>}
-          {status === 'locked' && <span className="ml-2 text-red-300">{LOCKED_WORDS}</span>}
-          {connected ? 'Linked' : status === 'connecting' ? 'Finding laptop' : 'Offline'}
-        </div>
+        <RemoteLinkBanner
+          connected={connected}
+          status={status}
+          onRetry={retry}
+          detail={!connected ? linkDetail : null}
+          action={changeLaptopAction}
+        />
+        <RemoteSectionJumper active={activeSection} onJump={jumpTo} />
       </header>
-
-      {!connected && (
-        <p className="px-5 py-3 text-xs leading-relaxed text-white/45">
-          Waiting for the laptop. Make sure the show is open there and both devices are on the
-          same network.
-        </p>
-      )}
 
       <main className="px-5 pt-5 md:grid md:grid-cols-2 md:gap-8 md:px-8" data-testid="remote-main">
         {/* Left on a tablet: the pad, kept in view while the right column scrolls */}
-        <section className="md:sticky md:top-20 md:self-start">
-          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="remote-projectionist">
+        <section className="md:sticky md:top-44 md:self-start">
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4" ref={(el) => { sectionRefs.current.pad = el; }} id="remote-sec-pad" data-testid="remote-projectionist">
             <div className="mb-3 flex items-center justify-between">
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-white/40" />}
               </span>
-              <button onClick={openDraw} className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
+              <button onClick={openDraw} className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-full border border-white/10 px-3.5 text-[11px] font-bold uppercase tracking-widest text-white/70" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
                 <Maximize2 size={12} /> Draw
               </button>
             </div>
@@ -725,9 +795,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
 
           {/* The set list and the song shows (PLAN 12-ctl-1), their own screen */}
           <button
-            onClick={() => openSongs('controls')}
+            onClick={openSongs}
             className="mb-6 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 text-left active:scale-[0.99]"
-            data-testid="remote-to-songs"
+            data-testid="remote-songs-card"
           >
             <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
               <ListMusic size={15} /> Set list &amp; songs
@@ -741,10 +811,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
 
           {/* The dials that change the mood most */}
-          <Slider label="Sound Drive" field="audioImpact" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Speed" field="globalSpeed" step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Evolve Speed" field="automateRate" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Dimmer" field="dimmer" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
+          <div ref={(el) => { sectionRefs.current.sliders = el; }} id="remote-sec-sliders" data-testid="remote-sliders">
+          <Slider label="Sound Drive" field="audioImpact" step={0.01} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Speed" field="globalSpeed" step={0.005} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Evolve Speed" field="automateRate" step={0.01} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dimmer" field="dimmer" step={0.01} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
           {/* One Blackout on the remote: the one in the bar under the thumb (PLAN 35f). */}
           <div className="mb-6 flex gap-3">
             <button
@@ -760,17 +831,17 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               {state?.recording != null ? `${Math.floor(state.recording / 60)}:${String(state.recording % 60).padStart(2, '0')}` : 'Rec'}
             </button>
           </div>
-          <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Projector Focus" field="projectorFocus" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Heat" field="heat" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('heat') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Melody Walk" field="melodyWalk" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dye Budget" field="dyeBudget" step={0.05} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Projector Focus" field="projectorFocus" step={0.05} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Heat" field="heat" step={0.05} value={value('heat') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Plate Rock" field="plateRock" step={0.01} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Melody Walk" field="melodyWalk" step={0.05} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Kick Bloom" field="kickBloom" step={0.01} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Slosh" field="slosh" step={0.05} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
           {/* The two Tilt knobs (lib/handTilt.ts, PLAN 18a-13m): a look saved before them reads level, not the slider's −1. */}
-          <Slider label="Tilt Left/Right" field="plateTiltX" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltX') ?? 0) as number} {...sliderProps} connected={connected} />
-          <Slider label="Tilt Up/Down" field="plateTiltY" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={(value('plateTiltY') ?? 0) as number} {...sliderProps} connected={connected} />
-          <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Tilt Left/Right" field="plateTiltX" step={0.01} value={(value('plateTiltX') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Tilt Up/Down" field="plateTiltY" step={0.01} value={(value('plateTiltY') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Frame Sway" field="frameSway" step={0.01} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The dish's own turning (PLAN.md §22): Auto Spin's mode and its
             rate, so the phone in a hand across the room can set the plate
@@ -778,9 +849,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             Turn stays on the laptop and the phone's Play sheet: it is set
             once for a set, not played.
           */}
-          <Slider label="Auto Spin" field="spinAuto" step={1} format={(v) => SPIN_AUTO_NAMES[Math.round(v)] ?? 'Off'} value={value('spinAuto') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Spin Rate" field="spinRpm" step={0.5} format={(v) => `${v.toFixed(1)} rpm`} value={value('spinRpm') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Accent the One" field="beatAccent" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('beatAccent') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Auto Spin" field="spinAuto" step={1} value={value('spinAuto') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Spin Rate" field="spinRpm" step={0.5} value={value('spinRpm') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Accent the One" field="beatAccent" step={0.05} value={value('beatAccent') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             Only while a maze is on the plate, as the macro dials are only
             there with the closeup on: the phone is a surface for the show,
@@ -788,7 +859,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             Labyrinth. With it, how fine the fingers are is worth a thumb.
           */}
           {(settings?.ferroLabyrinth ?? 0) > 0.001 && (
-            <Slider label="Maze Detail" field="mazeDetail" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('mazeDetail') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Maze Detail" field="mazeDetail" step={0.05} value={value('mazeDetail') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             Only while there is a film to colour (Thin Film on the dye, or the
@@ -796,61 +867,65 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             Film Physics does nothing without one.
           */}
           {((settings?.thinFilm ?? 0) > 0.001 || (settings?.iridescence ?? 0) > 0.001) && (
-            <Slider label="Film Physics" field="filmPhysics" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Film Physics" field="filmPhysics" step={0.05} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* The frame's soap film (PLAN 32d), and while it is up its clock and the angle it is seen at, as on the desk. */}
-          <Slider label="Soap Film" field="soapFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('soapFilm') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Soap Film" field="soapFilm" step={0.05} value={value('soapFilm') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.soapFilm ?? 0) > 0.001 && (
             <>
-              <Slider label="Drain Rate" field="soapFilmRate" step={0.25} format={(v) => `${v.toFixed(2)}×`} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Film Angle" field="soapFilmAngle" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Frame Tilt" field="soapFilmTilt" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Drain Rate" field="soapFilmRate" step={0.25} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Film Angle" field="soapFilmAngle" step={1} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Frame Tilt" field="soapFilmTilt" step={1} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The water's glow (PLAN 48c), and while it is up the shear it fires at and how fast it refills, as on the desk. */}
-          <Slider label="Glow" field="glow" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glow') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Glow" field="glow" step={0.05} value={value('glow') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.glow ?? 0) > 0.001 && (
             <>
-              <Slider label="Glow Shear" field="glowShear" step={1} format={(v) => `${Math.round(v)}/s`} value={value('glowShear') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Glow Recharge" field="glowRecharge" step={0.5} format={(v) => `${v.toFixed(1)} s`} value={value('glowRecharge') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Shear" field="glowShear" step={1} value={value('glowShear') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Recharge" field="glowRecharge" step={0.5} value={value('glowRecharge') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
-          <Slider label="Glitter" field="glitter" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Glitter" field="glitter" step={0.05} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.glitter ?? 0) > 0.001 && (
-            <Slider label="Lens Stop" field="lensStop" step={0.1} format={(v) => `f/${v.toFixed(1)}`} value={value('lensStop') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Lens Stop" field="lensStop" step={0.1} value={value('lensStop') as number | undefined} {...sliderProps} connected={connected} />
           )}
-          <Slider label="Side Light" field="sideLight" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('sideLight') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Side Light" field="sideLight" step={0.05} value={value('sideLight') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.sideLight ?? 0) > 0.001 && (
             <>
-              <Slider label="Side Colour" field="sideLightHue" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Side Colour" field="sideLightHue" step={5} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Side Angle" field="sideLightAngle" step={5} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The dish on a speaker (PLAN 48f): Shaker's frequency, and while it is on, how hard it shakes. */}
-          <Slider label="Shaker" field="faradayHz" step={1} format={(v) => (v > 0 ? `${Math.round(v)} Hz` : 'Off')} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Shaker" field="faradayHz" step={1} value={value('faradayHz') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.faradayHz ?? 0) > 0 && (
-            <Slider label="Shake" field="faraday" step={0.01} format={(v) => `${v.toFixed(2)} g`} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+            <>
+              <Slider label="Shake" field="faraday" step={0.01} value={value('faraday') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Rock" field="faradayRock" step={0.01} value={value('faradayRock') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Wave Strength" field="faradayGain" step={0.05} value={value('faradayGain') as number | undefined} {...sliderProps} connected={connected} />
+            </>
           )}
           {/* Polarised light (PLAN 31p-1), and while the sheets are in the analyser's turn and the liquid's strength, as on the desk. */}
-          <Slider label="Polarisers" field="polariser" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Polarisers" field="polariser" step={0.05} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.polariser ?? 0) > 0.001 && (
             <>
-              <Slider label="Analyser" field="analyserAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('analyserAngle') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Quarter Wave" field="quarterWave" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('quarterWave') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Birefringence" field="birefringence" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('birefringence') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Dish Stress" field="dishStress" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dishStress') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Analyser" field="analyserAngle" step={5} value={value('analyserAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Quarter Wave" field="quarterWave" step={0.05} value={value('quarterWave') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Birefringence" field="birefringence" step={0.05} value={value('birefringence') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Dish Stress" field="dishStress" step={0.05} value={value('dishStress') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
-          <Slider label="Tank" field="tank" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Tank" field="tank" step={0.05} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.tank ?? 0) > 0.001 && (
             <>
-              <Slider label="Feed" field="tankFeed" step={0.1} format={(v) => `${v.toFixed(1)} cm/s`} value={value('tankFeed') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Dye Weight" field="tankWeight" step={0.05} format={(v) => `${v.toFixed(2)}%`} value={value('tankWeight') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Nozzle" field="tankNozzle" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('tankNozzle') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Drain" field="tankDrain" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tankDrain') as number | undefined} {...sliderProps} connected={connected} />
-              <Slider label="Glow Hue" field="tankHue" step={1} format={(v) => `${Math.round(v)}°`} value={value('tankHue') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Feed" field="tankFeed" step={0.1} value={value('tankFeed') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Dye Weight" field="tankWeight" step={0.05} value={value('tankWeight') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Nozzle" field="tankNozzle" step={0.01} value={value('tankNozzle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Drain" field="tankDrain" step={0.05} value={value('tankDrain') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Hue" field="tankHue" step={1} value={value('tankHue') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/*
@@ -858,76 +933,76 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             on the plate to do the pushing.
           */}
           {(settings?.phaseAmount ?? 0) > 0.001 && (
-            <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             Lamp Ground (PLAN 18b), always: the ground the dye is seen on,
             black or the lamp through it, which turns a look over and is
             worth a thumb from across the room.
           */}
-          <Slider label="Lamp Ground" field="lampGround" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('lampGround') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Lamp Ground" field="lampGround" step={0.05} value={value('lampGround') as number | undefined} {...sliderProps} connected={connected} />
           {/* Two projectors (PLAN 18b-10), optionally combining lamp inputs. */}
-          <Slider label="Two Projectors" field="twoProjectors" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={(value('twoProjectors') ?? 0) as number} {...sliderProps} connected={connected} />
+          <Slider label="Two Projectors" field="twoProjectors" step={1} value={(value('twoProjectors') ?? 0) as number} {...sliderProps} connected={connected} />
 
           {/*
             And Ben-Day Dots while the plate prints (the Roy look): how much
             of a comic it is, for a thumb.
           */}
           {printed.current && (
-            <Slider label="Ben-Day Dots" field="benDay" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('benDay') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Ben-Day Dots" field="benDay" step={0.05} value={value('benDay') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             And Turing Print while the reaction runs (PLAN 26d): starch in the
             dish, the pattern printed black on the lamp.
           */}
           {((settings?.chemistry ?? 0) > 0.001 || (settings?.turingPrint ?? 0) > 0.001) && (
-            <Slider label="Turing Print" field="turingPrint" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('turingPrint') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Turing Print" field="turingPrint" step={0.05} value={value('turingPrint') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {((settings?.turingPrint ?? 0) > 0.001) && (
-            <Slider label="Print Ink" field="turingInk" step={0.01} format={(v) => (v > 0 ? `${Math.round(v * 360)}°` : 'Starch')} value={value('turingInk') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Print Ink" field="turingInk" step={0.01} value={value('turingInk') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {((settings?.turingPrint ?? 0) > 0.001) && (
-            <Slider label="Print Drift" field="turingDrift" step={0.05} format={(v) => (v > 0 ? `${Math.round(v * 100)}%` : 'Still')} value={value('turingDrift') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Print Drift" field="turingDrift" step={0.05} value={value('turingDrift') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             The plate as a thin gap (PLAN §18a), a switch on the slider's two
             stops, and its liquid's Thickness only while it is on.
           */}
-          <Slider label="Thin Gap" field="thinGap" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={(value('thinGap') ?? 1) as number} {...sliderProps} connected={connected} />
+          <Slider label="Thin Gap" field="thinGap" step={1} value={(value('thinGap') ?? 1) as number} {...sliderProps} connected={connected} />
           {(settings?.thinGap ?? 1) > 0.5 && (
-            <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Thickness" field="gapThickness" step={0.05} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* The liquid under the cover and the glass on it (PLAN 38r-5), as on the desk. */}
-          <Slider label="Liquid" field="liquidMl" step={1} format={(v) => `${Math.round(v)} mL`} value={value('liquidMl') as number | undefined} {...sliderProps} connected={connected} />
-          <Slider label="Cover Weight" field="coverWeight" step={5} format={(v) => `${Math.round(v)} g`} value={value('coverWeight') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Liquid" field="liquidMl" step={1} value={value('liquidMl') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Cover Weight" field="coverWeight" step={5} value={value('coverWeight') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The clear film that tears into lace (PLAN §20b), always: laying it
             and thickening it is a pour, worth a thumb from across the room.
           */}
-          <Slider label="Clear Film" field="clearFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Clear Film" field="clearFilm" step={0.05} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
           {/* Its dye (PLAN 20b-13), while there is a film to dye. */}
           {(settings?.clearFilm ?? 0) > 0.001 && (
-            <Slider label="Film Dye" field="clearFilmDye" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilmDye') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Film Dye" field="clearFilmDye" step={0.05} value={value('clearFilmDye') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Oil Bodies" field="oilBodies" step={0.05} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Film Hold, which keeps the drops of that oil apart, likewise. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Film Hold" field="filmHold" step={0.05} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Weight, how heavy that oil is: a lava lamp's wax on a standing plate (PLAN 27f-9c). */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Oil Weight" field="oilWeight" step={0.05} format={(v) => (v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2))} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Oil Weight" field="oilWeight" step={0.05} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Thickness, how thick that oil is: a lamp's thin molten wax against a thick oil (PLAN 38w-31). */}
           {(settings?.oilTension ?? 0) > 0.001 && (
-            <Slider label="Oil Thickness" field="oilThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilThickness') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Oil Thickness" field="oilThickness" step={0.05} value={value('oilThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
           {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
-            <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
 
           {/* Song titles in a live set (PLAN 37x-10), the phone's Title switch. */}
@@ -946,12 +1021,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <span className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
               <Microscope size={15} /> Macro Closeup
             </span>
-            <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+            <Slider label="Macro Zoom" field="macroZoom" step={0.5} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
             {((value('macroZoom') as number | undefined) ?? 1) > 1.05 && (
               <div>
-                <Slider label="Chase Speed" field="macroChase" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
-                <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
-                <Slider label="Shot Length" field="macroHold" step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Chase Speed" field="macroChase" step={0.05} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Music Sync" field="macroSync" step={0.05} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Shot Length" field="macroHold" step={0.5} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
               </div>
             )}
           </div>
@@ -994,14 +1069,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 </div>
               )}
               <div className="flex gap-2">
-                <button onClick={() => action('seq-prev')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Previous stage" data-testid="remote-seq-prev">
+                <button onClick={() => action('seq-prev')} disabled={!connected || !state.sequencer.name} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Previous stage" data-testid="remote-seq-prev">
                   <SkipBack size={16} className="mx-auto" />
                 </button>
                 <button
                   aria-pressed={!!state.sequencer.running}
                   onClick={() => action(state.sequencer?.running ? 'seq-pause' : 'seq-play')}
                   disabled={!connected}
-                  className={`flex-[2] flex items-center justify-center gap-2 rounded-xl border py-3 text-[11px] font-bold uppercase tracking-[0.2em] disabled:opacity-30 active:scale-95 ${
+                  className={`flex min-h-11 flex-[2] items-center justify-center gap-2 rounded-xl border py-3 text-[11px] font-bold uppercase tracking-[0.2em] disabled:opacity-30 active:scale-95 ${
                     state.sequencer.running ? LIT : 'border-white/10 bg-white/5 text-white/80'
                   }`}
                   data-testid="remote-seq-toggle"
@@ -1009,10 +1084,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                   {state.sequencer.running ? <Pause size={16} /> : <Play size={16} />}
                   {state.sequencer.running ? 'Pause' : state.sequencer.name ? 'Resume' : 'Play'}
                 </button>
-                <button onClick={() => action('seq-next')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Next stage" data-testid="remote-seq-next">
+                <button onClick={() => action('seq-next')} disabled={!connected || !state.sequencer.name} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Next stage" data-testid="remote-seq-next">
                   <SkipForward size={16} className="mx-auto" />
                 </button>
-                <button onClick={() => action('seq-stop')} disabled={!connected || !state.sequencer.name} className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Stop sequencer" data-testid="remote-seq-stop">
+                <button onClick={() => action('seq-stop')} disabled={!connected || !state.sequencer.name} className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 disabled:opacity-30 active:scale-95" aria-label="Stop sequencer" data-testid="remote-seq-stop">
                   <Square size={16} className="mx-auto" />
                 </button>
               </div>
@@ -1038,7 +1113,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {settings && (
             <details className="mb-7 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2" data-testid="remote-mixer">
-              <summary className="cursor-pointer py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Mixer</summary>
+              <summary className="flex min-h-11 cursor-pointer items-center py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Mixer</summary>
               <div className="pb-2 pt-1">
                 <MixerPanel
                   settings={{ ...settings, ...localValues } as VisualizerSettings}
@@ -1053,6 +1128,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               </div>
             </details>
           )}
+          </div>
 
           {/* One-shot gestures */}
           <div className="mb-7 flex gap-3">
@@ -1063,11 +1139,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
 
           {/* Presets */}
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30">Preset palettes — tap to arm, Go sends</h2>
+          <div ref={(el) => { sectionRefs.current.looks = el; }} id="remote-sec-looks" className="mb-3 flex items-center justify-between">
+            <h2 className="text-[11px] uppercase tracking-[0.25em] text-white/45">Preset palettes — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
-              <button onClick={() => action('preset-prev')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={14} /></button>
-              <button onClick={() => action('preset-next')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={14} /></button>
+              <button onClick={() => action('preset-prev')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={16} /></button>
+              <button onClick={() => action('preset-next')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={16} /></button>
             </div>
           </div>
           {presetGroups.map(({ label, presets }) => (
@@ -1201,6 +1277,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </button>
         </div>
       </div>
+      <AppToast toast={undoToast} onAction={() => action('undo-reset')} phone bottomClass="bottom-24" />
     </div>
   );
 }

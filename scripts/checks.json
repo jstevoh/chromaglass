@@ -3020,7 +3020,7 @@
     {
       "name": "A held press moves only its own neighbourhood",
       "shard": "plate",
-      "run": "npm run heldpress -- --owed=presstwist",
+      "run": "npm run heldpress",
       "why": [
         "A press held in one place (each bubble's) moves the liquid around it,",
         "not the whole plate: the projection's source sums to zero exactly."
@@ -3073,6 +3073,16 @@
         "The app's own Press on a thin gap: the ring goes out as far as the",
         "displaced volume says with every drop kept, the colour's carry takes",
         "the substeps it needs, and it comes back when the glass lifts."
+      ]
+    },
+    {
+      "name": "A light press is round, not the grid's facets",
+      "shard": "plate",
+      "run": "npm run pressfacets",
+      "why": [
+        "A light press on a thin gap lays its bowl as a smooth plate contact",
+        "patch at the solver's own resolution: the bowl is as deep as asked,",
+        "and its curvature carries no creases one CPU cell apart (PLAN 18a-14)."
       ]
     },
     {
@@ -3136,6 +3146,30 @@
         "On tools since PLAN 19k: plate ran 19.1 to 20.4 minutes on the PR runs of",
         "2026-10-26 against its 20, and #502's was stopped there with one check left;",
         "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14."
+      ]
+    },
+    {
+      "name": "A pour off the screen's edge flows into the picture",
+      "shard": "plate",
+      "run": "npm run edgepour",
+      "timeout": 6,
+      "why": [
+        "Pouring past the edge (PLAN 18a-18): the bottle's tools in the screen's",
+        "edge band land on the dish past the picture, the rest of the screen",
+        "exactly as before, and the lab holds that a held pour there comes into",
+        "view by its own volume (none in view without it)."
+      ]
+    },
+    {
+      "name": "The draught keeps the dish's liquid in the dish",
+      "shard": "plate",
+      "run": "npm run draught",
+      "timeout": 6,
+      "why": [
+        "Air between two glasses (PLAN 18a-16): a uniform shear laid into the",
+        "open-rim solve slid Solar Flare's whole dish out over its rim (0% of",
+        "its dye left in the lab); a closed dish answers it with its pressure,",
+        "so only the gusts' curl moves the liquid, as strong as before."
       ]
     },
     {
@@ -3272,7 +3306,7 @@
       "run": "npm run filmlook",
       "why": [
         "Film Physics on the plate: nothing but the film changes; the projector's bubbles take the",
-        "faint tint the light through a film is, the closeup's the soap's own reflected gold."
+        "faint tint the light through a film is, the closeup's the light through the film too, at every Film Physics (38h-6)."
       ]
     },
     {

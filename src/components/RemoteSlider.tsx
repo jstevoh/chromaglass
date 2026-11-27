@@ -2,6 +2,7 @@
 import type { VisualizerSettings } from '../types';
 import { PIN_RANGE } from '../lib/deskPins';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
+import { readSetting } from '../lib/readout';
 
 /**
  * Defined at module level on purpose: a component created inside the render
@@ -34,7 +35,7 @@ export function Slider({ label, field, step, format, value, connected, onDrag, o
     <div className="mb-5">
       <div className="mb-2 flex items-baseline justify-between">
         <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">{label}</span>
-        <span className="font-mono text-xs text-white/40">{format ? format(current) : current.toFixed(2)}</span>
+        <span className="font-mono text-xs text-white/40">{format ? format(current) : readSetting(String(field), current, min, max)}</span>
       </div>
       <input
         id={`remote-${String(field)}`}
@@ -52,7 +53,7 @@ export function Slider({ label, field, step, format, value, connected, onDrag, o
           if (curve === 1) { onChange(field, raw); return; }
           onChange(field, handValueAt(raw, min, max, curve));
         }}
-        className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30 md:h-12"
+        className="remote-slider h-11 w-full cursor-pointer disabled:opacity-30 md:h-12"
         style={{ ['--fill' as string]: `${(curve === 1 ? (current - min) / (max - min) : at) * 100}%` }}
       />
     </div>

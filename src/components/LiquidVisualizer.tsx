@@ -41,6 +41,7 @@ import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } 
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, dishFollow, dishFrame, lookMotor, lookMotorRate } from '../lib/turntable';
+import { pointerOnPlate } from '../lib/pointerPlate';
 import { stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
@@ -67,7 +68,7 @@ import { makeNoteVoices, readNoteFeature, resetNoteVoices, type VoiceDrop, type 
 import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
-import { openCamera } from '../lib/cameras';
+import { captureFilmCamera, captureFilmWindow } from '../lib/filmCapture';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
 import { Modulators } from '../lib/modulators';
@@ -86,6 +87,8 @@ import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles, syncBubblesGpu } from '../sim/speciesPoll';
 import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../sim/noteVoicesStep';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
+import { buildPlateSnapshot, applyPlateSnapshot, type PlateSnapshotData } from '../sim/plateSnapshot';
+import type { PlateSnapshot } from './visualizerHandle';
 import { recolourHandoff, type Handoff } from './paletteRecolour';
 import { plateLayers } from './plateLayers';
 
@@ -1128,7 +1131,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const drawnRectRef = useRef<(() => DOMRect) | null>(null);
   /** A window point on the lead plate, in plate units, as a hand there would land (`chromaglassDebug().plateAt`). */
   const plateAtRef = useRef<((clientX: number, clientY: number) => { x: number; y: number }) | null>(null);
-  const wallPointRef = useRef<((u: number, v: number, layer: number, turned: boolean) => { x: number; y: number }) | null>(null);
+  const wallPointRef = useRef<((u: number, v: number, layer: number, turned: boolean, reach?: boolean) => { x: number; y: number }) | null>(null);
   /**
    * A gesture from any hand, applied to the plate.
    *
@@ -1797,119 +1800,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       Nothing is requested until the button is pressed, and the browser's
       picker, not this app, decides what is shared.
     */
-    startFilmWindow: async (onEnded?: () => void, onBlank?: () => void) => {
-      const media = navigator.mediaDevices as MediaDevices & {
-        getDisplayMedia?: (c: DisplayMediaStreamOptions) => Promise<MediaStream>;
-      };
-      if (!media?.getDisplayMedia) throw new Error('This browser cannot capture a window.');
-      // Asked for before `stopFilm`, so a picker the operator cancels leaves
-      // whatever was already playing alone rather than putting the projector
-      // out on the way to a dialog they changed their mind about.
-      /*
-        What the picker is told, and why each part of it.
-
-        `displaySurface: 'browser'` opens the picker on its Tab list. It is a
-        hint, not a restriction — a whole window or a screen is still one
-        click away — and it is the right default for this feature twice over.
-        A film is usually a video playing in a tab, and capturing the *tab*
-        composites through the renderer, while capturing the *window* around
-        it does not always: a video handed to a hardware overlay plane is
-        drawn past the window's own surface, and window capture then yields
-        black frames with the audio and the controls coming through perfectly.
-        That is the most likely reading of a black plate from a playing movie,
-        and the tab is the capture that does not have the problem.
-
-        `selfBrowserSurface: 'exclude'` takes ChromaGlass out of the list.
-        Offering it invites capturing the plate into the plate, and it is the
-        one choice that can only ever be a mistake.
-
-        `surfaceSwitching: 'exclude'` drops the "Share this tab instead"
-        control Chrome otherwise puts up, which is a question about the app's
-        own tab asked in the middle of choosing a film.
-      */
-      const stream = await media.getDisplayMedia({
-        video: { frameRate: { ideal: 30 }, displaySurface: 'browser' },
-        // The plate is driven by the room's sound, not by the captured window,
-        // and asking for audio makes the picker offer a checkbox that does
-        // nothing here.
-        audio: false,
-        selfBrowserSurface: 'exclude',
-        surfaceSwitching: 'exclude',
-      } as DisplayMediaStreamOptions);
-      stopFilm();
-      const f = filmRef.current;
-      const v = filmVideo();
-      f.stream = stream;
-      v.srcObject = stream;
-      f.kind = 'window';
-      filmEndedRef.current = onEnded ?? null;
-      for (const t of stream.getVideoTracks()) {
-        t.addEventListener('ended', () => {
-          const cb = filmEndedRef.current;
-          stopFilm();
-          cb?.();
-        });
-      }
-      try { await v.play(); } catch { /* as above */ }
-
-      /*
-        Say so when the capture is coming through black.
-
-        A window that yields nothing but black pixels is indistinguishable, on
-        the plate, from a film that is simply very dark — and from the feature
-        being broken. So the frames are looked at: a few samples over a second
-        and a half, and if every pixel of every one of them is black the
-        operator is told, because the remedy (share the tab rather than the
-        window) is not something anybody would guess.
-
-        Sampled, not watched: one 32x32 read every 300ms, stopped as soon as
-        anything lights up, on a machine that is also running a fluid solver.
-      */
-      if (onBlank) {
-        const probe = document.createElement('canvas');
-        probe.width = 32; probe.height = 32;
-        const pctx = probe.getContext('2d', { willReadFrequently: true });
-        let looks = 0;
-        const timer = setInterval(() => {
-          looks++;
-          if (!pctx || filmRef.current.kind !== 'window' || v.readyState < 2) {
-            if (looks >= 5) clearInterval(timer);
-            return;
-          }
-          try {
-            pctx.drawImage(v, 0, 0, probe.width, probe.height);
-            const { data } = pctx.getImageData(0, 0, probe.width, probe.height);
-            for (let i = 0; i < data.length; i += 4) {
-              if (data[i] > 8 || data[i + 1] > 8 || data[i + 2] > 8) { clearInterval(timer); return; }
-            }
-          } catch { clearInterval(timer); return; }   // tainted: not ours to read, and not black either
-          if (looks >= 5) { clearInterval(timer); onBlank(); }
-        }, 300);
-      }
-    },
-    startFilmCamera: async (deviceId = '', onEnded) => {
-      stopFilm();
-      const f = filmRef.current;
-      const v = filmVideo();
-      const opened = await openCamera(deviceId, 'environment', { width: 1280 });
-      const stream = opened.stream;
-      f.stream = stream;
-      v.srcObject = stream;
-      f.kind = 'camera';
-      // Unplugged, the same way a captured window is taken away: the film
-      // comes off and the panel is told, rather than the plate holding the
-      // camera's last frame with the source still reading "live".
-      filmEndedRef.current = onEnded ?? null;
-      for (const t of stream.getVideoTracks()) {
-        t.addEventListener('ended', () => {
-          const cb = filmEndedRef.current;
-          stopFilm();
-          cb?.();
-        });
-      }
-      try { await v.play(); } catch { /* as above */ }
-      return { label: opened.label, fellBack: opened.fellBack };
-    },
+    startFilmWindow: (onEnded?: () => void, onBlank?: () => void) =>
+      captureFilmWindow({ film: filmRef.current, video: filmVideo, stop: stopFilm, setEnded: cb => { filmEndedRef.current = cb; }, getEnded: () => filmEndedRef.current }, onEnded, onBlank),
+    startFilmCamera: (deviceId = '', onEnded) =>
+      captureFilmCamera({ film: filmRef.current, video: filmVideo, stop: stopFilm, setEnded: cb => { filmEndedRef.current = cb; }, getEnded: () => filmEndedRef.current }, deviceId, onEnded),
     clearFilm: () => stopFilm(),
     loadMark: (source, width, height) => {
       markRef.current = { source, aspect: width > 0 && height > 0 ? width / height : 1, dirty: true };
@@ -1992,7 +1886,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     applyGesture: (g) => performGestureBanked(g),
-    wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
+    wallToPlate: (u, v, layer, turned = true, reach) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned, reach) ?? { x: u, y: v },
+    takeSnapshot: () => buildPlateSnapshot(fluidsRef.current, bubblesRef.current, beadsRef.current, {
+      livePreset: livePresetRef.current, laidPreset: laidPresetRef.current, harmony: harmonyRef.current,
+      harmonyLock: harmonyLockRef.current, contract: presetContractRef.current, paletteWindow: paletteWindowRef.current,
+      journey: journeyRef.current, injectStyle: injectStyleRef.current, plateLiquids: plateLiquidsRef.current,
+      areas: areasRef.current, melodyLine: melodyLineRef.current, rotationAngles: rotationAnglesRef.current,
+      spinVel: spinVelRef.current, dishSpin: dishSpinRef.current, liquidSpin: liquidSpinRef.current, backDyes: backDyesRef.current,
+    }) as PlateSnapshot,
+    restoreSnapshot: (raw) => {
+      const r = applyPlateSnapshot(fluidsRef.current, bubblesRef.current, beadsRef.current, raw as PlateSnapshotData);
+      livePresetRef.current = r.livePreset; laidPresetRef.current = r.laidPreset; harmonyRef.current = r.harmony;
+      harmonyLockRef.current = r.harmonyLock; presetContractRef.current = r.contract; paletteWindowRef.current = r.paletteWindow;
+      journeyRef.current = r.journey; injectStyleRef.current = r.injectStyle; plateLiquidsRef.current = r.plateLiquids;
+      areasRef.current = r.areas as PlateArea[] | null; melodyLineRef.current = r.melodyLine as MelodyLine;
+      rotationAnglesRef.current = r.rotationAngles; spinVelRef.current = r.spinVel; dishSpinRef.current = r.dishSpin;
+      liquidSpinRef.current = r.liquidSpin; backDyesRef.current = r.backDyes; drainFrameRef.current = 0; handoffRef.current = null;
+      lastClearTrigger.current = clearTriggerRef.current; lastDrainTrigger.current = drainTriggerRef.current; lastSeedCount.current = seedCountRef.current;
+    },
   }));
 
   // Between frames too (the opening, a covered window, a harness's `pour`): at each reading
@@ -5319,7 +5230,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
         padPicture: padPictureSender()?.debug ?? null,
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
-        wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
+        wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true, reach = false) => wallPointRef.current?.(u, v, layer, turned, reach) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
         /** The clears this engine has been handed (`clearTrigger`): `npm run draftwall` reads the wall's against the desk's copy (PLAN.md 8b). */
@@ -6540,9 +6451,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       DOMRect the canvas's own size stands for the screen's box; only its
       proportions are read.
     */
-    wallPointRef.current = (u, v, layer, turned) => {
+    wallPointRef.current = (u, v, layer, turned, reach) => {
       const rect = new DOMRect(0, 0, Math.max(1, canvas.width), Math.max(1, canvas.height));
-      const p = fluidPointAt(u * rect.width, (1 - v) * rect.height, rect, layer, turned);
+      const p = fluidPointAt(u * rect.width, (1 - v) * rect.height, rect, layer, turned, reach);
       return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
     };
     /*
@@ -6551,47 +6462,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       a cell is an angle rounded to a sixtieth of a radian at a third of the
       plate out, which at sixty readings a second is a turn a second of noise.
     */
-    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect, layer = activeLayerRef.current, turned = true) => {
-      const cxp = clientX - rect.left - rect.width / 2;
-      const cyp = -(clientY - rect.top - rect.height / 2); // the plate's uv counts up, CSS counts down
-      const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
-      const angle = turned ? rotationAnglesRef.current[layer] || 0 : 0;
-      const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
-      const ry = cxp * Math.sin(-angle) + cyp * Math.cos(-angle);
-      // Mirror the shader's camera transform so the brush lands under the
-      // cursor at any magnification.
-      const shot = macroShotRef.current;
-      const z = Math.max(0.0001, shot.zoom);
+    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect, layer = activeLayerRef.current, turned = true, reach = false) => {
+      const shot = macroShotRef.current, st = settingsRef.current;
       // As the plate's uniforms have it: gathered back to one plate as the closeup comes in.
-      const spread = c01(settingsRef.current.dishSpread ?? 0) * (1 - macroAmountOf(settingsRef.current));
-      if (spread > 0.001) {
-        // The layers are spread into dishes: this layer's dish is its whole plate.
-        const aspect = rect.width / Math.max(1, rect.height);
-        const cen = layer === 0 ? [0.5 + 0.144 * spread / aspect, 0.5 - 0.02 * spread] : [0.5 - 0.304 * spread / aspect, 0.5 + 0.06 * spread];
-        const rad = layer === 0 ? 0.98 + (0.66 - 0.98) * spread : 0.98 + (0.36 - 0.98) * spread;
-        const u = (clientX - rect.left) / rect.width, v = 1 - (clientY - rect.top) / rect.height;
-        let dx = (u - cen[0]) * aspect / (rad * 0.5), dy = (v - cen[1]) / (rad * 0.5);
-        const ca = Math.cos(-angle), sa = Math.sin(-angle);
-        const px = ca * dx - sa * dy, py = sa * dx + ca * dy;
-        dx = px; dy = py;
-        return { x: (0.5 + dx * 0.5) * GRID_SIZE, y: (0.5 + dy * 0.5) * GRID_SIZE };
-      }
-      let fx = rx / (scale * z) + shot.cx * GRID_SIZE;
-      let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
-      // The second layer is viewed through its own zoom and drift.
-      const view = layer1ViewRef.current;
-      if (layer === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
-        fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
-        fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
-      }
-      return { x: fx, y: fy };
+      const spread = c01(st.dishSpread ?? 0) * (1 - macroAmountOf(st));
+      return pointerOnPlate(clientX - rect.left, clientY - rect.top, rect.width, rect.height, layer, turned ? rotationAnglesRef.current[layer] || 0 : 0,
+        shot.cx, shot.cy, shot.zoom, spread, layer1ViewRef.current, GRID_SIZE, reach);
     };
     plateAtRef.current = (clientX, clientY) => {
-      const p = fluidPointAt(clientX, clientY, drawnRect());
+      const p = fluidPointAt(clientX, clientY, drawnRect(), activeLayerRef.current, true, LAYING_TOOLS.has(activeToolRef.current));
       return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
     };
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
-      const p = fluidPointAt(clientX, clientY, rect);
+      // A pouring hand in the screen's edge band reaches the dish past it (lib/pointerPlate.ts, PLAN 18a-18).
+      const p = fluidPointAt(clientX, clientY, rect, activeLayerRef.current, true, LAYING_TOOLS.has(activeToolRef.current));
       return { x: Math.floor(p.x), y: Math.floor(p.y) };
     };
     /*

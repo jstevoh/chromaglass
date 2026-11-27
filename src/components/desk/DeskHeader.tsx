@@ -82,6 +82,7 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
     back when the cluster as it was with them fits again.
   */
   const headerRef = useRef<HTMLElement>(null);
+  const leftRef = useRef<HTMLDivElement>(null);
   const switchRef = useRef<HTMLDivElement>(null);
   const clusterRef = useRef<HTMLDivElement>(null);
   /*
@@ -103,6 +104,7 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
     cannot flicker between two.
   */
   const [level, setLevel] = useState<0 | 1 | 2>(0);
+  const [leftMax, setLeftMax] = useState<number | null>(null);
   /*
     What each level saves, measured at the moment it was taken: the width
     just before, less the width just after. Coming back down asks whether
@@ -114,14 +116,31 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
   const before = useRef<{ from: number; w: number } | null>(null);
   useLayoutEffect(() => {
     const fit = () => {
-      const h = headerRef.current, sw = switchRef.current, c = clusterRef.current;
+      const h = headerRef.current, lf = leftRef.current, sw = switchRef.current, c = clusterRef.current;
       if (!h || !sw || !c) return;
       const hr = h.getBoundingClientRect(), sr = sw.getBoundingClientRect(), cr = c.getBoundingClientRect();
+      // Give the left group (brand + look crumb) all room up to the centred switch when pinned (>= 1024 px), instead of capping at 30%.
+      const nextLeftMax = window.innerWidth < 1024 ? null : Math.max(220, Math.floor(sr.left - hr.left - 12));
+      setLeftMax(prev => (prev === nextLeftMax ? prev : nextLeftMax));
       // How close the cluster may come to the switch at each level before the next.
       const margin = (l: number) => (l === 0 ? 12 : 0);
       if (before.current && before.current.from === level - 1) {
         saved.current[level] = Math.max(0, before.current.w - cr.width);
         before.current = null;
+      }
+      if (window.innerWidth < 1024) {
+        // Below 1024 px the tab switch sits in the flex flow instead of pinned to
+        // the middle, so measure whether all three groups fit across the header.
+        const lw = lf?.getBoundingClientRect().width ?? 0;
+        const swFull = Math.max(sr.width, sw.scrollWidth);
+        const need = lw + swFull + cr.width + 48;
+        if (level < 2 && need > hr.width) {
+          before.current = { from: level, w: cr.width };
+          setLevel((level + 1) as 1 | 2);
+          return;
+        }
+        if (level > 0 && need + saved.current[level] + 4 < hr.width) setLevel((level - 1) as 0 | 1);
+        return;
       }
       if (level < 2 && cr.left < sr.right + margin(level)) {
         before.current = { from: level, w: cr.width };
@@ -133,6 +152,7 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
     fit();
     const ro = new ResizeObserver(fit);
     if (headerRef.current) ro.observe(headerRef.current);
+    if (switchRef.current) ro.observe(switchRef.current);
     if (clusterRef.current) ro.observe(clusterRef.current);
     return () => ro.disconnect();
   }, [level]);
@@ -225,8 +245,8 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
         <StatusDot
           on
           tone="live"
-          label={`Rec ${dots.rec}`}
-          short="Rec"
+          label={dots.recWhat ? `Rec · ${dots.recWhat} ${dots.rec}` : `Rec ${dots.rec}`}
+          short={dots.recWhat ? `${dots.recWhat} ${dots.rec}` : 'Rec'}
           tight={t}
           onClick={onRecord}
           title={`Recording ${dots.recWhat ?? 'Plate video'} (${dots.rec}). Click for the Record panel, or press R to stop.`}
@@ -254,16 +274,19 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
       centre off true again. The sides can now give way, and the breadcrumb
       truncates instead.
     */
-    <header ref={headerRef} className="relative col-[1/-1] flex items-center justify-between gap-4 border-b border-border px-4">
-      <div className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium">
+    <header ref={headerRef} className="relative col-[1/-1] flex items-center justify-between gap-2 border-b border-border px-3 lg:gap-4 lg:px-4">
+      <div
+        ref={leftRef}
+        className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium lg:max-w-[38%]"
+        style={leftMax != null ? { maxWidth: leftMax } : undefined}
+      >
         {/*
           The name where there is room for it, the mark alone where there is
-          not. Below 1280 this side is already giving way to the centred mode
-          switch (see below), and what it has room for belongs to the
-          breadcrumb — the look that is up is what someone reads here.
+          not. Below 1400 this side gives room to the breadcrumb so the active
+          look name never truncates to a single letter at 1280.
         */}
-        <img src={LOCKUP_URL} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 xl:block" draggable={false} />
-        <img src={MARK_URL} alt="ChromaGlass" className="h-7 w-7 shrink-0 xl:hidden" draggable={false} />
+        <img src={LOCKUP_URL} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 min-[1400px]:block" draggable={false} />
+        <img src={MARK_URL} alt="ChromaGlass" className="h-7 w-7 shrink-0 min-[1400px]:hidden" draggable={false} />
         <AlphaBadge />
         <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
         {breadcrumb}
@@ -300,8 +323,8 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
         used to go altogether, and a row of unlabelled dots was reported as
         impossible to read.
       */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div ref={switchRef} className="pointer-events-auto">
+      <div className="min-w-0 shrink lg:pointer-events-none lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
+        <div ref={switchRef} className="lg:pointer-events-auto">
           {/*
             The owner's tabs, each a set of panels (lib/deskTabs.ts), and the
             pencil that edits them. Sequence and Sound were screens of their

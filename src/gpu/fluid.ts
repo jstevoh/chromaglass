@@ -789,6 +789,16 @@ export class WebGPUFluid extends FluidCover {
         colour's weight in it too, κ the lift over that weight per unit.
       */
       const lifting = rockOn && !!mix && this.mixLive && oil > 0.001;
+      /*
+        With no oil the colour's own weight (Plate Rock's, and Rain Drip's on
+        a standing plate) goes through the same closed circulation (PLAN
+        18a-17; hsBody says why): laid straight into the gap's solve, whose
+        rim is open, the heavy colour left over the downhill rim, Rain Drip
+        0.5 keeping 1.8% of its dish (\`npm run draught\`). Rain Drip's pull is
+        down S.up, and hsBody adds it to the tilt's as one in-plane weight
+        (A.b.w 2). With oil, Rain Drip stays laid directly (27f-6).
+      */
+      const closing = thin && !(!!mix && this.mixLive && oil > 0.001) && (rockOn || (dripWeightOf(p) > 0 && upright > 0.001));
       const mixTex = lifting ? mix!.read : this.blank('rgba');
       // The oil's own share of the colour, with Oil Bodies (WATER_DYE in wgsl/thinGap.ts).
       const oilDyeTex = lifting && bodiesOn && this.oilDye ? this.oilDye.read : this.blank('rgba');
@@ -810,6 +820,18 @@ export class WebGPUFluid extends FluidCover {
           }
           const built = (name: string) => this.pipelines.hasCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
           if (built('hsLiftSource') && built('hsLiftRelaxOil')) closed = [lnB, 1];
+        } else if (closing) {
+          const m = this.liftN, blank = this.blank('rgba');
+          this.hsRun(pass, 'hsLiftSource', `hsLiftSource:${blank.label}:${this.dye.read.label}:${blank.label}`, this.arg('lift source', [m, 0, 0, 0]),
+            [blank, this.hsLiftSrc!, this.hsLiftB!, this.dye.read, blank], m * m);
+          const omega = 2 / (1 + Math.sin(Math.PI / m));
+          for (let k = 0; k < LIFT_SWEEPS; k++) {
+            for (const parity of [0, 1]) {
+              this.hsRun(pass, 'hsLiftRelax', `liftRelax:${parity}`, this.arg(`weight relax ${parity}`, [m, parity, omega, 0]), [this.hsLiftSrc!, this.hsLiftPsi!], m * (m / 2));
+            }
+          }
+          const built = (name: string) => this.pipelines.hasCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
+          if (built('hsLiftSource') && built('hsLiftRelax')) closed = [0, 2];
         }
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
           this.arg('thin body', [dripWeightOf(p), AIR_SHEAR, REST_GAP, breathScale,

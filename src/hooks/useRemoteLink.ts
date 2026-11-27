@@ -74,6 +74,8 @@ export function useRemoteLink({ role, onMessage, state, enabled = true, keptKey 
   onMessageRef.current = onMessage;
   const stateRef = useRef(state);
   stateRef.current = state;
+  const retryFnRef = useRef<() => void>(() => {});
+  const retry = useCallback(() => { retryFnRef.current(); }, []);
 
   const send = useCallback((message: RemoteMessage) => {
     const socket = socketRef.current;
@@ -205,7 +207,6 @@ export function useRemoteLink({ role, onMessage, state, enabled = true, keptKey 
       socket.onclose = () => {
         socketRef.current = null;
         if (closedRef.current || lockedRef.current) return;   // refused, locked out, or torn down on purpose: keep that status
-        setStatus('connecting');
         scheduleRetry();
       };
 
@@ -215,15 +216,32 @@ export function useRemoteLink({ role, onMessage, state, enabled = true, keptKey 
 
     const scheduleRetry = () => {
       if (closedRef.current) return;
-      setStatus('connecting');
+      setStatus(role === 'controller' ? 'offline' : 'connecting');
       timerRef.current = setTimeout(connect, retryRef.current);
       retryRef.current = Math.min(RETRY_MAX, retryRef.current * 2);
+    };
+
+    retryFnRef.current = () => {
+      if (!enabled) return;
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      closedRef.current = false;
+      lockedRef.current = false;
+      retryRef.current = RETRY_MIN;
+      const sock = socketRef.current;
+      if (sock) {
+        socketRef.current = null;
+        sock.onclose = null;
+        sock.close();
+      }
+      setStatus('connecting');
+      connect();
     };
 
     connect();
 
     return () => {
       closedRef.current = true;
+      retryFnRef.current = () => {};
       if (timerRef.current) clearTimeout(timerRef.current);
       const socket = socketRef.current;
       socketRef.current = null;
@@ -247,5 +265,5 @@ export function useRemoteLink({ role, onMessage, state, enabled = true, keptKey 
     }, 80);
   }, [role, state, send]);
 
-  return { status, send };
+  return { status, send, retry };
 }
