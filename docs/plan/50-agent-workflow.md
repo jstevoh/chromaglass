@@ -50,8 +50,10 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
     closeup's Alt-drag and two-finger camera) to `src/engine/pointer.ts`, `coverPinch.ts`
     from `components/` beside it. `LiquidVisualizer.tsx` 390,411 to 373,454 bytes. No check
     read the moved text. The order of the next moves (50c-2 debug report, 50c-3 the GPU's
-    guards, 50c-4 the governor, 50c-5 the start, 50c-6 the clocks, 50c-7 on: `renderFrame`
-    by stage) is the README's table; each is Antigravity's, one PR each.
+    guards, 50c-4 the governor, 50c-5 the clocks: Antigravity's, briefed 2026-11-27 in the
+    owner's files under `antigravity/engine-50c/`, strictly one after another; 50c-6 the
+    device's start, which writes the effect's own state, so Claude designs its home first;
+    50c-7 on: `renderFrame` by stage) is the README's table.
   - **50c-1a. Found along the way: the pointer reads the frame's box, not its own.** The
     moved handlers read `stageRef`, `frameRef` and `macroShotRef` as the loop writes them,
     so in a worker (50d) the page side needs a copy of the camera's shot each frame to map a

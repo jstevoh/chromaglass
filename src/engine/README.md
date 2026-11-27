@@ -30,7 +30,9 @@ A PR moves one block of the effect, and nothing else:
 1. The block goes verbatim into a function here that takes the canvas (if it needs one) and
    a `refs` object, destructured at the top under the component's own names, so the body is
    the same text at a new indent. It returns what undoes it (`detach`), called where the
-   effect's cleanup undid it before.
+   effect's cleanup undid it before. An effect-local `let` the piece only reads comes in as
+   a getter (`getStage: () => stage`), the one text change allowed; a piece that writes one
+   waits until that state has a home in the engine.
 2. The component calls it at the block's old place, passing its refs as they are
    (`useRef` results are `Box`es, `types.ts`). No ref is copied, renamed or reordered.
 3. Held against the checks that read `LiquidVisualizer.tsx` as text (19ai-3a): grep
@@ -50,9 +52,9 @@ Changing a piece is a later PR, never the same one.
 | The debug report and the crash log's provider | `debugState`, `?debug`, `crashLog.provide` | `debug.ts` | next (50c-2) |
 | The GPU's self-heal, out-of-memory and upload guards | `healStage`, `outOfMemory`, `scopedFrame`, `upload` | `guards.ts` | 50c-3 |
 | The governor's feed | `govern`, `startWith`, the ladder | `governor.ts` | 50c-4 |
-| The device's start and the stage's build | from `preparing` to the first `startWith` | `start.ts` | 50c-5 |
-| The render's stamps and the plate's clocks | `resetStamps`, `resetPlateClocks` | `clocks.ts` | 50c-6 |
-| The frame itself, by stage | `renderFrame` (about 2,700 lines): the hands' step, the sound's cords, the look, the post chain, the readbacks | `frame/*.ts` | 50c-7 onward, one stage a PR |
+| The render's stamps and the plate's clocks | `resetStamps`, `resetPlateClocks` | `clocks.ts` | 50c-5 |
+| The device's start and the stage's build | from `preparing` to the first `startWith` | `start.ts` | 50c-6: writes the effect's own `let`s (`stage`, `chain`, `renderer`), so Claude first decides how they become engine state |
+| The frame itself, by stage | `renderFrame` (about 2,700 lines): the hands' step, the sound's cords, the look, the post chain, the readbacks | `frame/*.ts` | 50c-7 onward, one stage a PR, after 50c-6 |
 | The component's helpers above the effect that only the loop calls | the gesture appliers, the palette walk, the drops | beside the stage that calls them | with that stage |
 
 Done when `LiquidVisualizer.tsx` is under 40 KB and mounts the engine.
