@@ -35,8 +35,9 @@
  *     centroid, in drop radii, mean over the window, at most LAG_BAR. The
  *     momentum pass is what lets the ferrofluid in a rim cell travel at its
  *     own speed, not the oil's; without it the drop trails further.
- *  2. The drop keeps its body: the mean count of cells over half-full is at
- *     least HALF_BAR. The deficit pass pays back the share the limiter
+ *  2. The drop keeps its body: the mean ferrofluid in its cells over
+ *     half-full is at least BODY_BAR (since 38k-7; it was the count of those
+ *     cells, see below), and its cells over three quarters CORE_BAR. The deficit pass pays back the share the limiter
  *     withheld at the moving edge; without it the edge thins and the body
  *     goes sooner.
  *  3. Each pass is shown to be the reason, in the same run. The scene is run
@@ -149,6 +150,37 @@
  * The quick drag's absolute lead is printed and not a bar: the magnet
  * outruns a drop held by a 2 mm gap at that speed, as a real one does.
  *
+ * At the liquid's own onset (PLAN 38k-7, with the pull under the domes of
+ * 9t-2) the half-full count stopped reading the body. The magnet here (0.4
+ * at a height of 0.2) is about 14 mT on its axis: under the plate's old
+ * onset of 22 mT, and three and a half times past the real one, 4 mT. A
+ * real drop of EFH1 under it stands up as a cone, and the lab's does (at
+ * 6 mm, before the 2 mm gap: its top 2.2 to 2.3 times full, forty cells
+ * past full, on a footprint of about 64 cells past half, where the flat
+ * drop had a hundred). A cone holds the same ferrofluid on fewer cells, so
+ * counting cells past half reads its footprint, not its wholeness, and
+ * without the compression pass the cone slumps and spreads, which counts
+ * as many cells past half or more (on the Mac, #645's head, run
+ * 41308840631: 60.8 as given and 67.8 with phaseCompress off). What the
+ * pass keeps is the ferrofluid in the body, so that is what lines 1 and 3
+ * read: the phase summed over the cells past half (at 6 mm, the cloud lab,
+ * 2026-11-01, steps 60 to 180):
+ *
+ *                       body (full cells' worth)   half-full cells   skirt (0.01..0.5)
+ *   both passes on      83.8  (82.1 .. 84.9)       64.0              233 -> 310
+ *   phaseMomentum off   73.4  (83.4 .. 63.7)       80.3              228 -> 447
+ *   phaseCompress off   58.7  (69.9 .. 50.0)       70.6              310 -> 444
+ *   held still          100.9 (88.9 .. 104.8)      65.1              155 -> 22
+ *
+ * (the held drop is the same scene with the magnet left over the pour; the
+ * drop as poured is about 110 in all.) BODY_BAR is 71, midway between 83.8
+ * and 58.7; line 1's "whole when the window opened" reads at least 60 of it.
+ * Those were measured at 6 mm; the 2 mm gap holds the drop to the oil
+ * better (the slow drag above keeps up at 1.58R), so the body should read
+ * nearer the held drop's, not under it. The cells over three quarters and
+ * their differential stay main's 2 mm bars: a cone's core is that and more.
+ * The body, the skirt and the cells past full are printed for every run.
+ *
  * Lab only (software WebGPU in headless Chrome, or Metal on the Mac).
  */
 import { openLab } from './lab.mjs';
@@ -171,7 +203,9 @@ const windowOf = ({ DRAG }) => ({ FROM: Math.round(DRAG / 3), TO: DRAG, EVERY: M
 // The lead's bar as it was after #495 (1.73R on, 2.06R off at 6 mm), kept: at
 // 2 mm the slow drag's drop reads 1.58R. The half-full body's, kept: 102.3.
 const LAG_BAR = 1.89;
-const HALF_BAR = 94;
+// The body (the ferrofluid in the half-full cells), since 38k-7: midway
+// between 83.8 on and 58.7 with phaseCompress off (6 mm; the header).
+const BODY_BAR = 71;
 // Cells over three quarters, midway between 42.0 on and 23.8 with
 // phaseCompress off in the slow drag (software WebGPU, 2 mm).
 const CORE_BAR = 33;
@@ -186,15 +220,16 @@ try {
     const stats = async () => {
       const p = await lab.phase();
       if (!p || p.n !== N) throw new Error(`phase: ${p ? `${p.n}² read for ${N}²` : 'no phase field'}`);
-      let half = 0, core = 0, sp = 0, sx = 0, peak = 0;
+      let half = 0, core = 0, sp = 0, sx = 0, peak = 0, body = 0, skirt = 0, full = 0;
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const v = p.data[j * N + i];
         if (v > peak) peak = v;
-        if (v > 0.5) half++;
+        if (v > 0.5) { half++; body += v; } else if (v > 0.01) skirt++;
         if (v > 0.75) core++;
+        if (v > 1) full++;
         if (v > 0.05) { sp += v; sx += (i + 0.5) / N * v; }
       }
-      return { half, core, cx: sp ? sx / sp : 0, peak };
+      return { half, core, cx: sp ? sx / sp : 0, peak, body, skirt, full };
     };
     const scene = async ({ DRAG, DIST }, { FROM, TO, EVERY }, extra) => {
       await lab.create(N, N);
@@ -217,29 +252,29 @@ try {
   }, { N, R, SLOW, QUICK, slowW: windowOf(SLOW), quickW: windowOf(QUICK) });
 
   const mean = (a) => a.reduce((t, x) => t + x, 0) / a.length;
-  const read = (rows) => ({ rows, lags: rows.map((r) => (r.magX - r.cx) / R), lag: mean(rows.map((r) => (r.magX - r.cx) / R)), half: mean(rows.map((r) => r.half)), core: mean(rows.map((r) => r.core)) });
+  const read = (rows) => ({ rows, lags: rows.map((r) => (r.magX - r.cx) / R), lag: mean(rows.map((r) => (r.magX - r.cx) / R)), half: mean(rows.map((r) => r.half)), core: mean(rows.map((r) => r.core)), body: mean(rows.map((r) => r.body)) });
   const on = read(runs.on), noC = read(runs.noCompress), qOn = read(runs.quickOn), noM = read(runs.noMomentum);
   const sw = windowOf(SLOW), qw = windowOf(QUICK);
   for (const [name, r, d, w] of [['on', on, SLOW, sw], ['phaseCompress off', noC, SLOW, sw], ['quick, on', qOn, QUICK, qw], ['quick, phaseMomentum off', noM, QUICK, qw]]) {
-    console.log(`  ${name} (${d.DIST} of the plate in ${d.DRAG} steps); steps ${w.FROM} to ${w.TO} every ${w.EVERY}: lag in R ${r.lags.map((x) => x.toFixed(2)).join(' ')}, half-full ${r.rows.map((x) => x.half).join(' ')}, over three quarters ${r.rows.map((x) => x.core).join(' ')}, peak ${r.rows.map((x) => x.peak.toFixed(2)).join(' ')}`);
+    console.log(`  ${name} (${d.DIST} of the plate in ${d.DRAG} steps); steps ${w.FROM} to ${w.TO} every ${w.EVERY}: lag in R ${r.lags.map((x) => x.toFixed(2)).join(' ')}, half-full ${r.rows.map((x) => x.half).join(' ')}, over three quarters ${r.rows.map((x) => x.core).join(' ')}, peak ${r.rows.map((x) => x.peak.toFixed(2)).join(' ')}, body ${r.rows.map((x) => x.body.toFixed(1)).join(' ')}, skirt ${r.rows.map((x) => x.skirt).join(' ')}, past full ${r.rows.map((x) => x.full).join(' ')}`);
   }
   const slow = `over steps ${sw.FROM} to ${sw.TO} of the slow drag (${SLOW.DIST} of the plate in ${SLOW.DRAG} steps)`;
 
   check('the drop was whole and had been carried when the window opened',
-    on.rows[0].half >= 60 && on.rows[0].cx > 0.40,
-    `${on.rows[0].half} half-full cells at step ${sw.FROM} (bar >= 60), centroid at ${on.rows[0].cx.toFixed(3)} from 0.360 (bar > 0.400, 15 cells)`);
+    on.rows[0].body >= 60 && on.rows[0].cx > 0.40,
+    `${on.rows[0].body.toFixed(1)} full cells' worth in its half-full cells at step ${sw.FROM} (bar >= 60; ${on.rows[0].half} cells), centroid at ${on.rows[0].cx.toFixed(3)} from 0.360 (bar > 0.400, 15 cells)`);
   check(`the drop keeps up with the hand: the magnet leads its centroid by at most ${LAG_BAR} drop radii ${slow}`,
     on.lag <= LAG_BAR,
     `mean lead ${on.lag.toFixed(2)}R (bar <= ${LAG_BAR}R); in the quick drag ${qOn.lag.toFixed(2)}R, printed: the magnet outruns a drop a 2 mm gap holds`);
-  check(`the drop keeps its body: at least ${HALF_BAR} half-full cells, and at least ${CORE_BAR} over three quarters, on average ${slow}`,
-    on.half >= HALF_BAR && on.core >= CORE_BAR,
-    `mean ${on.half.toFixed(1)} half-full (bar >= ${HALF_BAR}; the step-0 drop has 100), ${on.core.toFixed(1)} over three quarters (bar >= ${CORE_BAR})`);
+  check(`the drop keeps its body: at least ${BODY_BAR} full cells' worth of ferrofluid in its half-full cells, and at least ${CORE_BAR} cells over three quarters, on average ${slow}`,
+    on.body >= BODY_BAR && on.core >= CORE_BAR,
+    `mean ${on.body.toFixed(1)} (bar >= ${BODY_BAR}; the drop as poured is about 110 in all) in ${on.half.toFixed(1)} half-full cells, ${on.core.toFixed(1)} over three quarters (bar >= ${CORE_BAR})`);
   check(`and it is the momentum pass: with phaseMomentum off in the quick drag (${QUICK.DIST} of the plate in ${QUICK.DRAG} steps) the lead is at least ${DLAG_BAR} drop radii longer`,
     noM.lag - qOn.lag >= DLAG_BAR,
     `lead ${qOn.lag.toFixed(2)}R on, ${noM.lag.toFixed(2)}R with phaseMomentum off over steps ${qw.FROM} to ${qw.TO} (difference ${(noM.lag - qOn.lag).toFixed(2)}R, bar >= ${DLAG_BAR}R)`);
   check(`and it is the compression pass: with phaseCompress off in the same slow drag the body's core is at least ${DHALF_BAR} cells over three quarters fewer`,
     on.core - noC.core >= DHALF_BAR,
-    `${on.core.toFixed(1)} cells over three quarters on, ${noC.core.toFixed(1)} with phaseCompress off (difference ${(on.core - noC.core).toFixed(1)}, bar >= ${DHALF_BAR}); half-full ${on.half.toFixed(1)} and ${noC.half.toFixed(1)}, printed`);
+    `${on.core.toFixed(1)} cells over three quarters on, ${noC.core.toFixed(1)} with phaseCompress off (difference ${(on.core - noC.core).toFixed(1)}, bar >= ${DHALF_BAR}); half-full ${on.half.toFixed(1)} and ${noC.half.toFixed(1)}, body ${on.body.toFixed(1)} and ${noC.body.toFixed(1)}, printed`);
 } finally {
   await close();
 }

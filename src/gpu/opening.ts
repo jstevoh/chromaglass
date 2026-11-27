@@ -31,6 +31,8 @@ import { closeupFine } from './closeupWindow';
 import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
 import { COVER_FULL_ML, coverNew } from '../lib/cover';
 import { DISH_GAP_FIELD_METRES, carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
+import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
+import { SPIKE_ONSET, fieldOnAxis } from './wgsl/spikes';
 
 /**
  * `?lean=0` opens on the whole display, as before `displayLean.ts`: the
@@ -85,6 +87,15 @@ export interface Opening {
   spin: boolean;
   /** The chemistry (Turing patterns). */
   chemistry: boolean;
+  /**
+   * The standing film (wgsl/standing.ts), when the look's own magnet is past
+   * the spikes' onset on its axis. Added with PLAN 38k, whose real onset
+   * (4 mT, where it was 22) put Magnet Garden's and Ferro Paint's own
+   * magnets past it: `npm run startup` on Metal found Magnet Garden asking
+   * for the film's pipelines in its first steps with no list naming them.
+   * Named apart from `film` below, the clear film (§20b), a different layer.
+   */
+  standing: boolean;
   /**
    * The plate stood up (Plate Upright), or the dye given weight (Dye
    * Weight): the mix's push on the flow (mixSmooth, mixForce) runs from the
@@ -245,6 +256,8 @@ export function openingOf(s: Partial<VisualizerSettings>, oilWaiting = false): O
     thinGap: thin,
     spin: lookOpensSpinning(s),
     chemistry: on(s.chemistry),
+    standing: on(s.phaseAmount) && on(s.magnetStrength)
+      && fieldOnAxis(s.magnetStrength!, magnetDepth(s.magnetHeight, s.phaseScale), magnetRadiusAt(s.magnetSize)) > SPIKE_ONSET,
     gravity,
     slosh: thin
       && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway))

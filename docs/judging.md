@@ -3099,3 +3099,16 @@ each top.
 2. Relief / 3D at 0: the old flat drawing, black domes.
 3. Bad: domes that read as holes or bowls rather than raised, a sheen that looks painted on, or
    any change to the plate at 1x.
+
+## 148. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
+
+Filmed on the owner's Mac before and after (2026-11-01); the films are on one page in the
+project. `spikes`, `standing`, `ferrodrag`, `ferrohold` and `ferropour` check the physics
+in the lab; only the Mac shows whether it reads as ferrofluid.
+
+1. Magnet Garden: the look's own magnet stands the layer up into a field of separate black
+   domes, each lit on top, where it used to gather one flat pool.
+2. Ferro Paint: domes stand up and light under the walking magnet as it passes.
+3. Bad: domes that sit on a grid, flicker, or stand up under a look with no magnet.
+4. Not this change (9t-12): a wide pool dragged by the Magnet turns to worms and creeps,
+   the same before and after.
