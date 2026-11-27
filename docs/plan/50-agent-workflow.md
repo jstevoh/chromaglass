@@ -66,9 +66,50 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   it arrives, 2026-12-04 to 12-11). Two Antigravity lanes in separate worktrees, 50b's table
   nightly on the machine that is not deploying; the Air keeps the deploy runner. No cloud cost.
 
-Parked by the owner's turn (2026-11-27), not dropped: a weekly mutation run proving checks
-can fail, a main-against-branch parity run, failures grouped by fingerprint before briefing,
-the foreman re-running `Measured:` receipts, the scorecard as a script, a README drift check.
-They came from the write-up of an agent-built service port (traffic mirrored to the old and
-new systems, mismatches grouped by shape, human corrections written down as tests) and suit a
-system that already works; take them up when the plate does.
+Taken up again the same day. The owner, 2026-11-27 14:45Z, of the parked list: "Let's get
+all of these going. You can leave the MacBook Pro one until I get that computer." So 50h
+waits for the machine, and the six below are live. They came from the write-up of an
+agent-built service port (traffic mirrored to the old and new systems, mismatches grouped by
+shape, human corrections written down as tests); here they serve the agents' speed, not more
+gates: a check that can no longer fail is worse than none, because it reads as safety.
+
+- **50i** *A weekly mutation run: proof the checks can still fail* (S, Claude; **shipped**,
+  `npm run mutate`). `scripts/mutants.json` holds faults this repository has really had,
+  each the one line a merged fix changed, written back the old way in today's code;
+  `scripts/mutate.mjs` puts each back alone in a worktree of its own, runs the checks that
+  read its file (as `npm run quick` selects them), re-runs a red one on the clean tree so a
+  check already red is no catch, and reports CAUGHT (by which), MISSED, NO CHECK, STALE (the
+  code moved: rewrite the fault) or BROKEN (it only broke the typecheck). Weekly on the
+  owner's Mac, Sundays 03:30, through the film queue (`scripts/mutate-weekly.sh`, installed
+  by `scripts/mutate-install.sh`; report `~/cg-scratch/mutate/latest.md`); never a gate.
+  Its own test, `--self`, is a check in `logic`. Open: **50i-1** every MISSED or NO CHECK
+  line of the first run becomes a check (Claude), one PR per area; **50i-2** a fault per
+  area the list does not yet reach (the desks, the phone, the server) as their fixes land;
+  **50i-3** the app's checks (`--app`) in the weekly run once a run's length is known.
+- **50j** *Main against the branch, same input, same frames* (M, Claude). `samelook` already
+  runs the lab in two trees on fixed plates; the parity run generalises it: every look,
+  seeded, on main and on the branch, the frames and the debug report compared, and the
+  differences grouped by shape (one look, every look, one dye) instead of a wall of pixels.
+  For the pure-move PRs of 50c and 50e, "identical" is the whole test.
+- **50k** *Failures grouped by fingerprint before a brief* (S, Claude). Before a red main or a
+  bug bash becomes Antigravity briefs, the FAIL lines are grouped by what they share (the
+  check, the file and line of the first frame of a stack, the normalised message), so one
+  cause is one brief, not six (19ak-24a–f were briefed by hand that way, 11-26).
+- **50l** *The foreman re-runs `Measured:` receipts* (S, Claude writes, the foreman runs). An
+  Antigravity PR's `Measured:` lines quote what a command printed (checkguard holds the
+  quote's shape); the foreman runs that command on the PR's head before it merges and
+  compares, so a receipt is a measurement, not a claim.
+- **50m** *The scorecard as a script* (S, Claude). `/mnt/project-files/workflow/scorecard.md`
+  is written by hand; a script that reads the merged PRs, main's deploy runs and the plan's
+  status writes it, weekly, beside the mutation report.
+- **50n** *Every folder's README names what its code exports* (S, Claude; **shipped**,
+  `npm run readmes`, an always-run check in `logic`). CLAUDE.md's rule, held: a name a PR
+  newly exports under `src/` or `server/` is named in that folder's README, one it removes
+  is not still named there as live, and no README names a code name no code has. Its first
+  run found two: `src/gpu/README.md` described `gateDisplayWgsl` and `leanConstants`, names
+  #870's lean display never shipped; fixed in the same PR.
+- **50o** *The owner's corrections become checks* (rule, Claude; **shipped** in
+  `docs/handoff.md`). A correction's fix PR adds a check red on what the owner saw and the
+  fault itself to `scripts/mutants.json` with that check as `expect`, so the weekly run
+  proves it every week; one no check can see goes to `docs/judging.md` and still into the
+  list, where it shows as a hole until a check exists.

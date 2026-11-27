@@ -1,0 +1,209 @@
+{
+  "about": [
+    "Known faults for the weekly mutation run (PLAN.md 50i, scripts/mutate.mjs). Each is a fault this",
+    "repository has really had: `fixed` the merged fix, `file` where it lives today, `find` today's text",
+    "(exactly once in the file), `replace` the fault written back, `fault` what goes wrong in plain words,",
+    "`expect` the checks that should catch it. The run says which do. A fault whose `find` moved is STALE",
+    "in the report: rewrite it for today's code. New ones come from the owner's corrections",
+    "(docs/handoff.md). Claude writes this file; Antigravity never does (it is a check's input)."
+  ],
+  "mutants": [
+    {
+      "id": "music-dye-on-reagent",
+      "plan": "#783",
+      "fixed": "1b60f99",
+      "file": "src/lib/areaCords.ts",
+      "find": "(a && reagentArea(a) ? 0 : 1)",
+      "replace": "(a && reagentArea(a) ? 1 : 1)",
+      "fault": "The music's own hands (kick bloom, pulse, sparks) pour the area's dye onto Chemical Clock's still gel, which piles up into dark green and teal flower-like clusters at its touch places.",
+      "expect": [
+        "The kick's bloom"
+      ]
+    },
+    {
+      "id": "lava-wax-never-laid",
+      "plan": "#865",
+      "fixed": "616026d",
+      "file": "src/sim/fluidSimulation.ts",
+      "find": "layLavaLamp(S, this.wait.oil,",
+      "replace": "layLavaLamp(S, (x, y, r) => this.gpu?.addMix?.(x, y, r, { oil: 1 }),",
+      "fault": "Lava Lamp laid before its solver exists drops its wax on the floor: the page that opens on Lava Lamp has no oil at all, only dye.",
+      "expect": [
+        "A look's oil reaches its solver, whichever came first",
+        "The look the page opens on holds its oil"
+      ]
+    },
+    {
+      "id": "live-show-black-frames",
+      "plan": "#677",
+      "fixed": "715dc24",
+      "file": "src/lib/liveStream.ts",
+      "find": "frame = new VideoFrame(framed ? this.stageOf(o) : this.staged(canvas, o),",
+      "replace": "frame = new VideoFrame(this.staged(canvas, o),",
+      "fault": "The Live Show reads the WebGPU canvas on its own timer instead of the frame task's copy, so the stream carries black frames rather than the plate.",
+      "expect": [
+        "The Live Show streams the picture",
+        "The live stream"
+      ]
+    },
+    {
+      "id": "flower-point-read-taps",
+      "plan": "#949",
+      "fixed": "62568d4",
+      "file": "src/gpu/wgsl/plateSlope.ts",
+      "find": "if (s < 1.5) { return heldAt(t, air, uv, dC, hasAir); }",
+      "replace": "if (s > 0.0) { return heldAt(t, air, uv, dC, hasAir); }",
+      "fault": "Each slope tap reads one texel at its cell's middle instead of the whole cell, so on a 768 grid a sharp drop or bubble rim reappears as eight grey copies round it (the flower).",
+      "expect": [
+        "The flower"
+      ]
+    },
+    {
+      "id": "draught-drains-dish",
+      "plan": "#968",
+      "fixed": "6b82533",
+      "file": "src/gpu/wgsl/thinGap.ts",
+      "find": "let g = vec2f(cy, -cx) / (2.0 * e * S.l) * S.air * ${AIR_GUST.toFixed(1)} * S.dt;",
+      "replace": "let g = vec2f(cy, -cx) / (2.0 * e * S.l) * S.air * ${AIR_GUST.toFixed(1)} * S.dt + vec2f(0.0, -S.air * 8.0 * S.dt);",
+      "fault": "The Air draught pushes the whole thin-gap dish one way again, a through-flow out of the open rim, so Solar Flare drains to an empty dish in about two and a half minutes.",
+      "expect": [
+        "The draught keeps the dish's liquid in the dish"
+      ]
+    },
+    {
+      "id": "rain-drip-out-the-rim",
+      "plan": "#979",
+      "fixed": "c4f5c54",
+      "file": "src/gpu/wgsl/thinGap.ts",
+      "find": "let dripClosed = A.b.w > 1.5;",
+      "replace": "let dripClosed = A.b.w > 9.0;",
+      "fault": "Rain Drip's pull on a standing plate with no oil is laid straight into the gap's solve instead of the closed circulation, so the colour runs out of the open rim and the dish empties.",
+      "expect": [
+        "The draught keeps the dish's liquid in the dish"
+      ]
+    },
+    {
+      "id": "oil-thickness-ignored",
+      "plan": "#954",
+      "fixed": "60c2a32",
+      "file": "src/gpu/fluid/constants.ts",
+      "find": "export const oilNuOf = (t?: number) => !Number.isFinite(t) || t === OIL_THICKNESS ? OIL_NU : thicknessViscosity(Math.max(0, Math.min(1, t as number)));",
+      "replace": "export const oilNuOf = (_t?: number) => OIL_NU;",
+      "fault": "Every oil is the 50 mm2/s mineral oil whatever its Oil Thickness, so Lava Lamp's molten wax drags like syrup, stays up and stops cycling.",
+      "expect": [
+        "Lava Lamp's wax holds together and is heavy while cold",
+        "Lava Lamp's wax goes round, and keeps going round: up off the warm floor, down from the cool top, minute after minute"
+      ]
+    },
+    {
+      "id": "unknown-board-cc-is-fader",
+      "plan": "#876",
+      "fixed": "177b3d9",
+      "file": "src/lib/midi.ts",
+      "find": "if (!board) return 'encoder';",
+      "replace": "if (!board) return 'fader';",
+      "fault": "A CC learned on a controller with no profile is taken for a fader, so a control learned to it (Iridescence on CC 16) draws as a full-width slider above the Recipe's knob row.",
+      "expect": [
+        "The desk"
+      ]
+    },
+    {
+      "id": "recipe-mixed-kinds",
+      "plan": "#941",
+      "fixed": "6f6da01",
+      "file": "src/components/desk/DeskPanels.tsx",
+      "find": "testId={`${prefix}-${String(s.key)}`} asKnob />)}",
+      "replace": "testId={`${prefix}-${String(s.key)}`} asKnob={(p.ccFor(s.key) ?? 0) % 2 === 0} />)}",
+      "fault": "A panel's grid draws each control by what it is learned to on the controller, so the Recipe and section panels show knobs and sliders mixed and change shape when a binding moves.",
+      "expect": [
+        "One panel, one kind of control"
+      ]
+    },
+    {
+      "id": "narrow-window-goes-phone",
+      "plan": "#981",
+      "fixed": "5d8fdb3",
+      "file": "src/lib/phone.ts",
+      "find": "  if (env.path && isPlayPath(env.path)) return true;",
+      "replace": "  if (env.path && isPlayPath(env.path)) return true;\n  if (!env.coarse && env.width < 768) return true;",
+      "fault": "A laptop window narrower than 768 px switches to the phone layout instead of keeping the folded desk.",
+      "expect": [
+        "The phone"
+      ]
+    },
+    {
+      "id": "saved-look-loses-stir",
+      "plan": "#864",
+      "fixed": "00dd8e2",
+      "file": "src/lib/userPresets.ts",
+      "find": "  if (!(v >= 3) && s && typeof s === 'object') s = withStirCordOnce(s, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);\n",
+      "replace": "",
+      "fault": "A look the owner saved before the music's stir cord existed comes back without one, and stirs to the music less than it did the day before.",
+      "expect": [
+        "The music stirs only through a cord"
+      ]
+    },
+    {
+      "id": "click-is-a-beat",
+      "plan": "#277",
+      "fixed": "e069723",
+      "file": "src/lib/handSounds.ts",
+      "find": "if (t >= m && t <= m + HAND_HEARD_FOR_S) return true;",
+      "replace": "if (t >= m && t <= m + HAND_HEARD_FOR_S) return false;",
+      "fault": "On the microphone, the operator's own mouse clicks and key taps are heard as kicks, so the plate pulses on every click.",
+      "expect": [
+        "A click is not a beat",
+        "A click is not a beat, in the app"
+      ]
+    },
+    {
+      "id": "blow-presses-glass",
+      "plan": "#623",
+      "fixed": "a8be287",
+      "file": "src/sim/tools.ts",
+      "find": "if (tool === 'blow') return;",
+      "replace": "if (tool === 'blow-off') return;",
+      "fault": "Every pointer move of a Blow stroke also presses the glass and shoves the film along, on top of the breath's own wind.",
+      "expect": [
+        "Every tool does what it says"
+      ]
+    },
+    {
+      "id": "closeup-lands-on-bare-glass",
+      "plan": "#856",
+      "fixed": "adcbe3f",
+      "file": "src/lib/macroLanding.ts",
+      "find": "if (!(plate > EMPTY_PLATE)) return false;",
+      "replace": "if (!(plate > 1e9)) return false;",
+      "fault": "Zooming the closeup in never steers to the liquid, so it comes in on the plate's bare middle and shows blank glass.",
+      "expect": [
+        "The closeup comes in on liquid",
+        "The Macro Zoom pushed in lands on liquid"
+      ]
+    },
+    {
+      "id": "press-grid-facets",
+      "plan": "#950",
+      "fixed": "1ef0695",
+      "file": "src/sim/fluidSimulation.ts",
+      "find": "const fine = this.thinGap && stroke === 'press' && !!this.gpu!.pressBowl;",
+      "replace": "const fine = false && this.thinGap && stroke === 'press' && !!this.gpu!.pressBowl;",
+      "fault": "A light press on a thin gap is laid on the 192 grid again instead of as a smooth bowl in the glass, so it shows the grid's square facets.",
+      "expect": [
+        "A light press is round, not the grid's facets"
+      ]
+    },
+    {
+      "id": "patches-four-screens",
+      "plan": "#983",
+      "fixed": "1c092a2",
+      "file": "src/components/settings/PatchesSection.tsx",
+      "find": "    embed, CARD, GRID, TITLE,\n  } = c;",
+      "replace": "    CARD, GRID, TITLE,\n  } = c;\n  const embed = true;",
+      "fault": "Settings > Patches stacks every LFO and Envelope card in one column in the sheet, so a look with several cords (Crowd Plate) runs past three screens deep.",
+      "expect": [
+        "A show night"
+      ]
+    }
+  ]
+}

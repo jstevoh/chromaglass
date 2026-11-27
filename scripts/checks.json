@@ -292,6 +292,29 @@
       ]
     },
     {
+      "name": "Every folder's README names what its code exports",
+      "shard": "logic",
+      "run": "npm run readmes",
+      "always": true,
+      "why": [
+        "CLAUDE.md's rule that a PR changing an export updates its folder's README (PLAN.md 50n):",
+        "a name a PR newly exports under src/ or server/ is named in that folder's README, one it",
+        "removes is not still named there as live, and no README names a code name no code has.",
+        "Always: it reads the diff and the tree by walking them, which no trace can see."
+      ]
+    },
+    {
+      "name": "The mutation run tells a caught fault from a missed one",
+      "shard": "logic",
+      "run": "npm run mutate -- --self",
+      "why": [
+        "The weekly mutation run's own test (PLAN.md 50i): on made-up files, a fault a check sees",
+        "is caught, one every check stays green on is missed, a check red without the fault is no",
+        "catch, a fault that only breaks the typecheck is to rewrite, every file is put back; and",
+        "scripts/mutants.json is well formed, its files there and its expected checks real."
+      ]
+    },
+    {
       "name": "Main held red lets only the fix merge",
       "shard": "logic",
       "run": "npm run mainhold -- --self-test",

@@ -195,6 +195,8 @@
     "sizes": "node scripts/sizes.mjs",
     "rules": "node scripts/syncrules.mjs",
     "checkguard": "node scripts/checkguard.mjs",
+    "readmes": "node scripts/readmedrift.mjs",
+    "mutate": "node scripts/mutate.mjs",
     "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
     "maclock": "node scripts/maclock.mjs",

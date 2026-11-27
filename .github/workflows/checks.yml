@@ -206,6 +206,11 @@ jobs:
         part: ${{ fromJSON(needs.reach.outputs.parts) }}
     steps:
       - uses: actions/checkout@v5
+        # Two deep, so a check that reads the PR's own diff (`npm run readmes`,
+        # PLAN 50n) has main as the merge commit's first parent; at one deep
+        # the commit has no parent and such a check has nothing to judge.
+        with:
+          fetch-depth: 2
       # 22, not 20: `music`, `scene`, `liquids` and `wall` all run their
       # TypeScript sources directly through `node --experimental-strip-types`,
       # which arrived in 22.6. On 20 every one of them fails to start, which

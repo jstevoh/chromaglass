@@ -199,6 +199,30 @@ when there is no PR, a line in `PLAN.md`'s status table:
 
 One or two lines is enough: what, where, when, and what is now no longer owed.
 
+## The owner's corrections become checks
+
+When the owner corrects the work (a look that is broken, a fix that did not take, a tool
+that does the wrong thing, a check that was green on the fault they saw), the correction
+is the best test this repository will ever get: a real fault, seen on a real GPU, by the
+person the app is for. So it is never fixed only once (PLAN.md 50o):
+
+1. The fix's PR adds or changes a check that fails on what the owner saw, run red before
+   the fix and green after, both numbers in the commit message (CLAUDE.md "Every claim has
+   a check").
+2. The same PR adds the fault to `scripts/mutants.json`: the one line the fix changed,
+   written back the old way (`find` is today's text, `replace` the fault), `plan` the
+   item and the date of the owner's words, `fault` what they saw in plain words, and
+   `expect` the check from step 1. The weekly mutation run (`npm run mutate`, PLAN.md 50i)
+   then proves every week that the check still catches it; a check that went blind shows
+   as MISSED in `~/cg-scratch/mutate/latest.md` on the owner's Mac.
+3. Where no check can see it (a picture only the owner's eyes judge), the PR says so, adds
+   the line to `docs/judging.md`, and still adds the fault with `expect: []`: the run lists
+   it as a hole until a check exists.
+
+Claude writes the check and the fault: Antigravity never writes or loosens a check. An
+Antigravity PR that fixes an owner's correction puts `Check owed: <the owner's words,
+date>` under `Left:`, and the next Claude session writes both.
+
 ## Stopping halfway
 
 When a session runs out of credit mid-task: push what it has, even if it is red, fill in
