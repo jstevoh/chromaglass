@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { type OutputConfig, loadOutput, saveOutput, DEFAULT_OUTPUT, type WallTest, wallTestOn, normalizeOutput } from '../lib/outputConfig';
+import { publishWall, setWallDoor } from './projectorNow';
 
 /**
  * The projector's geometry and grade, and the wall's test card.
@@ -57,6 +58,13 @@ export function useOutput() {
     window.chromaglassOutput =
       (patch: Partial<OutputConfig>) => { setOutput(prev => normalizeOutput({ ...prev, ...patch })); };
   }, [setOutput]);
+
+  // The owner's assistant reads the wall and changes it through the same calls as Settings → Wall (PLAN 44k-15, app/projectorNow.ts).
+  useEffect(() => { publishWall(output, wallTest); }, [output, wallTest]);
+  useEffect(() => {
+    setWallDoor({ patch: setOutput, reset: resetOutput, test: setWallTest });
+    return () => setWallDoor(null);
+  }, [setOutput, resetOutput]);
 
   return {
     output, setOutput, resetOutput, wallTest, setWallTest, shownOutput,

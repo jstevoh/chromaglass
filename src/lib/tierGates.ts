@@ -22,6 +22,8 @@ export interface NativeLicenseBridge {
   exp?: number | null;
   error?: string | null;
   enforced?: boolean;
+  /** The art packs the Mac's held key names (PLAN 45a-2), read from its signed payload by desktop/main.js. */
+  packs?: string[];
 }
 
 interface NativeBridgeWindow {
@@ -30,6 +32,7 @@ interface NativeBridgeWindow {
     platform?: string;
     requireSignIn?: boolean;
     license?: NativeLicenseBridge;
+    onOpenAccount?: (fn: () => void) => () => void;
   };
 }
 
@@ -37,12 +40,16 @@ export const FREE_RECORD_MAX_SECONDS = 15;
 export const FREE_RENDER_MAX_HEIGHT = 720;
 export const FREE_SITE_LOGO_TEXT = 'ChromaGlass';
 
-export { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, buildCheckoutUrl } from './checkoutLinks';
+export { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, CHECKOUT_MOIRE_URL, buildCheckoutUrl } from './checkoutLinks';
 
 export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cg-open-account'));
   }
+}
+
+if (typeof window !== 'undefined') {
+  (window as unknown as NativeBridgeWindow).__CHROMAGLASS_NATIVE__?.onOpenAccount?.(openAccountSheet);
 }
 
 const MARKETING_OPTIN_KEY = 'chromaglass-marketing-optin';
@@ -137,6 +144,15 @@ export const APP_FEATURE_TILES: AppTileSpec[] = [
     tier: 'home',
     summary: 'In the ChromaGlass app — put your own band mark or SVG on the glass instead of the ChromaGlass mark.',
   },
+  // Pro only until 2026-11-15, when the owner dropped Home to $29 and moved
+  // the Live Show into it (PLAN.md 23.21): streamers are Home's buyers, and a
+  // $29 visualizer they compare us with streams too.
+  {
+    id: 'live-show',
+    title: 'Live Show streaming',
+    tier: 'home',
+    summary: 'In the ChromaGlass app — stream the show to YouTube, Twitch, Facebook and the rest at once.',
+  },
   // The two Pro tiles sold several projectors with edge blending and MIDI out,
   // and neither ships: the app drives one projector output (mapped into up to
   // sixteen surfaces, on every tier), and MIDI out is only a controller's LEDs
@@ -193,6 +209,8 @@ export function getActiveLicenseInfo(): {
   email: string | null;
   id: string | null;
   error: string | null;
+  /** The art packs the held key names (PLAN 45a-2); empty for a key that names none. */
+  packs: string[];
 } {
   const cached = getCachedLicenseStatus();
   if (cached.valid && cached.tier) {
@@ -202,6 +220,7 @@ export function getActiveLicenseInfo(): {
       email: cached.email,
       id: cached.id,
       error: null,
+      packs: Array.isArray(cached.payload?.packs) ? cached.payload.packs : [],
     };
   }
   const nativeLic = getNativeBridge()?.license;
@@ -212,6 +231,7 @@ export function getActiveLicenseInfo(): {
       email: nativeLic.email ?? null,
       id: nativeLic.id ?? null,
       error: null,
+      packs: Array.isArray(nativeLic.packs) ? nativeLic.packs : [],
     };
   }
   return {
@@ -220,6 +240,7 @@ export function getActiveLicenseInfo(): {
     email: null,
     id: null,
     error: nativeLic?.error ?? cached.error ?? null,
+    packs: [],
   };
 }
 
@@ -248,10 +269,22 @@ export function canUseProFeature(): boolean {
  * Everything is open where tiers are not enforced (a self-run copy, the
  * checks, development); where they are, Pro includes every art pack
  * (PLAN 23) and Home buys this one as an add-on, which the licence names
- * once the store sells it (PLAN 45a-2). Like every site gate, a nudge.
+ * in its signed `packs` (PLAN 45a-2). Like every site gate, a nudge.
  */
 export function canUseMoirePack(): boolean {
-  return !isTierGatingEnforced() || canUseProFeature();
+  return !isTierGatingEnforced() || canUseProFeature() || (canUseHomeFeature() && hasLicensePack('moire'));
+}
+
+/**
+ * Whether the licence held here names an art pack bought on top of Home (PLAN 45a-2).
+ * The pack is in the key's signed payload (`packs`), so it verifies offline as the
+ * tier does: the account sheet's verified key first, then the Mac's own (the Mac
+ * verifies its key in the main process and hands the page what it read). A key signed
+ * before packs were sold names none, and reads as no pack, which is what it bought.
+ */
+export function hasLicensePack(pack: string): boolean {
+  const lic = getActiveLicenseInfo();
+  return lic.valid && lic.packs.includes(pack);
 }
 
 /** Whether a look of this art pack (a `Preset.pack`) is locked here: the pack is not on this copy. */
@@ -296,10 +329,19 @@ export function drawChromaGlassWatermark(
   const padY = Math.max(12, Math.round(height * 0.022));
   ctx.font = `600 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
   ctx.textBaseline = 'bottom';
-  ctx.textAlign = 'right';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
   ctx.shadowBlur = 6;
   ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
-  ctx.fillText(FREE_SITE_LOGO_TEXT, width - padX, height - padY);
+  if (height > width) {
+    // A portrait clip (PLAN 34f) is watched inside Reels' and TikTok's own
+    // chrome: the caption and account name cover the bottom fifth and the
+    // buttons the right edge, so a corner mark would be hidden by the very
+    // app the clip is for. Centred, above that band.
+    ctx.textAlign = 'center';
+    ctx.fillText(FREE_SITE_LOGO_TEXT, width / 2, height * 0.8);
+  } else {
+    ctx.textAlign = 'right';
+    ctx.fillText(FREE_SITE_LOGO_TEXT, width - padX, height - padY);
+  }
   ctx.restore();
 }

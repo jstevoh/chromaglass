@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself
 
-This section is in 3 files, cut between items: `19-checks-build-plan.md`, `19-checks-build-plan-2.md`, `19-checks-build-plan-3.md`.
+This section is in 4 files, cut between items: `19-checks-build-plan.md`, `19-checks-build-plan-2.md`, `19-checks-build-plan-3.md`, `19-checks-build-plan-4.md`.
 
 Found 2026-09-28 by reading `.github/workflows/`, `scripts/` and the build, and by
 reading 14 recent `Checks` runs and 96 `gallery.yml` runs through the Actions API.
@@ -257,21 +257,10 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-6** (E, S): **shipped**, Measure's lab part split in two (`lab` about 12 min, `lab2` about 10; the required names unchanged). Story in `docs/plan-shipped.md` §19k-6 (moved 2026-10-29, 19m-2). Open: the browser part
   is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
   / the job summary over the next merges and split the browser part next if it passes 21.
-- **19k-8** (E, S): **shipped**, the soap's two checks (`soap`, `soapbreak`) in a sixth Measure
-  part `lab3`, since `lab2` ran 24:18 of its 25 minutes with them. Story in `docs/plan-shipped.md` §19k-8.
-- **19k-9** (E, S): **shipped**, the browser part's last sixteen checks in a seventh Measure
-  part `browser2`, cut at `applink`, which builds `dist/` for the ones after it. Story in
-  `docs/plan-shipped.md` §19k-9.
 - **19k-11** (E, S): **shipped** in part, `holeline` in an eighth Measure part `lab4` (#690),
   since `lab` was cancelled in it at 25 minutes on main's deploys 667 and 670 and on both of
   #688's attempts, all on the slow runner tier. Story in `docs/plan-shipped.md` §19k-11. Open:
   19k-11b.
-  - **19k-11a, shipped 2026-11-07 (#688).** `lab` was cancelled at 25:00 on both of #688's
-    attempts, on the slow tier: the first in holeline at ten minutes, the second with all 11
-    checks green in 24:34 (holeline 10:19), the job's own setup taking it past the limit;
-    `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
-    checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
-    #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
 - **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
   slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
   0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
@@ -298,13 +287,29 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   print a line before each of those calls under `CI`, so the next hang names its call, then
   find why that call can stop (D671's same-check red, "the dimmer still reaches the wall", is
   19aa's and may share the cause).
-- **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
-  whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
-  deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also
-  cancelled open at 19:27, a slow runner; 669 also read reds in oscout, ears and startup 1b, 19aa-7,
-  each green on the runs either side). Before #655 fifth ran 17:14 and 17:48. `mirror` (85 s, the
-  shard's last) moved to `show`, which ran 15:56 and 16:23 on those deploys; no bound moves. The
-  same day deploy 667 was cancelled in `lab` at 24:30 of its 25, all eleven green: 19k-11 again.
+- **19k-16a, open** (E, S). **A projector opened during a cold start is asked for frames the show cannot draw.** Found
+  with 19k-16: until the wall engine's renderer starts (`startWith`), the projector's rAF asks
+  `askFrame` (`src/components/LiquidVisualizer.tsx`, grep `const askFrame`) for a frame sixty times a
+  second; each one counts a frame and throws on the governor (`governorRef.current!` null) before the
+  mirror, and the canvas has already taken the projector's size before the governor's scale. A real
+  projector opened while a Mac opening builds its pipelines (13.5 to 14.8 s cold) gets that throw
+  storm and a false frame count. The fix is `if (!renderer) return;` at the top of `askFrame` (tried in
+  a scratch copy: 0 frames and 0 throws before the start, then a clean start at 672x378), but
+  LiquidVisualizer.tsx may not grow by a byte (`npm run sizes`), so the ask moves to a module of its
+  own first (19ai-10). Since 19k-16 no line opens a projector before the show's first step, so the
+  fix comes with a check of its own: open the wall while `stepIndex` is 0, then expect no throw from
+  `askFrame` and frames painted once the show starts.
+- **19k-20, open** (E, S): **the phone's held Drop reads its dye against a baseline its own drop displaces.** `scripts/phone.mjs`, "a finger holding Drop with Drop Height up lets go of a drop as it lands and one every ten steps after": red once on the Mac's `show` shard on 2026-11-13 (the closeup pull request, 38u), green on the head before with the same source and green on its one re-run. The count it is named for was right (3 drops over 27 steps, 3 wanted); its second half read `-206 dye under it against 0/0/0/-0`. The line before it leaves a pool under the same finger ("A 206 under it"), `dropBefore` is snapped with that pool there, and a drop from Drop Height 0.9 lands with a push: minus 206 is the whole pool out of one disk and none of the three drops' dye inside it 700 ms after the finger lifts, on a plate that stepped 29 times in 1063 ms. The feature is "the drops reach the plate", not "the disk under the finger gained". *Do:* clear the plate before `dropBefore` (or hold a cell no earlier line has used), and read the dye nearest the finger as the two-finger line above it does (within three disks), keeping the mirrors as the control. *Measure:* the line's printed dye over twenty Mac runs has no negative reading and its least is several times the bar of 5; a build that counts drops and hands the solver none is still red. **A second read of the same kind, same file** (2026-11-14, the same pull request's next head, green on its one re-run and red on none of seventeen other runs): "and spreading them zooms in by as much as they spread" printed `4.00× → 12.00× (3.00 times, 3.40 wanted) for fingers 50 → 170 px apart`. 12.00 is 4 × 150/50: the setting was read after `settle(300)` with the sixth touch move not yet in it, on a `show` shard that ran 18:45 of its 18 minutes. The feature is "the zoom follows the spread", not "it has arrived 300 ms on". *Do:* wait on the setting itself (poll `macroZoom` until it stops changing, bounded), then read. *Measure:* twenty Mac runs print the wanted ratio; a build whose pinch stops one move short is still red.
+- **19k-21, open** (E, S): **`inktitle -- --thin` sits on its 16-minute timeout.** On lab6 the
+  check ran 7:29 to 7:53 on three PRs on the morning of 2026-11-13, then 12:23 to 12:32, then
+  15:34, 15:40 and 15:57 on PRs that touch none of its code, and on #835's head it was stopped at
+  16:00 mid-arm (`page.evaluate: Target page … closed` at `arm`, inktitle.mjs:582), which also put
+  lab6 past its 21 minutes. The same software-WebGPU work doubling within a day reads as the
+  runner, or as something merged to main that day costing SwiftShader more per step, not as the
+  check. Find which: time the thin arms on main's commits from that day under `PW_WEBGPU=1`, and
+  if one commit doubled it, fix that; if the runner, split the thin arms into two checks so each
+  has room. Never raise the timeout to get green.
+- **19k-19, open** (E, S): **the Mac's five parts have no room.** `show`, `tools`, `plate`, `open` and `fifth` run 16 to 23 of their 25 minutes on a GitHub Mac (read off #820's run, 2026-11-12), and a GPU check too long for SwiftShader has nowhere else to go: Lava Lamp's cycle (`lavacycle`, six minutes of the lamp, two hours on SwiftShader, a couple of minutes on Metal) went on `show`, the lightest. The next one will not fit. Wanted: a sixth Mac part, or the five rebalanced by measured minutes (`npm run checks` could print each part's last times), weighed against the Mac queue a sixth part lengthens (docs/ci.md).
 - **19k-10** (E, S): a check-only PR can run a `dist/`-leaning check with no `dist/`. Under
   `CHECKS_ONLY` (19k-4) a part runs only the checks the diff reaches, so a PR that changes
   only `scripts/followview.mjs` runs `followview` alone, and it (like `inputpick`,

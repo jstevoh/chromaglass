@@ -31,12 +31,9 @@ for thirty seconds and reading `chromaglassCastState().ear.reads` before and aft
 The worker's tick is chosen because a hidden page's own timers are held to about one
 a second; that is Chrome's documented behaviour and cannot be shown headless.
 
-*Found along the way, not done:* the look fade, the dimmer, the drift glides and the
+~~*Found along the way, not done:* the look fade, the dimmer, the drift glides and the
 simulated band run on the page's own timers (`showInterval`, `simulatedMusic.ts`),
-moved there so a covered window would not freeze them. A hidden page's timers are
-held to about one a second (much less after five minutes hidden), so a Go fired from
-a MIDI pad while the show window is covered steps through its crossfade a second at a
-time instead of gliding. The same worker tick could drive them.
+moved there so a covered window would not freeze them.~~ **Shipped as 14a-timers**: `pumpShowIntervals(now)` in `src/lib/showClock.ts` is driven from the ear worker's 16 ms tick and `simulatedMusic.ts` runs on `showInterval`, so a 4 s look fade steps 121 times hidden (was 4) and 121 visible (`npm run timers`; [`docs/plan-shipped.md`](../plan-shipped.md) §14).
 
 ## 14b. With the wall up, the plate may draw twice a refresh and the governor cannot see it
 
@@ -59,12 +56,7 @@ and nobody has seen it happen on the Mac.
   brings it to 0.90 to 0.95 in the arithmetic, at the cost of up to a quarter more draws on a
   machine already short of time; whether the wall's smoothness is worth that is the
   owner's call. Measure: the busy phase's draws against its slots.
-- *A 120 Hz laptop with a 60 Hz projector draws 120 a second.* The gate works to the
-  faster display so that neither window gets fewer frames than it would alone, which
-  keeps the desk at 120 on a ProMotion screen; but every draw carries the mirror
-  copy, and the wall shows only every other one. Pacing to the projector while the
-  show window is not what the audience is watching would halve that work. Measure:
-  the arithmetic case 120/60 with the draws counted against the wall's refresh.
+- ~~*A 120 Hz laptop with a 60 Hz projector draws 120 a second.*~~ **Shipped** (14b-120, `DrawGate.paceTo = 'wall'` in `src/lib/drawGate.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
 - *The wall's older "asking for one draws one" line cannot fail on the ask.* It asks
   thirty times with the show's own frames running and counts every frame drawn, so
   the show's own clock alone passes it (and did before this: 60 a second is over its
@@ -92,15 +84,9 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
   from it would share that page's device scale factor, so a Retina laptop driving a
   1x projector cannot be staged in one browser context. A `?stage=1920x1080`
   diagnostic knob, like `?dpr=`, calling `setStage` would let it measure the wall.
-- A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before. The start
-  rule weighs the GPU class and not the stage's pixels; the governor finds the 0.75
-  rung within seconds, but a wall above 1920×1200 could open there.
-- The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall
-  rather than a pixel ratio, and the bench's `dpr` reads the same number. On a stage it
-  should say so ("of the wall").
-- A wall coming or going builds a new governor, which forgets a step rate it had given
-  up and waits out its settling period again, and forgets rungs a solver that would not
-  start had marked failed (only running out of memory sets the cap it keeps).
+- ~~A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before.~~ **Shipped** (14c-4k, `stageLadder` in `src/lib/platform.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
+- ~~The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall rather than a pixel ratio.~~ **Shipped** (14c-readout, `engineLabel` in `src/sim/stepping.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
+- ~~A wall coming or going builds a new governor, which forgets a step rate it had given up and waits out its settling period again, and forgets rungs a solver that would not start had marked failed.~~ **Shipped** (14c-governor, `QualityGovernor.carry` in `src/lib/governor.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
 - `PW_WEBGPU=1 npm run phone` went red once in two runs on "spreading them zooms in by
   as much as they spread" (3.00 times of 3.40): the zoom was read before the pinch's
   last move landed, on a software plate a few frames a second. Green on the rerun; the
@@ -109,10 +95,6 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
 ## 14d. The beat clock hears a smoothed bass level, not the kick
 
 **Shipped** (#199): the clock hears the kick's onset, by its time (`npm run kicks`); counting heard kicks in the app on the Mac is 10.4's. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
-
-## 14d-2. No kick drum, no beat: the 1920s records (shipped)
-
-**Shipped**: the ear's `beat` is the kick where a kick keeps time and the band's whole-range attack (SuperFlux, 60 Hz–4 kHz) where none does, entrained to the band's period; Kick hit and the beat clock follow it (`npm run pulse`). The six 1920s song films went from 3–22 beats a minute to 37–109. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ## 14d-3. The smoothed levels sit at 1 on a loud record
 
@@ -187,6 +169,17 @@ the filter removed either: the median-and-MAD threshold already eats a steady vi
 *Fix:* a voice whose vibrato deepens and quickens through a phrase (as a 1920s tenor's
 does), where plain flux fires and the maximum filter does not. *Measure:* pulses a minute on
 that voice, with and without the filter.
+
+## 14d-10. A long song's plate drifts, brighter or fainter, by its end
+
+**Measured 2026-11-08** (the six 1920s films, brightness every 15 s, before and after 14d-2):
+with the beat feeding Kick hit, Rachmaninoff no longer fades but Whiteman still does (it ends
+at 29 against 45 at its start), and Oliver's second half runs brighter (120 to 133). Wolverines
+peaks lower (97 against 113); Bessie and Caruso hold. So over three minutes the plate does not
+hold its level: dye in and dye out are not balanced for the song's whole length. Noted, not
+fixed: the owner has not asked for it. *Measure:* the brightness of each 15 s window against
+the first minute's, on the six films; *fix* in the dye budget the beat feeds, never by
+normalising the picture.
 
 ## 14e. The picture and the room disagree about when the kick is
 
@@ -337,8 +330,8 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   dual-GPU laptops. Cap a phone's climb
   at its starting rung, and consider a "cool / battery" output setting (low-power
   adapter, 30 steps, a capped top rung) that ships with its phone control.
-- *The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
-  the timer on `gamepadconnected`.
+- ~~*The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
+  the timer on `gamepadconnected`.~~ **Shipped as 14j-gamepad**: `src/hooks/useGamepad.ts` arms its 16 ms poll on `gamepadconnected` (or at mount when `navigator.getGamepads()` already has a pad) and clears it on the last `gamepaddisconnected` (`npm run timers`: 0 timers with no pad, was 1; [`docs/plan-shipped.md`](../plan-shipped.md) §14).
 
 *Measure:* Chromium with `--disable-frame-rate-limit`, draws a second at 65 or fewer
 while steps hold; frozen, readbacks a second near 0; `npm run rungs` with a simulated
@@ -385,10 +378,6 @@ the room's lights, a load-in card and the show kit `docs/rig-plan.md` (R4, R5, R
 the checks and the build §19.
 
 ## ~~14m. Anyone on the venue's network can drive the show~~
-
-**Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped.md`.
-Left open from it:
-
 - **14m-guest** (*proposed*, M; moved up by §36f, with a plate per performer): a **guest key**, now that the server has roles: a key
   whose socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto
   a chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
@@ -400,19 +389,6 @@ Left open from it:
   unchanged, which no cloud session can confirm (`npm run showkey` asks it with the
   headers cloudflared is documented to send). *Measure:* on the Mac, a phone through the
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
-- ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- **14m-https** (M, found in 14m-lan): a **network display cannot start at an `http://`
-  Wi-Fi address**. Browsers give WebGPU only to a secure page (https, or localhost), so
-  `http://<laptop-ip>:3000/?cast=true&key=…`, the address the README and the server give
-  a projector's browser or a second computer, fails at the first shader module with
-  "GPUTextureUsage is not defined" (measured in Chromium on 2026-10-24; `npm run
-  phonelink` now asks for the plain words on that screen). The phone's remote needs no
-  GPU and is unaffected. *Fix, to choose:* the show server serves https on the LAN with a
-  certificate the owner's devices trust (mkcert-style; every device installs it once), or
-  network displays go through the tunnel's https address, or the network display gets a
-  WebGL2 fallback of the plate. *Measure:* a network display opened at the address the
-  server prints draws a plate in a browser as it ships (the Mac's `wall`).
 - **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
   address, the server refuses new joins from everyone but the laptop for 60 s. That is
   what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years
@@ -420,23 +396,13 @@ Left open from it:
   phones out (phones already in, the laptop and its display are untouched). If a venue
   ever meets that, the fix is a longer key for the tunnel, not a looser budget.
 
-## ~~14n. One malformed message can end the plate~~
-
-**Shipped, #322.** Story in `docs/plan-shipped.md`.
-
 ## ~~14o. The song-ID Worker is open to anyone~~
-
-**Shipped, this PR** (`npm run fingerprint-worker`: 7 of 19 on the old Worker, 19 of 19 now).
-Story in `docs/plan-shipped.md`. Left open from it:
-
 - **14o-count** (S): the counters are in Workers KV, which takes one write a second per
   key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
   free plan meters about 500 lookups a day, and a second lookup from one address in the
   same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
   (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
   plan's quota. *Measure:* the same harness with a store that allows one write a second.
-- ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24. Story in `docs/plan-shipped.md` §14o-smoke (moved 2026-10-29, 19m-2). Left: whether a well-known commercial track comes back named, which needs a recording no cloud session should send.
-
 ## 14p. Show night runs whatever merged last
 
 **Read in the code.** `npm run show` is `npm run update && npm run remote`, and `update`

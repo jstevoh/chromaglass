@@ -216,6 +216,40 @@ export class LiquidPhase {
     this.live = false;
   }
 
+  /** Copy channels and scalars so destructive resets can restore exact liquid properties. */
+  snapshot() {
+    return {
+      soap: new Float32Array(this.soap),
+      body: new Float32Array(this.body),
+      repel: new Float32Array(this.repel),
+      weight: new Float32Array(this.weight),
+      polarity: new Float32Array(this.polarity),
+      totals: { ...this.totals },
+      kindsHeld: this.kindsHeld,
+      live: this.live,
+      gpuNative: this.gpuNative,
+      tiltX: this.tiltX,
+      tiltY: this.tiltY,
+    };
+  }
+
+  /** Restore a snapshot taken by `snapshot()`. */
+  restore(s: ReturnType<LiquidPhase['snapshot']>): void {
+    this.soap.set(s.soap);
+    this.body.set(s.body);
+    this.repel.set(s.repel);
+    this.weight.set(s.weight);
+    this.polarity.set(s.polarity);
+    this.totals.soap = s.totals.soap;
+    this.totals.body = s.totals.body;
+    this.totals.repel = s.totals.repel;
+    this.kindsHeld = s.kindsHeld;
+    this.live = s.live;
+    this.gpuNative = s.gpuNative;
+    this.tiltX = s.tiltX;
+    this.tiltY = s.tiltY;
+  }
+
   /**
    * How much room is left for a deposit of this shape, 0..1.
    *
@@ -306,9 +340,10 @@ export class LiquidPhase {
   /**
    * Told of every pour, before anything here decides whether it matters, so
    * the GPU's own fields (oil, soap, acidity: see WebGPUFluid.addMix) hear of
-   * the same liquid on the same disc. Set by the plate.
+   * the same liquid on the same disc. Set by the plate. `push` false when
+   * the volume came in already (a queued drop, sim/dropSplash.ts).
    */
-  onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number, seconds?: number) => void;
+  onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number, seconds?: number, push?: boolean) => void;
 
   /*
     The share of the dish that is poured liquid, as the GPU last read it
@@ -335,9 +370,11 @@ export class LiquidPhase {
    * A pour of `what` on a disc. `seconds`, for a held bottle: the deposit is
    * that long of its stream (lib/liquidProps.ts, pourShare), which is what a
    * pour that is volume on a thin gap puts down; without, a one-shot dose.
+   * `volume` false when its volume came in already, with the drop or the
+   * stream that brought its colour (sim/dropSplash.ts, PLAN 18c-10).
    */
-  deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1, seconds?: number): void {
-    this.onDeposit?.(cx, cy, radius, what, amount, seconds);
+  deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1, seconds?: number, volume = true): void {
+    this.onDeposit?.(cx, cy, radius, what, amount, seconds, volume);
     if (this.gpuNative) return;
     const s = this.size;
     const r = Math.max(1, radius);

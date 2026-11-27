@@ -18,7 +18,7 @@
  * on Classic, the look's Bubbles turned all the way up (so a kick that can
  * release air very likely does, at the old odds 0.45 a kick), and then the
  * first click on the plate, which starts the band. Twenty-five seconds later
- * (a minute on the look's own Audio Impact, below):
+ * (a minute at Audio Impact 0.55, below):
  *
  *   at 0          the band started, and at least fifteen of its kicks reached
  *                 the bubbles' own decision with room on the plate (counted
@@ -31,7 +31,7 @@
  *                 lifts the plate's. On the laptop's Perform desk and on the
  *                 phone's own layout (asserted, both), whose first tap is the
  *                 same gesture and whose Sound Drive is the same setting.
- *   the look's own  Audio Impact left where Classic puts it (0.55): the drive
+ *   at 0.55         Audio Impact where Classic had it before 38w-1: the drive
  *                 the frame used is 1, so a kick is as likely to release air
  *                 as before the fix (0.45 with Bubbles full), and the share of
  *                 chances that released air sits in 0.1 to 0.85 (fifteen
@@ -76,14 +76,22 @@ const PHONE = { viewport: { width: 390, height: 844 }, touch: true };
 const CASES = [
   { name: 'laptop, Audio Impact 0', impact: 0, screen: LAPTOP },
   { name: 'phone, Audio Impact 0', impact: 0, screen: PHONE },
-  // Left at the look's own value, not patched: what a visitor plays. Listened to for a minute (below).
-  { name: "laptop, Classic's own Audio Impact", impact: null, screen: LAPTOP, listenMs: 60_000 },
+  /*
+    The control: an Audio Impact that releases air. It was Classic's own
+    (0.55), left unpatched as what a visitor plays, until 38w-1 (#917) made
+    Classic a still dish that hears the band only through a hand, at Audio
+    Impact 0, and this case then asserted 0.55 on a plate that had 0 and
+    failed. The control is the same plate at the same 0.55, now set, so it
+    still proves a kick can release air; what a visitor plays on Classic is
+    the 0 above.
+  */
+  { name: 'laptop, Audio Impact 0.55', impact: 0.55, screen: LAPTOP, listenMs: 60_000 },
 ];
 const LISTEN_MS = 25_000;
 /*
   Why Classic is listened to for a minute and not 25 seconds. A chance is a
   kick that reaches the bubbles' decision with room on the plate (fewer
-  than 17 of the music's own bubbles at Bubbles full), and at Classic's own
+  than 17 of the music's own bubbles at Bubbles full), and at 0.55
   Audio Impact the kicks fill that room: two to four bubbles on nearly half
   of them, each lasting 13 to 35 seconds. So after the first dozen chances
   the next ones wait for a bubble to go, and in 25 seconds the Mac counted
@@ -137,7 +145,7 @@ try {
     await page.waitForFunction(() => typeof window.chromaglassSettings === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
     await settlePlate(page, 6000);
     await waitForEngine(page);
-    await page.evaluate((impact) => window.chromaglassSettings(impact === null ? { bubbles: 1 } : { audioImpact: impact, bubbles: 1 }), c.impact);
+    await page.evaluate((impact) => window.chromaglassSettings({ audioImpact: impact, bubbles: 1 }), c.impact);
     await settlePlate(page, 1000);
     const before = await read(page);
     // Bubbles to full can lay the plate again, and in software a new plate's first step is 25 to 100 s.
@@ -153,8 +161,7 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
     } else {
       await page.getByTestId('dot-sound').click();
-      await page.getByTestId('audio-source-open').click();
-      await page.getByTestId('sound-source-simulated').click();
+      await page.getByTestId('sound-source-simulated').first().click();
       await page.keyboard.press('Escape');
     }
     await settlePlate(page, 500);
@@ -192,7 +199,7 @@ try {
       !before.band && !!after.band && chances >= CHANCE_FLOOR,
       `the band ${after.band ? `played ${after.band.kicks} kicks` : 'never started'}, ${kicks} reached the plate, ${chances} the bubbles with room (at least ${CHANCE_FLOOR})`);
     check(`${c.name}: the plate ran with Bubbles full and the Audio Impact asked for`,
-      m1.amount === 1 && (c.impact === null ? m1.impact >= 0.45 && m1.drive === 1 : m1.impact === c.impact),
+      m1.amount === 1 && (c.impact > 0 ? m1.impact >= 0.45 && m1.drive === 1 : m1.impact === c.impact),
       `Bubbles ${m1.amount}, Audio Impact ${m1.impact}, drive ${m1.drive}`);
     if (c.impact === 0) {
       check(`${c.name}: the music releases no bubbles`, onKicks === 0 && onHeld === 0 && after.onPlate === 0,

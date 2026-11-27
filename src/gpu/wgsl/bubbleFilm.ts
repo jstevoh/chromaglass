@@ -11,7 +11,7 @@
  * The projector's bubble used to wear the camera's reflected film,
  * cp * (0.45 + 1.25 * filmC), which multiplies the plate by up to 1.7 where
  * the rainbow is bright. At Iridescence 1 against 0, Film Physics 0, the
- * plate's bubbles read 54 levels brighter (`npm run nolight` line 15): light
+ * plate's bubbles read 54 levels brighter (`npm run nolight` line 16): light
  * out of a pocket of air that has nothing to give it. At Film Physics 1 it
  * already gave way to the measured soap film's transmission, so this only
  * changes what the rainbow does, below that.

@@ -51,6 +51,7 @@ them is played, in order.
 | `preset-next`, `preset-prev` | Step through the preset list (each clears the plate and reseeds) |
 | `lucky` | A random look, as the desk's Lucky button rolls it |
 | `seed`, `clear`, `drain` | Drop new colour, clear the plate, drain it |
+| `undo-reset` | Put back the plate the last Reset cleared, the same as the Undo toast's button (`/chromaglass/action/undo-reset`; does nothing when there is nothing to undo) |
 | `play`, `pause` | The plate's motion |
 | `automate-on`, `automate-off` | Evolve |
 | `blackout-toggle` | The house lights down to black, and back |
@@ -66,10 +67,10 @@ them is played, in order.
 The built-in looks by id: `classic`, `comet`, `galaxy`, `cyberpunk`, `acid-trip`,
 `bass-drop`, `microscopic-chaos`, `aurora-borealis`, `solar-flare`,
 `jellyfish-bloom`, `fractal-dream`, `velvet-underground`, `neon-coral-reef`,
-`stardust-collapse`, `lumia`, `turing-print`, `poster-1969`, `macro-bead`,
+`stardust-collapse`, `turing-print`, `poster-1969`, `macro-bead`,
 `cell-bloom`, `lace-run`, `crowd-plate`, `milk-marble`, `soap-film`,
 `oil-and-water`, `red-cabbage`, `chemical-clock`, `magnet-garden`, `home-movie`,
-`clock-glass`, `splodascope`, `ferro-paint`, `roy`, `lava-lamp`. A look you saved
+`clock-glass`, `splodascope`, `ferro-paint`, `roy`, `lava-lamp`, `saffron-lace`. A look you saved
 yourself has an id starting `user-`.
 
 ### Settings worth a fader

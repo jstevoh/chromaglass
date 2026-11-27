@@ -381,6 +381,18 @@ export class PipelineCache {
     return !this.isFailed(name) && this.computeSlot(name, entryPoint).has(code);
   }
 
+  /**
+   * Whether `renderPipeline` would find this one built, without building it.
+   * With `ask`, the ask is kept in the ledger as `renderPipeline`'s would be:
+   * the plate asks for its whole display so (`WebGPUPlate.displayFor`) while
+   * drawing with its lean one, and a harness reading the ledger still sees
+   * that a look's first steps wanted it.
+   */
+  hasRender(name: string, ask = false): boolean {
+    if (ask) this.asked(name);
+    return !this.isFailed(name) && this.render.has(name);
+  }
+
   /** `renderPipeline`'s, ahead: see `prepareCompute`. */
   async prepareRender(name: string, make: RenderRecipe, use = false, times?: BuildTimes): Promise<boolean> {
     if (this.render.has(name)) return true;
@@ -800,18 +812,32 @@ export class ReadbackRing {
   /** The newest copy asked for: a reading is of the GPU as of its copy (see `landed`). */
   get issued(): number { return this.seq; }
 
-  /** Copy `src` into a free slot as part of `encoder`; false when every slot is still in flight (skip this frame). */
-  copyFrom(encoder: GPUCommandEncoder, src: GPUBuffer, offset = 0): GPUBuffer | null {
+  /** Whether a slot is free to be copied into. */
+  get hasFree(): boolean { return this.slots.some((s) => !s.busy); }
+
+  /**
+   * Reserve a free slot and hand back its buffer to copy into (H2c-7: a
+   * `copyTextureToBuffer` straight into the ring rather than through a
+   * staging buffer); null when every slot is still in flight (skip this frame).
+   */
+  reserve(): GPUBuffer | null {
     const slot = this.slots.find((s) => !s.busy);
     if (!slot) return null;
-    encoder.copyBufferToBuffer(src, offset, slot.buf, 0, this.bytes);
     slot.busy = true;
     slot.seq = ++this.seq;
     slot.epoch = epoch;
     return slot.buf;
   }
 
-  /** After the submit: map the slot `copyFrom` returned, keeping its data if it is the newest to land. */
+  /** Copy `src` into a free slot as part of `encoder`; null when every slot is still in flight (skip this frame). */
+  copyFrom(encoder: GPUCommandEncoder, src: GPUBuffer, offset = 0): GPUBuffer | null {
+    const buf = this.reserve();
+    if (!buf) return null;
+    encoder.copyBufferToBuffer(src, offset, buf, 0, this.bytes);
+    return buf;
+  }
+
+  /** After the submit: map the slot `reserve` or `copyFrom` returned, keeping its data if it is the newest to land. */
   collect(buf: GPUBuffer): void {
     const slot = this.slots.find((s) => s.buf === buf);
     if (!slot) return;
@@ -879,7 +905,25 @@ export class GpuProfiler {
   private readonly resolve: GPUBuffer | null;
   private readonly ring: ReadbackRing | null;
   private labels: string[] = [];
-  private pending: { buf: GPUBuffer; labels: string[] } | null = null;
+  private pending: GPUBuffer | null = null;
+  /**
+   * Each ring copy's pass labels, keyed by `ReadbackRing.issued` when the copy
+   * was encoded and read back against `ReadbackRing.landed` (H2c-labels).
+   *
+   * What was wrong: `afterSubmit` set `lastLabels` to the frame it had just
+   * handed to `collect`, while `ring.latest` held a copy that had landed one
+   * to three frames earlier. When the frame's pass list changed (camera,
+   * particles, finish, output, a projector's source), every pass after the
+   * change read its neighbour's timestamps for as long as the ring lagged, and
+   * `gpuFrameMs` jumped on the frame of the change rather than when the frame
+   * that ran the new pass came back (`npm run timelabels`, 133 readings off
+   * their pass across the five lag/stall runs, `gpuFrameMs` +30.0 % on the
+   * frame the camera turned on). Keyed by the copy's sequence number rather
+   * than the ring slot because `resolveInto` reuses a newly freed slot at the
+   * end of encoding before `afterSubmit` reads the data that slot just landed.
+   * Frames the ring dropped (`copyFrom` null) are simply untimed.
+   */
+  private readonly labelsBySeq = new Map<number, string[]>();
   /** Smoothed milliseconds per label. */
   readonly ms = new Map<string, number>();
   constructor(private readonly device: GPUDevice, disposer: Disposer, readonly enabled: boolean, readonly capacity = 32) {
@@ -909,18 +953,24 @@ export class GpuProfiler {
     if (!this.query || !this.resolve || !this.ring || !this.labels.length) { this.labels = []; return; }
     encoder.resolveQuerySet(this.query, 0, this.labels.length * 2, this.resolve, 0);
     const buf = this.ring.copyFrom(encoder, this.resolve);
-    this.pending = buf ? { buf, labels: this.labels } : null;
+    if (buf) this.labelsBySeq.set(this.ring.issued, this.labels);
+    this.pending = buf;
     this.labels = [];
   }
 
   /** After the submit: start the read, and fold in whatever frame last came back. */
   afterSubmit(): void {
-    if (this.pending && this.ring) { this.ring.collect(this.pending.buf); this.lastLabels = this.pending.labels; this.pending = null; }
+    if (this.pending && this.ring) { this.ring.collect(this.pending); this.pending = null; }
     const data = this.ring?.latest;
-    if (!data || !this.lastLabels.length) return;
+    const landed = this.ring?.landed ?? -1;
+    const labels = this.labelsBySeq.get(landed);
+    if (!data || !labels) return;
+    for (const seq of this.labelsBySeq.keys()) {
+      if (seq < landed) this.labelsBySeq.delete(seq);
+    }
     const t = new BigInt64Array(data);
     const seen = new Set<string>();
-    this.lastLabels.forEach((label, i) => {
+    labels.forEach((label, i) => {
       seen.add(label);
       const ms = Number(t[i * 2 + 1] - t[i * 2]) / 1e6;
       if (!(ms >= 0 && ms < 1000)) return;
@@ -947,7 +997,6 @@ export class GpuProfiler {
       if (!seen.has(label)) this.ms.set(label, prev * 0.9);
     }
   }
-  private lastLabels: string[] = [];
 }
 
 // ── Errors ───────────────────────────────────────────────────────────

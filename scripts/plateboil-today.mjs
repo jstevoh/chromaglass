@@ -48,9 +48,18 @@ export const TODAY_PLUGIN = {
  * (S.curDamp, S.curBuoy as upright × Buoyancy, S.curGrav, S.meanD, S.maxCur,
  * S.rock), as main had them: the control lab shares the tree's fluid.ts, so
  * the check holds these to today's text.
+ *
+ * Changed on purpose by PLAN 27f-9 (a standing plate is a sealed bottle): on
+ * a thin gap with Plate Upright above nothing, once the seal's kernels are
+ * built and with no boil live, S.curBuoy is 0 and the same heat lift is laid
+ * by the seal as the closed cell's circulation (wgsl/fluid/seal.ts), so it no
+ * longer runs out of the open rim. `sealsHeat` is false during a boil and on
+ * every level or open plate, so the current's Buoyancy at every Heat is today's
+ * wherever the seal does not run, and the Heat 0 lines below still compare it
+ * byte for byte.
  */
 export const TODAY_PACK = [
-  "    f[22] = fin(p.currentDamp, 0.98); f[23] = upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);",
+  "    f[22] = fin(p.currentDamp, 0.98); f[23] = sealsHeat ? 0 : upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);",
   "    f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);",
   "    f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);"
 ];

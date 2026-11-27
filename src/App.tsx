@@ -1,26 +1,28 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
+import type { EarView } from './hooks/useEarView';
+import { EarMeters, EarPercent } from './components/EarLeaves';
 import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
-import { holdWhereItIs, shotLabel } from './lib/macroCamera';
+import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
+import { RailZoom } from './components/RailZoom';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
-import { GuidePanel } from './components/GuidePanel';
+import { CommandAndShortcuts } from './components/ShortcutSheet';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
+import { CastNetworkItems, TvAsks } from './components/CastNetworkItems';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
-import type { Cue, ControlKind } from './components/desk/deskProps';
-import { useDeskTabs } from './hooks/useDeskLayout';
+import type { Cue } from './components/desk/deskProps';
 import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
-import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, travelOfKey, valueOfKey, type DeskSurface } from './lib/deskPins';
+import { travelOfKey, valueOfKey } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
-import { CommandPalette } from './components/desk/CommandPalette';
 import { SoundPanel } from './components/SoundPanel';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
@@ -32,9 +34,9 @@ import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES 
 import { sanitizePatch } from './lib/sanitizeSettings';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
 import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
-import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
+import { clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS, findPreset, livePresetId } from './presets';
+import { PRESETS, findPreset, livePresetId, NEW_LOOK } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
@@ -55,7 +57,6 @@ import { useFilmSense } from './hooks/useFilmSense';
 import { type SimulatedMusic } from './lib/simulatedMusic';
 import { useWakeLock } from './hooks/useWakeLock';
 import type { MidiAction, MidiMap } from './lib/midi';
-import { controlKindOf } from './lib/midi';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
@@ -90,25 +91,6 @@ const DRIFT_STEP_MS = 500;
  * The ear's own rate (useAudioAnalyzer's EAR_VIEW_MS), for the same reason.
  */
 const RIDE_VIEW_MS = 100;
-const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
-
-// Detect which preset (if any) matches the current settings. Only the look is
-// compared: a look does not set the room (see RIG_KEYS).
-function detectActivePreset(settings: VisualizerSettings): string | null {
-  for (const preset of PRESETS) {
-    const ps = preset.settings;
-    const match = Object.keys(ps).filter(key => !RIG_KEYS.has(key as keyof VisualizerSettings)).every(key => {
-      const pv = (ps as any)[key];
-      const sv = (settings as any)[key];
-      if (typeof pv === 'object' && pv !== null) {
-        return JSON.stringify(pv) === JSON.stringify(sv);
-      }
-      return pv === sv;
-    });
-    if (match) return preset.id;
-  }
-  return null;
-}
 
 import AccountSheet from './components/AccountSheet';
 import { LIT, LIVE } from './components/ui';
@@ -124,9 +106,13 @@ import { usePour } from './app/usePour';
 import { useSoundSource } from './app/useSoundSource';
 import { useBench } from './app/useBench';
 import { useToast } from './app/useToast';
+import { usePlateUndo } from './app/usePlateUndo';
+import { AppToast } from './components/ui/AppToast';
 import { useFilm } from './app/useFilm';
 import { useSceneSource } from './app/useSceneSource';
 import { usePaletteLock } from './app/usePaletteLock';
+import { useDesk } from './app/useDesk';
+import { useHand } from './app/useHand';
 import { useLayerReport } from './app/useLayerReport';
 import { useSetListState } from './app/useSetListState';
 import { usePhoneLayout } from './app/usePhoneLayout';
@@ -145,25 +131,14 @@ import { useRowFades } from './app/useRowFades';
 import { useRemote, type OscOutHear } from './app/useRemote';
 import { useShowFeed } from './app/useShowFeed';
 import { useSongScore } from './app/useSongScore';
+import { useSongSequences } from './app/useSongSequences';
+import { useListen } from './app/useListen';
 import { useSongRendering } from './app/useSongRendering';
 import { useControllers } from './app/useControllers';
 import { useCommandPalette } from './app/useCommandPalette';
 import { useCheckHooks } from './app/useCheckHooks';
 import { useCrashState } from './app/useCrashState';
-import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSettings } from './app/shared';
-
-const hasAccountOrLicenseUI =
-  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
-  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
-  (typeof window !== 'undefined' &&
-    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
-      new URLSearchParams(window.location.search).get('tierGates') === '1'));
-
-const isProfileRoute = () =>
-  typeof window !== 'undefined' &&
-  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
-    new URLSearchParams(window.location.search).has('profile') ||
-    new URLSearchParams(window.location.search).has('unsubscribe'));
+import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSettings, randomLook, detectActivePreset, hasAccountOrLicenseUI, isProfileRoute } from './app/shared';
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
@@ -228,7 +203,7 @@ export default function App() {
   const {
     audioSource, setAudioSource, audioSourceRef, audioInputId, setAudioInputId, audioInputs,
     refreshAudioInputs, musicFile, setMusicFile, playTrackRef, musicLoop, setMusicLoop, libraryOpen,
-    setLibraryOpen, showSound, setShowSound, droneRef, droneParams, setDroneParams, droneRunning,
+    setLibraryOpen, droneRef, droneParams, setDroneParams, droneRunning,
     setDroneRunning, stopDrone, musicPlaying, setMusicPlaying, musicTime, setMusicTime, musicElRef,
     musicInputRef, musicCtxRef,
   } = useSoundState();
@@ -245,14 +220,8 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   /** Which guide topic to open at, when something sent you there to read one. */
   const [helpFocus, setHelpFocus] = useState<string | null>(null);
-  /*
-    The desk's tabs (lib/deskTabs.ts): the owner's to make since 2026-10-27,
-    each a set of panels, with Perform, Sequence and Setup shipped as the
-    three to start from. The tab that is up is kept under the old desk mode's
-    key, so a laptop left on Gig or Build opens on Perform and one left on
-    Load-in opens on Setup. Each tab remembers where its panels were.
-  */
-  const deskTabs = useDeskTabs();
+  // The desk's tabs, its pins and the MIDI activity overlay (app/useDesk.ts).
+  const { deskTabs, rideKeys, setRideKeys, recipeKeys, setRecipeKeys, pinSetting, showActivity, setShowActivity } = useDesk();
   const deskTab = deskTabs.tab;
   const setDeskTab = deskTabs.setTab;
   const deskLayout = deskTabs.layout;
@@ -262,25 +231,6 @@ export default function App() {
   const onDeskReset = useCallback(() => resetLayout(deskTab), [resetLayout, deskTab]);
   /** The Stage sheet (⌘,): the room and the machine, the sections no look saves. */
   const [showStage, setShowStage] = useState(false);
-  /*
-    What is out on each surface.
-
-    A property of this desk rather than of a look: two rooms with the same
-    presets want different things under the hand, and a saved look that
-    rearranged your faders would be unusable. Both lists come from the one
-    registry in `deskPins`, so a control the settings panel draws can be put on
-    either surface — which is the thing that could not be done before, and the
-    reason the panel was the only place most of the app existed.
-  */
-  const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('perform', DEFAULT_RIDES));
-  useEffect(() => { savePins('perform', rideKeys, DEFAULT_RIDES); }, [rideKeys]);
-  const [recipeKeys, setRecipeKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('design', DEFAULT_RECIPE));
-  useEffect(() => { savePins('design', recipeKeys, DEFAULT_RECIPE); }, [recipeKeys]);
-  /** Put a control on a surface, or take it off, from the settings panel. */
-  const pinSetting = useCallback((desk: DeskSurface, key: keyof VisualizerSettings, on: boolean) => {
-    const set = desk === 'perform' ? setRideKeys : setRecipeKeys;
-    set(prev => togglePin(prev, key, on));
-  }, []);
   /**
    * The preset last applied by hand. Which preset is *active* is derived from
    * the settings below rather than stored: it only ever differed from them
@@ -319,7 +269,8 @@ export default function App() {
   const flickPlate = (layer: number) => setSpinFlick(p => ({ seq: (p?.seq ?? 0) + 1, layer }));
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
-  const [activeLayer, setActiveLayer] = useState(0);
+  // The tool, its amount and the plate in hand (app/useHand.ts).
+  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = useHand();
   // The shelf: the bottles the app ships, then any someone made (lib/liquidFile.ts).
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]);
   useEffect(() => { saveCustomLiquids(liquidTypes); }, [liquidTypes]);
@@ -337,16 +288,8 @@ export default function App() {
     setSelectedLiquidId(sel => (sel === id ? 'water' : sel));
   }, []);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
-  // How much each tool does, per tool (lib/toolAmount.ts); 1 is what it always did.
-  const [toolAmounts, setToolAmounts] = useState<Record<string, number>>(() => loadToolAmounts());
-  useEffect(() => { saveToolAmounts(toolAmounts); }, [toolAmounts]);
-  const toolAmount = toolAmounts[activeTool] ?? 1;
-  const activeToolRef = useRef(activeTool);
-  activeToolRef.current = activeTool;
-  const setToolAmount = useCallback((tool: string, v: number) => setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })), []);
   // The message handler is built once and must not go stale when a liquid's
   // colour is edited.
   const liquidTypesRef = useRef(liquidTypes);
@@ -466,8 +409,8 @@ export default function App() {
   const { songLine, barKnown, heardBpm, songCueSeqRef } = useSongLine({ wallRef });
 
   const {
-    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying, pouringCartoon,
-    setPouringCartoon, pourName, setPourName, pourVideoFrom, stopPour, pourFile, handleVideoUpload,
+    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
+    pourName, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
   } = usePour({
     visualizerRef,
   });
@@ -548,11 +491,7 @@ export default function App() {
    */
   const stageLayers = Math.max(1, settings.layerCount ?? 1, backLook ? 2 : 1);
 
-  useEffect(() => {
-    if (activeLayer >= stageLayers) {
-      setActiveLayer(Math.max(0, stageLayers - 1));
-    }
-  }, [stageLayers, activeLayer]);
+  useEffect(() => setStageLayers(stageLayers), [stageLayers, activeLayer, setStageLayers]);
 
   const {
     calibrateNonce, setCalibrateNonce, engineStatus, setEngineStatus, shownEngineStatus,
@@ -561,13 +500,13 @@ export default function App() {
     setSettings,
   });
 
-  const { toast, setToast } = useToast({ setToastRef });
+  const { toastItem, setToast, showToast, triggerToastAction } = useToast({ setToastRef });
 
   const {
     filmSource, filmName, loadFilm, cameras, filmCameraId, filmCamera, filmCameraLost,
-    startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, cartoons,
+    startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, video,
   } = useFilm({
-    wallRef, setToast, pouringCartoon, pourVideoFrom, setPouringCartoon, setPourName, stopPour,
+    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour,
   });
 
   const {
@@ -587,11 +526,12 @@ export default function App() {
     twitchy a reading should be, which is a property of the plate rather than
     of where the pixels came from.
   */
-  const filmDriving = filmSource !== 'none'
+  // A poured video is read the same (PLAN 14ag): the film's when one plays, else the pour's.
+  const filmDriving = (filmSource !== 'none' || isVideoPlaying)
     && ((settings.filmDrive ?? 0) > 0 || (settings.filmImpact ?? 0) > 0);
   const filmSense = useFilmSense({
     enabled: filmDriving,
-    getVideo: () => wallRef.current?.filmVideoEl() ?? null,
+    getVideo: () => wallRef.current?.filmVideoEl() ?? (isVideoPlaying ? videoPlayerRef.current : null),
     deadzone: settings.sceneDeadzone ?? 0.25,
     smooth: settings.sceneSmooth ?? 0.35,
   });
@@ -604,7 +544,6 @@ export default function App() {
     audioSource === 'microphone',
     earContext,
   );
-  const liveAudio = ear.audioData;
   /*
     What the show hears: the room, or a song being rendered.
 
@@ -631,26 +570,15 @@ export default function App() {
   const readLevel = useCallback(() => hear()?.volume ?? null, [hear]);
   const [renderHold, setRenderHold] = useState(false);
   const renderHoldRef = useRef(false);
-  const audioData = renderAudio ?? liveAudio;
+  // What renders a level: the ear's view, a render's reading in its place. A store its
+  // readers subscribe to, never state here (hooks/useEarView.ts, PLAN.md 46f).
+  const earOwn = ear.view;
+  const earView = useMemo<EarView>(() => ({ get: () => renderAudioRef.current ?? earOwn.get(), subscribe: earOwn.subscribe }), [earOwn]);
 
   // ── Music intelligence ──────────────────────────────────────────
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
   const [showMidi, setShowMidi] = useState(false);
-  /*
-    The controller's own readout, and whether it is up.
-
-    A property of this desk rather than of a look: whether you want to see what
-    the hardware is doing depends on how well you know the map, not on which
-    preset is loaded. Remembered, because someone who wants it wants it all
-    night and someone who does not should not have to hide it every time.
-  */
-  const [showActivity, setShowActivity] = useState<boolean>(() => {
-    try { return localStorage.getItem(MIDI_ACTIVITY_KEY) === '1'; } catch { return false; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(MIDI_ACTIVITY_KEY, showActivity ? '1' : '0'); } catch { /* private window */ }
-  }, [showActivity]);
   const [presetMenu, setPresetMenu] = useState<'none' | 'title'>('none');
   const [castMenu, setCastMenu] = useState(false);
   // ── The user's own presets: a library in the browser, files on disk ──
@@ -691,7 +619,7 @@ export default function App() {
     });
   }, []);
 
-  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings, ear.onReading);
+  const musicIntel = useMusicIntelligence(audioStream, earLive, musicSettings, settings, ear.onReading);
   /*
     Performances, started and stopped by hand: T on either desk, the
     Performance dot in the desk header, or the Track panel. The note after a
@@ -724,14 +652,16 @@ export default function App() {
   const [perfNow, setPerfNow] = useState(0);
   useEffect(() => {
     if (!musicIntel.performance.live) return;
-    const t = window.setInterval(() => setPerfNow(performance.now()), 500);
+    // Told only when the shown second changes: twice a second it rendered the shell twice for one new digit (PLAN.md 46f).
+    const t0 = musicIntel.performance.live.startedAtMs, sec = (t: number) => Math.floor(Math.max(0, t - t0) / 1000);
+    const t = window.setInterval(() => setPerfNow((was) => { const now = performance.now(); return sec(now) === sec(was) ? was : now; }), 500);
     return () => window.clearInterval(t);
   }, [musicIntel.performance.live]);
   const perfClock = musicIntel.performance.live
     ? clockText((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000)
     : null;
 
-  const { paletteLock, selectPalette } = usePaletteLock({ bothEngines, visualizerRef });
+  const { paletteLock, selectPalette, paletteFromFile, palettes, pictureDyes } = usePaletteLock({ bothEngines, visualizerRef, setToast });
   // Lay the opening look's plate: its dyes, its seed, its injection styles and
   // its liquids. The settings above arrive with the first render, but the
   // plate is the visualizer's and it seeds Classic until told otherwise — so
@@ -747,7 +677,7 @@ export default function App() {
   // (the settings state itself is untouched, so preset detection keeps working).
   // And a back plate with a look of its own is on the stage whatever the front
   // look's plate count says: a Go on the front to a one-plate look would
-  // otherwise drop the plate someone had just sent a look to.
+  // otherwise drop the plate someone just sent a look to.
   const effectiveSettings = useMemo(() => {
     const s = musicIntel.overrides ? { ...settings, ...musicIntel.overrides } : settings;
     return (s.layerCount ?? 1) < stageLayers ? { ...s, layerCount: stageLayers } : s;
@@ -765,7 +695,8 @@ export default function App() {
   useEffect(() => {
     // Not into a render: the lyric clock is the room's, not the film's.
     if (musicIntel.trigger && !renderHoldRef.current) {
-      const energy = audioData ? Math.min(1, audioData.energy) : 0.6;
+      const heard = hear();
+      const energy = heard ? Math.min(1, heard.energy) : 0.6;
       wallRef.current?.triggerTheme(musicIntel.trigger.trigger.theme, Math.max(0.35, energy));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1025,7 +956,7 @@ export default function App() {
     setDocId(null);
     setDocDirty(false);
     setPinnedPresetId(null);
-    applyPreset('default', DEFAULT_SETTINGS);
+    applyPreset('default', NEW_LOOK);
   };
 
   const saveLook = () => setShowSave(true);
@@ -1040,6 +971,12 @@ export default function App() {
     setShowSave(false);
     setDocDirty(false);
     setToast(`Saved over “${saved.name}”`);
+  };
+  const replaceLookById = (id: string, name: string, description = '', forSong = false) => {
+    const p = visualizerRef.current?.describePlate();
+    const s = userPresets.saveOver(id, settingsRef.current, p?.contract ?? null, p?.injectStyles ?? null, p?.liquids ?? null);
+    if (!s) { saveCurrentPreset(name, description, forSong); return; }
+    setPinnedPresetId(s.id); setDocId(s.id); setDocDirty(false); setToast(`Saved over “${s.name}”`);
   };
   /** A saved look taken out of the library; the plate keeps what is on it. */
   const deleteSavedLook = (id: string) => {
@@ -1061,14 +998,13 @@ export default function App() {
     rowFades.clear();
     rowFades.forget(FADE_ROWS);
     setRowFading({});
-    setSettings({ ...DEFAULT_SETTINGS });
+    setSettings({ ...NEW_LOOK });
     setClearTrigger(v => v + 1);
     visualizerRef.current?.setHarmonyLock(null);
     setPinnedPresetId(null);
     setDocId(null);
     setDocDirty(false);
     setCued(null);
-    setToast('Empty plate');
   };
   /** The song playing now, as a file would remember it. */
   const currentSong = useMemo<SongRef | null>(() => (musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null), [musicIntel.state.track]);
@@ -1103,7 +1039,7 @@ export default function App() {
   /*
     A hand on the closeup camera (Alt-drag or Alt-click on the plate): it goes
     where it is aimed. Taken off Auto, since a camera that roams on its own
-    would leave the spot the hand just chose.
+    would leave the spot the hand chose.
   */
   const aimMacro = useCallback((x: number, y: number) => {
     const auto = (settingsRef.current.macroCamera ?? 'hold') === 'auto';
@@ -1372,7 +1308,7 @@ export default function App() {
   const markUrlRef = useRef<string | null>(null);
 
   const {
-    wallLook, ridePlate, drafting, walled, wallEngineRef, sendToWallRef, wallSettings, lookFor,
+    wallLook, ridePlate, drafting, walled, wallEngineRef, sendToWallRef, wallSettings, lookSince,
   } = useWallLook({
     isCasting, mirrorCount, designing, musicIntel, ride, wallRef, visualizerRef, settingsRef,
     pinnedPresetId, activePresetId, presetSeq, seedCount, clearTrigger, drainTrigger, spinFlick,
@@ -1493,16 +1429,6 @@ export default function App() {
     return b && b.source.kind === 'cc' ? b.source.number : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  /*
-    And what it is learned to: a knob draws as a knob, a fader as a slider
-    (the design's rule, so the desk looks like the controller). A binding
-    only says absolute or relative, so the controller's profile names which
-    of its CCs turn (`controlKindOf`, PLAN.md 8d).
-  */
-  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null =>
-    controlKindOf(midiRef.current?.map, key, midiRef.current?.activeInputName),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  []);
 
   // The stage look's place in each list, for the slide tray's click (PLAN 35g):
   // the desk's is among all the presets, the phone's among its grouped list.
@@ -1590,46 +1516,8 @@ export default function App() {
     },
   });
   sequencerRef.current = sequencer;
-  // ── Files made for a song ───────────────────────────────────────
-  // When a song is identified, a sequence made for it starts at the right
-  // point in it and a preset made for it is applied; when the song ends or
-  // another takes its place, a song-bound sequence stops.
-  const songBoundRef = useRef<string | null>(null);   // the sequence running for the current song
-  const lastSongKey = useRef<string | null>(null);
-  useEffect(() => {
-    const key = musicIntel.state.track ? `${musicIntel.state.track.isrc}|${musicIntel.state.track.title}|${musicIntel.state.track.artist}` : null;
-    if (key === lastSongKey.current) return;
-    lastSongKey.current = key;
-    const song = currentSong;
-    const running = sequencer.status.sequenceId;
-    if (songBoundRef.current && (running === songBoundRef.current) && !sameSong(sequencer.sequences.find(q => q.id === running)?.song, song)) {
-      sequencer.stop();
-      songBoundRef.current = null;
-    }
-    if (!song) return;
-    // A set item made for this song goes up on its own, at its own fade.
-    const setHit = setListRef.current.items.find(i => sameSong(i.song, song));
-    const setLook = setHit ? lookOfItem(setHit) : null;
-    if (setLook) { sendLook(setLook, setLook.fade ?? fadeSeconds); return; }
-    const seq = sequencer.sequences.find(q => sameSong(q.song, song));
-    if (seq) {
-      sequencer.startAt(seq.id, musicIntel.state.positionSec);
-      songBoundRef.current = seq.id;
-      return;
-    }
-    const up = userPresets.presets.find(p => sameSong(p.song, song));
-    if (up) applyUserPreset(up);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [musicIntel.state.track, currentSong]);
-  // The song ran out: stop its sequence rather than looping into the next song.
-  useEffect(() => {
-    const id = songBoundRef.current;
-    if (!id || sequencer.status.sequenceId !== id) return;
-    const seq = sequencer.sequences.find(q => q.id === id);
-    const dur = seq?.song?.durationSec;
-    if (dur && musicIntel.state.positionSec > dur + 2) { sequencer.stop(); songBoundRef.current = null; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [musicIntel.state.positionSec]);
+  // ── Files made for a song (app/useSongSequences.ts) ─────────────
+  const { startSongSequence } = useSongSequences({ musicIntel, currentSong, sequencer, setListRef, lookOfItem, sendLook, fadeSeconds, userPresets, applyUserPreset });
 
   const {
     addingToSet, setAddingToSet, addToSet, importToSet, onSetAction, onItemAction,
@@ -1639,11 +1527,15 @@ export default function App() {
     sequencerRef, setShowSongs, currentSong, rideKeys, settingsRef,
   });
 
-  const {
-    luckyArmed, setLuckyArmed, triggerLucky,
-  } = useLucky({
+  const { triggerLucky } = useLucky({
     settings, liquidTypes, previousLook, pinnedPresetId, settingsRef, lookTakesLevels, setSettings,
     setPinnedPresetId, visualizerRef, setSeedCount,
+  });
+  const { undoNotice, clearPlate, drainPlate, luckyPlate, newPlate, randomLookPlate, restorePlateUndo, showPanelClosedUndo } = usePlateUndo({
+    visualizerRef, settingsRef, pinnedPresetId, docId, docDirty, cued, liveItemId,
+    isAutomated, previousLook, setSettings, setPinnedPresetId, setDocId, setDocDirty,
+    setCued, setLiveItemId, setIsAutomated, setClearTrigger, setDrainTrigger, triggerLucky,
+    rawNewLook: newLook, goLookNow, showToast,
   });
 
   const {
@@ -1658,10 +1550,9 @@ export default function App() {
     castState, relaySendRef, markLoaded, loadMark, clearMark,
   } = useCastFeed({
     wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
-    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
+    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, pictureDyes, shownOutput, castSend,
     mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
-    isCasting, ear, hear, audioData, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
-    liveAudio,
+    isCasting, ear, hear, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
   });
 
   const [, setLicenseTick] = useState(0);
@@ -1682,9 +1573,9 @@ export default function App() {
     return onAuthFlagChange(ask);
   }, []);
   // ── Macro zoom at will ──
-  // + and − (and the wheel over the plate, and the chip) move the closeup's
-  // magnification a step at a time; + with the closeup off turns it on at a
-  // gentle 2×, and − never turns it off (the Macro button does that).
+  // + and − (and the wheel over the plate, and the chip) move the Macro Zoom
+  // a step at a time: + from the plate comes in gently, and − all the way
+  // down is the whole plate again.
   // (settingsRef is declared above.)
   const zoomMacro = useCallback((dir: 1 | -1, amount = 1) => {
     const cur = settingsRef.current;
@@ -1700,9 +1591,9 @@ export default function App() {
 
   const {
     recorder, showRecordPanel, setShowRecordPanel, recordChoice, setRecordChoice, toggleRecording,
-    recordingAny, recordSeconds,
+    recordingAny, recordSeconds, phoneRecording,
   } = useRecording({
-    audioStream, perfLive, stopPerformance, startPerformance, musicIntel, perfNow,
+    audioStream, perfLive, stopPerformance, startPerformance, musicIntel, perfNow, wallRef, stageRef, phone,
   });
 
   // ── The phone's own hands: a pinch on the closeup, and Tilt ──
@@ -1759,10 +1650,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'b' || e.key === 'B') toggleBlackout();
-      if (e.key === '?') setShowHelp(h => !h);
-      if (e.key === '+' || e.key === '=') zoomMacro(1);
-      if (e.key === '-' || e.key === '_') zoomMacro(-1);
+      macroKey(e, settingsRef.current, visualizerRef.current, zoomMacro, aimMacro);
       // The tool in hand's Amount, a step at a time, at any width.
       if (e.key === '[' || e.key === ']') {
         const tool = activeToolRef.current;
@@ -1785,7 +1673,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
-  }, [toggleBlackout, zoomMacro]);
+  }, [zoomMacro, aimMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.
@@ -1865,20 +1753,12 @@ export default function App() {
       case 'spin-back':       flickPlate(1); break;
       case 'spin-reverse':    updateSettings({ spinRpm: -(settingsRef.current.spinRpm ?? 6) }); break;
       case 'spin-auto':       updateSettings({ spinAuto: (Math.round(settingsRef.current.spinAuto ?? 0) + 1) % 3 }); break;
-      case 'clear':           setClearTrigger(prev => prev + 1); break;
-      case 'drain':           setDrainTrigger(prev => prev + 1); break;
-      case 'lucky':           triggerLucky(); break;
+      case 'clear':           clearPlate(); break;
+      case 'drain':           drainPlate(); break;
+      case 'lucky':           luckyPlate(); break;
       case 'play-toggle':     setIsActive(v => !v); break;
       case 'automate-toggle': setIsAutomated(v => !v); break;
       case 'overlays-toggle': if (overlaysVisible) hideOverlays(); else setOverlaysVisible(true); break;
-      case 'macro-toggle': {
-        // A pad still wants one press in and one press out. It moves the zoom,
-        // because that is the control; the flag rides along for the looks that
-        // still read it.
-        const inNow = (settingsRef.current.macroZoom ?? 1) > 1.05;
-        updateSettings(inNow ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: 4 });
-        break;
-      }
       case 'seq-play-pause':  if (sequencer.status.running) sequencer.pause(); else sequencer.play(); break;
       case 'seq-next':        sequencer.next(); break;
       case 'seq-prev':        sequencer.prev(); break;
@@ -1936,21 +1816,18 @@ export default function App() {
     updateLiquidColor(selectedLiquidId, c.hex);
   };
   /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
-  const selectDye = (paletteIndex: number) => {
-    colourDye(paletteIndex);
-    
-  };
+  const selectDye = (paletteIndex: number) => { colourDye(paletteIndex); };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
   const {
-    remoteLink,
+    remoteLink, tv,
   } = useRemote({
     settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
     allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
     updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
-    cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypesRef, setSelectedLiquidId,
-    setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
+    cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypes, setSelectedLiquidId,
+    setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky: luckyPlate, clearPlate, drainPlate, luckyPlate, undoNotice, restorePlateUndo, setIsAutomated,
     hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
     togglePerformance, goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName,
     runActionRef, runAction, tempoRef, oscOutHearRef,
@@ -1962,6 +1839,10 @@ export default function App() {
     wallRef, goLookNow, runActionRef, setSettings, glideSetting, songShows, followSongs, designing,
     renderHold, musicIntel, isActive, currentSong, songShowsRef, setSongShows, activePresetId,
     pinnedPresetId, userPresets, tempoLabel,
+  });
+  const listen = useListen({
+    musicIntel, audioSource, handleSourceChange, musicEnabled: musicSettings.enabled, updateMusicSettings, followSongs, setFollowSongs,
+    songShowsRef, setSongShows, songRuntimeRef, sequencer, startSongSequence, activePresetId, pinnedPresetId, userPresets,
   });
 
   // ── Render this song (PLAN.md §6) ───────────────────────────────
@@ -1989,26 +1870,24 @@ export default function App() {
     connected: remoteLink.status === 'connected', relaySendRef, wallRef, blackoutRef, hear, tempoRef, oscOutHearRef,
   });
 
-  // ── MIDI controller and game controller ─────────────────────────
+  // ── MIDI controller and game controller ──────────────────────
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
 
-  const {
-    midi, runSoundTrigger, gamepad, projector, gamepadRingRect,
-  } = useControllers({
+  const { midi, runSoundTrigger, gamepad, projector, gamepadRingRect } = useControllers({
     ride, settingsRef, rideSetting, runAction, cuePreset, playSetItem, selectDye, wallRef, activePresetId,
     selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
     blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
-    visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, isCasting,
+    visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
   });
 
   const {
-    showPalette, setShowPalette, paletteCommands,
+    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands,
   } = useCommandPalette({
     allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
-    blackout, toggleBlackout, newLook, saveLook, docId, docName, replaceLook, setSeedCount,
-    setClearTrigger, setDrainTrigger, isActive, setIsActive, isAutomated, setIsAutomated, settings,
+    blackout, toggleBlackout, newLook: newPlate, saveLook, docId, docName, replaceLook, setSeedCount,
+    setClearTrigger, setDrainTrigger, clearPlate, drainPlate, isActive, setIsActive, isAutomated, setIsAutomated, settings,
     updateSettings, recordingAny, recordChoice, toggleRecording, perfLive, togglePerformance,
-    setShowRecordPanel, triggerLucky, hideOverlays, setSettingsSection, setShowSettings,
+    setShowRecordPanel, triggerLucky: luckyPlate, hideOverlays, setSettingsSection, setShowSettings,
     setShowHelp, openAllSettings, setShowMidi, setShowSequencer, showActivity, setShowActivity,
     setShowSongs, startCast, deskTabs, setDeskTab, setShowStage, recorder, deskUp, sendToWallRef,
     setActiveTool, designing, cuesRef, cueAny,
@@ -2072,7 +1951,8 @@ export default function App() {
   */
   const earDeaf = ear.deaf && audioSource !== 'none' && !renderHold;
   const deskAudioLine = audioSource === 'none' ? 'silent'
-    : `${earDeaf ? 'not hearing · ' : ''}${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}${songLine ? ` · ${songLine}` : ''}`;
+    : `${earDeaf ? 'not hearing · ' : ''}${audioSource === 'simulated' ? 'band' : audioSource}`;
+  const deskAudio = audioSource === 'none' ? deskAudioLine : <>{deskAudioLine}<EarPercent view={earView} />{songLine ? ` · ${songLine}` : ''}</>;
 
   /** The dyes on the desk's tray: the bottles that are colours, not behaviours. */
   const trayDyes = useMemo(() => liquidTypes.filter(l => !l.behaviour).map(l => l.color), [liquidTypes]);
@@ -2100,18 +1980,15 @@ export default function App() {
     control cannot be wired one way in the sheet and another on the desk.
   */
   /*
-    The three screens that were behind the Sequence and Sound chips, each
-    drawn either as the sheet it was (from a status dot, the palette or a
-    link inside another sheet) or, embedded, as a panel on any tab
-    (lib/deskLayout.ts: songs, sequences, player).
+    The screens that were behind the Sequence and Sound chips: songs and
+    sequences, each a sheet or a desk panel (lib/deskLayout.ts), and the
+    sound's sources, player and drone, the top of Settings → Sound (35c-7).
   */
-  const soundScreen = (embed: boolean) => (
+  const soundScreen = (inputPicker: ReactNode) => (
     <SoundPanel
       source={audioSource}
       onSource={(x) => { void handleSourceChange(x); }}
-      inputs={audioInputs}
-      inputId={audioInputId}
-      onPickMic={deskOpen.sound}
+      inputPicker={inputPicker}
       playing={musicPlaying}
       time={musicTime}
       loop={musicLoop}
@@ -2129,8 +2006,6 @@ export default function App() {
       onAmbientMode={setAmbientMode}
       readLevel={readLevel}
       deaf={earDeaf}
-      embed={embed}
-      onClose={() => setShowSound(false)}
     />
   );
   const songsScreen = (embed: boolean) => (
@@ -2144,6 +2019,7 @@ export default function App() {
       currentSong={currentSong}
       follow={followSongs}
       onFollow={setFollowSongs}
+      listen={listen}
       status={songRuntime.status}
       onRun={songRuntime.start}
       onStop={songRuntime.stop}
@@ -2188,7 +2064,7 @@ export default function App() {
       onSongDetection={(on) => updateMusicSettings({ enabled: on })}
       settings={settings}
       onUpdate={updateSettings}
-      calibration={audioData?.calibration ?? null}
+      earView={earView}
       onRecalibrate={() => setCalibrateNonce(n => n + 1)}
       onFlickPlate={flickPlate}
       engineStatus={engineStatus}
@@ -2230,7 +2106,7 @@ export default function App() {
       pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
       midi={midi}
       onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
-      onOpenSound={() => { setShowSettings(false); setShowSound(true); setShowSongs(false); setShowMidi(false); }}
+      soundSources={soundScreen}
       sceneOn={sceneOn}
       onSceneToggle={toggleScene}
       sceneState={scene.state}
@@ -2240,11 +2116,8 @@ export default function App() {
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       filmName={filmSource === 'file' ? filmName : null}
-      pourName={isVideoPlaying ? pourName : null}
-      cartoons={cartoons}
+      video={video}
       onFilmFile={loadFilm}
-      onPourVideo={pourFile}
-      onStopPourVideo={stopPour}
       onFilmCamera={() => void startFilmCamera()}
       filmCameraId={filmCameraId}
       onFilmCameraDevice={chooseFilmCamera}
@@ -2258,8 +2131,8 @@ export default function App() {
       {...over}
     />
   );
-  // A section as a panel; with Music & Drone out, Sound has no way there (35c-5).
-  const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {}, ...(whereIs(deskLayout, 'player') && { onOpenSound: undefined }) });
+  // A section as a panel.
+  const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} });
 
   const evolveAt = travelOfKey('automateRate', settings.automateRate);
   return (
@@ -2269,7 +2142,7 @@ export default function App() {
       <LiquidVisualizer
         ref={wallEngineRef}
         onBackLookCleared={backLookCleared}
-        audioData={audioData} hear={hear}
+        audioData={null} hear={hear} heardNews={earOwn.subscribe}
         settings={walled ? wallSettings : effectiveSettings} ride={ridePlate.wall}
         seedCount={wallLook ? wallLook.seedCount : seedCount} spinFlick={wallLook ? wallLook.spinFlick : spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer}
@@ -2316,7 +2189,7 @@ export default function App() {
           key="draft"
           ref={visualizerRef}
           draft
-          audioData={audioData} hear={hear} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
+          audioData={null} hear={hear} heardNews={earOwn.subscribe} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
           selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
           onAim={aimMacro}
           toolAmount={toolAmount}
@@ -2513,18 +2386,11 @@ export default function App() {
         <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
       )}
 
+      <TvAsks tv={tv} />
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
       <AnimatePresence>
 
-        {toast && (
-          <div
-            key="toast"
-            className={`pointer-events-none absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl`}
-            data-testid="toast"
-          >
-            {toast}
-          </div>
-        )}
+        <AppToast toast={toastItem} onAction={triggerToastAction} phone={phone} />
         {/*
           The room camera was on when they left, so the app offers it back
           rather than taking it.
@@ -2896,18 +2762,8 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* Macro closeup */}
-                <button
-                  aria-pressed={!!settings.macroMode}
-                  onClick={() => updateSettings({ macroMode: !settings.macroMode })}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    settings.macroMode ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title="Macro closeup — magnify the plate and chase a single bead of liquid"
-                >
-                  <Microscope size={16} className={settings.macroMode ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Macro</span>
-                </button>
+                {/* The Macro button became the zoom itself (PLAN QA-32c). */}
+                <RailZoom zoom={settings.macroZoom ?? 1} onZoom={pinchZoom} />
 
                 {/* Settings */}
                 <button
@@ -2968,23 +2824,13 @@ export default function App() {
 
                 {/* Randomize */}
                 <button
-                  aria-pressed={luckyArmed}
-                  onClick={() => {
-                    if (performing && !luckyArmed) { setLuckyArmed(true); return; }
-                    setLuckyArmed(false);
-                    triggerLucky();
-                  }}
+                  onClick={luckyPlate}
                   data-testid="lucky-button"
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    // Armed to confirm is pressed, not live: red is only blackout and recording (PLAN 35a).
-                    luckyArmed ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title={luckyArmed
-                    ? 'Click again to replace every setting with a random one. Revert brings this look back.'
-                    : 'Randomize all settings — the look it replaces is kept, so Revert brings it back'}
+                  className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full bg-white/5 hover:bg-white/10 border-white/10"
+                  title="Randomize all settings — undo toast brings the plate and settings back"
                 >
-                  <Shuffle size={16} className={luckyArmed ? '' : 'text-yellow-400 group-hover:scale-110 transition-transform'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">{luckyArmed ? 'Sure?' : 'Random'}</span>
+                  <Shuffle size={16} className="text-yellow-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-[7px] font-bold uppercase tracking-widest">Random</span>
                 </button>
 
                 <div className="w-full h-px bg-white/10" />
@@ -3010,7 +2856,7 @@ export default function App() {
                     ))}
                   </div>
                   <button
-                    onClick={() => setDrainTrigger(prev => prev + 1)}
+                    onClick={drainPlate}
                     className="py-1.5 px-2 rounded-lg text-[11px] uppercase tracking-widest font-bold opacity-70 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
                     title="Drain — swirls all dye down the drain"
                   >
@@ -3111,8 +2957,10 @@ export default function App() {
           activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
           lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
-          onShuffle={triggerLucky}
+          onShuffle={luckyPlate}
           onSave={(name) => saveCurrentPreset(name, '', false)}
+          existingLooks={userPresets.presets}
+          onReplaceLook={(id, name) => replaceLookById(id, name)}
           saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           dyes={DROPPER_COLORS.slice(0, 8)}
           dye={liquidTypes.find(t => t.id === selectedLiquidId)?.color ?? DROPPER_COLORS[0]}
@@ -3137,7 +2985,7 @@ export default function App() {
           }}
           wandering={isAutomated}
           onWander={setIsAutomated}
-          onClear={() => setClearTrigger(n => n + 1)}
+          onClear={clearPlate}
           recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
           onOpenAccount={openAccount}
@@ -3157,7 +3005,7 @@ export default function App() {
               panels: openPanels(deskLayout),
               onAdd: (id) => onDeskLayout(l => openPanel(l, id, 'deck')),
               onRemove: (id) => onDeskLayout(l => closePanel(l, id)),
-              render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true) : id === 'player' ? soundScreen(true)
+              render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true)
                 : isSectionPanel(id) && id !== 'mixer' ? sectionPanel(id) : null),
             }}
             // Mid-fade the settings are between two looks and match neither,
@@ -3171,12 +3019,11 @@ export default function App() {
             // A look from the phone crossfades in, as Go does on the desk: a
             // thumb in front of a room should never cut the plate to clean glass.
             onLook={(id) => goLookNow(id)}
-            onRandomLook={() => {
-              const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
-              if (pool.length) goLookNow(stream('phone.look').pick(pool).id);
-            }}
+            onRandomLook={() => randomLookPlate(randomLook(activePresetId, stream('phone.look').float) ?? null)}
             onRevert={previousLook.current ? revertLook : null}
             onSaveLook={(name) => saveCurrentPreset(name, '', false)}
+            existingLooks={userPresets.presets}
+            onReplaceLook={(id, name) => replaceLookById(id, name)}
             saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
             onBackLook={(id) => backLookNow(id)}
             backLook={backLookName}
@@ -3191,12 +3038,13 @@ export default function App() {
             onLiquid={setSelectedLiquidId}
             dyeColors={DROPPER_COLORS}
             onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
-            palettes={COLOR_HARMONIES.map((h, i) => ({ name: COLOR_HARMONY_NAMES[i], colors: h.slice(0, 4).map(pi => PALETTE[pi].hex) }))}
+            palettes={palettes}
             paletteLock={paletteLock}
             onPalette={selectPalette}
+            onPicturePalette={paletteFromFile}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
-            cartoons={cartoons}
+            video={video}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -3208,13 +3056,13 @@ export default function App() {
             onLayer={setActiveLayer}
             onAddLayer={addLayer}
             onRemoveLayer={removeLayer}
-            onClear={() => setClearTrigger(n => n + 1)}
-            onDrain={() => setDrainTrigger(n => n + 1)}
+            onClear={clearPlate}
+            onDrain={drainPlate}
             onSpin={() => flickPlate(activeLayer)}
             spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, bpm: tempoLabel.source ? tempoLabel.bpm : heardBpm, onChange: updateSettings }}
-            onLucky={triggerLucky}
+            onLucky={luckyPlate}
             zoom={settings.macroZoom ?? 1}
-            onZoom={() => runAction('macro-toggle')}
+            onZoom={pinchZoom}
             camera={settings.macroCamera ?? 'hold'}
             cameraShot={shotLabel(settings.macroHold)}
             onCamera={(c) => updateSettings({ macroCamera: c })}
@@ -3293,7 +3141,8 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
-            recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice }}
+            onShortcuts={() => setShowShortcuts(true)}
+            recording={phoneRecording}
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
             onHide={hideOverlays}
@@ -3306,10 +3155,6 @@ export default function App() {
           />
           </PanelGuard>
           )}
-          {/* The song-file picker the Sound sheet reaches for; on the laptop it
-              lives in the overlay's audio column, which a phone does not draw. */}
-          <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
-            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
         </>
       )}
 
@@ -3405,11 +3250,6 @@ export default function App() {
 
       {/* ── Songs ──────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {showSound && (
-          <PanelGuard name="Sound" onClose={() => setShowSound(false)}>
-          {soundScreen(false)}
-          </PanelGuard>
-        )}
         {showSongs && (
           <PanelGuard name="Songs" onClose={() => setShowSongs(false)}>
           {songsScreen(false)}
@@ -3620,33 +3460,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="px-3 py-2.5 rounded-lg" data-testid="cast-network">
-                  <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
-                  {relay ? (
-                    <>
-                      <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
-                      {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                      ))}
-                      {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
-                        <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                      )}
-                      <div className="mt-2">
-                        <Info label="">
-                          Open one of these on a projector, a TV or a tablet and it shows the
-                          show. Across buildings or other access points: run{' '}
-                          <span className="font-mono">npm run tunnel</span> and use the https
-                          address it prints, with the same{' '}
-                          <span className="font-mono">?cast=true&amp;key=…</span>.
-                        </Info>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">
-                      Needs the show server: run <span className="font-mono">npm run remote</span>.
-                    </div>
-                  )}
-                </div>
+                <CastNetworkItems relay={relay} mirrorCount={mirrorCount} tv={tv} />
 
                 <div className="flex items-start gap-1">
                   <button
@@ -3712,9 +3526,9 @@ export default function App() {
           bare={!overlaysVisible}
           tabs={deskTabs.tabs}
           tab={deskTab}
-          onTab={(id) => { setShowSound(false); setShowSongs(false); setShowSequencer(false); setDeskTab(id); }}
+          onTab={(id) => { setShowSongs(false); setShowSequencer(false); setDeskTab(id); }}
           onTabEdit={deskTabs.edit}
-          screens={{ songs: songsScreen(true), sequences: sequencesScreen(true), player: soundScreen(true) }}
+          screens={{ songs: songsScreen(true), sequences: sequencesScreen(true) }}
           layout={deskLayout}
           onLayout={onDeskLayout}
           onResetLayout={onDeskReset}
@@ -3730,10 +3544,11 @@ export default function App() {
           onMidi={deskOpen.midi}
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
+          onOpenShortcuts={() => setShowShortcuts(true)}
           onOpenAccount={openAccount}
           status={{
-            audio: deskAudioLine,
-            engine: engineStatus?.label ?? '',
+            audio: deskAudio,
+            engine: engineStatus,
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,
@@ -3745,14 +3560,14 @@ export default function App() {
           blackout={blackout}
           plateRef={preview.ref}
           liveName={liveLookName}
-          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
+          liveSince={lookSince}
           lookName={docName}
           edited={docDirty}
           dirty={docDirty}
           onSendToWall={() => sendToWallRef.current()}
           onSave={saveLook}
           onSaveOver={docId ? replaceLook : undefined}
-          onNew={newLook}
+          onNew={newPlate}
           savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
           openLookId={docId}
           onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
@@ -3790,6 +3605,8 @@ export default function App() {
             if (look) sendLook(look, look.fade ?? fadeSeconds);
           }}
           onGo={() => goLook()}
+          onBack={revertLook}
+          canBack={!!previousLook.current}
           onGoBackPlate={() => goBackPlate()}
           backLook={backLookName}
           onBackFollowsFront={backFollowsFront}
@@ -3800,20 +3617,19 @@ export default function App() {
           onCueSaved={cueLook}
           onSendSaved={(id) => goLookNow(id)}
           onAddSavedToSet={(id) => addToSet('saved', id)}
-          onDrain={() => setDrainTrigger(v => v + 1)}
+          onDrain={drainPlate}
           settings={settings}
           onSetting={updateSettings}
           automated={isAutomated}
           onAutomate={setIsAutomated}
           ccFor={ccFor}
-          kindFor={kindFor}
           lookValueOf={lookValueOf}
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
           recipeKeys={recipeKeys}
           onRecipeKeys={setRecipeKeys}
-          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
-          randomiseArmed={luckyArmed}
+          onRandomise={luckyPlate}
+          onPanelClosed={showPanelClosedUndo}
           hasFilm={filmSource !== 'none'}
           hasMark={markLoaded}
           takes={mixTakes}
@@ -3825,15 +3641,13 @@ export default function App() {
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); }}
-          palettes={COLOR_HARMONIES.map((h, i) => ({
-            name: COLOR_HARMONY_NAMES[i],
-            colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
-          }))}
+          palettes={palettes}
           paletteLock={paletteLock}
           onPalette={selectPalette}
+          onPicturePalette={paletteFromFile}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
-          cartoons={cartoons}
+          video={video}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
@@ -3857,12 +3671,13 @@ export default function App() {
         <AccountSheet onClose={closeProfileSheet} />
       )}
 
-      {/* The file input the bench's Image dye button reaches for. It lives
-          in the narrow-screen toolbar, which is not rendered under a desk. */}
+      {/* The file inputs the bench and Sound reach for (kept once for both desk and phone). */}
       {(deskUp || phone) && (
         <>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
           <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+          <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
           <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
         </>
       )}
@@ -3893,6 +3708,8 @@ export default function App() {
           suggested={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           replaceName={docId ? docName : null}
           onReplace={replaceLook}
+          existingLooks={userPresets.presets}
+          onReplaceExisting={replaceLookById}
           songName={musicIntel.state.track?.title ?? null}
           onSave={saveCurrentPreset}
           onClose={() => setShowSave(false)}
@@ -3900,12 +3717,17 @@ export default function App() {
         </PanelGuard>
       )}
 
-      {/* ── ⌘K ─────────────────────────────────────────────────── */}
-      {showPalette && (
-        <PanelGuard name="The command palette" onClose={() => setShowPalette(false)}>
-        <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
-        </PanelGuard>
-      )}
+      {/* ── ⌘K, ? & About ──────────────────────────────────────── */}
+      <CommandAndShortcuts
+        showPalette={showPalette}
+        onClosePalette={() => setShowPalette(false)}
+        commands={paletteCommands}
+        showShortcuts={showShortcuts}
+        onCloseShortcuts={() => setShowShortcuts(false)}
+        showHelp={showHelp}
+        helpFocus={helpFocus}
+        onCloseHelp={() => { setShowHelp(false); setHelpFocus(null); }}
+      />
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
@@ -3926,18 +3748,6 @@ export default function App() {
           />
           </PanelGuard>
         )}
-      </AnimatePresence>
-
-      {/* ── About: the manual ─────────────────────────────────── */}
-      {/*
-        This used to be a five-line popover, and by the time anyone read it two
-        of the five lines were wrong — it still sent people to the settings
-        panel for presets months after the presets moved to the title. A short
-        help text that nobody owns rots; a manual with a section per control
-        group is at least somewhere the truth can be kept.
-      */}
-      <AnimatePresence>
-        {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
       {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}
@@ -3962,26 +3772,7 @@ export default function App() {
       )}
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
-      {isActive && audioData && !isMinimized && overlayUp && (
-        <div className="absolute bottom-16 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
-          {[
-            { label: 'B', value: audioData.bass },
-            { label: 'M', value: audioData.mid },
-            { label: 'T', value: audioData.treble },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex flex-col items-center gap-1">
-              <div className="w-1.5 h-16 bg-white/10 rounded-full overflow-hidden relative">
-                <motion.div
-                  className="absolute bottom-0 w-full bg-white/80 rounded-full"
-                  animate={{ height: `${Math.min(100, value)}%` }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                />
-              </div>
-              <span className="text-[7px] uppercase font-bold opacity-60">{label}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {isActive && !isMinimized && overlayUp && <EarMeters view={earView} />}
 
       {/* ── Background Glow ────────────────────────────────────── */}
       <div className="fixed inset-0 pointer-events-none z-0">

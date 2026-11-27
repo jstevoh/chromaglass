@@ -87,74 +87,6 @@ button, making it look good. Every item here is held to those.
   unblock it as a performer's control: a Heat dial and a pad gesture, the lamp feeding
   heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
   bubbles while it is held and calming when released. Not a bubble sprite.
-  - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the reference the GPU build (36e-2) is held to and `npm run boil` its judge (#352 took the buoyancy tanh out). Story in `docs/plan-shipped.md` §36e-1 (moved 2026-10-29, 19m-2). *Owed with 36e-4:* `boil`'s dry-out look-alike passes today (it throws away 1.7% of the lamp's heat, moving the ledger 0.16%, under its 3% bar); once the glass absorbs the infrared, that build adds a tighter dry-out ledger line.
-  - **36e-2. The GPU build** (*open*, Antigravity's brief in the project's shared files).
-    The model as passes on the plate's grid: the temperature in kelvin, the lamp in watts,
-    the Heat dial, the hand's held air, the threshold and the vapour as a field the bubbles'
-    shading reads (H6's air), the volume sources in the thin gap's projection (as 18c-1's
-    pours), and the `clamp(temp, 0, 50)` and the current's cap out of the heat's way. The
-    phone gets the dial and the gesture in the same PR.
-    *Its check is written* (2026-10-27), red on main until the build, as `soapgpu` was
-    before 32c: `npm run boilgpu` (scripts/boilgpu.mjs, its dishes in
-    scripts/boilgpu-scenes.ts) asks the solver `src/gpu/lampBoil.ts`, in the contract
-    written in scripts/boilgpu-cpu.ts, for boil.mjs's lines on its own fields with boil.mjs's
-    bars, five moved to what float32 can read (each says why: H1 and H2 over 10 ms, the
-    dye's ratio 1e-2, the rim's heat over 1 ms at ±10 K, a site 1e-4 K over its superheat,
-    the volume's divergence 1e-3), plus a nucleus alone (gap-wide, paying its latent heat);
-    and holds its fields to the reference, stepped beside it in node, cell by cell: the
-    lamp's first step and second, a warm patch's upright second, a steam pocket's, a boiling
-    second with no sites, the dish after five minutes, and the hand's boil's start, cell,
-    peak and size at the lift. Every step must submit GPU work, every read map a buffer, and
-    the solver may not carry the reference. The control (`-- --selftest`, Measure's lab2
-    part) reads 54 of 54. Of ten look-alikes of the reference, the dry-out discard, a
-    first-order carry and an explicit rim pass boil.mjs and fail here on the model's lines;
-    a nucleus with no latent heat and one a tenth of a cell pass everything else and fail
-    the nucleus lines; a shortened pressure solve, a weaker rim, a non-conservative steam
-    carry and no vapour volume fail both. One passes: dropping the heat of a bubble's last
-    vapour when it vanishes (under a hundredth of a nucleus, about 0.05 mK), named in 36e-4.
-    `npm run boilgpu` itself joins the Mac's plate shard with the build, which prints its
-    cost a step at 768².
-  - **36e-2b. The live plate's boil, its check** (*check written 2026-11-08, owed until
-    36e-2*). `boilgpu` holds the dish solver; the boil the app steps on the plate every frame
-    (#718's `stepPlateBoil`, `PLATE_BOIL_WGSL`, the current beside it) had no line, and the
-    review of #718 found three faults there. `npm run plateboil` (scripts/plateboil.mjs):
-    *boil* (the Mac's plate shard, `--owed=rate,hold,fan,steam,writes`, printed owed while
-    neither src/gpu/lampBoil.ts nor `GpuStepParams.boilHolds` exists): a level dish of dark
-    dye at Heat 1, Heat Decay at the app's 0.98, warmed at the app's longest frame (0.1 s,
-    FluidSimulation's clamp) and then stepped at 1/60 s. `rate` the 1/60 s approach heats
-    as the warm-up did (the hand's mean, 0.6x–1.4x, still climbing); `hold` under a held
-    hand the spot reaches 100 °C and steam shows in the air field within 150 s (a site's
-    superheat, about 4.3 K at the lowest under the hand, comes on top); `fan` under the fan,
-    after 15 minutes, over 80 °C and under 100 °C at every read, no steam; `steam` the dye
-    that leaves a ring twice the hand's size, less the ring's own drift, is what the steam's
-    volume displaced (0.5x–1.5x) and arrives in the annulus beyond (0.7x–1.3x); `writes`
-    30 K poured out of the fan plate's spot stays out ten 1/60 s steps later (a boil that
-    keeps a private copy and writes it back passes the rest on a still level plate). An f64
-    port of #718's own heat balance reads 100 °C at 258 s under the hand and 94 °C after 15
-    minutes under the fan. #718's head (cc0f6523) reads 0/4 on the first four: its hand's
-    plate climbs in half-float quanta to 84.8 °C at 0.1 s steps and then cools at 1/60 s
-    (vel.z is a half float: once 64 K over the room a step is 1/16 K and a frame's 0.007 K
-    rounds away), its fan's stops at 67.7 °C, and no steam. *zero* (Measure's lab2, holds on
-    main): Heat 0 keeps today's current byte for byte, the tree's `currentForces` against
-    today's (scripts/plateboil-today.mjs, generated from main at 50159cb) in a second lab on
-    SwiftShader, three plates with a spot over the clamp's 50 K, the fluid.ts lines that
-    pack its uniforms held to today's text, and FluidSimulation's `stepCurrent` against
-    today's body. #718 reads 20 084 and 20 889 values different on the upright plates and
-    89 872 on the CPU; the level plate is the same (S.curBuoy is already upright ×
-    Buoyancy, so #718's uncapped branch never runs there). A throwaway fix of #718 (its
-    temperature kept in a float32 channel of the boil field, the reference's vapour source,
-    the Kell branch only while the boil runs, a write to vel.z taken when it is more than a
-    half-float step from the boil's own; /mnt/project-files/antigravity/36e-2b-proof-throwaway.diff)
-    reads 6/6 on *zero* and 6/6 on *boil* (rate 0.84x, steam at 112 s peaking 108.7 °C, fan
-    89.5 °C, the steam's dye 0.89x of its room and 1.00x arriving past the disc, writes 1.00).
-    Its pocket flashes across the spot in one read and condenses within 10 s as the cooler
-    liquid it pushed out flows back: one pocket, as 36e-3 says. The same fix with the
-    vapour term in `poured` zeroed still reads `steam` 1.01x: the air field's own change
-    (thinGap.ts reads its rate) already displaces the liquid by the steam's volume, so #718's
-    review point 5 is answered by measurement: the vapour's volume is counted there, and a
-    second term in `poured` is not needed (with the reference's term as well it read 0.89x,
-    a different pocket, not a doubled push). One check-skeptic pass; its
-    six findings are in the check.
   - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
     On the check's dish the first site's bubble grows across the superheated hot spot (its
     rim moves at about h_i·ΔT/(ρ_v·L), 4 cm/s) before the next site warms to its threshold,
@@ -174,8 +106,55 @@ button, making it look good. Every item here is held to those.
     dissolved air); one broadband infrared coefficient and one visible share; a nucleus
     born whole in one step; the heat of a bubble's last vapour (under 1% of a nucleus)
     given back when it vanishes, which no check can read in float32 and a solver could
-    drop unseen; and an upright dish warmer than its reservoir turns over
-    through the open rim (a slide is closed at its edges; S1 wants a closed rim).
+    drop unseen; an upright dish warmer than its reservoir turns over
+    through the open rim (a slide is closed at its edges; S1 wants a closed rim); and on the
+    live plate's `stepPlateBoil` pass (unlike the standalone `createBoilPlateGpu` dish solver,
+    which runs the full substepped minmod face-flux carry and Jacobi conduction in `r32float`),
+    the plate's temperature and vapour ride the thin gap's velocity by single-step first-order
+    semi-Lagrangian sampling with explicit 5-point conduction, and the boil's float32
+    temperature in `boilAlpha.g` (`rg32float`) writes `vel.z` (`rgba16float`) while taking
+    external writes to `vel.z` only when they differ from `boilAlpha.g` by more than one
+    half-float ULP (so sub-ULP external writes are rounded to the boil's float32 copy).
+    38v (2026-11-21): the gap's heat capacity is wrong for the boil: `lampBoil.ts:819-828`,
+    with C at `:889` counting the glass, so the vapour front runs at 5.6 m/s, about 240 cells
+    a frame at 512². The liquid's share of the heat is (1 − α)ρ_l c_l d/C. Weight the minmod
+    fluxes by it and step α in CFL substeps. Check: in `npm run plateboil`, the pulse moves at
+    the weighted fraction, Σα holds within 1%, and Heat 0 stays bit-identical. (From RS-1.)
+  - **36e-4b. The boil's bubbles are a fixed size** (*open*, S–M; Low). `AIR_BOIL_FILM` 0.533
+    and `AIR_BOIL_R` 0.0175 (`air.ts:55-56`), a hash (`:202-217`) and `bubbleShape.ts:127-137`
+    set them. A vapour bubble in a gap is a pancake of r = √(V/πb), and leaves the hot glass
+    at Fritz's 1–3 mm. Size them from the vapour made. Check: the bubbles' area within 10% of
+    the vapour's volume over the gap. (38v, from RS-16.)
+  - **36e-5. The open plate's boil was never looked at** (*open*, found with 46r,
+    2026-11-13). With Thin Gap off the lasting current did not read the boil at all at
+    Depth Drag 0 until 46r, so Heat on that plate has had no check and no eye. The lab's
+    first pictures of it (128², upright, Heat 1 under a held hand, the app's Buoyancy and
+    cap; `open-plate-46r/before-after.png` in the project's files) show horizontal bands a
+    cell or two apart in the dye piled at the floor, before 46r and after. Find whether
+    the bands are the boil's first-order carry, the current's coarser grid or the open
+    plate's wall, and either give the open plate a `plateboil` part of its own or say in
+    the Heat control that the boil is the thin gap's. No shipped look runs the open plate.
+  - **36e-6. Hot water's lift is capped, and its viscosity is not gated** (*open* — `heatVisc` half shipped, lift half stays open behind 36e-7 and 36e-8; S; Medium).
+    Buoyancy (`forces.ts:254-289`) is added after the `maxCur` clamp at `:277`, so a hot plume
+    never reaches its speed; `heatVisc` (`fluid.ts:645-668`) runs when the heat carry
+    (`fluid.ts:1199`) is gated off by `!boilLive`; and `tempAt` (`lampBoil.ts:750-757`) reads
+    a half-float. Exempt buoyancy from the cap or move it into `hsBody` (38f), and gate
+    `heatVisc` with the carry. Check: an upright plate at 80 °C rises at over 0.9 of U_buoy,
+    and a 50 K spot cools the same at Double Diffusion 0 and 1. (38v, from RS-2.)
+    *Shipped (heatVisc half):* `heatViscPlan` in `src/gpu/fluid/heat.ts` skips `heatVisc`
+    and resets `heatSeconds` while `boilLive` is true (`npm run heat` `once` out of `--owed`).
+    The lift half stays open behind **36e-7** and **36e-8** (which hide thermal buoyancy on a
+    standing plate).
+  - **36e-7. With the boil live on a standing plate, the heat vanishes** (*open*, found writing
+    36e-6's check). On a standing plate with the boil live (`plateUpright: 1`, `thinGap: 1`),
+    24% of the heat is kept after 0.25 s and 9% after 3 s (falling to $1/e$ in ~1.2 s),
+    where air cooling through the 2 mm water + 2 mm glass sandwich ($\rho c \cdot d \approx
+    1.26 \times 10^4\text{ J/(m}^2\cdot\text{K)}$) at $h = 10\text{–}50\text{ W/(m}^2\cdot\text{K)}$
+    a face should take about 2 minutes or more.
+  - **36e-8. Dye climbs a standing plate with no heat patch at all** (*open*, found writing
+    36e-6's check). On a standing plate with no heat patch laid, dye climbs at 16.6 mm/s (and
+    9.65 mm/s at Buoyancy 0), likely the lamp-floor kick into dye treated as wax in
+    `src/gpu/wgsl/fluid/capillary.ts` near line 426.
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
   Glenn McKay's crew described it as "painting with three or four hands". Build the guest

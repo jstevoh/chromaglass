@@ -61,6 +61,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { stayedFree } from './macdeploy.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.json');
@@ -97,18 +98,33 @@ export const SHARED = [
   (it stopped early), one with as many FAIL lines as the runner keeps (the
   rest unread), a quarantined line whose numbers read unread, never, NaN or
   null (the flake is a reading on the wrong side of its bar, not a missing
-  one), and any FAIL line that is not on the list. And nothing at all off a
-  pull request: main's deploy holds every line to its bar, so a real
-  regression the quarantine let through a PR is red there before it is live.
-  An entry has to end within QUARANTINE_DAYS of its start: a quarantine is
-  the time the fix takes, not a place lines go to stay. Adding one, or moving
-  its end later, is a check change `checkguard.mjs` makes the PR name.
+  one), and any FAIL line that is not on the list. An entry has to end within
+  QUARANTINE_DAYS of its start: a quarantine is the time the fix takes, not a
+  place lines go to stay. Adding one, or moving its end later, is a check
+  change `checkguard.mjs` makes the PR name.
+
+  Main's deploys (PLAN.md 19ak-18). Until 2026-11-22 a quarantine held only on
+  a pull request, so that main's deploy, running every line to its bar, would
+  be red on a regression a quarantine let through a PR before it went live.
+  What it did instead, from 11-21 12:26 PM Pacific: deploys 871, 872, 879 and
+  881 were each red on a line already known to flake (startup's "moving for
+  good", intro's 9c, the ear behind the wall, the Live Show's film), none on
+  new code, and the site stayed where it was while every merge since waited.
+  The owner chose (a card, 2026-11-22 05:06Z) to let main's deploys honour the
+  same entries until 2026-12-06, by when the fixes are due. So off a pull
+  request an entry holds only before MAIN_QUARANTINE_UNTIL, whatever its own
+  end date says: the day after it, main holds every line again without a PR
+  having to remember to take this out. A run with no GITHUB_EVENT_NAME (a
+  session's own run) holds every line, so the red is in front of whoever is
+  working on it.
 */
 export const QUARANTINE_DAYS = 21;
+export const MAIN_QUARANTINE_UNTIL = '2026-12-06';
 export const MAX_FAILS = 20;
 const failText = (l) => l.replace(/^.*?\bFAIL\b[:\s]*/, '').trim();
-export function quarantined(c, r, { today = new Date().toISOString().slice(0, 10), event = process.env.GITHUB_EVENT_NAME } = {}) {
-  if (event !== 'pull_request') return null;
+export function quarantined(c, r, { today = new Date().toISOString().slice(0, 10), event = process.env.GITHUB_EVENT_NAME, mainUntil = MAIN_QUARANTINE_UNTIL } = {}) {
+  if (!event) return null;
+  if (event !== 'pull_request' && !(today < mainUntil)) return null;
   if (r.ok || r.code !== 1 || r.timedOut || r.signal || r.stack || !r.fails.length || r.fails.length >= MAX_FAILS) return null;
   // The harness reached its own end and counted exactly these lines red.
   if (!r.tally || r.tally.total - r.tally.pass !== r.fails.length) return null;
@@ -133,6 +149,11 @@ export function parseManifest(text, where = 'scripts/checks.json') {
   if (!Array.isArray(measure) || !Array.isArray(mac) || !measure.length || !mac.length) bad('needs shards.measure and shards.mac, each a list');
   const all = [...measure, ...mac];
   if (new Set(all).size !== all.length) bad('a shard is named twice');
+  // The Measure parts a pull request runs (PLAN.md 19ak-20): optional, and
+  // when given, a non-empty list of Measure parts. reach.mjs runs every part
+  // when it is missing, so a tree from before it reads as it did.
+  const pr = m.shards?.pr;
+  if (pr !== undefined && (!Array.isArray(pr) || !pr.length || pr.some((s) => !measure.includes(s)))) bad('shards.pr, when given, is a list of Measure parts');
   if (!Array.isArray(m.checks) || !m.checks.length) bad('has no checks');
   const seen = new Set();
   for (const [i, c] of m.checks.entries()) {
@@ -164,7 +185,7 @@ export function parseManifest(text, where = 'scripts/checks.json') {
     seen.add(key);
   }
   for (const s of all) if (!m.checks.some((c) => c.shard === s)) bad(`shard ${s} has no checks`);
-  return { shards: { measure, mac }, checks: m.checks };
+  return { shards: { measure, mac, ...(pr ? { pr } : {}) }, checks: m.checks };
 }
 
 export const loadManifest = () => parseManifest(fs.readFileSync(MANIFEST, 'utf8'), path.relative(ROOT, MANIFEST));
@@ -557,7 +578,18 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
     }
   }
   const results = [];
+  /*
+    On the owner's Mac, a look for other work before each check and after
+    the last (PLAN.md 19ah-9a, scripts/macdeploy.mjs): work begun mid-shard
+    shares the GPU the timing lines read. Gone within two minutes, the shard
+    goes on; still there, or there at all after a red check, it stops here,
+    and its last step hands the deploy to GitHub's Macs. GitHub's own Macs
+    answer true at once.
+  */
+  const lookAgain = () => stayedFree(results.length > 0 && !results.at(-1).r.ok && !results.at(-1).q);
+  let stopped = false;
   for (const c of list) {
+    if (!lookAgain()) { stopped = true; break; }
     console.log(`::group::Run ${c.run}`);
     const r = await runOne(c);
     console.log('::endgroup::');
@@ -576,6 +608,11 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
       console.log(`::error title=${escProp(c.name)}::${escData([`${c.run}: ${how}`, ...r.fails].join('\n'))}`);
     }
   }
+  if (!stopped && results.length && !lookAgain()) stopped = true;
+  if (stopped) {
+    const left = list.filter((c) => !results.some((x) => x.c === c));
+    console.log(`::error title=${escProp(`${shard}: stopped, the owner's Mac busy`)}::${escData(`Other work drew with the owner's Mac's GPU mid-shard; the watchdog runs this deploy again on GitHub's Macs (PLAN.md 19ah-9a).${left.length ? ` Not run here: ${left.map((c) => c.name).join('; ')}` : ''}`)}`);
+  }
   const red = results.filter(({ r, q }) => !r.ok && !q);
   const held = results.filter(({ r, q }) => !r.ok && q);
   const total = results.reduce((s, { r }) => s + r.secs, 0);
@@ -586,7 +623,7 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
     const rows = results.map(({ c, r, q }) => `| ${r.ok ? '✓' : q ? '⚠' : '✗'} | ${c.name.replace(/\|/g, '\\|')} | \`${c.run.replace(/\|/g, '\\|').replace(/`/g, "'")}\` | ${Math.round(r.secs)} |`);
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length - held.length} of ${results.length} green${held.length ? `, ${held.length} red on quarantined lines only` : ''}, ${fmtSecs(total)}${room ? ' ⚠ past its room line (PLAN.md 19k-13)' : ''}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
   }
-  return red.length ? 1 : 0;
+  return red.length || stopped ? 1 : 0;
 }
 
 /*
@@ -615,7 +652,7 @@ async function selftest() {
   say(/^\s+part: \$\{\{ fromJSON\(needs\.reach\.outputs\.parts\) \}\}\s*$/m.test(wf), 'Measure\'s matrix is the parts reach selected (the manifest\'s measure shards unless the diff is only checks and documents)');
   say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.only \}\}/.test(wf), 'and the names reach selected are passed to the part\'s runner');
   say(/^\s+shard: \$\{\{ fromJSON\(needs\.reach\.outputs\.shards\) \}\}\s*$/m.test(wf), 'the Mac matrix is the shards reach selected');
-  say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.maconly \}\}/.test(wf) && /ESBUILD_MODULE: /.test(wf), 'and the Mac\'s names are passed to the shard\'s runner, read with the esbuild the reach job installs (19ak-2)');
+  say(!/outputs\.maconly/.test(wf), 'and the Mac runs every check of its shard: only main\'s deploy runs one (19ak-20)');
   say(/run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.part \}\}/.test(wf) && /run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.shard \}\}/.test(wf), 'Measure and the Mac run their shard from the manifest');
   // The workflow's own tools (which files reach, the runner, the guard on a
   // PR's bars, whether the owner's Mac is free of other work before a shard,
@@ -720,7 +757,7 @@ async function selftest() {
   const read = man.checks.find((c) => trace(entryFiles(c.run, scripts)).has('docs/handoff.md') && man.shards.measure.includes(c.shard));
   say(!read || mpick(['docs/handoff.md']).names.includes(read.name), `a document a check reads selects that check${read ? ` (docs/handoff.md: ${read.name})` : ''}`);
   say(mpick(['src/gpu/fluid.ts']).all, 'a source file runs Measure in full');
-  say(mpick(['public/video/cartoons/SOURCES.md']).all, 'and a Markdown file of the site\'s own does too');
+  say(mpick(['public/press/MEDIA.md']).all, 'and a Markdown file of the site\'s own does too');
   say(mpick(['scripts/tools.mjs', 'src/presets.ts']).all, 'a check script with a source file does');
   say(mpick(['scripts/frame.mjs']).all && mpick(['scripts/checks.mjs']).all, 'a shared helper, and this file, do');
   say(mpick(['scripts/nothing-reads-this.mjs']).all, 'a script no check traces does');
@@ -954,14 +991,36 @@ async function selftest() {
   say(/✗ untallied/.test(qt), 'a check that never printed its closing count is red');
   say(/✗ miscounted/.test(qt), 'a check whose count has more red than its FAIL lines is red');
   say(/✗ unread/.test(qt), 'a quarantined line that could not read its numbers is red');
-  say(qc === 1 && /✗ onmain/.test(qt), 'off a pull request (main\'s deploy) a quarantined line blocks');
+  // Main's deploys (19ak-18): held before MAIN_QUARANTINE_UNTIL, blocked from
+  // that day on, and never on a run that is not CI's at all. The shard run
+  // above reads today's date, so it is held or blocked by which side of the
+  // cut-off today is; the direct calls pin both sides whatever the date.
+  const onMain = new Date().toISOString().slice(0, 10) < MAIN_QUARANTINE_UNTIL;
+  say(onMain ? qc === 0 && /⚠ onmain, red after/.test(qt) : qc === 1 && /✗ onmain/.test(qt),
+    `off a pull request (main's deploy) a quarantined line is ${onMain ? `held until ${MAIN_QUARANTINE_UNTIL}` : 'red again'} (exit ${qc})`);
+  const qr = { ok: false, code: 1, timedOut: false, signal: null, stack: false, fails: ['FAIL  the flaky line — 3 against 2'], tally: { pass: 0, total: 1 } };
+  const qc1 = { quarantine: [{ line: 'the flaky line', plan: '19ak-1', since: '2026-11-15', until: '2026-12-06' }] };
+  const held = (event, today) => quarantined(qc1, qr, { event, today, mainUntil: '2026-12-01' }) != null;
+  say(held('push', '2026-11-30') && held('workflow_dispatch', '2026-11-30'), 'on a push or a dispatched deploy, the day before the main cut-off, it holds');
+  say(!held('push', '2026-12-01') && held('pull_request', '2026-12-01'), 'from the cut-off main holds the line to its bar, while a pull request still honours the entry to its own end');
+  // null, not undefined: an undefined event takes quarantined()'s default,
+  // process.env.GITHUB_EVENT_NAME, which in CI is the run's own event (this
+  // line was red on the PR's first run for that reason).
+  say(!held(null, '2026-11-30') && !held('', '2026-11-30'), 'a run outside CI (no GITHUB_EVENT_NAME) holds every line');
+  // The real cut-off is compared as a string, so it has to be a whole date
+  // (a '2026-12-6' would hold all December), and no later than an entry may
+  // run from today: main's hold is the time the fixes take, like an entry's.
+  const mainDays = (Date.parse(MAIN_QUARANTINE_UNTIL) - Date.parse('2026-11-22')) / 86_400_000;
+  say(/^\d{4}-\d\d-\d\d$/.test(MAIN_QUARANTINE_UNTIL) && mainDays > 0 && mainDays <= QUARANTINE_DAYS,
+    `MAIN_QUARANTINE_UNTIL (${MAIN_QUARANTINE_UNTIL}) is a whole date within ${QUARANTINE_DAYS} days of the owner's choice on 2026-11-22`);
   const refuses = (q) => { try { parseManifest(JSON.stringify({ shards: { measure: ['m'], mac: ['x'] }, checks: [{ name: 'a', shard: 'm', run: 'true', quarantine: q }, { name: 'b', shard: 'x', run: 'true' }] })); return false; } catch { return true; } };
   say(refuses([{ line: 'the flaky line', since: day(0), until: day(5) }]), 'a quarantine with no plan id is refused');
   say(refuses(qd('the flaky line', day(0), day(QUARANTINE_DAYS + 1))), `a quarantine longer than ${QUARANTINE_DAYS} days is refused`);
   say(refuses(qd('flaky')), 'a quarantined line too short to name one FAIL line is refused');
   say(!refuses(qd('the flaky line')), 'and a whole entry is taken');
-  // The real ones: each names a check that has the line, and a plan id the plan has.
-  const planText = fs.readdirSync(path.join(ROOT, 'docs/plan')).map((f) => fs.readFileSync(path.join(ROOT, 'docs/plan', f), 'utf8')).join('\n');
+  // The real ones: each names a check that has the line, and a plan id the live plan has
+  // (docs/plan/*.md; a quarantine's debt is open work, so not docs/plan/archive/).
+  const planText = fs.readdirSync(path.join(ROOT, 'docs/plan')).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(ROOT, 'docs/plan', f), 'utf8')).join('\n');
   const qs = man.checks.flatMap((c) => (c.quarantine ?? []).map((q) => ({ c, q })));
   const noPlan = qs.filter(({ q }) => !new RegExp(`\\*\\*${q.plan.replace(/[-]/g, '\\-')}\\b`).test(planText));
   say(!noPlan.length, `every quarantined line's plan id is an item in docs/plan/ (${qs.length} lines${noPlan.length ? `; not found: ${noPlan.map(({ q }) => q.plan).join(', ')}` : ''})`);

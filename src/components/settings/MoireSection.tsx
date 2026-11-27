@@ -2,6 +2,7 @@ import { Grid3x3 } from 'lucide-react';
 import { groupOf } from '../../lib/settingsMap';
 import { MOIRE_SHEETS } from '../../lib/moire';
 import { useMoirePreview } from '../../hooks/useMoirePreview';
+import { openAccountSheet } from '../../lib/tierGates';
 import { Info } from '../Info';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
@@ -27,7 +28,7 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
         value={settings[side] ?? 'spokes'}
         disabled={!pack.live}
         onChange={(e) => set(e.target.value)}
-        className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/85 disabled:opacity-40"
+        className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/85 disabled:opacity-65"
         data-testid={`moire-${side === 'moireSheetA' ? 'lower' : 'upper'}`}
         title={title}
       >
@@ -55,6 +56,11 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
           {pack.secondsLeft <= 0 && (
             <button type="button" onClick={pack.start} className="rounded-full bg-white/10 px-3 py-1 text-white/85 hover:bg-white/20" data-testid="moire-try">
               Try for a minute
+            </button>
+          )}
+          {pack.secondsLeft <= 0 && (
+            <button type="button" onClick={openAccountSheet} className="rounded-full bg-white/10 px-3 py-1 text-white/85 hover:bg-white/20" data-testid="moire-get">
+              Get it
             </button>
           )}
         </div>

@@ -1,6 +1,9 @@
 import { type MusicSettings, DEFAULT_MUSIC_SETTINGS } from '../lib/musicTypes';
 import { findPreset, PRESETS } from '../presets';
+import { RIG_KEYS } from '../lib/lookFade';
 import { stream } from '../lib/rng';
+import { pickLook } from '../lib/lookPick';
+import { isPackLocked } from '../lib/tierGates';
 import type { VisualizerSettings } from '../types';
 
 /**
@@ -40,6 +43,23 @@ export const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 export const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 
 /**
+ * The Mac app's kept System audio (PLAN 14y-2), in `localStorage`, so it
+ * outlives the app: '1' while System audio is the source, gone otherwise.
+ *
+ * 14y opens every launch on Off, because a Mic or a Band that came back by
+ * itself was a device opened, or a band playing, that nobody asked for. The
+ * owner, 2026-11-10, after the Mac app came back from an update on Off in
+ * the middle of a stream rehearsal: "I shouldn't have to click the system
+ * audio ever." System audio in the Mac app asks for nothing at open (macOS
+ * asks once, the first time, and remembers), plays nothing and is what a
+ * live stream is run with, so it alone is kept across launches, and only in
+ * the Mac app: in a browser it is a tab picker, which may never open itself.
+ * Its own key, not AUDIO_SOURCE_KEY's: a pick an older version left in
+ * `localStorage` under that one must still not come back (`npm run opensource`).
+ */
+export const MAC_SYSTEM_AUDIO_KEY = 'chromaglass-mac-system-audio';
+
+/**
  * The room camera lives outside the settings: a preset carries how hard the
  * room drives the plate, never whether a camera is switched on or which one.
  * Loading someone else's look should not open your camera.
@@ -68,9 +88,20 @@ export const OPENING_LOOK: string = (() => {
     const named = asked ? findPreset(asked) : undefined;
     if (named) return named.id;
   } catch { /* no window: the default below */ }
-  const pool = PRESETS.filter(p => !p.settings.macroMode);
-  return pool.length ? stream('show.opening').pick(pool).id : 'classic';
+  // Never an art pack's look (lib/lookPick.ts): the licence that says whether
+  // this copy has the pack is not read yet when the first look is chosen, and
+  // a first impression is the liquid, not the sheets laid on it.
+  return pickLook(PRESETS, stream('show.opening').float, { locked: (pack) => !!pack })?.id ?? 'classic';
 })();
+
+/**
+ * A random shipped look, as the phone's Surprise me and a new song in "New
+ * preset" mode pick one: weighted so an art pack counts as one choice, not as
+ * each of its looks, never a pack this copy does not have, and not the liquid
+ * now on the plate or one picked lately (lib/lookPick.ts, PLAN 45a-13).
+ */
+export const randomLook = (currentId: string | null, rand: () => number) =>
+  pickLook(PRESETS, rand, { currentId, locked: isPackLocked });
 
 /**
  * What the wall shows while the desk builds on a copy (PLAN.md 8b): the look
@@ -115,3 +146,31 @@ export interface ArmedLook {
   /** A stage sequence to start rather than a look to send. */
   sequence?: string;
 }
+
+/** Detect which preset (if any) matches the current settings (ignoring room RIG_KEYS). */
+export function detectActivePreset(settings: VisualizerSettings): string | null {
+  for (const preset of PRESETS) {
+    const ps = preset.settings;
+    const match = Object.keys(ps).filter(key => !RIG_KEYS.has(key as keyof VisualizerSettings)).every(key => {
+      const pv = (ps as Record<string, unknown>)[key];
+      const sv = (settings as unknown as Record<string, unknown>)[key];
+      if (typeof pv === 'object' && pv !== null) return JSON.stringify(pv) === JSON.stringify(sv);
+      return pv === sv;
+    });
+    if (match) return preset.id;
+  }
+  return null;
+}
+
+export const hasAccountOrLicenseUI =
+  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
+  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
+  (typeof window !== 'undefined' &&
+    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
+      new URLSearchParams(window.location.search).get('tierGates') === '1'));
+
+export const isProfileRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('profile') ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
