@@ -24,14 +24,14 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
 
   const row = macAppRow(tier, onMacComputer(), state, !!updates);
   // The sheet's own classes (AccountSheet, CloudSyncCard), so the card reads as one of its sections.
-  const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const label = 'text-[12px] font-medium uppercase tracking-wider text-dim';
   const note = 'mt-1 text-[12px] leading-snug text-muted';
   const what = 'The show offline, with the phone remote and the projector built in.';
   return (
     <div data-cg-mac-app={row.kind} className="border-t border-border pt-4">
       <div className="flex items-center justify-between">
         <div className={label}>Mac app</div>
-        {row.kind === 'in-app' && row.current && <span className="font-mono text-[11px] text-dim">{row.current}</span>}
+        {row.kind === 'in-app' && row.current && <span className="font-mono text-[12px] text-dim">{row.current}</span>}
       </div>
       {row.kind === 'download' && (
         <>

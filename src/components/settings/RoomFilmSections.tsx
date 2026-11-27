@@ -81,13 +81,13 @@ export const RoomSection = ({ c }: { c: SectionCtx }) => {
                 <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-full bg-white/70 transition-[width] duration-100" style={{ width: `${Math.round((sceneState?.energy ?? 0) * 100)}%` }} />
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[12px] font-mono opacity-40">
+                <div className="mt-1 flex items-center justify-between text-[12px] font-mono text-dim">
                   <span>{sceneState?.active ? `${sceneState.people} tracked` : 'opening…'}</span>
                   <span>{sceneState ? `${sceneState.ms.toFixed(1)} ms` : ''}</span>
                 </div>
               </>
             )}
-            <p className="mt-2 text-[12px] leading-relaxed opacity-40">
+            <p className="mt-2 text-[12px] leading-relaxed text-dim">
               Frames are read in this page and never leave it. Nothing is recorded, and the camera stops the moment this is switched off.
             </p>
           </div>
@@ -165,7 +165,7 @@ export const RoomSection = ({ c }: { c: SectionCtx }) => {
             as well as this camera, so it has a section of its own now — and a
             line where it used to be, because this is where anyone who knew it
             will look first. */}
-        <p className="mt-3 mb-3 text-[12px] leading-relaxed text-white/40">
+        <p className="mt-3 mb-3 text-[12px] leading-relaxed text-dim">
           Any feature of the room onto any control is a patch, in {goTo('patches', 'room')}.
         </p>
         <Info>
@@ -258,7 +258,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
                 aria-pressed={filmSource === id}
                 onClick={go}
                 disabled={id === 'window' && !canCaptureWindow}
-                className={`flex ${id === 'none' ? '' : 'flex-1'} items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                className={`flex ${id === 'none' ? '' : 'flex-1'} items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-65 ${
                   filmSource === id ? LIT : 'border-white/15 bg-white/5 text-text-2 hover:bg-white/10'
                 }`}
                 title={title}
@@ -338,7 +338,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
           <button
             onClick={() => onUpdate({ filmZoom: 1, filmX: 0, filmY: 0 })}
             disabled={!framed}
-            className="flex h-7 items-center gap-1 rounded-md border border-white/15 px-2 text-[12px] text-text-2 hover:bg-white/10 disabled:opacity-30"
+            className="flex h-7 items-center gap-1 rounded-md border border-white/15 px-2 text-[12px] text-text-2 hover:bg-white/10 disabled:opacity-65"
             title="Fill the plate again, centred"
             data-testid="film-fit"
           >
@@ -428,7 +428,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ filmImpact: v })}
           settingKey="filmImpact"
         />
-        <p className="mb-3 text-[12px] leading-relaxed text-white/40">
+        <p className="mb-3 text-[12px] leading-relaxed text-dim">
           Any feature of the film onto any control is a patch, in {goTo('patches', 'film')}, where Film Impact, just above, is its master.
         </p>
         {(filmSource !== 'none' || video?.pouring) && (

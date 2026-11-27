@@ -45,9 +45,9 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
           <Sliders size={12} /> Controller
         </h3>
         {!midi ? (
-          <p className="text-[11px] text-white/40">The controller is not available in this window.</p>
+          <p className="text-[12px] text-dim">The controller is not available in this window.</p>
         ) : !midi.supported ? (
-          <p className="text-[11px] leading-relaxed text-amber-200/80" data-testid="settings-midi-unsupported">
+          <p className="text-[12px] leading-relaxed text-amber-200/80" data-testid="settings-midi-unsupported">
             This browser has no Web MIDI. Chrome, Edge and Opera have it; Safari and Firefox do not.
           </p>
         ) : (
@@ -78,7 +78,7 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                     {midi.inputs.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                   </select>
                   {midi.inputs.length === 0 && (
-                    <p className="text-[12px] text-white/40" data-testid="settings-midi-none">
+                    <p className="text-[12px] text-dim" data-testid="settings-midi-none">
                       Nothing plugged in yet. Connect the controller by USB — it appears here by itself.
                     </p>
                   )}
@@ -141,7 +141,7 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                     <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
                       Sweep every fader and knob, then press each pad and button. Nothing reaches the show meanwhile.
                     </p>
-                    <p className="mt-1.5 font-mono text-[11px] text-amber-100" data-testid="settings-midi-auto-tally">
+                    <p className="mt-1.5 font-mono text-[12px] text-amber-100" data-testid="settings-midi-auto-tally">
                       {midi.watched.continuous} faders · {midi.watched.encoder} encoders · {midi.watched.button} buttons
                     </p>
                     <div className="mt-2 flex gap-1.5">
@@ -187,7 +187,7 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                 >
                   {midi.learning?.target.kind === 'voices' ? 'Play a note on the channel…' : 'Learn a channel as Notes as voices…'}
                 </button>
-                <p className="mb-3 text-[12px] text-white/40" data-testid="settings-midi-state">
+                <p className="mb-3 text-[12px] text-dim" data-testid="settings-midi-state">
                   {midi.map.bindings.length} bindings · {midi.activeInputName ?? 'no device'}
                   {midi.clocked ? ' · clock arriving' : ''}
                 </p>
@@ -195,14 +195,14 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
             )}
 
             {midi.map.bindings.length > 0 && (
-              <div className="mb-3 max-h-56 overflow-y-auto rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px]" data-testid="settings-midi-bindings">
+              <div className="mb-3 max-h-56 overflow-y-auto rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[12px]" data-testid="settings-midi-bindings">
                 {midi.map.bindings.map(b => (
                   <div key={b.id} className="py-1 border-b border-white/5 last:border-b-0" data-testid="settings-midi-binding" data-midi-key={b.target.kind === 'voices' ? 'voices' : undefined}>
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-white/60 shrink-0">{b.target.kind === 'voices' ? `Ch ${b.source.channel + 1}` : sourceLabel(b.source)}</span>
                       <span className="truncate text-white/80 flex-1 text-right">{targetLabel(b.target, (id) => PRESETS.find(p => p.id === livePresetId(id))?.name)}</span>
                       {b.target.kind === 'voices' && (
-                        <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-white/40 hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
+                        <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-dim hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
                       )}
                     </div>
                     {b.target.kind === 'voices' && (() => {
@@ -210,13 +210,13 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                       return (
                         <div className="mt-1.5 flex flex-col gap-1.5 rounded border border-white/10 bg-black/30 p-2" data-testid={`settings-midi-voices-${b.id}`}>
                           <div className="flex items-center gap-2">
-                            <label className="flex flex-1 items-center gap-1 text-[11px] text-white/60">
+                            <label className="flex flex-1 items-center gap-1 text-[12px] text-white/60">
                               Tool
                               <select
                                 value={vt.tool ?? 'dropper'}
                                 aria-label="Voice tool"
                                 onChange={e => midi.updateBinding(b.id, { ...vt, tool: e.target.value as VoiceTool })}
-                                className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1 py-0.5 text-[11px] text-white outline-none"
+                                className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1 py-0.5 text-[12px] text-white outline-none"
                                 data-testid={`settings-midi-voices-tool-${b.id}`}
                               >
                                 <option value="dropper">Drop</option>
@@ -225,13 +225,13 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                                 <option value="splatter">Splatter</option>
                               </select>
                             </label>
-                            <label className="flex flex-1 items-center gap-1 text-[11px] text-white/60">
+                            <label className="flex flex-1 items-center gap-1 text-[12px] text-white/60">
                               Liquid
                               <select
                                 value={vt.liquid ?? ''}
                                 aria-label="Voice liquid"
                                 onChange={e => midi.updateBinding(b.id, { ...vt, liquid: e.target.value || undefined })}
-                                className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1 py-0.5 text-[11px] text-white outline-none"
+                                className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1 py-0.5 text-[12px] text-white outline-none"
                                 data-testid={`settings-midi-voices-liquid-${b.id}`}
                               >
                                 <option value="">Look’s own</option>
@@ -244,7 +244,7 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                             ['release', 'Release', 0, 4, 0.05, vt.release ?? VOICE_DEFAULTS.release, (v: number) => `${v.toFixed(2)} s`],
                             ['cap', 'Voices', 1, 8, 1, vt.cap ?? VOICE_DEFAULTS.cap, (v: number) => `${Math.round(v)}`],
                           ] as const).map(([k, lbl, min, max, step, val, fmt]) => (
-                            <label key={k} className="flex items-center gap-2 text-[11px] text-white/60">
+                            <label key={k} className="flex items-center gap-2 text-[12px] text-white/60">
                               <span className="w-12 shrink-0">{lbl}</span>
                               <input
                                 type="range" min={min} max={max} step={step} value={val}
@@ -253,7 +253,7 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                                 className="set-range flex-1"
                                 data-testid={`settings-midi-voices-${k}-${b.id}`}
                               />
-                              <span className="w-11 text-right font-mono text-[11px] text-white/80">{fmt(val)}</span>
+                              <span className="w-11 text-right font-mono text-[12px] text-white/80">{fmt(val)}</span>
                             </label>
                           ))}
                         </div>
