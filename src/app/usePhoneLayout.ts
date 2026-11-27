@@ -65,11 +65,13 @@ export function usePhoneLayout({
    *
    * Previously windows narrower than 1024 px dropped out of the desk into the
    * old floating overlay, so snapping a laptop window to half a screen mid-set
-   * replaced Perform, Cues, and the tabs with retired controls (PLAN 49c).
-   * Now every window that is not in the phone layout keeps the desk: from
-   * 1024 px up it draws both side columns; from 768 px to 1023 px it folds
-   * into one column; below 768 px on a non-touch window `wantsPhoneLayout`
-   * selects the phone layout instead. The old floating overlay is unhooked.
+   * replaced Perform, Cues, and the tabs with retired controls (PLAN 49c), and
+   * 49c routed non-touch windows under 768 px to the phone layout instead.
+   * Now every non-touch window keeps the desk down to 360 px: from 1024 px up
+   * it draws both side columns; from 768 px to 1023 px it folds them into one
+   * column beside the plate; below 768 px it stacks that folded column under
+   * the plate. Touch phones and `/play` still get the phone layout. The old
+   * floating overlay is unhooked.
    */
   const deskUp = !phone;
   // A phone is never a desk, whatever its width turned sideways.

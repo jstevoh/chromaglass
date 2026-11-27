@@ -150,7 +150,7 @@ const phonePage = async (width, height, { touch = true, query = '' } = {}) => {
   page.setDefaultTimeout(60_000);
   page.on('pageerror', (e) => { pageErrors.push(e.message); console.log('  [pageerror]', e.message.slice(0, 200)); });
   await page.goto(`${URL}${query}`, { waitUntil: 'load' });
-  for (let i = 0; i < 40 && !(await page.getByTestId('phone-stage').count()) && !(await page.getByTestId('liquid-water').count()); i++) await page.waitForTimeout(250);
+  for (let i = 0; i < 40 && !(await page.getByTestId('phone-stage').count()) && !(await page.getByTestId('desk-preview').count()); i++) await page.waitForTimeout(250);
   await page.waitForTimeout(800);
   return { ctx, page };
 };
@@ -167,7 +167,7 @@ try {
   {
     const { ctx, page } = await phonePage(390, 844, { touch: false });
     check('a mouse at 390 wide gets the laptop\'s layout, not the phone\'s',
-      (await page.getByTestId('phone-stage').count()) === 0 && (await visible(page, 'liquid-water')));
+      (await page.getByTestId('phone-stage').count()) === 0 && (await visible(page, 'desk-preview')));
     await ctx.close();
   }
 
@@ -1122,7 +1122,7 @@ try {
       await tap(page, 'phone-open-more');
       await tap(page, 'phone-full-layout');
       await page.waitForTimeout(500);
-      check('"Full layout" puts the laptop\'s layout up instead', !(await visible(page, 'phone-stage')) && (await visible(page, 'liquid-water')));
+      check('"Full layout" puts the laptop\'s layout up instead', !(await visible(page, 'phone-stage')) && (await visible(page, 'desk-preview')));
     }
     await ctx.close();
   }
@@ -1236,14 +1236,14 @@ try {
         rb.map((b, i) => (onScreen(b) ? null : rest[i])).filter(Boolean).join(', ') || `${rest.length} of them`);
       const sCovered = await coveredControls(page, { skipInside: '[data-testid="needs-webgpu"]' });
       check('Play: nothing covers a control on the sheet', sCovered.length === 0, sCovered.slice(0, 4).join('; '));
-      // A slider moves the setting it names: the value printed is the app's.
+      // A slider moves its setting; the readout has its unit.
       const speedText = () => page.getByTestId('play-slider-speed').locator('span').last().textContent();
       const before = await speedText();
       const track = await page.getByTestId('play-slider-speed').locator('input').boundingBox();
       await page.touchscreen.tap(track.x + track.width * 0.9, track.y + track.height / 2);
       await page.waitForTimeout(300);
       const after = await speedText();
-      check('Play: Speed moved is the plate\'s speed', before !== after && Number(after) > Number(before), `${before} → ${after}`);
+      check('Play: Speed moved is the plate\'s speed', before !== after && parseFloat(after) > parseFloat(before), `${before} → ${after}`);
       check('Play: and the look is marked edited', await visible(page, 'play-edited'));
       // A double tap puts it back where the look has it (8c: the desk's
       // double-click, on a phone where every knob is a slider). Tapped at a
