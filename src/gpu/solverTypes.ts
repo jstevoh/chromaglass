@@ -162,6 +162,8 @@ export interface GpuStepParams {
   liquidMl?: number;
   coverGrams?: number;
   coverHand?: number;
+  /** Whole-number seed for the ground cover rim's white per-cell roughness (PLAN 38r-16). */
+  airSeed?: number;
   /**
    * The ferrofluid's kinematic viscosity in a thin gap, m²/s. Not a setting:
    * the default is a real ferrofluid's (FERRO_NU in fluid.ts), and only the

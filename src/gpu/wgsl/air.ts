@@ -43,12 +43,13 @@
 */
 /** How many bubbles the field's index can name. */
 export const AIR_LOOK_SPAN = 512;
+export const AIR_LOOK_BOIL = 1600;
 
 export const AIR_RIM_WGSL = /* wgsl */ `
 const AIR_LOOK_SKIRT: i32 = 1;
 const AIR_LOOK_IN: i32 = 1024;
 const AIR_LOOK_SPAN: i32 = ${AIR_LOOK_SPAN};
-const AIR_LOOK_BOIL: i32 = 1600;
+const AIR_LOOK_BOIL: i32 = ${AIR_LOOK_BOIL};
 /** How far past a rim the index reaches, in texels. */
 const AIR_SKIRT: f32 = 3.0;
 /** A steam pocket's film and radius, which its look once packed (sixteen steps each: film 8, size 6 of 0.004 to 0.16). */

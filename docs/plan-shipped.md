@@ -16071,6 +16071,31 @@ closed circulation the oil's lift has), 15e-13 (a bottle's polarity loses its si
 same floor), 15e-14 (a thin gap reads the magnet's and the mix's forces against a different
 drag when no other body force runs that step).
 
+## 38r-16. The pinch and the air edge (G2, 2026-11-27)
+
+Added the air phase directly into the WebGPU Hele-Shaw thin-gap solver (`wgsl/fluid/airEdge.ts`,
+`gpu/fluid/cover.ts`, `wgsl/thinGap.ts`, `wgsl/thinWarm.ts`, `gpu/fluid/passes.ts`):
+
+- A per-cell wet fraction `w` (`1` liquid, `0` air) with `WebGPUFluid.readWet(): Promise<Float32Array>`
+  on the `N×N` grid row by row from `y = 0`, carried by Strang-split (alternating X/Y, Y/X)
+  Courant-substepped fluxes (`wetCourant`, `wetPlan`, `wetAdvect`) and kept sharp via conservative
+  relaxation (`wetRelax`) and isotropic sharpening (`wetSharpen`).
+- Pressure solve: air cells sit at `p_air = 0` with `1/55` water viscosity (`wetPrep` marks air
+  mobility `-55 * |m|`), and the front's liquid side holds the Laplace boundary jump
+  `p_Γ = −2σ cosθ / h + σ κ` (`κ = ∇·n̂`, outward unit normal `n̂` from `wetSmooth`) across
+  `hsDivergence`, `hsGradient`, and `THIN_FACE`, with circular `onRim` / `openWall` handling on
+  the cover boundary.
+- Rim inflow: liquid enters while the ledger's `bead > 0` (`rimBeadShare`) and air enters once
+  empty, with white per-cell ground-rim roughness seeded by `airSeed?: number` on `GpuStepParams`.
+- Dye & display integration: `wetShedDye` moves residual dye out of dry cells into liquid
+  neighbours; `wetToAir` composites `1 − w` into `fields.air` (`AIR_LOOK_BOIL`) so the plate
+  draws air fingers and pinched-off fingers as bubbles without any drawn angle pattern.
+- Verification: `npm run airedge` `rim` and `front` green; `fingers` passes `Thickness 0.6` hard
+  and gentle, growth, cross-seed independence, hard/gentle and `0.6/0.9` ratios; `Thickness 0.9`
+  `-0.4` misses `0.50` band share at `0.45` (`mode 23.6` vs `30.1`, `grew ×18.0`, `corr 0.03`) from
+  nonlinear coarsening over 75 steps (`--owed=fingers` left for Claude bar re-aim, along with
+  dropping the main-ledger branches of `gap` lines 15–16).
+
 ## 38r-17. The rest gap's other readers, part 1 (2026-11-21)
 
 Wired the seven non-optical readers of the 2 mm rest gap constant to read the solver's live

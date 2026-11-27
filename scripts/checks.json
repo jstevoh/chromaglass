@@ -1922,15 +1922,15 @@
     {
       "name": "The air edge's fingers, owed until 38r-16 is built",
       "shard": "lab3",
-      "run": "npm run airedge -- --owed=rim,front,fingers",
+      "run": "npm run airedge -- --owed=fingers",
       "why": [
         "Written before the build (PLAN 38r-16; scripts/airedge.mjs): a lift past",
         "the rim's bead draws air in at the rim only once the bead is empty, the",
         "field's air is the ledger's A - wet, and the front fingers as",
         "Saffman-Taylor in a lifted cell (n_max from the pull, not the viscosity).",
-        "Its finger counter's control runs on main; the GPU lines wait for",
-        "readWet, so on main it takes about two seconds. Lab, so SwiftShader",
-        "runs it once built (four runs at 192 squared, a few hundred steps)."
+        "rim and front are green; fingers stays owed for Thickness 0.9 -0.4",
+        "band share 0.45 against 0.50 (nonlinear coarsening at 18x growth over",
+        "75 steps, handed back for bar re-aim)."
       ]
     },
     {

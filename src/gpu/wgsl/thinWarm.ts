@@ -111,7 +111,13 @@ fn energy(x: i32, y: i32, n: i32, mi: f32, p1: f32, q2: f32) -> vec3f {
   var o = array<vec2i, 4>(vec2i(1, 0), vec2i(0, 1), vec2i(-1, 0), vec2i(0, -1));
   for (var k = 0; k < 4; k++) {
     let q = vec2i(x, y) + o[k];
-    if (!hsIn(q.x, q.y, n)) { continue; }
+    if (!hsIn(q.x, q.y, n)) {
+      if (A.a.x > 0.5) {
+        let f = hsHarm(mi, 55.0 * mi);
+        e += f * vec3f(p1 * p1, p1 * q2, q2 * q2);
+      }
+      continue;
+    }
     let mn = mob[q.x + q.y * n];
     let f = hsHarm(mi, abs(mn));
     var d = vec2f(0.0);

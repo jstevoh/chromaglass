@@ -432,6 +432,11 @@ export class FluidFields extends FluidCore {
     return this.hsPrev;
   }
 
+  /** Storage buffer holding capillary pressure jumps at air-liquid faces, or a 16-byte zero buffer when inactive. */
+  protected wetJumpBuf(): GPUBuffer {
+    return this.wetDirty && this.wetJump ? this.wetJump : this.wetJumpZero;
+  }
+
   /** The flow the thin carries ride: the forced flow, less the glass's drift when it has one (driftCells). */
   protected ride(): GPUTexture {
     return this.riding ? this.velRide : this.velForced;
@@ -485,8 +490,8 @@ export class FluidFields extends FluidCore {
       grain: this.grain?.read ?? null,
       /** The particle splat, or in the closeup the fine detail in its place (PLAN 47a-1); null with neither. */
       particles: this.fineDetail ?? (this.particles && !this.particles.idle ? this.particles.target : null),
-      /** The air field (H6), or null when no bubble is on this plate. */
-      air: this.air?.any ? this.air.field : null,
+      /** The air field (H6), or null when no bubble or air edge is on this plate. */
+      air: this.airOutLive && this.airOutTex ? this.airOutTex : this.air?.any ? this.air.field : null,
       /** The bubbles as that field was stamped from them, for the plate to draw each from its own disc (38h-15). */
       airGeo: this.air?.any ? this.air.geo : null,
       /** The second phase (H7), or null when none has been poured. */

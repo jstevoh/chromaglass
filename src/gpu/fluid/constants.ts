@@ -98,6 +98,15 @@ export const FERRO_NU = 5e-6;
 export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'heatPack', 'heatUnpack'];
 /** Air-give kernels built behind the show (no opening pours air). */
 export const THIN_GAP_LATER_KERNELS = ['airGiveSub', 'airGiveThin'];
+/** Air-edge kernels built behind the show (PLAN 38r-16). */
+export const WET_SUBSTEPS = 97;
+export const WET_PAIRS = (WET_SUBSTEPS - 1) / 2;
+export const AIR_EDGE_KERNELS: [string, string][] = [
+  ['wetInit', 'r32float'], ['wetGapInit', 'r32float'], ['wetGapSeen', 'r32float'],
+  ['wetSmooth', 'r32float'], ['wetPrep', 'rgba16float'], ['wetCourant', 'r32float'],
+  ['wetPlan', 'r32float'], ['wetAdvect', 'r32float'], ['wetRelax', 'r32float'],
+  ['wetSharpen', 'r32float'], ['wetToAir', 'rgba16float'],
+];
 /** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
 export const AIR_DISP_LEAST = 1e-5;
 /*

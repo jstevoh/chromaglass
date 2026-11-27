@@ -472,6 +472,24 @@ export class FluidCore {
   protected phaseGap: GPUBuffer | null = null;
   protected phaseGapPrimed = false;
   protected mazeReady = false;
+  /** The air edge's wet fraction (PLAN 38r-16): 1 liquid, 0 air, lazy until air enters under the cover. */
+  protected wet: PingPong | null = null;
+  protected wetSoft: GPUTexture | null = null;
+  protected wetGapSeen: GPUBuffer | null = null;
+  protected wetJump: GPUBuffer | null = null;
+  protected wetMost: GPUBuffer | null = null;
+  protected wetInd: GPUBuffer | null = null;
+  protected wetSub: GPUBuffer | null = null;
+  protected readonly wetJumpZero: GPUBuffer;
+  protected airOutTex: GPUTexture | null = null;
+  protected airOutLive = false;
+  protected wetStarted = false;
+  protected wetDirty = false;
+  protected wetInitRadius = 0.5;
+  protected rimIsAir = false;
+  protected rimBeadShare = 0;
+  protected wetSeed = 1;
+  protected wetParity = 0;
   protected airCover = 0;
   /*
     Last frame's coverage, so the rate term can be made zero-mean.
@@ -609,6 +627,7 @@ export class FluidCore {
     this.cpuMulTex = tex(this.L, R32, 'dye multiplier (cpu)');
 
     this.sim = this.disposer.track(device.createBuffer({ label: 'sim', size: SIM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    this.wetJumpZero = this.disposer.track(device.createBuffer({ label: 'wet jump zero', size: 16, usage: GPUBufferUsage.STORAGE }));
     this.splatArgs = this.disposer.track(device.createBuffer({ label: 'splat args', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
     this.statsArgs = this.disposer.track(device.createBuffer({ label: 'stats args', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
     this.statsPartials = this.disposer.track(device.createBuffer({ label: 'stats partials', size: STATS_GROUPS * 2 * 16, usage: GPUBufferUsage.STORAGE }));
@@ -804,6 +823,10 @@ export class FluidCore {
     // The gap the ferrofluid last saw is from before the clear: the next
     // step must carry it by area until phaseGapSeen has read the new one.
     this.phaseGapPrimed = false;
+    this.wetStarted = false;
+    this.wetDirty = false;
+    this.airOutLive = false;
+    this.rimIsAir = false;
     for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b, this.swirlDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
