@@ -168,6 +168,17 @@
       ]
     },
     {
+      "name": "Keep Full tops up a dish left running, and only when it runs low",
+      "shard": "logic",
+      "run": "npm run keepfull",
+      "why": [
+        "The owner left Lava Pop running with Evolve off and the plate emptied (PLAN 18a-22).",
+        "Keep Full's sums in node: an empty dish gets a full drop, paced, a full one nothing,",
+        "topped up from 80% to 95% of the look's amount; and its wiring: only with the switch",
+        "on, through the hand's own Drop on its own dice, a room key, on every surface."
+      ]
+    },
+    {
       "name": "The desk's layouts",
       "shard": "logic",
       "run": "npm run desklayout",
@@ -380,6 +391,21 @@
         "timeout cleanup, CG_FILM_LOCK_HELD nesting, stale-rename race protection,",
         "--max-wait exit 75 with no leftover ticket, deploy-mark priority, and",
         "scripts/macbusy.sh refusing a live film.lock."
+      ]
+    },
+    {
+      "name": "The parity run compares numbers, not noise",
+      "shard": "logic",
+      "run": "npm run sameapp -- --selftest",
+      "why": [
+        "The nightly main-against-branch comparison (scripts/sameapp.mjs, PLAN.md 50i)",
+        "on made-up sweeps, no browser: the same numbers give nothing, a change the",
+        "size of noise gives nothing, a look darker at one moment only gives nothing,",
+        "and each regression a merge could make gives its line (a look darker at both",
+        "moments, half its frame rate, a dial that stopped moving its setting or",
+        "reaching the plate, a look gone, a new finding); a noisy night raises only",
+        "the floor it is noisy on, and the launchd agent runs main's script from its",
+        "own clone. The run itself is a report on the owner's Mac, never a gate."
       ]
     },
     {
@@ -893,6 +919,14 @@
         "The back plate's own look (PLAN.md §16a): the fold hands plate 1 the",
         "look's solver keys under the live patches and leaves the picture the",
         "front's, the fade is a Go's, Follow lets go, and the pours are wired."
+      ]
+    },
+    {
+      "name": "Which looks carry trapped air",
+      "shard": "logic",
+      "run": "npm run lookair",
+      "why": [
+        "Air on by default only in the looks made for it, the clock-glass sandwich (PLAN 33q-4, scripts/lookair.mjs)."
       ]
     },
     {
@@ -3183,6 +3217,17 @@
         "open-rim solve slid Solar Flare's whole dish out over its rim (0% of",
         "its dye left in the lab); a closed dish answers it with its pressure,",
         "so only the gusts' curl moves the liquid, as strong as before."
+      ]
+    },
+    {
+      "name": "Keep Full refills an emptied dish in the app",
+      "shard": "plate",
+      "run": "npm run keepfullapp",
+      "timeout": 8,
+      "why": [
+        "Lava Pop on Metal (PLAN 18a-22): left alone it keeps its dye (the leak printed as a",
+        "half-life), a cleared dish stays empty with Keep Full off, and with it on the",
+        "dropper brings it back to 60% of the look's amount by its own drops, then stops."
       ]
     },
     {

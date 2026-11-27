@@ -3087,7 +3087,21 @@ How the rings read with a moving liquid at sixty frames is only seen here.
 4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
 5. Dish Stress at 0: the look exactly as before.
 
-## 147. The Magnet's domes in the closeup (PLAN 29a-13)
+## 147. The video coming in: the camera's row, the LED ring, the camera poured (PLAN 14ag-9)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. On the desk, click the **Video** dot in the header. Good: the Video panel opens beside the
+   plate (not the Settings sheet), its source row on top.
+2. **Camera**. Good: right under the sources, a row with a small live picture of what the camera
+   sees, the camera's name, and "over the plate"; Plate lit. Bad: a file's name there, or no picture.
+3. **Lamp**, then **LED ring**. Good: Lamp puts the camera under the dish, filtered by the dye;
+   LED ring turns it round the plate's centre like the LED platform, at LED Rotation Speed
+   (Lamp & Light). Bad: the picture both over and under the glass, or a ring that does not turn.
+4. **Pour**. Good: the camera's picture laid into the dish as dye, its motion stirring the liquid,
+   the camera still on the plate; Stop ends only the pour; Off ends both.
+5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
+
+## 148. The Magnet's domes in the closeup (PLAN 29a-13)
 
 The domes a magnet stands were black blobs in the macro view. Their sides now mirror the lit
 liquid round them as a camera records a dark gloss under water, with the light's glint on
@@ -3100,7 +3114,7 @@ each top.
 3. Bad: domes that read as holes or bowls rather than raised, a sheen that looks painted on, or
    any change to the plate at 1x.
 
-## 148. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
+## 149. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
 
 Filmed on the owner's Mac before and after (2026-11-01); the films are on one page in the
 project. `spikes`, `standing`, `ferrodrag`, `ferrohold` and `ferropour` check the physics
@@ -3113,7 +3127,7 @@ in the lab; only the Mac shows whether it reads as ferrofluid.
 4. Not this change (9t-12): a wide pool dragged by the Magnet turns to worms and creeps,
    the same before and after.
 
-## 149. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
+## 150. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
 
 The labyrinth's period now follows Labyrinth (the coil's field) through the magnetic Bond
 number. Magnet Garden and Ferro Paint sit at the top of the dial, where the period is 0.042

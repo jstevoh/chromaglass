@@ -21,7 +21,7 @@ import { Sheet, Button, SwitchPill, Toggle, LIT } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
-import { openAccountSheet } from '../lib/tierGates';
+import { TierLockBanner } from './TierLock';
 import { makesText, type RecordChoice } from '../lib/recordChoice';
 import { PORTRAIT_STAGE, FREE_PORTRAIT_STAGE, type ClipShape } from '../lib/clipFrame';
 import { canShareClip, shareClip } from '../lib/shareClip';
@@ -170,23 +170,14 @@ export function RecordPanel({
                 </div>
               </div>
               {recorder.maxDurationSec !== null && (
-                <div
-                  data-cg-app-tile="full-record"
-                  data-cg-record-free-cap={String(recorder.maxDurationSec)}
-                  onClick={openAccountSheet}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
-                  className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
-                >
-                  <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
-                    <span>In the ChromaGlass app · Full-length unmarked Record</span>
-                    <span className="shrink-0 text-[12px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
-                  </div>
-                  <p className="mt-0.5 text-amber-100/90">
-                    On the free site, clips are capped at {recorder.maxDurationSec} seconds and carry the ChromaGlass corner mark. Unlock Home or Pro for full-length unmarked takes.
-                  </p>
-                </div>
+                <TierLockBanner
+                  feature="full-record"
+                  summary={`On the free site, clips are capped at ${recorder.maxDurationSec} seconds and carry the ChromaGlass corner mark. Unlocked by ChromaGlass Home or Pro.`}
+                  dataAttrs={{
+                    'data-cg-app-tile': 'full-record',
+                    'data-cg-record-free-cap': String(recorder.maxDurationSec),
+                  }}
+                />
               )}
 
 

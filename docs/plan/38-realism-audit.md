@@ -358,7 +358,7 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   in `docs/plan-shipped.md` §38k.
   - **38k-7. The plate on the real onset (shipped, #662, with 9t-2).** `SPIKE_ONSET`
     is the liquid's 4.0 mT; the owner's films of Magnet Garden, Ferro Paint and a dragged
-    Magnet are `docs/judging.md` §148. Story in `docs/plan-shipped.md` §9t-2 + 38k-7.
+    Magnet are `docs/judging.md` §149. Story in `docs/plan-shipped.md` §9t-2 + 38k-7.
   - **38k-1. A Magnetite dial** (S–M; Medium, the owner's call). The ferrofluid's loading
     φ sets Ms and χ together (both in proportion to φ; EFH1 is about 8%), so one dial
     from very dilute (no field raises domes: Ms under Mc) to very loaded (past real, 20%
@@ -514,7 +514,7 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
       checks written 2026-11-08*. ~~**G1** (the ledger and the pinch, `npm run gap` lines 1–23,
       `puddle`, `settle`, `lift`, `pinch` all green)~~ built on `antigravity/38r-16-pinch`
       (Liquid range 1–150 mL, `lib/cover.ts` puddle ledger + RK4 substepping, `lib/playGesture.ts`
-      `pinchHand`/`PINCH_SPAN`/`playHand` span, `components/coverPinch.ts`, `PhonePlay.tsx`).
+      `pinchHand`/`PINCH_SPAN`/`playHand` span, `engine/coverPinch.ts`, `PhonePlay.tsx`).
       **G2** (`npm run airedge -- --owed=rim,front,fingers`, the Saffman–Taylor fingers on the
       GPU solver) remains open.
       - *The pinch.* A two-finger pinch on the desk (trackpad: wheel + ctrlKey over the plate,

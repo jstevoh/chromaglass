@@ -14,12 +14,12 @@ comments, which moved with it.
 | `useAmbientMode` | Ambient TV mode's switch |
 | `useSoundState` | what the show listens to, as state |
 | `useSongLine` | the song's shape, the bar and the heard tempo, for the status lines |
-| `usePour` | an image or a film poured into the dish, and the one video loaded (`LoadedVideo`, `loaded`, `pourLoaded`, PLAN 14ag) |
+| `usePour` | an image or a film poured into the dish, and the one video loaded (`LoadedVideo`, `loaded`, `pourLoaded`, PLAN 14ag); a live picture poured by a clone of its stream (`pourStream`, `pourLive`, PLAN 14ag-9) |
 | `useSoundSource` | changing what the show hears; the music player; the drone |
 | `useBench` | the engine's status, Calibrate and the grid sweep (`?bench`) |
 | `useToast` | the one-line notice and rich 8 s Undo toast (`ToastItem`, `showToast`, `clearToast`, `triggerToastAction`, PLAN 49a) |
 | `usePlateUndo` | full solver + settings snapshot & 8 s Undo safety net for `clearPlate`, `drainPlate`, `luckyPlate`, `newPlate`, `randomLookPlate`, and panel-close Undo (`showPanelClosedUndo`), syncing `undoNotice` (`RemoteState.undo`) to the phone remote (PLAN 49a) |
-| `useFilm` | the film that drives the plate: a file, a camera, a window; and `video`, the row that plays and pours the video loaded (`VideoShelfProps`, PLAN 14ag) |
+| `useFilm` | the film that drives the plate: a file, a camera, a window; and `video`, the row of the input on the plate (the camera or window while one is on, else the video loaded) with its preview, where it shows and its pour (`VideoShelfProps`, PLAN 14ag, 14ag-9) |
 | `useSceneSource` | the room camera as a sensor |
 | `usePaletteLock` | the palette held across looks; since PLAN 43d also `paletteFromFile` (a picture or video file's colours as the palette, "From picture", the lock `PICTURE_LOCK`), `palettes` (the list the desk and the phone draw, the picture's last) and `pictureDyes` (sent to a projector with the lock) |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
@@ -62,7 +62,7 @@ comments, which moved with it.
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption only since the ink was shelved, 37x-10m; `titleCaption` deleted); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film, and `loopRender`, a seamless Canvas loop (PLAN 43b) |
 | `useControllers` | MIDI, the gamepad, the projector window |
-| `useCommandPalette` | the palette's commands, panel/section indexing, the `?` shortcut sheet state, and the keyboard |
+| `useCommandPalette` | the palette's commands, panel/section indexing, the `?` shortcut sheet state, and the keyboard; `openPanelNow`, a desk panel opened or brought forward on the tab in view (the Video dot, PLAN 14ag-9) |
 | `useCheckHooks` | the checks' `?debug` doors (`lib/checkHooks.ts` declares them) |
 | `useCrashState` | the black box's half from here |
 

@@ -7291,7 +7291,7 @@ middle and 1 to 6 across (both red on main), now 23 and 7 to 38; the ten older l
 176 of 255, its brightest up and left, the dye line blue 197 to 0, red 209 to 187, the 1x
 plate 0 bytes different). No setting and no phone change: the phone draws the same plate
 shader. Found along the way: 29a-14 (the ridges), 29a-15 (the dye's amount over a dome),
-38h-12 (the bubbles' walls on display values too). Judging §147.
+38h-12 (the bubbles' walls on display values too). Judging §148.
 
 ### 29c. The drop follows the hand and holds together (#373)
 

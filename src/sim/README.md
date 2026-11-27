@@ -34,9 +34,11 @@ the component.
 
 - `beadStep.ts`: `stepPlateBeads` (oil bead stepping and live gap/liquid wiring, moved out of `LiquidVisualizer.tsx`, PLAN 18i-2, 19ai-10).
 - `constants.ts`: the grid, the macro zoom, Turing's drift, the currents' gains.
-- `dice.ts`: `DICE` (seeded randomness), the palette window.
+- `dice.ts`: `DICE` (seeded randomness; `keep` is Keep Full's, PLAN 18a-22), the palette window.
 - `dropSplash.ts`: `layDrop` (a colour drop: on a thin gap its volume and dye queued through lib/dropImpact.ts, else the stamp; its crater, and satellites only past Cossali's K using the falling liquid's own ρ, σ, μ and live `coverMetres` gap, splitting drop dye and volume across central drop and satellites; a last `what` carries the bottle's liquid into every pour, PLAN 18c-13), `dropBottle` (a hand's drop from a bottle: `layDrop` with its liquid, and the bottle's deposit told the volume came already), `layStream` (a stream held on the plate: one held share a step with its colour laid at the strength of a column of the same drop, `dropColumnDye`; the stamp when nothing pours) and `stepPlateDrops` (the drops on their way in, a step at a time), PLAN 18c-2, 18c-3, 18c-10, 18c-13; moved out of `fluidSimulation.ts` with its old `splash()`. `FluidSimulation.autoInject` takes a last `volume` (false for a fresh plate's lay and a bottle whose own pour brought it) and the sim holds `drops`.
 - `fluidSimulation.ts`: `FluidSimulation`.
+- `hueJourney.ts`: `hueJourneyTurns`, the hue journey's step on the wall clock (moved out of the frame loop with PLAN 18a-22).
+- `keepFull.ts`: Keep Full, the dropper topping up a dish left running (PLAN 18a-22): `keepFullState(look)`, `stepKeepFull`, `keepFullDose` (the pure decision), `keepFullHands`, `KEEP_FULL_*`. Lays through `dropBottle` on `DICE.keep`.
 - `frameTypes.ts`: the frame's shapes.
 - `mixWait.ts`: `mixWait()` (a look's oil laid before its solver is built: kept, played onto the solver when it attaches, put back if that solver goes before it has spoken, dropped on a clear or when a carry holds it; PLAN 27f-9m, `npm run oillaid`).
 - `noteVoicesStep.ts`: `handleNoteVoiceEvent`, `queueMelodyDrops`, `stepMelodyAndVoices` (MIDI note voices and Melody Walk stepped into the plate, PLAN 24.3).

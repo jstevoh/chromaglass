@@ -2,7 +2,7 @@ import { Grid3x3 } from 'lucide-react';
 import { groupOf } from '../../lib/settingsMap';
 import { MOIRE_SHEETS } from '../../lib/moire';
 import { useMoirePreview } from '../../hooks/useMoirePreview';
-import { openAccountSheet } from '../../lib/tierGates';
+import { TierLockBanner } from '../TierLock';
 import { Info } from '../Info';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
@@ -47,23 +47,27 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
         Two printed transparencies on the stage, one under the glass and one on the cover. The light goes through both, and two line patterns multiplied make slow fringes far larger than their lines: turn the upper sheet a few degrees and bars, stars and flowers sweep across the plate. The lower sheet is seen through the liquid, so every drop bends its lines and shows up magnified in the fringes.
       </Info>
       {!pack.allowed && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-[12px] text-white/70" data-testid="moire-pack-note">
-          <span className="flex-1">
-            {pack.secondsLeft > 0
+        <TierLockBanner
+          feature="moire"
+          className="mb-3"
+          dataAttrs={{ 'data-testid': 'moire-pack-note' }}
+          summary={
+            pack.secondsLeft > 0
               ? `Trying the moiré pack: ${pack.secondsLeft} s left.`
-              : 'The moiré pack: included in Pro, an add-on for Home.'}
-          </span>
-          {pack.secondsLeft <= 0 && (
-            <button type="button" onClick={pack.start} className="rounded-full bg-white/10 px-3 py-1 text-white/85 hover:bg-white/20" data-testid="moire-try">
-              Try for a minute
+              : 'Included in ChromaGlass Pro, or a $15 add-on for Home.'
+          }
+          actionLabel={pack.secondsLeft > 0 ? 'See unlock options →' : 'Unlock…'}
+          secondaryAction={pack.secondsLeft <= 0 ? (
+            <button
+              type="button"
+              onClick={pack.start}
+              className="inline-flex min-h-7 items-center rounded-full bg-white/10 px-3 text-[12px] font-medium text-white/90 hover:bg-white/20"
+              data-testid="moire-try"
+            >
+              Try for 60 s
             </button>
-          )}
-          {pack.secondsLeft <= 0 && (
-            <button type="button" onClick={openAccountSheet} className="rounded-full bg-white/10 px-3 py-1 text-white/85 hover:bg-white/20" data-testid="moire-get">
-              Get it
-            </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       )}
       {sheetPicker('moireSheetA', 'Lower sheet', 'The sheet under the glass, seen through the liquid', (v) => onUpdate({ moireSheetA: v }))}
       {sheetPicker('moireSheetB', 'Upper sheet', 'The sheet laid on the cover glass, the one a hand turns', (v) => onUpdate({ moireSheetB: v }))}

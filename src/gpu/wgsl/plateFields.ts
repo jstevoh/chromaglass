@@ -78,6 +78,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'filmLevel', type: 'f32', note: 'density below which magnified dye reads as bare ground' },
   { name: 'filmMix', type: 'f32' },
   { name: 'filmOn', type: 'i32' },
+  { name: 'filmRing', type: 'i32', note: 'the video is the LED platform under the dish, turned with the ring (PLAN 14ag-9)' },
   { name: 'finishInMain', type: 'i32' },
   { name: 'flowRate', type: 'f32', note: 'plate-uv per unit of cellClock per unit of velocity, for advecting procedural detail' },
   { name: 'gelAngle', type: 'f32' },

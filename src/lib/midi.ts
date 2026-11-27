@@ -305,7 +305,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Thin Gap, which switches the solver: see the same list there.
 // Nor Clear Film, which pours over the whole dish: the same list again.
 // Nor Two Projectors, which switches the rig between one lamp and two.
-const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+// Nor Video on LED Ring, which moves the picture under the dish (PLAN 14ag-9).
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
@@ -619,6 +620,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'filmZoom',        label: 'Video Zoom',       min: 0.25, max: 4 },
   { key: 'filmX',           label: 'Video Across',     min: -1, max: 1 },
   { key: 'filmY',           label: 'Video Up',         min: -1, max: 1 },
+  // The video as the spinning LED platform (PLAN 14ag-9): a pad that throws it onto the ring and off.
+  { key: 'filmRing',        label: 'Video on LED Ring', min: 0, max: 1, step: 1 },
   { key: 'soundImpact',     label: 'Sound Impact',     min: 0, max: 1 },
   // The fourth master, over the LFOs and envelopes. It had a setting and a
   // reader and no control anywhere, so a shape patch could not be pulled down
