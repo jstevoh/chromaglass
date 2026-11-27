@@ -169,7 +169,7 @@ again ten times a second for three meters and a percentage.
   the aux target stored where nothing reads it (`storeOp: 'discard'`, an interim to H2c-6);
   derive drawn on frames H2c-9 skips the pack; `packDye` and `packVel` as one kernel.
   `framereads`, `framegroups`, `encode`, `samelook`.
-- **46o · Song ID listens and matches on the page's thread** (M): every six seconds with a
+- ~~**46o · Song ID listens and matches on the page's thread**~~ **retired with Song ID (2026-11-27)**: the owner retired automatic song identification, so nothing captures or matches any more and the hitch is gone with it; the brief was pulled from Antigravity's queue. The item stands for the day Song ID comes back from `archive/song-id/` (M): every six seconds with a
   local library, a new AudioContext and a ScriptProcessor for four seconds, then the match
   (a 192k-sample resample, about 86 FFTs) in one block. Into the ear's context by a worklet
   and the index's worker. Check: long tasks over 8 ms in 30 s with the band and one track.

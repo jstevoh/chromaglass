@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Does the show know which song is playing, and keep time with it?
+ * Does the show keep time with the song playing?
  *
  *   npm run music
  *
- * The local matcher naming songs it has heard before (and never naming one it
- * has not), the beat clock against a typed tempo and a loud room, and On a New
- * Song's default. Where one song ends and the next begins is `npm run songends`,
- * on recordings of real songs.
+ * The beat clock against a typed tempo and a loud room, and On a New Song's
+ * default. (The local matcher naming songs it had heard before was checked
+ * here too until automatic song identification was retired on 2026-11-27;
+ * those checks are in archive/song-id/scripts/music.mjs.) Where one song
+ * ends and the next begins is `npm run songends`, on recordings of real songs.
  */
 
-import { extractPeakHashes, buildIndex, addToIndex, forEachEntry, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
 import { TempoSource, bpmOf } from '../src/lib/tempo.ts';
 import { BeatClock, LevelOnsets } from '../src/lib/beatClock.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -29,148 +29,12 @@ const checks = [];
 */
 
 
-// ── Naming the track ────────────────────────────────────────────────
+// ── Naming the track: retired ─────────────────────────────────────
 //
-// The local matcher is what names a song the show has heard before, and it is
-// the only identification most people will ever have, because the fingerprint
-// API needs a proxy with an API key behind it. Naming the WRONG song is worse
-// than naming none: the plate takes on another track's colours and evolution,
-// and nothing about the picture says it is wrong.
-//
-// Two synthetic songs, built from different note sequences over the same kind
-// of material, so a match is a match on structure rather than on timbre.
-
-function prng(seed) {
-  let s = seed >>> 0;
-  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
-}
-
-/** A minute of "music": a note sequence with harmonics, hats and a kick. */
-function song(seed, seconds = 60) {
-  const rnd = prng(seed);
-  const n = Math.round(seconds * FP_RATE);
-  const pcm = new Float32Array(n);
-  const scale = [0, 2, 3, 5, 7, 8, 10, 12];
-  const noteLen = Math.round(0.5 * FP_RATE);
-  for (let start = 0; start < n; start += noteLen) {
-    const semis = scale[Math.floor(rnd() * scale.length)] + (rnd() < 0.3 ? 12 : 0);
-    const f0 = 110 * Math.pow(2, semis / 12);
-    const len = Math.min(noteLen, n - start);
-    for (let i = 0; i < len; i++) {
-      const t = i / FP_RATE;
-      const env = Math.exp(-t * 3);
-      let v = 0;
-      for (let h = 1; h <= 5; h++) v += Math.sin(2 * Math.PI * f0 * h * t) / (h * h);
-      // A kick at the top of each note and a hat halfway through it.
-      const kick = Math.exp(-t * 26) * Math.sin(2 * Math.PI * 58 * Math.exp(-t * 7) * t);
-      const hatAt = Math.abs(t - 0.25) < 0.03 ? (rnd() * 2 - 1) * 0.6 : 0;
-      pcm[start + i] = v * 0.35 * env + kick * 0.5 + hatAt + (rnd() * 2 - 1) * 0.01;
-    }
-  }
-  return pcm;
-}
-
-function fingerprint(isrc, pcm) {
-  const { hashes, frames, durationSec } = extractPeakHashes(pcm, FP_RATE);
-  return { isrc, title: isrc, artist: 'Test', hashes, frames, durationSec, createdAt: Date.now() };
-}
-
-const snippet = (pcm, atSec, seconds = 4) =>
-  pcm.slice(Math.round(atSec * FP_RATE), Math.round((atSec + seconds) * FP_RATE));
-
-const A = song(1), C = song(1234);
-const fpA = fingerprint('TEST-A', A), fpC = fingerprint('TEST-C', C);
-
-/**
- * The same audio as a microphone in a room would deliver it: band-limited,
- * with the room's noise on top and the level wrong. The reference in the
- * library was recorded through the same chain, but not on the same day, in
- * the same place, at the same volume — so a genuine match has to survive this
- * much difference and still be told apart from a track nobody has heard.
- */
-function throughAMic(pcm, seed) {
-  const rnd = prng(seed);
-  const out = new Float32Array(pcm.length);
-  let lp = 0, hp = 0, prev = 0;
-  for (let i = 0; i < pcm.length; i++) {
-    lp += (pcm[i] - lp) * 0.45;          // top end rolled off
-    hp = 0.97 * (hp + lp - prev); prev = lp;  // and the bottom
-    out[i] = hp * 0.55 + (rnd() * 2 - 1) * 0.02;
-  }
-  return out;
-}
-
-const library = [
-  { name: 'one track in the library', index: buildIndex([fpA]) },
-  { name: 'two tracks in the library', index: buildIndex([fpA, fpC]) },
-];
-
-const ratio = (m) => (m ? m.score / Math.max(1, m.background) : 0);
-const OFFSETS = [8, 17, 25, 33, 41, 49];
-/** Six songs the library has never heard. */
-const STRANGERS = [77, 404, 909, 1515, 2020, 3131].map(seed => song(seed));
-
-console.log('');
-for (const { name, index } of library) {
-  console.log(`${name}:`);
-  const genuine = OFFSETS.map(at => matchSnippet(snippet(A, at), FP_RATE, index));
-  const degraded = OFFSETS.map(at => matchSnippet(throughAMic(snippet(A, at), at), FP_RATE, index));
-  const strangers = STRANGERS.map(s2 => matchSnippet(snippet(s2, 25), FP_RATE, index));
-  const noise = matchSnippet(Float32Array.from({ length: 4 * FP_RATE }, () => Math.random() * 2 - 1), FP_RATE, index);
-
-  const named = (ms, want) => ms.filter(m => (want ? m && m.isrc === 'TEST-A' : m !== null)).length;
-  const ratios = (ms) => ms.filter(Boolean).map(ratio);
-  const lo = (a) => (a.length ? Math.min(...a).toFixed(1) : '—');
-  const hi = (a) => (a.length ? Math.max(...a).toFixed(1) : '—');
-  const offErr = genuine.filter(Boolean).map((m, i) => Math.abs(m.offsetSec - (OFFSETS[i] + 4)));
-
-  console.log(`  clean, six offsets     named ${named(genuine, true)}/6, background ratio ${lo(ratios(genuine))}–${hi(ratios(genuine))}, worst offset error ${offErr.length ? Math.max(...offErr).toFixed(2) : '—'} s`);
-  console.log(`  through a microphone   named ${named(degraded, true)}/6, background ratio ${lo(ratios(degraded))}–${hi(ratios(degraded))}`);
-  console.log(`  six unheard tracks     named ${named(strangers, false)}/6 (want 0), background ratio ${lo(ratios(strangers))}–${hi(ratios(strangers))}`);
-  console.log(`  white noise            ${noise ? `named, ratio ${ratio(noise).toFixed(1)}` : 'no match'}`);
-
-  checks.push([`${name}: names the track it knows, every time`, named(genuine, true) === 6]);
-  checks.push([`${name}: and through a microphone`, named(degraded, true) >= 5]);
-  checks.push([`${name}: and knows where in it`, offErr.length === 6 && Math.max(...offErr) < 1.0]);
-  checks.push([`${name}: says nothing about six tracks it has not heard`, named(strangers, false) === 0]);
-  checks.push([`${name}: says nothing about noise`, noise === null]);
-}
-
-// ── The index a song at a time ──────────────────────────────────────
-//
-// In the app the index is built once, at load, and then each newly mapped
-// song is added to it on its own — segments merging as they go — rather than
-// the whole library being rebuilt. That only works if the index it ends up
-// as answers every question exactly as a fresh build of the same library
-// would: the same entries under every hash, and the same verdict (track,
-// offset, score, background) on every snippet.
-{
-  const all = [fpA, fpC, ...STRANGERS.map((pcm, i) => fingerprint(`TEST-S${i}`, pcm))];
-  const full = buildIndex(all);
-  const grown = buildIndex(all.slice(0, 1));
-  for (const rec of all.slice(1)) addToIndex(grown, rec);
-
-  const entriesOf = (index, h) => {
-    const out = [];
-    forEachEntry(index, h, (t, f) => out.push(`${t}:${f}`));
-    return out.sort().join(',');
-  };
-  let hashesSame = true, checked = 0;
-  for (const rec of all) {
-    for (const h of rec.hashes) { checked++; if (entriesOf(full, h) !== entriesOf(grown, h)) hashesSame = false; }
-  }
-  const questions = [...all.map((_, i) => (i < 2 ? [A, C][i] : STRANGERS[i - 2])), song(4242)]
-    .flatMap(pcm => [5, 20, 38].map(at => snippet(pcm, at)));
-  const answers = (index) => JSON.stringify(questions.map(q => matchSnippet(q, FP_RATE, index)));
-  const verdictsSame = answers(full) === answers(grown);
-  const refused = !addToIndex(grown, fpC);
-
-  console.log(`\nThe index grown a song at a time: ${all.length} tracks in ${grown.segments.length} segment(s), ${checked} hash lookups, ${questions.length} snippets`);
-  checks.push(['an index grown a song at a time holds what a full build holds', hashesSame && grown.trackCount === full.trackCount]);
-  checks.push(['and names every snippet the same way', verdictsSame]);
-  checks.push(['and will not index a track twice', refused && grown.trackCount === all.length]);
-}
-
+// The local matcher was checked here (naming songs heard before, never one
+// it had not, through a mic, and the index grown a song at a time) until the
+// owner retired automatic song identification on 2026-11-27. Those checks
+// went with the matcher to archive/song-id/scripts/music.mjs, unchanged.
 // ── Taking the tempo from somewhere that knows ──────────────────────
 //
 // Onset detection is a guess, and there are rooms where the guess is hard.
