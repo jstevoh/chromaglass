@@ -103,6 +103,16 @@ export interface LiquidBehaviour {
    * scattering is PLAN 18j.
    */
   scatter?: number;
+  /**
+   * How much of the bottle is ethanol, and how much is anise oil dissolved
+   * in it, each a volume fraction of the bottle (PLAN 48s). The solver
+   * carries both where the bottle is poured, and wherever water has thinned
+   * the ethanol past what holds the oil, the oil comes out as a white cloud
+   * of micron droplets: the ouzo effect (lib/ouzo.ts has the measured curve).
+   * Ethanol alone clouds nothing, and poured on a cloud dissolves it.
+   */
+  ethanol?: number;
+  anise?: number;
 }
 
 export interface LiquidType {
