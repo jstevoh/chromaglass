@@ -306,8 +306,11 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   `ouzoDrops`; none in a cell with no oil or at the bottle's own strength; Σ(dissolved +
   droplets) unchanged while nothing has reached the rim; Alcohol poured on the cloud lowers
   the droplets there and leaves the oil; the plate handed for the species is the species
-  plus 209 times the droplets in b; and a plate with milk or glycerine and no Ouzo makes no
-  `solvent` field and renders byte for byte as before.
+  plus 209 times the droplets in b; a plate with milk or glycerine and no Ouzo makes no
+  `solvent` field and renders byte for byte as before; and the oil and the cloud come
+  across a governor's move (`lab.regrid`) as the species does since 18d-10 (the field is
+  handed over beside it: a scratch run at 192 → 128 read the oil 25.01537 before and
+  25.01725 after, the droplets 14.867 and 14.861, where without the hand-over both were 0).
 - **48s-2. Alcohol poured before any Ouzo is not remembered** (S; a shortcut 48s took for
   cost). The `solvent` field starts at the first pour that brings anise oil, so a plate that
   only ever sees Alcohol carries nothing new; ethanol poured before that first Ouzo is
@@ -338,7 +341,7 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   A new look, not a new bottle in an old look's dish, so every look that was there is as it
   was. Its dish is water, Ouzo and Alcohol by thirds; in the lab on its own settings a bloom
   reads 228 of 255 on a ground of 0, 208 after one drop of Alcohol and 0 after two. How it
-  looks over a show is the owner's (docs/judging.md 148, step 6).
+  looks over a show is the owner's (docs/judging.md 149, step 6).
 - **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
   `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
   membrane of precipitate at the front, and the front's speed against its reaction sets the

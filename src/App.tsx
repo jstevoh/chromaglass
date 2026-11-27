@@ -208,6 +208,7 @@ export default function App() {
     musicInputRef, musicCtxRef,
   } = useSoundState();
   const [showControls, setShowControls] = useState(true);
+  const [phoneMoreOpen, setPhoneMoreOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   /** Which section the panel should open at, when it was opened from a ⌘K row. */
   const [settingsSection, setSettingsSection] = useState<string | null>(null);
@@ -270,7 +271,8 @@ export default function App() {
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
   // The tool, its amount and the plate in hand (app/useHand.ts).
-  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = useHand();
+  const hand = useHand();
+  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = hand;
   // The shelf: the bottles the app ships, then any someone made (lib/liquidFile.ts).
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]);
   useEffect(() => { saveCustomLiquids(liquidTypes); }, [liquidTypes]);
@@ -1815,8 +1817,8 @@ export default function App() {
     const c = PALETTE[((paletteIndex % PALETTE.length) + PALETTE.length) % PALETTE.length];
     updateLiquidColor(selectedLiquidId, c.hex);
   };
-  /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
-  const selectDye = (paletteIndex: number) => { colourDye(paletteIndex); };
+  /** A hand on a dye pad: the selected liquid takes a palette colour, as colourDye. */
+  const selectDye = colourDye;
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
@@ -1878,6 +1880,7 @@ export default function App() {
     selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
     blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
     visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
+    hand, setSelectedLiquidId,
   });
 
   const {
@@ -3151,6 +3154,7 @@ export default function App() {
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
             onOpenAccount={openAccount}
+            onMoreOpen={setPhoneMoreOpen}
           />
           </PanelGuard>
           )}
@@ -3482,9 +3486,6 @@ export default function App() {
               </div>
             )}
           </div>
-          <PanelGuard name="The crash report">
-          <CrashReportButton />
-          </PanelGuard>
           <button
             aria-pressed={showHelp}
             onClick={() => setShowHelp(!showHelp)}
@@ -3680,10 +3681,8 @@ export default function App() {
           <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
         </>
       )}
-      {/* The crash report, under a desk: its header has no room for a
-          button that is idle nearly always, so the chip says when there is
-          news and ⌘K opens the sheet. */}
-      {(deskUp || phone) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
+      {/* Floating chip + sheet when no button is mounted. */}
+      {((deskUp && !overlaysVisible) || (phone && !(showControls && phoneScreenUp === 'stage' && phoneMoreOpen))) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
       {overlaysVisible && <PanelGuard name="The report dot"><QuickReportDot /></PanelGuard>}
 

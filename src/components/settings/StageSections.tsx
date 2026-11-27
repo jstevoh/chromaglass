@@ -6,7 +6,8 @@ import { MappingPanel, OutputPanel } from '../OutputPanel';
 import { SwitchPill, Toggle, LIT } from '../ui';
 import { readEngineStatus } from '../../lib/readout';
 import { isProLicenseUnlocked } from '../../lib/platform';
-import { CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../../lib/tierGates';
+import { isFreeTierGated, isTierGatingEnforced } from '../../lib/tierGates';
+import { TierLockBanner } from '../TierLock';
 import { Slider, PinChips } from './controls';
 import type { SectionCtx } from './props';
 
@@ -116,23 +117,14 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
         </h3>
         {isFreeTierGated() ? (
           <div className="mb-5 flex flex-col gap-2.5">
-            <div
-              data-cg-free-logo-mark="ChromaGlass"
-              data-cg-app-tile="custom-logo"
-              onClick={openAccountSheet}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
-              className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
-            >
-              <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
-                <span>In the ChromaGlass app · Custom band logo &amp; text layer</span>
-                <span className="shrink-0 text-[12px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
-              </div>
-              <p className="mt-0.5 text-amber-100/90">
-                On the free site, the logo layer displays the ChromaGlass mark. Unlock Home or Pro to load your own band mark or SVG.
-              </p>
-            </div>
+            <TierLockBanner
+              feature="custom-logo"
+              summary="On the free site, the logo layer displays the ChromaGlass mark. Unlocked by ChromaGlass Home or Pro to load your own band mark or SVG."
+              dataAttrs={{
+                'data-cg-free-logo-mark': 'ChromaGlass',
+                'data-cg-app-tile': 'custom-logo',
+              }}
+            />
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -293,34 +285,11 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </Info>
           {((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
-            <div
-              data-cg-grid-upgrade-pro=""
-              className="mt-1 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] p-3 text-[12px] leading-snug text-amber-100/90"
-            >
-              <div className="font-semibold text-amber-200">
-                Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
-              </div>
-              <p className="mt-1 text-[12px] text-white/75">
-                Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <a
-                  href={getEffectiveTier() === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[12px] font-semibold text-black hover:bg-amber-300"
-                >
-                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $170' : 'Get Pro — $199'}
-                </a>
-                <button
-                  type="button"
-                  onClick={openAccountSheet}
-                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[12px] font-medium text-white/85 hover:bg-white/[0.12]"
-                >
-                  Enter licence key
-                </button>
-              </div>
-            </div>
+            <TierLockBanner
+              feature="grid-1024"
+              className="mt-1"
+              dataAttrs={{ 'data-cg-grid-upgrade-pro': '' }}
+            />
           )}
         </div>
       </section>

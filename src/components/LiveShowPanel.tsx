@@ -8,6 +8,7 @@ import {
 } from '../lib/liveShow';
 import { probeVideoEncoders } from '../lib/liveStream';
 import { liveRates, type LiveEncodeRate } from '../lib/liveRate';
+import { TierLockBanner } from './TierLock';
 
 /**
  * The Live Show panel (PLAN.md 37x-4d): the Mac app streaming the show to
@@ -126,7 +127,7 @@ export function LiveShowPanel() {
     return <p className="text-[13px] text-text-2" data-testid="live-show-absent">The Live Show streams from the Mac app.</p>;
   }
   if (!liveAllowed()) {
-    return <p className="text-[13px] text-text-2" data-testid="live-show-pro">The Live Show comes with Home and Pro: stream the show to YouTube, Twitch, Facebook and the rest at once.</p>;
+    return <TierLockBanner feature="live-show" dataAttrs={{ 'data-testid': 'live-show-pro' }} />;
   }
 
   return (

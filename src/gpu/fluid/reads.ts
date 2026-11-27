@@ -490,9 +490,11 @@ export class FluidReads extends FluidInputs {
   }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix' | 'solvent' | 'cloud'): Promise<Float32Array> {
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix' | 'liquids0' | 'liquids1' | 'solvent' | 'cloud'): Promise<Float32Array> {
     const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read
       : which === 'mix' ? (this.mixLive ? this.mix?.read : this.blank('rgba'))
+      : which === 'liquids0' ? (this.liquidsLive ? this.liquids0.read : this.blank('rgba'))
+      : which === 'liquids1' ? (this.liquidsLive ? this.liquids1.read : this.blank('rgba'))
       : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba'))
       // The ouzo's solvent (ethanol, oil dissolved, oil as droplets: wgsl/fluid/ouzo.ts) and what the plate is handed for the species, PLAN 48s.
       : which === 'solvent' ? (this.solventLive ? this.solvent?.read : this.blank('rgba'))
