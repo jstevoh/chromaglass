@@ -190,6 +190,18 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   - ~~**The heat is not carried on a thin gap.**~~ **Shipped** (38f-1, 2026-11-11): the heat
     rides the liquid as the colour does, h·T beside h through the thin solve's faces
     (`carryHeat`, heatPack in `wgsl/fluid/dye.ts`). Story in `docs/plan-shipped.md` §38f-1.
+  - **38f-2. The cooling in watts and seconds, redone on today's plate** (M, lab; Medium).
+    The October build of 38f and 38t (#614) was read against main on 2026-11-27 and not
+    landed: its carry is 38f-1's by another road, its lift went through the open rim, which
+    18a-17 showed empties the dish (main lifts by the sealed bottle's closed circulation,
+    `sealWeight`, 27f-9), and its Updraft was the through-flow 18a-16 took out. What is still
+    wanted is the cooling: C dΔT/dt = I·a − 2h_air·ΔT − 2εσ(T⁴ − T₀⁴), C = ρc_w·h + 2ρc_g·t
+    (water 4.18e6 J/m³K, glass 2500 × 840 at 2 mm, lamp 1000 W/m², ε 0.9), so Heat Decay
+    reads h_air (7200·(−ln v) a face) and the lamp warms at I/C, about 0.06 K/s at the 2 mm
+    gap against today's `LAMP_HEATING` 0.24. It moves every heated look (14 presets at Heat
+    Decay 0.99) and Lava Lamp's wax needs its lamp (27f-9h), so it is measured first:
+    `heat`, `lavacycle`, `lavaround`, `dispersion`, `draught`, and a `plume` rewritten
+    against heatPack and sealWeight. The branch of #614 keeps the old code to read. none.
 - **38g-2. Facets and Plateau borders drawn** (M, GPU; Medium-High for the straw's rafts).
   The air field still draws every pocket as a disc (`gpu/wgsl/air.ts`), so two big ones
   pressed together overlap rather than meet in a wall, and a stretched one is drawn round
@@ -656,6 +668,10 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   plus a uniform −8dt (`thinGap.ts:348-353`, `forces.ts:224-228`). A draught has no free
   surface to shear between two glasses; a fan acts on an open dish's surface or by cooling
   the glass (38f). Either an open-dish surface shear or a cooling, not a noise.
+  *Read again 2026-11-27 (#614):* the air's Blasius stress τ(x) ∝ x^-½ laid whole into the
+  open-rim solve is the through-flow 18a-16 removed (Air 0.35 left 0% of the dye). Only its
+  closed part may drive the liquid: most of the stress is met by the dish's own pressure
+  and an edge curl is left. That is a design to work out on the lab, with `draught`.
 
 Also found, left with their owners: the ferrofluid's dye is moved by two exchanges that
 tell it where the black went (`phaseDisplace`, `wgsl/fluid/phase.ts:330-370`) rather than

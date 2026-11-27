@@ -247,6 +247,14 @@ how much dye sits in a cell, not from the shape of the oil and water surface, an
 only darkened where it is, never moved, so there are no caustics: no bright rims focused by a
 lens-shaped drop, no shadow beside it.*
 
+- **31s-1a. The height field is paid for before anything draws it** (S; Medium for frame
+  time, found landing 31s-1, 2026-11-27). On a look with oil the field is levelled every
+  frame (`fluid/passes.ts` stepSurfaceHeight) and packed whole for the plate
+  (`plate.ts` packSurface), and the plate reads it only when `U.gridSize < 0`, which never
+  happens: a step and a full-grid pack a frame for no picture, until 31s-2 reads it. Its
+  `profiler.pass` is also not behind the `stageTimings` gate the particles use. Either gate
+  both on a reader existing, or land 31s-2 next (the owner's physics queue has it in batch
+  2). Measure: `npm run encode`'s dispatch count on an oil look, with and without. none.
 - **31s-2. Light traced through the surface, gathered on the wall.** Each lamp ray leaves the
   lamp, bends at the surface by Snell's law (air, oil, water and glass indices, the slope from
   31s-1), and lands on the wall where its new direction takes it; the wall's brightness is how
