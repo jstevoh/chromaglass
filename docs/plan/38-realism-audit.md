@@ -419,7 +419,9 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   nucleates where the film is thinnest, then opens at Culick's speed, which *is* right for
   a free film). Number them in §32 when its next thread opens.
 
-- **38p. Light summed where it is light** (M, re-baseline; Medium on two projectors, beams
+- ~~**38p. Light summed where it is light**~~ (shipped 2026-11-27 with **18k-linear** and
+  **16c-linear**, `npm run linearlight`; the leftovers are **38p-1** and **38p-2** below).
+  (M, re-baseline; Medium on two projectors, beams
   and the lumia). Names the sites for **18k-linear** and **16c-linear**: the canvas is
   `bgra8unorm`, not `-srgb` (`src/gpu/stage.ts:43`), so the six-band sums
   (`plate.ts:150-153`), the two projectors' add (`:3298`), screen-over (`:2141-2143`), the beams
@@ -429,6 +431,34 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   38v (2026-11-21): two sites where it shows: `plate.ts:2755` adds the linear studio light to
   the encoded `edgeLit`, and the drop's total-reflection switch (`ferroDrop.ts:363-374`):
   29a-6.
+  Shipped 2026-11-27: `wgsl/plateLight.ts` (lightOf, displayOf, mixLight exact at both ends,
+  addLight, and the six bands of Spectral Mix summed on light). Lamp Ground's fades
+  (onGround, groundOf, chemOnGround, the closeup's liquidPart), the mixer's faders
+  (mixLevelled) and rows (blendRowKeyed: Screen and Multiply computed on light, Add as light),
+  the LED ring and lumia as beams (screenOver) and the lumia in the lamp, the camera's depth of
+  field and bloom (its knee 0.55 of display values, 0.268 of light), the ferro drop's Fresnel
+  share and the studio light added to `edgeLit` take them. The two projectors' add had
+  shipped with 51a (#1012, `wallAdd`). `npm run linearlight` 6/6 (halfway 0.730 where
+  display values read 0.5; two half lights 0.685 where they read white); `npm run lamp`
+  line 6 asks for half of each light. Saved looks are at Lamp Ground 0 or 1 and every row
+  at level 1, so the fades move none of them; what moved is the PR's table.
+  - **38p-1. The projector pass's beams add as light** (S–M; Low: only the stage's beam
+    mode). `wgsl/output.ts` lays each surface and beam by the GPU's blend
+    (`gpu/output.ts`, one / one-minus-src-alpha) into the encoded canvas, so two beams on one
+    wall add display values. The fix is an `-srgb` view of the canvas texture for that pass
+    (configure `viewFormats`), the shader decoding what it samples with the piecewise curve,
+    so a lone surface round-trips to the bit. Check: two half-white beams overlapping read
+    0.685 of display, one beam unchanged.
+  - **38p-2. What is still summed in display values on purpose** (S each; Low). Highlights
+    drawn at a size in display values: the ferro glint and the domes' rays (the `pc +=`
+    lines in `plate.ts`'s phase branch), the photo style's speculars, the thin film's sheen
+    (`plateThinFilm.ts`, 0.08), a bead's glow (`glowC`), the bubbles' six-sample rim
+    average, the film projector's row (`plateFilm.ts`). Each is a highlight whose strength
+    was set by eye on display values, so moving it re-tunes every look that has it: do each
+    with that look's pictures. The second plate's blends on the black ground (screen,
+    lighter, multiply, exclusion) stay display-value operations: they are the Blend
+    picker's named operation, not two lights, and on the lamp ground the second plate is
+    already a filter (a product).
 
 - **38q. The camera's lens, not a grade** (S–M; Medium on the camera looks). Sharpens
   **31a**, **31e**. ACES on an 8-bit scene, bloom thresholded at 0.55 in encoded values, a
