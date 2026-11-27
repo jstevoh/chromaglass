@@ -91,7 +91,7 @@ for (const pack of [false, true]) {
     most = Math.max(most, b);
   }
   const share = withAir / N;
-  check(`5. Feeling Lucky rolls air about one look in five, a few bubbles (${pack ? 'with' : 'without'} the moiré pack)`, share > 0.15 && share < 0.25 && most <= 0.3,
+  check(`5. Feeling Lucky rolls air about one look in five, a few bubbles (moiré pack ${pack ? 'in' : 'out'})`, share > 0.15 && share < 0.25 && most <= 0.3,
     `${(share * 100).toFixed(1)}% of ${N} rolls, at most ${most.toFixed(2)}`);
 }
 
