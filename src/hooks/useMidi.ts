@@ -59,6 +59,8 @@ export interface MidiHost {
    */
   pad?: (e: MidiEvent, target: PadTarget) => void;
   padPressure?: (channel: number, note: number | null, value01: number) => void;
+  /** Let go of the hold on this note, whatever the note is bound to now. */
+  padLift?: (channel: number, note: number) => void;
   pickHand?: (target: HandTarget) => void;
   toolAmount?: (tool: PadTool) => number;
   setToolAmount?: (tool: PadTool, amount: number) => void;
@@ -223,6 +225,14 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
       if (!watchRef.current) hostRef.current.padPressure?.(e.channel, e.number === CHANNEL_PRESSURE ? null : e.number, e.value / 127);
       return;
     }
+    /*
+      A note-off lets go of its pad's hold ahead of everything else. The
+      binding that started the hold may not be the one live now: Shift
+      pressed mid-hold changes bank, a learn or a clear changes the map,
+      auto-map swallows every message. A hold whose note-off went elsewhere
+      would pour at 30 Hz until the page closed.
+    */
+    if (e.kind === 'noteoff') hostRef.current.padLift?.(e.channel, e.number);
     const src = eventSource(e);
     const now = performance.now();
     heardRef.current.set(sourceKey(src), now);
@@ -446,6 +456,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
 
   useEffect(() => {
     if (!enabled || !supported) {
+      // MIDI going away takes its note-offs with it: let go of every held pad.
+      hostRef.current.releasePads?.();
       if (accessRef.current) {
         for (const input of accessRef.current.inputs.values()) input.onmidimessage = null;
         accessRef.current.onstatechange = null;
@@ -463,7 +475,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         accessRef.current = access;
         setError(null);
         setOpen(true);
-        access.onstatechange = () => { refreshPorts(); wireInputs(); };
+        // A port coming or going (the APC40 unplugged mid-pour) can strand a hold's note-off.
+        access.onstatechange = () => { hostRef.current.releasePads?.(); refreshPorts(); wireInputs(); };
         refreshPorts();
         wireInputs();
       })
@@ -600,6 +613,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         level = f.inHand?.(t) ? 1 : 0;
       } else if (t.kind === 'toolAmount' && b.source.kind === 'cc' && b.mode !== 'relative') {
         level = Math.round(knobOfAmount(hostRef.current.toolAmount?.(t.tool) ?? 1) * 127);
+      } else if (t.kind === 'dye' && b.source.kind === 'note' && b.source.number === 0x33) {
+        // Track Select's LEDs are one colour: lit for the dye in hand, dark for the rest (Liquids × Tools).
+        level = f.dyeIndex === t.paletteIndex ? 1 : 0;
       } else if (t.kind === 'dye') {
         const c = f.paletteColor(t.paletteIndex);
         level = c ? padVelocityFor(c.r, c.g, c.b, f.dyeIndex !== t.paletteIndex) : 0;
@@ -711,6 +727,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     attention.
   */
   const startAutoMap = useCallback(() => {
+    hostRef.current.releasePads?.();
     watchRef.current = new SurfaceWatcher();
     setWatched({ continuous: 0, encoder: 0, button: 0 });
   }, []);

@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { PALETTE } from '../../constants';
 import { DEFAULT_LIQUID_TYPES } from '../../types';
 import { padDoor } from '../../lib/padDoor';
@@ -57,6 +57,13 @@ export function PhonePads({ testId = 'phone-pads' }: { testId?: string }) {
   };
   const move = (i: number) => (e: ReactPointerEvent) => { if (held.current.has(i) && e.pointerType === 'pen') padDoor()?.press(i, squeezeOf(e)); };
   const up = (i: number) => () => { if (held.current.delete(i)) padDoor()?.lift(i); };
+  /*
+    Let go of every held pad when the grid goes: closing the sheet with the
+    other hand, or a layout switch remounting the pads, loses the pointer
+    capture, and the pointerup that would lift the hold never arrives.
+  */
+  const liftAll = () => { for (const k of held.current) padDoor()?.lift(k); held.current.clear(); };
+  useEffect(() => liftAll, []);
 
   return (
     <div className="flex flex-col gap-1.5" data-testid={testId}>
@@ -64,7 +71,7 @@ export function PhonePads({ testId = 'phone-pads' }: { testId?: string }) {
         {LAYOUTS.map(l => (
           <button
             key={l}
-            onClick={() => { setLayout(l); setPicked(null); }}
+            onClick={() => { liftAll(); setLayout(l); setPicked(null); }}
             aria-pressed={layout === l}
             className={`min-h-[44px] rounded-lg border px-1 text-[12px] ${layout === l ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 text-text-2'}`}
             data-testid={`${testId}-layout-${l}`}
@@ -81,6 +88,7 @@ export function PhonePads({ testId = 'phone-pads' }: { testId?: string }) {
             onPointerMove={move(i)}
             onPointerUp={up(i)}
             onPointerCancel={up(i)}
+            onLostPointerCapture={up(i)}
             onContextMenu={e => e.preventDefault()}
             aria-label={padTargetLabel(t, id => liquidOf(id)?.name ?? id, d => PALETTE[d]?.name ?? `Dye ${d + 1}`)}
             className="flex aspect-square min-h-[36px] items-end justify-center overflow-hidden rounded-md border border-black/40 text-[12px] leading-none text-black/80 active:brightness-150"

@@ -75,10 +75,14 @@ export function usePadHits(deps: {
         if (g.du !== undefined || g.dv !== undefined) {
           const q = v.wallToPlate(g.u + (g.du ?? 0), g.v + (g.dv ?? 0), d.activeLayer, true);
           dx = q.x - p.x; dy = q.y - p.y;
+          // A streak's dx/dy is a direction (performGesture smears ±len along it), as the recorder sends; Stir's is a drag.
+          const n = Math.hypot(dx, dy);
+          if (g.tool === 'streak' && n > 0) { dx /= n; dy /= n; }
         }
         const size = d.hand.toolAmounts[g.tool] ?? 1;
         v.applyGesture({
-          tool: g.tool, x: p.x, y: p.y, dx, dy, layer: d.activeLayer, amount: g.amount, id: PAD_ID_BASE + g.id,
+          // amount is the squeeze, and 0.5 is the mouse's: a full press of Press, Blow or Stir is the mouse's, not twice it.
+          tool: g.tool, x: p.x, y: p.y, dx, dy, layer: d.activeLayer, amount: LAYING_PAD_TOOLS.has(g.tool) ? g.amount : g.amount / 2, id: PAD_ID_BASE + g.id,
           gain: g.gain * size * size, liquid: g.paint.liquid, color: g.paint.color, clear: g.paint.clear,
         });
       }
@@ -109,6 +113,7 @@ export function usePadHits(deps: {
     else if (e.kind === 'noteon') start(e.channel, e.number, e.value / 127, t);
   }, [start]);
 
+  const lift = useCallback((channel: number, note: number) => padOff(holds.current, channel, note), []);
   const pressure = useCallback((channel: number, note: number | null, v: number) => padPressure(holds.current, channel, note, v), []);
   const releasePads = useCallback(() => { releaseAllPads(holds.current); stop(); }, [stop]);
   useEffect(() => releasePads, [releasePads]);
@@ -145,5 +150,5 @@ export function usePadHits(deps: {
   const { hand, selectedLiquid } = deps;
   const handKey = `${hand.activeTool}|${selectedLiquid.id}|${selectedLiquid.color}|${Object.values(hand.toolAmounts).join(',')}`;
 
-  return { pad, padPressure: pressure, releasePads, pickHand, toolAmount, setToolAmount, padColor, inHand, handKey };
+  return { pad, padPressure: pressure, padLift: lift, releasePads, pickHand, toolAmount, setToolAmount, padColor, inHand, handKey };
 }

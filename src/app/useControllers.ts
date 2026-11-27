@@ -84,7 +84,7 @@ export function useControllers({
       // Every note plays the envelopes, whatever else that pad is for.
       noteStruck: (velocity, source) => wallRef.current?.fireEnvelopes?.(velocity, source),
       noteVoice: (e, target) => (visualizerRef.current ?? wallRef.current)?.noteVoice?.(e, target),
-      pad: pads.pad, padPressure: pads.padPressure, releasePads: pads.releasePads, pickHand: pads.pickHand,
+      pad: pads.pad, padPressure: pads.padPressure, padLift: pads.padLift, releasePads: pads.releasePads, pickHand: pads.pickHand,
       toolAmount: pads.toolAmount, setToolAmount: pads.setToolAmount,
     },
     {
