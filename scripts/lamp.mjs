@@ -252,7 +252,9 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
     if (tH < 0.7 && tT > 0.95) front++; else if (tT < 0.7 && tH > 0.95) back++; else if (tH < 0.7 && tT < 0.7) both++;
     for (let c = 0; c < 3; c++) {
       err += Math.abs(got[c] - lampHere[c] * tHere[c] * tThere[c]);
-      let expected = (lampHere[c] * tHere[c] + lampHere[c] * tThere[c]) * 0.5;
+      // Added in linear light (PLAN 51a, wgsl/projectors.ts), each at half: the crossfade at its centre.
+      const lin = (v) => Math.pow(Math.max(0, v) / 255, 2.2);
+      const expected = 255 * Math.pow(0.5 * lin(lampHere[c] * tHere[c]) + 0.5 * lin(lampHere[c] * tThere[c]), 1 / 2.2);
       errAdd += Math.abs(gotAdd[c] - expected);
       n++;
     }
@@ -260,7 +262,7 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
   check('the lamp through the back plate and the front is the product of what each lets through, each where its own dye is',
     n > 0 && err / n <= 2 && front > 50 && back > 50 && both > 50,
     `mean error ${f2(err / Math.max(1, n))} over ${n} readings; ${front} pixels under the front's dye alone, ${back} under the back's, ${both} under both`);
-  check('two projectors add their light: each filtered by its own plate, from a lamp dimmed to half',
+  check('two projectors add their light in linear light: each filtered by its own plate, each lamp at half (the crossfade at its centre)',
     n > 0 && errAdd / n <= 2,
     `mean error ${f2(errAdd / Math.max(1, n))} over ${n} readings`);
 

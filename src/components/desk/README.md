@@ -15,7 +15,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 - `App.tsx` owns settings and show state, with the hooks in `src/app/`, and hands them down through `DeskProps`; the desk changes them only through those callbacks.
 - One panel, one kind of control (PLAN 8d-3): `RidesBody` draws sliders, `ControlGrid` (the Recipe and every section's knobs panel) draws knobs, whatever a control is learned to. `DeskProps.kindFor` is gone with that rule; `controlKindOf` in `lib/midi.ts` still names a board's faders but nothing draws by it.
 - Layout and tabs come from `lib/deskLayout`, `lib/deskTabs` via `hooks/useDeskLayout`.
-- Imports `src/lib`, `src/types`, `src/brand`, `../ui` and a few siblings (`MixerPanel`, `VideoShelf`, `SongScore`, `PanelGuard`, `ToolAmount`, `AlphaBadge`, `portalBody`). Never `src/gpu` or `LiquidVisualizer`.
+- Imports `src/lib`, `src/types`, `src/brand`, `../ui` and a few siblings (`MixerPanel`, `VideoShelf`, `SongScore`, `PanelGuard`, `CrashReportButton`, `ToolAmount`, `AlphaBadge`, `portalBody`). Never `src/gpu` or `LiquidVisualizer`.
 - `phone/PhoneStage.tsx` reuses `TabStrip`. `App.tsx` and the hooks in `src/app/` import the desk's types (`Cue`, `SetAction`, `Command`).
 
 ## Files

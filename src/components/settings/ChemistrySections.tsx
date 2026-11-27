@@ -5,6 +5,7 @@ import { ViscosityDrip } from '../ui/Playful';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 import { COVER_FULL_ML, COVER_GLASS_G } from '../../lib/cover';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 /*
   Chemistry: the liquid itself. The squish plate, oil and soap, the ferrofluid and
@@ -266,6 +267,11 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ clearFilm: v })}
           settingKey="clearFilm"
         />
+        {clearFilmGroundNote(settings.lampGround, settings.clearFilmDye) && (
+          <p className="text-[11px] leading-snug text-white/50" data-testid="clear-film-ground-note">
+            {clearFilmGroundNote(settings.lampGround, settings.clearFilmDye)}
+          </p>
+        )}
         {/*
           The film's own dye (PLAN 20b-13): the lamp filtered over the film's
           thickness, so the lace is a colour and the holes the water's. Shown

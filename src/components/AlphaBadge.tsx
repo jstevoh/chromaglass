@@ -21,7 +21,7 @@
 export function AlphaBadge({ className = '' }: { className?: string }) {
   return (
     <span
-      className={`shrink-0 whitespace-nowrap rounded border border-amber-300/40 bg-amber-300/10 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-widest text-amber-200 ${className}`}
+      className={`shrink-0 whitespace-nowrap rounded border border-amber-300/40 bg-amber-300/10 px-1.5 py-0.5 text-[12px] font-bold uppercase leading-none tracking-widest text-amber-200 ${className}`}
       data-alpha-badge=""
     >
       Alpha

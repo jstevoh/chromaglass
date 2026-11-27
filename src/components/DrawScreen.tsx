@@ -336,7 +336,7 @@ export function DrawScreen(p: DrawScreenProps) {
             data-frames="0"
           />
           {/* On the phone the dye rail lies over the frame's left edge, so the label starts past it. */}
-          <span className={`absolute top-2 font-mono text-[10px] text-muted [text-shadow:0_1px_2px_#000] ${tablet ? 'left-2.5' : 'left-11'}`}>
+          <span className={`absolute top-2 font-mono text-[12px] text-muted [text-shadow:0_1px_2px_#000] ${tablet ? 'left-2.5' : 'left-11'}`}>
             {tablet ? `wall ${ratioName(aspect)} · every touch lands on the wall` : `wall ${ratioName(aspect)}`}
           </span>
           {!p.connected && (
@@ -360,7 +360,7 @@ export function DrawScreen(p: DrawScreenProps) {
             key={c.hex}
             onClick={() => p.chooseColor(c.hex)}
             disabled={!p.connected}
-            className="shrink-0 transition-transform active:scale-95 disabled:opacity-40"
+            className="shrink-0 transition-transform active:scale-95 disabled:opacity-65"
             style={{ width: dye, height: dye, borderRadius: 14, backgroundColor: c.hex, boxShadow: on ? '0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-text)' : undefined }}
             title={c.name}
             aria-label={c.name}
@@ -376,7 +376,7 @@ export function DrawScreen(p: DrawScreenProps) {
           onClick={() => p.chooseColor(bottle.own!)}
           disabled={!p.connected}
           aria-pressed={p.color?.toLowerCase() === bottle.own.toLowerCase()}
-          className={`shrink-0 border-2 border-dashed disabled:opacity-40 ${p.color?.toLowerCase() === bottle.own.toLowerCase() ? 'border-text' : 'border-white/30'}`}
+          className={`shrink-0 border-2 border-dashed disabled:opacity-65 ${p.color?.toLowerCase() === bottle.own.toLowerCase() ? 'border-text' : 'border-white/30'}`}
           style={{ width: dye, height: dye, borderRadius: 14, backgroundColor: isClearLiquid(bottle) ? 'transparent' : bottle.own }}
           title={`Natural: ${bottle.name.toLowerCase()} with no dye`}
           aria-label={`Natural ${bottle.name}`}
@@ -393,13 +393,13 @@ export function DrawScreen(p: DrawScreenProps) {
         key={t.tool}
         onClick={() => p.setTool(t.tool)}
         disabled={!p.connected}
-        className={`flex shrink-0 flex-col items-center justify-center rounded-2xl disabled:opacity-40 ${on ? LIT : `${GLASS} text-text`}`}
+        className={`flex shrink-0 flex-col items-center justify-center rounded-2xl disabled:opacity-65 ${on ? LIT : `${GLASS} text-text`}`}
         style={{ height: h, width: w }}
         aria-pressed={on}
         data-testid={`draw-tool-${t.tool}`}
       >
         <span className="text-[14px] font-semibold">{t.name}</span>
-        <span className={`mt-0.5 text-[9px] ${on ? 'text-on-primary/70' : 'text-muted'}`}>{t.hint}</span>
+        <span className={`mt-0.5 text-[12px] ${on ? 'text-on-lit' : 'text-muted'}`}>{t.hint}</span>
       </button>
     );
   };
@@ -426,7 +426,7 @@ export function DrawScreen(p: DrawScreenProps) {
     <button
       onClick={onClick}
       disabled={!p.connected}
-      className={`rounded-2xl px-5 text-[15px] font-semibold disabled:opacity-40 ${opts.flex ? 'flex-1' : ''} ${opts.on ? LIT : `${GLASS} text-text`}`}
+      className={`rounded-2xl px-5 text-[15px] font-semibold disabled:opacity-65 ${opts.flex ? 'flex-1' : ''} ${opts.on ? LIT : `${GLASS} text-text`}`}
       style={{ height: opts.h }}
       aria-pressed={opts.on}
       data-testid={id}
@@ -441,7 +441,7 @@ export function DrawScreen(p: DrawScreenProps) {
       onPointerCancel={blackUp}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.action('blackout-toggle'); } }}
       disabled={!p.connected}
-      className={`flex items-center justify-center gap-2 rounded-2xl border px-5 text-[15px] font-semibold disabled:opacity-40 ${flex ? 'flex-1' : ''} ${
+      className={`flex items-center justify-center gap-2 rounded-2xl border px-5 text-[15px] font-semibold disabled:opacity-65 ${flex ? 'flex-1' : ''} ${
         dark ? 'border-live bg-live text-on-primary' : 'border-border-strong bg-[rgba(17,17,19,.78)] text-text'
       }`}
       style={{ height: h, touchAction: 'none' }}
@@ -450,7 +450,7 @@ export function DrawScreen(p: DrawScreenProps) {
     >
       <LensCap capped={dark} size={20} />
       {dark ? 'Dark' : 'Blackout'}
-      {tablet && <span className={`text-[11px] font-normal ${dark ? 'text-on-primary/70' : 'text-live/70'}`}>hold</span>}
+      {tablet && <span className={`text-[12px] font-normal ${dark ? 'text-on-primary' : 'text-live'}`}>hold</span>}
     </button>
   );
   const selectView = (next: RemoteView) => {
@@ -507,7 +507,7 @@ export function DrawScreen(p: DrawScreenProps) {
                   key={i}
                   onClick={() => p.setLayer(i)}
                   disabled={!p.connected}
-                  className={`h-11 min-w-[44px] rounded-lg px-3.5 text-[12px] font-medium disabled:opacity-40 ${p.layer === i ? 'bg-active text-text' : 'text-muted'}`}
+                  className={`h-11 min-w-[44px] rounded-lg px-3.5 text-[12px] font-medium disabled:opacity-65 ${p.layer === i ? 'bg-active text-text' : 'text-muted'}`}
                   aria-pressed={p.layer === i}
                   data-testid={`draw-layer-${i}`}
                 >
@@ -520,7 +520,7 @@ export function DrawScreen(p: DrawScreenProps) {
         </header>
         <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto border-r border-border p-3" data-testid="draw-tools">
           {TILES.map(t => tile(t, 72))}
-          <div className="mt-3 px-1 text-[11px] font-medium uppercase tracking-wider text-dim">Bottle</div>
+          <div className="mt-3 px-1 text-[12px] font-medium uppercase tracking-wider text-dim">Bottle</div>
           <div className="flex flex-col gap-2" data-testid="draw-bottles">
             {DEFAULT_LIQUID_TYPES.map((liq) => {
               const on = p.liquid === liq.id;
@@ -529,7 +529,7 @@ export function DrawScreen(p: DrawScreenProps) {
                   key={liq.id}
                   onClick={() => p.chooseLiquid(liq.id)}
                   disabled={!p.connected}
-                  className={`flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] border px-2 text-left text-[12px] font-medium disabled:opacity-40 ${on ? LIT : 'border-border bg-surface text-text-2'}`}
+                  className={`flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] border px-2 text-left text-[12px] font-medium disabled:opacity-65 ${on ? LIT : 'border-border bg-surface text-text-2'}`}
                   title={liq.description}
                   aria-pressed={on}
                   data-testid={`draw-bottle-${liq.id}`}
@@ -626,12 +626,12 @@ export function DrawScreen(p: DrawScreenProps) {
           <button
             onClick={() => p.setLayer((p.layer + 1) % p.layerCount)}
             disabled={!p.connected || p.layerCount < 2}
-            className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl text-text disabled:opacity-60 ${GLASS}`}
+            className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl text-text disabled:opacity-65 ${GLASS}`}
             title={p.layerCount > 1 ? 'Step to the next plate' : 'The laptop has one plate'}
             data-testid="draw-layer"
           >
             <span className="text-[14px] font-semibold">L{p.layer + 1}</span>
-            <span className="mt-0.5 text-[9px] text-muted">layer</span>
+            <span className="mt-0.5 text-[12px] text-muted">layer</span>
           </button>
         </div>
         <footer data-testid="draw-footer" className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/85 to-transparent px-4 pb-3 ${side ? 'flex items-center gap-4 pt-3' : 'pt-6'}`}>

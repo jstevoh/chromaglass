@@ -3086,3 +3086,38 @@ How the rings read with a moving liquid at sixty frames is only seen here.
    with still liquid.
 4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
 5. Dish Stress at 0: the look exactly as before.
+
+## 147. The video coming in: the camera's row, the LED ring, the camera poured (PLAN 14ag-9)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. On the desk, click the **Video** dot in the header. Good: the Video panel opens beside the
+   plate (not the Settings sheet), its source row on top.
+2. **Camera**. Good: right under the sources, a row with a small live picture of what the camera
+   sees, the camera's name, and "over the plate"; Plate lit. Bad: a file's name there, or no picture.
+3. **Lamp**, then **LED ring**. Good: Lamp puts the camera under the dish, filtered by the dye;
+   LED ring turns it round the plate's centre like the LED platform, at LED Rotation Speed
+   (Lamp & Light). Bad: the picture both over and under the glass, or a ring that does not turn.
+4. **Pour**. Good: the camera's picture laid into the dish as dye, its motion stirring the liquid,
+   the camera still on the plate; Stop ends only the pour; Off ends both.
+5. The same on the phone's Dye sheet under "Video in": buttons a thumb's height.
+
+
+## 148. The APC40's pads play the liquid (PLAN 30c)
+
+Asked 2026-11-27. Not filmed (the owner, 2026-11-26: "Don't film anything - just push things").
+1. Settings → Feed → Controller, **Set up the APC40 mkII** (again, to take the new strips).
+   Good: the grid lights as rows of colours, the bottom row dim white (Press); **Grid layout**
+   shows Tools × Colours lit.
+2. Hold a pad on the top row (Drip). Good: a drop on the hit, more while held, none after you let
+   go, landing in the pad's column of the picture. Hold a Pour or Spray pad: it pours until let go.
+   Hold Press: the glass stays pressed until let go. Tap Splatter and hold another: the held one
+   flicks again, smaller each time.
+3. Track Select 4 (Syrup), hold the same Drip pad. Good: far slower drops; Pour slower too.
+4. Turn the top-left device knob (Drip's size). Good: bigger drops at the right, smaller at the left.
+5. **Bank ▶** over the device knobs. Good: the grid relights as Liquids × Colours, then Liquids ×
+   Tools, then the looks, then round; the faders keep their jobs. Bad: Bank ◀ ▶ do nothing (PLAN
+   30c-3: they may send on another channel; Learn shows what they send).
+6. The faders and the knob over each: Dye Budget/Saturation, Speed/Turbulence, Sound
+   Drive/Beat Squeeze, Plate Rock/Slosh, Bubbles/Bubble Melt, Oil Beads/Bead Drops,
+   Iridescence/Edge Relief, Evolve Speed/Hue Journey. The crossfader tips the plate side to side.
+7. On the phone: Motion → Pads. Good: the same grid, held pads keep going.

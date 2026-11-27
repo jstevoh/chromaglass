@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useState, useRef, useEffect, useCallback, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import { useCameras } from '../hooks/useCameras';
 import { cameraChoices, cameraPresent } from '../lib/cameras';
 import type { VideoShelfProps } from '../components/VideoShelf';
@@ -25,17 +25,22 @@ interface FilmDeps {
   pourName: string | null;
   pourLoaded: (v: LoadedVideo) => void;
   stopPour: () => void;
+  /** usePour's `live` (PLAN 14ag-9): whether the pour is a live picture, how one is poured, and the pour's own <video> for the row's little screen. */
+  live: { pourLive: boolean; pourStream: (stream: MediaStream, name: string) => void; pourVideoRef: RefObject<HTMLVideoElement | null> };
 }
 
 export function useFilm({
-  wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour,
+  wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour, live: { pourLive, pourStream, pourVideoRef },
 }: FilmDeps) {
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
+  /** Bumped whenever the film's picture is replaced or put down: a live pour belongs to one picture (PLAN 14ag-9). */
+  const [filmEpoch, setFilmEpoch] = useState(0);
   /** The file playing as the film, by its name; read only while the film is a file. */
   const [filmName, setFilmName] = useState<string | null>(null);
   /** Play a file as the film, which becomes the video loaded. */
   const loadFilm = async (file: File) => {
     await wallRef.current?.loadFilmFile(file);
+    setFilmEpoch(n => n + 1);
     setFilmSource('file');
     setFilmName(file.name);
     setFilmCameraLost(false);
@@ -69,6 +74,7 @@ export function useFilm({
         setFilmCameraLost(true);
         setToast('The film\u2019s camera was unplugged');
       });
+      setFilmEpoch(n => n + 1);
       setFilmSource('camera');
       setFilmCamera(got ?? null);
       setFilmCameraLost(false);
@@ -115,6 +121,7 @@ export function useFilm({
         () => setFilmSource('none'),
         () => setToast('That window is coming through black — share the tab instead'),
       );
+      setFilmEpoch(n => n + 1);
       setFilmSource('window');
       setFilmCameraLost(false);
       return null;
@@ -126,12 +133,14 @@ export function useFilm({
   };
   const clearFilm = () => {
     wallRef.current?.clearFilm();
+    setFilmEpoch(n => n + 1);
     setFilmSource('none');
     setFilmCameraLost(false);
   };
   /** A film the show server serves by the assistant's path (PLAN 44k-13): the file's way, by address. */
   const filmUrlNow = async (url: string, name: string) => {
     await wallRef.current?.loadFilmUrl(url);
+    setFilmEpoch(n => n + 1);
     setFilmSource('file');
     setFilmName(name);
     setFilmCameraLost(false);
@@ -183,17 +192,60 @@ export function useFilm({
     } });
   }, [filmSource, filmName, filmCamera, filmCameraId, filmCameraLost, camKey]);
   /*
-    The row of the video loaded (components/VideoShelf.tsx), on the Video
-    panel, the Dyes panel and the phone's dye sheet. Every file film is the
-    video loaded (a file played becomes it), so Play is lit while the film is
-    a file; Pour while anything pours, which is only ever the video loaded too.
+    A live pour ends with the live picture it copies (PLAN 14ag-9): the pour
+    holds a clone of the film's stream, so it would go on reading a camera the
+    Video panel says is off. Taken off with the film, a swap to a file or
+    another camera or window included (keyed on each picture the film is
+    given, not its name: two windows share one, and an unnamed camera has
+    none); the new source is poured afresh by pressing Pour. A camera
+    unplugged mid-show takes the film off without clearFilm, so its going
+    to 'none' is in the key too.
   */
-  const video: VideoShelfProps = {
+  /** The row's little screen: the film's own picture, else the pour's (a file pouring with nothing on the plate). */
+  const pourOnRef = useRef(false);
+  pourOnRef.current = pourName !== null;
+  const filmPreview = useCallback(() => wallRef.current?.filmVideoEl() ?? (pourOnRef.current ? pourVideoRef.current : null), [wallRef, pourVideoRef]);
+  const liveKey = `${filmEpoch} ${filmSource}`;
+  const pourLiveRef = useRef(pourLive);
+  pourLiveRef.current = pourLive;
+  const pourKeyRef = useRef('');
+  useEffect(() => {
+    if (pourLiveRef.current && pourKeyRef.current !== liveKey) stopPour();
+    // stopPour is stable (usePour's useCallback).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveKey]);
+  const liveName = filmSource === 'camera' ? (filmCamera?.label || 'Camera') : filmSource === 'window' ? 'A shared window' : null;
+  /*
+    The row of the video coming in (components/VideoShelf.tsx), on the Video
+    panel, the Dyes panel and the phone's dye sheet. It is the input on the
+    plate: the camera or the window while one is on, else the file loaded
+    (every file film is the video loaded: a file played becomes it). It used
+    to be the file's alone, so with the camera on it named a file that was not
+    playing, Play unlit, and the camera had no Pour (the owner, 2026-11-27:
+    "hard to understand and control what is on screen").
+  */
+  const video: VideoShelfProps = liveName ? {
+    name: liveName,
+    kind: filmSource === 'camera' ? 'camera' : 'window',
+    filming: true,
+    // Lit only while this picture pours; a file still pouring from before is said, and Pour swaps to the camera.
+    pouring: pourName !== null && pourLive,
+    pourName: pourLive ? null : pourName,
+    onFilm: () => clearFilm(),
+    onPour: () => {
+      if (pourName !== null && pourLive) { stopPour(); return; }
+      const s = wallRef.current?.filmVideoEl()?.srcObject;
+      if (s instanceof MediaStream) { pourKeyRef.current = liveKey; pourStream(s, liveName); }
+    },
+    preview: filmPreview,
+  } : {
     name: loaded?.name ?? null,
+    kind: 'file',
     filming: filmSource === 'file',
     pouring: pourName !== null,
     onFilm: () => { if (filmSource === 'file') clearFilm(); else if (loaded) void filmLoaded(loaded); },
     onPour: () => { if (pourName !== null) stopPour(); else if (loaded) pourLoaded(loaded); },
+    preview: filmPreview,
   };
 
   return {

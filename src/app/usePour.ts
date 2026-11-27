@@ -60,6 +60,8 @@ export function usePour({
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   /** The video pouring as dye, by its name, or null: what the row lights its Pour by. */
   const [pourName, setPourName] = useState<string | null>(null);
+  /** The pour is a live picture (the camera or a window), not a file. */
+  const [pourLive, setPourLive] = useState(false);
   /** The video loaded, by either door, or null before one is. */
   const [loaded, setLoaded] = useState<LoadedVideo | null>(null);
   const loadedRef = useRef(loaded);
@@ -72,36 +74,67 @@ export function usePour({
     picture, so once is enough. A served video is given by address, so it pours
     while it is still arriving; a file by an object URL.
   */
-  const pourVideoFrom = useCallback((src: string, objectUrl: boolean) => {
+  /** A live picture's own copy of its stream while it pours (PLAN 14ag-9), stopped when the pour moves on. */
+  const pourStreamRef = useRef<MediaStream | null>(null);
+  const dropPourStream = () => {
+    pourStreamRef.current?.getTracks().forEach(t => t.stop());
+    pourStreamRef.current = null;
+  };
+  const pourVideoFrom = useCallback((src: string | MediaStream, objectUrl: boolean) => {
     const v = videoPlayerRef.current;
     if (!v) return;
     if (pourUrlRef.current) URL.revokeObjectURL(pourUrlRef.current);
-    pourUrlRef.current = objectUrl ? src : null;
+    pourUrlRef.current = objectUrl && typeof src === 'string' ? src : null;
+    dropPourStream();
     v.onplay = () => { setIsVideoPlaying(true); visualizerRef.current?.pourVideo(v); };
     v.onpause = () => setIsVideoPlaying(false);
     v.onended = () => setIsVideoPlaying(false);
-    v.src = src;
+    if (typeof src === 'string') { v.srcObject = null; v.src = src; }
+    else { v.removeAttribute('src'); pourStreamRef.current = src; v.srcObject = src; }
     v.play().catch(() => { /* autoplay policy: plays on the next gesture */ });
   }, []);
   const stopPour = useCallback(() => {
     visualizerRef.current?.stopPourVideo();
     const v = videoPlayerRef.current;
-    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    if (v) { v.pause(); v.removeAttribute('src'); v.srcObject = null; v.load(); }
     if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
+    dropPourStream();
     setIsVideoPlaying(false);
     setPourName(null);
+    setPourLive(false);
   }, []);
   /** Pour a file, which becomes the video loaded. */
   const pourFile = useCallback((file: File) => {
     pourVideoFrom(URL.createObjectURL(file), true);
     setPourName(file.name);
+    setPourLive(false);
     setLoaded({ file, url: null, name: file.name });
   }, [pourVideoFrom]);
   /** Pour the video loaded, whichever door it came in by: a file afresh, a served one by its address. */
   const pourLoaded = useCallback((v: LoadedVideo) => {
     if (v.file) pourFile(v.file);
-    else if (v.url) { pourVideoFrom(v.url, false); setPourName(v.name); }
+    else if (v.url) { pourVideoFrom(v.url, false); setPourName(v.name); setPourLive(false); }
   }, [pourFile, pourVideoFrom]);
+  /*
+    Pour a live picture: the camera or a shared window (PLAN 14ag-9).
+
+    The owner, with the camera on, 2026-11-27: "I want to bring back the
+    ability to pour the video on". A file could pour (14ag) and a camera could
+    not: the pour is the hidden <video> above, and only a file had an address
+    to give it. A stream has none, but it can be shared: the pour gets its own
+    clone of the film's stream, so the pour and the projector are two readers
+    of one camera, and stopping the pour (which stops its clone's tracks) never
+    takes the camera off the plate. The film's own tracks are still the
+    camera's life: when the film is put down they end, and useFilm stops the
+    pour with them, so nothing is left reading a camera the panel says is off.
+    What the pour does with each frame is the file's: the frame laid as dye
+    and its optical flow as the liquid's motion (lib/videoFlow.ts).
+  */
+  const pourStream = useCallback((stream: MediaStream, name: string) => {
+    pourVideoFrom(stream.clone(), false);
+    setPourName(name);
+    setPourLive(true);
+  }, [pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) pourFile(file);
@@ -119,7 +152,7 @@ export function usePour({
       video: async (url, name) => {
         if (!videoPlayerRef.current || !visualizerRef.current) return 'the plate is not running';
         const why = await videoOpens(url);
-        if (!why) { pourVideoFrom(url, false); setPourName(name); setLoaded({ file: null, url, name }); }
+        if (!why) { pourVideoFrom(url, false); setPourName(name); setPourLive(false); setLoaded({ file: null, url, name }); }
         return why;
       },
       loaded: () => {
@@ -137,6 +170,6 @@ export function usePour({
 
   return {
     fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
-    pourName, pourVideoFrom, stopPour, pourFile, pourLoaded, handleVideoUpload, loaded, setLoaded,
+    pourName, pourLive, pourStream, pourVideoFrom, live: { pourLive, pourStream, pourVideoRef: videoPlayerRef }, stopPour, pourFile, pourLoaded, handleVideoUpload, loaded, setLoaded,
   };
 }

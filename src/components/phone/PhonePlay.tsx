@@ -10,7 +10,8 @@ import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import { findPreset } from '../../presets';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
 
 const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -101,7 +102,7 @@ export interface PhonePlayProps {
   onDye: (hex: string) => void;
   /** The app's hand: Play sets it from the tray and from the touch itself. */
   onTool: (t: PhoneTool) => void;
-  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'>;
+  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'> & Partial<Pick<VisualizerSettings, 'keepFull'>>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
@@ -340,7 +341,7 @@ export function PhonePlay(p: PhonePlayProps) {
         >
           <span className={`flex h-9 min-w-0 items-center gap-2 rounded-[18px] pl-3.5 pr-2.5 ${GLASS_PILL}`}>
             <span className="truncate text-[14px] font-medium text-text">{p.lookName}</span>
-            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-medium text-text-2" data-testid="play-edited">edited</span>}
+            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[12px] font-medium text-text-2" data-testid="play-edited">edited</span>}
             {!sheet && <ChevronDown size={14} className="shrink-0 text-text-2" />}
           </span>
         </button>
@@ -381,7 +382,7 @@ export function PhonePlay(p: PhonePlayProps) {
                   <span className="relative flex h-7 w-7 flex-col items-center justify-center gap-px" data-testid="play-record-box">
                     <TapeReels seconds={p.recording.seconds} running={p.recording.on} height={p.recording.on ? 11 : 13} />
                     {p.recording.on && (
-                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[9px] leading-none tabular-nums">
+                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[12px] leading-none tabular-nums">
                         {clock(p.recording.seconds)}
                       </span>
                     )}
@@ -476,7 +477,7 @@ export function PhonePlay(p: PhonePlayProps) {
                   data-testid="play-save-name"
                 />
                 <button type="submit" disabled={!saveName.trim()} data-testid="play-save-confirm"
-                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-40">Save</button>
+                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-65">Save</button>
               </form>
               {saveDup && (
                 <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="play-save-duplicate">
@@ -513,12 +514,14 @@ export function PhonePlay(p: PhonePlayProps) {
               <div ref={stripRef} className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1" data-testid="play-looks">
                 {p.looks.map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
-                    <button key={l.id} onClick={() => (isPackLocked(findPreset(l.id)?.pack) ? openAccountSheet() : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
-                      className="flex w-[76px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
+                    <button key={l.id} onClick={() => (locked ? openTierLock('moire', { itemName: l.name }) : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
+                      className="flex w-[84px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
                       {/* Lit like every other chosen thing (PLAN 35a): the slide's own film cannot change colour, so its name takes the lit chip and the mount a lit ring (on a wrapper, since the mount's clipped corner would cut a ring drawn on it). A slide a flick, snapping one at a time (35g). */}
                       <span className={`flex w-full justify-center rounded-[4px] py-1 ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><SlideMount swatch={l.swatch} size={60} /></span>
                       <span className={`w-full truncate rounded-[6px] px-1.5 text-[12px] ${on ? `${LIT} font-medium` : 'text-text-2'}`}>{l.name}</span>
+                      {locked && <TierLockBadge label="Pro · Pack" className="self-start whitespace-nowrap" />}
                     </button>
                   );
                 })}
@@ -538,6 +541,14 @@ export function PhonePlay(p: PhonePlayProps) {
                   }`}>
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.wandering ? 'bg-accent' : 'bg-muted'}`} />
                   <span className="truncate">Evolve</span>
+                </button>
+                {/* Keep full (PLAN 18a-22), the desk's switch beside Evolve: the dropper tops up a dish left running. */}
+                <button onClick={() => p.onSetting({ keepFull: !s.keepFull })} aria-pressed={!!s.keepFull} data-testid="play-keepfull"
+                  className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
+                    s.keepFull ? LIT : 'border-white/10 text-text-2'
+                  }`}>
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${s.keepFull ? 'bg-accent' : 'bg-muted'}`} />
+                  <span className="truncate">Keep full</span>
                 </button>
               </div>
               <div className="mt-3 flex gap-2 pb-1">

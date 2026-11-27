@@ -100,13 +100,13 @@ export function FeedbackPane({ card, title }: {
         maxLength={FEEDBACK_MAX}
         placeholder={topic === 'bug' ? 'What happened, and what were you doing just before?' : 'Tell us…'}
         aria-label="Your feedback"
-        className="w-full resize-y rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-[13px] leading-relaxed text-white/90 outline-none placeholder:text-white/30 focus:border-accent-border pointer-coarse:text-[16px]"
+        className="w-full resize-y rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-[13px] leading-relaxed text-white/90 outline-none placeholder:text-dim focus:border-accent-border pointer-coarse:text-[16px]"
         data-testid="feedback-message"
       />
-      <div className="mb-3 mt-1 text-right text-[11px] text-white/30">{message.length} / {FEEDBACK_MAX}</div>
+      <div className="mb-3 mt-1 text-right text-[12px] text-dim">{message.length} / {FEEDBACK_MAX}</div>
 
       {account ? (
-        <p className="mb-3 text-[12px] text-white/50" data-testid="feedback-account">We will answer at {account}.</p>
+        <p className="mb-3 text-[12px] text-muted" data-testid="feedback-account">We will answer at {account}.</p>
       ) : (
         <input
           type="email"
@@ -115,7 +115,7 @@ export function FeedbackPane({ card, title }: {
           placeholder="Your email, if you would like an answer (optional)"
           aria-label="Your email"
           autoComplete="email"
-          className="mb-3 h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 text-[13px] text-white/90 outline-none placeholder:text-white/30 focus:border-accent-border pointer-coarse:text-[16px]"
+          className="mb-3 h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 text-[13px] text-white/90 outline-none placeholder:text-dim focus:border-accent-border pointer-coarse:text-[16px]"
           data-testid="feedback-reply-to"
         />
       )}
@@ -125,7 +125,7 @@ export function FeedbackPane({ card, title }: {
         <Toggle label="Include the app's recent log and this look's settings" on={logs} onChange={(v) => { setLogs(v); setPreview(null); }} testId="feedback-logs" />
         <Toggle label="Include a picture of the plate" on={picture} onChange={(v) => { setPicture(v); setPreview(null); }} testId="feedback-picture" />
       </div>
-      <p className="mb-4 text-[11px] leading-relaxed text-white/40">
+      <p className="mb-4 text-[12px] leading-relaxed text-dim">
         Always sent: the app's version, this browser and screen, the graphics card, the look's name, whether Evolve and a projector are on, and your plan. Never sent: passwords,
         licence keys, stream keys or sign-in tokens; they are taken out of the log first.{' '}
         <button type="button" onClick={showPreview} className="underline decoration-white/25 underline-offset-2 hover:text-white" data-testid="feedback-preview-toggle">
@@ -133,10 +133,10 @@ export function FeedbackPane({ card, title }: {
         </button>
       </p>
       {preview !== null && (
-        <pre className="mb-4 max-h-64 overflow-auto rounded-lg bg-black/40 p-3 text-[10.5px] leading-snug text-white/60" data-testid="feedback-preview">{preview}</pre>
+        <pre className="mb-4 max-h-64 overflow-auto rounded-lg bg-black/40 p-3 text-[12px] leading-snug text-white/60" data-testid="feedback-preview">{preview}</pre>
       )}
       </>) : (
-        <p className="mb-4 text-[11px] leading-relaxed text-white/40" data-testid="feedback-mail-only">
+        <p className="mb-4 text-[12px] leading-relaxed text-dim" data-testid="feedback-mail-only">
           Send opens your mail app with the note, the app's version and the look's name in it. The log
           cannot go by email; describe what happened as best you can.
         </p>

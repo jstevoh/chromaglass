@@ -82,8 +82,8 @@ export function CastNetworkItems({ relay, mirrorCount, tv }: { relay: RelayInfo 
         {relay ? (
           <NetworkDisplayAddresses relay={relay} />
         ) : (
-          <div className="text-[11px] opacity-50 leading-snug mt-0.5">
-            Needs the show server: run <span className="font-mono">npm run remote</span>.
+          <div className="text-[12px] text-white/70 leading-snug mt-0.5">
+            Needs the show server: open the ChromaGlass Mac app on this computer.
           </div>
         )}
       </div>
@@ -118,8 +118,8 @@ export function CastNetworkItems({ relay, mirrorCount, tv }: { relay: RelayInfo 
             </div>
           </>
         ) : (
-          <div className="text-[11px] opacity-50 leading-snug mt-0.5">
-            Needs the show server: open the Mac app, or run <span className="font-mono">npm run remote</span>.
+          <div className="text-[12px] text-white/70 leading-snug mt-0.5">
+            Needs the show server: open the ChromaGlass Mac app on this computer.
           </div>
         )}
       </div>
