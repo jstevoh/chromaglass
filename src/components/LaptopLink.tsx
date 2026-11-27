@@ -141,10 +141,10 @@ export function LaptopLinkForm() {
       {error && <p className="mt-3 text-[13px] text-red-300" data-testid="laptop-error">{error}</p>}
 
       <div className="mt-6 flex gap-3">
-        <button type="submit" className="flex-1 rounded-full bg-white px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-black" data-testid="laptop-connect">
+        <button type="submit" className="flex min-h-11 flex-1 items-center justify-center rounded-full bg-white px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-black" data-testid="laptop-connect">
           Connect
         </button>
-        <button type="button" onClick={goPlay} className="flex items-center gap-2 rounded-full border border-white/20 px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-white/80" data-testid="app-play-here">
+        <button type="button" onClick={goPlay} className="flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-white/80" data-testid="app-play-here">
           <Droplets size={15} /> Play here
         </button>
       </div>
@@ -165,10 +165,10 @@ export function AppModeBar() {
           app shows (SiteLink.tsx). Beside them, on a 390 phone it had 153 px and showed
           "Try more free visua…" (`npm run applink` measures the box). */}
       <div className="order-last flex basis-full justify-end"><SiteLink look="bar" /></div>
-      <a href="/?remote=1" className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60" data-testid="app-change-laptop">
+      <a href="/?remote=1" className="inline-flex min-h-11 min-w-11 items-center rounded-full border border-white/15 px-3.5 text-[11px] font-bold uppercase tracking-widest text-white/60" data-testid="app-change-laptop">
         Change laptop
       </a>
-      <button onClick={goPlay} className="flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/90" data-testid="app-play-here">
+      <button onClick={goPlay} className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-full border border-white/25 px-3.5 text-[11px] font-bold uppercase tracking-widest text-white/90" data-testid="app-play-here">
         <Droplets size={12} /> Play here
       </button>
     </div>

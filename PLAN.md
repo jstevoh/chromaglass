@@ -569,7 +569,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46a **shipped**; 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46r, one args name one value a step, **shipped** (`npm run argnames`); 46b H2c-5, H2c-8 **shipped**; 46b-46e builds to Antigravity after its queue; the audit of 2026-11-13: 46f (the ear's view and the clock out of the shell), 46g (liquids carried only once poured) and 46k (`dyeDisperse` gated on its own coefficients) **shipped**, 46h-46j, 46l-46q, 46s and 46t written | 17 |
 | 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 44 |
 | 48 | Ideas: more compelling visuals from real phenomena (brainstormed 2026-11-21) | [`48-ideas-visuals.md`](docs/plan/48-ideas-visuals.md) |  | 15 |
-| 49 | Usability against Nielsen's ten heuristics: undo, fit, one name for one thing (asked 2026-11-26) | [`49-usability-review.md`](docs/plan/49-usability-review.md) | 49a–49l | 24 |
+| 49 | Usability against Nielsen's ten heuristics: undo, fit, one name for one thing (asked 2026-11-26) | [`49-usability-review.md`](docs/plan/49-usability-review.md) | 49a–49l (49c **shipped (#963)**, 49g **shipped (#970)**) | 24 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 3 |
 
 ## Not doing
