@@ -69,6 +69,7 @@
     "liquidfile": "node --experimental-strip-types scripts/liquidfile.mjs",
     "seed": "esbuild scripts/seed.mjs --bundle --platform=node --format=esm --log-level=warning --external:typescript --external:playwright --external:esbuild --outfile=node_modules/.cache/seed.mjs && node node_modules/.cache/seed.mjs",
     "record": "node --experimental-strip-types scripts/record.mjs",
+    "lookair": "esbuild scripts/lookair.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/lookair.mjs && node node_modules/.cache/lookair.mjs",
     "setlist": "esbuild scripts/setlist.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/setlist.mjs && node node_modules/.cache/setlist.mjs",
     "compilestop": "node scripts/compilestop.mjs",
     "stillwait": "esbuild scripts/stillwait.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/stillwait.mjs && node node_modules/.cache/stillwait.mjs",

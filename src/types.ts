@@ -1294,7 +1294,20 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   crispEdges: 0,            // off: the oil's edge drawn as the solver's band, as every look had it
   projectorFocus: 0.5,
   lacing: 0,
-  bubbles: 0.2,
+  /*
+    No trapped air unless the look asks for it (PLAN 33q-4, the owner's
+    choice, 2026-11-27: "too many bubbles in the looks"). Air is trapped
+    when a second glass is laid or pressed onto the liquid: the clock-glass
+    sandwich of a 1960s wet show, where the top glass closes over the water
+    and a press or a kick shuts pockets under it. An open dish, a gel, a
+    film in a frame or a reaction has no glass to close over the air, so
+    those looks carried 0.2 here by inheritance, not by choice. So the base
+    every look is laid on (LOOK_BASE in lib/lookFade.ts) has none, and the
+    four looks that are the sandwich ask for their own: Lava Pop, Oil &
+    Water, Clock Glass and Splodascope. The dial still turns it on in any
+    look, on the desk, the phone and MIDI. `npm run lookair` counts them.
+  */
+  bubbles: 0,
   bubbleMelt: 0,            // nature's rate: a pocket between the glasses stays (PLAN 38b)
   plateRock: 0.45,
   frameSway: 0,             // the frame holds still; the music moves the liquid (lib/plateRock.ts)
