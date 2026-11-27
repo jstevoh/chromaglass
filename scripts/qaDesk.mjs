@@ -43,19 +43,27 @@ export async function presetChecks({ page, clickOn, settle, check, firstVisible 
   const entries = await page.locator('[data-testid="looks-grid"] [data-testid^="looks-grid-"]:not([data-testid="looks-grid-close"])').count();
   check('the Looks grid opens with every look in it',
     (await page.getByTestId('looks-grid').count()) === 1 && entries > 10, `${entries} looks`);
+  // Loading: a card in the grid sends its look (LooksGrid onSelectLook), so
+  // one is picked and the plate's name read back.
+  let loaded = '';
+  if (await page.getByTestId('looks-grid-galaxy').count()) {
+    await clickOn('looks-grid-galaxy');
+    await settle(2500);
+    loaded = await firstVisible('plate-name').innerText().catch(() => '');
+  }
   await page.keyboard.press('Escape');
   await settle(400);
   if (await page.getByTestId('looks-grid').count()) await clickOn('looks-grid-close');
 
   // Saving must still be reachable now that the settings panel's copy of the
-  // presets is gone; loading is the grid just counted, and the saved looks the
-  // same menu lists once there are any.
+  // presets is gone.
   await clickOn('doc-menu-button');
   await settle(400);
   const menuIds = await page.evaluate(() =>
     [...document.querySelectorAll('[data-testid="doc-menu"] [data-testid]')].map(e => e.dataset.testid));
   check('the File menu can still save a look, and the grid loads one',
-    menuIds.includes('doc-save') && entries > 10, `${menuIds.join(', ') || 'no menu'}; ${entries} looks in the grid`);
+    menuIds.includes('doc-save') && /galaxy/i.test(loaded),
+    `${menuIds.join(', ') || 'no menu'}; Galaxy from the grid → ${loaded.replace(/\s+/g, ' ').trim() || '(no name over the plate)'}`);
   await page.keyboard.press('Escape');
   await settle(400);
 

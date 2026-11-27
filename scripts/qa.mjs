@@ -173,18 +173,12 @@ const errors = [];
 /*
   Starts at 900 px, and why it no longer means the overlay.
 
-  This width was chosen for the floating overlay (bottle rail, toolbar, preset
-  title menu), which the app drew below 1024 px. Since 49b (#962, 2026-11-26)
-  there is no overlay at any width: `overlayUp` is false and a non-touch window
-  keeps the folded desk down to 360 px. The steps from here to the desk section
-  were written against the overlay's Band button, preset title and toolbar, and
-  the first, the Band, waited its sixty seconds for a button no longer drawn:
-  main's `qa` read "locator.scrollIntoViewIfNeeded: Timeout 60000ms" on every
-  deploy from then on, five checks run. They now take the desk's own way to the
-  same things (qaDesk.mjs: the Settings sheet's Sound section, the Looks grid,
-  the cue list and Go, the File menu; the command palette for MIDI, Songs and
-  the Guide). 900 px stays as the desk folded; the 1440 section asks the full
-  desk.
+  Chosen for the floating overlay, which the app drew below 1024 px. Since 49b
+  (#962, 2026-11-26) there is no overlay at any width (`overlayUp` is false),
+  and the steps below waited sixty seconds for its Band button: main's `qa`
+  ran five checks on every deploy from then on. They take the desk's ways to
+  the same things now (qaDesk.mjs; the command palette for MIDI, Songs and the
+  Guide). 900 px stays as the desk folded; the 1440 section asks the full one.
 */
 const context = await browser.newContext({ permissions: ['camera'], viewport: { width: 900, height: 860 } });
 const page = await context.newPage();
@@ -525,7 +519,8 @@ try {
   // ── Settings, and every section of it ─────────────────────────────
   await clickOn('open-all-settings');
   await settle();
-  const headings = await page.locator('section h3').allInnerTexts();
+  // In the sheet only: the desk's own panels draw some of the same sections.
+  const headings = await page.locator('[data-testid="settings-panel"] section h3').allInnerTexts();
   check('settings opens with its sections', headings.length > 8, `${headings.length}: ${headings.slice(0, 6).join(', ')}…`);
   await noteDuplicates();
 
@@ -965,22 +960,28 @@ try {
   // device.
   // On the desk the sources are a chooser, not a toggle (the Settings sheet's
   // Sound section): the band is stopped by choosing Silent and started by
-  // choosing it again, and what is read is the level reaching the show, not
-  // only which button is lit.
+  // choosing it again, and each line reads the level reaching the show as
+  // well as which button is lit.
   const beforeBand = await page.evaluate(() => window.__media.length);
   // Read by what the button says, not by its colour: aria-pressed is the state
   // itself (PLAN 35a).
-  const volume = () => page.evaluate(() => window.chromaglassCastState?.().audio?.volume ?? null);
+  // `undefined` when the hook is not there, which is not Silent.
+  const volume = () => page.evaluate(() => (window.chromaglassCastState ? window.chromaglassCastState().audio?.volume ?? null : undefined));
+  const playingBefore = await volume();
   const silentLit = await chooseSource('none');
   await settle(2000);
   const silentVolume = await volume();
-  check('choosing Silent stops the band', silentLit && !(silentVolume > 0),
-    `Silent ${silentLit ? 'lit' : 'not lit'}, volume ${silentVolume}`);
+  check('choosing Silent stops the band',
+    playingBefore > 0 && silentLit && (silentVolume === null || silentVolume === 0),
+    `volume ${playingBefore} before, Silent ${silentLit ? 'lit' : 'not lit'}, volume ${silentVolume} after`);
   const bandLit = await chooseSource('simulated');
-  await settle(3000);
+  // Waits for a level, as the first five seconds do: the analyser reopens.
+  let bandVolume = null;
+  for (let i = 0; i < 20 && !(bandVolume > 0); i++) { await settle(1000); bandVolume = await volume(); }
   check('the band plays without opening a device',
     (await page.evaluate(() => window.__media.length)) === beforeBand);
-  check('the band reports itself as playing', bandLit);
+  check('the band reports itself as playing', bandLit && bandVolume > 0,
+    `Band ${bandLit ? 'lit' : 'not lit'}, volume ${bandVolume}`);
 
   // ── Tools and the plate ───────────────────────────────────────────
   //
@@ -1005,13 +1006,12 @@ try {
     }, [mid.x, mid.y]);
     check('the plate is what the cursor is over', topmost.ok, `the cursor is over ${topmost.what}`);
 
-    // Pause from the overlay's own transport, not the F key: F is gated on
-    // `deskUp` and this section runs at 900px, where the narrow-screen UI is
-    // the surface and F does nothing. Pressed it anyway and the plate kept
-    // running, and the check read the liquid's own evaporation — density fell
-    // by 489 across a drag that had just added dye to it.
-    // The desk has no Pause button; its transport is Freeze, the F key
-    // (lib/shortcuts.ts), the same isActive the overlay's button flipped.
+    // Still the plate for the drag, or the check reads the liquid's own
+    // evaporation (density once fell by 489 across a drag that had just added
+    // dye). This used the overlay's Pause, because F is gated on `deskUp` and
+    // the overlay had no desk; at 900 px the desk is up now (49b), it has no
+    // Pause button, and F (lib/shortcuts.ts) is the same isActive. Whether it
+    // took is read from the loop's own flag, not assumed.
     const frozen = () => page.evaluate(() => window.chromaglassDebug?.().active?.() ?? null);
     const pause = page.locator('button[title="Pause"]').first();
     const byButton = await pause.count() > 0;
@@ -1061,12 +1061,17 @@ try {
   // The overlay had a button for each; the desk reaches MIDI and Songs from
   // the command palette (useCommandPalette.ts, Open), so a panel with no
   // button is opened there rather than skipped.
-  for (const [title, what, palette] of [['MIDI', 'the MIDI panel', 'MIDI'], ['Songs', 'the songs sheet', 'Songs'], ['Track', 'the track panel', null]]) {
+  // Opened from the palette, the panel's own element has to be there: the
+  // palette's Enter runs whatever row comes first, and a line that passes on
+  // the keystroke would pass with the panel gone.
+  for (const [title, what, palette, root] of [['MIDI', 'the MIDI panel', 'MIDI', 'midi-state'], ['Songs', 'the songs sheet', 'Songs', 'songs-panel'], ['Track', 'the track panel', null, null]]) {
     const b = page.locator(`button[title*="${title}" i]`).first();
-    if (await b.count() || palette) {
-      if (await b.count()) await clickOn(b); else await viaPalette(palette);
+    const byButton = (await b.count()) > 0;
+    if (byButton || palette) {
+      if (byButton) await clickOn(b); else await viaPalette(palette);
       await settle(800);
-      check(`${what} opens`, true, (await b.count()) ? '' : `from the command palette, "${palette}"`);
+      const up = byButton || (await page.getByTestId(root).count()) > 0;
+      check(`${what} opens`, up, byButton ? '' : `from the command palette, "${palette}": ${up ? root : `no ${root}`}`);
       await noteDuplicates();
       await page.keyboard.press('Escape');
       await settle(400);
