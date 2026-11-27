@@ -11,7 +11,7 @@ eyes on a real GPU.
 ## Where things live
 
 Before any code, read the folder's `README.md`: `src/gpu`, `src/gpu/fluid`, `src/gpu/wgsl`,
-`src/gpu/wgsl/fluid`, `src/sim`, `src/app`, `src/lib`, `src/hooks`, `src/components/desk`,
+`src/gpu/wgsl/fluid`, `src/sim`, `src/engine`, `src/app`, `src/lib`, `src/hooks`, `src/components/desk`,
 `src/components/settings`, `src/components/phone`, `server`, `scripts`. Which domain owns
 what, and why the code is split this way: `docs/architecture.md`. A file over 40 KB is
 never opened whole: grep for the symbol, then read about 80 lines around it. A search

@@ -21,7 +21,7 @@ import { Sheet, Button, SwitchPill, Toggle, LIT } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
-import { openAccountSheet } from '../lib/tierGates';
+import { TierLockBanner } from './TierLock';
 import { makesText, type RecordChoice } from '../lib/recordChoice';
 import { PORTRAIT_STAGE, FREE_PORTRAIT_STAGE, type ClipShape } from '../lib/clipFrame';
 import { canShareClip, shareClip } from '../lib/shareClip';
@@ -170,23 +170,14 @@ export function RecordPanel({
                 </div>
               </div>
               {recorder.maxDurationSec !== null && (
-                <div
-                  data-cg-app-tile="full-record"
-                  data-cg-record-free-cap={String(recorder.maxDurationSec)}
-                  onClick={openAccountSheet}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
-                  className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
-                >
-                  <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
-                    <span>In the ChromaGlass app · Full-length unmarked Record</span>
-                    <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
-                  </div>
-                  <p className="mt-0.5 text-amber-100/90">
-                    On the free site, clips are capped at {recorder.maxDurationSec} seconds and carry the ChromaGlass corner mark. Unlock Home or Pro for full-length unmarked takes.
-                  </p>
-                </div>
+                <TierLockBanner
+                  feature="full-record"
+                  summary={`On the free site, clips are capped at ${recorder.maxDurationSec} seconds and carry the ChromaGlass corner mark. Unlocked by ChromaGlass Home or Pro.`}
+                  dataAttrs={{
+                    'data-cg-app-tile': 'full-record',
+                    'data-cg-record-free-cap': String(recorder.maxDurationSec),
+                  }}
+                />
               )}
 
 
@@ -224,7 +215,7 @@ export function RecordPanel({
                       aria-checked={videoOpts.includeAudio}
                       aria-label="Sound in the video"
                       className={`flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1 ${
-                        recorder.recording ? 'opacity-50 cursor-not-allowed' : ''
+                        recorder.recording ? 'opacity-65 cursor-not-allowed' : ''
                       }`}
                     >
                       <SwitchPill on={videoOpts.includeAudio} />
@@ -264,19 +255,19 @@ export function RecordPanel({
                           data-testid={`record-shape-${f.id}`}
                           className={`flex flex-col text-left rounded-lg border p-3 transition-colors ${
                             selected ? LIT : 'border-border text-muted hover:border-border-strong hover:text-text'
-                          } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${recorder.recording ? 'opacity-65 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center justify-between w-full font-medium text-[13px]">
                             <span>{f.label}</span>
                             {selected && <Check size={14} />}
                           </div>
-                          <span className="mt-1 text-[11px] leading-snug opacity-80">{f.desc}</span>
+                          <span className={`mt-1 text-[12px] leading-snug ${selected ? 'text-on-lit' : 'text-muted'}`}>{f.desc}</span>
                         </button>
                       );
                     })}
                   </div>
                   {videoOpts.shape === 'portrait' && (
-                    <p className="text-[11px] leading-snug text-muted" data-testid="record-shape-note">
+                    <p className="text-[12px] leading-snug text-muted" data-testid="record-shape-note">
                       While it records, the plate on this screen becomes a tall strip and goes back when you stop. With a projector attached the wall keeps its shape and the clip is the centred 9:16 slice of it.
                     </p>
                   )}
@@ -325,13 +316,13 @@ export function RecordPanel({
                             selected
                               ? LIT
                               : 'border-border text-muted hover:border-border-strong hover:text-text'
-                          } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${recorder.recording ? 'opacity-65 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center justify-between w-full font-medium text-[13px]">
                             <span>{q.label}</span>
                             {selected && <Check size={14} />}
                           </div>
-                          <span className="mt-1 text-[11px] leading-snug opacity-80">{q.desc}</span>
+                          <span className={`mt-1 text-[12px] leading-snug ${selected ? 'text-on-lit' : 'text-muted'}`}>{q.desc}</span>
                         </button>
                       );
                     })}
@@ -360,7 +351,7 @@ export function RecordPanel({
                             videoOpts.fps === rate
                               ? LIT
                               : 'border-border text-muted hover:border-border-strong'
-                          } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${recorder.recording ? 'opacity-65 cursor-not-allowed' : ''}`}
                         >
                           {rate} fps
                         </button>
@@ -394,7 +385,7 @@ export function RecordPanel({
                             videoOpts.format === fmt.id
                               ? LIT
                               : 'border-border text-muted hover:border-border-strong'
-                          } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${recorder.recording ? 'opacity-65 cursor-not-allowed' : ''}`}
                         >
                           {fmt.label}
                         </button>
@@ -503,7 +494,7 @@ export function RecordPanel({
                                 <span className="text-[12px] text-muted truncate">· {perf.artist}</span>
                               )}
                             </div>
-                            <div className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-dim">
+                            <div className="mt-0.5 flex items-center gap-2 font-mono text-[12px] text-dim">
                               <span>{clockText(perf.durationSec)}</span>
                               <span>·</span>
                               <span>{perf.gestures.length} gestures</span>

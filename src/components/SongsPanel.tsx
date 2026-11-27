@@ -49,7 +49,7 @@ interface SongsPanelProps {
 }
 
 const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40';
-const smallBtn = 'flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[12px] font-medium disabled:opacity-30';
+const smallBtn = 'flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[12px] font-medium disabled:opacity-65';
 
 const SECTIONS: SectionKind[] = ['any', 'intro', 'verse', 'chorus', 'bridge', 'drop', 'outro'];
 const WHEN_KINDS: [ActionWhen['at'], string][] = [
@@ -164,7 +164,7 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-hide @[640px]:flex-row @[640px]:overflow-hidden">
         {/* ── The songs ─────────────────────────────────────────── */}
         <div className="flex w-full shrink-0 flex-col border-b border-white/10 p-4 @[640px]:w-[300px] @[640px]:border-b-0 @[640px]:border-r">
-          <p className="mb-3 text-[10px] leading-relaxed opacity-50">
+          <p className="mb-3 text-[12px] leading-relaxed text-dim">
             A look for each song and what happens while it plays. With Follow on, a song's show starts when the song is recognised.
           </p>
           {/*
@@ -187,14 +187,18 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
                     className={smallBtn} data-testid="songs-listen-tag" title="Name the song playing with the Title and Artist typed below">Name it</button>
                 )}
               </div>
-              <p className="mt-1.5 text-[10px] leading-relaxed opacity-60" role="status" data-testid="songs-listen-status" data-phase={listenPhase}>{listen.line}</p>
+              <p className="mt-1.5 text-[12px] leading-relaxed text-muted" role="status" data-testid="songs-listen-status" data-phase={listenPhase}>{listen.line}</p>
             </div>
           )}
           <div className="mb-3">
             <Toggle label="Follow songs" on={follow} onChange={onFollow} testId="songs-follow" />
           </div>
           <div className="max-h-[220px] min-h-0 flex-1 overflow-y-auto scrollbar-hide @[640px]:max-h-none" data-testid="songs-list">
-            {shows.length === 0 && <p className="text-[11px] opacity-40">No songs yet.</p>}
+            {shows.length === 0 && (
+              <p className="text-[12px] leading-relaxed text-dim" data-testid="songs-list-empty">
+                No songs yet. Press Listen while a track plays, or enter Title and Artist below.
+              </p>
+            )}
             {shows.map((s) => {
               const live = status.showId === s.id;
               return (
@@ -207,7 +211,7 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
                   data-testid={`songs-item-${s.id}`}
                 >
                   <span className="block truncate text-xs font-semibold">{live ? '▶ ' : ''}{s.song.title}</span>
-                  <span className="block truncate text-[10px] opacity-50">{s.song.artist} · {lookName(s.look)} · {s.actions.length} action{s.actions.length === 1 ? '' : 's'}</span>
+                  <span className="block truncate text-[12px] text-dim">{s.song.artist} · {lookName(s.look)} · {s.actions.length} action{s.actions.length === 1 ? '' : 's'}</span>
                 </button>
               );
             })}
@@ -221,18 +225,22 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
             <input className={`${inputCls} min-w-0 flex-1`} placeholder="Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} data-testid="songs-new-title" />
             <input className={`${inputCls} min-w-0 flex-1`} placeholder="Artist" value={newArtist} onChange={(e) => setNewArtist(e.target.value)} data-testid="songs-new-artist" />
           </div>
-          <button
-            disabled={!newTitle.trim() || !newArtist.trim()}
-            onClick={() => { addSong({ title: newTitle.trim(), artist: newArtist.trim() }); setNewTitle(''); setNewArtist(''); }}
-            className={`${smallBtn} mt-1.5 w-full`} data-testid="songs-add"
-          ><Plus size={12} /> Add a song</button>
+          {(newTitle.trim() || newArtist.trim()) && (
+            <button
+              disabled={!newTitle.trim() || !newArtist.trim()}
+              onClick={() => { addSong({ title: newTitle.trim(), artist: newArtist.trim() }); setNewTitle(''); setNewArtist(''); }}
+              className={`${smallBtn} mt-1.5 w-full`} data-testid="songs-add"
+            ><Plus size={12} /> Add a song</button>
+          )}
           <div className="mt-3 flex gap-1.5">
-            <button onClick={() => download('chromaglass-songs.json', exportShows())} disabled={!shows.length} className={`${smallBtn} flex-1`} data-testid="songs-export"><Download size={12} /> Save file</button>
+            {shows.length > 0 && (
+              <button onClick={() => download('chromaglass-songs.json', exportShows())} className={`${smallBtn} flex-1`} data-testid="songs-export"><Download size={12} /> Save file</button>
+            )}
             <button onClick={() => songsFile.current?.click()} className={`${smallBtn} flex-1`} data-testid="songs-import"><FolderOpen size={12} /> Load file</button>
             <input ref={songsFile} type="file" accept=".json,application/json" className="hidden" data-testid="songs-file-input"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); e.target.value = ''; }} />
           </div>
-          {fileError && <p className="mt-2 text-[10px] text-red-300" data-testid="songs-file-error">{fileError}</p>}
+          {fileError && <p className="mt-2 text-[12px] text-red-300" data-testid="songs-file-error">{fileError}</p>}
           {/* A button like its neighbours, not a 10 px link at 40% opacity: the
               sequencer is the other way to cue a set (a timeline of actions
               against the clock rather than a show per song), and one that
@@ -246,22 +254,65 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
         {/* ── The song being set up ─────────────────────────────── */}
         <div className="shrink-0 p-5 @[640px]:min-h-0 @[640px]:flex-1 @[640px]:shrink @[640px]:overflow-y-auto @[640px]:scrollbar-hide">
           {!selected ? (
-            <p className="text-[12px] opacity-40">Add a song, or pick one from the list.</p>
+            shows.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4" data-testid="songs-empty">
+                <p className="text-[13px] font-medium text-white">Add your first song</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/75">
+                  {currentSong
+                    ? `“${currentSong.title}” by ${currentSong.artist} is playing now.`
+                    : listen
+                      ? 'Play a track in Sound, then press Listen to name it automatically — or type a Title and Artist on the left.'
+                      : 'Type a Title and Artist on the left to add a song, or load a songs file.'}
+                </p>
+                <div className="mt-3">
+                  {currentSong ? (
+                    <button
+                      type="button"
+                      onClick={() => addSong(currentSong)}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[12px] font-semibold text-black hover:opacity-90"
+                      data-testid="songs-empty-action"
+                    >
+                      <Plus size={13} /> Add “{currentSong.title}”
+                    </button>
+                  ) : listen ? (
+                    <button
+                      type="button"
+                      onClick={listenBusy ? listen.cancel : listen.start}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[12px] font-semibold text-black hover:opacity-90"
+                      data-testid="songs-empty-action"
+                    >
+                      <Ear size={13} /> {listenBusy ? 'Stop listening' : 'Listen for a song'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => songsFile.current?.click()}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[12px] font-semibold text-black hover:opacity-90"
+                      data-testid="songs-empty-action"
+                    >
+                      <FolderOpen size={13} /> Load songs file
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[12px] text-dim">Pick a song from the list to edit its look and actions.</p>
+            )
           ) : (
             <>
               <div className="mb-4 flex items-end gap-2">
                 <label className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="text-[11px] font-medium opacity-60">Title</span>
+                  <span className="text-[12px] font-medium text-muted">Title</span>
                   <input className={inputCls} value={selected.song.title} data-testid="songs-title"
                     onChange={(e) => update(selected.id, (s) => ({ ...s, song: { ...s.song, title: e.target.value } }))} />
                 </label>
                 <label className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="text-[11px] font-medium opacity-60">Artist</span>
+                  <span className="text-[12px] font-medium text-muted">Artist</span>
                   <input className={inputCls} value={selected.song.artist} data-testid="songs-artist"
                     onChange={(e) => update(selected.id, (s) => ({ ...s, song: { ...s.song, artist: e.target.value } }))} />
                 </label>
                 <label className="flex w-20 flex-col gap-1">
-                  <span className="text-[11px] font-medium opacity-60">Length</span>
+                  <span className="text-[12px] font-medium text-muted">Length</span>
                   <input className={inputCls} placeholder="m:ss" defaultValue={selected.song.durationSec ? mmss(selected.song.durationSec) : ''} key={`${selected.id}-len`} data-testid="songs-length"
                     onBlur={(e) => { const t = parseTime(e.target.value); update(selected.id, (s) => ({ ...s, song: { ...s.song, durationSec: t ?? undefined } })); }} />
                 </label>
@@ -269,7 +320,7 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
               </div>
 
               <label className="mb-4 flex flex-col gap-1">
-                <span className="text-[11px] font-medium opacity-60">Look</span>
+                <span className="text-[12px] font-medium text-muted">Look</span>
                 <select className={inputCls} value={lookKey(selected.look)} data-testid="songs-look"
                   onChange={(e) => { const c = looks.find((l) => lookKey(l) === e.target.value); if (c) update(selected.id, (s) => ({ ...s, look: { kind: c.kind, id: c.id, name: c.name } })); }}>
                   <optgroup label="Built-in looks">
@@ -295,13 +346,13 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
                 </div>
               </div>
               {running && (
-                <p className="mb-3 text-[10px] opacity-60" data-testid="songs-status">
+                <p className="mb-3 text-[12px] text-muted" data-testid="songs-status">
                   ▶ {status.song} · {mmss(status.t)}{status.manual ? ' (by hand)' : ''}{status.last ? ` · last: ${status.last}` : ''}
                 </p>
               )}
 
               <div className="mb-3 flex flex-col gap-1.5" data-testid="songs-actions">
-                {selected.actions.length === 0 && <p className="text-[11px] opacity-40">Nothing yet: the look plays on its own. Add actions below, or load a set.</p>}
+                {selected.actions.length === 0 && <p className="text-[12px] text-dim">Nothing yet: the look plays on its own. Add actions below, or load a set.</p>}
                 {selected.actions.map((a, i) => (
                   <ActionRow
                     key={a.id} action={a} looks={looks} index={i} count={selected.actions.length}
@@ -341,7 +392,7 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
                   <button disabled={!set || set.builtIn} className={smallBtn} title="Delete this set" data-testid="songs-set-delete"
                     onClick={() => { if (set && !set.builtIn) { onDeleteSet(set.id); setChosenSet(sets[0]?.id ?? ''); } }}><Trash2 size={12} /></button>
                 </div>
-                {set?.description && <p className="mb-2 text-[10px] opacity-50">{set.description}</p>}
+                {set?.description && <p className="mb-2 text-[12px] text-dim">{set.description}</p>}
                 <div className="flex gap-1.5">
                   <input className={`${inputCls} min-w-0 flex-1`} placeholder="Name, to keep this song's actions as a set" value={setName} onChange={(e) => setSetName(e.target.value)} data-testid="songs-set-name" />
                   <button disabled={!setName.trim() || selected.actions.length === 0} className={smallBtn} data-testid="songs-set-save"
@@ -395,12 +446,12 @@ function ActionRow({ action, looks, index, count, onChange, onRemove, onMove, lo
       )}
       {w.at === 'kick' && (
         <>
-          <span className="text-[11px] opacity-50">every</span>
+          <span className="text-[12px] text-dim">every</span>
           <input className={`${inputCls} w-12`} type="number" min={1} max={64} value={w.every}
             onChange={(e) => onChange({ when: { at: 'kick', every: Math.round(num(e.target.value, 1, 64, 4)) } })} />
         </>
       )}
-      <span className="text-[11px] opacity-40">→</span>
+      <span className="text-[12px] text-dim">→</span>
       <select className={inputCls} value={a.do} onChange={(e) => onChange({ what: defaultWhat(e.target.value as ActionWhat['do'], looks) })} data-testid={`songs-action-${index}-what`}>
         {WHAT_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         {a.do === 'set' && <option value="set">{describeWhat(a)}</option>}
@@ -412,18 +463,18 @@ function ActionRow({ action, looks, index, count, onChange, onRemove, onMove, lo
             onChange={(e) => { const c = looks.find((l) => lookKey(l) === e.target.value); if (c) onChange({ what: { ...a, look: { kind: c.kind, id: c.id, name: c.name } } }); }}>
             {looks.map((l) => <option key={lookKey(l)} value={lookKey(l)}>{l.name}</option>)}
           </select>
-          <span className="text-[11px] opacity-50">over</span>
+          <span className="text-[12px] text-dim">over</span>
           <input className={`${inputCls} w-12`} type="number" min={0} max={60} value={a.fade} onChange={(e) => onChange({ what: { ...a, fade: num(e.target.value, 0, 60, 4) } })} />
-          <span className="text-[11px] opacity-50">s</span>
+          <span className="text-[12px] text-dim">s</span>
         </>
       )}
       {a.do === 'zoom' && (
         <>
-          <span className="text-[11px] opacity-50">to</span>
+          <span className="text-[12px] text-dim">to</span>
           <input className={`${inputCls} w-12`} type="number" min={1} max={16} step={0.5} value={a.zoom} onChange={(e) => onChange({ what: { ...a, zoom: num(e.target.value, 1, 16, 4) } })} />
-          <span className="text-[11px] opacity-50">× over</span>
+          <span className="text-[12px] text-dim">× over</span>
           <input className={`${inputCls} w-12`} type="number" min={0} max={30} value={a.over} onChange={(e) => onChange({ what: { ...a, over: num(e.target.value, 0, 30, 3) } })} />
-          <span className="text-[11px] opacity-50">s</span>
+          <span className="text-[12px] text-dim">s</span>
         </>
       )}
       {a.do === 'kaleidoscope' && (
@@ -433,15 +484,15 @@ function ActionRow({ action, looks, index, count, onChange, onRemove, onMove, lo
       )}
       {(a.do === 'blackout' || a.do === 'lights-up') && (
         <>
-          <span className="text-[11px] opacity-50">over</span>
+          <span className="text-[12px] text-dim">over</span>
           <input className={`${inputCls} w-12`} type="number" min={0} max={30} value={a.over} onChange={(e) => onChange({ what: { ...a, over: num(e.target.value, 0, 30, 4) } })} />
-          <span className="text-[11px] opacity-50">s</span>
+          <span className="text-[12px] text-dim">s</span>
         </>
       )}
       <span className="ml-auto flex gap-1">
-        <button disabled={index === 0} onClick={() => onMove(-1)} className="rounded p-1 opacity-50 hover:opacity-100 disabled:opacity-20" title="Earlier in the list"><ChevronUp size={12} /></button>
-        <button disabled={index === count - 1} onClick={() => onMove(1)} className="rounded p-1 opacity-50 hover:opacity-100 disabled:opacity-20" title="Later in the list"><ChevronDown size={12} /></button>
-        <button onClick={onRemove} className="rounded p-1 opacity-50 hover:opacity-100" title="Remove" data-testid={`songs-action-${index}-remove`}><Trash2 size={12} /></button>
+        <button disabled={index === 0} onClick={() => onMove(-1)} className="rounded p-1 text-muted hover:text-text disabled:opacity-65" title="Earlier in the list"><ChevronUp size={12} /></button>
+        <button disabled={index === count - 1} onClick={() => onMove(1)} className="rounded p-1 text-muted hover:text-text disabled:opacity-65" title="Later in the list"><ChevronDown size={12} /></button>
+        <button onClick={onRemove} className="rounded p-1 text-muted hover:text-text" title="Remove" data-testid={`songs-action-${index}-remove`}><Trash2 size={12} /></button>
       </span>
     </div>
   );

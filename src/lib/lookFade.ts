@@ -54,9 +54,13 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   'inkTitle', 'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   // The logo melted at the start of a film (PLAN 37x-11): the show's too.
   'logoMelt',
+  // Keep full (PLAN 18a-22): the operator's hand on the dropper, left running, not a look's.
+  'keepFull',
   'filmMix', 'filmKey',
   // How the video is framed for this wall (PLAN 14ag): the operator's, as the logo's place is.
   'filmZoom', 'filmX', 'filmY',
+  // Whether the video is the LED ring (PLAN 14ag-9): where the operator put it, as the mixer's order is.
+  'filmRing',
   // The mixer (lib/mixer.ts) is the operator's desk, like the logo and the
   // film's own mix: the order of the stack and each source's grade stay put
   // when the look changes, or a look would reset a film graded for this room.

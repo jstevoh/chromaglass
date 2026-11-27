@@ -411,7 +411,7 @@ export default function App() {
 
   const {
     fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
-    pourName, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
+    pourName, live, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
   } = usePour({
     visualizerRef,
   });
@@ -507,7 +507,7 @@ export default function App() {
     filmSource, filmName, loadFilm, cameras, filmCameraId, filmCamera, filmCameraLost,
     startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, video,
   } = useFilm({
-    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour,
+    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour, live,
   });
 
   const {
@@ -1882,7 +1882,7 @@ export default function App() {
   });
 
   const {
-    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands,
+    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands, openPanelNow,
   } = useCommandPalette({
     allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
     blackout, toggleBlackout, newLook: newPlate, saveLook, docId, docName, replaceLook, setSeedCount,
@@ -1925,10 +1925,9 @@ export default function App() {
   /*
     Where each status dot goes.
 
-    One set of handlers rather than one per desk, for the same reason the
-    header itself is one component: Design and Perform must send you to the
-    same place from the same dot. Each closes whatever else is open, because
-    two panels over a plate is the state you cannot see the show through.
+    One set for both desks, as the header is one component: Design and
+    Perform send you to one place from one dot. Each closes what else is
+    open: two panels over a plate hide the show.
   */
   const openSettingsAt = useCallback((section: string) => {
     // An id from before a section was folded into another opens that one.
@@ -1940,9 +1939,9 @@ export default function App() {
   }, []);
   const deskOpen = useMemo(() => ({
     sound: () => openSettingsAt('audio-input'),
-    video: () => openSettingsAt('film'),
+    video: () => { setShowSettings(false); setShowStage(false); openPanelNow('film'); },
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
-  }), [openSettingsAt]);
+  }), [openSettingsAt, openPanelNow]);
 
   /*
     Deaf is said first and in words: listening, but nothing arriving (the

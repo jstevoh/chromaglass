@@ -25,6 +25,7 @@ const HAND_SLIDERS: readonly [MusicRole, string][] = [['bloom', 'Kick Pour'], ['
 import { musicShakeOf, withMusicShake } from '../../lib/shakeCord';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 function pinSlider(k: keyof VisualizerSettings, val: number) {
@@ -37,7 +38,8 @@ import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
 import { lookStill } from '../../lib/lookStills';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
 import { CrashReportButton } from '../CrashReportButton';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
@@ -764,7 +766,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 <ToolGlyph id={id} size={20} />
                 <span>{label}</span>
                 {on && Math.abs(p.amount - 1) > 0.01 && (
-                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[11px] text-text">{p.amount.toFixed(1)}</span>
+                  <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[12px] text-text">{p.amount.toFixed(1)}</span>
                 )}
               </button>
             );
@@ -851,7 +853,9 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-3">
             <Slider label="Clear Film" value={p.film.clearFilm ?? 0} {...pinSlider('clearFilm', p.film.clearFilm ?? 0)} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
               touch testId="phone-clear-film" />
-            <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+            <p className="-mt-3 text-[12px] leading-snug text-dim">
+              A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. {clearFilmGroundNote(p.lampGround, p.film.clearFilmDye) ?? 'White on the Lamp Ground.'}
+            </p>
             {(p.film.clearFilm ?? 0) > 0.001 && (
               <div className="mt-3 flex items-end gap-3">
                 <div className="flex-1">
@@ -951,8 +955,8 @@ export function PhoneStage(p: PhoneStageProps) {
               both of, and Pour's Stop is here too. */}
           {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
-              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} onMixOrder={p.mixer ? o => p.mixer!.onSetting({ mixOrder: o }) : undefined} />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Video in</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} filmRing={p.mixer?.settings.filmRing} onPlace={p.mixer ? patch => p.mixer!.onSetting(patch) : undefined} />
             </div>
           )}
           </PanelGuard>
@@ -982,7 +986,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 className="h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none focus:border-accent"
                 data-testid="phone-save-name"
               />
-              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-40" data-testid="phone-save-confirm">
+              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-65" data-testid="phone-save-confirm">
                 Save
               </button>
             </form>
@@ -1047,6 +1051,7 @@ export function PhoneStage(p: PhoneStageProps) {
               <div className="flex flex-col gap-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
                     <button
                       key={l.id}
@@ -1054,8 +1059,8 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        // A pack's look without the pack opens the account sheet (PLAN 45a).
-                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        // A pack's look without the pack opens the lock/account sheet (PLAN 45a, 49j).
+                        if (locked) openTierLock('moire', { itemName: l.name });
                         else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
@@ -1066,9 +1071,10 @@ export function PhoneStage(p: PhoneStageProps) {
                     >
                       <SlideMount swatch={l.swatch} still={lookStill(l.id)} size={44} />
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
-                        {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
+                        <span className={`block truncate text-[14px] ${on ? 'text-on-lit' : 'text-text'}`}>{l.name}</span>
+                        {l.description && <span className={`block truncate text-[12px] ${on ? 'text-on-lit' : 'text-dim'}`}>{l.description}</span>}
                       </span>
+                      {locked && <TierLockBadge label="Pro · Pack" />}
                     </button>
                   );
                 })}
@@ -1140,9 +1146,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
           )}
           {p.audioSource !== 'none' && (
-            <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
+            <div className="mt-3">
               <Slider label="Follow the song" value={p.songFollow} {...pinSlider('songFollow', p.songFollow)} step={0.01} onChange={p.onSongFollow}
-                touch testId="phone-song-follow" />
+                disabled={!p.show.running} touch testId="phone-song-follow" />
               <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-song-follow-says">
                 {p.show.running
                   ? 'The show holds still through a build and throws its big move on the drop.'
@@ -1326,7 +1332,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.score && (
             <>
               <SectionLabel>The song</SectionLabel>
-              <SongScore {...p.score} touch />
+              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
             </>
           )}
           {/*
@@ -1359,9 +1365,14 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
-          <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
+          <div className="mt-4">
             <Slider label="Evolve speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
-              touch testId="phone-evolve-speed" />
+              disabled={!p.evolving} touch testId="phone-evolve-speed" />
+            {!p.evolving && (
+              <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-evolve-speed-says">
+                Turn Evolve on above to set how fast it drifts.
+              </p>
+            )}
           </div>
           {/*
             The plates, on every look. This section was here only on a look
@@ -1410,16 +1421,16 @@ export function PhoneStage(p: PhoneStageProps) {
               </button>
             ))}
           </div>
-          <div className={`mt-3 transition-opacity ${Math.round(p.spin.auto) === 0 ? 'opacity-50' : ''}`}>
+          <div className="mt-3">
             <Slider label="Spin rate" value={p.spin.rpm} {...pinSlider('spinRpm', p.spin.rpm)} step={0.5} onChange={(v) => p.spin.onChange({ spinRpm: v })}
-              touch testId="phone-spin-rate" />
+              disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-rate" />
             {Math.round(p.spin.auto) === 2 && (
               <Slider label="Beats a turn" value={p.spin.beats} {...pinSlider('spinBeats', p.spin.beats)} step={1}
                 onChange={(v) => p.spin.onChange({ spinBeats: Math.round(v) })}
-                touch testId="phone-spin-beats" />
+                disabled={Math.round(p.spin.auto) === 0} touch testId="phone-spin-beats" />
             )}
-            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} data-testid="phone-spin-reverse"
-              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active">
+            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} disabled={Math.round(p.spin.auto) === 0} data-testid="phone-spin-reverse"
+              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active disabled:cursor-not-allowed disabled:opacity-65">
               Reverse
             </button>
           </div>

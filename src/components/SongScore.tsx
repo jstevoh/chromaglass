@@ -42,6 +42,7 @@ export interface SongScoreProps {
   /** Add a cue to the song's show (making the show, if the song has none). */
   onPin: (when: ActionWhen, what: ActionWhat) => void;
   onRemoveCue: (actionId: string) => void;
+  onOpenSound?: () => void;
   touch?: boolean;
 }
 
@@ -69,7 +70,7 @@ const FILL: Record<string, string> = {
 };
 
 const SAYS: Record<Exclude<ScorePhase, 'ready'>, (song: string | null) => string> = {
-  none: () => 'No song yet. The score draws itself once a song is recognised and the show has heard it through once.',
+  none: () => 'No song playing yet. Start music in Sound (or turn on your microphone) and let a song play through once to build its score.',
   unmapped: (s) => `${s ?? 'This song'} has not been heard through yet. Its score is ready after the first full listen.`,
   hearing: (s) => `Hearing ${s ?? 'this song'} for the first time. Its score is ready when it ends.`,
   analyzing: (s) => `Working out the shape of ${s ?? 'the song'}…`,
@@ -88,7 +89,7 @@ export function SongScore(p: SongScoreProps) {
   const laneH = p.touch ? 72 : 56;
   const btnH = p.touch ? 'h-11 text-[14px]' : 'h-8 text-[12px]';
   // One or the other set of colours, never both: which of two classes wins is the stylesheet's order, not the list's.
-  const btnOf = (on: boolean) => `${btnH} rounded-md border px-2.5 disabled:opacity-40 ${on
+  const btnOf = (on: boolean) => `${btnH} rounded-md border px-2.5 disabled:opacity-65 ${on
     ? 'border-accent-border bg-accent-bg text-accent-text'
     : 'border-border bg-elevated text-text-2 hover:bg-hover active:bg-active'}`;
   const btn = btnOf(false);
@@ -138,7 +139,7 @@ export function SongScore(p: SongScoreProps) {
               />
             ))}
             {score.sections.map(s => (s.x1 - s.x0 > 0.07 ? (
-              <span key={`l${s.index}`} className="pointer-events-none absolute top-1 truncate px-1 text-[11px] text-text"
+              <span key={`l${s.index}`} className="pointer-events-none absolute top-1 truncate px-1 text-[12px] text-text"
                 style={{ left: `${s.x0 * 100}%`, width: `${(s.x1 - s.x0) * 100}%` }}>
                 {sectionName(s, score.sections)}
               </span>
@@ -160,19 +161,32 @@ export function SongScore(p: SongScoreProps) {
           </button>
         </>
       ) : (
-        <p className="leading-relaxed text-dim" data-testid="score-says">{SAYS[p.phase === 'ready' ? 'unmapped' : p.phase](p.songName)}</p>
+        <div className="flex flex-col items-start gap-2.5">
+          <p className="leading-relaxed text-text-2" data-testid="score-says">{SAYS[p.phase === 'ready' ? 'unmapped' : p.phase](p.songName)}</p>
+          {p.phase === 'none' && p.onOpenSound && (
+            <button
+              type="button"
+              onClick={p.onOpenSound}
+              data-testid="score-open-sound"
+              className={`${btnH} rounded-md bg-primary px-3 font-medium text-on-primary transition-opacity hover:opacity-90`}
+            >
+              Open Sound
+            </button>
+          )}
+        </div>
       )}
 
       {/*
-        The nudge. Always drawn, so a performer finds it where it was, and
-        greyed until there is a song to move.
+        The nudge only appears once a song is ready: in the empty state
+        showing four disabled nudge buttons gave no clue what comes first.
       */}
+      {ready && (
       <div className="flex flex-wrap items-center gap-1.5" data-testid="score-nudge">
-        <button type="button" className={btn} disabled={!ready} onClick={() => p.onNudge(-step)} data-testid="score-nudge-earlier"
+        <button type="button" className={btn} onClick={() => p.onNudge(-step)} data-testid="score-nudge-earlier"
           title="The show is ahead of the song: move it back">
           − {hasBeat(p.bpm) ? 'beat' : '½ s'}
         </button>
-        <button type="button" className={btn} disabled={!ready} onClick={() => p.onNudge(step)} data-testid="score-nudge-later"
+        <button type="button" className={btn} onClick={() => p.onNudge(step)} data-testid="score-nudge-later"
           title="The show is behind the song: move it on">
           + {hasBeat(p.bpm) ? 'beat' : '½ s'}
         </button>
@@ -190,6 +204,7 @@ export function SongScore(p: SongScoreProps) {
           </button>
         )}
       </div>
+      )}
 
       {score && sel && (
         <div className="flex flex-col gap-1.5 border-t border-border pt-2" data-testid="score-section">

@@ -52,7 +52,7 @@ export function OscOutRow({ oscOut, onOscOut, touch = false, testId = 'osc-out' 
           className={`${touch ? 'h-11 rounded-xl text-[14px]' : 'h-9 rounded-lg text-[12px]'} w-40 border bg-white/5 px-3 font-mono outline-none focus:border-accent-border ${refused ? 'border-red-400/60' : 'border-white/10'}`}
         />
       </div>
-      <span className="text-[12px] leading-snug opacity-50" data-testid={`${testId}-says`}>
+      <span className="text-[12px] leading-snug text-dim" data-testid={`${testId}-says`}>
         {refused ? 'Not an address:port. Type it like 192.168.1.20:7000.' : oscOutLine(oscOut)}
       </span>
     </div>
