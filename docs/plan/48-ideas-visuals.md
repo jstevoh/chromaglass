@@ -265,7 +265,7 @@ sub-cell droplets. Ranked by what a person watching the wall would see against w
 
 | Rank | Item | On the wall | GPU cost | Build |
 |---|---|---|---|---|
-| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; check 48s-1 and the retune 48s-6 shipped) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built and checked (`npm run ouzo`) |
+| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; check 48s-1, the retune 48s-6 and the middle 48s-7 shipped) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built and checked (`npm run ouzo`) |
 | 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
 | 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
 | 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |
@@ -366,6 +366,18 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   about 205, and a strong pour keeps a clear middle in a white ring. `npm run ouzo` lines
   10–13 hold the three. Left: the look's opening doses never reach the solver when Louche is
   the page's first look (27f-9o, every look with a dish), and the cloud's billow wants 48s-4.
+- **48s-7. Louche in the middle** (shipped 2026-11-27; the owner: "just pick one"). 48s-6's own
+  film (Mac, seed 1, 60 s) had the cloud from the first frame but the dish 72 to 80% near black,
+  the purple barely there, 1.0 swells a minute against 4.9, and from 0:33 the white gathered into
+  opaque ribbons along the bottom. Between the two: four dye drops of radius 9 (`plainSeed`,
+  26% of the dish over 0.2 at seed 1, 22 to 26% over three seeds, against 9% and the pools'
+  61%); Evolve 0.24 (a drop spreads before the next, so motion stands above its median); the
+  dish Ouzo three times, Alcohol twice, water once (half Ouzo still, two thirds of 48s-6's oil
+  a minute, two Alcohol for three Ouzo where it was one for two: nothing but Alcohol takes the
+  droplets out of a dish, `npm run ouzo` line 3). Lines 10 and 11 of `npm run ouzo` hold the
+  seed's bracket and the spirit's share. The film is on the judging page in the PR.
+  Open: why the late cloud gathers at the bottom of the frame (Plate Rock's default 0.45 or the
+  rim's carry; not measured), still 27f-9o.
 - **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
   `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
   membrane of precipitate at the front, and the front's speed against its reaction sets the

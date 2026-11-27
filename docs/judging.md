@@ -3158,14 +3158,16 @@ crosses the solubility curve, the oil is conserved); how it looks in a show is t
 5. A plate that never sees the bottle looks exactly as before.
 6. The look **Louche** (the bottle's own, added because `npm run plate` holds that every
    bottle with physics is poured by some look). Retuned so the cloud leads (PLAN 48s-6):
-   three small deep drops of colour, half the drops Ouzo, three times as often, and the
-   bottle at 1% oil so the white is thin. Good: a dark dish with a few small blue accents;
-   within the first ten seconds a bloom, then one every five to ten seconds across the
-   dish, a thin opal white the dye shows through where they overlap, drifting and folding
+   then the middle between that and the first version (48s-7): four drops of colour over
+   about a quarter of the dish, half the drops Ouzo and a third Alcohol, Evolve 0.24, the
+   bottle at 1% oil so the white is thin. Good: a dark dish with blue, teal and purple over
+   about a quarter of it; within the first ten seconds a bloom, then one every ten seconds
+   or so across the dish, with a quiet spell between them, a thin opal white the dye shows through where they overlap, drifting and folding
    with the flow; some blooms thin or open a clear window where a later drop of Alcohol
    lands. Bad: dye over a large part of the dish, a minute with no white, flat opaque discs
-   like paint, the whole plate a grey veil inside a few minutes. Judged from the Mac's film
-   of the retune (the thread's page), not by loading the app.
+   like paint, white gathering into thick opaque ribbons along an edge, the whole plate a
+   grey veil inside a few minutes. Judged from the Mac's film (the thread's page), not by
+   loading the app.
 
 ## 151. Oil threads pinch into beads (PLAN 38w-27)
 
