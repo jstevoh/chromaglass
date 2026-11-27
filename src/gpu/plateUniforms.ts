@@ -19,6 +19,7 @@ import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
 import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
+import { type CloseupWindow, closeupFine, closeupWindowOf } from './closeupWindow';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
@@ -26,6 +27,7 @@ import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 import { BIREF_NM_PER_STRAIN } from '../lib/polar';
+import { FARADAY_GAIN_MAX } from '../lib/faraday';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
@@ -113,6 +115,11 @@ export interface PlateFluid {
     readonly grainMix: number;
     /** The coordinates the pigment rides, where the device can carry them. */
     readonly grainTexture?: unknown;
+    /** Where the closeup looks, for the fine dye's next step (PLAN 47a-1, closeupWindow.ts). */
+    setCloseupWindow?(w: CloseupWindow | null, amount: number): void;
+    /** The window the fine detail is in now, and how much of it the plate adds. */
+    readonly fineWindow?: CloseupWindow | null;
+    readonly fineStrength?: number;
   } | null;
 }
 
@@ -281,6 +288,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('analyserAngle', ((((an % 180) + 180) % 180) * Math.PI) / 180);
   pack.set('quarterWave', Number.isFinite(s.quarterWave) ? clamp01(s.quarterWave) : 1);
   pack.set('birefringence', Math.max(0, Number.isFinite(s.birefringence) ? s.birefringence : 0.3) * BIREF_NM_PER_STRAIN);
+  // The dish's frozen stress (PLAN 31p-3; lib/polarDish.ts): 0, the dish retarding nothing, for every look saved before it.
+  pack.set('dishStress', Math.max(0, Number.isFinite(s.dishStress) ? s.dishStress : 0));
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('crispEdges', Number.isFinite(s.crispEdges) ? clamp01(s.crispEdges as number) : 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
@@ -389,7 +398,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
     pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
     // The shaken dish (PLAN 48f): its light is drawn while it is on the shaker, whatever the shake, so a pattern dies away as the water does, not when the music stops.
-    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? 1 : 0);
+    // Its value is the Strength, the lens's throw over real water's (1 to 8, wgsl/plateFaraday.ts); 0 with no shaker.
+    const gain = Number.isFinite(s.faradayGain) ? Math.max(1, Math.min(FARADAY_GAIN_MAX, s.faradayGain as number)) : 1;
+    pack.set('faraday', (s.faradayHz ?? 0) > 0 ? gain : 0);
     // The water's glow (PLAN 48c): its light's brightness, past the real one up to twice the stage's.
     pack.set('glow', Number.isFinite(s.glow) ? Math.max(0, Math.min(2, s.glow as number)) : 0);
   }
@@ -509,6 +520,24 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('particles', parts);
   pack.set('particleMix', clamp01(s.particleMix ?? 0.6));
   pack.set('particleNorm', Math.max(1e-4, PARTICLE_NORM * parts));
+  /*
+    The closeup's fine dye (PLAN 47a-1, fineDye.ts), on the front plate only:
+    the back plate is drawn through its own zoom and offset (`layer1`), and a
+    window cut for the front frame would be the wrong piece of it. The solver
+    is told where the camera looks for its next step, and the shader the
+    window the detail is in now, which is the last step's: the two differ by
+    a frame while the camera moves, and reading the detail through the window
+    it was made in keeps every thread where it was drawn. A back plate that
+    is the same solver (the lab's) is not told again.
+  */
+  const front = fluids[0]?.gpu;
+  const fine = closeupFine(s, view.macroAmount);
+  front?.setCloseupWindow?.(closeupWindowOf(view.shot, fine, view.rotations[0] ?? 0, width, height, front.N, s), fine);
+  const back = fluids[1]?.gpu;
+  if (back && back !== front) back.setCloseupWindow?.(null, 0);
+  const fw = front?.fineWindow ?? null;
+  pack.set('fineWin', fw?.cx ?? 0, fw?.cy ?? 0, fw?.hx ?? 0, fw?.hy ?? 0);
+  pack.set('fineTurn', fw?.c ?? 1, fw?.s ?? 0, fw ? front?.fineStrength ?? 0 : 0, 0);
 
   pack.set('grainOn', grainOn);
   pack.set('grainMix', fluids[0]?.gpu?.grainMix ?? 0);

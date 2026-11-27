@@ -50,10 +50,10 @@ export function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings 
         title={on ? `On ${name}. Click to take it off.` : `Put this on ${name}`}
         aria-label={`${on ? 'Remove from' : 'Add to'} ${name}`}
         data-testid={`pin-${desk}-${String(settingKey)}`}
-        className={`h-[22px] w-[22px] shrink-0 rounded-[4px] border text-[11px] font-bold leading-none transition-colors ${
+        className={`h-[22px] w-[22px] shrink-0 rounded-[4px] border text-[12px] font-bold leading-none transition-colors ${
           on
             ? LIT
-            : 'border-white/15 text-white/25 hover:border-white/40 hover:text-white/70'
+            : 'border-white/15 text-dim hover:border-white/40 hover:text-text'
         }`}
       >
         {letter}
@@ -98,7 +98,7 @@ export const Slider = ({ label, value, min, max, step, onChange, icon: Icon, dis
   const line = helpFor(settingKey);
   const tip = useControlTip({ name: label, help: line, value: disabled ? undefined : readSetting(String(settingKey ?? ''), safeValue, min, max), disabled: !!disabled });
   return (
-    <div ref={el => { tip.anchor.current = el; }} {...tip.bind} className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
+    <div ref={el => { tip.anchor.current = el; }} {...tip.bind} className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-65' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
       {tip.card}
       <div className="flex items-center justify-between gap-2">
         {/*
@@ -119,17 +119,19 @@ export const Slider = ({ label, value, min, max, step, onChange, icon: Icon, dis
         <div className="flex shrink-0 items-center gap-2">
           {settingKey && <PinChips settingKey={settingKey} />}
           {/*
-            And the same reading as the desk, from the same function. This
-            printed `toFixed(2)` on everything, so the Dimmer said 100% on the
-            desk and 1.00 here — one control disagreeing with itself across two
-            screens — and `0.02` for a speed that rides 0.005 to 0.3 told you
-            nothing at all.
+            Keep the readout badge compact when disabled ("Off") so long
+            prerequisite sentences never crush the slider's name or collide
+            with the next column's P/D chips; the reason sits on its own
+            line below (H6-02).
           */}
-          <span className="min-w-[44px] rounded-md bg-white/[0.06] px-1.5 py-0.5 text-center font-mono text-[11.5px] font-medium tabular-nums text-text">
-            {disabled ? disabled : readSetting(String(settingKey ?? ''), safeValue, min, max)}
+          <span className="min-w-[44px] rounded-md bg-white/[0.06] px-1.5 py-0.5 text-center font-mono text-[12px] font-medium tabular-nums text-text">
+            {disabled ? 'Off' : readSetting(String(settingKey ?? ''), safeValue, min, max)}
           </span>
         </div>
       </div>
+      {typeof disabled === 'string' && disabled && (
+        <p className="text-[12px] leading-snug text-text-2" data-disabled-reason="">{disabled}</p>
+      )}
       <PaceTrack settingKey={settingKey} at={Math.max(0, Math.min(1, (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve))))}>
         <input
           type="range"

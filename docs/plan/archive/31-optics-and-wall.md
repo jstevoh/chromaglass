@@ -32,3 +32,8 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   against a point-read control of 0.33 to 0.35 (bars 0.10 and 0.3). Every harness that films the
   plate (recorder, film, showreel, sitefilms) runs it first and refuses to record a build that
   fails; `FILM_ALLOW_FLOWER=1` films anyway for a private take, flagged in the log.
+
+## 31p. Polarised light: the owner's photograph of dishes between polarisers (2026-11-14)
+
+~~**31p-3** Dish Stress: the moulded dish's own stress in series with the liquid~~ (shipped;
+story in `docs/plan-shipped.md` §31p-3; `npm run polar`).

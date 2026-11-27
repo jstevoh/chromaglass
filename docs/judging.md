@@ -2971,6 +2971,15 @@ standing waves at half the Shaker's frequency, drawn by the lamp's light through
    read on the wall; the light is the real lens of the water's surface, and a stronger
    default depth is a dial away.
 5. Watch for flicker: the pattern must hold still while it grows and fades, never strobe.
+6. The waves move (48f-6, 48f-9). Shaker 20 Hz, Shake 0.4, Rock 0.5: do the crests and
+   troughs trade places about once every two seconds, smoothly, with no flicker? Rock 0
+   holds them still again.
+7. Pour and swirl with the lattice up: does the pattern drift with the liquid's flow? Then
+   Shake to the top (2 g at 20 Hz): as it grows, does the lattice break up and move for some
+   seconds, then re-form as a new pattern (it settles; a real dish that hard keeps churning,
+   48f-12)? Does the break read as the water's, not a glitch?
+8. Wave strength (the phone's Sound sheet, Strength on the desk) 1 to 4 to 8, with a bass
+   cord on Shake: from what strength does a bass pulse read on the wall? Too harsh at 8?
 
 ## 141. The video as the lamp under the dish (PLAN 14ag-3)
 
@@ -3050,3 +3059,30 @@ Whether it looks like a wake at sixty frames is only seen here.
 4. Turn the music on with a stirring cord in Patches: the hits light wakes, the quiet
    lets them come back.
 5. Glow at 0 on any look: the look exactly as before.
+6. **Night Sea** (PLAN 48c-5, 48c-6) with a song that has a real bass line: still and dark
+   while the bass is quiet; on a strong bass note a lattice of waves about 14 mm across
+   stands up within a second and glows blue in its own pattern (brightest under the crests
+   and troughs, the strain's), then fades as the note dies; each kick flashes a ring round
+   the pressed glass. A long held bass dims (the sea tires) and the first notes after a quiet
+   passage are the brightest. Bad: a glow with the bass quiet, a flat blue wash with no
+   lattice in it, a lattice that never goes dark between notes, or the whole plate pulsing
+   with the level as a shader would.
+
+## 146. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
+
+The check (`npm run polar`) proves the two-retarder law against Jones matrices, that each
+ring of a still dish is the law's colour at its radius, the dark cross between plane sheets,
+and that crossed plus parallel still add up with the dish in, on the lab's software WebGPU.
+How the rings read with a moving liquid at sixty frames is only seen here.
+
+1. Any look on a lamp ground, Settings → Lamp & Light → **Polarisers** 1, then **Dish
+   Stress** up from 0. Good: coloured rings round the plate's middle, tight near the middle
+   and broad toward the rim, a thin pale rim at the dish's wall, like the photograph's dishes.
+   Bad: a flat tint, rings that slide with the liquid, a hard edge at the gate.
+2. **Quarter Wave** to 0: a dark four-armed cross along the screen's axes, the rings lit on
+   the diagonals (the photograph's pinwheel); back to 1, the cross goes and the rings stay.
+3. Stir the liquid (Turbulence or the music): the rings wobble and change colour where the
+   liquid flows, and stay put where it is calm. Bad: rings that do not react, or that move
+   with still liquid.
+4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
+5. Dish Stress at 0: the look exactly as before.

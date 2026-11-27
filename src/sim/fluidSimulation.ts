@@ -20,12 +20,11 @@ import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH 
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
-import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
+import { plateLook } from '../presetPlate';
 import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
-import { PALETTE_RGB, pickHarmony } from '../constants';
 import { THIN_GAP_THICKNESS, thinGapViscosity, NU_REF } from '../gpu/fluid';
 import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, SloshSpin, type SloshPress } from '../lib/slosh';
 import { OPEN_RIM, dyeDensityContrast, layerSpinDrag } from '../lib/turntable';
@@ -34,6 +33,7 @@ import { stirOf } from '../lib/stir';
 import { frameSway, rockStep } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { pourPictureCpu } from '../lib/videoFlow';
+import { seedDyes } from '../lib/pinnedDyes';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
@@ -49,14 +49,17 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
+import { layPress } from './pressLay';
 import { SolverSeeds, takeBack, addShare, scaleSince, OwedLay, dishMean } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { mixWait } from './mixWait';
 import { rimCount, rimMask } from '../lib/rimMask';
+import { captureSimSnapshot, restoreSimSnapshot, restoreReadbackArrays, copySeedArrays, applySeedArrays, zeroSimArrays, type SimStateSnapshot } from './plateSnapshot';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
 const c01 = (v: number | undefined) => Math.max(0, Math.min(1, v ?? 0));
+type Noise2D = (x: number, y: number) => number;
 
 export class FluidSimulation {
   size: number;
@@ -445,9 +448,9 @@ export class FluidSimulation {
   private coverCount = 0;
   /** Holes still closing: carried so the fill converges instead of running once. */
   private fillingHoles: { at: Float32Array; left: number }[] = [];
-  private rbDensity: Float32Array;  // downsampled readback
-  private rbVx: Float32Array;
-  private rbVy: Float32Array;
+  readonly rbDensity: Float32Array;  // downsampled readback
+  readonly rbVx: Float32Array;
+  readonly rbVy: Float32Array;
   /** What the plate is being asked to do this moment; set from outside once a frame. */
   phrase: Phrase = { drive: 1, gust: 0, drift: 0.5 };
   /** The clock's own lean, slewed so no one frame can move it far. */
@@ -612,7 +615,7 @@ export class FluidSimulation {
     gpu.clear();
     this.carried = !!this.carry && !!gpu.takeOver?.(this.carry);
     this.wait.play(gpu);
-    this.owed.take(!this.carried, (l, n) => this.layLook(l, n));
+    this.owed.take(!this.carried, (l, n, d) => this.layLook(l, n, d));
     // Its readings count from nothing again, and whatever was pending went with the last solver.
     this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
@@ -684,19 +687,14 @@ export class FluidSimulation {
 
   /** The state a new solver opens on, kept for `restoreSeed`. */
   private keepSeed() {
-    const src = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
-    if (!this.seed) this.seed = src.map(() => new Float32Array(GRID_AREA));
-    for (let k = 0; k < src.length; k++) this.seed[k].set(src[k]);
+    this.seed = copySeedArrays([this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp], this.seed);
   }
 
   /** Put the attached solver's opening state back; for a solver that never handed anything back. */
   private restoreSeed(): boolean {
-    if (!this.seed) return false;
-    const dst = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
-    for (let k = 0; k < dst.length; k++) dst[k].set(this.seed[k]);
-    this.wait.putBack();
-    this.restAfterRestore();
-    return true;
+    return applySeedArrays([this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp], this.seed, () => {
+      this.wait.putBack(); this.restAfterRestore();
+    });
   }
 
   /**
@@ -705,18 +703,7 @@ export class FluidSimulation {
    * whatever broke the one before it.
    */
   private restoreFrom(dye: Float32Array, vel: Float32Array): boolean {
-    const clean = (v: number) => (Number.isFinite(v) ? v : 0);
-    for (let i = 0; i < GRID_AREA; i++) {
-      this.densityR[i] = clean(dye[i * 4]);
-      this.densityG[i] = clean(dye[i * 4 + 1]);
-      this.densityB[i] = clean(dye[i * 4 + 2]);
-      this.density[i] = clean(dye[i * 4 + 3]);
-      this.vx[i] = clean(vel[i * 4]);
-      this.vy[i] = clean(vel[i * 4 + 1]);
-      this.temp[i] = clean(vel[i * 4 + 2]);
-    }
-    this.restAfterRestore();
-    return true;
+    return restoreReadbackArrays(this, dye, vel, () => this.restAfterRestore());
   }
 
   /** The CPU arrays hold absolute state again: the gap at rest, nothing pending. */
@@ -1239,11 +1226,8 @@ export class FluidSimulation {
     this.speciesPoll.clear();
     this.gpu?.clear();
     this.clearChemistry();
-    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
-    this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
-    this.temp.fill(0);
-    this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
-    this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
+    zeroSimArrays([this.density, this.densityR, this.densityG, this.densityB, this.s, this.sR, this.sG, this.sB,
+      this.temp, this.vx, this.vy, this.vx0, this.vy0, this.cvx, this.cvy, this.cpr, this.cdv, this.rbDensity, this.rbVx, this.rbVy]);
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
@@ -1258,6 +1242,15 @@ export class FluidSimulation {
     this.seedMean = null;
     this.handBank = 0;
     this.gpu?.clear();
+  }
+
+  /** Capture live GPU + CPU fields for Undo (PLAN 49a). */
+  snapshotPlate(): SimStateSnapshot { return captureSimSnapshot(this, this.stepIndex, this.oilAdd); }
+
+  /** Restore a snapshot captured by `snapshotPlate()`. */
+  restorePlate(snap: SimStateSnapshot): void {
+    const out = restoreSimSnapshot(this, snap, () => this.restAfterRestore());
+    this.stepIndex = out.stepIndex; this.oilAdd = out.oilAdd; this.dirty = out.forceUpload;
   }
 
   private splatBlob(cx: number, cy: number, radius: number, amount: number, r: number, g: number, b: number) {
@@ -1336,7 +1329,7 @@ export class FluidSimulation {
    * there. A seed only adds to the four dye arrays (the state on the CPU
    * path, the deltas pending on the GPU), so what it added scales either way.
    */
-  seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
+  seedPresetScaled(presetId: string, noise2D: Noise2D, w: number): number[] {
     const k = c01(w);
     const before = this.dye().map(a => a.slice());
     const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
@@ -1345,18 +1338,17 @@ export class FluidSimulation {
     return harmony;
   }
 
-  seedPreset(look: string, noise2D: (x: number, y: number) => number): number[] {
-    return this.owed.lay(!this.gpu && this.seeds.plain(), look, noise2D, () => this.layLook(look, noise2D));
+  seedPreset(look: string, noise2D: Noise2D, dyes: readonly number[] | null = null): number[] {
+    return this.owed.lay(!this.gpu && this.seeds.plain(), look, noise2D, () => this.layLook(look, noise2D, dyes), dyes);
   }
 
-  private layLook(look: string, noise2D: (x: number, y: number) => number): number[] {
+  private layLook(look: string, noise2D: Noise2D, dyes: readonly number[] | null = null): number[] {
     const presetId = plateLook(look);
     const S = this.size;
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
 
-    const harmony = PRESET_CONTRACTS[look] || pickHarmony();
-    const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
+    const { harmony, col, named } = seedDyes(look, dyes);
 
     const dishSum = () => dishMean(this.density, S, this.dishArea);
     const beforeMean = dishSum();
@@ -1406,8 +1398,8 @@ export class FluidSimulation {
     switch (presetId) {
       case 'galaxy': {
         // Gold core (28i-7) + two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
-        this.splatBlob(cx, cy, 4.2, 3.8, 1.0, 0.8, 0.45);
-        this.splatBlob(cx, cy, 8.5, 1.8, 0.5, 0.25, 0.85);
+        this.splatBlob(cx, cy, 4.2, 3.8, ...named(1.0, 0.8, 0.45, 0));
+        this.splatBlob(cx, cy, 8.5, 1.8, ...named(0.5, 0.25, 0.85, 1));
         // Two logarithmic spiral arms
         for (let arm = 0; arm < 2; arm++) {
           const offset = arm * Math.PI;
@@ -1538,8 +1530,8 @@ export class FluidSimulation {
       }
 
       case 'solar-flare': {
-        this.splatBlob(cx, cy, 8, 6.0, 1.0, 0.95, 0.8);
-        this.splatBlob(cx, cy, 15, 3.0, 1.0, 0.5, 0.0);
+        this.splatBlob(cx, cy, 8, 6.0, ...named(1.0, 0.95, 0.8, 0));
+        this.splatBlob(cx, cy, 15, 3.0, ...named(1.0, 0.5, 0.0, 1));
         for (let f = 0; f < 8; f++) {
           const a = f * Math.PI * 2 / 8 + this.rng.centred() * 0.4;
           const c = col(f);
@@ -2006,6 +1998,9 @@ export class FluidSimulation {
    * fingers on the way down that every press used to draw.
    */
   applySquish(x: number, y: number, radius: number, amount: number, fingering = 0, pileTips = false, stroke: Exclude<Stroke, 'lift'> = 'press', who: Presser = 'hand') {
+    // On a thin gap the bowl is the solver's, unrounded (pressBowl, PLAN 18a-14): what follows only counts it.
+    const fine = this.thinGap && stroke === 'press' && !!this.gpu!.pressBowl;
+    if (fine) { this.gpu!.pressBowl!(x + 0.5, y + 0.5, radius * GRID_SCALE, amount); this.foldDue = true; }
     radius = Math.round(radius * GRID_SCALE);
     /*
       A press lands on a whole cell. Beat Squeeze's centre was the middle of
@@ -2033,19 +2028,7 @@ export class FluidSimulation {
     if (pileTips && this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
     const pile = pileTips && fingering > 0 && this.squishSteps <= 45 ? 0.02 * fingering * Math.min(1, amount * 250) : 0;
     if (pileTips && stroke === 'press') this.pressLift.press(who, x, y, radius, amount, fingering, nowMs);
-    // Counted by who pressed, whole cells that close the gap only (a
-    // fractional one is dropped by the arrays, and a cell pressed by nothing
-    // is no press), with the depth laid there, so `npm run squeeze` can ask
-    // whether a kick's press reached the plate at all, and whether the kick's
-    // release gave back what it took.
-    let laid = 0, depth = 0;
-    // On a thin gap a press lays only the glass, as a bowl, and the flow moves the liquid (squishDisc).
-    squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, (idx, g, vx, vy, m) => {
-      if (Number.isInteger(idx) && g < 0) { laid++; depth -= g; }
-      this.squishCell(idx, g, vx, vy, m);
-    }, this.thinGap);
-    this.pressedCells[who] += laid;
-    this.pressedDepth[who] += depth;
+    layPress(this.size, x, y, radius, amount, fingering, stroke, pile, this.thinGap, fine, who, this.squishCell, this.pressedCells, this.pressedDepth);
   }
 
   /**
@@ -2188,35 +2171,6 @@ export class FluidSimulation {
           this.vy[idx] += ((j / dist) + (i / dist) * swirl) * strength;
           if (!erase) continue;
           this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
-        }
-      }
-    }
-  }
-
-  /**
-   * Cavity collapse and fluid shockwave when a bubble pops.
-   *
-   * Surface tension and pressure drive surrounding liquid rapidly inward
-   * to fill the collapsing void, while asymmetric rupture rolls an annular
-   * vortex ring into the flow. Unlike an outward air puff, dye is preserved
-   * rather than erased, leaving the fill pass (bubbleDye.ts) to heal the hole.
-   */
-  popBubble(x: number, y: number, radius: number, strength: number) {
-    radius = Math.round(radius * GRID_SCALE);
-    const r2 = radius * radius;
-    for (let i = -radius; i <= radius; i++) {
-      for (let j = -radius; j <= radius; j++) {
-        const distSq = i * i + j * j;
-        if (distSq >= r2 || distSq === 0) continue;
-        const nx = x + i;
-        const ny = y + j;
-        if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
-          const idx = nx + ny * this.size;
-          const dist = Math.sqrt(distSq);
-          this.dirty = true;
-          const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
-          this.vx[idx] += ((-i / dist) + (-j / dist) * swirl) * strength;
-          this.vy[idx] += ((-j / dist) + (i / dist) * swirl) * strength;
         }
       }
     }
@@ -2589,7 +2543,7 @@ export class FluidSimulation {
     }
   }
 
-  step(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number) {
+  step(settings: VisualizerSettings, time: number, noise2D: Noise2D) {
     this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
@@ -2832,7 +2786,7 @@ export class FluidSimulation {
   /** This layer's spin drag (38v-4): ν, gap (m), τ = h²/12ν. */
   spinDrag(settings: VisualizerSettings) { return layerSpinDrag(settings, this.gpu?.coverMetres, THIN_GAP_THICKNESS); }
 
-  private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
+  private deriveStep(settings: VisualizerSettings, time: number, noise2D: Noise2D): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
 
@@ -3141,7 +3095,8 @@ export class FluidSimulation {
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: c01(settings.oilTension),
       oilBodies: c01(settings.oilBodies),
-      // The oil's weight against the water (PLAN 27f-9c): −0.05, the mineral oil's lightness, where a look leaves it out.
+      // Oil weight (27f-9c; −0.05 left out), thickness (38w-31).
+      oilThickness: settings.oilThickness,
       oilWeight: Math.max(-1, Math.min(1, Number.isFinite(settings.oilWeight) ? settings.oilWeight : -0.05)),
       filmHold: c01(settings.filmHold),
       surfactantFlow: c01(settings.surfactantFlow),
@@ -3415,7 +3370,7 @@ export class FluidSimulation {
     }
   }
 
-  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: (x: number, y: number) => number) {
+  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: Noise2D) {
     if (scale <= 0.005) return;
     const step = 2;
     const eps = 0.75;

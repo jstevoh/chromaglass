@@ -165,6 +165,20 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ bubbles: v })}
           settingKey="bubbles"
         />
+        {/*
+          How fast that air dissolves (PLAN 38b-2). Beside Bubbles because
+          with no clock a look's bubbles leave only by the rim, a merge or
+          this, so it is how fast the plate turns its air over.
+        */}
+        <Slider
+          label="Bubble Melt"
+          value={settings.bubbleMelt ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ bubbleMelt: v })}
+          settingKey="bubbleMelt"
+        />
         <Slider
           label="Frame Sway"
           value={settings.frameSway ?? 0}
@@ -585,14 +599,14 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           settingKey="stock"
         />
         <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Stock</span>
+          <span className="text-[12px] uppercase tracking-widest font-bold text-muted">Stock</span>
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
                 aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
-                className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
+                className={`py-2 rounded-lg text-[12px] uppercase tracking-wider font-bold border transition-colors ${
                   (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[
@@ -752,6 +766,10 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
             />
             <Slider label="Birefringence" value={settings.birefringence ?? 0.3} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ birefringence: v })}
               settingKey="birefringence"
+            />
+            {/* The dish's own frozen moulding stress (PLAN 31p-3): rings round the gate, a pale wall, the cross with plane sheets. */}
+            <Slider label="Dish Stress" value={settings.dishStress ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ dishStress: v })}
+              settingKey="dishStress"
             />
           </>
         )}
@@ -1015,6 +1033,15 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               step={0.05}
               onChange={(v: number) => onUpdate({ macroRelief: v })}
           settingKey="macroRelief"
+        />
+            <Slider
+              label="Fine Detail"
+              value={settings.macroFine}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroFine: v })}
+          settingKey="macroFine"
         />
           </>
         )}

@@ -637,4 +637,42 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   calm moves on its own (then the allowance should read the plate's own motion without the
   drop, as the drift column does) or whether a drop's reach grew. Never a looser bar.
   Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes
-  the entries out.
+  the entries out.- **19ak-24. Open, found on main's deploy 967 (f3414ffd, 2026-11-26), after the day's
+  fifteen-PR merge sweep: 27 lines red, 21 of them green at deploy 931 (d8949fe).** Sorted
+  by the PR that broke each and briefed to Antigravity in six PRs (labelled `fixes-main`):
+  - 19ak-24a, the opening and the step's counts: `openingtime` 74 pipelines against 52,
+    `startup` 3 built on a frame, `framereads --owed=h2c9`, and `encode`'s 46g and H2c-5
+    lines (one carry a step missing; bisected to 46a, #862, be69025).
+  - 19ak-24b, `looksgrid --owed=preview` (four flat stills) and `benday` (after 43d-6, #913).
+  - 19ak-24c, `tools` (Press on the old plate "and keeps it", 225 → 173), `drawwall --app`,
+    `wall`, `oillift` (after 15g-18, #914, and 18a-13n, #955).
+  - 19ak-24d, `rimhold`, `dropcolour`, `airlens`, `spikes`, `thick`, `airblow` (**part shipped**:
+    `thick` `bodyAdvectPairSub` MC limiter matching `#948` `9/9`, and `rimhold` check 7
+    unpoured trough capillary leak in `mixForce` past `OPEN_RIM` fixed `0.20 → 0.26`;
+    remaining check-vs-physics reds need check/deep-solver decisions: `rimhold` 6 (`0.59` vs
+    `0.6` after `#946` 44 cSt oil), `airblow` 5 (`oil +4.65%` after `#946`; `ferro` `+31.12%`
+    vs its colour `+23.69%` partly from `phaseVelocity` `front`), `dropcolour` 4 (`0.103` after
+    `#889` `granulation = 0` under `splodascope` `saturationBoost = 1.3`), `airlens` 9–10
+    (`23` vs `41` after `#889`, same as `19ak-24i`), and `spikes` 5 (`6/6` at `3271c994` with
+    `16 vs 8`; `#859` moved `b1` `7 → 8`)).
+  - 19ak-24e, `live --codec aac`, `liveshow --stack`, `videolamp`, a show night:
+    - `live -- --codec aac` (3/3 green alone, 45/45) and `liveshow -- --stack` (3/3 green alone, 28/28): load/phase on deploy 967 (`liveshowstack.mjs:258` compares col 0/15 vs col 2/13, which hits the white bar on row 6 when the last decoded frame lands there).
+    - `qa` ("no section is more than three screens deep — deepest is 3.1 screens"): bisected to `#889` (`3bb0899b`, `38u-11` adding `glassSlide` cord to `Crowd Plate`, growing `Patches` from `2205/758 = 2.91` to `2327/758 = 3.07`); fixed in `PatchesSection.tsx` (2×2 LFOs and 2×1 Envelopes in the sheet). Full `npm run qa` remains blocked at `origin/main` on `49c-2` (`#963` unhooking `overlayUp` at `<1024px`).
+    - `videolamp` (0/3 alone, 9/11): bisected to `#755` (`6d11ce66`, `18e-2`, `19.57/3.57/3.91, flat 0.00` → `17.36/5.05/4.58, flat 8.68`); open for Claude Code (`scripts/videolamp.mjs` measures screen `(0.72, 0.5)` r=`0.12` where `uvToFluid` maps fluid `(0.72, 0.5)` r=`0.12` to screen `(0.83, 0.5)` r=`0.18` — `0.00` middle/far at true coords — and its `rim > 3 * flatRim` control predates `18e-2`'s real `|∇OPL|` pupil loss, which darkens the flat rim by `30.19` vs `58.27` on stripes).
+  - 19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
+    `lavaround` (after 27f-9q, #866, met 38w-31, #954).
+  - ~~19ak-24g, `filmlook`'s two camera lines~~ **shipped**: 38h-6 (#750) rightly took the
+    camera's rainbow away at every Film Physics, and the lines still measured Film Physics 1
+    against it (0.3 against 0.3); re-read on the film's own footprint (9/9).
+  - ~~19ak-24h, `heldpress --owed=presstwist`~~ **shipped**: it passes since 15g-18, so the
+    owed id is out.
+  - 19ak-24i, `nolight` 9, open: the camera's bead rims read 4 levels over the plate under
+    them at every commit from d8949fe to f3414ff; the bar is the ball's gain of the
+    projector's brightest pixel, which the dye's grain lifted to about 170 until 38u-8
+    (#889) made the dye smooth by default, so the bar fell from 4.0 to 3.87 with no rim
+    pixel moving. Read against the camera's own plate it is 3.3 over a pixel's own
+    gathering and 2.2 over the brightest the plate is under that drop. The shader's gain
+    (`focus` in plate.ts) multiplies the plate under the same pixel, so either the line's
+    ring (0.8 to 1.1 of the nominal radius) sits inside the drawn drop's 0.8, where the
+    gain is larger, or the drop draws a few levels of light. Measure the drawn radius in
+    `beadTex` against CAM_BEADS first. Never a looser bar.

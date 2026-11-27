@@ -224,6 +224,16 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ oilWeight: v })}
           settingKey="oilWeight"
         />
+        {/* How thick the oil itself is (PLAN 38w-31), on Thickness's scale: a thin oil (a lamp's molten wax) is carried and sinks freely, a thick one lags the water. */}
+        <Slider
+          label="Oil Thickness"
+          value={settings.oilThickness ?? Math.log10(50) / 3}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilThickness: v })}
+          settingKey="oilThickness"
+        />
         <Slider
           label="Soap Bursts"
           value={settings.surfactantFlow ?? 0}
@@ -502,7 +512,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistry"
         />
         <Slider
-          label="↳ Pattern (Spots to Labyrinth)"
+          label="Pattern"
           value={settings.chemistryPattern ?? 0}
           min={0}
           max={1.0}
@@ -511,7 +521,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryPattern"
         />
         <Slider
-          label="↳ Pattern Width"
+          label="Pattern Width"
           value={settings.chemistryWidth ?? 0.5}
           min={0.1}
           max={1.0}
@@ -520,7 +530,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryWidth"
         />
         <Slider
-          label="↳ Turing Print"
+          label="Turing Print"
           value={settings.turingPrint ?? 0}
           min={0}
           max={1.0}
@@ -529,7 +539,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingPrint"
         />
         <Slider
-          label="↳ Print Ink (0 is Starch)"
+          label="Print Ink"
           value={settings.turingInk ?? 0}
           min={0}
           max={1.0}
@@ -538,7 +548,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingInk"
         />
         <Slider
-          label="↳ Print Drift (0 is Still)"
+          label="Print Drift"
           value={settings.turingDrift ?? 0}
           min={0}
           max={1.0}

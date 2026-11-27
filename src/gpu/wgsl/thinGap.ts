@@ -87,9 +87,8 @@
  */
 
 import { HAND_GRIP } from '../../lib/handSolid';
-import { DISH_GAP_FIELD_METRES, OPEN_RIM, OIL_NU } from '../../lib/turntable';
+import { DISH_GAP_FIELD_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
-import { SPIN_OIL_LIGHT } from '../fluid/constants';
 import { thinWarmKernels } from './thinWarm';
 
 /**
@@ -97,6 +96,16 @@ import { thinWarmKernels } from './thinWarm';
  * its packed-plane reader, which are passed in rather than imported so this
  * file does not import the module that spreads it into its kernel table.
  */
+/**
+ * The draught's gusts on a thin gap (hsBody, PLAN 18a-16): the stress laid as
+ * ∇⊥χ, χ a noise of about unit size, times Air and this. 14 lays gusts as
+ * strong as the two noises it replaces (Air × 4 each): in the lab at Air
+ * 0.35 the old flow's rms about its mean was 1.73e-2 (its mean, 6.90e-2, was
+ * the slide out of the dish) and at 50 this laid 6.02e-2, so 50 × 1.73/6.02.
+ * The draught's uniform part is gone: a closed dish answers it with its own
+ * pressure, and nothing moves.
+ */
+const AIR_GUST = 14;
 /** The least share of its mobility a cell part air keeps (standingLiquid in hsPrep, PLAN 15g-8d). */
 const AIR_RIM_LEAST = 0.05;
 
@@ -316,15 +325,34 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       plain mean (\`npm run oillift\`, bar 3%). A closed dish cannot move its
       contents as a whole however its colour lies, and the circulation is
       that. Past LIFT_MOST the circulation's grid is coarser than the
-      solver's and the colour's finest swirl is lost (PLAN 27f-7). Rain
-      Drip's weight and the comet's pull keep the colour's whole weight over
-      the app's mean, as they were: a standing plate's oil is PLAN 27f-6.
+      solver's and the colour's finest swirl is lost (PLAN 27f-7).
+
+      **With no oil the colour's weight is the same circulation** (PLAN
+      18a-17, A.b.w 2, Ψ relaxed on the colour alone, κ 0, B 1). What was
+      found: with the treble's sparks gone (PLAN 38v-1) and the draught
+      closed (18a-16), Rain Drip on a standing plate still emptied its dish,
+      1.8% of its dye left after 600 lab steps, and Plate Rock tipped with
+      no oil 0.5%. Both were laid as A.b.xy·w and S.up·A.a.x·w straight into
+      the gap's solve, whose rim is open; with no oil the solve takes off
+      the force's gradient part, but what reaches the rim downhill is a
+      weight pressing on a free edge, and the colour poured out over it as a
+      drop off a tilted plate's edge. A clock glass's colour falls to its
+      bottom and lies in a pool there, the clear liquid rising past it: the
+      closed circulation, Rain Drip's pull down S.up added to the tilt's,
+      both one in-plane weight on the one colour. \`npm run draught\`: Rain
+      Drip keeps 99.8% and its colour's middle falls 0.14 of the plate;
+      Plate Rock keeps 100% and moves 0.18 downhill. With oil Rain Drip stays
+      laid directly, its colour's whole weight over the app's mean (a
+      standing plate's oil is PLAN 27f-6, and κ is the lift over the tilt's
+      weight, not Rain Drip's); the comet's pull is an explicit push and
+      stays one.
 
       A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
       AIR_SHEAR), the rest gap h0, the breath's pascals to the flow's speed);
       A.b = (Plate Rock's pull on the colour, x and y; with the oil, its
-      ln B per unit of oil and 1, zero without, when the colour's weight is
-      laid directly). \`psi\` is hsLiftRelaxOil's (Ψ_x, Ψ_y) of φ, on its
+      ln B per unit of oil and 1; with no oil and the circulation built, 0
+      and 2 (Rain Drip's pull joins it); zero until it is built, when the
+      colour's weight is laid directly). \`psi\` is hsLiftRelaxOil's (Ψ_x, Ψ_y) of φ, on its
       own square grid (its side the buffer's length's square root).
     */
     hsBody: `${HEAD}${NOISE}${COMMON}
@@ -348,6 +376,12 @@ fn liftAt(q: vec2i, m: i32) -> vec2f {
   if (!liftIn(q, m)) { return vec2f(0.0); }
   return psi[q.x + q.y * m];
 }
+// The draught's stream function at a point (the air, below): its gusts drifting down the plate, nothing over the dish's outer tenth.
+fn airChi(uv: vec2f) -> f32 {
+  let p = uv * S.l;
+  let r = length(uv - vec2f(0.5));
+  return snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * (1.0 - smoothstep(${(OPEN_RIM - 0.1).toFixed(2)}, ${OPEN_RIM.toFixed(2)} - 2.0 / S.n, r));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -364,6 +398,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let dq = textureLoad(dye, qDish, 0).a;
     let w = dq - S.meanD;
     var rock = A.b.xy * w;
+    // With no oil (A.b.w 2, PLAN 18a-17) Rain Drip's pull down the standing plate joins the tilt's in the circulation.
+    let dripClosed = A.b.w > 1.5;
+    let pull = A.b.xy - select(vec2f(0.0), S.up * A.a.x, dripClosed);
     if (A.b.w > 0.0) {
       // u = ∇⊥ψ = (∂ψ/∂y, −∂ψ/∂x), ψ = L_y Ψ_x − L_x Ψ_y with L the colour's pull, by differences a cell of Ψ's grid apart:
       // on every cell, the rim's and past it too, so its divergence is zero on all of them (LIFT_GRID).
@@ -375,15 +412,61 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       // Times B, which hsPrep's drag divides out again (above): the same oilBody, from the same oil.
       let md = vec2i(textureDimensions(mixT));
       let oilB = exp(clamp(clamp(textureLoad(mixT, min(q * md / i32(S.n), md - 1), 0).r, 0.0, 1.0) * A.b.z, -9.0, 9.0));
-      rock = oilB * vec2f(A.b.y * dy.x - A.b.x * dy.y, -A.b.y * dx.x + A.b.x * dx.y);
+      rock = oilB * vec2f(pull.y * dy.x - pull.x * dy.y, -pull.y * dx.x + pull.x * dx.y);
     }
-    v = vec4f(v.xy - S.up * (A.a.x * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
+    v = vec4f(v.xy - S.up * (select(A.a.x, 0.0, dripClosed) * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
   }
   if (S.air > 0.1) {
-    let p = uvOf(id) * S.l;
-    let gx = snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * S.air * 4.0 * S.dt;
-    let gy = -S.air * 8.0 * S.dt + snoise(vec2f(p.y * 0.05, p.x * 0.05 + S.time)) * S.air * 4.0 * S.dt;
-    v = vec4f(v.xy + vec2f(gx, gy) * A.a.y / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
+    /*
+      The draught's gusts as a closed circulation (PLAN 18a-16).
+
+      What was reported: Solar Flare, filmed to Hymn to the Dawn on main,
+      faded to an empty dish by about 2:40. What was measured, on the
+      owner's Mac (Metal, gpu=mid, no music): every build since 11-21
+      drains the dish to 5 to 7% of its opening dye in 150 s, the middle
+      first, then the rim. Before PLAN 38v-1 the treble's white sparks
+      poured 1200 to 3900 of dye a ten seconds back in and hid it; with
+      them gone (rightly: no projectionist has that hand) the leak showed.
+      On a thin gap the one place dye leaves is the open rim (decayDye),
+      so something was carrying the liquid out over it.
+
+      It was the draught. Its push was a uniform −y shear, S.air × 8 a
+      second, plus two noises, laid here straight into the gap's solve,
+      which holds p = 0 past the rim. Between two glasses whose rim is
+      open to the air that is a through-flow: the whole dish slides down
+      and out, and clear liquid comes in at the top. In the lab (128², dt
+      0.05, a disc of dye to r 0.44, 600 steps) Air 0.35 left 0% of the
+      dish's dye against 100% with it off.
+
+      A dish does not do that. Wind on a liquid in a basin piles it a
+      little against the downwind wall, and that set-up's pressure carries
+      the shear's mean back under it: the depth-averaged flow of a uniform
+      stress over an even layer in a closed basin is zero (Darcy's
+      u = (h²/12μ)(−∇p) + τh/2μ with no flux through the wall gives
+      ∇p = 6τ/h and u = 0). What a draught does move is its curl: gusts,
+      stronger here than there, turn the liquid in gyres that close inside
+      the rim. So the stress laid here is that part alone, made closed by
+      construction: τ = ∇⊥χ, χ a noise drifting down the plate as the old
+      gusts did (the draught still goes somewhere, its eddies travel with
+      it), held to zero over the outer tenth of the dish. ∇⊥χ has no
+      divergence, and with χ = 0 at the rim no flux through it, so the gap's
+      solve has nothing to push out. AIR_GUST sets the gusts as strong as the
+      old noises were (the lab: their rms flow 1.69e-2 against 1.73e-2,
+      \`npm run draught\`), and the dish now keeps 100% of its dye.
+
+      The shortcut named: χ is a new noise, not the Hodge projection of the
+      old field onto closed flows, which would need the Ψ solve the oil's
+      lift uses (hsLiftRelax); PLAN 18a-17 has it, with the colour's weight
+      on a rocked plate with no oil and Rain Drip on a standing plate, which
+      still go through the open rim the same way.
+    */
+    let e = 1.0 / S.n;
+    let uv = uvOf(id);
+    let cx = airChi(uv + vec2f(e, 0.0)) - airChi(uv - vec2f(e, 0.0));
+    let cy = airChi(uv + vec2f(0.0, e)) - airChi(uv - vec2f(0.0, e));
+    // ∇⊥χ in the plate's cells (S.l of them across), the differences 2e apart in uv.
+    let g = vec2f(cy, -cx) / (2.0 * e * S.l) * S.air * ${AIR_GUST.toFixed(1)} * S.dt;
+    v = vec4f(v.xy + g * A.a.y / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
   }
   if (A.a.w > 0.0) {
     let tau = textureLoad(breath, min(q, vec2i(textureDimensions(breath)) - 1), 0).xy;
@@ -690,13 +773,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     goes round the cells rather than through them. The drag in a column is
     its dynamic viscosity over the one density the solve carries, so the
     oil's is ρ_oil ν_oil, 0.88 of fifty (SPIN_OIL_LIGHT): λ is 44 against
-    water and 1.9 against the default Thickness. \`mixT\` is 1×1 and
-    empty with no oil laid.
+    water and 1.9 against the default Thickness. Which oil it is comes from
+    Oil Thickness (S.oilVisc, ln of ρ_oil ν_oil over ν_water, constants.ts
+    oilBodyLn, PLAN 38w-31): a lava lamp's molten paraffin is about nine,
+    λ 0.35 against the default; held at fifty, it could not sink.
+    \`mixT\` is 1×1 and empty with no oil laid.
   */
   let mixDims = vec2i(textureDimensions(mixT));
   let oilC = clamp(textureLoad(mixT, min(q * mixDims / n, mixDims - 1), 0).r, 0.0, 1.0);
-  let oilBody = exp(clamp(oilC * (${Math.log((1 - SPIN_OIL_LIGHT) * OIL_NU / WATER_NU).toFixed(4)} - lnClear), -9.0, 9.0));
+  let oilBody = exp(clamp(oilC * (S.oilVisc - lnClear), -9.0, 9.0));
   // Clear light mineral oil (Drakeol / baby oil / light paraffin, ~50 cSt at 20°C, 50x water):
+  // the clear film is its own oil, poured from its own bottle, so Oil Thickness (which sets the
+  // coloured oil's drag above, PLAN 38w-31) does not reach it.
   // Two layers stacked across a pressure-driven Poiseuille gap (oil thickness fm against one
   // wall, water depth a = 1 - fm against the other, continuous velocity and shear stress at interface).
   const OIL_REL_NU: f32 = 50.0;

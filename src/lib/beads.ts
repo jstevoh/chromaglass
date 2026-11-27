@@ -249,6 +249,33 @@ export class BeadField {
     this.liquidSet = true;
   }
 
+  /** Forget every drop cleanly; wait for repopulate/restore. */
+  snapshot() {
+    return {
+      beads: this.beads.map((b) => ({
+        ...b,
+        color: b.color ? ([...b.color] as [number, number, number]) : undefined,
+        inner: b.inner ? { ...b.inner, color: [...b.inner.color] as [number, number, number] } : undefined,
+      })),
+      dropAmt: this.dropAmt,
+      viscosityRatio: this.viscosityRatio,
+    };
+  }
+
+  restore(s: ReturnType<BeadField['snapshot']>): void {
+    this.beads.length = 0;
+    for (const b of s.beads) {
+      this.beads.push({
+        ...b,
+        color: b.color ? ([...b.color] as [number, number, number]) : undefined,
+        inner: b.inner ? { ...b.inner, color: [...b.inner.color] as [number, number, number] } : undefined,
+      });
+    }
+    this.dropAmt = s.dropAmt;
+    this.viscosityRatio = s.viscosityRatio;
+    this.dirty = true;
+  }
+
   /** Paterson's Hele-Shaw shape/coalescence relaxation time 2 μ R³ / (b² σ). */
   private patersonTau(rCells: number): number {
     const R = Math.max(0.1, rCells) * (DISH_METRES / this.grid);
@@ -345,19 +372,39 @@ export class BeadField {
    * old probability filled the plate evenly, since every bead the packed
    * patches refused landed in the gaps between them).
    */
-  populate(count: number, sizeScale = 1, density?: (x: number, y: number) => number): void {
+  populate(count: number, sizeScale = 1, density?: (x: number, y: number) => number, byOil = false): void {
     const N = this.grid;
     // With no droplets (always, at drops 0) the population is the beads, as it
     // always was, and so is every line and every draw below.
     const tinies = this.beads.reduce((n, b) => n + (b.tiny ? 1 : 0), 0);
+    /*
+      By oil (the plate's own call, `byOil`): the dial sets how much oil is on
+      the glass, and the field keeps that, not a head count. A bead is a
+      pancake the gap's height tall, so its oil is its area, r squared; two
+      that merge keep the sum of their areas (the merge below sets
+      r = sqrt(r1² + r2²)), and so does this: the target is `count` beads of
+      the mean area the draw below makes, and the field is topped up only
+      when it holds less oil than that, which is when beads have run off the
+      open rim. Held to a count, every merge was answered by a new bead
+      within half a second, and a plate that should coarsen, the way oil on
+      water does (small drops run together into fewer, bigger ones over
+      minutes), stayed a carpet of the same 125 beads forever: the owner's
+      "too many bubbles". The harnesses that pin a count call without it, and
+      see the count they asked for, to the draw.
+    */
+    const unit = (this.drops > 0 ? DROP_MEAN_R2 : RING_MEAN_R2) * (sizeScale * N / 192) ** 2;
+    let oil = 0;
+    if (byOil) for (const b of this.beads) if (!b.tiny) oil += b.r * b.r;
+    const target = count * unit;
     const want = tinies ? count + tinies : count;
-    while (this.beads.length > want) {
+    while (byOil ? oil > target * 1.1 + unit : this.beads.length > want) {
       const i = this.beads.findIndex((b) => !b.tiny);
       if (i < 0) break;
+      oil -= this.beads[i].r * this.beads[i].r;
       this.beads.splice(i, 1); this.dirty = true;
     }
     let tries = 0;
-    while (this.beads.length - tinies < count && tries++ < count * 6) {
+    while ((byOil ? oil < target : this.beads.length - tinies < count) && tries++ < count * 6) {
       // Two populations: mostly small beads of clearly different sizes, and
       // a tail of big lenses; the small ones spread over a wider range than
       // before so the carpet is not one size.
@@ -390,6 +437,7 @@ export class BeadField {
         const seed = this.rng.float();
         const c = this.drops > 0 ? this.slotColour(seed) : undefined;
         this.beads.push(c ? { x, y, r, age: 0, seed, color: [c[0], c[1], c[2]] } : { x, y, r, age: 0, seed });
+        oil += r * r;
         this.dirty = true;
       }
     }
@@ -450,19 +498,6 @@ export class BeadField {
       this.beads.push(c ? { x, y, r, age: 0, seed, color: [c[0], c[1], c[2]], tiny: true } : { x, y, r, age: 0, seed, tiny: true });
       have++; this.dirty = true;
     }
-  }
-
-  /** Something landed or pressed at (x, y): shove the beads out of its way. */
-  disturb(x: number, y: number, r: number, strength = 1): void {
-    for (const b of this.beads) {
-      const dx = b.x - x, dy = b.y - y;
-      const d = Math.hypot(dx, dy);
-      if (d > r * 2 || d < 1e-3) continue;
-      const push = (1 - d / (r * 2)) * r * 0.6 * strength;
-      b.x += dx / d * push;
-      b.y += dy / d * push;
-    }
-    this.dirty = true;
   }
 
   step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number): void {
@@ -1177,11 +1212,48 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
  * area, and still all of the count, where 3.0 starts to leave the plate
  * short of beads).
  *
- * Out of the closeup nothing moves: the plate's beads are the beads they were,
- * to the bit.
+ * The oil is the dial's, closeup or not (beadPopulation, below): laid larger,
+ * the closeup's beads are fewer, a quarter of the count for the same oil.
  */
 export const MACRO_BEAD_SCALE = 2.0;
 
+/*
+  The mean area, as r² in cells of a 192 grid at size scale 1, of a bead
+  populate() draws: what one bead's worth of oil is, so a count can be turned
+  into oil and back. The rings draw 80% at 0.45 + 2.6uv (u, v uniform: the
+  mean of (uv)² is 1/9) and 20% at 1.8 + 3.4u² (the mean of u⁴ is 1/5); the
+  drops draw a log-normal (median DROP_MEDIAN, σ DROP_SIGMA) kept between
+  DROP_MIN and DROP_MAX, so its mean is summed here once over the kept range.
+*/
+const RING_MEAN_R2 = 0.8 * (0.45 ** 2 + 2 * 0.45 * 2.6 / 4 + 2.6 ** 2 / 9)
+  + 0.2 * (1.8 ** 2 + 2 * 1.8 * 3.4 / 3 + 3.4 ** 2 / 5);
+const DROP_MEAN_R2 = (() => {
+  let w = 0, m = 0;
+  for (let z = -6; z <= 6; z += 0.001) {
+    const r = DROP_MEDIAN * Math.exp(DROP_SIGMA * z);
+    if (r < DROP_MIN || r > DROP_MAX) continue;
+    const p = Math.exp(-z * z / 2); w += p; m += p * r * r;
+  }
+  return m / w;
+})();
+
+/**
+ * How much of the glass the oil covers with the Beads dial at full: a
+ * twentieth. The dial is the amount of oil on the plate, and the field holds
+ * the beads that much oil makes at the dial's size, so the count is the
+ * cover over one bead's area: dial · BEAD_COVER · (plate area) / (π · mean r²
+ * · scale²). Through zero, so a look with a touch of oil has a few beads,
+ * where the old law, 60 + 360·dial, put 60 on the glass at the faintest
+ * touch and 125 at the default 0.18 (2.6% of the glass under oil, laid as
+ * many small rings), and in the closeup, where each bead is laid
+ * MACRO_BEAD_SCALE times wider, the same 125: four times the oil. Now the
+ * default holds 44, a look at 0.7 holds 112 where it held 312, and the
+ * closeup the same oil in its larger beads, a quarter of the count.
+ */
+export const BEAD_COVER = 0.05;
+const BEAD_FULL_COUNT = BEAD_COVER * 192 * 192 / (Math.PI * RING_MEAN_R2);
+
 export function beadPopulation(beadAmt: number, macro?: boolean): [count: number, sizeScale: number] {
-  return [Math.round(60 + 360 * beadAmt), (0.8 + 0.4 * beadAmt) * (macro ? MACRO_BEAD_SCALE : 1)];
+  const s = (0.8 + 0.4 * beadAmt) * (macro ? MACRO_BEAD_SCALE : 1);
+  return [Math.round(BEAD_FULL_COUNT * Math.max(0, beadAmt) / (s * s)), s];
 }

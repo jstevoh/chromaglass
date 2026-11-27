@@ -15,9 +15,10 @@ import { dyeAbsorbances } from '../lib/dye';
 /** Floats per record; four vec4s (see `Splat` in wgsl/splat.ts). */
 export const SPLAT_FLOATS = 16;
 
-export type Falloff = 'flat' | 'linear' | 'squared' | 'gaussian';
+/** `plate` is (1 − d²/r²)², a clamped glass's deflection under a press. */
+export type Falloff = 'flat' | 'linear' | 'squared' | 'gaussian' | 'plate';
 
-const FALLOFF: Record<Falloff, number> = { flat: 0, linear: 1, squared: 2, gaussian: 3 };
+const FALLOFF: Record<Falloff, number> = { flat: 0, linear: 1, squared: 2, gaussian: 3, plate: 4 };
 
 export interface SplatOpts {
   /** How much dye lands at the middle. */

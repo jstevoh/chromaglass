@@ -552,6 +552,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
+  { key: 'bubbleMelt',      label: 'Bubble Melt',      min: 0, max: 1 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
   { key: 'crispEdges',      label: 'Crisp Edges',      min: 0, max: 1 },
@@ -576,6 +577,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
+  { key: 'glassSmear',      label: 'Glass Smear',      min: 0, max: 3, wanderSpan: 1 },
   { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 3, wanderSpan: 1 },
@@ -660,6 +662,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'analyserAngle',   label: 'Analyser',         min: 0, max: 180 },
   { key: 'quarterWave',     label: 'Quarter Wave',     min: 0, max: 1 },
   { key: 'birefringence',   label: 'Birefringence',    min: 0, max: 1 },
+  { key: 'dishStress',      label: 'Dish Stress',      min: 0, max: 1 },
   { key: 'tank',            label: 'Tank',             min: 0, max: 1 },
   { key: 'tankFeed',        label: 'Feed',             min: 0, max: 6 },
   { key: 'tankWeight',      label: 'Dye Weight %',     min: 0.05, max: 3 },
@@ -669,6 +672,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The dish on a speaker (PLAN 48f): the drive's frequency, and its shake in g, which the music's cord rides.
   { key: 'faradayHz',       label: 'Shaker',           min: 0, max: 150 },
   { key: 'faraday',         label: 'Shake',            min: 0, max: 2 },
+  { key: 'faradayRock',     label: 'Rock',             min: 0, max: 2 },
+  { key: 'faradayGain',     label: 'Wave Strength',    min: 1, max: 8 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
@@ -680,6 +685,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
   // The oil's weight (PLAN 27f-9c): a fader sinks a floating oil to the bottom of a standing plate and lifts it again.
   { key: 'oilWeight',       label: 'Oil Weight',       min: -1, max: 1 },
+  { key: 'oilThickness',    label: 'Oil Thickness',    min: 0, max: 1 },
   { key: 'soapBreakdown',   label: 'Soap Breakdown',   min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.

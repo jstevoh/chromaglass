@@ -85,7 +85,9 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin', 'heatPack', 'heatUnpack'];
+export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'heatPack', 'heatUnpack'];
+/** Air-give kernels built behind the show (no opening pours air). */
+export const THIN_GAP_LATER_KERNELS = ['airGiveSub', 'airGiveThin'];
 /** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
 export const AIR_DISP_LEAST = 1e-5;
 /*
@@ -167,6 +169,37 @@ export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
   when the force is at its largest and least real.
 */
 export const OIL_CELLS = 0.5;
+/*
+  The oil's tension in a sealed bottle (a standing plate, PLAN 27f-9q), as a
+  multiple of OIL_TENSION_GAP, and the most it may move the liquid in a step.
+
+  Reported: Lava Lamp's wax would not hold round; it hung in stalks and
+  sheets. In the gap of a Hele-Shaw cell the wax's weight and its surface
+  tension are both resisted by the same Darcy drag, 12μ/h², so what
+  decides a blob's shape is their ratio, the Bond number Δρ g R²/σ, and the
+  gap drops out of it. PLAN 38r took the gap from 6 mm to 2 mm and scaled
+  the tension by h² (OIL_TENSION_GAP, a ninth) but not the standing plate's
+  weight (DYE_WEIGHT and HEAT_LIFT, laid by sealWeight), which
+  is what keeps the lamp's approved cycle at its speed (PLAN 27f-9h, #820).
+  So in the lamp every blob was nine times as heavy against its own skin as
+  at the 6 mm the tension was set on, and a heavy blob in a lamp draws out.
+
+  The consistent Bond number is nine. Four is what holds (scratch roundlab,
+  256², 180 s, the lamp's own settings, oil conserved to the cell in all):
+  today's tension rounds to 0.58 (a body's area against the disc its
+  perimeter would hold), four times it to 0.81–0.87 with the wax's
+  area over half oil 5.1% at 120 s against today's 5.0%, and nine times
+  to 0.94 but with that area falling to 3.0% at 120 s and 2.1% at 180:
+  at full strength the explicit force (mixForce) sheds the interface off
+  as a haze. That is a shortcut of the solver, not the wax, and PLAN
+  27f-9s is to lay the capillary implicitly so the full nine can stand.
+
+  SEALED_CELLS: at OIL_CELLS' half a cell the cap cut the stronger force
+  where it rounds a blob (nine times under it: 0.73, against 0.94); one cell is the
+  Courant limit an explicit carry may move in a step.
+*/
+export const SEALED_TENSION = 4;
+export const SEALED_CELLS = 1;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
 /*
@@ -809,11 +842,35 @@ export const LIFT_SWEEPS = 8;
 export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
 export const LIFT_KERNELS = ['hsLiftSource', 'hsLiftRelax', 'hsLiftRelaxOil', 'sealSource', 'sealFlow'];
 /*
-  ln B, the oil's drag over the plate's clear liquid at viscosity nu (hsPrep's
-  oilBody, PLAN 27f-7): the oil lift's circulation relaxes with B on its faces
-  (hsLiftRelaxOil), so that what hsPrep's drag divides out it laid in first.
+  The oil's own kinematic viscosity, from Oil Thickness (PLAN 38w-31): the
+  same log scale as the clear liquid's Thickness, 10^(3t) times water's, so
+  0 is water and 1 is glycerine. Left out it is OIL_THICKNESS, the light
+  mineral oil at 50 mm²/s (lib/turntable.ts OIL_NU) that every oil look was
+  built on. Not every oil is that one, and the one that showed it was the
+  lava lamp's: #946 gave the oil bodies their own drag, at fifty, and Lava
+  Lamp's wax, which is molten paraffin, stopped sinking (`npm run lavawax`:
+  77% of the cold wax stayed up for 3 s, 49% before). Molten paraffin is
+  about 9 mm²/s at a lamp's 60 °C, 7 at 70 °C and 4 at 100 °C (Anton Paar's
+  table; ExxonMobil's Prowax 610 sheet gives 3.5 to 4.5 at 100 °C), so a
+  lamp's wax is about a sixth as thick as the mineral oil, thinner than the
+  default clear liquid (22 mm²/s), and a Hele-Shaw drop of it rides the
+  flow at 2/(1 + λ) of its speed with λ about 0.35, not 1.9. The heat
+  thins both liquids together on top of this (hsPrep's tempVisc, 2% a
+  degree, close to paraffin's own 2.2%).
 */
-export const oilBodyLn = (nu: number) => Math.log((1 - SPIN_OIL_LIGHT) * OIL_NU / nu);
+// The default is written log10(50)/3 here and in types.ts alike, so it is the same double, and that
+// double (or a key left out) gives back OIL_NU itself, not 10^(3t)'s 4.9999999999999990e-5: every
+// look that never names the key keeps the ln B it had before this setting, to the last bit.
+export const OIL_THICKNESS = Math.log10(50) / 3;
+export const oilNuOf = (t?: number) => !Number.isFinite(t) || t === OIL_THICKNESS ? OIL_NU : thicknessViscosity(Math.max(0, Math.min(1, t as number)));
+/*
+  ln B, the oil's drag over the plate's clear liquid at viscosity nu (hsPrep's
+  oilBody, PLAN 27f-7), for an oil of Oil Thickness t: the oil lift's
+  circulation relaxes with B on its faces (hsLiftRelaxOil), so that what
+  hsPrep's drag divides out it laid in first. Over water (nu = 1e-6) it is
+  the Sim's oilVisc, which hsPrep's oilBody takes the clear liquid's off.
+*/
+export const oilBodyLn = (nu: number, t?: number) => Math.log((1 - SPIN_OIL_LIGHT) * oilNuOf(t) / nu);
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*
@@ -998,4 +1055,4 @@ export const RG32 = 'rg32float';
 export const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), the lamp's glass cooling at 54 (PLAN 27f-9e), 55 unused: a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks
+export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), the lamp's glass cooling at 54 (PLAN 27f-9e), the oil's ln B over water at 55 (oilBodyLn, PLAN 38w-31): a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks

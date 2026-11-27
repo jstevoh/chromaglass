@@ -730,9 +730,19 @@ console.log('\nWiring');
   const shove = accent => { const r = restingHand(); kickRock(r, 0.8, accent, 0, 0.5); return Math.hypot(r.toX ?? 0, r.toY ?? 0); };
   const shoveScales = shove(1) > 0 && Math.abs(shove(1.5) / shove(1) - 1.5) < 1e-9;
   const depthScales = kickDepth(0.9, 0.8, 1) > 0 && Math.abs(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1) - 1.5) < 1e-9;
-  check('and the weight reaches the rock, the squeeze and the beads',
+  /*
+    The beads were a third grep here: the squeeze pushed them out from under
+    the palm by its own depth times the accent. PLAN 15g-17 took that shove
+    out, since a bead floats in the liquid and a real squeeze moves it only by
+    moving the liquid round it; the beads now follow the liquid's own flow in
+    their step (lib/beads.ts), so the accent can reach them only through the
+    squeeze's depth, which the line below still reads. That the beads do
+    follow the squeezed liquid is not measured here (nor was it by the grep
+    this replaced); bubblephysics and tools read the liquid moving them.
+  */
+  check('and the weight reaches the rock and the squeeze',
     /if \(R > 0 && kickStep\) kickRock\(rock, bass01, accent, barGridRef\.current\.placeAt\(accentAt\), barGridRef\.current\.now\.period\);/.test(vis)
-    && /const a = kickDepth\(squeezeAmt, bass01, accent\);/.test(vis) && /0\.4 \* squeezeAmt \* bass01 \* accent\)/.test(vis)
+    && /const a = kickDepth\(squeezeAmt, bass01, accent\);/.test(vis)
     && shoveScales && depthScales,
     `the rock's lean ×${(shove(1.5) / shove(1)).toFixed(3)} and the squeeze's depth ×${(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1)).toFixed(3)} at an accent of 1.5`);
   check('a tempo that knows the bar tells the grid its one, on the grid\'s clock (13.5-link-one)',

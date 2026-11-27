@@ -10,9 +10,9 @@ import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
-import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
+import { OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -94,6 +94,46 @@ export class FluidPasses extends FluidFields {
     const t = this.airTex;
     t[0] = this.air.prev; t[1] = this.air.field; t[2] = this.airGiveTex; t[3] = this.airInTex;
     return t;
+  }
+
+  /** Free the air pair and its scratch targets after a quiet minute; clear bind-group caches so stale targets are never reused. */
+  protected dropAir(): void {
+    this.air?.dispose();
+    this.air = null;
+    if (this.airGiveTex) { this.disposer.release(this.airGiveTex); this.airGiveTex = null; }
+    if (this.airInTex) { this.disposer.release(this.airInTex); this.airInTex = null; }
+    this.airTex.length = 0;
+    this.airPush = 0;
+    this.airCover = 0;
+    this.airCoverPrev = 0;
+    this.airQuietSeconds = 0;
+    this.groups.clear();
+    this.groupRoot = { kids: new Map() };
+  }
+
+  /**
+   * Encode this step's air splat (when live or clearing), update `airPush`/`airCover`,
+   * and release the air storage after a quiet minute with neither bubbles nor boil (H2c-8).
+   */
+  protected stepAir(enc: GPUCommandEncoder, p: GpuStepParams, thin: boolean, disp: number): void {
+    if (this.air?.needsSplat) {
+      this.air.splat(enc, (label) => this.profiler.renderPass(label));
+    }
+    const hadAir = thin && this.airPush > 0 && this.airCover > 0;
+    const airAny = !!this.air?.any;
+    this.airPush = (airAny || hadAir) && disp > AIR_DISP_LEAST ? (p.bubbleClear ?? 1) : 0;
+    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
+    this.airCoverPrev = this.airCover;
+    this.airCover = this.air ? this.air.coverage : 0;
+    if (this.air) {
+      if (airAny || hadAir || this.air.needsSplat) {
+        this.airQuietSeconds = 0;
+      } else {
+        this.airQuietSeconds += Math.max(0, p.magnetSeconds ?? 1 / 60);
+        if (this.airQuietSeconds >= 60) this.dropAir();
+      }
+    }
+    this.lastDt = p.dt;
   }
 
   /** Whether both airGive kernels are built (asking builds them): a carry takes the air only then. */
@@ -300,7 +340,8 @@ export class FluidPasses extends FluidFields {
     if (!this.glowPlate) this.glowPlate = new GlowPlate(this.device);
     // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
     const travel = p.dt * p.advection * ((this.N - 2) / this.N);
-    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE);
+    // The shaken dish's wave too, stepped just before (stepBeside), so its strain lights the cells (48c-6).
+    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE, this.faradayPlate?.field ?? null, p.faradayHz ?? 0);
   }
 
   /**
@@ -315,7 +356,9 @@ export class FluidPasses extends FluidFields {
       return;
     }
     if (!this.faradayPlate) this.faradayPlate = new FaradayPlate(this.device);
-    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0);
+    // The pattern rides the plate's own flow: the uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N);
+    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0, p.faradayRock ?? 0, this.ride(), travel);
   }
 
   /**
@@ -547,7 +590,8 @@ export class FluidPasses extends FluidFields {
     this.vel.swap();
     this.boilAlpha.swap();
     this.boilLive = true;
-    this.air?.setBoilAlpha(this.boilAlpha.read);
+    this.airQuietSeconds = 0;
+    this.ensureAir().setBoilAlpha(this.boilAlpha.read);
   }
 
   /**
@@ -661,6 +705,8 @@ export class FluidPasses extends FluidFields {
 
   protected stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
     this.stepSurfaceHeight(enc, p);
+    // The closeup's fine dye rides the same velocity by the same displacement (PLAN 47a-1, fineDye.ts).
+    this.fine?.step(enc, this.dye.read, this.velForced, this.N, stepDisplacement(p.dt, p.advection, this.N), p.dt);
     const want = Math.max(0, Math.min(1, p.particles ?? 0));
     if (want <= 0) {
       if (this.particles) { this.particles.dispose(); this.particles = null; }
@@ -703,7 +749,7 @@ export class FluidPasses extends FluidFields {
 
   protected jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {
     if (a.every((v) => v <= 0)) return;
-    const scratch = label === 'dye' ? this.scratchA : this.scratchB;
+    const scratch = label === 'dye' ? this.scratchA : this.ensureVelScratch();
     // x0, the field before the diffusion, kept while the field ping-pongs.
     this.run(pass, 'scaleDye', scratch, [field.read], this.arg('scale one', [1, 0, 0, 0]));
     const rcp = a.map((v) => 1 / (1 + 4 * v));
@@ -789,7 +835,9 @@ export class FluidPasses extends FluidFields {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.divRaw, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
+    const airCur = this.air ? this.air.field : this.blank('rgba');
+    const airPrev = this.air ? this.air.prev : this.blank('rgba');
+    this.run(pass, 'divergence', this.divRaw, [this.vel.read, airCur, airPrev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
         (this.airCover - this.airCoverPrev) * invDt,
         // The press: how much of it reaches the flow. Its mean is no longer
@@ -837,7 +885,7 @@ export class FluidPasses extends FluidFields {
       mixOn ? this.mix!.read : this.blank('rgba'),
       this.phaseLive ? this.phase.read : this.blank('r'),
     ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
-      Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT * oilLightnessOf(p.oilWeight)]), this.M);
+      Math.max(1e-7, p.spinNu ?? 1e-6), oilNuOf(p.oilThickness), Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT * oilLightnessOf(p.oilWeight)]), this.M);
     this.swirl.swap();
     /*
       A thin gap stops here, at one dispatch where it was thirteen (PLAN 22k).
@@ -1083,16 +1131,18 @@ export class FluidPasses extends FluidFields {
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
+    const airCur = this.air ? this.air.field : this.blank('rgba');
+    const airPrev = this.air ? this.air.prev : this.blank('rgba');
     /* The oil bodies' viscosity (hsPrep's oilBody, PLAN 27f-7). */
     const oilMix = this.mixLive && this.mix ? this.mix.read : this.blank('rgba');
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}:${oilMix.label}`,
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${airCur.label}:${airPrev.label}:${oilMix.label}`,
       this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, this.airPush, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev, oilMix]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, airCur, airPrev, oilMix]);
     this.vel.swap();
-    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${airCur.label}:${airPrev.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
-      [this.vel.read, this.squeeze.read, this.air!.field, this.air!.prev, this.div, mob, this.hsGap!, this.hsPour!]);
+      [this.vel.read, this.squeeze.read, airCur, airPrev, this.div, mob, this.hsGap!, this.hsPour!]);
     this.hsPrimed = true;
     // Each coarse level's faces and rim, from the level above it.
     for (let l = 0; l < this.mg.length; l++) {

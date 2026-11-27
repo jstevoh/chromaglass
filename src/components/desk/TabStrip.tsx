@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowRight, Pencil, Plus, Copy, Trash2 } from 'lucide-react';
 import { Segmented } from '../ui';
 import { TAB_NAME_MAX, TABS_MAX } from '../../lib/deskTabs';
 import type { TabEdit } from '../../hooks/useDeskLayout';
+import { useEscape } from '../../hooks/useEscape';
 
 /**
  * The desk's tabs, and the editor that makes them the owner's.
@@ -40,8 +41,8 @@ export function TabStrip({ tabs, tab, onTab, onEdit, onAddPanel, height = 32, to
   };
   return (
     <div className="flex min-w-0 items-center gap-1" data-testid="desk-tabs">
-      {/* Half the header at most on the desk, where it is centred between two clusters; the sheet's width on the phone. */}
-      <div className={`min-w-0 overflow-x-auto scrollbar-hide ${touch ? 'flex-1' : 'max-w-[min(52vw,720px)]'}`}>
+      {/* Half the header at most on the desk, where it is centred between two clusters; the sheet's width on the phone or when wrapped below 768 px. */}
+      <div className={`min-w-0 overflow-x-auto scrollbar-hide ${touch ? 'flex-1' : 'max-w-full md:max-w-[min(52vw,720px)]'}`}>
         <Segmented
           value={tab}
           options={tabs.map(t => [t.id, t.name] as const)}
@@ -72,6 +73,7 @@ export function TabStrip({ tabs, tab, onTab, onEdit, onAddPanel, height = 32, to
           onAddPanel={onAddPanel ? () => { setOpen(null); onAddPanel(); } : undefined}
           onClose={() => setOpen(null)}
           at={touch ? null : open}
+          pencilRef={pencil}
           touch={touch}
         />,
         document.body,
@@ -80,7 +82,7 @@ export function TabStrip({ tabs, tab, onTab, onEdit, onAddPanel, height = 32, to
   );
 }
 
-function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
+function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, pencilRef, touch }: {
   tabs: { id: string; name: string }[];
   tab: string;
   onEdit: (e: TabEdit) => void;
@@ -88,30 +90,40 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
   onClose: () => void;
   /** Hung under the pencil; null for the phone's sheet along the bottom. */
   at: { top: number; left: number } | null;
+  pencilRef: RefObject<HTMLButtonElement | null>;
   touch: boolean;
 }) {
   /** The tab whose Delete has been pressed once: the second press takes it away. */
   const [arm, setArm] = useState<string | null>(null);
   const [armReset, setArmReset] = useState(false);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  useEscape(onClose);
+  // On desktop, close on pointerdown outside without mounting an invisible scrim over the header.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    if (!at) return;
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (editorRef.current?.contains(t) || pencilRef.current?.contains(t)) return;
+      onClose();
+    };
+    window.addEventListener('pointerdown', away);
+    return () => window.removeEventListener('pointerdown', away);
+  }, [at, onClose, pencilRef]);
   const row = touch ? 48 : 32;
-  const btn = `inline-flex shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-30 disabled:hover:bg-transparent`;
+  const btn = `inline-flex shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-65 disabled:hover:bg-transparent`;
   const full = tabs.length >= TABS_MAX;
   return (
     <>
-      <div className="fixed inset-0 z-[60]" onClick={onClose} data-testid="tabs-editor-scrim" />
+      {!at && <div className="fixed inset-0 z-[60] bg-black/30" onClick={onClose} data-testid="tabs-editor-scrim" />}
       <div
-        className={`fixed z-[61] flex flex-col gap-1 border border-border-strong bg-elevated p-2 shadow-[0_20px_60px_rgba(0,0,0,.6)] ${at ? 'w-[320px] rounded-lg' : 'inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl pb-6'}`}
+        ref={editorRef}
+        className={`fixed z-[61] flex flex-col gap-1 border border-border-strong bg-elevated p-2 shadow-[0_20px_60px_rgba(0,0,0,.6)] ${at ? 'w-[min(320px,calc(100vw-16px))] rounded-lg' : 'inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl pb-6'}`}
         style={at ? { top: at.top, left: at.left } : undefined}
         role="dialog"
         aria-label="The tabs"
         data-testid="tabs-editor"
       >
-        <p className="px-1 pb-1 text-[11px] font-bold uppercase tracking-widest text-muted">Tabs</p>
+        <p className="px-1 pb-1 text-[12px] font-bold uppercase tracking-widest text-muted">Tabs</p>
         {tabs.map((t, i) => (
           <div key={t.id} className="flex items-center gap-1" data-testid={`tabs-row-${t.id}`}>
             <NameField id={t.id} name={t.name} lit={t.id === tab} height={row} onRename={(name) => onEdit({ op: 'rename', id: t.id, name })} />
@@ -145,7 +157,7 @@ function TabEditor({ tabs, tab, onEdit, onAddPanel, onClose, at, touch }: {
             </button>
           )}
         </div>
-        <p className="px-1 pt-1 text-[11px] leading-snug text-dim">
+        <p className="px-1 pt-1 text-[12px] leading-snug text-dim">
           A tab is a set of panels. Put one on the tab that is up with + Panel (⌘P); a panel taken off a tab is still in the browser. ⌘1 to ⌘9 go to the tabs in order.
         </p>
         {armReset ? (

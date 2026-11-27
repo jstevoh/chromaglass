@@ -177,3 +177,13 @@ build and what it adds to the frame. S is under a day, M a few days, L a week or
 Every item here keeps today's look reachable until the Mac has judged the new one (the
 operating rules), and each ships from its own thread with the check that measures it
 written first. Line numbers are as read on main at d07ac31.
+- ~~**38u-8. Granulation is value noise**~~ — **Shipped** (the story is in
+  `docs/plan-shipped.md`). The owner's call: default 0 in every look, the dial kept;
+  `npm run glassstill`. The real grain (a concentration carried below the grid) stays 47a's.
+
+## The top picks
+
+- ~~**38b-2. An Air Dissolves dial**~~ **Shipped** as **Bubble Melt** (the owner, 2026-10-31:
+  "a bubble dial for them to melt away"): a factor on air's diffusivity in the Henry's-law
+  shrink, 1 at 0, then 10^(6 + 5v), very gentle to very extreme (`meltFactor`, `lib/bubbles.ts`); Settings → Look, desks,
+  MIDI, patches, the phone. `npm run bubblephysics` 28/28. Story in `docs/plan-shipped.md` §38b-2.

@@ -46,6 +46,25 @@
  *   E. A stirred plate lights in colour between crossed sheets, is black
  *      again at Birefringence 0, and with plane sheets leaves at least twice
  *      the near-black of the quarter-wave plates (the isoclinics).
+ *
+ *   F. The dish's own frozen stress (PLAN 31p-3, lib/polarDish.ts), a second
+ *      retarder in series with the liquid. In numbers: the series law against
+ *      the Jones matrices of the two retarders multiplied out, and its nine
+ *      weights against the rotations at one wavelength; the shader's nine
+ *      table colours against the spectrum while the sum stays in the table;
+ *      with the dish retarding nothing it is the liquid's law exactly; along
+ *      one axis the two add and across it they subtract. The dish: its
+ *      retardation falls as 1/r from the moulding gate, its slow axis is the
+ *      hoop, its wall is a high order, nothing outside the rim. Plane sheets
+ *      crossed show the dark cross along the sheets through the gate and
+ *      quarter-wave plates take it out. In the lab: at Polarisers 0 Dish
+ *      Stress changes no byte; on a still plate between crossed quarter-wave
+ *      plates each ring is the law's colour at its radius, times the open
+ *      plate; plane sheets show the cross, and it stays on the sheets with
+ *      the plate turned under them; on a gentle flow with the dish in, each
+ *      pixel is the series law with the dish first and both axes on the
+ *      wall; and on a laid flow with the dish in, crossed and parallel still
+ *      add to the open plate.
  */
 import { openLab } from './lab.mjs';
 import { build } from 'esbuild';
@@ -57,7 +76,7 @@ const check = (name, ok, detail = '') => { results.push({ name, ok }); console.l
 // ── A. The laws ────────────────────────────────────────────────────
 const lawsOut = 'node_modules/.cache/polar-laws.mjs';
 await build({
-  stdin: { contents: "export * from './src/lib/polar.ts';", resolveDir: process.cwd(), loader: 'ts' },
+  stdin: { contents: "export * from './src/lib/polar.ts'; export * from './src/lib/polarDish.ts';", resolveDir: process.cwd(), loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: lawsOut, logLevel: 'warning',
 });
 const L = await import(pathToFileURL(`${process.cwd()}/${lawsOut}`).href);
@@ -150,6 +169,84 @@ const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   check('a solid rotation turns the liquid without stretching it, and retards nothing', G2 === 0);
 }
 
+// ── F (numbers). The dish and the liquid in series ────────────────
+{
+  // The same Jones helpers as above, again: the dish (1) is passed first, then the liquid (2).
+  const C = (r, i = 0) => ({ r, i });
+  const add = (a, b) => C(a.r + b.r, a.i + b.i), mul = (a, b) => C(a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r);
+  const mm = (A, B) => [0, 1].map((i) => [0, 1].map((j) => add(mul(A[i][0], B[0][j]), mul(A[i][1], B[1][j]))));
+  const rot = (t) => [[C(Math.cos(t)), C(-Math.sin(t))], [C(Math.sin(t)), C(Math.cos(t))]];
+  const ret = (d, t) => mm(mm(rot(t), [[C(1), C(0)], [C(0), C(Math.cos(d), Math.sin(d))]]), rot(-t));
+  const pol = (t) => mm(mm(rot(t), [[C(1), C(0)], [C(0), C(0)]]), rot(-t));
+  const through = (M) => {
+    let s = 0;
+    for (const v of [[C(1), C(0)], [C(0), C(1)]]) {
+      const o = [add(mul(M[0][0], v[0]), mul(M[0][1], v[1])), add(mul(M[1][0], v[0]), mul(M[1][1], v[1]))];
+      s += o[0].r ** 2 + o[0].i ** 2 + o[1].r ** 2 + o[1].i ** 2;
+    }
+    return s;
+  };
+  let worstP = 0, worstQ = 0, worstW = 0;
+  for (let k = 0; k < 300; k++) {
+    const G1 = rnd() * 4000, t1 = rnd() * Math.PI, G2 = rnd() * 2500, t2 = rnd() * Math.PI, al = rnd() * Math.PI, l = 380 + rnd() * 400;
+    const d1 = (2 * Math.PI * G1) / l, d2 = (2 * Math.PI * G2) / l;
+    const both = mm(ret(d2, t2), ret(d1, t1));
+    const plane = through(mm(pol(al), mm(both, pol(0))));
+    const quarter = through(mm(pol(al), mm(ret(Math.PI / 2, -Math.PI / 4), mm(both, mm(ret(Math.PI / 2, Math.PI / 4), pol(0))))));
+    worstP = Math.max(worstP, Math.abs(plane - L.seriesTransmission(G1, t1, G2, t2, al, l, 0)));
+    worstQ = Math.max(worstQ, Math.abs(quarter - L.seriesTransmission(G1, t1, G2, t2, al, l, 1)));
+    const q = rnd(), w = L.seriesWeights(t1, t2, al, q);
+    const sum = w.k0 + w.kc1 * Math.cos(d1) + w.ks1 * Math.sin(d1) + w.kc2 * Math.cos(d2) + w.ks2 * Math.sin(d2)
+      + w.kcp * Math.cos(d1 + d2) + w.kcm * Math.cos(d1 - d2) + w.ksp * Math.sin(d1 + d2) + w.ksm * Math.sin(d1 - d2);
+    worstW = Math.max(worstW, Math.abs(sum - L.seriesTransmission(G1, t1, G2, t2, al, l, q)));
+  }
+  check('dish and liquid in series, plane sheets: the Jones matrices of the two retarders multiplied out', worstP < 1e-9, `worst ${worstP.toExponential(1)} over 300 cases`);
+  check('and with the quarter-wave plates', worstQ < 1e-9, `worst ${worstQ.toExponential(1)}`);
+  check("and the shader's nine weights are those rotations, at any quarter wave", worstW < 1e-9, `worst ${worstW.toExponential(1)}`);
+}
+{
+  let worst = 0, at = '';
+  for (let k = 0; k < 400; k++) {
+    const G1 = rnd() * 1700, G2 = rnd() * 1200, t1 = rnd() * Math.PI, t2 = rnd() * Math.PI, al = rnd() * Math.PI, q = k % 3 === 0 ? 0 : k % 3 === 1 ? 1 : rnd();
+    const a = L.seriesColour(G1, t1, G2, t2, al, q), b = L.seriesSpectral(G1, t1, G2, t2, al, q);
+    if (a.length !== 3 || b.length !== 3) { worst = Infinity; break; }
+    const e = Math.max(...a.map((v, c) => Math.abs(v - b[c])));
+    if (e > worst) { worst = e; at = `dish ${G1.toFixed(0)} nm, liquid ${G2.toFixed(0)} nm`; }
+  }
+  check("in series, the shader's nine table colours are T integrated wavelength by wavelength (the sum inside the table)", worst < 0.02, `worst ${worst.toFixed(4)} (${at})`);
+  let worst0 = 0, worstAdd = 0, worstSub = 0;
+  for (let k = 0; k < 200; k++) {
+    const G1 = rnd() * 1400, G2 = rnd() * 1400, th = rnd() * Math.PI, t2 = rnd() * Math.PI, al = rnd() * Math.PI, q = rnd();
+    const d = (a, b) => Math.max(...a.map((v, c) => Math.abs(v - b[c])));
+    worst0 = Math.max(worst0, d(L.seriesColour(0, rnd() * Math.PI, G2, t2, al, q), L.polarColour(G2, t2, al, q)));
+    worstAdd = Math.max(worstAdd, d(L.seriesColour(G1, th, G2, th, al, q), L.polarColour(G1 + G2, th, al, q)));
+    worstSub = Math.max(worstSub, d(L.seriesColour(G1, th, G2, th + Math.PI / 2, Math.PI / 2, q), L.polarColour(Math.abs(G1 - G2), th, Math.PI / 2, q)));
+  }
+  check("a dish that retards nothing leaves the liquid's own law", worst0 < 1e-9, `worst ${worst0.toExponential(1)}`);
+  check('along one axis the two retardations add; across it, between crossed sheets, they subtract',
+    worstAdd < 0.01 && worstSub < 0.01, `add ${worstAdd.toExponential(1)}, subtract ${worstSub.toExponential(1)} (the tables' rows)`);
+}
+{
+  const [Gh] = L.dishRetardation(0.5 + 0.125, 0.5, 1), [Gq] = L.dishRetardation(0.5, 0.5 - 0.0625, 1);
+  const [, thx] = L.dishRetardation(0.7, 0.5, 1), [, thy] = L.dishRetardation(0.5, 0.7, 1);
+  const hoop = (t) => Math.abs(Math.cos(t));
+  const [Gw] = L.dishRetardation(0.5 + 0.495, 0.5, 1), [Go] = L.dishRetardation(0.5 + 0.52, 0.5, 1), [Gg] = L.dishRetardation(0.5, 0.5, 1);
+  const [Gh2] = L.dishRetardation(0.5 + 0.125, 0.5, 0.5);
+  check('the dish: 1/r from the moulding gate, the hoop its slow axis, a high-order wall, nothing past the rim, in proportion to Dish Stress',
+    Math.abs(Gq / Gh - 2) < 1e-9 && Math.abs(Gh - L.DISH_STRESS_NM * 2) < 1e-6 && hoop(thx) < 1e-9 && Math.abs(Math.sin(thy)) < 1e-9
+      && Math.abs(Gw - L.DISH_WALL_NM) < 1e-6 && Go === 0 && Number.isFinite(Gg) && Gg > 0 && Math.abs(Gh2 - Gh / 2) < 1e-9,
+    `half way ${Gh.toFixed(0)} nm, a quarter ${Gq.toFixed(0)}, wall ${Gw.toFixed(0)}, gate ${Gg.toFixed(0)}, outside ${Go}`);
+  // Through the dish alone between crossed sheets: on the axes the hoop lies along a sheet (the dark cross), on the diagonals at 45.
+  const at = (x, y, q) => { const [G, th] = L.dishRetardation(x, y, 0.5); return Math.max(...L.seriesColour(G, th, 0, 0, Math.PI / 2, q)); };
+  const radii = [0.1, 0.18, 0.27, 0.4];
+  const axes = radii.flatMap((r) => [at(0.5 + r, 0.5, 0), at(0.5, 0.5 - r, 0)]);
+  const diag = radii.map((r) => at(0.5 + r * Math.SQRT1_2, 0.5 + r * Math.SQRT1_2, 0));
+  const qa = radii.map((r) => at(0.5 + r, 0.5, 1)), qd = radii.map((r) => at(0.5 + r * Math.SQRT1_2, 0.5 + r * Math.SQRT1_2, 1));
+  check('plane sheets crossed show the dish\'s dark cross along the sheets; quarter-wave plates take it out (the rings alone)',
+    Math.max(...axes) < 1e-9 && Math.min(...diag) > 0.2 && qa.every((v, i) => Math.abs(v - qd[i]) < 1e-9) && Math.min(...qa) > 0.2,
+    `plane: axes ${Math.max(...axes).toExponential(1)}, diagonals ${diag.map((v) => v.toFixed(2)).join(' ')}`);
+}
+
 // ── B to E: the real shaders, in the lab ──────────────────────────
 const { page, close } = await openLab();
 try {
@@ -221,6 +318,15 @@ try {
     const vPar = Array.from(await lab.render(S, { ...lamp, polariser: 1, analyserAngle: 0 }));
     const vPlane = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0 }));
     const vTurned = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0 }, { zoom: 1, rotation: Math.PI / 4 }));
+    // F. The same flow with the dish in, at a stress whose rings stay in the table across the middle half.
+    // The look's saturation grade comes after the sheets (plate.ts); it is left out (1) so the sum reads the sheets' light.
+    const vCrossD = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0.5, dishStress: 0.3, saturationBoost: 1 }));
+    const vParD = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0.5, analyserAngle: 0, dishStress: 0.3, saturationBoost: 1 }));
+    const vAlone = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0.5, saturationBoost: 1 }));
+    res.dishRatios = [];
+    for (let y = S / 4; y < (3 * S) / 4; y += 3) for (let x = S / 4; x < (3 * S) / 4; x += 3) {
+      res.dishRatios.push({ off: px3(vOff, [x, y]), cross: px3(vCrossD, [x, y]), par: px3(vParD, [x, y]), alone: px3(vAlone, [x, y]) });
+    }
     // The middle half's pixels, as ratios to the open plate, for the identity and the curve.
     res.ratios = [];
     for (let y = S / 4; y < (3 * S) / 4; y += 3) for (let x = S / 4; x < (3 * S) / 4; x += 3) {
@@ -251,6 +357,69 @@ try {
     res.crossed = stats(crossed);
     res.plane = stats(Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0 })));
     res.none = stats(Array.from(await lab.render(S, { ...lamp, polariser: 1, birefringence: 0 })));
+    // F. The dish (PLAN 31p-3). At Polarisers 0 its stress reaches nothing; at 1 it moves the stirred plate.
+    res.dishOff = same(off, Array.from(await lab.render(S, { ...lamp, dishStress: 1 })));
+    res.dishReach = !same(crossed, Array.from(await lab.render(S, { ...lamp, polariser: 1, dishStress: 0.5 })));
+    // A still plate under grey dye: the dish alone between the sheets, its rings read along the axes and the diagonals.
+    await lab.create(256);
+    lab.dye(0.5, 0.5, 0.7, [0.5, 0.5, 0.5], 0.9);
+    lab.flush(); await lab.step(6);
+    // The look's saturation grade comes after the sheets (plate.ts), so the law is read with it at 1, the grade left out.
+    const dOff = Array.from(await lab.render(S, { ...lamp, saturationBoost: 1 }));
+    const dQ = Array.from(await lab.render(S, { ...lamp, polariser: 1, dishStress: 0.5, saturationBoost: 1 }));
+    const dPlane = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0, dishStress: 0.5 }));
+    // The plate turned a quarter of a right angle under the sheets: the dish's cross belongs to the sheets, so it stays on the screen's axes.
+    const dPlaneTurned = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0, dishStress: 0.5 }, { zoom: 1, rotation: Math.PI / 4 }));
+    const toPx = (fx, fy) => [Math.round(S / 2 + (fx - 0.5) * 1.5 * S), Math.round(S / 2 + (fy - 0.5) * 1.5 * S)];
+    res.dish = { rings: [], axes: [], diag: [], axesT: [], diagT: [] };
+    for (const r of [0.06, 0.09, 0.12, 0.15, 0.19, 0.24, 0.3]) {
+      for (const [ux, uy] of [[1, 0], [0, -1], [Math.SQRT1_2, Math.SQRT1_2], [-Math.SQRT1_2, Math.SQRT1_2]]) {
+        // The plate uv of the pixel actually sampled, so the law is asked at the pixel's own radius.
+        const [x, y] = toPx(0.5 + r * ux, 0.5 + r * uy);
+        const fx = 0.5 + (x + 0.5 - S / 2) / (1.5 * S), fy = 0.5 + (y + 0.5 - S / 2) / (1.5 * S);
+        res.dish.rings.push({ fx, fy, off: px3(dOff, [x, y]), q: px3(dQ, [x, y]) });
+        (ux === 0 || uy === 0 ? res.dish.axes : res.dish.diag).push(Math.max(...px3(dPlane, [x, y])));
+        (ux === 0 || uy === 0 ? res.dish.axesT : res.dish.diagT).push(Math.max(...px3(dPlaneTurned, [x, y])));
+      }
+    }
+    res.dish.lit = stats(dQ);
+    /*
+      The dish in series with a gentle flow, pixel by pixel. A streamfunction
+      A (sin pi X sin pi Y + 0.6 sin 2 pi X sin 2 pi Y) puts no flux through
+      the walls, so the solver's projection keeps it, and its strain turns
+      through every axis across the middle half. A = 0.05 keeps the liquid
+      under about 300 nm (the first order, where its colour changes slowly):
+      the strain is read here from the forced velocity (lab.field), not the
+      texture the display samples, and at A = 0.2 the higher orders turned
+      that small difference into 25 levels of mismatch on the liquid alone.
+      Analyser at 60 and quarter-wave half in, so every term of the law is
+      weighted (crossed quarter-wave plates alone are blind to the axes).
+    */
+    {
+      const A = 0.05, P = Math.PI;
+      const Lf = await laid((x, y) => {
+        const X = x + 0.5, Y = y + 0.5;
+        return [A * (P * Math.sin(P * X) * Math.cos(P * Y) + 1.2 * P * Math.sin(2 * P * X) * Math.cos(2 * P * Y)),
+          -A * (P * Math.cos(P * X) * Math.sin(P * Y) + 1.2 * P * Math.cos(2 * P * X) * Math.sin(2 * P * Y))];
+      });
+      const vel = await lab.field('vel');
+      const sOff = Array.from(await lab.render(S, { ...lamp, saturationBoost: 1 }));
+      const sDish = Array.from(await lab.render(S, { ...lamp, polariser: 1, quarterWave: 0.5, analyserAngle: 60, dishStress: 0.3, saturationBoost: 1 }));
+      const samp = (fx, fy) => {
+        const gx = fx * Lf - 0.5, gy = fy * Lf - 0.5, i0 = Math.floor(gx), j0 = Math.floor(gy), tx = gx - i0, ty = gy - j0;
+        const at = (i, j, c) => vel[(Math.min(Lf - 1, Math.max(0, i)) + Math.min(Lf - 1, Math.max(0, j)) * Lf) * 4 + c];
+        return [0, 1].map((c) => (at(i0, j0, c) * (1 - tx) + at(i0 + 1, j0, c) * tx) * (1 - ty) + (at(i0, j0 + 1, c) * (1 - tx) + at(i0 + 1, j0 + 1, c) * tx) * ty);
+      };
+      res.series = [];
+      const h = 1 / Lf;
+      for (let y = S / 4; y < (3 * S) / 4; y += 3) for (let x = S / 4; x < (3 * S) / 4; x += 3) {
+        const fx = 0.5 + (x + 0.5 - S / 2) / (1.5 * S), fy = 0.5 + (y + 0.5 - S / 2) / (1.5 * S);
+        const ux1 = samp(fx + h, fy), ux0 = samp(fx - h, fy), uy1 = samp(fx, fy + h), uy0 = samp(fx, fy - h);
+        const du = [(ux1[0] - ux0[0]) / (2 * h), (ux1[1] - ux0[1]) / (2 * h)], dv = [(uy1[0] - uy0[0]) / (2 * h), (uy1[1] - uy0[1]) / (2 * h)];
+        const a = 0.5 * (du[0] - dv[1]), b = 0.5 * (dv[0] + du[1]);
+        res.series.push({ fx, fy, e: Math.hypot(a, b), tf: 0.5 * Math.atan2(b, a), off: px3(sOff, [x, y]), got: px3(sDish, [x, y]) });
+      }
+    }
     return res;
   });
   const f = (s) => `mean ${s.mean.toFixed(1)}, max ${s.max}, dark ${(100 * s.dark).toFixed(1)}%, coloured ${(100 * s.sat).toFixed(1)}%`;
@@ -302,6 +471,94 @@ try {
   check('at Birefringence 0 the stirred plate is black again: the light is the retardation\'s', out.none.max <= 3, f(out.none));
   check('the quarter-wave plates take the dark lines out: plane sheets leave at least twice the near-black',
     out.plane.dark >= 2 * Math.max(out.crossed.dark, 0.005), `plane ${(100 * out.plane.dark).toFixed(1)}%, quarter-wave ${(100 * out.crossed.dark).toFixed(1)}%`);
+  {
+    // F. The dish, in the lab.
+    const lin = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const enc = (v) => { const x = Math.max(0, v); return x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055; };
+    check('at Polarisers 0, Dish Stress changes no byte of the plate', out.dishOff);
+    check('and at Polarisers 1 it reaches the picture', out.dishReach);
+    /*
+      Each ring, the dish alone between crossed quarter-wave plates on a still
+      plate (the liquid retards nothing), is the law's colour at its pixel's
+      radius times the open plate. Both are rendered with the look's
+      saturation grade at 1: the grade comes after the sheets (plate.ts) and
+      at its default 1.45 pushed every unclipped ring 13 to 25 levels from the
+      law while the rings a channel clipped matched (measured 2026-11-15; that
+      pattern is what gave the grade away). The bar: a level of rounding and
+      dither on each of two numbers, and the law asked at the pixel's centre
+      while the rings tighten toward the gate (a pixel spans about 12 nm of
+      retardation at 1000 nm); measured worst 1 level along a whole radius.
+      4 levels is far below a wrong order, a wrong radius or a wrong axis
+      (each misses by tens).
+    */
+    let worstRing = 0, ringAt = '';
+    for (const p of out.dish.rings) {
+      const [G, th] = L.dishRetardation(p.fx, p.fy, 0.5);
+      const want = L.seriesColour(G, th, 0, 0, Math.PI / 2, 1).map(enc);
+      const e = Math.max(...want.map((v, c) => Math.abs(v * p.off[c] - p.q[c])));
+      if (e > worstRing) { worstRing = e; ringAt = `${G.toFixed(0)} nm: [${p.q.join(' ')}] against [${want.map((v, c) => (v * p.off[c]).toFixed(0)).join(' ')}]`; }
+    }
+    check('the dish alone between crossed quarter-wave plates: each ring is the law\'s colour at its radius on the open plate',
+      worstRing <= 4 && out.dish.lit.sat > 0.2, `worst ${worstRing.toFixed(1)} levels (${ringAt}), coloured ${(100 * out.dish.lit.sat).toFixed(1)}%`);
+    check('plane sheets crossed: the dish\'s dark cross along the sheets, its rings lit on the diagonals',
+      Math.max(...out.dish.axes) <= 5 && Math.min(...out.dish.diag) > 30, `axes ${out.dish.axes.join(' ')}, diagonals ${out.dish.diag.join(' ')}`);
+    check('and with the plate turned 45 under them the cross stays on the sheets, not on the plate',
+      Math.max(...out.dish.axesT) <= 5 && Math.min(...out.dish.diagT) > 30, `axes ${out.dish.axesT.join(' ')}, diagonals ${out.dish.diagT.join(' ')}`);
+    /*
+      The dish in series with a gentle flow, each pixel against the law
+      (lib/polarDish.ts's seriesColour, the dish first): the dish's
+      retardation and hoop at the pixel, the liquid's from the strain read
+      off the forced velocity, both axes carried to the wall (uv y runs down
+      the lab's screen, so a uv angle is its negative there). The liquid
+      alone against its own law misses by a mean of 4.3 levels, which is
+      the strain read from a field one texture away from the one the
+      display samples, not the law; with the dish in, 4.85 (measured
+      2026-11-15). Mutants of the shader measured the same way: the two
+      retarders in the wrong order 22.5, the K terms swapped 16.8, a sign
+      flipped in one 18.1, the dish's axis mirrored 24.8 or radial 26.5,
+      the liquid's strain dropped with the dish in 36.9, the dish never
+      taken 21.7. The bar, a mean of 8 and a 95th percentile of 20 (the
+      shader's is 12.2, every mutant's 42 or more).
+    */
+    {
+      const errs = [];
+      for (const p of out.series) {
+        const [G1, thUv] = L.dishRetardation(p.fx, p.fy, 0.3);
+        const G2 = 0.75 * L.BIREF_NM_PER_STRAIN * p.e;
+        const want = L.seriesColour(G1, -thUv, G2, -p.tf, (60 * Math.PI) / 180, 0.5).map(enc);
+        errs.push(Math.max(...want.map((w, c) => Math.abs(w * p.off[c] - p.got[c]))));
+      }
+      const mean = errs.reduce((s, e) => s + e, 0) / errs.length;
+      const p95 = [...errs].sort((a, b) => a - b)[Math.floor(0.95 * errs.length)];
+      check('a flow with the dish in: each pixel is the two retarders in series, dish first, liquid second, both axes on the wall',
+        errs.length > 500 && mean <= 8 && p95 <= 20, `mean ${mean.toFixed(2)}, 95th percentile ${p95.toFixed(1)} levels over ${errs.length} pixels`);
+    }
+    /*
+      Crossed and parallel with the dish in add to the open plate wherever
+      neither went out of the screen's gamut. The colours of the high orders
+      the dish brings (a dish at 0.3 retards 1100 nm and more across the
+      middle half) are partly outside sRGB: the spectrum's own light there
+      has a negative primary (lib/polar.ts's Michel-Levy check shows -0.16
+      red at 650 nm), the shader clips it to 0, and the clip takes up to 0.3
+      of white from the sum (scratch, 20000 cases, the one-retarder law the
+      same). A pixel with a channel at 0 or 1 level in either picture is
+      that clip and is left out; at least half the pixels must remain.
+    */
+    let worstSum = 0, sumAll = 0, sumN = 0, moved = 0, kept = 0;
+    for (const r of out.dishRatios) {
+      if (Math.max(...r.cross.map((v, c) => Math.abs(v - r.alone[c]))) > 20) moved++;
+      if (Math.min(...r.cross, ...r.par) <= 1) continue;
+      kept++;
+      for (let c = 0; c < 3; c++) {
+        const sum = lin(r.cross[c] / r.off[c]) + lin(r.par[c] / r.off[c]);
+        worstSum = Math.max(worstSum, Math.abs(sum - 1) * r.off[c]);
+        sumAll += Math.abs(sum - 1) * r.off[c]; sumN++;
+      }
+    }
+    check('a laid flow with the dish in: crossed and parallel still add to the open plate, and the dish moves most of the picture',
+      kept >= out.dishRatios.length / 2 && worstSum <= 12 && sumAll / sumN <= 2 && moved > out.dishRatios.length / 2,
+      `worst ${worstSum.toFixed(1)}, mean ${(sumAll / Math.max(sumN, 1)).toFixed(2)} levels over the ${kept} of ${out.dishRatios.length} pixels in gamut; ${moved} moved by the dish`);
+  }
 } finally {
   await close();
 }

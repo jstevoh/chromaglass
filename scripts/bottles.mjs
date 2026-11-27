@@ -585,10 +585,8 @@ try {
   */
   const near3 = (a, b) => !!a && a.every((v, i) => Math.abs(v - b[i]) < 0.02);
   const fmt3 = (a) => a ? `(${a.map((v) => v.toFixed(3)).join(', ')})` : 'none';
-  // The ambient orbits lay dye straight onto the plate every frame, not
-  // through autoInject, so near the stroke they would read as the hand's
-  // (as scripts/tools.mjs found): off for these three, back on after.
-  await page.evaluate(() => window.chromaglassDebug().ambientSeed(false));
+  // Nothing lays dye but the hand: the app's own seeding, which laid it
+  // near the stroke and read as the hand's, is gone (PLAN.md 18c-14).
   await bottle('glycerine');
   await clear();
   const glyClear = await arm('pour');
@@ -610,7 +608,6 @@ try {
   check('a Syrup Pour, as it is, lays its own amber, Water\'s dye per push',
     syr.same && syr.push > 0 && Math.abs(sp - wp) < 0.1 * wp && near3(syr.rgb, [0xde / 255, 0xbf / 255, 0x45 / 255]),
     `${sp.toFixed(2)} against ${wp.toFixed(2)} per push, laid ${fmt3(syr.rgb)} (#debf45 is (0.871, 0.749, 0.271))${same(syr)}`);
-  await page.evaluate(() => window.chromaglassDebug().ambientSeed(true));
 
   // ── The other hands ──────────────────────────────────────────────
   const AT = [0.3, 0.25];
