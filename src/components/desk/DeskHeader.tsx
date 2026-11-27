@@ -5,6 +5,8 @@ import { TabStrip } from './TabStrip';
 import type { TabEdit } from '../../hooks/useDeskLayout';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
 import { AlphaBadge } from '../AlphaBadge';
+import { CrashReportButton } from '../CrashReportButton';
+import { PanelGuard } from '../PanelGuard';
 
 /**
  * The bar across the top of both desks.
@@ -382,6 +384,9 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
           <SearchIcon size={13} aria-hidden />
           <span className="hidden xl:inline">Search</span>
         </button>
+        <PanelGuard name="The crash report">
+          <CrashReportButton />
+        </PanelGuard>
         {trailing}
       </div>
     </header>
