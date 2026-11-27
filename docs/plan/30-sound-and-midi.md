@@ -125,14 +125,43 @@ story is in `docs/plan-shipped.md` under 48f. Open:
 - **48f-5. Two frequencies** (M). A real speaker playing music shakes at many at once;
   two drive frequencies make quasi-crystal patterns (Edwards and Fauve 1993). The step
   takes one.
-- **48f-6. The strobe's phase** (S). The light is drawn as a camera locked to the wave at
-  its crest (wgsl/plateFaraday.ts), so it holds still; a dial that detunes that lock
-  slowly would let the crests and troughs trade places over seconds, as a detuned strobe
-  shows them, without ever flickering.
+- **48f-6. The strobe's phase** (S). *Shipped 2026-11-21 as Rock; story in `docs/plan-shipped.md` under 48f-6.*
 - **48f-7. A look that opens shaken** (S). No look sits on the shaker yet, so every look
   opens as it did; a look built for it (Shaker on, Music Shake set) would show the
   feature without a hand on the desk. Needs the owner's judging first (docs/judging.md
   §140).
+- **48f-8. The mean flow, derived** (M). The waves' own mean flow (wgsl/faraday.ts,
+  faradayForce) is the streaming push −Γ ∇²u ∇u, projected and held by the floor's friction,
+  with Γ a scale set so a wave's push matches ω k u² at the critical ring: the shape is the
+  one the theory gives (a pure gradient on the ring, so only defects, modulation and a
+  square's off-ring harmonics stream)
+  but the size is not derived. Replace Γ with the Vega, Knobloch and Martel (2001) mean-flow
+  coefficients for the layer, and hold `npm run faraday`'s 350 and 830 µm/s (4× and 12×) to
+  them. Measured 2026-11-21: at real strength the mean flow barely changes how the pattern
+  breaks (corr over 4 s 0.61 with it, 0.64 without, at 12×); the breaking is the
+  amplitude equation's own. It does carry the pattern: the dish with it differs from the
+  dish without it by 8.6% of the r.m.s. at 4× and 40% at 12×.
+- **48f-9. The pattern moves** (M). *Shipped 2026-11-21: it rides the plate's flow, streams
+  its own mean flow, breaks up and re-forms at high drive, and Strength throws its light past
+  real; story in `docs/plan-shipped.md` under 48f-9.*
+- **48f-10. The streaming carries the dye** (M). The waves ride the plate's flow, but their
+  own mean flow moves only the waves: a real dish's streaming drifts what floats on it too.
+  Add the mean flow (scaled to the plate's units) to the solver's velocity as a force, so the
+  dye follows the pattern's defects. Needs 48f-8's size first, or a dial past real.
+- **48f-12. Lasting defect chaos** (M). Far past threshold a real dish never settles: its
+  pattern goes over to defect chaos, defects born, gliding and dying for as long as it is
+  shaken (Kudrolli and Gollub 1996). Ours breaks up and moves for some seconds as it grows,
+  then locks into a new pattern: ten seconds on the correlation is 0.99 at 12× and 0.9997
+  at the dial's top, 2 g (`npm run faraday`, 2026-11-21), so lasting motion today is the
+  Rock's and the plate's flow. The cubic that picks the pattern is the place to look (a
+  shortcut, PLAN 48f-2): the real coefficients for the layer, and the mean flow's feedback at
+  its derived size (48f-8), are what keep a real one moving. Hold it as a late window that
+  still decorrelates.
+- **48f-11. Folds drawn as caustics** (S). Where the waves are steep enough to fold the
+  light (det(I + D′H) below nought) the plate draws dark (wgsl/plateFaraday.ts); a real
+  caustic is the sum of the sheets that land there, brighter not darker. At Strength 4 the
+  mean brightness falls 3.5% (`npm run faraday`), part the aperture's real loss and part
+  this. Sum the folded sheets' light instead of zeroing it.
 
 ## ~~48c. Bioluminescent trails: the water glows where it is sheared~~ (shipped 2026-11-21)
 - **48c-1. The plankton are spread evenly.** Every cell of the plate's water holds the same

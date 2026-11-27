@@ -44,6 +44,8 @@ export const CONTROL_HELP: Record<string, string> = {
   plateTiltY: 'A hand tipping the flat plate: up dips the top edge, so heavy colour runs up the screen. The middle is level.',
   faradayHz: 'Sits the dish on a speaker at this frequency (under 10 plays as 10); shaken hard enough, the water stands in waves. Off at 0.',
   faraday: 'How hard the speaker shakes the dish, in g. Past the water\'s threshold the waves grow; a cord from the bass shakes it.',
+  faradayRock: 'Slips the strobe off the waves, in Hz, so crests and troughs slowly trade places and the pattern breathes. At 0 it stands still.',
+  faradayGain: 'How strongly the waves bend the light on the wall: 1 is real water, higher racks the lens back so a bass pulse reads clearly.',
   slosh: 'How much the dish\'s own momentum carries when it is tilted: the colour piles on the low edge and a wave rings back.',
   bubbles: 'Trapped air bubbles on the plate. A few go a long way.',
   bubbleMelt: 'How fast the bubbles\' air dissolves into the liquid, the small ones first. Off is nature\'s rate, where a bubble stays all night.',
