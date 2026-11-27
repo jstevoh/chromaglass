@@ -15,11 +15,17 @@
  * (the app's deriveStep for the look, read on node from
  * sim/fluidSimulation.ts):
  *
+ *  0. The curve and the scattering are the measured ones: the constants both
+ *     sides of 1 and 5 are built from, pinned to numbers fixed in advance.
  *  1. A laid layer of Ouzo, then water poured into it: every cell's droplets
  *     are `ouzoDrops` of its own ethanol, oil and gap (lib/ouzo.ts, the same
  *     curve written in TypeScript), to float precision, before and after the
- *     water; the cloud is not vacuous (hundreds of cells hold droplets) and
- *     the water made more of it.
+ *     water; the cloud is not vacuous (hundreds of cells hold droplets), the
+ *     water made more of it, and the gap is pressed so it differs cell to
+ *     cell (or "its own gap" would go unread; control 9c reads the mirrored
+ *     cell's).
+ *  2 restates, on the clear side, the arithmetic 1 holds (at 1% oil no cell
+ *     past NEAT can cloud); it is kept for the plan's sentence and exactness.
  *  2. None where it cannot be: no droplets in a cell with no oil, and none
  *     in a cell still at the bottle's own strength (clear in the bottle).
  *  3. Nothing is made or lost: the dish's oil, dissolved and droplets
@@ -37,6 +43,7 @@
  *     control: without the hand-over the new solver holds no oil.
  *  9. Control for 1: a build whose curve holds half as much oil again (the
  *     measured cloud points' own scatter) fails it, its oil still kept.
+ *     9c, also for 1: a build reading the mirrored cell's gap fails it.
  *     9b, control for 3: a build that makes 2% more droplets than the oil it
  *     had fails it. (A kernel making droplets out of nothing still agrees with
  *     ouzoDrops cell for cell, the oil it reads being the oil it made, so 1
@@ -96,7 +103,7 @@ await build({
       "export { PRESETS } from './src/presets.ts';",
       "export { DEFAULT_SETTINGS } from './src/types.ts';",
       "export { setShowSeed } from './src/lib/rng.ts';",
-      "export { ouzoDrops, OUZO_SCATTER } from './src/lib/ouzo.ts';",
+      "export { ouzoDrops, ouzoSolubility, OUZO_SCATTER } from './src/lib/ouzo.ts';",
       "export { DISH_GAP_RANGE, DISH_REST_GAP } from './src/lib/turntable.ts';",
       "export { PRESET_LIQUIDS, AUTO_DOSE } from './src/presetPlate.ts';",
       "export { DEFAULT_LIQUID_TYPES } from './src/bottles.ts';",
@@ -163,12 +170,13 @@ const consts = {
 
 /** Each cell's droplets against ouzoDrops of its own ethanol, oil and gap. */
 const agree = (solvent, gap) => {
-  let worst = 0, cloudy = 0, oilFree = 0, oilFreeDrops = 0, neat = 0, neatDrops = 0, sum = 0, drops = 0, maxF = 0;
+  let worst = 0, cloudy = 0, oilFree = 0, oilFreeDrops = 0, neat = 0, neatDrops = 0, sum = 0, drops = 0, maxF = 0, tallLo = Infinity, tallHi = 0;
   for (let c = 0; c < N * N; c++) {
     const g = solvent[c * 4 + 1], b = solvent[c * 4 + 2], a = solvent[c * 4 + 3];
     const oil = b + a;
     sum += oil; drops += a;
     const tall = Math.max(gap[c], consts.range0) / consts.rest;
+    if (Math.hypot((c % N + 0.5) / N - 0.5, (Math.floor(c / N) + 0.5) / N - 0.5) < 0.45) { tallLo = Math.min(tallLo, tall); tallHi = Math.max(tallHi, tall); }
     worst = Math.max(worst, Math.abs(a - app.ouzoDrops(g, oil, tall)));
     if (a > 1e-7) cloudy++;
     if (oil <= 0) { oilFree++; if (a > 0) oilFreeDrops++; }
@@ -179,7 +187,7 @@ const agree = (solvent, gap) => {
       if (f >= NEAT) { neat++; if (a > 0) neatDrops++; }
     }
   }
-  return { worst, cloudy, oilFree, oilFreeDrops, neat, neatDrops, sum, drops, maxF };
+  return { worst, cloudy, oilFree, oilFreeDrops, neat, neatDrops, sum, drops, maxF, spread: tallHi - tallLo };
 };
 
 /** The laid layer, the water, the Alcohol, the plate's view: parts 1 to 5, on whatever build the page holds. */
@@ -196,11 +204,20 @@ const ouzoRun = (page) => page.evaluate(async ({ P, N, consts }) => {
   lab.addSpecies(0.5, 0.5, 0.12, 1.0, 'ouzo', false);
   const pours = [[0.32, 0.36, 0.08, 0.6], [0.66, 0.34, 0.08, 0.35], [0.36, 0.66, 0.07, 0.2], [0.66, 0.66, 0.09, 0.8]];
   for (const [x, y, r, take] of pours) lab.addSpecies(x, y, r, take, 'ouzo', true);
+  /*
+    A press on the glass beside the layer before each read, so the gap is
+    not the same in every cell and line 1's "at its own gap" is read: with
+    the dish's gap flat a kernel reading the wrong cell's gap would agree.
+  */
+  const press = (x, y) => { lab.squish(x * N, y * N, 16, 0.004, 0, 'press', 0, true); lab.flush(); };
+  press(0.42, 0.56);
   await lab.step(3, P);
   const laid = await read();
   // Water poured across the layer's edges.
   for (const [x, y] of [[0.42, 0.42], [0.58, 0.58], [0.6, 0.4], [0.4, 0.6], [0.5, 0.36]]) lab.addSpecies(x, y, 0.06, 0.5, 'water', true);
-  await lab.step(20, P);
+  await lab.step(18, P);
+  press(0.58, 0.44);
+  await lab.step(2, P);
   const watered = await read();
   // Alcohol on the cloud's thickest place.
   let at = 0, most = -1;
@@ -283,9 +300,11 @@ let main, control, plain, moved, unmoved, louche;
           const k = ((S / 2 + j) * S + S / 2 + i) * 4;
           v += 0.2126 * px[k] + 0.7152 * px[k + 1] + 0.0722 * px[k + 2]; n++;
         }
-        // The ground well clear of the drop.
-        const g = (8 * S + 8) * 4;
-        edge = 0.2126 * px[g] + 0.7152 * px[g + 1] + 0.0722 * px[g + 2];
+        // The dish's own ground well clear of the drop: the brightest of four points inside the rim (the render shows the plate's middle at 1.5×).
+        for (const [u, w] of [[0.5, 0.15], [0.5, 0.85], [0.15, 0.5], [0.85, 0.5]]) {
+          const g = ((w * S | 0) * S + (u * S | 0)) * 4;
+          edge = Math.max(edge, 0.2126 * px[g] + 0.7152 * px[g + 1] + 0.0722 * px[g + 2]);
+        }
         return { middle: v / n, ground: edge };
       };
       return { now: await bloom(consts.anise), old: await bloom(0.03) };
@@ -328,16 +347,50 @@ let wide;
   const { page, close } = await openLab({ plugins: [WIDE], tag: 'ouzo-wide' });
   try { wide = await ouzoRun(page); } finally { await close(); }
 }
+/** 9c. A control build: ouzoCloud reads the gap of the cell mirrored across the plate, not its own. */
+const MIRROR = {
+  name: 'mirror-gap',
+  setup(b) {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]fluid[\\/]ouzo\.ts$/ }, (a) => {
+      const s = readFileSync(a.path, 'utf8');
+      const at = 'let tall = max(textureLoad(sq, p, 0).r';
+      const found = s.split(at).length - 1;
+      if (found !== 1) throw new Error(`ouzo: the control found ${found} of 1 gap reads in wgsl/fluid/ouzo.ts`);
+      return { contents: s.replace(at, 'let tall = max(textureLoad(sq, vec2i(i32(S.n) - 1 - p.x, p.y), 0).r'), loader: 'ts' };
+    });
+  },
+};
+let mirror;
+{
+  const { page, close } = await openLab({ plugins: [MIRROR], tag: 'ouzo-mirror' });
+  try { mirror = await ouzoRun(page); } finally { await close(); }
+}
 
 const A = { laid: agree(main.laid.solvent, main.laid.gap), watered: agree(main.watered.solvent, main.watered.gap), alcohol: agree(main.alcohol.solvent, main.alcohol.gap) };
 const W = { laid: agree(wide.laid.solvent, wide.laid.gap), watered: agree(wide.watered.solvent, wide.watered.gap), alcohol: agree(wide.alcohol.solvent, wide.alcohol.gap) };
+const M = { laid: agree(mirror.laid.solvent, mirror.laid.gap), watered: agree(mirror.watered.solvent, mirror.watered.gap), alcohol: agree(mirror.alcohol.solvent, mirror.alcohol.gap) };
 const C = { watered: agree(control.watered.solvent, control.watered.gap), alcohol: agree(control.alcohol.solvent, control.alcohol.gap), laid: agree(control.laid.solvent, control.laid.gap) };
 const rel = (a, b) => Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1e-12);
 
+/*
+  0. The constants both sides of line 1 and 5 are built from, pinned to
+  numbers fixed in advance, so a typo in OUZO_BINODAL or OUZO_SCATTER cannot
+  move the kernel and its reference together unseen: the solubility at three
+  ethanol fractions within 1.5× (the cloud points' own scatter about the fit)
+  of what lib/ouzo.ts says was measured (water 0.008% by volume, a 40% spirit
+  0.2%, 78% alcohol a fifth of its volume), and the droplets' μs′ against
+  3 Q (1 − g) / 4a from the Mie numbers it quotes (Q 2.30, g 0.939 at a
+  diameter of one micron), within 1%.
+*/
+const anchors = [[0, 8e-5], [0.4, 2e-3], [0.78, 0.2]].map(([f, want]) => ({ f, want, got: app.ouzoSolubility(f) }));
+const mie = (3 * 2.30 * (1 - 0.939)) / (4 * 0.5e-3);
+check('0. the curve and the droplets\' scattering are the measured ones',
+  anchors.every((a) => a.got <= a.want * 1.5 && a.got >= a.want / 1.5) && Math.abs(app.OUZO_SCATTER - mie) <= 0.01 * mie,
+  `${anchors.map((a) => `s(${a.f}) ${a.got.toExponential(2)} against ${a.want.toExponential(1)}`).join(', ')}; μs′ ${app.OUZO_SCATTER} against Mie's ${mie.toFixed(1)} per mm`);
 check('1. every cell\'s droplets are ouzoDrops of its own ethanol, oil and gap, laid and after water; the water clouded more',
   A.laid.worst <= CELL_TOL && A.watered.worst <= CELL_TOL && A.alcohol.worst <= CELL_TOL && A.laid.cloudy > 200
-    && A.watered.cloudy > A.laid.cloudy && A.watered.drops > A.laid.drops,
-  `worst ${A.laid.worst.toExponential(1)} / ${A.watered.worst.toExponential(1)} / ${A.alcohol.worst.toExponential(1)}; cloudy cells ${A.laid.cloudy} → ${A.watered.cloudy}; droplets ${A.laid.drops.toFixed(4)} → ${A.watered.drops.toFixed(4)}`);
+    && A.watered.cloudy > A.laid.cloudy && A.watered.drops > A.laid.drops && A.laid.spread > 0.02 && A.watered.spread > 0.02,
+  `worst ${A.laid.worst.toExponential(1)} / ${A.watered.worst.toExponential(1)} / ${A.alcohol.worst.toExponential(1)}; cloudy cells ${A.laid.cloudy} → ${A.watered.cloudy}; droplets ${A.laid.drops.toFixed(4)} → ${A.watered.drops.toFixed(4)}; the gap varies by ${A.laid.spread.toFixed(3)} and ${A.watered.spread.toFixed(3)} of the rest gap`);
 check('2. no droplets in a cell with no oil, nor in one at the bottle\'s own strength',
   A.laid.oilFree > 1000 && A.laid.oilFreeDrops === 0 && A.watered.oilFreeDrops === 0 && A.laid.neat > 5 && A.laid.neatDrops === 0,
   `${A.laid.oilFreeDrops} of ${A.laid.oilFree} oil-free cells and ${A.laid.neatDrops} of ${A.laid.neat} at ${NEAT} ethanol or more hold droplets (the most ${A.laid.maxF.toFixed(3)})`);
@@ -371,6 +424,9 @@ const worstOf = (X) => Math.max(X.laid.worst, X.watered.worst, X.alcohol.worst);
 check('9. control: a kernel whose curve holds half as much oil again (the cloud points\' own scatter) fails 1',
   worstOf(W) > CELL_TOL && rel(W.laid.sum, W.alcohol.sum) <= SUM_TOL,
   `worst ${worstOf(W).toExponential(1)} against ${CELL_TOL.toExponential(0)}, its oil kept (${W.laid.sum.toFixed(5)} → ${W.alcohol.sum.toFixed(5)})`);
+check('9c. control: a kernel reading the mirrored cell\'s gap fails 1',
+  worstOf(M) > CELL_TOL,
+  `worst ${worstOf(M).toExponential(1)} against ${CELL_TOL.toExponential(0)}`);
 check('9b. control: a kernel that makes 2% more droplets than the oil it had fails 3',
   rel(C.laid.sum, C.watered.sum) > SUM_TOL || rel(C.laid.sum, C.alcohol.sum) > SUM_TOL,
   `oil ${C.laid.sum.toFixed(5)} → ${C.watered.sum.toFixed(5)} → ${C.alcohol.sum.toFixed(5)}`);
