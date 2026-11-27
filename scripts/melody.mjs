@@ -30,8 +30,7 @@
  */
 import { analysePcm } from '../src/lib/audioFeatures.ts';
 import { MelodyWalk, MELODY_LINES, DEFAULT_MELODY_LINE, melodyLine, fifthsPlace, SCALE_LOW, SCALE_HIGH } from '../src/lib/melodyWalk.ts';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { frameLoopSource } from './frameloop-source.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
@@ -254,7 +253,8 @@ console.log('\nThe plate');
   while the dial is up, lays on the plate the music plays, with the dye under
   the look's fill and the dial's gain on the drop, and is forgotten on a render.
 */
-const vis = readFileSync(join(process.cwd(), 'src/components/LiquidVisualizer.tsx'), 'utf8');
+// The loop wherever it lives, the component and src/engine/ (scripts/frameloop-source.mjs, PLAN 50c).
+const vis = frameLoopSource();
 const lay = vis.slice(vis.indexOf('const layMelodyDrop'), vis.indexOf('/** Pour into an area'));
 check('the walk hears every reading and queues only while Melody Walk is up',
   /melodyWalkRef\.current\.update\(heard, melodyLineRef\.current\)/.test(vis) && /\(currentSettings\.melodyWalk \?\? 0\) > 0/.test(vis));
