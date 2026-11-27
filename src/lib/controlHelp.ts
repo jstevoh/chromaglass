@@ -202,7 +202,7 @@ export const CONTROL_HELP: Record<string, string> = {
   phaseScale: 'How big the ferrofluid\'s domains are, from small beads at zero to big hands at one.',
   phaseSharp: 'How hard the ferrofluid refuses to blur into a grey wash.',
   phaseDisplace: 'How much the ferrofluid shoves the dye aside, so colour packs along its edge instead of hiding under it.',
-  ferroLabyrinth: 'The field coil under the dish: past about 0.47 the ferrofluid fingers into a maze, wide stripes near the onset, narrower as the field rises.',
+  ferroLabyrinth: 'The field coil under the dish: past 0.47 the ferrofluid fingers into a maze, wide stripes near onset, narrower as the field rises.',
   oilBodies: 'Oil and water each keep their own colour, and an oil body\'s colour travels with it. Needs Oil Tension.',
   oilThickness: 'How thick the oil is: left, a lamp\'s thin molten wax that sinks freely; right, a thick oil that lags the water.',
   oilWeight: 'How heavy the oil is against the water. Right, it sinks like a lava lamp\'s wax and the lamp lifts it. Needs Gravity.',
