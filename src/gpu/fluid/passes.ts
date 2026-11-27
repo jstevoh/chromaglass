@@ -58,14 +58,16 @@ export class FluidPasses extends FluidFields {
     const pipe = airPipe ?? this.pipeline(name, dst.format);
     if (!pipe) return;
     const ride = this.ride();
+    const wJump = this.wetJumpBuf();
     const air = airPipe ? this.airPair() : null;
     if (air) this.airGive(pass, false, args);
     let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'thin faced'), pipe), dst), src), args), this.squeeze.read);
+    at = this.groupAt(at, wJump);
     if (air) at = this.groupAt(at, air[0]);
     const last = this.groupAt(at, ride);
     let group = last.group;
     if (!group) {
-      group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!, ...(air ?? [])]);
+      group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!, wJump, ...(air ?? [])]);
       last.group = group;
     }
     pass.setPipeline(pipe);
@@ -174,11 +176,12 @@ export class FluidPasses extends FluidFields {
     if (!pipe) return;
     const air = this.airPair();
     const ride = this.ride();
-    const at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'air give'), pipe), args), ride), this.squeeze.read);
+    const wJump = this.wetJumpBuf();
+    const at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'air give'), pipe), args), ride), this.squeeze.read), wJump);
     const last = this.groupAt(at, air[0]);
     let group = last.group;
     if (!group) {
-      group = bindGroup(this.device, pipe, [this.sim, args, ride, air[2], this.hsP!, ...(planned ? [this.carrySub!] : []), this.squeeze.read, this.hsMob!, air[0], air[1], air[3]]);
+      group = bindGroup(this.device, pipe, [this.sim, args, ride, air[2], this.hsP!, ...(planned ? [this.carrySub!] : []), this.squeeze.read, this.hsMob!, air[0], air[1], air[3], wJump]);
       last.group = group;
     }
     pass.setPipeline(pipe);
@@ -912,8 +915,9 @@ export class FluidPasses extends FluidFields {
   protected planCarry(pass: GPUComputePassEncoder, disp: number): void {
     this.ensureThinGap();
     const ride = this.ride();
-    this.hsRun(pass, 'carryCourant', `carryCourant:${ride.label}:${this.squeeze.read.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, REST_GAP]),
-      [ride, this.hsP!, this.carryMost!, this.squeeze.read, this.hsMob!]);
+    const wJump = this.wetJumpBuf();
+    this.hsRun(pass, 'carryCourant', `carryCourant:${ride.label}:${this.squeeze.read.label}:${wJump.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, REST_GAP]),
+      [ride, this.hsP!, this.carryMost!, this.squeeze.read, this.hsMob!, wJump]);
     this.hsRun(pass, 'carryPlan', 'carryPlan', this.arg('carry plan', [CARRY_COURANT, CARRY_SUBSTEPS, Math.ceil(this.N / 8), CARRY_PAIRS]),
       [this.carryMost!, this.carryInd!, this.carrySub!], 1);
   }
@@ -938,15 +942,16 @@ export class FluidPasses extends FluidFields {
     if (!pipe) return;
     if (!airPipe) argsAt = undefined;
     const ride = this.ride();
+    const wJump = this.wetJumpBuf();
     const air = airPipe ? this.airPair() : null;
     const group = (a: GPUBuffer, src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
       let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'carry'), pipe), a), src), dst);
       if (src2) at = this.groupAt(at, src2);
-      at = this.groupAt(this.groupAt(at, this.squeeze.read), ride);
+      at = this.groupAt(this.groupAt(this.groupAt(at, this.squeeze.read), ride), wJump);
       if (air) at = this.groupAt(at, air[0]);
       let g = at.group;
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, a, src, ride, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : []), ...(air ?? [])]);
+        g = bindGroup(this.device, pipe, [this.sim, a, src, ride, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : []), wJump, ...(air ?? [])]);
         at.group = g;
       }
       return g;
@@ -1055,6 +1060,9 @@ export class FluidPasses extends FluidFields {
     }
   }
 
+  /** Hook overridden by `FluidCover` to stamp air cells, curvature and rim jump before divergence. */
+  protected wetPrepPass(_pass: GPUComputePassEncoder, _p: GpuStepParams, _disp: number): void {}
+
   /**
    * One step of the plate as a Hele-Shaw cell (wgsl/thinGap.ts): the forces
    * read as terminal speeds and the drag, the mobility, the right-hand side,
@@ -1115,18 +1123,21 @@ export class FluidPasses extends FluidFields {
         NU_REF / nu, glassX, glassY]),
       [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, airCur, airPrev, oilMix]);
     this.vel.swap();
-    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${airCur.label}:${airPrev.label}`,
+    this.wetPrepPass(pass, p, disp);
+    const wJump = this.wetJumpBuf();
+    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${airCur.label}:${airPrev.label}:${wJump.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
-      [this.vel.read, this.squeeze.read, airCur, airPrev, this.div, mob, this.hsGap!, this.hsPour!]);
+      [this.vel.read, this.squeeze.read, airCur, airPrev, this.div, mob, this.hsGap!, this.hsPour!, wJump]);
     this.hsPrimed = true;
     // Each coarse level's faces and rim, from the level above it.
+    const openEdge = this.wetDirty && this.rimIsAir ? 1 : 0;
     for (let l = 0; l < this.mg.length; l++) {
       const fineN = l === 0 ? this.N : this.mg[l - 1].n;
       const cells = l === 0 ? mob : this.hsMobC[l - 1];
       // Level 0 has no face buffer (its faces are its cells' harmonic means), so its
       // cells fill the slot too: read twice is allowed, read and written in one dispatch is not.
       const faces = l === 0 ? mob : this.hsFaceC[l - 1];
-      this.hsRun(pass, 'hsCoarsen', this.nameOf('hsCoarsen:', l), this.arg4(this.nameOf('thin coarsen ', l), fineN, l === 0 ? 1 : 0),
+      this.hsRun(pass, 'hsCoarsen', this.nameOf('hsCoarsen:', l), this.arg4(this.nameOf('thin coarsen ', l), fineN, l === 0 ? 1 : 0, l === 0 ? openEdge : 0),
         [cells, faces, this.hsMobC[l], this.hsFaceC[l]], this.mg[l].n * this.mg[l].n);
     }
     /*
@@ -1165,26 +1176,28 @@ export class FluidPasses extends FluidFields {
       last step's P alone was a worse first guess than zero.
     */
     const warm = this.hsWarm!;
-    this.hsRun(pass, 'hsWarmDot', 'hsWarmDot', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, this.hsP2!, warm], WARM_GROUPS * 64);
+    this.hsRun(pass, 'hsWarmDot', 'hsWarmDot', this.arg('warm dot', [openEdge, 0, 0, 0]), [this.div, this.hsP!, mob, this.hsP2!, warm], WARM_GROUPS * 64);
     this.hsRun(pass, 'hsWarmFit', 'hsWarmFit', this.arg('none', [0, 0, 0, 0]), [warm], 64);
     this.hsRun(pass, 'hsWarmScale', 'hsWarmScale', this.arg('none', [0, 0, 0, 0]), [this.hsP!, this.hsP2!, warm], this.N * this.N);
     if (Math.abs(this.airCover - this.airCoverPrev) > AIR_SETTLE_COVER) this.airSettle = 2;
     const settle = this.airSettle > 0 && this.airPush > 0;
     if (this.airSettle > 0) this.airSettle--;
-    for (let c = 0; c < this.hsCycles + (settle ? this.hsCycles : this.airPush > 0 ? 1 : 0); c++) this.hsCycle(pass, 0);
-    this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
-      [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press]);
+    const cycles = this.hsCycles + (this.wetDirty ? 4 : settle ? this.hsCycles : this.airPush > 0 ? 1 : 0);
+    for (let c = 0; c < cycles; c++) this.hsCycle(pass, 0);
+    this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}:${wJump.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
+      [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press, wJump]);
     this.vel.swap();
   }
 
   /** One V-cycle of the thin gap's variable-coefficient multigrid, as `vcycle` is for the old one. */
   private hsCycle(pass: GPUComputePassEncoder, l: number): void {
     const mob = this.hsMob!;
+    const openEdge = this.wetDirty && this.rimIsAir ? 1 : 0;
     const smooth = (level: number, sweeps: number) => {
       for (let k = 0; k < sweeps; k++) {
         for (let parity = 0; parity < 2; parity++) {
           if (level === 0) {
-            this.hsRun(pass, 'hsSmooth0', this.nameOf('hsSmooth0:', parity), this.arg4(this.nameOf('pressure ', parity), parity), [this.div, this.hsP!, mob], this.N * (this.N / 2));
+            this.hsRun(pass, 'hsSmooth0', this.nameOf('hsSmooth0:', parity), this.arg4(this.nameOf('pressure ', parity), parity, openEdge), [this.div, this.hsP!, mob], this.N * (this.N / 2));
           } else {
             const lv = this.mg[level - 1];
             this.hsRun(pass, 'hsSmooth', this.nameOf('hsSmooth:', level, ':', parity), this.arg4(this.nameOf('mg smooth ', level, ' ', parity), lv.n, parity),
@@ -1197,7 +1210,7 @@ export class FluidPasses extends FluidFields {
     smooth(l, MG_SWEEPS);
     const below = this.mg[l];
     if (l === 0) {
-      this.hsRun(pass, 'hsRestrict0', 'hsRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, below.b], below.n * below.n);
+      this.hsRun(pass, 'hsRestrict0', 'hsRestrict0', this.arg('hs restrict 0', [openEdge, 0, 0, 0]), [this.div, this.hsP!, mob, below.b], below.n * below.n);
     } else {
       const here = this.mg[l - 1];
       this.hsRun(pass, 'hsRestrict', this.nameOf('hsRestrict:', l), this.arg4(this.nameOf('mg level ', l), here.n), [here.p, here.b, this.hsMobC[l - 1], this.hsFaceC[l - 1], below.b], below.n * below.n);

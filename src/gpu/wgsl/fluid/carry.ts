@@ -429,6 +429,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var<storage, read_write> most: array<atomic<u32>>;
 @group(0) @binding(5) var sq: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read> mob: array<f32>;
+@group(0) @binding(7) var<storage, read> wetJump: array<f32>;
 ${THIN_FACE}
 var<workgroup> wgMost: atomic<u32>;
 fn faceCourant(a: vec2i, e: vec2i, n: i32) -> f32 {

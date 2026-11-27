@@ -15,6 +15,7 @@ import { GRID_FILTER_KERNELS } from './fluid/gridFilter';
 import { REACTION_KERNELS } from './fluid/reactions';
 import { FIELD_KERNELS } from './fluid/fields';
 import { SEAL_KERNELS } from './fluid/seal';
+import { AIR_EDGE_WGSL_KERNELS } from './fluid/airEdge';
 import { HEAD, NOISE_WGSL, THIN_FACE, W } from './fluid/shared';
 import { thinGapKernels } from './thinGap';
 import { filmKernels } from './film';
@@ -43,6 +44,8 @@ export const KERNELS: Record<string, string> = {
   ...FIELD_KERNELS,
   // A standing plate's weight inside a sealed bottle (PLAN 27f-9): see wgsl/fluid/seal.ts.
   ...SEAL_KERNELS,
+  // The air edge in the thin-gap solve (PLAN 38r-16): see wgsl/fluid/airEdge.ts.
+  ...AIR_EDGE_WGSL_KERNELS,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
   // A clear film that tears (PLAN §20b): see wgsl/film.ts.
@@ -79,7 +82,7 @@ function thinFaced(src: string, name: string): string {
   if (!block.test(src) || at < 0 || !src.includes('var vel: texture_2d<f32>;') || !src.includes('var<storage, read> pr: array<f32>;')) {
     throw new Error(`${name} cannot take the thin solve's faces: its face velocity, its flux or its bindings moved`);
   }
-  const bindings = `@group(0) @binding(${last + 1}) var sq: texture_2d<f32>;\n@group(0) @binding(${last + 2}) var<storage, read> mob: array<f32>;\n`;
+  const bindings = `@group(0) @binding(${last + 1}) var sq: texture_2d<f32>;\n@group(0) @binding(${last + 2}) var<storage, read> mob: array<f32>;\n@group(0) @binding(${last + 3}) var<storage, read> wetJump: array<f32>;\n`;
   const withFace = src.slice(0, at) + `${THIN_FACE}\n` + src.slice(at);
   return withFace
     .replace(block, '  let ve = thinFaceVel(a, e, n);\n')
@@ -259,6 +262,7 @@ ${sub}@group(0) @binding(${b}) var sq: texture_2d<f32>;
 @group(0) @binding(${b + 2}) var airWas: texture_2d<f32>;
 @group(0) @binding(${b + 3}) var airNow: texture_2d<f32>;
 @group(0) @binding(${b + 4}) var inflow: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(${b + 5}) var<storage, read> wetJump: array<f32>;
 ${THIN_FACE}
 ${airLiquidAt(planned ? 'A.a.x * sub[0]' : 'A.a.x')}
 ${airFaceShares(planned ? 'sub[0]' : '1.0')}
@@ -389,6 +393,7 @@ KERNELS.bodyAdvectPairSub = `${HEAD}
 @group(0) @binding(8) var<storage, read> mob: array<f32>;
 @group(0) @binding(9) var src2: texture_2d<f32>;
 @group(0) @binding(10) var dst2: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(11) var<storage, read> wetJump: array<f32>;
 ${THIN_FACE}
 fn mm(a: vec4f, b: vec4f) -> vec4f {
   return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));

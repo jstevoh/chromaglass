@@ -50,7 +50,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, AIR_EDGE_KERNELS, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { phaseCHPlan, phaseCapillaryPull } from './fluid/phase';
 import { heatViscPlan } from './fluid/heat';
@@ -284,6 +284,9 @@ export class WebGPUFluid extends FluidCover {
       for (const name of SEAL_KERNEL_NAMES) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.sealed);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
       for (const [key, code] of WebGPUFluid.driftBuilds(dye)) add(key, code, false);
+      // The air edge (PLAN 38r-16): behind the show; no opening lifts past the bead.
+      for (const [name, f] of AIR_EDGE_KERNELS) add(`${name}:${f}`, kernel(name, f), false);
+      add(`wetShedDye:${dye}`, kernel('wetShedDye', dye), false);
     } else {
       /*
         And the other way: the old plate's projections, its velocity's
@@ -880,6 +883,7 @@ export class WebGPUFluid extends FluidCover {
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
+        this.wetPrepareStep(pass);
         this.thinProject(pass, p, disp, hands);
         // What the dye rides is the flow itself: the current is in it now.
         if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
@@ -899,6 +903,7 @@ export class WebGPUFluid extends FluidCover {
           this.run(pass, 'driftOff', this.velRide, [this.velForced], this.arg('drift off', [(wx + fx) * toVel, (wy + fy) * toVel, 0, 0]));
         }
       });
+      stage('wet', (pass) => this.stepWet(pass, disp), this.wetDirty);
     } else {
       stage('project 1', (pass) => this.project(pass));
       // Open plate only (H2c-5): first-order semi-Lagrangian carry saves the backward
@@ -1116,6 +1121,7 @@ export class WebGPUFluid extends FluidCover {
       }
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
+    stage('wet shed', (pass) => this.shedWetDye(pass), thin && this.wetDirty);
     stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && !this.boilLive);
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
@@ -1591,7 +1597,7 @@ export class WebGPUFluid extends FluidCover {
     });
 
     // What the plate draws from all of it, once the step has settled it.
-    stage('view', (pass) => this.packView(pass));
+    stage('view', (pass) => { this.finishWet(pass, thin); this.packView(pass); });
 
     shared?.end();
 
@@ -1678,6 +1684,8 @@ export class WebGPUFluid extends FluidCover {
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;
         for (const [key, code] of WebGPUFluid.driftBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
+        for (const [name, f] of AIR_EDGE_KERNELS) await this.pipelines.prepareCompute(`${name}:${f}`, kernel(name, f));
+        await this.pipelines.prepareCompute(`wetShedDye:${this.dyeFormat}`, kernel('wetShedDye', this.dyeFormat));
       })();
     }
     return this.hsBuilding;

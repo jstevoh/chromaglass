@@ -284,7 +284,8 @@ export class FluidReads extends FluidInputs {
   }
 
   async readAir(): Promise<{ n: number; data: Float32Array } | null> {
-    if (!this.air) return null;
+    const tex = this.airOutLive && this.airOutTex ? this.airOutTex : this.air?.field;
+    if (!tex) return null;
     const n = this.N;
     /*
       Eight bytes a texel, because the field is `rgba16float` (it was
@@ -301,7 +302,7 @@ export class FluidReads extends FluidInputs {
     const row = Math.ceil((n * 8) / 256) * 256;
     const buf = this.device.createBuffer({ label: 'read air', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read air' });
-    enc.copyTextureToBuffer({ texture: this.air.field }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    enc.copyTextureToBuffer({ texture: tex }, { buffer: buf, bytesPerRow: row }, [n, n]);
     this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const halves = new Uint16Array(buf.getMappedRange().slice(0));

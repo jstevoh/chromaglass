@@ -298,10 +298,25 @@ fn tfP(q: vec2i, n: i32) -> f32 {
 // The solve's M_f·ΔP through the face q → q + e; nothing through the grid's wall.
 fn tfFace(q: vec2i, e: vec2i, n: i32) -> f32 {
   let b = q + e;
-  if (!tfIn(q, n) || !tfIn(b, n)) { return 0.0; }
-  let ma = abs(mob[q.x + q.y * n]);
-  let mb = abs(mob[b.x + b.y * n]);
-  return 2.0 * ma * mb / max(ma + mb, 1e-20) * (tfP(b, n) - tfP(q, n));
+  let qIn = tfIn(q, n);
+  let bIn = tfIn(b, n);
+  if (!qIn && !bIn) { return 0.0; }
+  if (!qIn || !bIn) {
+    if (arrayLength(&wetJump) < u32(n * n)) { return 0.0; }
+    let inC = select(b, q, qIn);
+    let mIn = mob[inC.x + inC.y * n];
+    if (mIn < 0.0) { return 0.0; }
+    let f = 2.0 * mIn * (55.0 * mIn) / max(56.0 * mIn, 1e-20);
+    return f * select(-1.0, 1.0, qIn) * (wetJump[inC.x + inC.y * n] - tfP(inC, n));
+  }
+  let ma = mob[q.x + q.y * n];
+  let mb = mob[b.x + b.y * n];
+  let m = 2.0 * abs(ma) * abs(mb) / max(abs(ma) + abs(mb), 1e-20);
+  var jump = 0.0;
+  if (arrayLength(&wetJump) >= u32(n * n) && (ma < 0.0) != (mb < 0.0)) {
+    jump = select(-1.0, 1.0, ma >= 0.0) * (wetJump[q.x + q.y * n] + wetJump[b.x + b.y * n]);
+  }
+  return m * (tfP(b, n) - tfP(q, n) + jump);
 }
 fn tfGap(q: vec2i) -> f32 { return max(textureLoad(sq, q, 0).r, 0.004) / A.b.w; }
 // The velocity through the face a → a + e, both cells inside the grid.

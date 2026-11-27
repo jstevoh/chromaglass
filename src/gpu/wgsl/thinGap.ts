@@ -190,13 +190,16 @@ fn waterDye(q: vec2i, d: f32) -> f32 {
 
   /* The same on level 0, whose pressure is packed and whose mobility is `mob`. */
   const ROWS0 = /* wgsl */ `
-fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
+fn hsSums0(x: i32, y: i32, n: i32, mi: f32, openWall: bool) -> vec2f {
   var den = 0.0;
   var num = 0.0;
   var o = array<vec2i, 4>(vec2i(-1, 0), vec2i(1, 0), vec2i(0, -1), vec2i(0, 1));
   for (var k = 0; k < 4; k++) {
     let q = vec2i(x, y) + o[k];
-    if (!hsIn(q.x, q.y, n)) { continue; }
+    if (!hsIn(q.x, q.y, n)) {
+      if (openWall) { den += hsHarm(mi, 55.0 * mi); }
+      continue;
+    }
     let mn = mob[q.x + q.y * n];
     let f = hsHarm(mi, abs(mn));
     den += f;
@@ -828,6 +831,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(7) var<storage, read> mob: array<f32>;
 @group(0) @binding(8) var<storage, read_write> gapBefore: array<f32>;
 @group(0) @binding(9) var<storage, read_write> poured: array<f32>;
+@group(0) @binding(10) var<storage, read> wetJump: array<f32>;
 const DRY_FACES = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
 fn flux(p: vec2i, n: i32) -> vec2f {
   let c = clamp(p, vec2i(0), vec2i(n - 1));
@@ -893,7 +897,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let pour = poured[k] * hsGap(g, A.a.w) * A.b.y;
   poured[k] = 0.0;
   let q = rate * A.a.x - dh + pour;
-  var b = -div / S.n + q / (S.n * S.n);
+  var edgeJump = 0.0;
+  let mi = mob[k];
+  let openEdge = arrayLength(&wetJump) >= u32(n * n) && mi >= 0.0;
+  if (openEdge) {
+    for (var fk = 0; fk < 4; fk++) {
+      let nb = p + DRY_FACES[fk];
+      if (!hsIn(nb.x, nb.y, n)) {
+        div += 0.5 * dot(flux(p, n), vec2f(DRY_FACES[fk]));
+        edgeJump += hsHarm(mi, 55.0 * mi) * wetJump[k];
+        continue;
+      }
+      let mn = mob[nb.x + nb.y * n];
+      if (mn < 0.0) {
+        edgeJump += hsHarm(mi, abs(mn)) * (wetJump[k] + wetJump[nb.x + nb.y * n]);
+      }
+    }
+  }
+  var b = -div / S.n + q / (S.n * S.n) + edgeJump;
   if (!(abs(b) < 1e30) || dry) { b = 0.0; }
   textureStore(dst, p, vec4f(b, 0.0, 0.0, 0.0));
 }`,
@@ -919,7 +940,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let x = 2 * (i % half) + ((y + parity) & 1);
   let mi = mob[x + y * n];
   if (mi < 0.0) { pr[parity * n * half + i] = 0.0; return; }
-  let s = hsSums0(x, y, n, mi);
+  let s = hsSums0(x, y, n, mi, A.a.y > 0.5);
   pr[parity * n * half + i] = select(0.0, (textureLoad(dv, vec2i(x, y), 0).r + s.y) / s.x, s.x > 0.0);
 }`,
 
@@ -940,7 +961,7 @@ fn res0(x: i32, y: i32, n: i32) -> f32 {
   if (!hsIn(x, y, n)) { return 0.0; }
   let mi = mob[x + y * n];
   if (mi < 0.0) { return 0.0; }
-  let s = hsSums0(x, y, n, mi);
+  let s = hsSums0(x, y, n, mi, A.a.x > 0.5);
   return textureLoad(dv, vec2i(x, y), 0).r - (s.x * pr[hsPacked(x, y, n)] - s.y);
 }
 @compute @workgroup_size(64)
@@ -1042,7 +1063,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let b = select(1.0, mf[x + 1 + y * n], x + 1 < n);
   let c = select(1.0, mf[x + (y + 1) * n], y + 1 < n);
   let d = select(1.0, mf[x + 1 + (y + 1) * n], x + 1 < n && y + 1 < n);
-  let nOpen = select(0, 1, a < 0.0) + select(0, 1, b < 0.0) + select(0, 1, c < 0.0) + select(0, 1, d < 0.0);
+  var nOpen = select(0, 1, a < 0.0) + select(0, 1, b < 0.0) + select(0, 1, c < 0.0) + select(0, 1, d < 0.0);
+  if (A.a.z > 0.5 && (x == 0 || y == 0 || x + 1 >= n - 1 || y + 1 >= n - 1)) { nOpen += 1; }
   mc[i] = select(1.0, -1.0, nOpen >= 1);
 }`,
 
@@ -1158,16 +1180,28 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(5) var<storage, read> pr: array<f32>;
 @group(0) @binding(6) var<storage, read> mob: array<f32>;
 @group(0) @binding(7) var<storage, read_write> seen: array<f32>;
+@group(0) @binding(8) var<storage, read> wetJump: array<f32>;
 fn pAt(x: i32, y: i32, n: i32) -> f32 {
   if (mob[x + y * n] < 0.0) { return 0.0; }
   return pr[hsPacked(x, y, n)];
 }
-// The flux correction through the face from this cell toward (dx, dy), as M_f (p_nb − p).
+// The flux correction through the face from this cell toward (dx, dy), as M_f (p_nb − p + jump).
 fn face(x: i32, y: i32, dx: i32, dy: i32, n: i32, mi: f32, pi: f32) -> f32 {
   let qx = x + dx;
   let qy = y + dy;
-  if (!hsIn(qx, qy, n)) { return 0.0; }
-  return hsHarm(mi, abs(mob[qx + qy * n])) * (pAt(qx, qy, n) - pi);
+  let mp = mob[x + y * n];
+  if (!hsIn(qx, qy, n)) {
+    if (arrayLength(&wetJump) >= u32(n * n) && mp >= 0.0) {
+      return hsHarm(mi, 55.0 * mi) * (wetJump[x + y * n] - pi);
+    }
+    return 0.0;
+  }
+  let mq = mob[qx + qy * n];
+  var jump = 0.0;
+  if (arrayLength(&wetJump) >= u32(n * n) && (mp < 0.0) != (mq < 0.0)) {
+    jump = select(-1.0, 1.0, mp >= 0.0) * (wetJump[x + y * n] + wetJump[qx + qy * n]);
+  }
+  return hsHarm(mi, abs(mq)) * (pAt(qx, qy, n) - pi + jump);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
