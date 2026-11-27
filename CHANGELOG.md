@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the video coming in, clear and on the desk (PLAN 14ag-9)
+
+- The video row is the input on the plate: the camera or a window while one is on, else the file
+  loaded, with a small live picture of what is coming in and what it is doing in words.
+- **Plate / Lamp / LED ring**: where it shows, one at a time. **LED ring** (`filmRing`, MIDI
+  "Video on LED Ring") puts the video on the spinning LED platform under the dish, turning at LED
+  Rotation Speed. **Pour** now pours a camera or a shared window as well as a file.
+- The desk's **Video** dot (was Film) opens the Video panel beside the plate, not Settings.
+  `npm run myvideo`, `npm run videolamp`.
+
 ### Added — the standing waves move (PLAN 48f-6, 48f-9)
 
 - **Rock** (`faradayRock`, 0–2 Hz): the strobe slips off the Faraday waves so crests and

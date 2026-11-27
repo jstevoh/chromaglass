@@ -586,7 +586,7 @@ export function Desk(p: DeskProps) {
               data-panel-wrap={id}
             >
               {PANEL_BY_ID.get(id)?.name ?? id}
-              {panelMeta(id, p) && <span className="font-mono text-[11px] text-faint">{panelMeta(id, p)}</span>}
+              {panelMeta(id, p) && <span className="font-mono text-[12px] text-faint">{panelMeta(id, p)}</span>}
             </button>
           ))}
           <button
@@ -660,7 +660,7 @@ export function Desk(p: DeskProps) {
       )}
 
       {/* ── Status ────────────────────────────────────────────────── */}
-      <footer className="col-[1/-1] flex items-center justify-between gap-3 border-t border-border px-3 font-mono text-[11px] text-dim">
+      <footer className="col-[1/-1] flex items-center justify-between gap-3 border-t border-border px-3 font-mono text-[12px] text-dim">
         <span className="flex min-w-0 items-center gap-3 truncate">
           {p.onOpenAccount && (
             // Signed out, the one place on the desk that lets you back in says so,
@@ -671,7 +671,7 @@ export function Desk(p: DeskProps) {
               data-cg-account-signin={signedOut ? '' : undefined}
               data-cg-tier={getEffectiveTier()}
               onClick={p.onOpenAccount}
-              className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 font-sans text-[11px] font-medium transition-colors ${
+              className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 font-sans text-[12px] font-medium transition-colors ${
                 signedOut
                   ? 'bg-primary text-on-primary hover:opacity-90'
                   : 'border border-border-strong bg-elevated text-text-2 hover:bg-hover hover:text-text'
@@ -682,7 +682,7 @@ export function Desk(p: DeskProps) {
               {signedOut ? <LogIn size={12} className="shrink-0" /> : <User size={12} className="shrink-0 text-muted" />}
               <span>{signedOut ? 'Sign in' : 'Account'}</span>
               {!signedOut && (
-                <span className="rounded-sm bg-accent-bg px-1 py-px font-mono text-[9px] uppercase tracking-wider text-accent-text">
+                <span className="rounded-sm bg-accent-bg px-1 py-px font-mono text-[12px] uppercase tracking-wider text-accent-text">
                   {getEffectiveTier()}
                 </span>
               )}
@@ -700,7 +700,7 @@ export function Desk(p: DeskProps) {
           <button
             type="button"
             onClick={p.onOpenSettings}
-            className="inline-flex h-6 shrink-0 items-center rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+            className="inline-flex h-6 shrink-0 items-center rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
             title="Every setting, by group (the Settings sheet)"
             data-testid="open-all-settings"
           >
@@ -710,12 +710,12 @@ export function Desk(p: DeskProps) {
             <button
               type="button"
               onClick={p.onOpenShortcuts}
-              className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+              className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
               title="Keyboard shortcuts (?)"
               aria-label="Keyboard shortcuts"
               data-testid="shortcuts-button"
             >
-              <span className="font-mono text-[11px]">?</span>
+              <span className="font-mono text-[12px]">?</span>
               <span className="hidden xl:inline">Shortcuts</span>
             </button>
           )}
@@ -765,8 +765,8 @@ export function Desk(p: DeskProps) {
       {dropping && drag && createPortal(
         <>
           {/* An empty column, as a strip at the window's edge to drop on. */}
-          {!narrow && !left && <div className="fixed bottom-[64px] left-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="left">Dock left</div>}
-          {(narrow ? sideIds.length === 0 : !right) && <div className="fixed bottom-[64px] right-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[11px] text-accent-text [writing-mode:vertical-rl]" data-slot="right">{narrow ? 'Dock column' : 'Dock right'}</div>}
+          {!narrow && !left && <div className="fixed bottom-[64px] left-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[12px] text-accent-text [writing-mode:vertical-rl]" data-slot="left">Dock left</div>}
+          {(narrow ? sideIds.length === 0 : !right) && <div className="fixed bottom-[64px] right-0 top-12 z-[62] flex w-14 items-center justify-center border-2 border-dashed border-accent-border bg-accent-bg text-[12px] text-accent-text [writing-mode:vertical-rl]" data-slot="right">{narrow ? 'Dock column' : 'Dock right'}</div>}
           <div
             className="pointer-events-none fixed z-[63] rounded-md border border-border-strong bg-elevated px-2.5 py-1 text-[13px] font-medium text-text shadow-[0_20px_60px_rgba(0,0,0,.6)]"
             style={{ left: drag.x + 12, top: drag.y + 8 }}
@@ -840,7 +840,7 @@ function DeskColumn({ slot, ids, collapsed, dashed, renderFrame }: {
         <button
           type="button"
           onClick={() => scroll.scrollBy(220)}
-          className="flex h-6 shrink-0 items-center justify-center gap-1 border-t border-border bg-surface/90 text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+          className="flex h-6 shrink-0 items-center justify-center gap-1 border-t border-border bg-surface/90 text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
           data-testid={`desk-${slot}-more`}
         >
           More panels ↓
@@ -1033,12 +1033,12 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
                   data-testid={id}
                 >
                   <span className="truncate">{label}</span>
-                  {kbd ? <span className="font-mono text-[11px] text-faint">{kbd}</span> : null}
+                  {kbd ? <span className="font-mono text-[12px] text-faint">{kbd}</span> : null}
                 </button>
               ))}
               {p.savedLooks.length > 0 && (
                 <div className="border-t border-border py-1" data-testid="doc-saved">
-                  <div className="px-3 pb-1 pt-1.5 text-[11px] text-faint">Your preset palettes</div>
+                  <div className="px-3 pb-1 pt-1.5 text-[12px] text-faint">Your preset palettes</div>
                   <div className="max-h-[50vh] overflow-y-auto">
                     {p.savedLooks.map(sl => (
                       <div key={sl.id} className={`group flex items-center ${sl.id === p.openLookId ? 'bg-active' : 'hover:bg-hover'}`}>
@@ -1053,7 +1053,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
                         </button>
                         <button
                           onClick={() => p.onDeleteSaved(sl.id)}
-                          className="mr-1 rounded p-1.5 text-faint opacity-60 hover:bg-hover hover:text-text group-hover:opacity-100"
+                          className="mr-1 rounded p-1.5 text-faint hover:bg-hover hover:text-text"
                           title={`Remove ${sl.name} from your presets`}
                           aria-label={`Remove ${sl.name}`}
                           data-testid={`doc-saved-remove-${sl.id}`}

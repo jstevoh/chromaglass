@@ -56,6 +56,7 @@ const UNITS: Record<string, (v: number) => string> = {
   filmZoom:   v => `${v.toFixed(2)}×`,
   filmX:      v => `${Math.round(v * 100)}%`,
   filmY:      v => `${Math.round(v * 100)}%`,
+  filmRing:   v => (v > 0.5 ? 'On' : 'Off'),
   lampWarmth: kelvinLabel,
   turbulenceDetail: v => `${Math.round(v)}`,
   kaleidoscope: v => (v < 1 ? 'Off' : `${Math.round(v)}×`),

@@ -106,7 +106,7 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onReveal,
             className="h-8 min-w-0 flex-1 bg-transparent text-[13px] text-text outline-none placeholder:text-faint"
             data-testid="panel-browser-search"
           />
-          <span className="font-mono text-[11px] text-faint">esc</span>
+          <span className="font-mono text-[12px] text-faint">esc</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto py-1" data-testid="panel-browser-list">
           {rows.length === 0 && <p className="px-3 py-3 text-[13px] text-dim">Nothing matches “{query}”.</p>}
@@ -117,7 +117,7 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onReveal,
             const count = r.kind === 'own' ? null : CONTROLS.get(r.id) ?? null;
             return (
               <div key={r.id}>
-                {head && <div className="px-3 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-dim">{head}</div>}
+                {head && <div className="px-3 pb-1 pt-2.5 text-[12px] font-medium uppercase tracking-[0.12em] text-dim">{head}</div>}
                 <div
                   className={`mx-1 flex h-8 items-center gap-2 rounded-md px-2 ${i === sel ? 'bg-hover' : ''}`}
                   onMouseEnter={() => setSel(i)}
@@ -125,12 +125,12 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onReveal,
                   data-testid={`panel-browser-row-${r.id}`}
                 >
                   <span className="min-w-0 flex-1 truncate text-[13px] text-text-2">{r.name}</span>
-                  {count != null && <span className="shrink-0 font-mono text-[11px] text-faint">{count}</span>}
-                  {whereLabel && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">{whereLabel}</span>}
+                  {count != null && <span className="shrink-0 font-mono text-[12px] text-faint">{count}</span>}
+                  {whereLabel && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[12px] font-medium text-accent-text">{whereLabel}</span>}
                   {i === sel && !where && (
                     <>
-                      <button onClick={() => act(i, false)} className="h-6 shrink-0 rounded-sm bg-primary px-2 text-[11px] font-medium text-on-primary" data-testid={`panel-browser-dock-${r.id}`}>Dock ⏎</button>
-                      <button onClick={() => act(i, true)} className="h-6 shrink-0 rounded-sm border border-border-strong px-2 text-[11px] font-medium text-text-2 hover:bg-hover" data-testid={`panel-browser-float-${r.id}`}>Float ⇧⏎</button>
+                      <button onClick={() => act(i, false)} className="h-6 shrink-0 rounded-sm bg-primary px-2 text-[12px] font-medium text-on-primary" data-testid={`panel-browser-dock-${r.id}`}>Dock ⏎</button>
+                      <button onClick={() => act(i, true)} className="h-6 shrink-0 rounded-sm border border-border-strong px-2 text-[12px] font-medium text-text-2 hover:bg-hover" data-testid={`panel-browser-float-${r.id}`}>Float ⇧⏎</button>
                     </>
                   )}
                 </div>
@@ -145,7 +145,7 @@ export function PanelBrowser({ layout, at, anchorRef, onDock, onFloat, onReveal,
             data-testid="panel-browser-stage"
           >
             <span>Stage · wall, mapping, logo, plates, simulation</span>
-            <span className="font-mono text-[11px] text-faint">⌘,</span>
+            <span className="font-mono text-[12px] text-faint">⌘,</span>
           </button>
         }
       </div>,

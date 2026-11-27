@@ -40,7 +40,7 @@ export function RemoteSongs({ state, send, connected, status, onRetry, onSelectV
 }) {
   const set = state?.setList;
   const songs = state?.songs;
-  const row = 'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-40';
+  const row = 'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-65';
   return (
     <div
       className="min-h-screen bg-[#0a0a0a] text-white"
@@ -70,9 +70,9 @@ export function RemoteSongs({ state, send, connected, status, onRetry, onSelectV
 
       <main className="px-4 pt-4 md:grid md:grid-cols-2 md:gap-8 md:px-8">
         <section className="mb-8" data-testid="remote-set">
-          <h2 className="mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Set list{set?.name ? ` · ${set.name}` : ''}</h2>
-          <p className="mb-3 text-[12px] text-white/40">Tap to arm for the next Go.</p>
-          {!set?.items.length && <p className="text-[13px] text-white/45" data-testid="remote-set-empty">The set list on the laptop is empty.</p>}
+          <h2 className="mb-1 text-[12px] font-bold uppercase tracking-[0.2em] text-muted">Set list{set?.name ? ` · ${set.name}` : ''}</h2>
+          <p className="mb-3 text-[12px] text-dim">Tap to arm for the next Go.</p>
+          {!set?.items.length && <p className="text-[13px] text-dim" data-testid="remote-set-empty">The set list on the laptop is empty.</p>}
           <div className="flex flex-col gap-2">
             {set?.items.map((item, i) => {
               const live = set.liveId === item.id;
@@ -88,8 +88,8 @@ export function RemoteSongs({ state, send, connected, status, onRetry, onSelectV
                   aria-pressed={cued}
                   className={`${row} ${live ? 'border-live-border bg-live-bg' : cued ? 'border-accent-border bg-elevated' : 'border-white/10 bg-white/5'}`}
                 >
-                  <span className="w-6 shrink-0 font-mono text-[12px] text-white/35">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="flex-1 text-[15px] font-medium text-white/90">{item.name}</span>
+                  <span className="w-6 shrink-0 font-mono text-[12px] text-dim">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="flex-1 text-[15px] font-medium text-text">{item.name}</span>
                   {live && <Tag tone="live">Live</Tag>}
                   {cued && <Tag tone="next">Next</Tag>}
                 </button>
@@ -99,7 +99,7 @@ export function RemoteSongs({ state, send, connected, status, onRetry, onSelectV
         </section>
 
         <section className="mb-8" data-testid="remote-song-shows">
-          <h2 className="mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Song shows</h2>
+          <h2 className="mb-1 text-[12px] font-bold uppercase tracking-[0.2em] text-muted">Song shows</h2>
           {/* The desk's Follow songs switch (the Songs panel's songs-follow), not the songFollow dial. */}
           <button
             type="button"
@@ -108,15 +108,15 @@ export function RemoteSongs({ state, send, connected, status, onRetry, onSelectV
             onClick={() => send({ type: 'song-follow', on: !songs?.follow })}
             disabled={!connected || !songs}
             data-testid="remote-song-follow"
-            className="mb-3 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 disabled:opacity-40"
+            className="mb-3 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 disabled:opacity-65"
           >
             <span className="text-left">
-              <span className="block text-[14px] font-medium text-white/85">Follow songs</span>
-              <span className="block text-[12px] text-white/40">Start a song's show when its song plays</span>
+              <span className="block text-[14px] font-medium text-text">Follow songs</span>
+              <span className="block text-[12px] text-dim">Start a song&apos;s show when its song plays</span>
             </span>
             <SwitchPill on={!!songs?.follow} />
           </button>
-          {!songs?.shows.length && <p className="text-[13px] text-white/45" data-testid="remote-songs-empty">No song shows saved on the laptop.</p>}
+          {!songs?.shows.length && <p className="text-[13px] text-dim" data-testid="remote-songs-empty">No song shows saved on the laptop.</p>}
           <div className="flex flex-col gap-2">
             {songs?.shows.map((show) => {
               const running = songs.runningId === show.id;
@@ -127,13 +127,13 @@ export function RemoteSongs({ state, send, connected, status, onRetry, onSelectV
                   data-running={running ? 'true' : 'false'}
                   className={`${row} ${running ? 'border-live-border bg-live-bg' : 'border-white/10 bg-white/5'}`}
                 >
-                  <span className="flex-1 text-[15px] font-medium text-white/90">{show.title}</span>
+                  <span className="flex-1 text-[15px] font-medium text-text">{show.title}</span>
                   {running ? (
                     <button
                       onClick={() => send({ type: 'song-stop' })}
                       disabled={!connected}
                       data-testid="remote-song-stop"
-                      className="flex h-11 items-center gap-1.5 rounded-full border border-live px-4 text-[13px] font-semibold text-live disabled:opacity-40"
+                      className="flex h-11 items-center gap-1.5 rounded-full border border-live px-4 text-[13px] font-semibold text-live disabled:opacity-65"
                     >
                       <Square size={13} fill="currentColor" /> Stop
                     </button>
@@ -142,7 +142,7 @@ export function RemoteSongs({ state, send, connected, status, onRetry, onSelectV
                       onClick={() => send({ type: 'song-run', id: show.id })}
                       disabled={!connected}
                       data-testid={`remote-song-run-${show.id}`}
-                      className="flex h-11 items-center gap-1.5 rounded-full border border-white/15 px-4 text-[13px] font-semibold text-white/80 disabled:opacity-40"
+                      className="flex h-11 items-center gap-1.5 rounded-full border border-white/15 px-4 text-[13px] font-semibold text-text disabled:opacity-65"
                     >
                       <Play size={13} fill="currentColor" /> Run
                     </button>

@@ -26,14 +26,14 @@ import { useEarView, type EarView } from '../../hooks/useEarView';
 const roomOf = (a: AudioData | null) => a?.calibration ?? null;
 function RoomReadout({ view }: { view: EarView }) {
   const calibration = useEarView(view, roomOf);
-  if (!calibration) return <span className="text-[12px] opacity-40">Waiting for audio</span>;
+  if (!calibration) return <span className="text-[12px] text-dim">Waiting for audio</span>;
   return (
     <>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[12px] opacity-60">
+        <span className="text-[12px] text-muted">
           {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
         </span>
-        <span className="text-[12px] font-mono opacity-50">
+        <span className="text-[12px] font-mono text-dim">
           {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
         </span>
       </div>
@@ -105,7 +105,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
           Sound…" each sent you to the other for half a job; both are gone.
         */}
         {soundSources ? soundSources(inputPicker) : inputPicker}
-        <p className="mb-2 mt-1 text-[11px] font-bold uppercase tracking-widest text-muted">How it drives the plate</p>
+        <p className="mb-2 mt-1 text-[12px] font-bold uppercase tracking-widest text-muted">How it drives the plate</p>
         {/*
           Sound Drive: how hard the music moves the plate at all. First in
           Sound, which it joined with the rest of Sound Mappings (2026-10-10):
@@ -194,7 +194,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
           <div className="mb-4 mt-2 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-[13px] font-medium text-text">Tempo</span>
-              <span className="font-mono text-[12px] opacity-50" data-testid="tempo-readout">
+              <span className="font-mono text-[12px] text-dim" data-testid="tempo-readout">
                 {tempo?.source
                   ? `${tempo.bpm} bpm \u00b7 ${tempoSourceName(tempo.source)}`
                   : 'listening'}
@@ -207,7 +207,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className="min-h-9 flex-none rounded-lg border border-white/10 bg-white/5 px-3 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
+                className="min-h-9 flex-none rounded-lg border border-white/10 bg-white/5 px-3 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-65"
               >
                 Listen
               </button>
@@ -232,7 +232,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
                 }}
                 className="h-9 w-24 rounded-lg border border-white/10 bg-white/5 px-3 font-mono text-[12px] outline-none focus:border-accent-border"
               />
-              <span className="text-[12px] opacity-30">off the setlist</span>
+              <span className="text-[12px] text-dim">off the setlist</span>
             </div>
             {/*
               Ableton Link (PLAN.md 13.5-link): only where a show server is
@@ -250,7 +250,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
                 >
                   Link
                 </button>
-                <span className="text-[12px] opacity-50" data-testid="tempo-link-says">{linkLine(tempo.link)}</span>
+                <span className="text-[12px] text-dim" data-testid="tempo-link-says">{linkLine(tempo.link)}</span>
                 {/* Live's play and stop on the Sequence (13.5-link-transport): off until asked for. */}
                 {tempo.link.on && onLinkTransport && (
                   <button
@@ -285,7 +285,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
               <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2" data-testid="timecode-readout">
                 <span className="text-[13px] font-medium text-text">Timecode</span>
                 <span className="font-mono text-[13px] tabular-nums">{timecode}</span>
-                <span className="text-[12px] opacity-40">the sequence is following the desk</span>
+                <span className="text-[12px] text-dim">the sequence is following the desk</span>
               </div>
             )}
           </div>
@@ -337,7 +337,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         </div>
         {settings.autoCalibrate !== false && (
           <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
-            {earView ? <RoomReadout view={earView} /> : <span className="text-[12px] opacity-40">Waiting for audio</span>}
+            {earView ? <RoomReadout view={earView} /> : <span className="text-[12px] text-dim">Waiting for audio</span>}
             <button
               onClick={() => onRecalibrate?.()}
               className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[13px] font-medium opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
@@ -347,7 +347,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
           </div>
         )}
         {/* What each band of the sound moves: Sound Mappings, as was. */}
-        <span className="mb-2 mt-4 block text-[11px] font-medium uppercase tracking-wide text-white/40">What the sound moves</span>
+        <span className="mb-2 mt-4 block text-[12px] font-medium uppercase tracking-wide text-dim">What the sound moves</span>
         {/*
           The selects below are the coarse wiring: which reading the look's
           music cords take (PLAN 38v-1, lib/musicCords.ts). Velocity is what
@@ -366,7 +366,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         */}
         {['velocity', 'density', 'color'].map((param) => (
           <div key={param} className="flex flex-col gap-2 mb-4">
-            <span className="text-[13px] font-medium text-text">{param} <span className="text-white/40 font-normal">({ROUTE_NAMES[param as MusicRoute]})</span></span>
+            <span className="text-[13px] font-medium text-text">{param} <span className="text-dim font-normal">({ROUTE_NAMES[param as MusicRoute]})</span></span>
             <select
               value={musicRouteOf(settings.sceneMappings, param as MusicRoute)}
               data-testid={`sound-route-${param}`}
@@ -387,7 +387,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
             </select>
           </div>
         ))}
-        <p className="mb-3 text-[12px] leading-relaxed text-white/40">
+        <p className="mb-3 text-[12px] leading-relaxed text-dim">
           Turning the plates with the music is in {goTo('spin', 'sound')}. Any sound feature onto any other control is a patch, in {goTo('patches', 'sound')}.
         </p>
       </section>
