@@ -5,7 +5,7 @@
  * the solver's class chain; the map is at the top of `gpu/fluid.ts`.
  */
 
-import { PingPong, bindGroup } from '../kit';
+import { FIELD_USAGE, PingPong, bindGroup } from '../kit';
 import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
@@ -607,6 +607,45 @@ export class FluidPasses extends FluidFields {
     if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
     this.run(pass, 'speciesSplat', sp.write, [sp.read, this.squeeze.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
+    if (this.solventLive && this.solvent) this.stepOuzo(pass, this.solvent);
+  }
+
+  /**
+   * The ouzo's solvent carried with the colour (PLAN 48s), beside the
+   * chemistry's carry and by the same call: the colour's arguments and, while
+   * there is air, the air's, so the ethanol and the oil cross the same faces
+   * in the same substeps as the dye and the species they were poured with,
+   * and leave a bubble's hole as those do. Nothing with no ouzo on the plate.
+   */
+  protected carrySolvent(pass: GPUComputePassEncoder, args: GPUBuffer, argsAt?: GPUBuffer[]): void {
+    if (!this.solventLive || !this.solvent) return;
+    this.carrySubsteps(pass, 'bodyAdvect', this.solvent, args, undefined, argsAt);
+    this.solventCarried = true;
+  }
+  private solventCarried = false;
+
+  /**
+   * The ouzo's stage (PLAN 48s; lib/ouzo.ts, wgsl/fluid/ouzo.ts), after the
+   * species' and only while there is anise oil on the plate. Where the colour
+   * was carried some other way and the species alone (the maze's sixths),
+   * the solvent is carried here as the species just was; then the phase
+   * change and the rim in one pass (`ouzoCloud`), then the droplets'
+   * scattering onto the species for the plate.
+   */
+  private stepOuzo(pass: GPUComputePassEncoder, v: PingPong): void {
+    if (!this.solventCarried) this.carrySubsteps(pass, 'bodyAdvect', v, this.arg('solvent advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
+    this.solventCarried = false;
+    this.run(pass, 'ouzoCloud', v.write, [v.read, this.squeeze.read], this.arg('none', [0, 0, 0, 0]));
+    v.swap();
+    this.writeCloudView(pass);
+  }
+
+  /** The species with the droplets' scattering added (`ouzoView`), for the plate: after a step, and after an Undo has put both fields back. */
+  protected writeCloudView(pass: GPUComputePassEncoder): void {
+    if (!this.species || !this.solvent) return;
+    this.cloudView ??= this.disposer.track(this.device.createTexture({ label: 'cloud view', size: [this.N, this.N], format: 'rgba32float', usage: FIELD_USAGE }));
+    this.run(pass, 'ouzoView', this.cloudView, [this.species.read, this.solvent.read], this.arg('none', [0, 0, 0, 0]));
+    this.cloudFresh = true;
   }
 
   /** The heat carried with the liquid on a thin gap (PLAN 38f): h·T and h, made on the first thin step. */
