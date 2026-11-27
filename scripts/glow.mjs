@@ -54,8 +54,42 @@
  *      by over 2 of 255 inside the band, and under a tenth of that far from
  *      it), and drawn at 0 twice it is the same bytes (the comparison sees
  *      the glow, not a plate that never draws the same twice).
+ *
+ *   6. The shaken dish lights the sea (PLAN 48c-6): the music's bass on the
+ *      dish's speaker (Music Shake, on Shake) stands up a Faraday wave, and
+ *      the wave's strain fires the cells. No stroke, Shaker at 30 Hz:
+ *        - shaken at half the wave's threshold (nothing stands up), the
+ *          plate stays dark and keeps its charge, as a still one does;
+ *        - shaken at 1 g, twelve times the threshold, the lattice lights:
+ *          charge is spent across the plate. Twelve times, because the
+ *          pattern grows from the dish's whisper of noise at the Mathieu
+ *          rate (9 per second here, 2 at 0.3 g) and the lab steps four
+ *          seconds; Glow Recharge at 0.5 s, so a firing cell holds a third
+ *          of its charge or more and every cell's share can be read below;
+ *        - where it lights is the wave's: the cells' firing share, read back
+ *          as their light over their charge, is held against a share worked
+ *          out here from the wave's own amplitude field (read back from the
+ *          Faraday solver), by sampling the linear wave's strain at a
+ *          thousand heights through the layer and the floor's Stokes layer
+ *          (not the closed form the kernel uses), cell by cell: correlated
+ *          over 0.9 and the same in the mean within 15%. The same share
+ *          worked out with the wave read upside down correlates far less
+ *          (a field read with its rows reversed fails);
+ *        - the threshold is a threshold: the same shake under a Glow Shear
+ *          ten times higher spends under a tenth as much;
+ *        - the shaker off, the sea goes dark again within a second.
  */
+import { build } from 'esbuild';
+import { rmSync } from 'node:fs';
 import { openLab } from './lab.mjs';
+
+const libOut = `node_modules/.cache/glow-faraday-lib-${process.pid}.mjs`;
+await build({ stdin: { contents: "export * from './src/lib/faraday.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: libOut, logLevel: 'warning' });
+const F = await import(`../${libOut}`);
+rmSync(libOut, { force: true });
+const SHAKE_HZ = 30;
+const SHAKE_G = 1;
+const SHAKE_AC = F.faradayThreshold(SHAKE_HZ) / F.FARADAY_G;
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => {
@@ -66,7 +100,7 @@ const check = (name, ok, detail = '') => {
 const { page, close } = await openLab();
 let o;
 try {
-  o = await page.evaluate(async () => {
+  o = await page.evaluate(async ({ shakeHz, shakeG, shakeAc }) => {
     const N = 128, R = 192, n = 256;
     const cam = { zoom: 1, macroAmount: 0, cx: 0.5, cy: 0.5, bubbles: 0 };
     const dark = { ledColor: '#000000', ledPlatform: false };
@@ -165,8 +199,42 @@ try {
     r.picMirror = bmr(pics.on, 0.15, 0.65, 0.58, 0.72) - bmr(pics.off, 0.15, 0.65, 0.58, 0.72);
     r.picFar = bmr(pics.on, 0.05, 0.95, 0.85, 0.95) - bmr(pics.off, 0.05, 0.95, 0.85, 0.95);
     r.picSame = pics.off.every((v, k) => v === pics.off2[k]);
+
+    // 6. The shaken dish. The wave's amplitude field, read back from its solver.
+    const readWave = async () => {
+      const sv = lab.solver(), fp = sv.faradayPlate, dev = sv.device;
+      const size = fp.field.n * fp.field.n * 4;
+      const out = dev.createBuffer({ size, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+      const enc = dev.createCommandEncoder();
+      enc.copyBufferToBuffer(fp.field.h, 0, out, 0, size);
+      dev.queue.submit([enc.finish()]);
+      await out.mapAsync(GPUMapMode.READ);
+      const h = Array.from(new Float32Array(out.getMappedRange().slice(0)));
+      out.unmap(); out.destroy();
+      return { h, n: fp.field.n };
+    };
+    const shaken = (shake, over = {}) => P({ faradayHz: shakeHz, faraday: shake, ...over });
+    await fresh();
+    await lab.step(240, shaken(shakeAc * 0.5));
+    g = await glowOf().read();
+    r.belowMax = Math.max(...g.light);
+    r.belowMinCharge = Math.min(...g.charge);
+    await fresh();
+    await lab.step(240, shaken(shakeG, { glowRecharge: 0.5 }));
+    g = await glowOf().read();
+    r.shakenSpent = spent(g).reduce((t, v) => t + v, 0) / (n * n);
+    r.shakenLit = Array.from(g.lit);
+    r.shakenCharge = Array.from(g.charge);
+    r.wave = await readWave();
+    await fresh();
+    await lab.step(240, shaken(shakeG, { glowShear: 300, glowRecharge: 0.5 }));
+    g = await glowOf().read();
+    r.highSpent = spent(g).reduce((t, v) => t + v, 0) / (n * n);
+    await lab.step(60, P({ faradayHz: 0, faraday: 0 }));
+    g = await glowOf().read();
+    r.offMax = Math.max(...g.light);
     return r;
-  });
+  }, { shakeHz: SHAKE_HZ, shakeG: SHAKE_G, shakeAc: SHAKE_AC });
 } finally {
   await close();
 }
@@ -188,5 +256,62 @@ check('the plate draws the glow blue in the band', o.picBand > 2, `blue−red up
 check('and not in its mirror (a picture drawn upside down)', Math.abs(o.picMirror) < o.picBand / 10, `mirror ${f(o.picMirror, 2)}`);
 check('and not far from it', Math.abs(o.picFar) < Math.max(0.2, o.picBand / 10), `far ${f(o.picFar, 2)}`);
 check('control: the plate drawn twice at 0 is the same bytes', o.picSame, '');
+
+/*
+  6's reference share, worked out here from the wave's field and not by the
+  kernel's closed form: the linear wave's strain sampled at a thousand
+  heights through the layer, and the floor's Stokes layer (a twentieth of
+  the depth at 30 Hz) at its own envelope. A height fires if either passes
+  the threshold there.
+*/
+const shareOf = (h, n, flip) => {
+  const k = F.faradayK(SHAKE_HZ), w = F.faradayOmega(k), d = F.FARADAY_DEPTH, nu = F.FARADAY_NU, th = 30;
+  const dx = 0.2 / n, sh = Math.sinh(k * d), delta = Math.sqrt((2 * nu) / w), LEVELS = 1000;
+  const at = (i, j) => { const jj = flip ? n - 1 - j : j; return h[(((jj % n) + n) % n) * n + (((i % n) + n) % n)]; };
+  const out = new Float64Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const u = at(i, j), e = at(i + 1, j), ww = at(i - 1, j), s = at(i, j + 1), q = at(i, j - 1);
+    const uxx = (e - 2 * u + ww) / (dx * dx), uyy = (s - 2 * u + q) / (dx * dx);
+    const uxy = (at(i + 1, j + 1) - at(i + 1, j - 1) - at(i - 1, j + 1) + at(i - 1, j - 1)) / (4 * dx * dx);
+    const gx = (e - ww) / (2 * dx), gy = (s - q) / (2 * dx);
+    const wall = ((w / k) * Math.hypot(gx, gy) / sh) * Math.sqrt(w / nu);
+    let fire = 0;
+    for (let l = 0; l < LEVELS; l++) {
+      const z = ((l + 0.5) / LEVELS) * d;
+      const C = Math.cosh(k * z) / sh, S = Math.sinh(k * z) / sh;
+      const exx = (w / k) * C * uxx, eyy = (w / k) * C * uyy, exy = (w / k) * C * uxy, ezz = w * k * C * u;
+      const exz = w * S * gx, eyz = w * S * gy;
+      const rate = Math.sqrt(2 * (exx * exx + eyy * eyy + ezz * ezz + 2 * exy * exy + 2 * exz * exz + 2 * eyz * eyz));
+      if (rate > th || wall * Math.exp(-z / delta) > th) fire++;
+    }
+    out[j * n + i] = fire / LEVELS;
+  }
+  return out;
+};
+const corr = (a, b, keep) => {
+  let m = 0, sa = 0, sb = 0;
+  for (let k = 0; k < a.length; k++) if (keep[k]) { m++; sa += a[k]; sb += b[k]; }
+  const ma = sa / m, mb = sb / m;
+  let ab = 0, aa = 0, bb = 0;
+  for (let k = 0; k < a.length; k++) if (keep[k]) { const x = a[k] - ma, y = b[k] - mb; ab += x * y; aa += x * x; bb += y * y; }
+  return { r: ab / Math.sqrt(aa * bb), ma, mb, n: m };
+};
+{
+  const { h, n } = o.wave;
+  const want = shareOf(h, n, false), flipped = shareOf(h, n, true);
+  // The cells' firing share now: their light over their charge (a firing cell's light is its share times its charge, wgsl/glow.ts).
+  const got = o.shakenLit.map((L, k) => L / Math.max(1e-6, o.shakenCharge[k]));
+  const keep = o.shakenCharge.map((c) => c > 0.05);
+  const cs = corr(got, want, keep), cf = corr(got, flipped, keep);
+  console.log(`glow shaken (${SHAKE_HZ} Hz, threshold ${f(SHAKE_AC, 3)} g): below it max ${f(o.belowMax, 6)} min charge ${f(o.belowMinCharge)}; at ${SHAKE_G} g spent ${f(o.shakenSpent)} (Glow Shear ×10: ${f(o.highSpent, 5)}); share mean ${f(cs.ma)} vs reference ${f(cs.mb)}, r ${f(cs.r, 3)} (upside down ${f(cf.r, 3)}); off after 1 s ${f(o.offMax, 5)}`);
+  check('shaken under the wave\'s threshold, the sea stays dark and charged', o.belowMax < 1e-4 && o.belowMinCharge > 0.999, `brightest ${f(o.belowMax, 6)}, lowest charge ${f(o.belowMinCharge)}`);
+  check('shaken past it, the standing wave lights the sea', o.shakenSpent > 0.01, `mean spent ${f(o.shakenSpent)}`);
+  check('it lights where the wave strains the water (cell by cell against the depth-sampled share)', cs.r > 0.9, `r ${f(cs.r, 3)} over ${cs.n} cells`);
+  check('and as much of the depth as the wave strains past the threshold (mean within 15%)', Math.abs(cs.ma / cs.mb - 1) < 0.15, `${f(cs.ma)} vs ${f(cs.mb)}`);
+  check('and not the wave read upside down', cf.r < cs.r - 0.3, `upside down r ${f(cf.r, 3)}`);
+  check('the threshold holds for the wave too: ten times the Glow Shear spends under a tenth', o.highSpent < o.shakenSpent / 10, `${f(o.highSpent, 5)} vs ${f(o.shakenSpent)}`);
+  check('the shaker off, the sea is dark again within a second', o.offMax < 1e-3, `brightest ${f(o.offMax, 5)}`);
+}
 console.log(`${passed} passed, ${failed} failed`);
+
 process.exit(failed ? 1 : 0);

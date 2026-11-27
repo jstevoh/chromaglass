@@ -157,7 +157,14 @@ story is in `docs/plan-shipped.md` under 48f. Open:
   48f's surface (binding 25): the eight every device gives without asking (`gpu/device.ts`
   asks for no more). The next field the plate draws must pack into a buffer already bound
   (the glow's light and the Faraday surface fit one array) or be a texture.
-- **48c-5. A look made for the glow.** Every look ships with Glow at 0. A look of dark water,
-  sparse dye and a cord that stirs on the kick (the music lights a wake on each hit and the
-  quiet lets the water recharge) would show it on Go; the owner picks it from Mac films.
+- **48c-7. The wave's strain and the flow's are two, taken as the larger** (S). The stroke's
+  shear is the gap's (two glasses 2 mm apart) and the wave's the open layer's (48f's 3 mm of
+  water with a free surface), and a cell's share is the larger of the two rather than one
+  strain from both flows together. One geometry for both (the open dish's layer with the
+  stroke's flow in it, or the wave in the gap, 48f-3) would let them add as one tensor.
+- **48c-8. The wave does not carry the plankton** (S–M). A standing Faraday wave drives a
+  steady streaming (Stokes drift and the boundary layers' own), which over seconds gathers
+  floating matter under the lattice's nodes; the glow's state is carried by the plate's flow
+  alone. Add the streaming velocity of the amplitude field to the carry, so a long bass note
+  herds the bloom into the lattice.
 
