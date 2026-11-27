@@ -13070,7 +13070,8 @@ model cannot reach one, the PR says what it reached and asks.
     (`projectorFilm`), plate.ts being at its size ceiling. Measured: `npm run nolight` line
     16 (new), the plate's bubbles at Iridescence 1 against 0 at Film Physics 0 and 1, no
     pixel brighter by over 1 and over 0.2% of the picture still moved: main 54 over (4.39%
-    moved), this 0 at both (4.34% and 3.12%). The lab's stills: 30 → 0 at Iridescence 0.6,
+    moved), this 0 at both (4.34% and 3.12%; landed on 2026-11-27's main, after the
+    bubbles' rework, 0 at both again with 4.59% and 3.19% moved). The lab's stills: 30 → 0 at Iridescence 0.6,
     53 → 0 at 1; the plate's mean at Iridescence 1 160.0 → 158.4. Only looks with
     Iridescence over 0.25 change (Soap Film, and what Lucky, drift or MIDI push there): a
     cream glow becomes a pale cool tint. The owner judged it from before/after clips filmed
