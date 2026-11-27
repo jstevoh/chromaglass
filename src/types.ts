@@ -1,6 +1,7 @@
 import type { SourceName } from './lib/audioFeatures';
 import type { HitFeature } from './lib/hitSource';
 import type { NoteFeature } from './lib/noteVoices';
+import type { ModulatorFeature } from './lib/modulators';
 
 export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
@@ -254,8 +255,8 @@ export type CordMode = 'follow' | 'gate';
 export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
-  /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName | HitFeature | NoteFeature;
+  /** A room/film feature, an audio one, a named source or an LFO/envelope ('shape'), depending on the source. */
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature | NoteFeature | ModulatorFeature;
   /**
    * Any numeric setting — the same list a MIDI fader can learn — or, on a
    * cord aimed at an area, what the hand does there (`AreaTarget`).
@@ -570,6 +571,16 @@ export interface VisualizerSettings {
     standing plate (Gravity) for the weight to act.
   */
   oilWeight: number;
+  /**
+    Oil Thickness, 0..1 on the same scale as Thickness (10^(3t) mm²/s): how
+    thick the oil itself is. The default, log10(50)/3 ≈ 0.566 (50 mm²/s), is the light
+    mineral oil every oil look had; molten paraffin, a lava lamp's wax, is
+    about 9 mm²/s at 60 °C (0.32). A drop in a Hele-Shaw gap rides the flow
+    at 2/(1+λ) of its speed, λ its viscosity over the water's, so a thin
+    oil is carried and sinks freely where a thick one lags
+    (gpu/fluid/constants.ts oilNuOf, PLAN 38w-31). Needs Oil Tension.
+  */
+  oilThickness: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
@@ -821,6 +832,8 @@ export interface VisualizerSettings {
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: how many the plate carries (0 = none; a few go a long way); they leave by the rim and merges, never a clock
+  /** How fast trapped air dissolves into the liquid (PLAN 38b-2): 0 is nature's rate, nil on a show's clock; up, Henry's law with air's diffusivity scaled 1e6 to 1e11 times, very gentle to very extreme, the small bubbles melting first (lib/bubbles.ts meltFactor). */
+  bubbleMelt?: number;
   plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
@@ -1001,6 +1014,9 @@ export interface VisualizerSettings {
   soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
   soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
   soapFilmTilt: number;       // the frame's tilt from flat, degrees: 90 hangs it (gravity along the film is g sin of it, 32h)
+  glow: number;               // the water's bioluminescence, 0 (off) to 2: blue light where a stroke shears it past a threshold, tiring as it is spent (PLAN 48c)
+  glowShear: number;          // the shear rate, per second, the organisms fire at: lower and a gentle stir lights, higher and only a hard stroke does (48c)
+  glowRecharge: number;       // seconds the organisms take to refill their light once they have flashed (48c)
   glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
   lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
   sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
@@ -1010,6 +1026,7 @@ export interface VisualizerSettings {
   analyserAngle: number;      // the analyser's turn against the polariser, degrees: 90 crossed (dark field), 0 parallel (white field, complementary colours)
   quarterWave: number;        // quarter-wave plates with the sheets, 0 (plane: dark pinwheel arms where the stretch lines up with a sheet) to 1 (circular: colour bands only)
   birefringence: number;      // how strongly the liquid's stretch retards the light, 0 to 1 (400 nm per unit of the solver's strain rate at 1)
+  dishStress: number;         // the moulded dish's own frozen stress between the sheets, 0 (none) to 1 (1200 nm at half its radius, rings tightening toward the moulding gate; PLAN 31p-3)
   tank: number;               // a tank of water seen through its side instead of the dish: 0 off, else the dye's glow (PLAN 47n)
   tankFeed: number;           // the nozzle's speed, cm/s: how fast dye is fed in at the surface (47n)
   tankWeight: number;         // how much heavier the dye is than water, %: what gravity pulls it down with (47n)
@@ -1018,6 +1035,8 @@ export interface VisualizerSettings {
   tankHue: number;            // the dye's glow, degrees of hue (47n)
   faradayHz: number;          // Shaker: the dish on a speaker, its drive's frequency in Hz; 0 is no shaker (PLAN 48f)
   faraday: number;            // Shake: the dish's peak acceleration, g; past the liquid's threshold it stands up in Faraday waves (48f)
+  faradayRock: number;        // Rock: the strobe slipped off the waves, Hz 0..2, so crests and troughs trade places (0 holds them still) (48f-6)
+  faradayGain: number;        // Strength: the projector's throw past the dye, 1 real water to 8, so the same waves bend more light (48f)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -1042,6 +1061,8 @@ export interface VisualizerSettings {
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
   macroDepth: number;         // the closeup camera's depth of field (it was also a drawn dome shading, contact shadow and paper grain until PLAN 38u-2)
+  /** The dye finer than the grid in the closeup: carried over the frame without diffusion and added as detail below a cell (PLAN 47a-1, gpu/fineDye.ts), 0–1; 0 is the grid magnified. */
+  macroFine: number;
   macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
@@ -1158,6 +1179,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
+  oilThickness: Math.log10(50) / 3, // 50 mm²/s, the light mineral oil every oil look had (constants.ts OIL_THICKNESS, the same double)
   oilWeight: -0.05,         // the light mineral oil every oil look had: it floats up a standing plate
   surfactantFlow: 0,
   soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
@@ -1179,7 +1201,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   liesegang: 0,
   thicknessOptics: 0,
   spectralOptics: 0,
-  glassSmear: 0.3,          // gentle smear from plate contact
+  // The cover glass is still until a hand or a cord slides it (PLAN 38u-11, 2026-11-14): the looks
+  // that slid it carry the slide as a cord now (lib/glassSlide.ts), so 0 here is a still plate.
+  glassSmear: 0,
   rainDrip: 0.0,
   viscosity: 'thick',
   polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
@@ -1227,7 +1251,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // CC15; a plate that wants it can have it, and the pass will now do something
   // when it is asked to.
   sharpness: 0,
-  granulation: 0.5,         // pigment texture between the boundaries, not just at them
+  // Smooth by default (PLAN 38u-8, 2026-11-14): a dye in solution has no grain, and the speckle is
+  // invented noise, so it is the performer's to turn up on the dial, not every look's ground.
+  granulation: 0,
   grainScale: 110,
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
   buoyancy: 0.45,
@@ -1260,6 +1286,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,
+  bubbleMelt: 0,            // nature's rate: a pocket between the glasses stays (PLAN 38b)
   plateRock: 0.45,
   frameSway: 0,             // the frame holds still; the music moves the liquid (lib/plateRock.ts)
   layerScaleVariety: 0.5,
@@ -1294,6 +1321,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   soapFilmRate: 1,
   soapFilmAngle: 0,
   soapFilmTilt: 90,
+  glow: 0,                  // the water is dark: every look but the ones that glow
+  glowShear: 30,
+  glowRecharge: 8,
   glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
   lensStop: 4,
   sideLight: 0,
@@ -1303,6 +1333,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   analyserAngle: 90,        // crossed, the classic: dark until the liquid moves
   quarterWave: 1,           // circular: the bands with no black lines through them (the owner dislikes thick black outlines)
   birefringence: 0.3,       // a Turbulence-0.35 stir in broad first- and second-order bands on the Mac (lib/polar.ts)
+  dishStress: 0,            // the dish retards nothing: the sheets show the liquid alone, as before (the shader's branch; lib/polarDish.ts)
   tank: 0,                  // the dish from above: every look but the tank's
   tankFeed: 1.5,
   tankWeight: 0.5,
@@ -1311,6 +1342,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   tankHue: 205,
   faradayHz: 0,             // no shaker under the dish: every look until a performer turns it on
   faraday: 0,
+  faradayRock: 0,           // the strobe locked to the crest: the pattern stands
+  faradayGain: 1,           // real water's light
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,
@@ -1397,6 +1430,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroLacing: 0,
   macroDepth: 0.5,
   macroRelief: 0.7,
+  macroFine: 1,              // the owner asked for the closeup's fine detail (2026-11-13); 0 is the closeup before it
   sceneDrive: 0,            // the room does nothing to the plate until it is asked to
   sceneHands: 0,
   sceneImpact: 0.5,         // the depth room patches are read at once any are added

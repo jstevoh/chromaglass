@@ -64,9 +64,9 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
 
   // The sheet's own tokens and sizes (AccountSheet.tsx `label`, `section`, `ghostBtn`), so the
   // card reads as part of it on the desk and keeps the phone's 48 px targets.
-  const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const label = 'text-[12px] font-medium uppercase tracking-wider text-dim';
   const section = 'border-t border-border pt-4';
-  const quiet = 'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-50';
+  const quiet = 'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-65';
   const textBtn = 'min-h-10 pointer-coarse:min-h-12 text-[12px] text-muted underline decoration-faint underline-offset-2 hover:text-text';
 
   if (tier !== 'pro') {

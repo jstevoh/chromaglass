@@ -43,9 +43,6 @@ export interface Bubble {
   film: number;
   /** Open to the air at the rim and emptying (see `step`). */
   venting?: boolean;
-  /** A transient kick of velocity (cells/s) from a drop's spreading front nearby. */
-  kx: number;
-  ky: number;
   /**
    * Fingering: how far the rim has broken into fingers (0 round, 1 the
    * fingers as long as the radius), how many there are, and where they sit.
@@ -101,6 +98,47 @@ const D_AIR_WATER = 2e-9;
 const MU_WATER = 1e-3;
 const ATMOSPHERE = 101325;
 const G = 9.81;
+
+/*
+  The Bubble Melt dial (PLAN 38b-2): how many times faster than nature air
+  diffuses out of a pocket into the liquid. The owner asked for bubbles that
+  melt away (2026-10-31), and the rule is that a dial scales a physical
+  quantity past real without the law under it changing, so the dial is a
+  factor on D in the Henry's-law shrink `step` already runs and nothing else:
+  the small pockets still go first, each faster as its Laplace pressure
+  climbs at the end, a thick oil still slower than water by Stokes–Einstein.
+
+  Why a jump off zero and then decades. At 0 the rate is the real one, and
+  the real one is nil on a show's clock: a 1 mm pocket in the default oil
+  takes years. Even a fully degassed liquid, the most a real plate could do
+  (the drive Δp/p₀ going from the Laplace pressure's 3e-4 to 1), is only
+  about 3,000 times that, still days. So the dial's first step jumps to a
+  million and its travel is five decades on a log scale, from very gentle
+  to very extreme, as the owner asked every dial to run (2026-10-31). What
+  a show has sets the ends: the music's and the straw's bubbles are born
+  at two cells' radius or more (`spawn`), 2 mm at 192², the straw blows
+  them to 8 mm, and the flow carries most of them to the rim in 5 to 30 s.
+  At the first step (0.05, 1.8e6) a 2 mm pocket takes about 25 minutes, a
+  slow thinning over a set; at 0.25 (1.8e7) about 2.5 minutes, the small
+  ones going while they are still on the plate; at the middle (3e8) 9 s,
+  4 mm in 45 s; at 0.75 (5.6e9) 2 mm in half a second and the straw's 8 mm
+  in 11 s; at the top (1e11) even that one is gone in a fraction of a
+  second and no bubble lives to be seen. Filmed on the owner's Mac
+  (2026-10-31): the first mapping, 10^(6 + 3v), melted nothing visible
+  below 0.9; the second, 10^(8 + 3v), went from a gradual melt at 0.25 to
+  an empty plate at 0.9, all of it strong, with nothing gentle.
+  Those times are at today's 6 mm gap; at 38r's 2 mm the Laplace pressure
+  2σ/b triples and a millimetre pocket goes about a quarter sooner, by the
+  same law. `npm run bubblephysics` holds the dial to these times.
+*/
+export const MELT_FLOOR = 1e6;
+export const MELT_DECADES = 5;
+
+/** The Bubble Melt dial (0–1) as the factor on air's diffusivity: 1 at 0, then 10^(6 + 5v). */
+export function meltFactor(v: number | undefined): number {
+  const x = Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : 0;
+  return x > 0 ? MELT_FLOOR * Math.pow(10, MELT_DECADES * x) : 1;
+}
 
 /**
  * A pancake's film (Park and Homsy 1984, Bretherton's law with the half gap
@@ -191,7 +229,7 @@ export class BubbleField {
    * How many times the real rate air dissolves into the liquid. 1 is real,
    * and real is effectively never on a show's clock (see `step`); a dial
    * may scale it past nature, as the owner's rule allows, without the law
-   * underneath changing (PLAN 38b-2).
+   * underneath changing: the Bubble Melt dial, by `meltFactor` (PLAN 38b-2).
    */
   dissolve = 1;
 
@@ -260,9 +298,11 @@ export class BubbleField {
    * Thickness dial's, on the same log scale from water to glycerine the
    * thin-gap solver drags with; off, the Viscosity word's. The word also
    * says whether the carrier is water ('thin') or oil, which sets the
-   * surface tension and how much air it dissolves.
+   * surface tension and how much air it dissolves. Bubble Melt scales how
+   * fast that air leaves it.
    */
-  liquid(s: { thinGap?: number; gapThickness?: number; viscosity?: string }): void {
+  liquid(s: { thinGap?: number; gapThickness?: number; viscosity?: string; bubbleMelt?: number }): void {
+    this.dissolve = meltFactor(s.bubbleMelt);
     const c = s.viscosity === 'thin' ? WATER_AIR : OIL_AIR;
     this.liquidRho = c.rho;
     this.liquidSigma = c.sigma;
@@ -282,6 +322,37 @@ export class BubbleField {
     this.poured = null;
     this.areaGap = Math.max(1e-6, this.gapMetres);
     this.nextId = 1;
+  }
+
+  snapshot() {
+    return {
+      bubbles: this.bubbles.map((b) => ({ ...b })),
+      nextId: this.nextId,
+      areaGap: this.areaGap,
+      gapMetres: this.gapMetres,
+      liquidMu: this.liquidMu,
+      liquidSigma: this.liquidSigma,
+      liquidRho: this.liquidRho,
+      liquidOstwald: this.liquidOstwald,
+      dissolve: this.dissolve,
+    };
+  }
+
+  restore(s: ReturnType<BubbleField['snapshot']>): void {
+    this.bubbles.length = 0;
+    for (const b of s.bubbles) this.bubbles.push({ ...b });
+    this.events.length = 0;
+    this.strawBubble = null;
+    this.contactDrain.clear();
+    this.touchingNow.clear();
+    this.nextId = s.nextId;
+    this.areaGap = s.areaGap;
+    this.gapMetres = s.gapMetres;
+    this.liquidMu = s.liquidMu;
+    this.liquidSigma = s.liquidSigma;
+    this.liquidRho = s.liquidRho;
+    this.liquidOstwald = s.liquidOstwald;
+    this.dissolve = s.dissolve;
   }
 
   /**
@@ -330,7 +401,6 @@ export class BubbleField {
       id: this.nextId++,
       x, y, r, age: 0, inject: 0,
       sx: 0, sy: 0, film: 0,
-      kx: 0, ky: 0,
       fing: 0, lobes: 8 + this.rng.int(7), fph: this.rng.angle(),
     };
   }
@@ -477,40 +547,35 @@ export class BubbleField {
     // Held at the straw.
     const k = Math.min(1, dt * 8);
     b.x += (x - b.x) * k; b.y += (y - b.y) * k;
-    b.kx = 0; b.ky = 0;
     b.held = true;
   }
 
   /**
-   * Something landed on the plate at (x, y): dye from a dropper, or a blow
-   * of air. A pocket under a drop of dye is taken by it, the liquid closing
-   * where the air was (the engulfing PLAN 38b keeps), and bubbles around the
-   * point are shoved away along the spreading front. Air shoves harder and
-   * takes nothing (fresh air arrives as new bubbles elsewhere).
+   * Liquid landed on the plate at (x, y), reaching `r` cells: a pocket it
+   * lands on is taken by it, the liquid closing where the air was (the
+   * engulfing PLAN 38b keeps). Nothing else.
+   *
+   * This was `disturb`, which also kicked every bubble within three times
+   * the reach outward along "the spreading front" (40 cells/s for air, 22
+   * for dye), a velocity of the bubble's own that decayed over a fifth of a
+   * second, and a blow or a press shoved them the same way. But a pocket
+   * between two glasses has nothing to push it but the liquid round it: a
+   * drop's spreading front moves the bubbles because it moves the liquid,
+   * and the solver already carries that (a drop brings volume on a thin gap,
+   * a blow is wind on the surface, a press closes the gap). The kick moved
+   * a bubble that the liquid round it left where it was, which is the hand
+   * reaching through the glass (PLAN 15g-17). Now a pocket moves only in
+   * `step`, with the flow, the tilt and a press.
    */
-  disturb(x: number, y: number, r: number, kind: 'dye' | 'air', strength = 1): void {
+  engulf(x: number, y: number, r: number): void {
     const bs = this.bubbles;
-    // The front spreads well past the drop itself.
-    const reach = kind === 'air' ? r * 3 + 4 : r * 3 + 6;
-    const shove = (kind === 'air' ? 40 : 22) * strength;
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
-      const dx = b.x - x, dy = b.y - y;
-      const dist = Math.hypot(dx, dy) || 1e-3;
-      if (kind === 'dye' && dist < r + b.r * 0.6 && b.age > 0.3) {
-        // No spray of daughters: that was a free soap film's rim retracting
-        // (Culick), and a pocket between glasses has no film to retract.
-        this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
-        bs.splice(i, 1);
-        continue;
-      }
-      if (dist < reach) {
-        const k = shove * (1 - dist / reach);
-        const ux = dx / dist, uy = dy / dist;
-        // A shove sets the kick rather than adding to it, so a finger held
-        // still does not wind a bubble up to escape velocity.
-        if (Math.hypot(b.kx, b.ky) < k) { b.kx = ux * k; b.ky = uy * k; }
-      }
+      if (b.age <= 0.3 || Math.hypot(b.x - x, b.y - y) >= r + b.r * 0.6) continue;
+      // No spray of daughters: that was a free soap film's rim retracting
+      // (Culick), and a pocket between glasses has no film to retract.
+      this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
+      bs.splice(i, 1);
     }
   }
 
@@ -598,12 +663,10 @@ export class BubbleField {
         moves with the flow, up the tilt and off a press, and with nothing
         else.
       */
-      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb + b.kx;
-      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb + b.ky;
+      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb;
+      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb;
       b.x += dx * dt;
       b.y += dy * dt;
-      b.kx *= Math.exp(-dt / 0.22);
-      b.ky *= Math.exp(-dt / 0.22);
       const speed = Math.hypot(dx, dy);
       const R = b.r * m;
 

@@ -144,7 +144,7 @@ export function useControlTip({ name, help, value, hint, held = false, disabled 
           {value !== undefined && <span className="shrink-0 font-mono text-[12px] text-text-2" data-tip="value">{value}</span>}
         </div>
         {help && <p className="mt-1 text-[12px] leading-snug text-text-2" data-tip="help">{help}</p>}
-        {hint && <p className="mt-1.5 text-[11px] leading-snug text-faint" data-tip="hint">{hint}</p>}
+        {hint && <p className="mt-1.5 text-[12px] leading-snug text-faint" data-tip="hint">{hint}</p>}
       </div>,
       body,
     );

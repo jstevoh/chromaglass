@@ -182,6 +182,16 @@ written first. Line numbers are as read on main at d07ac31.
   boost", in every look). The dye raises the path by tartrazine's measured dn/dc over its
   summed absorbance (`wgsl/dyeIndex.ts`, 2e-5 for a dye that takes 96% of a channel), and
   **Dye Index Boost** (×1 real to ×1000) is the dial that says it is past real; Boundary
-  Contrast no longer scales it. `npm run derive`'s 38u-10 line. Left: **38u-17**.
-- ~~**38u-18. The derived path is stored in half floats, so a real dye's step rounds away**~~ shipped
-  2026-11-14 with 38u-10: `.w` holds the path less clear water's. `npm run derive`'s 38u-18 line.
+  Contrast no longer scales it. `npm run derive`'s 38u-10 line. Left: **38u-19**.
+- ~~**38u-20. The derived path is stored in half floats, so a real dye's step rounds away**~~ shipped
+  2026-11-14 with 38u-10: `.w` holds the path less clear water's. `npm run derive`'s 38u-20 line.
+- ~~**38u-8. Granulation is value noise**~~ — **Shipped** (the story is in
+  `docs/plan-shipped.md`). The owner's call: default 0 in every look, the dial kept;
+  `npm run glassstill`. The real grain (a concentration carried below the grid) stays 47a's.
+
+## The top picks
+
+- ~~**38b-2. An Air Dissolves dial**~~ **Shipped** as **Bubble Melt** (the owner, 2026-10-31:
+  "a bubble dial for them to melt away"): a factor on air's diffusivity in the Henry's-law
+  shrink, 1 at 0, then 10^(6 + 5v), very gentle to very extreme (`meltFactor`, `lib/bubbles.ts`); Settings → Look, desks,
+  MIDI, patches, the phone. `npm run bubblephysics` 28/28. Story in `docs/plan-shipped.md` §38b-2.

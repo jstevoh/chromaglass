@@ -169,7 +169,7 @@ export function Bulb({ warmth }: { warmth: number }) {
         <path d="M8 18h6M8.6 20.4h4.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         <path d="M9 17.4V10.6l1-1.6 1 1.6 1-1.6 1 1.6v6.8" fill="none" stroke={hex} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span className="whitespace-nowrap font-mono text-[10px] leading-none text-muted">{kelvinLabel(warmth)}</span>
+      <span className="whitespace-nowrap font-mono text-[12px] leading-none text-muted">{kelvinLabel(warmth)}</span>
     </span>
   );
 }
@@ -484,7 +484,7 @@ const MOUNT_COLOUR = '#cfc9ba';
  * look's own palette on the film. The mount never changes colour for state;
  * the row or tile around it carries lit and live as it did before.
  */
-export function SlideMount({ swatch, size = 24, className = '' }: { swatch: string; size?: number; className?: string }) {
+export function SlideMount({ swatch, still, size = 24, className = '' }: { swatch: string; still?: string | null; size?: number; className?: string }) {
   const n = NOTCH_MM / MOUNT_MM * 100;
   return (
     <span
@@ -493,13 +493,15 @@ export function SlideMount({ swatch, size = 24, className = '' }: { swatch: stri
       style={{ width: size, height: size, background: MOUNT_COLOUR, clipPath: `polygon(0 ${n}%, ${n}% 0, 100% 0, 100% 100%, 0 100%)` }}
     >
       <i
-        className="absolute"
+        className="absolute overflow-hidden"
         style={{
           left: `${(1 - WINDOW_W) / 2 * 100}%`, top: `${(1 - WINDOW_H) / 2 * 100}%`,
           width: `${WINDOW_W * 100}%`, height: `${WINDOW_H * 100}%`,
           background: swatch, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.5)',
         }}
-      />
+      >
+        {still && <img src={still} loading="lazy" alt="" className="block h-full w-full object-cover" draggable={false} />}
+      </i>
     </span>
   );
 }

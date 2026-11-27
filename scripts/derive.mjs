@@ -82,7 +82,7 @@ try {
       const halves = new Uint16Array(buf.getMappedRange().slice(0));
       buf.unmap();
       /*
-        .w stores the path less clear water's 1.333 (PLAN 38u-18: a half float
+        .w stores the path less clear water's 1.333 (PLAN 38u-20: a half float
         near 1.333 steps by 1e-3, ten times a real dye's rise), so at() adds
         it back and every line below reads the path itself; raw() is what the
         texture holds, which is what the plate's shadowgraph samples.
@@ -484,12 +484,12 @@ try {
       ix.predicted > 1e-5 && err < 0.05 && Math.abs(ix.clear - 1.333) < 0.002 && ix.zBig > 0 && lin < 0.05 && dim < 1 / 255 && ix.dimBig > 0.04,
       `index rise over the dye ${ix.read.toExponential(3)} against ${ix.predicted.toExponential(3)} predicted (${(err * 100).toFixed(1)}% off); clear water ${ix.clear.toFixed(4)}; .z peak ${ix.zReal.toExponential(3)} at 1, ${ix.zBig.toFixed(4)} at 1000 (${(lin * 100).toFixed(1)}% from linear); the wall's shadowgraph on the stored path at Focus 1 changes the light by ${(dim * 100).toFixed(3)}% at 1, ${(ix.dimBig * 100).toFixed(1)}% at 1000`);
     /*
-      PLAN 38u-18: the stored path keeps a real dye. At ×1 the path over the
+      PLAN 38u-20: the stored path keeps a real dye. At ×1 the path over the
       dye's peak less clear water's, read straight from .w, is the measured
       rise within 5%. With .w holding the whole path (about 1.333 in a half
       float), this read 9.77e-4 against 1.0e-4, one rounding step.
     */
-    check('38u-18: the stored path keeps a real dye\'s rise at Dye Index Boost ×1 (within 5%)', errReal < 0.05,
+    check('38u-20: the stored path keeps a real dye\'s rise at Dye Index Boost ×1 (within 5%)', errReal < 0.05,
       `rise read from .w at ×1 ${ix.readReal.toExponential(3)} against ${ix.predicted.toExponential(3)} predicted (${(errReal * 100).toFixed(1)}% off)`);
   }
   const worst = Math.max(...r.paths.map((p) => Math.abs(p.read - p.expected)));

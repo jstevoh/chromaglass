@@ -88,7 +88,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     Video. `MERGED_SECTIONS` below sends its old id here.
   */
   { id: 'audio-input', name: 'Sound', category: 'feed',
-    terms: 'sound source music player shelf drone instrument plate plays itself ambient tv silent microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation impact' },
+    terms: 'audio inputs sound source music player shelf drone instrument plate plays itself ambient tv silent microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation impact' },
   /*
     Called by what it does (PLAN 14ad, the owner 2026-10-24: "what the room
     control is vs. showing video on the plate"). "The Room" said where the

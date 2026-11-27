@@ -54,7 +54,7 @@ const ENV_ON_NAMES: Record<typeof ENVELOPE_TRIGGERS[number], string> = {
 export const PatchesSection = ({ c }: { c: SectionCtx }) => {
   const {
     settings, onUpdate, readEar, focusSection, lookAreas, areaColours, pins, keep, shown, goTo, listens,
-    CARD, GRID, TITLE,
+    embed, CARD, GRID, TITLE,
   } = c;
   // The music's cords folded until opened (HandControls.tsx MusicHandsFold says why).
   const [handsOpen, setHandsOpen] = React.useState(false);
@@ -102,7 +102,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
             </button>
           </div>
           {(settings.sceneMappings ?? []).length === 0 ? (
-            <p className="text-[12px] text-white/40" data-testid="patch-empty">
+            <p className="text-[12px] text-dim" data-testid="patch-empty">
               Nothing patched yet. Add one, then pick what it listens to and what it moves.
             </p>
           ) : (
@@ -194,7 +194,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 text-muted hover:text-text"
                       aria-label="Remove mapping"
                       // By the patch's index, for the phone's check: the music's folded cords make the nth on screen another patch.
                       data-testid={`patch-remove-${i}`}
@@ -228,7 +228,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                         next[i] = { ...m, layer: v === 'all' ? 'all' : Number(v) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="min-h-6 w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
+                      className="min-h-6 w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-65"
                       data-testid={`patch-layer-${i}`}
                     >
                       <option value="all">All plates</option>
@@ -251,7 +251,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       className="set-range flex-1"
                       style={{ '--fill': `${Math.round(50 * (m.depth + 1))}%` } as React.CSSProperties}
                     />
-                    <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
+                    <span className="text-[12px] font-mono text-dim w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
                   {/*
                     Live spectrum strip for `bands` cords (PLAN 30a): log
@@ -339,7 +339,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                               style={{ '--fill': `${Math.round(100 * (m.gain ?? 1) / 4)}%` } as React.CSSProperties}
                               data-testid={`patch-gain-${i}`}
                             />
-                            <span className="text-[12px] font-mono opacity-50 w-12 text-right">{`${(m.gain ?? 1).toFixed(2)}×`}</span>
+                            <span className="text-[12px] font-mono text-dim w-12 text-right">{`${(m.gain ?? 1).toFixed(2)}×`}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between gap-2 min-h-[28px]" data-testid={`patch-mode-${i}`}>
@@ -400,7 +400,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                               style={{ '--fill': `${Math.round(100 * ((m[key] ?? 0) - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
                               data-testid={`patch-${key}-${i}`}
                             />
-                            <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
+                            <span className="text-[12px] font-mono text-dim w-12 text-right">{show(m[key] ?? 0)}</span>
                           </div>
                         ))}
                       </div>
@@ -419,8 +419,9 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
           attack, decay and trigger source (any, kick, snare, note, pad).
           Defaults match the fixed rates and shapes looks were built against.
         */}
+        {/* LFOs pair 2×2 and Envelopes 2×1 in the sheet (like SECTION_GRID) so Patches stays under three screens deep when a look has several cords (`npm run qa`); desk panels (`embed`) and phones stay one column. */}
         <div className="mt-6 mb-2 text-[13px] font-medium text-text" data-testid="patch-lfos">LFOs</div>
-        <div className="flex flex-col gap-2 mb-4">
+        <div className={`${embed ? 'flex flex-col' : 'grid grid-cols-1 md:grid-cols-2'} gap-2 mb-4`}>
           <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="lfo-row-1">
             <div className="flex items-center justify-between gap-1 mb-1.5">
               <span className="text-[12px] font-medium text-text">LFO 1</span>
@@ -615,7 +616,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
         </div>
 
         <div className="mt-4 mb-2 text-[13px] font-medium text-text" data-testid="patch-envelopes">Envelopes</div>
-        <div className="flex flex-col gap-2 mb-4">
+        <div className={`${embed ? 'flex flex-col' : 'grid grid-cols-1 md:grid-cols-2'} gap-2 mb-4`}>
           <div className="rounded-lg border border-white/10 bg-white/5 p-2" data-testid="env-row-1">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-[12px] font-medium text-text">Envelope 1 Trigger</span>

@@ -552,6 +552,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
+  { key: 'bubbleMelt',      label: 'Bubble Melt',      min: 0, max: 1 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
   { key: 'crispEdges',      label: 'Crisp Edges',      min: 0, max: 1 },
@@ -577,8 +578,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
   // A cube on the travel: 1 to 1000 is three decades, and real (1) to the
-  // old stand-in's 300 to 600 has to be reachable in the bottom two thirds.
+  // first stand-in's 300 to 600 has to be reachable in the bottom two thirds
+  // (18e-2's retuned stand-in sat near 3400, past the top: dyeIndex.ts).
   { key: 'dyeIndexBoost',   label: 'Dye Index Boost',  min: 1, max: 1000, curve: 3 },
+  { key: 'glassSmear',      label: 'Glass Smear',      min: 0, max: 3, wanderSpan: 1 },
   { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 3, wanderSpan: 1 },
@@ -643,6 +646,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
   { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
   { key: 'soapFilmTilt',    label: 'Frame Tilt',       min: 0, max: 90 },
+  // The water's glow (PLAN 48c): how bright, the shear it fires at, how fast it refills.
+  { key: 'glow',            label: 'Glow',             min: 0, max: 2 },
+  { key: 'glowShear',       label: 'Glow Shear',       min: 5, max: 200 },
+  { key: 'glowRecharge',    label: 'Glow Recharge',    min: 0.5, max: 60 },
   // Glitter in the liquid and the lens photographing it (PLAN 47e, 47d): a
   // fader for how much, and the f-number on a curve, so the knob's travel
   // spends as long on the wide-open discs as on the stopped-down stars.
@@ -659,6 +666,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'analyserAngle',   label: 'Analyser',         min: 0, max: 180 },
   { key: 'quarterWave',     label: 'Quarter Wave',     min: 0, max: 1 },
   { key: 'birefringence',   label: 'Birefringence',    min: 0, max: 1 },
+  { key: 'dishStress',      label: 'Dish Stress',      min: 0, max: 1 },
   { key: 'tank',            label: 'Tank',             min: 0, max: 1 },
   { key: 'tankFeed',        label: 'Feed',             min: 0, max: 6 },
   { key: 'tankWeight',      label: 'Dye Weight %',     min: 0.05, max: 3 },
@@ -668,6 +676,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The dish on a speaker (PLAN 48f): the drive's frequency, and its shake in g, which the music's cord rides.
   { key: 'faradayHz',       label: 'Shaker',           min: 0, max: 150 },
   { key: 'faraday',         label: 'Shake',            min: 0, max: 2 },
+  { key: 'faradayRock',     label: 'Rock',             min: 0, max: 2 },
+  { key: 'faradayGain',     label: 'Wave Strength',    min: 1, max: 8 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
@@ -679,6 +689,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
   // The oil's weight (PLAN 27f-9c): a fader sinks a floating oil to the bottom of a standing plate and lifts it again.
   { key: 'oilWeight',       label: 'Oil Weight',       min: -1, max: 1 },
+  { key: 'oilThickness',    label: 'Oil Thickness',    min: 0, max: 1 },
   { key: 'soapBreakdown',   label: 'Soap Breakdown',   min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.
@@ -695,7 +706,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // up pours liquid in at the rim and the glass rises; down wicks it off.
   // The weight on a squared curve, so the default 157 g sits two fifths up
   // and the bottom of the travel is a whisper of a glass.
-  { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
+  { key: 'liquidMl',        label: 'Liquid',           min: 1, max: 150 },
   { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
   // The song's title as ink (PLAN 37x-10) had its sweep, size and height on knobs here until the
   // owner shelved the ink on 2026-11-12 (37x-10m): titles are the corner caption, which has no dial,

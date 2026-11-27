@@ -1,3 +1,4 @@
+import { DISH_REST_GAP } from '../../lib/turntable';
 import { BULB_FILL } from './lampField';
 import { MOIRE_WGSL } from './plateMoire';
 /**
@@ -50,7 +51,7 @@ fn gelFilter(uv: vec2f) -> vec3f {
   past the plate sees the light gathered where that path is curved: the
   transport 1 - Δz·∇²OPL, whose first order exp(-Δz ∇²OPL/n) stays positive
   as light must. The derive pass writes the whole column's OPL (.w, less clear water's 1.333,
-  PLAN 38u-18), so this
+  PLAN 38u-20), so this
   is one term for all of it. It was two: refractionOptics drew the dye's
   from the derive pass's ∇²OPL, masked to the dye's own slope and only over
   dye, so a pour that moved only the index drew nothing; and the oil block
@@ -74,17 +75,7 @@ fn gelFilter(uv: vec2f) -> vec3f {
 fn defocusShadow(t: texture_2d<f32>, uv: vec2f) -> f32 {
   let dz = (U.projectorFocus - 0.5) * 1.5;
   if (abs(dz) <= 0.001) { return 1.0; }
-  let e = 3.0 / U.logicalGrid;
-  let R = e * (1.0 + 4.0 * abs(dz));
-  var outer = 0.0;
-  var inner = 0.0;
-  for (var k = 0; k < 16; k++) {
-    let d = vec2f(cos(f32(k) * 0.3926991), sin(f32(k) * 0.3926991));
-    outer += tex2(t, uv + d * R).w;
-    if (k % 2 == 1) { inner += tex2(t, uv + d * (R / 3.0)).w; }
-  }
-  let lap = (outer / 16.0 - inner / 8.0) * 4.0 / (R * R * (8.0 / 9.0)) * 50.0 * e * e;
-  return clamp(exp(-dz * (lap / N_WATER) * max(1.0, U.boundaryContrast * 2.0)), 0.2, 2.5);
+  return clamp(exp(-dz * pathLap(t, uv, dz) * max(1.0, U.boundaryContrast * 2.0)), 0.2, 2.5);
 }
 
 /*
@@ -332,8 +323,44 @@ fn edgePass(bend: f32, cam: f32) -> f32 {
   every look (smooth, 2% of the frame or more).
 */
 const CAMERA_DEFOCUS: f32 = 0.75;
+fn pathLap(t: texture_2d<f32>, uv: vec2f, dz: f32) -> f32 {
+  let e = 3.0 / U.logicalGrid;
+  let R = e * (1.0 + 4.0 * abs(dz));
+  var outer = 0.0;
+  var inner = 0.0;
+  for (var k = 0; k < 16; k++) {
+    let d = vec2f(cos(f32(k) * 0.3926991), sin(f32(k) * 0.3926991));
+    outer += tex2(t, uv + d * R).w;
+    if (k % 2 == 1) { inner += tex2(t, uv + d * (R / 3.0)).w; }
+  }
+  return (outer / 16.0 - inner / 8.0) * 4.0 / (R * R * (8.0 / 9.0)) * 50.0 * e * e / N_WATER;
+}
 fn camShadow(lapK: f32, relief: f32) -> f32 {
   return clamp(exp(-relief * CAMERA_DEFOCUS * lapK), 0.2, 2.5);
+}
+/*
+  The projected plate's pupil loss from the optical path's gradient (PLAN 18e-2).
+  In small angle a ray crossing the column bends by the physical slope of the
+  optical path, theta = |grad(n * h_phys)|. calcOpl writes OPL = n * h in rest
+  gaps (DISH_REST_GAP of the plate's width) and the derive pass's Sobel stencil
+  measures |grad OPL| per texel of the logical grid (1 / logicalGrid of the
+  plate's width), so converting rest gaps per texel to plate widths per plate
+  width multiplies by DISH_REST_GAP / (1 / logicalGrid) = DISH_REST_GAP *
+  logicalGrid. Where the column's gradient comes from dye, normal0 carries both
+  airNear's bubble-hole mask (33b) and Glossiness's relief gain (38h), so the
+  path gradient scales with the masked normal's slope over the raw dye slope
+  (1 on a clear pour or oil drop, 0 at an air hole's false dye ramp). Kept the
+  same at every Focus so the in-focus rim and the defocused shadowgraph separate.
+*/
+fn oplPupilLoss(oplGrad: f32, dyeGrad: vec2f, normal0: vec3f, plateOn: bool, plateAmt: f32) -> f32 {
+  if (!plateOn || U.edgeRelief <= 0.005) { return 1.0; }
+  let gRaw = length(dyeGrad);
+  let gMod = length(normal0.xy) / (0.9 * max(normal0.z, 1e-4));
+  let grad = abs(oplGrad) * select(1.0, gMod / gRaw, gRaw > 1e-4);
+  if (grad <= 1e-5) { return 1.0; }
+  let theta = grad * ${DISH_REST_GAP} * U.logicalGrid;
+  let u = clamp(theta / (2.0 * DROP_NA), 0.0, 1.0);
+  return 1.0 - clamp(smoothstep(0.0, 1.0, u) * U.edgeRelief * plateAmt, 0.0, 0.85);
 }
 /*
   The bend at a dye surface of normal n, in aperture radii: the slope the

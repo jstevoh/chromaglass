@@ -18,6 +18,21 @@ the "Closer 3D macro view" work owns now (14ab-6, #601).
 The music's stir, from the third pass (38u, 2026-11-13; its ranked list is in section 38u,
 at the foot of this file):
 
+The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
+
+- **38u-17. The glass's direction is a noise path** (S; Medium). Glass Smear is now a speed a
+  hand or a cord sets, but the way the glass goes is still `noise2D(0.3 t)` in `deriveStep`, a
+  wander nobody chose, and uniform over the plate, so the liquid leaves by the rim on one side
+  and comes back on the other (18a-2). A hand pushing the glass chooses the direction: give
+  the slide a direction the performer sets (a second dial, or the hand's drag on the phone),
+  and a cord that can carry it. Check: `glassstill` gains a direction held across a run.
+- **38u-18. A look saved before 38u-11 still slides its glass all the time** (S; Medium). The
+  built-in looks are laid out where they are defined; a look the owner saved with Glass Smear
+  above 0, or with none written (the old default of 0.3 filled in when it was made), reads
+  back sliding constantly, or not at all where none was written. Like 38u-16: hand a saved
+  look the slide cord once as it is read (`parsePresetFile` and `upgradeSaved`, lib/glassSlide.ts
+  `laySlideCords`), with a mark so a cord the owner pulls stays pulled. Check: `glassstill`
+  gains a saved look read back with its cord and its dial at rest.
 ## The top picks
 
 - **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes
@@ -38,11 +53,6 @@ at the foot of this file):
   the two looks that set it, Crowd Plate with its `dirX` patch and Soap Film), or give it a real
   thing that moves, such as the gel wheel's hand.
 
-- **38b-2. An Air Dissolves dial** (S; Low, the owner's call). `BubbleField.dissolve` scales
-  air's diffusivity past nature (1 is real, nil on a show's clock; 3e7 melts a 2-cell pocket in
-  about 90 s, the small first). A setting for it, with its desk, phone and MIDI, would give a
-  music look back the turnover its timers gave it, by the real law. Not built: the owner sees
-  the plate fill and empty only by the rim and merges first.
 - **38b-3. Music air reaches the rim** (S; Medium). With no clock a look's bubbles hold at its
   Bubbles count (`room` in `LiquidVisualizer.tsx`) and new ones come only as old ones leave,
   so how fast they turn over is now how fast the flow takes them to the rim and how often they
@@ -201,19 +211,14 @@ at the foot of this file):
     bulb's lost share.
   - **38h-6. Light still made at an edge, found doing 38h-2** (S each, nil). The back
     plate's derived boundary adds `edge1 · edgeK · 0.25` of white and 1.6 of the dye (the
-    31a shortcut, left to **31a**); the camera's bubble's film colour multiplies by up to
-    1.7 (a front-lit soap film's reflection, where a backlit pocket's film transmits:
-    `filmTableAt(…, true)`, as the projected bubble already uses at Film Physics); the
-    ferrofluid's glint is a fixed key light (with **38j**). The photo style's softbox is a
-    print lit from the front and stays. And the lab draws only the derived path, so the
-    plain path's rims are checked through the camera's, which shares `meniscus`.
-    *The film's check, written first (2026-11-08):* `npm run nolight -- --owed=film` line
-    15, the camera's bubbles at Iridescence 1 against 0, at Film Physics 0 and 1: no pixel
-    brighter (by over 1), over 0.2% of the picture still moved, and Film Physics 0 the same
-    picture as 1 (one transmitted film; main differs by 31). Main: 22 levels over at
-    Film Physics 0 (`camFilm`'s `0.45 + 1.25 × filmC`), 0 at 1, where it already
-    transmits. A throwaway `camFilm` that returns `mix(1, filmTableAt(filmP, true), irid)`
-    at any Film Physics passed it (10.83% moved at each).
+    31a shortcut, left to **31a**); the ferrofluid's glint is a fixed key light (with
+    **38j**). The photo style's softbox is a print lit from the front and stays. And the lab
+    draws only the derived path, so the plain path's rims are checked through the camera's,
+    which shares `meniscus`. ~~*The camera bubble's film*~~ *shipped 2026-11-08:* `camFilm`
+    (`src/gpu/wgsl/closeupDepth.ts`) returns the transmitted film `mix(1, filmTableAt(filmP,
+    true), clamp(irid, 0, 1))` at every Film Physics (22 levels over to 0, 13.36% moved at
+    each, 0 levels between Film Physics 0 and 1); `npm run nolight` line 15 (`film` taken out
+    of `--owed`). Story in `docs/plan-shipped.md` §38.
     38v (2026-11-21): the ferro glint is drawn, not lit. `plate.ts:2690-2736` paints a
     nine-arm star, cos(ang·9 + rise·3), on pow(1 − N_z, 2), with pow(face, 70)·1.2 and a dot
     on each crest, from a key at about 44.6°, and the halo multiplies the light by 1 +
@@ -472,9 +477,12 @@ at the foot of this file):
     and turns a moving cover into flow at the rim; pours add to it; the main readers of the rest
     gap follow it; the dials are on the sheet, the desks, MIDI and the phone's remote. Open:
     - **38r-16. The pinch and the air edge** (M-L; part 2, its own thread). *Design pass and
-      checks written 2026-11-08* (`npm run gap -- --owed=puddle,settle,lift,pinch`, lines 19–23;
-      `npm run airedge -- --owed=rim,front,fingers`; a throwaway proof of the ledger half passes
-      every gap line but the wiring). Built by Antigravity from the brief in the project's files.
+      checks written 2026-11-08*. ~~**G1** (the ledger and the pinch, `npm run gap` lines 1–23,
+      `puddle`, `settle`, `lift`, `pinch` all green)~~ built on `antigravity/38r-16-pinch`
+      (Liquid range 1–150 mL, `lib/cover.ts` puddle ledger + RK4 substepping, `lib/playGesture.ts`
+      `pinchHand`/`PINCH_SPAN`/`playHand` span, `components/coverPinch.ts`, `PhonePlay.tsx`).
+      **G2** (`npm run airedge -- --owed=rim,front,fingers`, the Saffman–Taylor fingers on the
+      GPU solver) remains open.
       - *The pinch.* A two-finger pinch on the desk (trackpad: wheel + ctrlKey over the plate,
         outside the closeup, scale ×exp(−deltaY/100) an event) and the phone (two fingers whose
         span changes past `PINCH_SPAN`, 1.2, told from Blow's pair moving together in
@@ -663,14 +671,7 @@ Shipped with this pass (the closeup, `npm run stillcloseup`):
   `platePressure` (and Moiré Ripple), and Clock Glass's kick adds 8% to dt. Drop the terms and
   retune Speed per look. Check: dt equal under kicks and in silence; `npm run quick` green.
   (S; Medium; from RS-45.)
-- **38u-8. Granulation is value noise** (M; High, the owner's call). `plate.ts` grainAt and
-  pigmentGrain: the solver carries the speckle's coordinates, so it moves rightly, but the
-  speckle is invented and scales the dye's depth at every pixel. Granulation 0.5 by default,
-  on in every look. A dye in solution has no grain; a pigment (India ink) flocculates. The
-  real thing is a concentration the solver carries below the grid (the particles, the fine
-  dye of 47a). Until then the choice is the owner's: default 0, or keep it named as a
-  shortcut. 38h-9 holds only its scale at zoom. none.
-- **38u-17. Every dye bends light as tartrazine does, at one wavelength** (S; Low, found doing
+- **38u-19. Every dye bends light as tartrazine does, at one wavelength** (S; Low, found doing
   38u-10). `DYE_DN_PER_ABSORBANCE` is tartrazine's dn/dc (0.41 mL/g, arXiv 2503.05105) over its
   peak absorptivity, applied to every dye's summed absorbance; and the index is one number, not
   one per channel. A dye's dn/dc follows its own absorption band (Kramers–Kronig): red light
@@ -678,10 +679,10 @@ Shipped with this pass (the closeup, `npm run stillcloseup`):
   defocused edge. Measured dn/dc for the palette's dyes (food dyes, ink) and an index per
   channel carried through the derive pass (it writes one path today). Check: `derive` asks two
   dyes of equal absorbance to step the path by their own ratio. none.
-- **38u-11. Glass Smear slides the cover glass along a noise path, always** (S; Medium).
-  `fluidSimulation.ts:3129-3133`, noise2D(0.3 t), Glass Smear 0.3 by default and in 17 looks;
-  uniform, so the liquid leaves by the rim on one side and comes back on the other (18a-2).
-  The glass moves when a hand or a cord moves it; default 0. 27a-3 holds only its units.
+- ~~**38u-11. Glass Smear slides the cover glass along a noise path, always**~~ — **Shipped
+  2026-11-15** (the story is in `docs/plan-shipped.md`). Default 0; the 22 looks that slid
+  carry the slide as an LFO 1 cord whose top is their old speed; `npm run glassstill`. The
+  direction is still a noise path (**38u-17**).
 - Ranked here, held elsewhere: the black ground paints dye as light (**18b-2**, 23 of 35
   looks); the line between two dyes is a colour difference fed to the pupil (**18e-2**,
   **18e-1**); the gooey contrast curve decides where every edge falls (**18b-4**, the lit
@@ -708,9 +709,9 @@ On in many looks:
 Behind a dial at 0, or in one look:
 
 - **38u-9. The drawn textures that are left** (M, one PR; Low-Medium). Each is noise or a hash
-  on a clock, drawn over the liquid: Macro Lacing (fbm filaments on `U.time`, Lacing Run only;
-  `npm run stillcloseup` prints 3.2% of its frame moving on a still plate, and Paint Cells at 1 the same), Lacing's pale
-  thread (its level jittered by fbm on the clock), Paint Cells and the plate's Cells
+  on a clock, drawn over the liquid: ~~Macro Lacing and Lacing's thread on `U.time`~~ (**shipped**:
+  read in the grain's carried coordinates, `stillcloseup` `lace-run` 0.000%; still drawn noise),
+  Paint Cells (`stillcloseup` prints 3.2% at 1) and the plate's Cells
   (`cellField` on a clock; **20c-1** holds the closeup's), Satellite Droplets (a hashed
   lattice that never moves with the flow; 38h fixed their optics, not their places), Thin
   Film at Film Physics 0 (**38m**, **38n-2**), Colour Body (a chroma grade), the glitter's

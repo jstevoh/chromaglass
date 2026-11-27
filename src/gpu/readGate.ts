@@ -32,9 +32,9 @@ export class ReadGate {
   /** A submit that may have changed a field. */
   wroteOne(): void { this.wrote++; }
 
-  /** Whether to ask: written since the last readback asked, or a ring with nothing landed this epoch. */
+  /** Whether to ask: every ring has a free slot, and either written since the last readback asked or a ring has nothing landed this epoch. */
   wants(rings: readonly ReadbackRing[]): boolean {
-    return this.wrote !== this.asked || rings.some((r) => !r.latest);
+    return rings.every((r) => r.hasFree) && (this.wrote !== this.asked || rings.some((r) => !r.latest));
   }
 
   /** A readback asked for, every ring having found a free slot. */

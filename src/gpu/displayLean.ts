@@ -100,6 +100,7 @@ const GATES: readonly Gate[] = [
   { test: 'U.granulation > 0.002', may: above('granulation'), corded: ['granulation'] },
   { test: 'U.grainOn > 0.5', may: above('granulation'), corded: ['granulation'] },
   { test: 'U.soapFilm > 0.001', may: above('soapFilm'), corded: ['soapFilm'] },
+  { test: 'U.glow > 0.001', may: above('glow'), corded: ['glow'] },
   { test: 'U.faraday > 0.5', may: above('faradayHz'), corded: ['faradayHz'] },
   { test: 'U.macroLacing > 0.005', may: above('macroLacing'), corded: ['macroLacing'] },
 ];

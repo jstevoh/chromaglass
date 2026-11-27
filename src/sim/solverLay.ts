@@ -182,15 +182,17 @@ export function scaleSince(arrays: Float32Array[], before: Float32Array[], k: nu
   So a plain lay of one of these looks with no solver is remembered with what
   it put in the four dye arrays, and the first solver attached that carries no
   plate across has that taken back out and the look laid again on it, oil and
-  all. The picture is the same look laid fresh a moment later, not the CPU's
-  layout: the CPU's dye spots were never a dish anyone saw with its oil.
+  all. Clock Glass, Splodascope and Lava Lamp keep their oil splats directly in
+  `mixWait` (`src/sim/mixWait.ts`, PLAN 27f-9m); this holds the two looks that
+  lay onto the solver's own grid (`layDye`, `layOil`).
 */
-export const SOLVER_OIL_LOOKS: ReadonlySet<string> = new Set(['classic', 'clock-glass', 'splodascope', 'foam-cells', 'lava-lamp']);
+export const SOLVER_OIL_LOOKS: ReadonlySet<string> = new Set(['classic', 'foam-cells']);
 
 type Noise = (x: number, y: number) => number;
 
 export class OwedLay {
-  private owed: { look: string; noise: Noise; delta: Float32Array[] } | null = null;
+  private owed: { look: string; noise: Noise; dyes: readonly number[] | null; delta: Float32Array[] } | null = null;
+  get pending(): boolean { return this.owed !== null; }
 
   /** `arrays` hands over the four dye arrays as they are now (a resize makes new ones). */
   constructor(private readonly arrays: () => Float32Array[]) {}
@@ -200,7 +202,7 @@ export class OwedLay {
    * and the look lays its oil on the solver, keep what `f` put in the dye
    * arrays, to take back and lay again at the attach.
    */
-  lay<T>(free: boolean, look: string, noise: Noise, f: () => T): T {
+  lay<T>(free: boolean, look: string, noise: Noise, f: () => T, dyes: readonly number[] | null = null): T {
     /*
       Any later lay supersedes what was owed, whether or not it is owed in
       turn. A Go before the device is up lays the next look through a capture
@@ -218,7 +220,7 @@ export class OwedLay {
         for (let i = 0; i < a.length; i++) d[i] = a[i] - b[i];
         return d;
       });
-      this.owed = { look, noise, delta };
+      this.owed = { look, noise, dyes: dyes?.length ? [...dyes] : null, delta };
     }
     return out;
   }
@@ -228,9 +230,9 @@ export class OwedLay {
   /**
    * At an attach: nothing is owed after it. With `relay` (no plate carried
    * across), the owed lay's dye is taken back out of the arrays and `lay` is
-   * handed its look and noise to lay them on the solver.
+   * handed its look, noise and pinned dyes to lay them on the solver.
    */
-  take(relay: boolean, lay: (look: string, noise: Noise) => void): void {
+  take(relay: boolean, lay: (look: string, noise: Noise, dyes: readonly number[] | null) => void): void {
     const o = this.owed;
     this.owed = null;
     if (!o || !relay) return;
@@ -240,7 +242,7 @@ export class OwedLay {
       const a = arrays[c], d = o.delta[c];
       for (let i = 0; i < a.length; i++) a[i] = Math.max(0, a[i] - d[i]);
     }
-    lay(o.look, o.noise);
+    lay(o.look, o.noise, o.dyes);
   }
 }
 

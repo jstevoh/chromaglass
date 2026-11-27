@@ -97,6 +97,8 @@ export interface GpuStepParams {
   /** Oil Bodies: the oil and the water each keep their own colour (see bodyPartition). */
   /** Oil Weight, −1..1: the oil's density against the water cold (constants.ts OIL_RHO; left out, −0.05, the mineral oil's lightness). PLAN 27f-9c. */
   oilWeight?: number;
+  /** Oil Thickness, 0..1 on the Thickness scale: the oil's own viscosity (constants.ts oilNuOf; left out, the 50 mm²/s mineral oil). PLAN 38w-31. */
+  oilThickness?: number;
   oilBodies?: number;
   /** Film Hold: the water film between two drops of oil pushes back as it thins, so drops crowd without merging (FILM_WGSL). */
   filmHold?: number;
@@ -200,6 +202,12 @@ export interface GpuStepParams {
   soapFilmRate?: number;
   /** The frame's tilt from flat, degrees (default 90, hanging; PLAN 32h): gravity along the film is g sin of it. */
   soapFilmTilt?: number;
+  /** Glow (0 off, else the light's brightness, 1 a fully charged sea at the stage's strength): the water's dinoflagellates flash where the flow shears them (PLAN 48c, gpu/glow.ts). The front plate's only. */
+  glow?: number;
+  /** The shear rate that fires them, per second (default 30, 0.03 Pa in seawater). */
+  glowShear?: number;
+  /** The seconds a fired cell takes to recharge (default 8). */
+  glowRecharge?: number;
   /** The tank's side view (PLAN 47n, gpu/tankPlate.ts): Tank (0 off, else its glow), Feed cm/s, Dye Weight % heavier than water, Nozzle 0..1 across, Drain 0..1, Glow Hue degrees. The front plate's only. */
   tank?: number;
   tankFeed?: number;
@@ -207,9 +215,10 @@ export interface GpuStepParams {
   tankNozzle?: number;
   tankDrain?: number;
   tankHue?: number;
-  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), and Shake, its peak acceleration in g. The front plate's only. */
+  /** The dish on a shaker (PLAN 48f, gpu/faraday.ts): Shaker, the drive's Hz (0 no shaker), Shake, its peak acceleration in g, and Rock, the strobe's slip in Hz (48f-6). The front plate's only. */
   faradayHz?: number;
   faraday?: number;
+  faradayRock?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
@@ -285,6 +294,16 @@ export interface SolverCarry {
   /** The grid it was copied from. */
   readonly n: number;
   /** Let its copies go. */
+  destroy(): void;
+}
+
+/**
+ * Full GPU field snapshot for plate-level Undo (PLAN 49a): holds exact copies
+ * of dye, velocity, gap and active chemistry/phase fields on the same device
+ * so a drained or cleared plate returns byte-for-byte before the wipe.
+ */
+export interface SolverSnapshot {
+  /** Release copied GPU textures and buffers held by this snapshot. */
   destroy(): void;
 }
 
@@ -367,6 +386,13 @@ export interface PlateSolver {
    * (lib/squish.ts). Optional because only the WebGPU solver has one.
    */
   readonly thinGapLive?: boolean;
+  /**
+   * A press's bowl in the glass on a thin gap, at the solver's own cells
+   * (PLAN 18a-14): centre and radius in logical cells, unrounded, the bowl
+   * (1 − d²/r²)² deep 3·amount, folded at the next flush. Laid on the CPU's
+   * 192² grid it came up through the bilinear upsample as facets.
+   */
+  pressBowl?(x: number, y: number, radius: number, amount: number): void;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */
@@ -383,6 +409,10 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /** Copy the live GPU fields for an 8 s Undo safety net (PLAN 49a). */
+  takeSnapshot?(): SolverSnapshot | null;
+  /** Restore fields captured by `takeSnapshot` back onto this solver. */
+  restoreSnapshot?(snap: SolverSnapshot): boolean;
   /**
    * A frame of the video pour, its dye and its motion worked out on the GPU
    * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:

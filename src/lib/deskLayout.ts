@@ -23,7 +23,7 @@
  * drives every operation in node.
  */
 
-import { SETTINGS_SECTIONS, SECTION_BY_ID, resolveSection } from './settingsMap.ts';
+import { SETTINGS_SECTIONS, SECTION_BY_ID, sectionSearchText, resolveSection } from './settingsMap.ts';
 import { PINNABLE } from './deskPins.ts';
 
 /**
@@ -99,6 +99,8 @@ export interface PanelSpec {
    * as wide as its widest panel asks; the rest take the column as it is.
    */
   columnWidth?: number;
+  /** Aliases and search terms for panels not backed by a Settings section (`⌘K` and `⌘P`). */
+  terms?: string;
 }
 
 /**
@@ -106,22 +108,23 @@ export interface PanelSpec {
  * settings section. Their ids are not section ids, so they cannot collide.
  */
 const OWN: PanelSpec[] = [
-  { id: 'cues',    name: 'Cues',    category: 'play',  kind: 'own', deckWidth: 304 },
-  { id: 'rides',   name: 'Rides',   category: 'play',  kind: 'own', deckWidth: 312 },
-  { id: 'recipe',  name: 'Recipe',  category: 'play',  kind: 'own', deckWidth: 320 },
+  { id: 'cues',    name: 'Cues',    category: 'play',  kind: 'own', deckWidth: 304, terms: 'set list setlist go fade cue back saved looks' },
+  { id: 'rides',   name: 'Rides',   category: 'play',  kind: 'own', deckWidth: 312, terms: 'faders sliders perform strip choose mixer drain' },
+  { id: 'recipe',  name: 'Recipe',  category: 'play',  kind: 'own', deckWidth: 320, terms: 'knobs controls design bench randomise' },
   // The song as a timeline, its show's cues and the nudge (PLAN 28h): the deck's widest, because a lane of sections is read across.
-  { id: 'score',   name: 'Score',   category: 'play',  kind: 'own', deckWidth: 400 },
-  { id: 'bottles', name: 'Bottles', category: 'pour', kind: 'own', deckWidth: 312 },
-  { id: 'dyes',    name: 'Dyes',    category: 'pour', kind: 'own', deckWidth: 360 },
-  { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340 },
-  { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 304 },
+  { id: 'score',   name: 'Score',   category: 'play',  kind: 'own', deckWidth: 400, terms: 'song timeline sections nudge cues' },
+  { id: 'bottles', name: 'Bottles', category: 'pour', kind: 'own', deckWidth: 312, terms: 'liquids pour drop viscosity' },
+  { id: 'dyes',    name: 'Dyes',    category: 'pour', kind: 'own', deckWidth: 360, terms: 'palette colour color swatches image video pour' },
+  { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340, terms: 'dropper spray splatter pour streak blow press finger magnet spin tip slosh amount' },
+  // Side-by-side QR code and full "Phone · iPad / not linked" header need 400 px.
+  { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 400, terms: 'ipad remote qr pair link mobile controller' },
   /*
     The Mac app's stream to YouTube, Twitch and the rest (PLAN 37x-4d). In
     Play because it is run during the show, beside the cues, not set up once
     with the room. Listed only where it can stream (`PanelBrowser`, lib/liveShow's
     `liveAvailable`); on the website a tab that has it says so in its body.
   */
-  { id: 'live',    name: 'Live Show', category: 'play', kind: 'own', deckWidth: 340, columnWidth: 340 },
+  { id: 'live',    name: 'Live Show', category: 'play', kind: 'own', deckWidth: 340, columnWidth: 340, terms: 'stream youtube twitch rtmps broadcast live' },
   /*
     The three that were screens of their own, behind the Sequence and Sound
     chips, before every tab was a set of panels (2026-10-27): a tab can only
@@ -129,8 +132,8 @@ const OWN: PanelSpec[] = [
     tab, and taking its chip away would have lost it. Each is the screen's own
     component drawn in a panel (`Sheet embed`), so nothing in it was rewritten.
   */
-  { id: 'songs',     name: 'Songs',         category: 'play', kind: 'own', deckWidth: 400, columnWidth: 420 },
-  { id: 'sequences', name: 'Sequences',     category: 'play', kind: 'own', deckWidth: 400, columnWidth: 360 },
+  { id: 'songs',     name: 'Songs',         category: 'play', kind: 'own', deckWidth: 400, columnWidth: 420, terms: 'song tracks music setlist shows listen' },
+  { id: 'sequences', name: 'Sequences',     category: 'play', kind: 'own', deckWidth: 400, columnWidth: 360, terms: 'sequencer sequence cues stages show timeline' },
 ];
 
 /**
@@ -142,15 +145,19 @@ const WHOLE = new Set(['audio-input', 'room', 'film', 'patches', 'midi', 'liquid
 /** Wider in the deck: the patch bay's rows and the Wall's corner pin need the room. */
 const WIDE: Record<string, number> = { patches: 340, projectors: 340, mapping: 312, midi: 312, 'audio-input': 340, simulation: 304, mixer: 312 };
 
-const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => ({
-  id: s.id,
-  name: s.name,
-  category: s.category,
-  kind: s.id === 'mixer' ? 'mixer' : WHOLE.has(s.id) || !PINNABLE.some(p => p.section === s.id) ? 'section' : 'knobs',
-  deckWidth: WIDE[s.id] ?? 266,
-  // Sound holds the player and the drone since PLAN 35c-7: the column they had as Music & Drone.
-  ...(s.id === 'audio-input' && { columnWidth: 340 }),
-}));
+const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => {
+  const kind: PanelKind = s.id === 'mixer' ? 'mixer' : WHOLE.has(s.id) || !PINNABLE.some(p => p.section === s.id) ? 'section' : 'knobs';
+  return {
+    id: s.id,
+    name: s.name,
+    category: s.category,
+    kind,
+    // Knobs panels hold four columns; 304 px gives each cell 66 px so knob names wrap cleanly instead of truncating.
+    deckWidth: WIDE[s.id] ?? (kind === 'knobs' ? 304 : 266),
+    // Sound holds the player and the drone since PLAN 35c-7: the column they had as Music & Drone.
+    ...(s.id === 'audio-input' && { columnWidth: 340 }),
+  };
+});
 
 export const PANELS: PanelSpec[] = [...OWN, ...FROM_SECTIONS];
 export const PANEL_BY_ID = new Map(PANELS.map(p => [p.id, p]));
@@ -323,6 +330,42 @@ export function closePanel(l: DeskLayout, id: string): DeskLayout {
   return { ...out, collapsed: out.collapsed.filter(x => x !== id) };
 }
 
+export interface ClosedPanelSpot {
+  id: string;
+  where: Slot | 'float';
+  index: number;
+  collapsed: boolean;
+  float?: FloatingPanel;
+}
+
+/** Remember where a panel sat before closing so Undo puts it back in the same place. */
+export function snapshotPanelSpot(l: DeskLayout, id: string): ClosedPanelSpot {
+  const collapsed = l.collapsed.includes(id);
+  const f = l.floating.find(p => p.id === id);
+  if (f) return { id, where: 'float', index: 0, collapsed, float: { ...f } };
+  for (const s of SLOTS) {
+    const idx = l[s].indexOf(id);
+    if (idx >= 0) return { id, where: s, index: idx, collapsed };
+  }
+  return { id, where: 'deck', index: l.deck.length, collapsed };
+}
+
+/** Put a closed panel back where `snapshotPanelSpot` saw it unless it was already reopened. */
+export function restoreClosedPanel(l: DeskLayout, spot: ClosedPanelSpot): DeskLayout {
+  if (whereIs(l, spot.id)) return l;
+  const collapsed = spot.collapsed && !l.collapsed.includes(spot.id)
+    ? [...l.collapsed, spot.id]
+    : l.collapsed;
+  if (spot.where === 'float') {
+    const f = spot.float ? { ...spot.float } : { id: spot.id, x: 0.35, y: 0.25, w: 320, h: 360 };
+    return { ...l, floating: [...l.floating, f], collapsed };
+  }
+  const slot = spot.where;
+  const next = [...l[slot]];
+  next.splice(Math.min(spot.index, next.length), 0, spot.id);
+  return { ...l, [slot]: next, collapsed };
+}
+
 /** Open a panel that is not out, where it goes by default; a panel already out is left where it is. */
 export function openPanel(l: DeskLayout, id: string, where: Slot | 'float' = 'deck'): DeskLayout {
   if (whereIs(l, id)) return l;
@@ -400,3 +443,10 @@ export const OLD_LAYOUT_KEY = (name: LayoutName) => `chromaglass-desk-layout:${n
 
 /** For the browser: is this section one of the settings sections? (The desk's own panels are not.) */
 export const isSectionPanel = (id: string): boolean => SECTION_BY_ID.has(id);
+
+/** Everything a search (`⌘K`, `⌘P`) can match for any panel in `PANELS`. */
+export function panelSearchText(p: PanelSpec): string {
+  const sec = SECTION_BY_ID.get(p.id);
+  const base = sec ? sectionSearchText(sec) : `${p.name} ${p.terms ?? ''} ${p.category}`;
+  return `${base} ${p.name} ${p.terms ?? ''}`.toLowerCase();
+}
