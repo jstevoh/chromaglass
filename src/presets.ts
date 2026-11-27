@@ -2115,7 +2115,22 @@ export const PRESETS: Preset[] = [
       */
       oilTension: 1,             // 27f-9h: all the tension the dial has, for the rounder blobs
       oilBodies: 1,
-      oilWeight: 0.6,
+      /*
+        0.5, from 0.6 (PLAN 19ak-25, measured on the owner's Mac at 8992faf). At
+        0.6 the wax rose, met the top of the lamp as one tight ball (Oil Tension
+        4 sealed, 27f-9q), gave its heat to the water it had risen into and, at
+        a weight that needs it 0.9 hotter than that water to float, fell back
+        with no cool glass to send it: `npm run lavacycle`'s control, the lamp
+        with its cool top taken out, came down 0.86 to 0.81 by 40 s, where the
+        claim is that only the cool glass brings the wax down. At 0.5 the wax
+        floats from 0.17 less over the water (1.52 against 1.69), nearer a real
+        lamp's few per cent; the lit lamp still goes round (0.69 at 20 s, 0.20
+        by 40 s, and back up), the control holds (0.87, 0.84), `lavaround`
+        rounds it better (0.832 against 0.780), and `lavawax` still keeps 30%
+        of the cold wax on the floor. 0.45 failed the same control (0.88 to
+        0.82; PR #984), so the window is narrow: PLAN 19ak-25b.
+      */
+      oilWeight: 0.5,
       oilThickness: 0.32, // paraffin
       plateUpright: 1,
       /*

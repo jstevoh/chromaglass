@@ -137,8 +137,10 @@ awaits `49c-2`; `live --codec aac` 3/3 and `liveshow --stack` 3/3 were load; `vi
 9/11 bisected to `#755` `18e-2` vs `videolamp.mjs` coords/control, owed to Claude Code).
 Still owed, each to its own thread: `looksgrid --owed=preview` (19ak-24b fixed `scripts/lookstills.mjs` `MAX_BYTES` cap and re-shot `velvet-underground`, `moire-star`, `moire-ripple`, `moire-groove`; check-side `32x32` Rec.709 luminance spread < 20 on dark-blue `velvet-underground` and 34–50-line moiré cards owed to Claude Code, plus `49c`'s `preset-title-button`), `nolight` 9 (Beads 0.8 rims brighter than the wash), `benday` (19ak-24b found culprit `#889`/`38u-8` `3bb0899b`: `granulation` `0.5 -> 0` removed the `0.75` blank-grain factor `benday.mjs`'s `[0.10, 0.11]` washes assumed, pushing `0.11` past `0.55`; re-laying `benday.mjs`'s washes owed to Claude Code), the open-rim oil meter on WebGPU · fifth, `heldpress
 --owed=presstwist` (after 15g-18), `openingtime` (3 pipelines built on a frame:
-fluid/upsampleDelta, fluid/scaleDye, plate/packDyeBodies, after 46a and 47a), and the Lava
-Lamp wax cycle on WebGPU · show (after 27f-9q and 38w-31 met). `holeline` on lab4 was red
+fluid/upsampleDelta, fluid/scaleDye, plate/packDyeBodies, after 46a and 47a), and ~~the Lava
+Lamp wax cycle on WebGPU · show (after 27f-9q and 38w-31 met)~~ (19ak-25: `lavaround`
+handed the wax's thickness, Oil Weight 0.5; with `lampzero`'s Classical Vibe and `qa`
+driving the desk, deploy 1053's three reds). `holeline` on lab4 was red
 before the sweep.
 
 ## Order of work
@@ -578,7 +580,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-20 | 28 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-24 | 51 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-25 | 51 |
 |  | (continued) | [`19-checks-build-plan-4.md`](docs/plan/19-checks-build-plan-4.md) | 19al-1–19ao-1 | 8 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 19 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
