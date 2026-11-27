@@ -32,6 +32,15 @@ export interface FieldCarry extends SolverCarry {
   readonly lies: GPUTexture | null;
   /** Oil Bodies' tally of the oil poured: the oil is carried, so its tally is. */
   readonly oilPoured: number;
+  /**
+   * The poured liquids (PLAN 18d-10): the species (each bottle's share and
+   * what it is made of) and the two fields of their forces, with the last
+   * bottle's tension and density. A governor's move used to drop them all.
+   */
+  readonly species: GPUTexture | null;
+  readonly liquids0: GPUTexture | null;
+  readonly liquids1: GPUTexture | null;
+  readonly speciesPoured: { sigma: number; rho: number } | null;
 }
 
 /** What the app used to scan the whole field for (see `measure`). */

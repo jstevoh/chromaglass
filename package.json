@@ -381,6 +381,7 @@
     "camrelief": "node scripts/camrelief.mjs",
     "bubbledye": "node scripts/bubbledye.mjs",
     "dyeedge": "node scripts/dyeedge.mjs",
+    "gridiso": "node scripts/gridiso.mjs",
     "bubbleair": "node scripts/bubbleair.mjs",
     "bubblelook": "node scripts/bubblelook.mjs",
     "bubbleround": "node scripts/bubbleround.mjs",

@@ -1845,6 +1845,18 @@
       ]
     },
     {
+      "name": "The colour's carry spreads it the same whichever way the flow crosses the grid",
+      "shard": "lab2",
+      "run": "npm run gridiso",
+      "why": [
+        "PLAN.md 18a-8 and 18c-8 (scripts/gridiso.mjs): a thin ring on Galaxy's gap turned two",
+        "hundred steps by a fast solid swirl widens evenly (the fourfold part of its gained",
+        "variance under 0.27: 0.331 with unsplit faces, 0.218 with the corner's transverse",
+        "share) and no more than 0.33 cells, keeping its colour; a small clear drop's window",
+        "opens round. About a minute on SwiftShader (cloud, 2026-11-27)."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",

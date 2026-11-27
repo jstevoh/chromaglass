@@ -11,6 +11,73 @@
 import { RIM_SIDE } from './oil';
 import { HEAD, PACKED, THIN_FACE, W } from './shared';
 
+/*
+  The corner of a face's flux (PLAN 18a-8, 18c-8): what the flow across the
+  face carries in the half step it takes, while the flow along the face is
+  carrying the donor cell's colour sideways at the same time.
+
+  What was reported: a ring of colour pressed out under a fast radial flow
+  came out squared off (the pressed rings in the owner's picture), and a small
+  window piled its pushed dye on its four diagonals. What was measured (the
+  lab, `npm run gridiso`): a thin ring of dye turned by a solid swirl on
+  Galaxy's gap, 128², two hundred steps. Its width grew by a fifth, and how
+  much it grew depended on the direction the flow crossed the grid: the
+  variance it gained had a fourfold part a third the size of its mean (0.33),
+  the grid's square printed on the liquid.
+
+  Why. The carry moved each axis's share across its own faces from the same
+  old colour, at once (unsplit donor cell, with MUSCL's slope). A flow along a
+  diagonal crosses the east face and the north face of a cell in one step, and
+  the colour it carries north out of the cell's north-east corner was taken
+  from the cell, not from the cell to its west that the flow brought it from.
+  The error is a diffusion of ½|u_x|Δx along x plus ½|u_y|Δx along y: along an
+  axis it spreads the colour only along the flow, along a diagonal it spreads
+  it across the flow as well, so a ring blurs most where its tangent runs at
+  45° and a radial front is pushed further on its diagonals than on its axes.
+  Real dye in water spreads the same way whichever way the glass is turned.
+
+  The fix is Colella's corner transport upwind (CTU, J. Comput. Phys. 87,
+  1990): the colour that crosses a face is the donor's carried half a step,
+  along the face as well as across it. Across it is MUSCL's slope, as before;
+  along it is the donor's colour moved by the transverse flow, upwind:
+  q − ½·c⊥·Δ⊥q, with c⊥ the donor cell's Courant number along the face and
+  Δ⊥q the one-sided difference from the side that flow comes from. It is still
+  a flux (each face's amount leaves one cell and enters the other, so nothing
+  is made or lost), and the transverse part is a convex mix of the donor and
+  its upstream neighbour for c⊥ ≤ 1 (here ≤ 0.45), so it makes no colour below
+  zero. Measured with the ring (`npm run gridiso`): the fourfold part of the
+  variance it gained 0.331 → 0.218, the variance itself 1.43 → 1.08 cells²
+  (the cross-flow blur the corner was making is gone too, so it is sharper as
+  well as rounder), and a small window's radius 0.013 → 0.009 fourfold.
+
+  What it costs: the transverse share is a second-order-accurate predictor
+  laid on MUSCL's, and together they are not exactly positive where the flow
+  is fast and changes across a cell, so the floor below (there for a half
+  float's rounding) now and then lifts a cell that would have gone a hair
+  under zero. On the fast ring that added 0.088% of the colour over two
+  hundred steps; at dyeedge's speed, a look's, 0.000%. A limiter on a cell's
+  total outflow (flux-corrected transport) would make it exact at the cost of
+  a second pass; not taken while it reads at that size.
+
+  `vel` is the cell's flow (on a thin gap hsGradient's, the mean of the solve's
+  faces, which is what the transverse share of the donor is), `k` the step's
+  displacement in cells per unit of velocity (substepped as the face is).
+
+  Only on a thin gap (`cornered` in wgsl/fluid.ts: bodyAdvectSub,
+  bodyAdvectThin and the pair carry), where the reports were and where the
+  carries cross the solve's own faces. The old plate (Thin Gap off) keeps its
+  unsplit faces: its looks were tuned on them, and `npm run liquidsgpu`'s
+  milk, whose held edge there reads 0.0002 of its spread (owed 15e-4), sits
+  below the size the corner moves a pool's spread by (0.5%).
+*/
+export const ACROSS = /* wgsl */ `
+fn across(d: vec2i, side: vec2i, k: f32, n: i32) -> vec4f {
+  let ct = clamp(dot(textureLoad(vel, d, 0).xy, vec2f(side)) * k, -0.45, 0.45);
+  let up = select(mx(d + side, n) - mx(d, n), mx(d, n) - mx(d - side, n), ct >= 0.0);
+  return 0.5 * ct * up;
+}
+`;
+
 export const CARRY_KERNELS: Record<string, string> = {
   // Semi-Lagrangian advection. A.a.x is the displacement's sign and scale.
   advect: `${HEAD}
@@ -376,7 +443,8 @@ fn flux(a: vec2i, e: vec2i, n: i32) -> vec4f {
   let pb = packedAt(b.x, b.y, n);
   let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
   let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
-  let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
+  let k = A.b.y * f32(n);
+  let c = clamp(ve * k, -0.45, 0.45);
   if (c >= 0.0) {
     let s = mm(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));
     return c * (mx(a, n) + 0.5 * (1.0 - c) * s);

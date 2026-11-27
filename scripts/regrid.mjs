@@ -45,6 +45,13 @@
  *   5. the two reactions (the BZ waves, the Liesegang gel) come across as
  *      they were, value for value: their grids are the same size on every
  *      solver
+ *   7. the poured liquids (PLAN 18d-10): a bottle of glycerine's species
+ *      and a nonpolar oil's drop (its sign in liquids1.b, 15e-13) come
+ *      across a move down a rung in the same amounts, each channel to 1%,
+ *      after five thin-gap steps that keep nine tenths of the oil's
+ *      nonpolar sign (the carries' floor took all of it before the split);
+ *      the same move with nothing handed over loses them (the control: what
+ *      the governor did to every poured liquid before)
  *   6. a carry offered to a solver on another device (as after a lost one)
  *      is refused: a bind of another device's textures is a validation
  *      error. (Only another device; a lost one is not made here.)
@@ -249,6 +256,38 @@ try {
     sameAs(rx0, rx1) && sameAs(li0, li1) && busy(rx0) > 50 && chemLive.rxn && chemLive.lies,
     `BZ ${rx0?.n}² with ${busy(rx0)} cells active, ${sameAs(rx0, rx1) ? 'identical' : 'changed'} on the new solver; `
     + `the gel ${li0?.n}², ${sameAs(li0, li1) ? 'identical' : 'changed'}; live on the new solver: BZ ${chemLive.rxn}, gel ${chemLive.lies}`);
+
+  // ── 7. The poured liquids (PLAN 18d-10) ──────────────────────────────
+  // A bottle of glycerine into the species and a nonpolar, light oil's drop
+  // into the forces' fields (its polarity in liquids1.b and its lightness in
+  // .g, 15e-13), then the governor's move down a rung. Read at the lab's own
+  // grid (L), so both sides are summed over the same cells.
+  const pourLiquids = () => page.evaluate(async () => {
+    lab.addSpecies(0.45, 0.5, 0.08, 1, 'glycerine');
+    lab.solver().addLiquidDrop(0.58, 0.5, 0.06, { polarity: -0.9, weight: -0.2 }, 1);
+  });
+  const sums = (d) => { const t = [0, 0, 0, 0]; for (let i = 0; i < d.length; i += 4) for (let c = 0; c < 4; c++) t[c] += d[i + c]; return t; };
+  const liquids = async () => ({ sp: sums(await page.evaluate(() => lab.field('species'))), l1: sums(await page.evaluate(() => lab.field('liquids1'))) });
+  await page.evaluate(() => lab.create(384));
+  await pourLiquids();
+  const lq0 = await liquids();
+  await page.evaluate(() => lab.regrid(256, false));
+  const lqCtl = await liquids();
+  await page.evaluate(() => lab.create(384));
+  await pourLiquids();
+  const lqLaid = await liquids();
+  // Carried a few thin-gap steps first: the carries floor every field at zero (15e-13).
+  await page.evaluate(() => lab.step(5, { thinGap: 1, gapThickness: 0.45 }));
+  const lqA = await liquids();
+  await page.evaluate(() => lab.regrid(256));
+  const lqB = await liquids();
+  const kept = (a, b) => a > 1e-3 && Math.abs(b / a - 1) < 0.01;
+  check('the poured liquids come across: the species\' share and viscosity, the oil\'s lightness and its nonpolar sign, each to 1%; the control loses them',
+    kept(lqA.sp[0], lqB.sp[0]) && kept(lqA.sp[1], lqB.sp[1]) && kept(lqA.l1[1], lqB.l1[1]) && kept(lqA.l1[2], lqB.l1[2])
+      && lqA.l1[2] > 0.9 * lqLaid.l1[2] && lqLaid.l1[2] > 1e-3
+      && Math.abs(lq0.sp[0] / lqLaid.sp[0] - 1) < 1e-3 && lqCtl.sp[0] < 1e-3 * lq0.sp[0] && lqCtl.l1[2] < 1e-3 * lq0.l1[2],
+    `species share ${lqA.sp[0].toFixed(2)} → ${lqB.sp[0].toFixed(2)}, its Σ share·lnν ${lqA.sp[1].toFixed(2)} → ${lqB.sp[1].toFixed(2)}; `
+      + `lightness ${lqA.l1[1].toFixed(2)} → ${lqB.l1[1].toFixed(2)}, nonpolar ${lqLaid.l1[2].toFixed(2)} laid, ${lqA.l1[2].toFixed(2)} after five carried steps, ${lqB.l1[2].toFixed(2)} moved; with nothing handed over ${lqCtl.sp[0].toFixed(3)} and ${lqCtl.l1[2].toFixed(3)}`);
 
   // ── 6. Another device's carry ────────────────────────────────────────
   await page.evaluate(() => lab.create(384));

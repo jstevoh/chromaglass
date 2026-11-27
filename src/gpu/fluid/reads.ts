@@ -490,9 +490,10 @@ export class FluidReads extends FluidInputs {
   }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix'): Promise<Float32Array> {
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix' | 'liquids1'): Promise<Float32Array> {
     const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read
       : which === 'mix' ? (this.mixLive ? this.mix?.read : this.blank('rgba'))
+      : which === 'liquids1' ? (this.liquidsLive ? this.liquids1.read : this.blank('rgba'))
       : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba')) : this.grain?.read;
     if (!src) throw new Error(`no ${which} field`);
     this.simF[0] = this.N; this.simF[1] = this.L;

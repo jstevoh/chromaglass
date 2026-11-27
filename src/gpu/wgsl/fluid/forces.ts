@@ -36,6 +36,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var liquids0: texture_2d<f32>;
 @group(0) @binding(4) var liquids1: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+fn polarAt(q: vec2i) -> f32 { let l = textureLoad(liquids1, q, 0); return l.r - l.b; }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -47,7 +48,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let body = l0.g;
   let repel = l0.b;
   let heavy = l0.a - l1.g;   // a heavy liquid's w, less a light one's lightness (addLiquidDrop)
-  let polar = l1.r;
+  let polar = l1.r - l1.b;   // a polar bottle's polarity, less a nonpolar one's (addLiquidDrop, PLAN 15e-13)
   
   if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
     textureStore(dst, p, safeVel(v));
@@ -87,10 +88,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   
   if (polar != 0.0 && open) {
-    let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
-    let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
-    let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
-    let dD = textureLoad(liquids1, p - vec2i(0, 1), 0).r - polar;
+    let dR = polarAt(p + vec2i(1, 0)) - polar;
+    let dL = polarAt(p - vec2i(1, 0)) - polar;
+    let dU = polarAt(p + vec2i(0, 1)) - polar;
+    let dD = polarAt(p - vec2i(0, 1)) - polar;
     fx -= (dR * dR - dL * dL) * A.b.x * dt * s;
     fy -= (dU * dU - dD * dD) * A.b.x * dt * s;
   }

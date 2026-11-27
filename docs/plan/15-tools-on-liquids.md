@@ -363,16 +363,6 @@ and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
   against counting the oil twice. *Measure:* `oillift`'s rim line for a heavy drop held
   against the downhill rim by a steady 6° tilt (keeps 98.5% over six readings), and
   `liquidfall` unchanged.
-- **15e-13. A bottle's polarity loses its sign to the carry (found with 15e-10).** The
-  carries floor every field at zero (`bodyAdvect`, there for the dye), and `liquids1.r`
-  holds a signed polarity (oil −0.9, soap −0.25, silicone −0.95), so every nonpolar bottle's
-  polarity is zero after its first carried step, on the thin gap and on the open plate
-  wherever it is carried by `bodyAdvect`. 15e-10 moved the weight's sign out of the way (a
-  light bottle's lightness in `liquids1.g`) and retired the polar push on the thin gap, where
-  an oil's keeping to itself is its own tension in the mix (38e) and the miscible ones have
-  none; the open plate's push still reads only the polar half. Split it as the weight was, or
-  retire it on the open plate too. *Measure:* `liquidsgpu`'s open-plate oil scene against
-  the stand-in, before and after.
 - **15e-14. A thin gap reads the magnet's, the maze's and the mix's forces against a
   different drag when nothing else is a body force that step (found with 15e-10).**
   `hsPrep` reads what was added between 'thin gap keep' and the body forces' keep (`hsMid`)

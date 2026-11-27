@@ -9,7 +9,7 @@ The solver's WGSL kernels, one file a pass (PLAN 19ai-6). Each file exports a ta
 - `gap.ts`: the gap between the glasses and the squeeze film of a press.
 - `forces.ts`: the liquids' forces (`liquidForces`; on a thin gap only its drags, and a bottle's weight down a rocked plate is `liquidDrive`, PLAN 15e-10) and the soap's thinning of the dye (`soapThin`), the current, the turntable's swirl, confinement, the slosh.
 - `pressure.ts`: the projection: Jacobi, red-black, the multigrid's levels, the gradient.
-- `carry.ts`: advection, MacCormack, the conserving carries, the substep plan, the glass's drift.
+- `carry.ts`: advection, MacCormack, the conserving carries, the substep plan, the glass's drift; and `ACROSS`, the corner's transverse share the thin gap's dye carries take (`cornered` in `../fluid.ts`, PLAN 18a-8, `npm run gridiso`).
 - `phase.ts`, `phaseForces.ts`, `labyrinth.ts`: the ferrofluid poured and carried; its magnet force, cap and separation; the maze and the Cahn-Hilliard step.
 - `oil.ts`, `capillary.ts`: the oil and its bodies (each liquid's colour: `bodyLand`, `bodyLay` for a lay that says which colour is the oil's, `bodyPartition`); its chemical potential (a deep-quench double well, `OIL_SPINODAL` and `OIL_WELL` from `../../fluid/constants.ts`, PLAN 38f-2), rim and film.
 - `dye.ts`: dispersion along the flow, the grain, sharpening, decay and drain, and the heat's pack and unpack round its carry on a thin gap (heatPack, heatUnpack, PLAN 38f-1).

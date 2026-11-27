@@ -116,3 +116,21 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 - ~~**15g-18**~~ A press twisted the liquid it squeezed (the local press only; the remote
   press had none). Shipped (2026-11-21): a press is its squeeze and squeeze-out on both
   paths and turns nothing (`npm run tools`). Story in `docs/plan-shipped.md` §15g-18.
+
+## 15e. The liquids' own forces on the GPU plate
+
+- ~~**15e-13. A bottle's polarity loses its sign to the carry (found with 15e-10).**~~ (shipped 2026-11-27) The
+  carries floor every field at zero (`bodyAdvect`, there for the dye), and `liquids1.r`
+  holds a signed polarity (oil −0.9, soap −0.25, silicone −0.95), so every nonpolar bottle's
+  polarity is zero after its first carried step, on the thin gap and on the open plate
+  wherever it is carried by `bodyAdvect`. 15e-10 moved the weight's sign out of the way (a
+  light bottle's lightness in `liquids1.g`) and retired the polar push on the thin gap, where
+  an oil's keeping to itself is its own tension in the mix (38e) and the miscible ones have
+  none; the open plate's push still reads only the polar half. Split it as the weight was, or
+  retire it on the open plate too. *Measure:* `liquidsgpu`'s open-plate oil scene against
+  the stand-in, before and after. **Shipped** (2026-11-27), split as the weight was: a polar
+  bottle's polarity in `liquids1.r`, a nonpolar one's in `liquids1.b`, and `liquidForces` reads
+  r − b. `liquidsgpu` has no oil-polarity scene (its oil-like bottle, silicone, lays soap and
+  repel), so the measure is `npm run regrid` line 7: an oil's drop (−0.9) keeps over nine tenths
+  of its sign through five thin-gap steps, where every carry floored all of it to zero. An
+  open-plate scene of two bottles of opposite polarity against the stand-in is still owed.

@@ -137,3 +137,24 @@ and a stream held on the plate, lay their colour with their own volume; story in
 ## 18e. Edges come from refraction (replaces the painted rims and highlights)
 
 - ~~**18e-2. A clear pour's edge, and the deflection from the optical path.**~~ **Shipped, this PR** (the derive pass writes `|∇OPL|` in `.z`, the closeup keeps its dye-path Laplacian in `camLap` via `TRANSMIT_WGSL`, and `oplPupilLoss` deflects the front plate's light by `|∇OPL| · DISH_REST_GAP · logicalGrid` against `DROP_NA = 0.25` beside `defocusShadow`; `npm run derive` 5/5, `npm run nolight -- --owed=film` 15/15; story in `docs/plan-shipped.md` §18e).
+
+## 18c. A pour adds liquid, not only colour
+
+- ~~**18c-8**~~ (shipped 2026-11-27) A small window is square-ish on the grid: a source a few cells wide on the
+  collocated grid piles the pushed dye on its four diagonals (dark lobes at 192² for a drop of
+  amount 10, gone by amount 30). With 18a-8's carry. **Shipped** (2026-11-27): measured in the
+  lab at 192², a clear drop of amount 10 in a cyan pool now opens round on main already (the
+  drop is a pour through the solve since 18c-2): the fourfold part of its radius 0.013 and of
+  its collar 0.0066, and 0.009 and 0.003 with 18a-8's corner transport. `npm run gridiso` line 4
+  holds both under 0.02. If the Mac still shows lobes, they are in the plate's drawing, not the
+  carry: film it there.
+
+## 18d. Each liquid has its real properties (replaces the property scalars)
+
+- ~~**18d-10**~~ (shipped 2026-11-27) The species is not in FieldCarry, so a rebuilt solver loses it, and now that
+  nothing fades it the loss shows: a governor's move drops every poured liquid. Carry it.
+  **Shipped** (2026-11-27): `handOver` copies the species and both liquids' fields, `takeOver`
+  lays them by area (carryArea) with the last bottle's tension and density. `npm run regrid`
+  line 7 (384² → 256²): species share 370.59 → 370.61, its Σ share·lnν 2601.87 → 2601.98, an
+  oil's nonpolar sign 112.58 → 112.59; the control (nothing handed over) 0.
+  On the old plate (Thin Gap off), the CPU body drag is still the thickness.
