@@ -53,22 +53,15 @@ ones.
 - **Two projectionists** — the phone remote has a pad: a finger on it blows air or drops dye at that point of the laptop's plate, each phone works one layer, and tilting the phone rocks the plate
 - **Palette contracts** — each preset names the two to four dyes it may use, and everything that adds colour (seeding, automation, beat hits, the slow harmony rotation, a song's identity) stays inside them, the way a projected plate carries a few dyes rather than a rainbow
 - **Palette from a picture or video** — on the Dyes panel under Palette, and on the phone's Dye sheet: pick an album cover, a photo or a video and its four main colours become the dyes, shown as *From picture* in the palette list and locked like any palette until you pick another or Auto. Picking it (or any palette) recolours the plate already playing over eight seconds, and a look opened while it is locked is laid in its dyes. Only the colours change: the picture is not drawn on the plate and the liquids move as the look has them. The colours a person would name are chosen, not the commonest pixels (a black sleeve with a pink title gives pinks), each kept far enough from black and from white to show on a lamp look and a dark one; a video gives the colours of eight frames across its length. The picture's colours are kept across a reload and go to the projector with the lock. To pour the picture itself in as dye, use *Image…*. Measured by `npm run picturepalette`
-- **Music intelligence** — Identifies the playing song (fingerprint proxy or manual tag), records the first listen and analyzes it offline into a song map (verse/chorus structure, pitch and energy curves, cached in IndexedDB), then drives visuals from known structure on every later listen
+- **Music intelligence** — Follows the song you name (the Track panel's tag, or Listen's Name it), records the first listen and analyzes it offline into a song map (verse/chorus structure, pitch and energy curves, cached in IndexedDB), then drives visuals from known structure on every later listen
 - **Lyrics layer** — Time-synced lyrics from LRCLIB with themed word-triggers (fire, water, sky…), per-section sentiment arc, and an optional kinetic typography overlay
 - **Evolving per-track identity** — Each song's ISRC seeds a stable visual identity that grows more complex with every listen; replay any past listen's exact look from the history panel
 
 ## Music Intelligence Setup (optional)
 
-Everything except automatic identification works out of the box. For automatic song ID:
+Everything works out of the box from a song you name: the **Tag Track** form in the Track panel, or **Listen** and **Name it** in the Songs panel. Song maps, lyrics, evolution, song shows and the title caption all follow from the name.
 
-1. Deploy the fingerprint proxy (holds your API key server-side):
-   ```bash
-   wrangler deploy server/fingerprint-worker.js --name chromaglass-fingerprint
-   wrangler secret put AUDD_API_TOKEN   # token from https://audd.io (or set ACR_* for ACRCloud)
-   ```
-2. Set `VITE_FINGERPRINT_PROXY_URL` in `.env` to the worker URL.
-
-Without the proxy, use the **Tag Track** form in the Track panel — song maps, lyrics, and evolution all work from a manual tag.
+Automatic song identification (a paid lookup through a Cloudflare Worker, and a local matcher that named songs the show had heard before) was retired on 2026-11-27: the owner was not using it. Its code, its Worker and its checks are kept in `archive/song-id/`, whose README says how to bring it back.
 
 ## Quick Start
 
@@ -132,7 +125,7 @@ Playing the visuals for a band is a different job from running them in a living 
 - **The Fillmore look.** The *Fillmore East, 1969* preset (and the *Fillmore East* sequence) is the Joshua Light Show behind the Mothers: **Dish Spread** (Settings → Look → Show) spreads the layers into their own dishes on a black screen, each dish a whole plate, the lead large and right of centre and the second smaller at the left; **Oil Beads** lays oil on the glass, up to a twentieth of it at full, as small dark-rimmed droplets that ride the flow and merge into fewer, bigger ones; **Plate Cells** lays the fine cell network in the dish core; a press with Fingering up lifts into the sunburst, and Beat Squeeze presses the big dish on every kick and lets it go, a faint ripple at the rim's spokes as each kick lifts (the big sunburst is a hand's).
 - **Freeze, pause, wash out.** Play/Pause holds the plate where it is; Drain washes it; a breakdown can also be a stage in the sequencer with the turbulence low and the palette narrow.
 - **The cue sheet is the sequencer.** Write the song as stages (verse: cool, slow; chorus: bright, fast; bridge: hard cut to red), bind it to the song, and it starts itself when the song is identified.
-- **Listen.** The **Listen** button at the top of the Songs panel (on the Sequence tab, and the phone's Songs tile) names the song playing and adds it to the list with its title, artist and length, opened. It turns on the microphone if nothing is chosen, the song ID, and Follow songs, then asks the song ID to try at once. Once the show has heard the song through (a song heard before, at once), it designs its show from the song's map, the one the Score draws: a stage sequence made for the song, one stage per section, fuller, more stirred and pressed harder in the louder sections against the song's own quietest and loudest, the colours opening from two dyes in the intro to the whole palette for the chorus and the bridge in close; and cues on the song's show pinned to sections, the title on the first note, a burst on every chorus, new dyes for the bridge and the last chorus, the plate drained eight seconds before the end. The map is laid on the song's own seconds, counted from where the song ID placed the song when the show started recording, so a song named halfway through has its sections, and its designed stages and cues, where they are in the song; the part it never heard is one *Unheard* stage. Both are ordinary sequences and cues, to edit like any other; designing again replaces only what Listen wrote, and a sequence of your own for the song is kept. When it cannot name the song in 45 seconds, type the title and artist and press **Name it**: the show still learns the song as it plays. Measured by `npm run listen`
+- **Listen.** The **Listen** button at the top of the Songs panel (on the Sequence tab, and the phone's Songs tile) gets the show ready to learn the song playing: it turns on the microphone if nothing is chosen, Song Detection, and Follow songs, and asks for the song's name. Type its title and artist and press **Name it**, and the song goes into the list, opened. Once the show has heard the song through (a song heard before, at once), it designs its show from the song's map, the one the Score draws: a stage sequence made for the song, one stage per section, fuller, more stirred and pressed harder in the louder sections against the song's own quietest and loudest, the colours opening from two dyes in the intro to the whole palette for the chorus and the bridge in close; and cues on the song's show pinned to sections, the title on the first note, a burst on every chorus, new dyes for the bridge and the last chorus, the plate drained eight seconds before the end. The map is laid on the song's own seconds, counted from where the song was when the show started recording; a song named by hand is taken to start when it is named, and the part the show never heard is one *Unheard* stage. Both are ordinary sequences and cues, to edit like any other; designing again replaces only what Listen wrote, and a sequence of your own for the song is kept. Nothing names the song by ear since automatic song identification was retired (2026-11-27), so Listen waits for the name as long as it takes. Measured by `npm run listen`
 - **Song titles.** When the show names a song it puts the credit up as the corner caption (the Songs panel's *Pour the title* cue does the same; the name is the ink's history). For a set the show cannot name (an album played from files, a band's own songs), the phone remote's Controls have **Song title**: type or paste the song's name, the artist on the next line, and press **Show** (`Song - Artist` on one line is read as both; **This song** fills the box with what the show heard). Anything joined to the show server can send the same `song-title` message, which is how a set's running order can put each title up as its track starts. Titles were once poured onto the plate as ink; that is shelved (PLAN 37x-10m).
 - **Record it.** **Record** on the plate bar (`R`, or `Record a take` in `⌘K`) opens the Record panel or writes the show to a `.webm` file straight from the canvas, with the music muxed in, for the band's socials. Set the **Frame** to *Portrait 9:16* in the Record panel (the sliders button beside Record; on a phone, More › Record) and the same button makes a tall clip for Reels and TikTok: the plate is drawn at 9:16 while it records (the plate on your screen turns into a tall strip and goes back when you stop), with sound, as an MP4 where the browser can write one; with a projector attached the wall keeps its shape and the clip is the middle 9:16 of it. The free site keeps its 15 seconds and its small ChromaGlass mark, which a portrait clip puts above the caption band. *Share* beside the last clip opens the phone's share sheet.
 - **The logo melts at the start.** Settings → Stage → Logo & Titles → **Melt the logo at the start** (on the phone, **Logo melt** under Title): when the Live Show goes live or a recording starts, the ChromaGlass logo is poured across the plate as thick ink, holds for two or three seconds, and then clear liquid rinses through it and the liquid's eddies melt it into the show's first colour, gone in about five seconds on a busy look. It is dye in the liquid, not a picture over it, so it is in the stream, the recording and on the wall at once, and its colour stays in the show. Off by default.
@@ -683,9 +676,9 @@ src/
     remoteProtocol.ts          # Phone-remote message types and socket URL
     midi.ts                    # MIDI messages, bindings, factory maps, pad colours, map files
     controllerSurface.ts       # Where every control sits on a controller's face, and what it sends
-    fingerprint.ts             # Snippet capture + fingerprint proxy client
     songMap.ts                 # Listen recorder, offline analysis orchestration
     songMapWorker.ts           # Web Worker: FFT, chroma, segmentation, pitch tracking
+  (archive/song-id/: automatic song identification, retired 2026-11-27)
     lyrics.ts                  # LRCLIB fetch, LRC parsing, word-triggers, sentiment
   components/
     LiquidVisualizer.tsx       # the plate's own state, the show's frame loop, and the stage
@@ -700,7 +693,6 @@ src/
     RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
     OutputPanel.tsx            # Setup's Wall panel: drag the corners square, pull the masks in, grade for the room
 server/
-  fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
   remote-server.js             # LAN static server + control relay + OSC in + Art-Net (npm run remote)
   artnet.js                    # Art-Net packet and patch: the plate's colour out to the rig, a desk's faders in
 public/
@@ -742,8 +734,8 @@ Pushes to `main` are typechecked, built and published to Firebase Hosting by
 `FIREBASE_SERVICE_ACCOUNT`, a service-account JSON key with the **Firebase
 Hosting Admin** role on the `chromaglass` project (Firebase console → Project
 settings → Service accounts → Generate new private key) — already set, and
-recreated the same way if the key is ever rotated. Optionally add
-`VITE_FINGERPRINT_PROXY_URL` to enable automatic song identification.
+recreated the same way if the key is ever rotated. (`VITE_FINGERPRINT_PROXY_URL`, which turned on automatic song
+identification, does nothing since that was retired on 2026-11-27.)
 
 A run that cannot find the secret fails rather than passing without publishing,
 so a green check on `main` means the site moved.

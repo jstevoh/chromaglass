@@ -7,7 +7,7 @@
 // so past visualizations can be replayed exactly.
 
 import { COLOR_HARMONIES } from '../constants';
-import { TrackEvolutionState, ListenRecord, LyricTheme } from './musicTypes';
+import { TrackEvolutionState, ListenRecord, LyricTheme, TrackIdentity } from './musicTypes';
 
 /** FNV-1a 32-bit — stable across sessions, good enough distribution for seeding. */
 export function hashString(str: string): number {
@@ -23,6 +23,23 @@ export function hashString(str: string): number {
 export function pseudoIsrc(artist: string, title: string): string {
   const h = hashString(`${artist.toLowerCase().trim()}::${title.toLowerCase().trim()}`);
   return `LOCAL-${h.toString(16).padStart(8, '0')}`;
+}
+
+/**
+ * A song named by hand (the Track panel's Tag, the Songs panel's Name it, the
+ * assistant's listen with a name): since automatic song identification was
+ * retired (2026-11-27, archive/song-id/) the only way a song gets a name. It
+ * lived in the identification module, `fingerprint.ts`, until then.
+ */
+export function manualIdentity(artist: string, title: string): TrackIdentity {
+  return {
+    isrc: pseudoIsrc(artist, title),
+    title: title.trim(),
+    artist: artist.trim(),
+    identifiedAtMs: performance.now(),
+    offsetSec: 0,
+    source: 'manual',
+  };
 }
 
 /** Deterministic mulberry32 PRNG from a seed. */

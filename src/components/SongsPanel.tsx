@@ -165,12 +165,14 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
         {/* ── The songs ─────────────────────────────────────────── */}
         <div className="flex w-full shrink-0 flex-col border-b border-white/10 p-4 @[640px]:w-[300px] @[640px]:border-b-0 @[640px]:border-r">
           <p className="mb-3 text-[10px] leading-relaxed opacity-50">
-            A look for each song and what happens while it plays. With Follow on, a song's show starts when the song is recognised.
+            A look for each song and what happens while it plays. With Follow on, a song's show starts when the song is named.
           </p>
           {/*
-            Listen (PLAN 28h-8): the song ID that already runs, asked to try
-            now, and the show it hears designed into stages and cues. First in
-            the column, because naming the song is where setting one up starts.
+            Listen (PLAN 28h-8): the song playing named here (the Title and
+            Artist below, then Name it; the song ID that named it by ear was
+            retired on 2026-11-27, archive/song-id/), and the show it hears
+            designed into stages and cues. First in the column, because naming
+            the song is where setting one up starts.
           */}
           {listen && (
             <div className="mb-3 rounded-lg border border-white/10 p-2.5" data-testid="songs-listen-box">
@@ -179,10 +181,10 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
                   // Lit while it listens, as the list's chosen song is: smallBtn's own
                   // grey fill and border would win over LIT's if both were given.
                   className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium ${listenBusy ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`} data-testid="songs-listen"
-                  title="Name the song playing, add it here, and design its show once the show has heard it through">
+                  title="Name the song playing (Title and Artist below), add it here, and design its show once the show has heard it through">
                   <Ear size={12} className={listenPhase === 'listening' ? 'animate-pulse' : ''} /> {listenBusy ? 'Stop listening' : 'Listen'}
                 </button>
-                {listenPhase === 'missed' && (
+                {listenPhase === 'listening' && (
                   <button disabled={!newTitle.trim() || !newArtist.trim()} onClick={() => listen.tag(newTitle, newArtist)}
                     className={smallBtn} data-testid="songs-listen-tag" title="Name the song playing with the Title and Artist typed below">Name it</button>
                 )}

@@ -115,12 +115,6 @@ export interface AppTileSpec {
 
 export const APP_FEATURE_TILES: AppTileSpec[] = [
   {
-    id: 'song-id',
-    title: 'Song ID & timed lyrics',
-    tier: 'home',
-    summary: 'In the ChromaGlass app — identifies the room’s music and steps through the song’s look script.',
-  },
-  {
     id: 'phone-remote',
     title: 'Phone remote & network stage',
     tier: 'home',

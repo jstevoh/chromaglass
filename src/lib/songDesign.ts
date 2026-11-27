@@ -49,6 +49,16 @@
  *
  * Designed cues carry ids of their own (`lsn-`), so designing again replaces
  * them and leaves every cue the person added by hand where it was.
+ *
+ * ## Since the song ID was retired (2026-11-27)
+ *
+ * The owner retired automatic song identification ("we aren't using the
+ * automatic song identity detection really"; the code is in archive/song-id/).
+ * So nothing names the song by ear: Listen's press asks for the name at once
+ * (the Title and Artist typed, then Name it), where before it waited up to
+ * forty-five seconds for the song ID and asked only when that missed. What
+ * follows the name is as it was: the show hears the song through, maps it,
+ * and designs its show, at once for a song it has mapped before.
  */
 
 import type { SongMap } from './musicTypes';
@@ -61,25 +71,16 @@ import { songRefFromTrack, type SongRef } from './songRef';
 export const DESIGNED_CUE = 'lsn-';
 export const DESIGNED_SEQUENCE = 'seq-lsn-';
 
-/**
- * How long Listen waits for a name before it says it could not hear one. The
- * song ID retries every ten seconds while nothing is named, and the local
- * matcher every six (`useMusicIntelligence`): forty-five seconds is four tries
- * of the first and seven of the second.
- */
-export const LISTEN_GIVE_UP_MS = 45_000;
 
 export type ListenPhase =
   /** Not listening. */
   | 'idle'
-  /** Waiting for the song ID to name the song. */
+  /** Waiting for the song's name, typed and given with Name it. */
   | 'listening'
   /** Named; the show is hearing it through to map it. */
   | 'learning'
   /** Its show is designed. */
   | 'designed'
-  /** Nothing named in LISTEN_GIVE_UP_MS. */
-  | 'missed'
   /** The song stopped before the show had heard enough of it to map. */
   | 'short';
 
@@ -89,7 +90,7 @@ export interface ListenState {
   startedAt: number;
   /** The song named, once it is. */
   song: SongRef | null;
-  /** Its key in the song ID, to tell its map from another song's. */
+  /** Its key (the ISRC, or the pseudo-ISRC of a name typed), to tell its map from another song's. */
   isrc: string | null;
   /** What was designed: stages and cues. */
   stages: number;
@@ -124,7 +125,7 @@ export interface ListenControl {
   showId: string | null;
   start: () => void;
   cancel: () => void;
-  /** Name it by hand when the song ID could not (the typed Title and Artist). */
+  /** Name the song playing (the typed Title and Artist). */
   tag: (title: string, artist: string) => void;
 }
 
@@ -140,14 +141,14 @@ export function startListening(now: number): ListenState {
 
 /**
  * One step of Listen, from what the ear knows now. Pure: the hook calls it
- * whenever the song ID's state changes, and on a slow tick for the give-up.
+ * whenever what the ear knows changes.
  */
 export function listenStep(s: ListenState, i: ListenInput): ListenStep {
   const none = { state: s, heard: null, design: null };
-  if (s.phase === 'listening' || s.phase === 'missed') {
-    if (!i.track) {
-      return s.phase === 'listening' && i.now - s.startedAt > LISTEN_GIVE_UP_MS ? { ...none, state: { ...s, phase: 'missed' } } : none;
-    }
+  if (s.phase === 'listening') {
+    // Waiting for the name. There is no giving up: nothing but the person
+    // names the song now, and they may take their time typing it.
+    if (!i.track) return none;
     const song = songRefFromTrack(i.track);
     const named: ListenState = { ...s, phase: 'learning', song, isrc: i.track.isrc };
     const map = mapFor(i, i.track.isrc);
@@ -173,18 +174,15 @@ function mapFor(i: ListenInput, isrc: string | null): SongMap | null {
 }
 
 /** What the panel says, in a line. */
-export function listenLine(s: ListenState, fingerprintEnabled: boolean): string {
+export function listenLine(s: ListenState): string {
   const name = s.song ? `${s.song.title} by ${s.song.artist}` : '';
   switch (s.phase) {
-    case 'idle': return 'Press Listen while a song plays: the show names it, adds it here, and designs its show once it has heard it through.';
-    case 'listening': return 'Listening for the song…';
+    case 'idle': return 'Press Listen while a song plays and name it: the show adds it here and designs its show once it has heard it through.';
+    case 'listening': return 'Type the song\'s title and artist below and press Name it: the show learns it as it plays.';
     case 'learning': return `Heard: ${name}. Learning the song; its show is designed when it ends.`;
     case 'designed': return s.ownSequence
-      ? `Designed for ${name}: ${s.cues} cue${s.cues === 1 ? '' : 's'} on its show; your own sequence for it is kept. They play whenever the song is recognised.`
-      : `Designed for ${name}: ${s.stages} stage${s.stages === 1 ? '' : 's'} and ${s.cues} cue${s.cues === 1 ? '' : 's'}. They play whenever the song is recognised.`;
-    case 'missed': return fingerprintEnabled
-      ? 'Could not name the song. Type its title and artist and press Name it: the show still learns it as it plays.'
-      : 'Song ID is not set up in this build. Type the title and artist and press Name it: the show still learns it as it plays.';
+      ? `Designed for ${name}: ${s.cues} cue${s.cues === 1 ? '' : 's'} on its show; your own sequence for it is kept. They play whenever the song is named.`
+      : `Designed for ${name}: ${s.stages} stage${s.stages === 1 ? '' : 's'} and ${s.cues} cue${s.cues === 1 ? '' : 's'}. They play whenever the song is named.`;
     case 'short': return `${name} stopped before the show had heard enough of it. Play it through and press Listen again.`;
   }
 }

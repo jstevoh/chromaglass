@@ -10,7 +10,31 @@ export interface TrackIdentity {
   offsetSec?: number;
   /** performance.now()-style wall clock when offsetSec was sampled — used to extrapolate position. */
   identifiedAtMs?: number;
+  /**
+   * How the song was named. Only 'manual' is made now: automatic song
+   * identification ('fingerprint', the paid lookup; 'local', the matcher over
+   * songs heard before) was retired on 2026-11-27 and its code kept in
+   * archive/song-id/. The other two stay in the type because tracks stored
+   * before then carry them, in IndexedDB and in show kits.
+   */
   source: 'fingerprint' | 'manual' | 'local';
+}
+
+/**
+ * A song's recognition fingerprint, as the local matcher stored it beside
+ * the song's map (archive/song-id/src/lib/localFingerprint.ts). Nothing makes
+ * or reads one since automatic song identification was retired (2026-11-27),
+ * but libraries keep the ones they have and show kits still carry them, so a
+ * library survives intact for the day the matcher comes back.
+ */
+export interface TrackFingerprint {
+  isrc: string;
+  title?: string;
+  artist?: string;
+  hashes: Uint32Array;    // packed (f1<<15 | f2<<6 | dt)
+  frames: Uint32Array;    // anchor frame index per hash
+  durationSec: number;
+  createdAt: number;
 }
 
 export interface SongSection {

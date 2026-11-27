@@ -1,5 +1,8 @@
 // Orchestrates the music intelligence layer:
-//  • periodic song identification (fingerprint proxy, or manual tagging)
+//  • the song playing, as it is named by hand (the Track panel's tag, the
+//    Songs panel's Name it, the assistant): automatic song identification,
+//    the paid lookup and the local matcher, was retired on 2026-11-27 and
+//    its code kept in archive/song-id/ (its README says how it comes back)
 //  • first-listen recording → offline song map analysis → IndexedDB cache
 //  • synced lyrics fetch, word-triggers and sentiment arc
 //  • per-track deterministic seed + evolution state across listens
@@ -17,9 +20,6 @@ import {
   LyricTrigger, SongSection, LyricLine, GestureEvent, SavedPerformance,
 } from '../lib/musicTypes';
 import { songStartMs, finishTake, takeSong, replayPosition, dueGestures, type TakeSong } from '../lib/performanceTake';
-import { identify, manualIdentity, fingerprintingAvailable, capturePcm } from '../lib/fingerprint';
-import { addToIndex, matchSnippet, FingerprintIndex, TrackFingerprint } from '../lib/localFingerprint';
-import { loadFingerprintIndex } from '../lib/fingerprintIndexBuild';
 import { ListenRecorder, generateSongMap, sectionAt, energyAt } from '../lib/songMap';
 import { songSecAt } from '../lib/songMapLead';
 import { SongPosition, nudgeFor, type NudgeKind } from '../lib/songScore';
@@ -27,39 +27,14 @@ import { FollowedPlace, readSection } from '../lib/followedPlace';
 import { buildLyrics, LyricsResult, lineAt, sectionSentiment } from '../lib/lyrics';
 import {
   trackSeed, newTrackState, evolveAfterListen, buildVisualParams,
-  paramsToSnapshot, pickPresetForTrack, MusicVisualParams,
+  paramsToSnapshot, pickPresetForTrack, MusicVisualParams, manualIdentity,
 } from '../lib/evolution';
 import {
   getSongMap, putSongMap, getTrackState, putTrackState, getAllTrackStates,
   putPerformance, getAllPerformances, deletePerformance as dbDeletePerformance,
 } from '../lib/musicDb';
 
-const IDENTIFY_INTERVAL_MS = 35_000; // API re-check cadence while a track is identified
-const IDENTIFY_RETRY_MS = 10_000;    // API retry cadence while nothing is identified
-const LOCAL_MATCH_RETRY_MS = 6_000;  // local matching is free — try often when unidentified
-/**
- * How often the local matcher re-checks while a track is already known.
- *
- * This is the only thing that catches a track change on a gapless service,
- * where there is no silence for the boundary detector to hear and the API
- * (when there is one at all) is on a 35-second leash to spare its quota. It
- * was 20 seconds, so half a short song could play under the last one's
- * colours. Matching is local and free; the cost is the four-second capture,
- * not the arithmetic.
- *
- * Six since PLAN 14z, from twelve. `npm run songends` runs this matcher over the
- * same transitions the boundary is measured on, every song fingerprinted as
- * heard before: a crossfade or a gapless join is never quiet, so this is what
- * changes the look there. At twelve seconds it named the new song a median of
- * 9.4 s into it after a 6 s crossfade; at six, 7.9 s (7.0 s gapless, 6.7 s
- * gapless in a noisy room), and no wrong names at either. The capture holds the shared busy flag for
- * four of every six seconds; the API's re-check, every 35 s, still finds its
- * turn in the two between (the same share it had while nothing was known,
- * when the retry here was already six).
- */
-const LOCAL_MATCH_INTERVAL_MS = 6_000;
 const SILENCE_END_MS = 5_000;   // this long below the silence floor ⇒ listen ended
-const GAP_MS = 1_600;           // a dip this long looks like a between-song gap
 const SILENCE_VOLUME = 2.5;
 const MIN_LISTEN_MS = 60_000;   // shorter listens don't count toward evolution
 
@@ -82,12 +57,10 @@ export interface MusicIntelState {
   section: SongSection | null;
   line: LyricLine | null;
   sectionSentimentValue: number;
-  identifying: boolean;
   /** The map the last first listen made, kept after its song ends (the track and its map are forgotten then): what Listen designs from (`lib/songDesign.ts`). */
   heardMap: SongMap | null;
   recording: boolean;
   analyzing: boolean;
-  fingerprintEnabled: boolean;
   replayListenNumber: number | null;
   allTracks: TrackEvolutionState[];
 }
@@ -122,8 +95,6 @@ export interface MusicIntelResult {
   stopPerformanceReplay: () => void;
   deletePerformance: (id: string) => void;
   manualTag: (artist: string, title: string) => void;
-  /** Try to name the song now rather than on the next turn of the song ID (Listen, `lib/songDesign.ts`). */
-  listenNow: () => void;
   clearTrack: () => void;
   replayListen: (listenNumber: number) => void;
   stopReplay: () => void;
@@ -169,7 +140,6 @@ export function useMusicIntelligence(
   const posClockRef = useRef(new SongPosition());
   const [nudgeSec, setNudgeSec] = useState(0);
   const [follow, setFollow] = useState<MusicIntelState['follow']>(null);
-  const [identifying, setIdentifying] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [heardMap, setHeardMap] = useState<SongMap | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
@@ -193,54 +163,17 @@ export function useMusicIntelligence(
   const listenStartMsRef = useRef(0);
   // When the first listen's recorder really started: after the awaits in adoptTrack, so a little after listenStartMsRef.
   const recordStartMsRef = useRef<number | null>(null);
-  const lastIdentifyMsRef = useRef(-Infinity); // first attempt fires as soon as sound is present
   const lastPosRef = useRef(0);
   /** Where the show reads the map (lib/followedPlace.ts); null while no track has been identified. */
   const placeRef = useRef<{ place: FollowedPlace; map: SongMap | null; isrc: string } | null>(null);
   const triggerSeqRef = useRef(0);
   const presetSeqRef = useRef(0);
-  const gapPendingRef = useRef(false); // saw a between-song dip; identify as soon as sound returns
-  const fpIndexRef = useRef<FingerprintIndex | null>(null);
-  const lastLocalMatchMsRef = useRef(-Infinity);
   // The performance being recorded: gestures timed from its start, and the
   // song that was running when it started, if one was.
   const takeRef = useRef<{ startedAtMs: number; date: string; gestures: GestureEvent[]; song: TakeSong | null } | null>(null);
   const gestureSeqRef = useRef(0);
   const firedGestureIdxRef = useRef(new Set<number>());     // replay: gestures already fired
 
-  // Local fingerprint index — recognized-before tracks match without the API.
-  // Built whole once, off the main thread; after that each newly mapped song
-  // is added on its own (see addToIndex) rather than the library being read
-  // and rebuilt around it. A song that lands while the first build is still
-  // out waits in fpPendingRef, since that build may have read the library
-  // before the song was stored — or after, which addToIndex notices.
-  // Only the latest build lands: an earlier one may have read the library
-  // before a song that has since been stored.
-  const fpPendingRef = useRef<TrackFingerprint[] | null>(null);
-  const fpLoadSeqRef = useRef(0);
-  const reloadFpIndex = useCallback(() => {
-    fpPendingRef.current ??= [];
-    const seq = ++fpLoadSeqRef.current;
-    loadFingerprintIndex().then(index => {
-      if (seq !== fpLoadSeqRef.current) return;
-      const pending = fpPendingRef.current ?? [];
-      fpPendingRef.current = null;
-      for (const rec of pending) addToIndex(index, rec);
-      fpIndexRef.current = index;
-    }).catch(e => {
-      console.warn('fingerprint index build failed', e);
-      // The next new song finds no index and asks for a build again.
-      if (seq === fpLoadSeqRef.current) fpPendingRef.current = null;
-    });
-  }, []);
-  const addToFpIndex = useCallback((rec: TrackFingerprint) => {
-    if (fpPendingRef.current) { fpPendingRef.current.push(rec); return; }
-    const index = fpIndexRef.current;
-    // Already indexed: a re-mapped song whose stored fingerprint was just
-    // replaced. Its old entries are in there too, so build it again whole.
-    if (!index || !addToIndex(index, rec)) reloadFpIndex();
-  }, [reloadFpIndex]);
-  useEffect(() => { reloadFpIndex(); }, [reloadFpIndex]);
   const firedTriggerIdxRef = useRef(new Set<number>());
   const paramsRef = useRef<MusicVisualParams | null>(null);
   const busyRef = useRef(false);
@@ -360,7 +293,6 @@ export function useMusicIntelligence(
     const listenMs = performance.now() - listenStartMsRef.current;
     const recording = await recorderRef.current.stop();
     setRecordingActive(false);
-    gapPendingRef.current = false;
 
     if (!currentTrack) return;
 
@@ -380,10 +312,9 @@ export function useMusicIntelligence(
       if (generated) setHeardMap(generated.map);
       setAnalyzing(false);
       if (generated) {
-        const { map, fingerprint } = generated;
+        const { map } = generated;
         await putSongMap(map);
         if (trackRef.current?.isrc === currentTrack.isrc) setSongMap(map);
-        if (fingerprint) addToFpIndex(fingerprint); // the analysis also stored a local recognition fingerprint
       }
     }
 
@@ -402,9 +333,9 @@ export function useMusicIntelligence(
       posClockRef.current.forget();
       setNudgeSec(0);
     }
-  }, [refreshTracks, addToFpIndex]);
+  }, [refreshTracks]);
 
-  // ── Identification + position + trigger loop ────────────────────────
+  // ── Position + trigger loop, and the end of a listen ─────────────────
   useEffect(() => {
     if (!music.enabled || !stream) {
       recorderRef.current.discard();
@@ -471,9 +402,9 @@ export function useMusicIntelligence(
       if (currentTrack && silentFor > SILENCE_END_MS && !busyRef.current) {
         busyRef.current = true;
         const playedSec = Math.max(0, (lastLoudMsRef.current - listenStartMsRef.current) / 1000);
-        // In a `finally`, like the two captures below: one throw here used to
-        // leave the flag up for the session, and with it identification, the
-        // local match and so the song-change half that rests on them (14s).
+        // In a `finally`: one throw here used to leave the flag up for the
+        // session, and with it the song identification of the time and the
+        // song-change half that rested on it (14s).
         try {
           await finalizeListen('silence', playedSec);
         } finally {
@@ -482,91 +413,18 @@ export function useMusicIntelligence(
         return;
       }
 
-      // A short dip while a track is playing looks like a between-song gap:
-      // identify immediately when sound returns instead of waiting out the
-      // slow re-check interval, so track changes are caught within seconds.
-      if (currentTrack && silentFor > GAP_MS && silentFor < SILENCE_END_MS) {
-        gapPendingRef.current = true;
-      }
-      const soundPresent = !!audio && audio.volume > SILENCE_VOLUME;
-      if (gapPendingRef.current && soundPresent) {
-        gapPendingRef.current = false;
-        lastIdentifyMsRef.current = -Infinity;   // force an identify this tick
-        lastLocalMatchMsRef.current = -Infinity; // local matcher goes first
-      }
-
-      // ── Local fingerprint match — free and offline, so it runs ahead of
-      // the API and on a much faster cadence. Any track heard once before
-      // (even manually tagged) is recognized here in seconds.
-      const fpIndex = fpIndexRef.current;
-      const localGap = currentTrack ? LOCAL_MATCH_INTERVAL_MS : LOCAL_MATCH_RETRY_MS;
-      if (fpIndex && fpIndex.trackCount > 0 && soundPresent && !busyRef.current &&
-          now - lastLocalMatchMsRef.current > localGap) {
-        busyRef.current = true;
-        lastLocalMatchMsRef.current = now;
-        setIdentifying(true);
-        try {
-          const snip = await capturePcm(stream, 4);
-          const m = snip ? matchSnippet(snip.pcm, snip.sampleRate, fpIndex) : null;
-          if (m) {
-            lastIdentifyMsRef.current = performance.now(); // matched — hold off the API
-            const identity: TrackIdentity = {
-              isrc: m.isrc,
-              title: m.title ?? 'Unknown',
-              artist: m.artist ?? 'Unknown',
-              offsetSec: m.offsetSec,
-              identifiedAtMs: performance.now(),
-              source: 'local',
-            };
-            if (identity.isrc !== trackRef.current?.isrc) {
-              const newStartMs = identity.identifiedAtMs! - identity.offsetSec! * 1000;
-              const prevSec = Math.max(0, (newStartMs - listenStartMsRef.current) / 1000);
-              await finalizeListen('trackChange', prevSec);
-              await adoptTrack(identity, stream);
-            } else if (trackRef.current) {
-              setTrack({ ...trackRef.current, offsetSec: identity.offsetSec, identifiedAtMs: identity.identifiedAtMs, source: 'local' });
-            }
-          }
-        } finally {
-          setIdentifying(false);
-          busyRef.current = false;
-        }
-        return; // one capture per tick — API path picks up on a later tick if needed
-      }
-
-      // Identification cadence: as soon as sound is present when nothing is
-      // identified yet (then a fast retry loop), slow re-checks once a track
-      // is known — those only refine position and catch track changes.
-      const identifyGap = currentTrack ? IDENTIFY_INTERVAL_MS : IDENTIFY_RETRY_MS;
-      const dueForIdentify = now - lastIdentifyMsRef.current > identifyGap;
-      if (fingerprintingAvailable() && dueForIdentify && !busyRef.current && soundPresent) {
-        busyRef.current = true;
-        lastIdentifyMsRef.current = now;
-        setIdentifying(true);
-        try {
-          const identity = await identify(stream);
-          if (identity) {
-            if (identity.isrc !== trackRef.current?.isrc) {
-              // Trim the previous listen's recording at the point the new
-              // track actually started (its match offset tells us when).
-              const newTrackStartMs = (identity.identifiedAtMs ?? performance.now()) - (identity.offsetSec ?? 0) * 1000;
-              const prevListenSec = Math.max(0, (newTrackStartMs - listenStartMsRef.current) / 1000);
-              await finalizeListen('trackChange', prevListenSec);
-              await adoptTrack(identity, stream);
-            } else if (trackRef.current) {
-              // Same track — refine the position clock with the fresh offset
-              setTrack({ ...trackRef.current, offsetSec: identity.offsetSec, identifiedAtMs: identity.identifiedAtMs });
-            }
-          }
-        } finally {
-          setIdentifying(false);
-          busyRef.current = false;
-        }
-      }
+      // Nothing names the song from here any more. Until 2026-11-27 this
+      // tick also ran automatic song identification: a four-second capture
+      // every six seconds through the local matcher (songs heard before), the
+      // paid lookup every ten seconds while nothing was named and every 35
+      // once one was, and a forced try when sound came back after a dip that
+      // looked like the gap between two songs. The owner retired it ("we
+      // aren't using the automatic song identity detection really"); the code
+      // is in archive/song-id/, and a song is named by hand now (manualTag).
     }, 500);
 
     return () => window.clearInterval(tick);
-  }, [music.enabled, stream, adoptTrack, finalizeListen]);
+  }, [music.enabled, stream, finalizeListen]);
 
   // ── Derived: section, line, sentiment ───────────────────────────────
   const section = useMemo(() => readSection(songMap?.sections, { positionSec, sure: follow?.sure ?? false, confidence: follow?.confidence ?? null }), [songMap, positionSec, follow]);
@@ -625,7 +483,6 @@ export function useMusicIntelligence(
   }, [adoptTrack, finalizeListen, stream]);
 
   const clearTrack = useCallback(() => { finalizeListen('manual'); }, [finalizeListen]);
-  const listenNow = useCallback(() => { lastIdentifyMsRef.current = -Infinity; lastLocalMatchMsRef.current = -Infinity; }, []);
 
   /*
     A nudge is a seek, not playback: what lies between the old position and
@@ -796,12 +653,12 @@ export function useMusicIntelligence(
   return {
     state: {
       track, songMap, lyrics, trackState, positionSec, nudgeSec, follow, section, line,
-      sectionSentimentValue, identifying, heardMap, recording: recordingActive, analyzing,
-      fingerprintEnabled: fingerprintingAvailable(), replayListenNumber, allTracks,
+      sectionSentimentValue, heardMap, recording: recordingActive, analyzing,
+      replayListenNumber, allTracks,
     },
     overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
     recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
-    manualTag, listenNow, clearTrack, replayListen, stopReplay, refreshTracks,
+    manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
     nudgePosition, nudgeToSection, resetNudge, positionNow,
   };
 }

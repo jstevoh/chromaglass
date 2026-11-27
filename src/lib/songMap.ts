@@ -4,9 +4,7 @@
 // listen gets instant structure-aware visuals.
 
 import { SongMap, SongSection } from './musicTypes';
-import { putFingerprint } from './musicDb';
-import { TrackFingerprint } from './localFingerprint';
-import { shiftSongMap, shiftFingerprintFrames } from './songMapLead.ts';
+import { shiftSongMap } from './songMapLead.ts';
 
 const ANALYSIS_SAMPLE_RATE = 22050;
 
@@ -116,21 +114,22 @@ interface WorkerResult {
   frameRate: number;
   durationSec: number;
   chroma?: number[];
-  fpHashes?: Uint32Array;
-  fpFrames?: Uint32Array;
-  fpDurationSec?: number;
 }
 
+/**
+ * The map a first listen made. It carried the recognition fingerprint the
+ * analysis stored beside it, for the local matcher's index, until automatic
+ * song identification was retired (2026-11-27, archive/song-id/): no
+ * fingerprint is made now, so nothing is spent on one.
+ */
 export interface GeneratedSongMap {
   map: SongMap;
-  /** The recognition fingerprint just stored with it, if the listen made one — for the live index. */
-  fingerprint: TrackFingerprint | null;
 }
 
 /**
  * Run the offline analysis worker over a recorded listen. `leadSec` is how far
  * into the song the recording began (`songSecAt` at the recorder's start): the
- * map and its fingerprint come back in the song's seconds, not the
+ * map comes back in the song's seconds, not the
  * recording's (PLAN 28h-9, `songMapLead.ts` says why the map moves and not
  * the clock).
  */
@@ -169,22 +168,6 @@ export async function generateSongMap(
     return null;
   }
 
-  // Store the local recognition fingerprint alongside the song map, so this
-  // track is identified instantly (and offline) on every future listen.
-  let fingerprint: TrackFingerprint | null = null;
-  if (result.fpHashes && result.fpFrames && result.fpHashes.length > 100) {
-    fingerprint = {
-      isrc,
-      title: meta?.title,
-      artist: meta?.artist,
-      hashes: result.fpHashes,
-      frames: shiftFingerprintFrames(result.fpFrames, leadSec),
-      durationSec: (result.fpDurationSec ?? result.durationSec) + leadSec,
-      createdAt: Date.now(),
-    };
-    await putFingerprint(fingerprint);
-  }
-
   const map: SongMap = shiftSongMap({
     isrc,
     title: meta?.title,
@@ -198,7 +181,7 @@ export async function generateSongMap(
     generatedAt: Date.now(),
   }, leadSec);
 
-  return { map, fingerprint };
+  return { map };
 }
 
 /** Find the section containing a given playback position. */

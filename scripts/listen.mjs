@@ -19,8 +19,10 @@
  * loudest section is quieter than a rock song's verse still opens up for its
  * chorus, which an absolute scale would not.
  *
- * The flow is judged step by step on what the ear reports: nothing named for
- * forty-five seconds says so; a song named with no map waits; a map for
+ * The flow is judged step by step on what the ear reports: nothing named
+ * waits for the name and asks for it, however long it takes (automatic song
+ * identification was retired on 2026-11-27, so the person names the song);
+ * a song named with no map waits; a map for
  * another song is not this song's; an analysis still running is not "too
  * short"; a song heard before is designed the moment it is named.
  *
@@ -32,18 +34,18 @@
  * moved by the lead the clock gives (`songSecAt`), and must then fire its
  * cues where the song's choruses really start, keep each moment in its own
  * section's stage, and read the same energy and harmony at every second as
- * the song does. Its fingerprint must make the real local matcher name the
- * song's position, not the recording's.
+ * the song does. (Until 2026-11-27 its fingerprint also had to make the real
+ * local matcher name the song's position; that check went to
+ * archive/song-id/scripts/listen.mjs with the matcher.)
  */
 
 import {
-  designFromMap, listenStep, startListening, withDesign, listenLine, LISTEN_IDLE, LISTEN_GIVE_UP_MS, DESIGNED_CUE,
+  designFromMap, listenStep, startListening, withDesign, listenLine, LISTEN_IDLE, DESIGNED_CUE,
 } from '../src/lib/songDesign.ts';
 import { scoreOf } from '../src/lib/songScore.ts';
 import { GLIDES, stageAtOffset } from '../src/lib/sequencer.ts';
-import { songSecAt, shiftSongMap, shiftFingerprintFrames, FOLD_LEAD_SEC, CHROMA_RATE } from '../src/lib/songMapLead.ts';
+import { songSecAt, shiftSongMap, FOLD_LEAD_SEC, CHROMA_RATE } from '../src/lib/songMapLead.ts';
 import { FOLLOW_RATE } from '../src/lib/songFollow.ts';
-import { extractPeakHashes, buildIndex, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -133,18 +135,18 @@ check('designing again replaces the designed cues and keeps the person\'s own',
   `${once.length} then ${twice.length}`);
 
 // ── The flow ──────────────────────────────────────────────────────────
-const track = (isrc = 'SONG-A') => ({ isrc, title: 'Tiger Rag', artist: 'The Band', source: 'fingerprint', durationSec: 180 });
+const track = (isrc = 'SONG-A') => ({ isrc, title: 'Tiger Rag', artist: 'The Band', source: 'manual', durationSec: 180 });
 const ear = (o) => ({ now: 0, track: null, songMap: null, heardMap: null, analyzing: false, ...o });
 const t0 = startListening(1000);
-// In seconds, not the constant: what the panel promises is forty-five.
-let r = listenStep(t0, ear({ now: 1000 + 44_000 }));
-const stillListening = r.state.phase === 'listening';
-r = listenStep(t0, ear({ now: 1000 + 45_001 }));
-check('nothing named for 45 s says so, and not before', LISTEN_GIVE_UP_MS === 45_000 && stillListening && r.state.phase === 'missed', listenLine(r.state, true));
+// Nothing names the song but the person now, so nothing gives up on them: an
+// hour unnamed is still waiting, and what it says asks for the name.
+let r = listenStep(t0, ear({ now: 1000 + 3_600_000 }));
+check('nothing named waits for the name however long it takes, and asks for it', r.state === t0 && r.state.phase === 'listening'
+  && /Name it/.test(listenLine(r.state)), listenLine(r.state));
 r = listenStep(t0, ear({ now: 2000, track: track() }));
 check('a song named with no map yet goes into the list and waits to be heard through',
   r.state.phase === 'learning' && r.heard?.title === 'Tiger Rag' && r.heard?.artist === 'The Band' && r.heard?.durationSec === 180 && r.design === null,
-  listenLine(r.state, true));
+  listenLine(r.state));
 const learning = r.state;
 r = listenStep(learning, ear({ track: track(), songMap: { ...ROCK, isrc: 'OTHER' } }));
 const notOther = r.design === null && r.state.phase === 'learning';
@@ -152,7 +154,7 @@ r = listenStep(learning, ear({ track: null, heardMap: { ...ROCK, isrc: 'OTHER' }
 const analysisRunning = r.state.phase === 'learning';
 r = listenStep(learning, ear({ track: null, heardMap: { ...ROCK, isrc: 'OTHER' }, analyzing: false }));
 check('another song\'s map is not this song\'s; a song gone while its analysis runs is not "too short"; gone with no map is',
-  notOther && analysisRunning && r.state.phase === 'short', listenLine(r.state, true));
+  notOther && analysisRunning && r.state.phase === 'short', listenLine(r.state));
 // The next song starting is the other way a song goes (no silence between).
 const nextSongAnalysing = listenStep(learning, ear({ track: track('OTHER'), analyzing: true })).state.phase;
 const nextSongNoMap = listenStep(learning, ear({ track: track('OTHER'), analyzing: false })).state.phase;
@@ -164,8 +166,8 @@ r = listenStep(learning, ear({ track: null, heardMap: ROCK }));
 check('the map its first listen made, kept after the song ended, is what it designs from', r.design === ROCK);
 r = listenStep(t0, ear({ now: 1500, track: track(), songMap: ROCK }));
 check('a song heard before is named and designed in one step', r.heard !== null && r.design === ROCK);
-r = listenStep({ ...t0, phase: 'missed' }, ear({ track: { ...track(), source: 'manual' } }));
-check('named by hand after a miss, it carries on as if heard (and keeps no made-up ISRC)',
+r = listenStep(t0, ear({ track: track() }));
+check('named by hand, it carries on as if heard (and keeps no made-up ISRC)',
   r.state.phase === 'learning' && r.heard?.isrc === undefined);
 check('idle and designed do nothing', listenStep(LISTEN_IDLE, ear({ track: track(), songMap: ROCK })).design === null
   && listenStep({ ...learning, phase: 'designed' }, ear({ heardMap: ROCK })).design === null);
@@ -233,30 +235,6 @@ check('a first match a few seconds in (into an intro or a verse), or named in th
   && verseFirst.sections.length === PLAIN.sections.length && verseFirst.sections[0].start === 0 && verseFirst.sections[0].label === 'verse'
   && shiftSongMap(ROCK, 0) === ROCK,
   `named at 0:06: ${firstSecs.sections[0].label} ${firstSecs.sections[0].start}-${firstSecs.sections[0].end}; named at 0:10 of a 20 s intro: ${midIntro.sections[0].label} ${midIntro.sections[0].start}-${midIntro.sections[0].end}`);
-
-// The fingerprint stored with the map, through the real local matcher. A
-// made-up record: a chord of three tones every fifth of a second, seeded, so
-// its peaks are sharp and never repeat.
-const toneSong = (() => {
-  const out = new Float32Array(90 * FP_RATE);
-  let seed = 7;
-  const rnd = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296);
-  const step = Math.round(0.2 * FP_RATE);
-  for (let a = 0; a < out.length; a += step) {
-    const fs = [0, 1, 2].map(() => 300 + rnd() * 3500);
-    for (let i = a; i < Math.min(out.length, a + step); i++) for (const f of fs) out[i] += 0.2 * Math.sin((2 * Math.PI * f * i) / FP_RATE);
-  }
-  return out;
-})();
-const fpLead = 20;
-const recorded = extractPeakHashes(toneSong.subarray(fpLead * FP_RATE), FP_RATE);
-const indexOf = (frames) => buildIndex([{ isrc: 'TONES', hashes: recorded.hashes, frames, durationSec: recorded.durationSec, createdAt: 0 }]);
-const snippet = toneSong.subarray(50 * FP_RATE, 54 * FP_RATE);
-const after = matchSnippet(snippet, FP_RATE, indexOf(shiftFingerprintFrames(recorded.frames, fpLead)));
-const before = matchSnippet(snippet, FP_RATE, indexOf(recorded.frames));
-check('the fingerprint it stores names the song\'s position: a snippet ending at 0:54 matches at 0:54, not 20 s early',
-  after && Math.abs(after.offsetSec - 54) < 0.25,
-  `before ${before ? before.offsetSec.toFixed(2) : 'no match'} s; after ${after ? after.offsetSec.toFixed(2) : 'no match'} s`);
 
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} listen checks pass`);

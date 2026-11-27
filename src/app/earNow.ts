@@ -31,7 +31,7 @@ import type { RoomCalibration } from '../lib/audioCalibration';
 import type { ListenPhase } from '../lib/songDesign';
 
 export interface EarNow {
-  /** The song detector (Song Detection): on, songs are identified and their changes heard. */
+  /** The song detector (Song Detection): on, the song named is followed and its end heard (nothing names a song by ear since 2026-11-27). */
   detector: boolean;
   /**
    * The room's calibration, as it was when it last started or ended: null when

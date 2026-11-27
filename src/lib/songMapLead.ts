@@ -44,7 +44,6 @@
 //     becomes a verse, the analysis's word for a section it cannot place.
 
 import type { SongMap, SongSection } from './musicTypes';
-import { FP_HOP_SEC } from './localFingerprint.ts';
 
 /** Leads shorter than this fold into the first section: the analysis never cuts a section this short. */
 export const FOLD_LEAD_SEC = 8;
@@ -98,19 +97,4 @@ export function shiftSongMap(map: SongMap, leadSec: number): SongMap {
     pitchCurve: pad ? new Array<number>(pad).fill(0).concat(map.pitchCurve) : map.pitchCurve,
     chroma: map.chroma ? new Array<number>(chromaPad).fill(0).concat(map.chroma) : map.chroma,
   };
-}
-
-/**
- * A fingerprint's anchor frames moved later by the lead, so the local matcher,
- * which reads a match's offset off these frames, names the song's position and
- * not the recording's: unmoved, every later local match would set the clock
- * early by the lead and undo the shift of the map.
- */
-export function shiftFingerprintFrames(frames: Uint32Array, leadSec: number): Uint32Array {
-  const lead = Number.isFinite(leadSec) ? Math.min(MAX_LEAD_SEC, Math.max(0, leadSec)) : 0;
-  const by = Math.round(lead / FP_HOP_SEC);
-  if (by === 0) return frames;
-  const out = new Uint32Array(frames.length);
-  for (let i = 0; i < frames.length; i++) out[i] = frames[i] + by;
-  return out;
 }

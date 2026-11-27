@@ -44,15 +44,12 @@
  *
  * Crossfades are never quiet, and measured on the lab's twenty-three songs no
  * summary of the sound separated two songs from two sections of one, so the
- * boundary is not asked to hear them. Song identification is: the local
- * matcher (`localFingerprint.ts`, what names a song the show has heard
- * before) over the same joins, every song fingerprinted first from a copy in
- * a noisy room (the app's library is its own room recordings), with a
- * four-second capture every six seconds as `useMusicIntelligence` takes it.
- * Each join's boundary changes and names then go through `SongChangeGate`,
- * as the hook sends them, so a gap and the name that follows it count once.
- * Not modelled: the app's capture resampling, its sound-present gate, the
- * busy flag shared with the API, and the forced match after a long gap.
+ * boundary is not asked to hear them. Song identification heard them, and
+ * was measured here over the same joins (the local matcher naming each
+ * crossfade's new song, through `SongChangeGate` with the boundary) until
+ * the owner retired automatic song identification on 2026-11-27: that half
+ * is in archive/song-id/scripts/songends.mjs with the matcher. A crossfade
+ * changes nothing now until the next song is named by hand.
  *
  * The rule the boundary replaced runs beside it, for the numbers before: the
  * old class verbatim (1.8 s of quiet after 20 s of song) timed against the
@@ -67,8 +64,7 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import { fileURLToPath } from 'node:url';
 import { AnalyserEmulator, AudioFeatures } from '../src/lib/audioFeatures.ts';
 import { RoomTracker } from '../src/lib/audioCalibration.ts';
-import { SongBoundary, SongChangeGate } from '../src/lib/songBoundary.ts';
-import { extractPeakHashes, buildIndex, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
+import { SongBoundary } from '../src/lib/songBoundary.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SR = 48000;
@@ -91,7 +87,6 @@ const JOINS = {
   gap2rise: { gap: 2, rise: true, tail: 100 },
   xfade6: { xfade: 6 }, xfade16: { xfade: 16 },
 };
-const ID_EVERY = 6;      // useMusicIntelligence's LOCAL_MATCH_INTERVAL_MS, in seconds
 
 const decode = (file, rate) => {
   const run = spawnSync('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', String(rate), '-f', 'f32le', '-'], { maxBuffer: 1 << 30 });
@@ -213,25 +208,6 @@ function listen(samples) {
   return { fires, oldFires, oldSilentFires };
 }
 
-/**
- * The local matcher over one case, a capture every `every` s from a phase
- * spread across the cases: when it names a different song than it last did,
- * and which. The time is the capture's end, plus `LEAD`'s place in the case.
- */
-function names(spec, pcm, index, every) {
-  const { samples } = build(spec, pcm, FP_RATE);
-  const S = (s) => Math.round(s * FP_RATE);
-  const out = [];
-  let current = null;
-  for (let t = 4 + ((spec.seed * 2.7) % every); t + 4 <= samples.length / FP_RATE; t += every) {
-    const hit = matchSnippet(samples.subarray(S(t), S(t + 4)), FP_RATE, index);
-    if (!hit) continue;
-    if (current !== null && hit.isrc !== current) out.push({ at: t + 4, isrc: hit.isrc });
-    current = hit.isrc;
-  }
-  return out;
-}
-
 if (!isMainThread) {
   const { files, specs } = workerData;
   const pcm = files.map((f) => decode(f, SR));
@@ -274,29 +250,8 @@ async function main() {
     worker.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`worker ${w} exited ${code}`))));
   })));
 
-  // Meanwhile, on this thread, song identification over the same cases.
   const name = (i) => files[i].split('/').pop().replace(/\.[^.]+$/, '');
-  const fp = files.map((f) => decode(f, FP_RATE));
-  const roomCopy = (p, i) => { const c = Float32Array.from(p); addRoom(c, NOISY_ROOM_DB, prng(9000 + i)); return c; };
-  const record = (p, i) => { const { hashes, frames, durationSec } = extractPeakHashes(roomCopy(p, i), FP_RATE); return { isrc: name(i), hashes, frames, durationSec, createdAt: 0 }; };
-  const records = fp.map(record);
-  const index = buildIndex(records);
-  const named = new Map();
-  for (const spec of specs) named.set(spec.seed, names(spec, fp, index, ID_EVERY));
-  // Every twelve, as it was, on the 6 s crossfades: a sanity line, since a
-  // capture half as often is late by about half the cadence more.
-  const xf6 = specs.filter((s) => s.join === 'xfade6');
-  const named12 = new Map(xf6.map((s) => [s.seed, names(s, fp, index, 12)]));
-  // The new song missing from the library: a song the show has never heard.
-  // Every join, not only the crossfades: one stranger in a few dozen captures
-  // is what a matcher that counts a held chord over and over gives, and the
-  // crossfades alone caught that by two names (38 over the whole songs).
-  const joinSpecs = specs.filter((s) => s.kind === 'join');
-  const without = new Map();
-  const strangers = joinSpecs.map((s) => {
-    if (!without.has(s.b)) without.set(s.b, buildIndex(records.filter((_, i) => i !== s.b)));
-    return names(s, fp, without.get(s.b), ID_EVERY);
-  });
+
   await listening;
 
   const checks = [];
@@ -387,44 +342,6 @@ async function main() {
   check('and no fewer of anything than the old rule caught',
     [...gaps, ...gapless].every((j) => now[j].hits >= before[j].hits), [...gaps, ...gapless].map((j) => `${j} ${now[j].hits} vs ${before[j].hits}`).join(', '));
 
-  // ── Song identification, and both ways in through the hook's gate ───────
-  const byJoin = {};
-  let wrongWhole = 0, twice = 0, never = 0;
-  const wrongWhere = [];
-  for (const r of results) {
-    const got = named.get(r.spec.seed).map((x) => ({ ...x, at: x.at + 0 }));
-    if (r.spec.kind === 'short') continue;
-    if (r.spec.kind === 'whole') { wrongWhole += got.length; for (const x of got) wrongWhere.push(`${name(r.spec.a)}${r.spec.noisy ? ' (noisy)' : ''} named ${x.isrc} at ${x.at.toFixed(0)} s`); continue; }
-    const o = (byJoin[r.spec.join] ??= { n: 0, hits: 0, late: [], wrong: 0, changes: [] });
-    o.n++;
-    // The build at the matcher's rate puts the join where the ear's does.
-    const right = got.find((x) => x.isrc === name(r.spec.b) && x.at > r.boundary);
-    o.wrong += got.filter((x) => x !== right).length;
-    if (right) { o.hits++; o.late.push(right.at - r.boundary); }
-    // Both ways in, in time order, through the gate.
-    const gate = new SongChangeGate();
-    const events = [...r.fires.filter((f) => f.at > LEAD + 5).map((f) => ({ at: f.at, gap: true })), ...(right ? [{ at: right.at, gap: false }] : [])].sort((x, y) => x.at - y.at);
-    const changes = events.filter((e) => (e.gap ? gate.gap(e.at) : gate.track(e.at)));
-    if (changes.length > 1) twice++;
-    if (changes.length === 0) never++;
-  }
-  console.log('song identification (the local matcher), every song heard before, a capture every six seconds:');
-  for (const [j, o] of Object.entries(byJoin)) console.log(`  ${j.padEnd(9)} named the new song ${o.hits}/${o.n}${o.hits ? `, median ${med(o.late).toFixed(1)} s after it began` : ''}, ${o.wrong} wrong`);
-  const late12 = xf6.map((s, k) => { const r = results.find((x) => x.spec.seed === s.seed); const x = named12.get(s.seed).find((y) => y.isrc === name(s.b) && y.at > r.boundary); return x ? x.at - r.boundary : null; }).filter((x) => x !== null);
-  const strangerNames = strangers.reduce((s, got) => s + got.length, 0);
-  strangers.forEach((got, k) => { for (const x of got) wrongWhere.push(`${joinSpecs[k].join} ${name(joinSpecs[k].a)} → ${name(joinSpecs[k].b)} (not in the library) named ${x.isrc} at ${x.at.toFixed(0)} s`); });
-  if (wrongWhere.length) console.log(`  wrong names: ${wrongWhere.join('; ')}`);
-  console.log(`  a capture every twelve seconds, 6 s crossfades: median ${med(late12).toFixed(1)} s; with the new song not in the library, over all ${joinSpecs.length} joins: ${strangerNames} names\n`);
-
-  const xf = ['xfade6', 'xfade16'].map((j) => byJoin[j]);
-  check('every crossfade\'s new song is named by song identification', xf.every((o) => o.hits === o.n), xf.map((o) => `${o.hits}/${o.n}`).join(', '));
-  check('and it never names a wrong song: in a join, in a whole song, or when the new song is not in the library',
-    Object.values(byJoin).every((o) => o.wrong === 0) && wrongWhole === 0 && strangerNames === 0,
-    `${Object.values(byJoin).reduce((s, o) => s + o.wrong, 0)} in joins, ${wrongWhole} in whole songs, ${strangerNames} for a stranger`);
-  check('each join changes the look once, with the gap and the name through the hook\'s gate (no song twice)',
-    twice === 0 && never === 0, `${twice} twice, ${never} never, of ${results.filter((r) => r.spec.kind === 'join').length}`);
-  check('sanity: a capture every six seconds names a crossfade sooner than every twelve', med(byJoin.xfade6.late) < med(late12),
-    `${med(byJoin.xfade6.late).toFixed(1)} s vs ${med(late12).toFixed(1)} s`);
 
   const passed = checks.filter(Boolean).length;
   console.log(`\n${passed}/${checks.length} checks passed`);

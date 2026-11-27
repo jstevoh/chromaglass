@@ -447,7 +447,7 @@ and to mark shipped, and the others now point to it.
 | MIDI clock phase | 14e (Start, dropout), 14t (Continue, SPP) | done together |
 | Precache, fonts, offline | 14h | §13, 19d |
 | Source maps, `CRASH_GPU` | 19d, 19c | `docs/crash-plan.md` |
-| The song-ID Worker | 14o | `docs/crash-plan.md` |
+| The song-ID Worker (retired 2026-11-27, `archive/song-id/`) | 14o | `docs/crash-plan.md` |
 | The show kit | rig R5 (R5-kit) | §13 |
 | Draw cap, pack and read back after a step | 14j | 14b, H2c-9 |
 | Probe pixels and timestamp labels | 14r, H2c-labels | |
@@ -576,6 +576,13 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 3 |
 
 ## Not doing
+
+- **Automatic song identification (Song ID), for now.** Retired on 2026-11-27 at the
+  owner's word ("we aren't using the automatic song identity detection really"): the
+  paid lookup and its Worker, the local matcher, its index and the fingerprints a song
+  map made. A song is named by hand (the Track panel's tag, Listen's Name it, the
+  assistant's `listen`), and everything that follows a named song works as before. The
+  code and its checks are in `archive/song-id/`, whose README says how to bring it back.
 
 - **Kaleidoscope, tiling, tunnel, halftone, posterize, solarize.** Warps of a picture.
   They are what every VJ tool already offers and they would erase the plate's identity.

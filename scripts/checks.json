@@ -400,8 +400,9 @@
       "shard": "sound",
       "run": "npm run music",
       "why": [
-        "The ear: synthetic songs through the real matcher, and the tempo",
-        "sources through the real beat clock."
+        "The ear: the tempo sources through the real beat clock. (The local",
+        "matcher's checks went to archive/song-id/ when automatic song",
+        "identification was retired, 2026-11-27.)"
       ]
     },
     {
@@ -428,8 +429,9 @@
         "scripts/fixtures/songs, decoded by the ffmpeg installed above, joined",
         "with gaps, gapless and crossfaded, in a quiet room and a noisy one,",
         "through the app's ear into the boundary; every song whole with no",
-        "change inside it; and the local matcher naming each crossfade's new",
-        "song. About two minutes on the runner's cores."
+        "change inside it. (The local matcher naming each crossfade's new song",
+        "went to archive/song-id/ with song identification, 2026-11-27.) About",
+        "two minutes on the runner's cores."
       ]
     },
     {
@@ -984,9 +986,9 @@
         "Listen (PLAN 28h-8): the show designed from a heard song's map plays on",
         "the song (its cues through the real scheduler, its stages where startAt",
         "lays them, louder sections fuller against the song's own range), and",
-        "the flow waits for the right map and says when nothing was named; and",
-        "a map heard from halfway in sits on the song's own seconds (28h-9): its",
-        "cues fire on the song's choruses and its fingerprint names the song's place."
+        "the flow waits for the name and then the right map; and a map heard",
+        "from halfway in sits on the song's own seconds (28h-9): its cues fire",
+        "on the song's choruses."
       ]
     },
     {
@@ -1228,20 +1230,6 @@
         "numbers into one group and is closed without the token; and one",
         "address is held to its hourly limit. The endpoint is public, so most",
         "of what it proves is what it will not do."
-      ]
-    },
-    {
-      "name": "The song-ID Worker",
-      "shard": "logic",
-      "run": "npm run fingerprint-worker",
-      "why": [
-        "The song-ID Worker (scripts/fingerprint-worker.mjs, PLAN.md 14o): every",
-        "lookup it passes on is paid for from the owner's account and its",
-        "address is in the public bundle, so what is checked is mostly what it",
-        "refuses (another site, no Origin, an oversized or unsized body, the",
-        "31st an hour from one address or /64, the day's ceiling, no counter",
-        "store), each read twice: the status, and that the service was never",
-        "called. Node's Request and FormData only, so `logic`."
       ]
     },
     {

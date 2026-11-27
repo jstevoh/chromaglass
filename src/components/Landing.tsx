@@ -111,7 +111,6 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
     lines: [
       'Full-length recording, 1080p and 4K render, no mark',
       'Phone remote',
-      'Song ID with timed lyrics',
       'Your own logo on the glass',
       'Live Show: stream to YouTube, Twitch and the rest',
       'The Mac app: the show offline, the phone remote built in',
