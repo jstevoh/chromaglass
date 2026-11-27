@@ -92,14 +92,17 @@ export function CrashReportButton({ floating = false, tile = false }: {
 
   if (floating) return <>{chipEl}{sheet}</>;
   const label = fatal ? 'The plate stopped — save a report' : 'Save a report of what the show was doing';
+  // Separate static layout/variant classes (`tile`) from the `lit` notice ternary so `states.mjs` reads `lit` alone.
+  const layout = tile
+    ? 'flex min-h-[64px] w-full flex-col items-center justify-center gap-1.5 rounded-lg border text-[13px] transition-colors active:scale-[0.97]'
+    : 'inline-flex h-8 w-8 items-center justify-center rounded-full transition-all';
+  const litLook = tile ? 'border-amber-400 bg-amber-500 text-black' : 'bg-amber-500 text-black';
+  const idleLook = tile ? 'border-border bg-elevated text-text-2 active:bg-active' : 'hover:bg-white/10 text-white/60';
   return (
     <div className="relative">
       <button
         onClick={() => { setOpen(true); setChip(false); }}
-        className={tile
-          ? `flex min-h-[64px] w-full flex-col items-center justify-center gap-1.5 rounded-lg border text-[13px] transition-colors active:scale-[0.97] ${lit ? 'border-amber-400 bg-amber-500 text-black' : 'border-border bg-elevated text-text-2 active:bg-active'}`
-          : `inline-flex h-8 w-8 items-center justify-center rounded-full transition-all ${lit ? 'bg-amber-500 text-black' : 'hover:bg-white/10 text-white/60'}`
-        }
+        className={`${layout} ${lit ? litLook : idleLook}`}
         title={label}
         aria-label={label}
         data-testid="crash-report-button"
