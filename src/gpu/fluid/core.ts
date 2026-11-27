@@ -352,6 +352,20 @@ export class FluidCore {
   protected speciesPoured: { sigma: number; rho: number } | null = null;
   /** The last completed species snapshot (`speciesSnapshot`, PLAN 33f), or null when cleared or empty. */
   protected speciesSnap: { L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null = null;
+  /*
+    The ouzo effect's solvent (PLAN 48s; src/lib/ouzo.ts for the physics,
+    wgsl/fluid/ouzo.ts for its four numbers): the ethanol and the anise oil
+    a column holds, laid by the species' pour and moved by the species'
+    carry. Made at the first pour of a bottle with anise oil in it, and live
+    for as long as the species is: every look that pours none carries
+    nothing new. `cloudView` is the species with the droplets' scattering
+    added, which the plate is handed in the species' place (fields.species)
+    once a step has written it (`cloudFresh`).
+  */
+  protected solvent: PingPong | null = null;
+  protected solventLive = false;
+  protected cloudView: GPUTexture | null = null;
+  protected cloudFresh = false;
   /** The thin solve's volume source (PLAN 18c): the share of each column poured since the last step, which hsDivergence takes and empties. */
   protected hsPour: GPUBuffer | null = null;
   /** The last thin step's displacement scale, which the species' carry was given (benchSpecies repeats it). */
@@ -807,6 +821,7 @@ export class FluidCore {
     this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.solventLive = this.cloudFresh = false;
     this.speciesClears++;
     this.speciesPoured = null;
     this.speciesSnap = null;

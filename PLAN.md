@@ -85,7 +85,7 @@ as cord sources, which every one of them can use.
 
 **Still missing from the plate (asked 2026-11-27, §48 second pass).** Eight real phenomena no
 item held, ranked for the wall against GPU cost and jitter, all waiting on the owner's pick:
-**48s** ouzo clouding, **48t** chemical gardens in the gap, **48u** a shear-thinning gum whose
+**48s** ouzo clouding (built, #PRNUM: the Ouzo bottle; its check is 48s-1), **48t** chemical gardens in the gap, **48u** a shear-thinning gum whose
 fingers crack, **48v** an electric field on the oil, **48w** Marangoni bursting, **48x** dancing
 droplets, **48y** drops drifting to the lamp's heat, **48z** partial coalescence in the closeup.
 

@@ -50,7 +50,30 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'alcohol', name: 'Alcohol', color: '#ffffff', own: '#ffffff', description: 'Light and thin: it rises through water and disperses with heat, and opens holes in a clear film',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
     // Ethanol: 1.2 mPa·s at 0.79 g/cm³, so a little thinner than water by
     // the kinematic measure that sets a thin gap's drag; 22 mN/m; n 1.361.
-    behaviour: { weight: -0.2, polarity: -0.15, solvent: 1, viscosity: 1.2, density: 0.79, tension: 22, index: 1.361 } },
+    // All ethanol (PLAN 48s): poured on an ouzo's cloud it dissolves the droplets, as it does in a glass.
+    behaviour: { weight: -0.2, polarity: -0.15, solvent: 1, viscosity: 1.2, density: 0.79, tension: 22, index: 1.361, ethanol: 1 } },
+  /*
+    The ouzo effect (PLAN 48s, lib/ouzo.ts): anise oil dissolved in alcohol,
+    water-clear in the bottle, and opal white wherever water mixes into it,
+    because watered alcohol cannot hold the oil and it comes out as micron
+    droplets all at once. The white is nothing the bottle lays: the solver
+    carries its ethanol and its oil, and the droplets appear where the two
+    cross the measured solubility curve, so a pour is clear in its middle,
+    clouds in a ring where it meets the plate's water, and clears again
+    under a pour of Alcohol.
+
+    Its strength is a kitchen's anise extract, 3% oil of anise by volume in
+    about 75% alcohol, not the drink's: an ouzo or a pastis holds about 2 g
+    of the oil a litre, 0.2%, and its louche is opaque in a glass 5 cm deep
+    and only a haze in a dish's 2 mm (μs′ about 0.15 per mm at its whitest).
+    The extract clouds once a fifth of the column is water and is whitest,
+    about 3 per mm and so a little past whole milk's 2, near three parts of
+    it to two of water. 75% alcohol by volume: 2.4 mPa·s, 0.87 g/cm³,
+    26 mN/m, n 1.364, so nearly three times water by the measure the gap's
+    drag takes, as watered alcohol is (it is thickest near half and half).
+  */
+  { id: 'ouzo',    name: 'Ouzo',    color: '#ffffff', own: '#ffffff', description: 'Anise oil in alcohol: clear in the bottle, opal white wherever it meets water, and clear again under Alcohol',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.0,
+    behaviour: { weight: -0.13, polarity: -0.15, solvent: 0.75, viscosity: 2.4, density: 0.87, tension: 26, index: 1.364, ethanol: 0.75, anise: 0.03 } },
   { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.3, heatAmount: 0.0,
     behaviour: { weight: 0.02, polarity: 0.2 } },
   // The heavy one, and it is sugar in water, so it is polar: it sinks through

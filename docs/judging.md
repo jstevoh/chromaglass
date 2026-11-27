@@ -3086,3 +3086,22 @@ How the rings read with a moving liquid at sixty frames is only seen here.
    with still liquid.
 4. **Analyser** 90 to 0: every ring swings to its opposite colour on a white field.
 5. Dish Stress at 0: the look exactly as before.
+
+## 147. The ouzo's cloud (PLAN 48s)
+
+The Ouzo bottle is anise oil in alcohol, clear in the bottle; where water mixes into it the
+oil comes out as a white cloud. Measured in the lab (the cloud sits only where the mix
+crosses the solubility curve, the oil is conserved); how it looks in a show is the owner's.
+
+1. Any look with colour on the plate, on a black ground. Pick **Ouzo** on the shelf and hold
+   the Dropper in one place. Good: the first second is milky (the drops are mostly water),
+   then the middle clears as the bottle's own liquid fills it and an opal white ring stands
+   where it meets the plate's water, soft-edged, moving out with the pour. Bad: a white disc
+   with no clear middle, a ring that flickers or is stepped along the grid, white where
+   nothing was poured.
+2. Pour **Water** into the middle of the clear pool. Good: a second white front where the
+   water meets the ouzo, moving out. Stir with the Finger: the white follows the folds.
+3. Pour **Alcohol** on part of the ring. Good: the white there fades to clear and stays
+   clear while the alcohol is there. Bad: no change, or the whole ring going at once.
+4. On a lamp ground the cloud is a warm grey shadow, as milk's is, not white.
+5. A plate that never sees the bottle looks exactly as before.

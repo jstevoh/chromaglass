@@ -68,6 +68,9 @@ export interface LiquidDeposit {
   tension?: number;
   index?: number;
   scatter?: number;
+  /** The bottle's ethanol and anise oil (PLAN 48s): into the GPU's solvent field with the species; nothing here reads them. */
+  ethanol?: number;
+  anise?: number;
 }
 
 /**

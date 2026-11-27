@@ -36,7 +36,7 @@ export class FluidReads extends FluidInputs {
       pass.end();
     });
     if (clears !== this.speciesClears) { this.speciesSnap = null; return 0; }
-    if (share < 1e-6 && pours === this.speciesQuiet) { this.speciesLive = false; this.speciesSnap = null; return share; }
+    if (share < 1e-6 && pours === this.speciesQuiet) { this.speciesLive = this.solventLive = this.cloudFresh = false; this.speciesSnap = null; return share; }
     const data = this.shareRead.data;
     this.speciesSnap = data && this.speciesPoured ? { L: this.L, data, poured: this.speciesPoured } : null;
     return share;
@@ -490,10 +490,13 @@ export class FluidReads extends FluidInputs {
   }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix'): Promise<Float32Array> {
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix' | 'solvent' | 'cloud'): Promise<Float32Array> {
     const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read
       : which === 'mix' ? (this.mixLive ? this.mix?.read : this.blank('rgba'))
-      : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba')) : this.grain?.read;
+      : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba'))
+      // The ouzo's solvent (ethanol, oil dissolved, oil as droplets: wgsl/fluid/ouzo.ts) and what the plate is handed for the species, PLAN 48s.
+      : which === 'solvent' ? (this.solventLive ? this.solvent?.read : this.blank('rgba'))
+      : which === 'cloud' ? (this.fields.species ?? this.blank('rgba')) : this.grain?.read;
     if (!src) throw new Error(`no ${which} field`);
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);

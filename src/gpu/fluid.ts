@@ -169,6 +169,9 @@ export class WebGPUFluid extends FluidCover {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      // The ouzo's phase change and its cloud for the plate (PLAN 48s), behind the show as the species' are.
+      ['ouzoCloud', [RGBA32], false],
+      ['ouzoView', [RGBA32], false],
       // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
       ['inkSpecies', [RGBA32], false],
       // The layered seed's oil share (38w-15, `layShare`): waited for when oil waits (Lava Pop).

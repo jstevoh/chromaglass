@@ -487,8 +487,8 @@ export class FluidFields extends FluidCore {
         side by side (packDyeBodies in wgsl/pack.ts, PLAN 47z-1).
       */
       oilDye: this.bodiesWanted && !this.oilDyeStale && this.oilDye && !(this.printLive && this.printDye) && this.mixLive && this.mix ? this.oilDye.read : null,
-      /** The poured species field (carries scatter in b channel). */
-      species: this.speciesLive && this.species ? this.species.read : null,
+      /** The poured species field (carries scatter in b channel); with ouzo on the plate, the same with its cloud's scatter added (PLAN 48s, `cloudView`). */
+      species: !this.speciesLive || !this.species ? null : this.solventLive && this.cloudFresh && this.cloudView ? this.cloudView : this.species.read,
       /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */
       soapFilm: this.soapPlate?.field ?? null,
       /** The tank's dye (PLAN 47n), or null when Tank is off: the plate draws it in its own place. */

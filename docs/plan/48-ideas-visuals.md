@@ -265,7 +265,7 @@ sub-cell droplets. Ranked by what a person watching the wall would see against w
 
 | Rank | Item | On the wall | GPU cost | Build |
 |---|---|---|---|---|
-| 1 | 48s ouzo clouding | a clear pour blooms into opal clouds where it mixes | low: per-cell, no new pass | Claude's check, then AG |
+| 1 | 48s ouzo clouding (shipped #PRNUM; its check is 48s-1) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built; Claude's check owed |
 | 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
 | 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
 | 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |
@@ -282,18 +282,57 @@ shadowgraph); the Cheerios effect (needs a free surface the sandwiched gap does 
 bubbles' crowding is 38g); the coffee ring (in §18 with evaporation as solvent loss); Bénard
 cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
 
-- **48s. Ouzo clouding: a clear pour turns milky where it mixes** (S–M; builds on **18j**
-  milk's scattering and **48n** its Tyndall colours). Anise oil dissolves in ethanol and not
-  in water; pour water into the mix (or the mix into water) and wherever the ethanol fraction
-  falls below the oil's solubility the oil comes out as micron droplets all at once, and the
-  liquid turns opal white exactly along the mixing front (spontaneous emulsification; Vitale
-  and Katz 2003). It needs a solvent fraction carried like any scalar and a solubility curve
-  (the ternary diagram's binodal) per cell; the droplets are never resolved, only their
-  volume fraction, which feeds the scattering 18j already draws. No random seeds: the cloud
-  grows from the mixing itself, so it is as smooth as the dye. *Check:* a water pour into a
-  clear ouzo layer gives a cloud only where the solvent fraction crosses the binodal, its
-  white fraction grows with mixing and never appears in an unmixed region, and the oil it
-  takes out of solution is conserved.
+- **48s. Ouzo clouding: a clear pour turns milky where it mixes** (shipped #PRNUM, 2026-11-27;
+  builds on **18j** milk's scattering). A fifteenth bottle, **Ouzo**: anise oil in alcohol at a
+  kitchen extract's strength (3% oil in 75% alcohol; the drink's 0.2% is only a haze in a
+  2 mm dish). The solver carries its ethanol and its oil in a field of their own (`solvent`,
+  made at the first pour of the bottle, laid by the species' pour and moved by the species'
+  carry), and once a step each cell is put on the measured binodal of water / ethanol /
+  trans-anethole (53 cloud points, arXiv:2404.18524, fitted as ln s = −9.38 + 6.23 f + 4.93 f²
+  in the solvent's ethanol volume fraction f): the oil over what the cell's solvent holds is
+  droplets, the rest dissolved, the two always summing to the oil carried there
+  (`ouzoCloud`, `src/lib/ouzo.ts`). The droplets' scattering (μs′ = 209 per mm for each unit
+  of their volume fraction: one-micron droplets, Mie) is added to the channel milk's rides in
+  and the plate draws it as it draws milk, unchanged. No seed, noise or timer. The Alcohol
+  bottle is now ethanol to the solver, so poured on a cloud it dissolves it. Off for every
+  look: no look pours the bottle, and without it no field is made and no pass runs.
+  Measured in the lab with a scratch script (in the PR): the cloud agrees with `ouzoDrops`
+  cell for cell, none appears in an unmixed cell or on the clear side of the curve, and the
+  oil is the same to seven figures through a water pour and an alcohol pour.
+- **48s-1. The ouzo's check** (S; owed by 48s, which shipped measured by a scratch script).
+  A lab check, `npm run ouzo`: a water pour into a laid ouzo layer gives droplets only in
+  cells on the two-phase side of `OUZO_BINODAL` at their own gap, to float precision against
+  `ouzoDrops`; none in a cell with no oil or at the bottle's own strength; Σ(dissolved +
+  droplets) unchanged while nothing has reached the rim; Alcohol poured on the cloud lowers
+  the droplets there and leaves the oil; the plate handed for the species is the species
+  plus 209 times the droplets in b; and a plate with milk or glycerine and no Ouzo makes no
+  `solvent` field and renders byte for byte as before.
+- **48s-2. Alcohol poured before any Ouzo is not remembered** (S; a shortcut 48s took for
+  cost). The `solvent` field starts at the first pour that brings anise oil, so a plate that
+  only ever sees Alcohol carries nothing new; ethanol poured before that first Ouzo is
+  therefore not in the field, and an Ouzo poured into a pool of Alcohol clouds as though the
+  pool were water. Real: the alcohol there would hold the oil. Either start the field at any
+  ethanol pour (one more carry a step while Alcohol is on the plate; measure its cost on the
+  Mac first), or lay the field from the species at its start when Alcohol is the only poured
+  liquid so far.
+- **48s-3. The ouzo's droplets ripen** (S–M; with **48n**). The droplets are taken at the one
+  micron they form at; real ones grow to three over hours by Ostwald ripening, faster in
+  less alcohol (Sitnikova and others 2005), and μs′ per unit of oil falls from 209 to 108
+  per mm as they do, with the blue-to-red ratio going from 1.20 to 1.09. Carry the droplets'
+  number beside their volume (the field's first channel is free for it) so the mean size is
+  volume over number, and give 48n's Tyndall colours the size.
+- **48s-4. The ouzo's front is as thin as the plate's mixing** (M; waits on **48w** and
+  **18d-5**). On the thin gap a pour pushes the liquid before it aside more than it mixes
+  with it, so the cloud is a ring a few cells wide at the pour's edge and wherever water is
+  poured back in. In a real dish alcohol meeting water spreads and stirs itself (its lower
+  surface tension pulls it out over the water, and it is lighter), which is what makes a
+  louche billow. When the plate has that flow the cloud will follow it with no change here.
+- **48s-5. A bottle's ethanol and anise oil as Liquid Designer dials, and a look that pours
+  Ouzo** (S; the owner's call on the look). The two numbers are a bottle's behaviour
+  (`ethanol`, `anise` in `LiquidBehaviour`) and the Designer does not show them yet: with
+  them a performer could make a stronger or weaker louche (past real: more oil than alcohol
+  can hold is already cloudy in the bottle). No look's dish pours Ouzo; a slow look whose
+  automation pours it into coloured water is the obvious home.
 - **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
   `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
   membrane of precipitate at the front, and the front's speed against its reaction sets the
