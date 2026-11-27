@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { PALETTE } from '../../constants';
+import { LIT } from '../ui';
 import { DEFAULT_LIQUID_TYPES } from '../../types';
 import { padDoor } from '../../lib/padDoor';
 import { PAD_LAYOUT_HELP, PAD_LAYOUT_LABELS, padLayoutBindings, type PadLayout } from '../../lib/padLayouts';
@@ -73,7 +74,7 @@ export function PhonePads({ testId = 'phone-pads' }: { testId?: string }) {
             key={l}
             onClick={() => { liftAll(); setLayout(l); setPicked(null); }}
             aria-pressed={layout === l}
-            className={`min-h-[44px] rounded-lg border px-1 text-[12px] ${layout === l ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 text-text-2'}`}
+            className={`min-h-[44px] rounded-lg border px-1 text-[12px] ${layout === l ? LIT : 'border-white/10 text-text-2'}`}
             data-testid={`${testId}-layout-${l}`}
           >
             {PAD_LAYOUT_LABELS[l]}

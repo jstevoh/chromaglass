@@ -145,7 +145,7 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                           key={l}
                           onClick={() => midi.setPadLayout(l)}
                           aria-pressed={midi.padLayout === l}
-                          className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${midi.padLayout === l ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
+                          className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${midi.padLayout === l ? LIT : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
                           data-testid={`settings-midi-pad-layout-${l}`}
                         >
                           {PAD_LAYOUT_LABELS[l]}
