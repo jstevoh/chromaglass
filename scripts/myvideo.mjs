@@ -90,7 +90,9 @@ const keepPlayed = () => {
 const held = (page) => page.evaluate(() => {
   const h = window.__cgVideo?.();
   const plate = !document.querySelector('[data-testid="needs-webgpu"]') && typeof window.chromaglassDebug?.()?.hands === 'function';
-  return h ? { pour: h.pour?.currentSrc || null, pourPaused: h.pour?.paused ?? null, film: h.film?.currentSrc || null, filmPaused: h.film?.paused ?? null, filmKind: h.filmKind, plate } : null;
+  const live = (el) => { const s = el?.srcObject; return s && typeof s.getTracks === 'function' ? s.getTracks().filter(t => t.readyState === 'live').length : 0; };
+  return h ? { pourLive: live(h.pour), filmLive: live(h.film), pourStream: h.pour?.srcObject?.id ?? null, filmStream: h.film?.srcObject?.id ?? null, pourReads: h.pourReads ?? 0,
+    pour: h.pour?.currentSrc || (h.pour?.srcObject ? 'stream' : null), pourPaused: h.pour?.paused ?? null, film: h.film?.currentSrc || null, filmPaused: h.film?.paused ?? null, filmKind: h.filmKind, plate } : null;
 });
 /** How far an element moved in two seconds, and how often it paused. */
 const clockOf = (page, which) => page.evaluate(async (which) => {
@@ -119,7 +121,8 @@ const choose = async (page, click) => {
   await chooser.setFiles(FIXTURE);
 };
 
-const browser = await launchChromium(chromium, { headless: true });
+// A fake camera, so the camera's own row (PLAN 14ag-9) can be pressed: Chromium's test pattern, granted without a prompt.
+const browser = await launchChromium(chromium, { headless: true, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 try {
   // ── The phone ──
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
@@ -203,6 +206,19 @@ try {
   dp.setDefaultTimeout(60_000);
   dp.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await dp.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
+  /*
+    The desk's Video dot (PLAN 14ag-9) opens the Video panel beside the plate,
+    not the Settings sheet over it: the owner wanted the video's controls on
+    the main desk, "to see things on the canvas as I change them".
+  */
+  for (let i = 0; i < 40 && !(await dp.locator('header [data-testid="dot-video"]').count()); i++) await dp.waitForTimeout(250);
+  await dp.locator('header [data-testid="dot-video"]').first().click();
+  await dp.waitForTimeout(600);
+  const panelOpen = await dp.locator('[data-panel="film"] [data-testid="film-source"]').count();
+  const sheetOpen = await dp.locator('[data-testid="settings-panel"]').isVisible().catch(() => false);
+  check('the desk\'s Video dot opens the Video panel on the desk, with its sources, and not the Settings sheet',
+    panelOpen === 1 && !sheetOpen, `panel ${panelOpen ? 'open' : 'not open'}, sheet ${sheetOpen ? 'open' : 'shut'}`);
+
   await dp.getByTestId('open-all-settings').click();
   await dp.getByTestId('settings-nav-film').click();
   await dp.waitForTimeout(500);
@@ -250,6 +266,69 @@ try {
   check('Video Zoom, Across and Up are in the section; Fit is off at the defaults, on once framed, and puts all three back',
     ['Video Zoom', 'Video Across', 'Video Up'].every(l => labels.some(t => t.includes(l))) && fitOff && fitOn && JSON.stringify(back) === '[1,0,0]',
     `sliders ${['Video Zoom', 'Video Across', 'Video Up'].map(l => labels.some(t => t.includes(l)) ? l : `no ${l}`).join(', ')}; Fit ${fitOff ? 'off' : 'on'} then ${fitOn ? 'on' : 'off'}; after Fit ${JSON.stringify(back)}`);
+
+  /*
+    LED ring (PLAN 14ag-9): the video as the spinning platform under the dish.
+    Here, that the row's switch writes filmRing and takes the film's row into
+    the lamp, says so, and a second press lays it over the plate again; what
+    the ring draws is `npm run videolamp`'s.
+  */
+  const ringState = () => dp.evaluate(() => { const s = window.chromaglassSettings?.(); return s ? { ring: s.filmRing, order: s.mixOrder } : null; });
+  const underFront = (o) => { const w = String(o ?? '').split(' '); return w.indexOf('film') >= 0 && w.indexOf('film') < w.indexOf('front'); };
+  const filmingNow = (await held(dp))?.filmKind;
+  await dp.locator(`${row} [data-testid="video-ring"]`).click();
+  await dp.waitForTimeout(300);
+  const onRing = await ringState();
+  const ringLit = (await dp.locator(`${row} [data-testid="video-ring"]`).getAttribute('aria-pressed')) === 'true';
+  const ringSaid = await dp.locator(`${row} [data-testid="video-doing"]`).textContent().catch(() => '');
+  const ringFilm = (await held(dp))?.filmKind;
+  await dp.locator(`${row} [data-testid="video-ring"]`).click();
+  await dp.waitForTimeout(300);
+  const offRing = await ringState();
+  const plateLit = (await dp.locator(`${row} [data-testid="video-film"]`).getAttribute('aria-pressed')) === 'true';
+  check('LED ring puts the video on the spinning platform (filmRing 1, its row under the glass), lit and said so, playing; a second press lays it over the plate again',
+    onRing?.ring === 1 && underFront(onRing.order) && ringLit && ringSaid?.includes('LED ring') && ringFilm === 'file'
+      && offRing?.ring === 0 && !underFront(offRing.order) && plateLit,
+    `before: film ${filmingNow}; ring ${onRing?.ring} ${onRing?.order} (${ringLit ? 'lit' : 'not lit'}, "${ringSaid}", film ${ringFilm}) → ring ${offRing?.ring} ${offRing?.order}, Plate ${plateLit ? 'lit' : 'not lit'}`);
+
+  /*
+    The camera's own row (PLAN 14ag-9). With a file loaded and the camera put
+    on, the row was the file's, Play unlit, and the camera had no Pour. Now
+    it is the camera's, and its Pour lays the camera's own picture in: a clone
+    of the film's stream, so Stop leaves the camera on the plate, and taking
+    the camera off ends the pour with it.
+  */
+  await dp.locator(`${section} [data-testid="film-camera"]`).click();
+  for (let i = 0; i < 40 && (await held(dp))?.filmKind !== 'camera'; i++) await dp.waitForTimeout(250);
+  await dp.waitForTimeout(800);
+  const camName = await dp.locator(`${row} [data-testid="video-name"]`).textContent().catch(() => null);
+  const camLit = (await dp.locator(`${row} [data-testid="video-film"]`).getAttribute('aria-pressed').catch(() => null)) === 'true';
+  const preview = await dp.locator(`${row} [data-testid="video-preview"]`).count();
+  check('with the camera on, the row is the camera\'s (not the file loaded before), shown over the plate, with its little live screen',
+    !!camName && camName !== NAME && camLit && preview === 1, `"${camName}", Plate ${camLit ? 'lit' : 'not lit'}, preview ${preview ? 'drawn' : 'missing'}`);
+  const reads0 = (await held(dp))?.pourReads ?? 0;
+  await dp.locator(`${row} [data-testid="video-pour"]`).click();
+  await dp.waitForTimeout(1500);
+  // A plate on software WebGPU reads a poured frame every two seconds or so, slower while it rebuilds: give it thirty.
+  for (let i = 0; i < 120 && (await held(dp))?.plate && ((await held(dp))?.pourReads ?? 0) <= reads0; i++) await dp.waitForTimeout(250);
+  const cp = await held(dp);
+  const camPourLit = (await dp.locator(`${row} [data-testid="video-pour"]`).getAttribute('aria-pressed')) === 'true';
+  check('Pour on the camera\'s row pours the camera: the pour plays a live stream of its own (not the film\'s), the film still the camera, and the plate reads it',
+    cp?.pour === 'stream' && cp.pourLive > 0 && cp.pourPaused === false && cp.pourStream !== cp.filmStream && cp.filmKind === 'camera' && cp.filmLive > 0 && camPourLit
+      && (!cp.plate || cp.pourReads > reads0),
+    `pour ${cp?.pour} (${cp?.pourLive} live tracks, ${cp?.pourPaused ? 'paused' : 'playing'}, ${cp?.pourStream === cp?.filmStream ? 'the film\'s own stream' : 'its own stream'}), film ${cp?.filmKind} ${cp?.filmLive} live, plate ${cp?.plate ? `read ${cp.pourReads - reads0} frames` : 'not running here'}`);
+  await dp.locator(`${row} [data-testid="video-pour"]`).click();
+  await dp.waitForTimeout(400);
+  const cs = await held(dp);
+  check('Stop ends the camera\'s pour and leaves the camera on the plate, its picture live',
+    cs?.pour === null && cs.filmKind === 'camera' && cs.filmLive > 0, `pour ${cs?.pour ?? 'none'}, film ${cs?.filmKind} ${cs?.filmLive} live`);
+  await dp.locator(`${row} [data-testid="video-pour"]`).click();
+  await dp.waitForTimeout(800);
+  await dp.locator(`${section} [data-testid="film-off"]`).click();
+  await dp.waitForTimeout(600);
+  const co = await held(dp);
+  check('taking the camera off ends its pour too: nothing is left reading a camera the panel says is off',
+    co?.filmKind === 'none' && co.pour === null, `film ${co?.filmKind}, pour ${co?.pour ?? 'none'}`);
 
   await desk.close();
 } catch (e) {

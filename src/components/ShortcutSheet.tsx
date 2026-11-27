@@ -20,7 +20,7 @@ export function ShortcutSheet({ onClose }: { onClose: () => void }) {
     <Sheet title="Keyboard shortcuts" onClose={onClose} width={640} height={600} testId="shortcut-sheet">
       <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-6">
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Show &amp; plate</h3>
+          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">Show &amp; plate</h3>
           <div className="divide-y divide-border rounded-lg border border-border bg-elevated/60">
             {SHOW_SHORTCUTS.map((s) => (
               <div key={s.id} className="flex items-center justify-between gap-4 px-3.5 py-2 text-[13px]">
@@ -32,7 +32,7 @@ export function ShortcutSheet({ onClose }: { onClose: () => void }) {
         </section>
 
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Tools</h3>
+          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">Tools</h3>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
             {DESK_TOOLS.map(([, label, kbd]) => (
               <div key={kbd} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-elevated/60 px-3 py-2 text-[13px]">
@@ -44,7 +44,7 @@ export function ShortcutSheet({ onClose }: { onClose: () => void }) {
         </section>
 
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Macro closeup</h3>
+          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">Macro closeup</h3>
           <div className="divide-y divide-border rounded-lg border border-border bg-elevated/60">
             {MACRO_SHORTCUTS.map((s) => (
               <div key={s.kbd} className="flex items-center justify-between gap-4 px-3.5 py-2 text-[13px]">
@@ -56,7 +56,7 @@ export function ShortcutSheet({ onClose }: { onClose: () => void }) {
         </section>
 
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Desk layout</h3>
+          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">Desk layout</h3>
           <div className="divide-y divide-border rounded-lg border border-border bg-elevated/60">
             {DESK_SHORTCUTS.map((s) => (
               <div key={s.id} className="flex items-center justify-between gap-4 px-3.5 py-2 text-[13px]">

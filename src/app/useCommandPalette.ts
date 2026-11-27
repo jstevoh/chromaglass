@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import type { Command } from '../components/desk/CommandPalette';
 import { DESK_TOOLS } from '../components/desk/tools';
 import { isUserPresetId, type UserPreset } from '../lib/userPresets';
@@ -108,6 +108,15 @@ export function useCommandPalette({
   const [showPalette, setShowPalette] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  /*
+    A panel opened on the tab in view, or brought forward and unfolded where
+    it is already: ⌘K's panel commands, and the desk's Video dot (PLAN
+    14ag-9). The dot opened the Settings sheet at Video, over the plate; the
+    owner, with the camera on (2026-11-27): "I would also like to more fully
+    control the video inputs on the main app vs just in settings. I want to be
+    able to see things on the canvas as I change them." The panel is the same
+    section the sheet draws, beside the plate, so nothing is lost.
+  */
   const openDeskPanel = (id: string) => {
     deskTabs.update(deskTabs.tab, (l) => {
       const next = whereIs(l, id) ? l : openPanel(l, id, 'deck');
@@ -120,6 +129,11 @@ export function useCommandPalette({
       document.querySelector<HTMLElement>(`[data-panel="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     });
   };
+
+  /** openDeskPanel for a handler kept across renders (App's Video dot): one identity, today's tab. */
+  const openDeskPanelRef = useRef(openDeskPanel);
+  openDeskPanelRef.current = openDeskPanel;
+  const openPanelNow = useCallback((id: string) => openDeskPanelRef.current(id), []);
 
   const paletteCommands = useMemo<Command[]>(() => {
     const looks: Command[] = allPresets.map(pr => {
@@ -296,6 +310,6 @@ export function useCommandPalette({
   }, [performing, designing, deskUp, goLook, revertLook, cueAny, toggleBlackout, togglePerformance, toggleRecording]);
 
   return {
-    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands,
+    showPalette, setShowPalette, showShortcuts, setShowShortcuts, paletteCommands, openPanelNow,
   };
 }

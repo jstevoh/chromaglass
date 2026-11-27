@@ -4,7 +4,7 @@ import { Info } from '../Info';
 import { Toggle, LIT } from '../ui';
 import { CameraPicker } from '../CameraPicker';
 import { VideoShelf } from '../VideoShelf';
-import { Slider } from './controls';
+import { Slider, PinChips } from './controls';
 import type { SectionCtx } from './props';
 
 /*
@@ -81,13 +81,13 @@ export const RoomSection = ({ c }: { c: SectionCtx }) => {
                 <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-full bg-white/70 transition-[width] duration-100" style={{ width: `${Math.round((sceneState?.energy ?? 0) * 100)}%` }} />
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[12px] font-mono opacity-40">
+                <div className="mt-1 flex items-center justify-between text-[12px] font-mono text-dim">
                   <span>{sceneState?.active ? `${sceneState.people} tracked` : 'opening…'}</span>
                   <span>{sceneState ? `${sceneState.ms.toFixed(1)} ms` : ''}</span>
                 </div>
               </>
             )}
-            <p className="mt-2 text-[12px] leading-relaxed opacity-40">
+            <p className="mt-2 text-[12px] leading-relaxed text-dim">
               Frames are read in this page and never leave it. Nothing is recorded, and the camera stops the moment this is switched off.
             </p>
           </div>
@@ -165,7 +165,7 @@ export const RoomSection = ({ c }: { c: SectionCtx }) => {
             as well as this camera, so it has a section of its own now — and a
             line where it used to be, because this is where anyone who knew it
             will look first. */}
-        <p className="mt-3 mb-3 text-[12px] leading-relaxed text-white/40">
+        <p className="mt-3 mb-3 text-[12px] leading-relaxed text-dim">
           Any feature of the room onto any control is a patch, in {goTo('patches', 'room')}.
         </p>
         <Info>
@@ -258,7 +258,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
                 aria-pressed={filmSource === id}
                 onClick={go}
                 disabled={id === 'window' && !canCaptureWindow}
-                className={`flex ${id === 'none' ? '' : 'flex-1'} items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                className={`flex ${id === 'none' ? '' : 'flex-1'} items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-65 ${
                   filmSource === id ? LIT : 'border-white/15 bg-white/5 text-text-2 hover:bg-white/10'
                 }`}
                 title={title}
@@ -269,6 +269,22 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
             ))}
           </div>
 
+          {/*
+            The input on the plate and what it is doing (PLAN 14ag, 14ag-9),
+            right under the source that brought it in: a little live picture of
+            it, where it shows (Plate, Lamp, LED ring) and its Pour. It was the
+            video file's row alone, further down: with the camera on it went on
+            naming the file, and the camera could not be poured or put under
+            the dish. The owner, 2026-11-27: "hard to understand and control
+            what is on screen".
+          */}
+          {video?.name && (
+            <div className="mt-1 rounded-lg border border-white/10 px-3 py-2" data-testid="film-video-row">
+              <VideoShelf {...video} mixOrder={settings.mixOrder} filmRing={settings.filmRing} onPlace={patch => onUpdate(patch)} />
+              {/* LED ring is a learnable setting (Video on LED Ring): its pins and MIDI chips, as Two Projectors shows its. */}
+              <div className="flex justify-end empty:hidden"><PinChips settingKey="filmRing" /></div>
+            </div>
+          )}
           {/*
             Which camera the film shows, and what the film's camera is for
             (PLAN 14ad). It had no picker: the browser's "environment" camera
@@ -296,19 +312,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
             )}
           </div>
 
-          {/*
-            The video loaded, with its Play and Pour (PLAN 14ag). The demo
-            loops and the cartoon shelf that sat here are gone: the owner
-            loaded a video of their own, found it could be played and not
-            poured while the shipped ones could be both, and asked for the
-            shipped ones to go ("people can figure out their own videos").
-          */}
-          {video?.name && (
-            <div className="mt-1 rounded-lg border border-white/10 px-3 py-2" data-testid="film-video-row">
-              <VideoShelf {...video} mixOrder={settings.mixOrder} onMixOrder={o => onUpdate({ mixOrder: o })} />
-            </div>
-          )}
-
+          {filmSource !== 'file' && filmSource !== 'camera' && (
           <Info>
             <span className="text-white/60">Window</span> is the way to a film you did not download.
             Open one in another tab — the Internet Archive's Prelinger collection is thousands of
@@ -317,6 +321,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
             plate, and almost nothing on the web sends the header that would allow it. A window has no
             origin, only pixels. Mute the tab and let the room's own sound drive the plate.
           </Info>
+          )}
         </div>
         {/*
           Where the frame lands (PLAN 14ag). The owner: "zoom in/out on the
@@ -333,7 +338,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
           <button
             onClick={() => onUpdate({ filmZoom: 1, filmX: 0, filmY: 0 })}
             disabled={!framed}
-            className="flex h-7 items-center gap-1 rounded-md border border-white/15 px-2 text-[12px] text-text-2 hover:bg-white/10 disabled:opacity-30"
+            className="flex h-7 items-center gap-1 rounded-md border border-white/15 px-2 text-[12px] text-text-2 hover:bg-white/10 disabled:opacity-65"
             title="Fill the plate again, centred"
             data-testid="film-fit"
           >
@@ -423,7 +428,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ filmImpact: v })}
           settingKey="filmImpact"
         />
-        <p className="mb-3 text-[12px] leading-relaxed text-white/40">
+        <p className="mb-3 text-[12px] leading-relaxed text-dim">
           Any feature of the film onto any control is a patch, in {goTo('patches', 'film')}, where Film Impact, just above, is its master.
         </p>
         {(filmSource !== 'none' || video?.pouring) && (

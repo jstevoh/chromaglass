@@ -159,7 +159,7 @@ const SECTION_OF: Record<string, string> = {
   beatLead: 'audio-input',
   filmDrive: 'film',
   // The video's framing (PLAN 14ag), learnable in midi.ts, drawn in Video.
-  filmZoom: 'film', filmX: 'film', filmY: 'film',
+  filmZoom: 'film', filmX: 'film', filmY: 'film', filmRing: 'film',
   // The four masters, with the patch bay they pull down.
   filmImpact: 'film',
   soundImpact: 'audio-input',
