@@ -325,15 +325,34 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       plain mean (\`npm run oillift\`, bar 3%). A closed dish cannot move its
       contents as a whole however its colour lies, and the circulation is
       that. Past LIFT_MOST the circulation's grid is coarser than the
-      solver's and the colour's finest swirl is lost (PLAN 27f-7). Rain
-      Drip's weight and the comet's pull keep the colour's whole weight over
-      the app's mean, as they were: a standing plate's oil is PLAN 27f-6.
+      solver's and the colour's finest swirl is lost (PLAN 27f-7).
+
+      **With no oil the colour's weight is the same circulation** (PLAN
+      18a-17, A.b.w 2, Ψ relaxed on the colour alone, κ 0, B 1). What was
+      found: with the treble's sparks gone (PLAN 38v-1) and the draught
+      closed (18a-16), Rain Drip on a standing plate still emptied its dish,
+      1.8% of its dye left after 600 lab steps, and Plate Rock tipped with
+      no oil 0.5%. Both were laid as A.b.xy·w and S.up·A.a.x·w straight into
+      the gap's solve, whose rim is open; with no oil the solve takes off
+      the force's gradient part, but what reaches the rim downhill is a
+      weight pressing on a free edge, and the colour poured out over it as a
+      drop off a tilted plate's edge. A clock glass's colour falls to its
+      bottom and lies in a pool there, the clear liquid rising past it: the
+      closed circulation, Rain Drip's pull down S.up added to the tilt's,
+      both one in-plane weight on the one colour. \`npm run draught\`: Rain
+      Drip keeps 99.8% and its colour's middle falls 0.14 of the plate;
+      Plate Rock keeps 100% and moves 0.18 downhill. With oil Rain Drip stays
+      laid directly, its colour's whole weight over the app's mean (a
+      standing plate's oil is PLAN 27f-6, and κ is the lift over the tilt's
+      weight, not Rain Drip's); the comet's pull is an explicit push and
+      stays one.
 
       A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
       AIR_SHEAR), the rest gap h0, the breath's pascals to the flow's speed);
       A.b = (Plate Rock's pull on the colour, x and y; with the oil, its
-      ln B per unit of oil and 1, zero without, when the colour's weight is
-      laid directly). \`psi\` is hsLiftRelaxOil's (Ψ_x, Ψ_y) of φ, on its
+      ln B per unit of oil and 1; with no oil and the circulation built, 0
+      and 2 (Rain Drip's pull joins it); zero until it is built, when the
+      colour's weight is laid directly). \`psi\` is hsLiftRelaxOil's (Ψ_x, Ψ_y) of φ, on its
       own square grid (its side the buffer's length's square root).
     */
     hsBody: `${HEAD}${NOISE}${COMMON}
@@ -379,6 +398,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let dq = textureLoad(dye, qDish, 0).a;
     let w = dq - S.meanD;
     var rock = A.b.xy * w;
+    // With no oil (A.b.w 2, PLAN 18a-17) Rain Drip's pull down the standing plate joins the tilt's in the circulation.
+    let dripClosed = A.b.w > 1.5;
+    let pull = A.b.xy - select(vec2f(0.0), S.up * A.a.x, dripClosed);
     if (A.b.w > 0.0) {
       // u = ∇⊥ψ = (∂ψ/∂y, −∂ψ/∂x), ψ = L_y Ψ_x − L_x Ψ_y with L the colour's pull, by differences a cell of Ψ's grid apart:
       // on every cell, the rim's and past it too, so its divergence is zero on all of them (LIFT_GRID).
@@ -390,9 +412,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       // Times B, which hsPrep's drag divides out again (above): the same oilBody, from the same oil.
       let md = vec2i(textureDimensions(mixT));
       let oilB = exp(clamp(clamp(textureLoad(mixT, min(q * md / i32(S.n), md - 1), 0).r, 0.0, 1.0) * A.b.z, -9.0, 9.0));
-      rock = oilB * vec2f(A.b.y * dy.x - A.b.x * dy.y, -A.b.y * dx.x + A.b.x * dx.y);
+      rock = oilB * vec2f(pull.y * dy.x - pull.x * dy.y, -pull.y * dx.x + pull.x * dx.y);
     }
-    v = vec4f(v.xy - S.up * (A.a.x * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
+    v = vec4f(v.xy - S.up * (select(A.a.x, 0.0, dripClosed) * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
   }
   if (S.air > 0.1) {
     /*
