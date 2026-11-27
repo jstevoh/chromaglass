@@ -3119,3 +3119,9 @@ crosses the solubility curve, the oil is conserved); how it looks in a show is t
    clear while the alcohol is there. Bad: no change, or the whole ring going at once.
 4. On a lamp ground the cloud is a warm grey shadow, as milk's is, not white.
 5. A plate that never sees the bottle looks exactly as before.
+6. The look **Louche** (the bottle's own, added because `npm run plate` holds that every
+   bottle with physics is poured by some look). Good: a dark dish; about one drop in three
+   blooms white as it lands and drifts with the flow, some blooms thin or open a clear
+   window where a later drop of Alcohol lands, the blues of the other drops stay deep. Bad:
+   the whole plate white inside a few minutes, blooms that are hard-edged discs for as long
+   as they last, a grey veil over the dark ground.

@@ -90,6 +90,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 47z-1: cobalt filmed on the Mac 2026-11-13 read darker, colourfulness 62 against 131, the frame 0.40 near black: vivid colour wants a bright ground)
   'foam-cells':         [12, 7, 17, 23],           // rust water (sienna) in the films; pale icy blue, amber and lavender cells (47z-5)
   'night-sea':          [18, 17, 16],              // a few ultramarine, amber and teal drops in the dark water, the glow's cyan the brightest thing (48c-5)
+  'louche':             [18, 16, 10],              // a few ultramarine, teal and purple drops in the dark water, deep enough that the cloud's white is the brightest thing (48s)
   // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
   // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
   // under a yellow film laid an olive-black blot in the lab.
@@ -152,6 +153,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'splodascope':        ['drop'],                 // a drop at a time into the crowd, as an eyedropper does
   'foam-cells':         ['drop'],                 // a drop into the foam presses its neighbours aside
   'night-sea':          ['drop'],                 // a drop now and then into the dark sea (48c-5)
+  'louche':             ['drop'],                 // a dropper's drops: each one a bloom or a window (48s)
   'saffron-lace':       ['drop'],                 // an eyedropper's drops: each one a hole in the film, or more film
 };
 
@@ -253,6 +255,9 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'foam-cells':         ['oil', 'water'],
   // Sea water: the glow's threshold is a shear rate at its viscosity (PLAN 48c-2).
   'night-sea':          ['water', 'water'],
+  // A third of the drops are Ouzo, which bloom white in the water; a third Alcohol, which thins a
+  // bloom it lands on and clears it at the second drop (presetsOuzo.ts has the sums; PLAN 48s).
+  'louche':             ['water', 'ouzo', 'alcohol'],
   // Oil poured onto a clear film joins it (it thickens where it lands, and tears again);
   // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
   // is the lavender wash's body, which holds its place under the film.

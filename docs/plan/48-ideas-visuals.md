@@ -265,7 +265,7 @@ sub-cell droplets. Ranked by what a person watching the wall would see against w
 
 | Rank | Item | On the wall | GPU cost | Build |
 |---|---|---|---|---|
-| 1 | 48s ouzo clouding (shipped #1007; its check is 48s-1) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built; Claude's check owed |
+| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; its check is 48s-1) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built; Claude's check owed |
 | 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
 | 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
 | 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |
@@ -295,7 +295,8 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   of their volume fraction: one-micron droplets, Mie) is added to the channel milk's rides in
   and the plate draws it as it draws milk, unchanged. No seed, noise or timer. The Alcohol
   bottle is now ethanol to the solver, so poured on a cloud it dissolves it. Off for every
-  look: no look pours the bottle, and without it no field is made and no pass runs.
+  look that was there: none of them pours the bottle, and without it no field is made and no
+  pass runs. The bottle's own look, Louche, pours it (48s-5 has why it came with the bottle).
   Measured in the lab with a scratch script (in the PR): the cloud agrees with `ouzoDrops`
   cell for cell, none appears in an unmixed cell or on the clear side of the curve, and the
   oil is the same to seven figures through a water pour and an alcohol pour.
@@ -327,12 +328,17 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   poured back in. In a real dish alcohol meeting water spreads and stirs itself (its lower
   surface tension pulls it out over the water, and it is lighter), which is what makes a
   louche billow. When the plate has that flow the cloud will follow it with no change here.
-- **48s-5. A bottle's ethanol and anise oil as Liquid Designer dials, and a look that pours
-  Ouzo** (S; the owner's call on the look). The two numbers are a bottle's behaviour
-  (`ethanol`, `anise` in `LiquidBehaviour`) and the Designer does not show them yet: with
-  them a performer could make a stronger or weaker louche (past real: more oil than alcohol
-  can hold is already cloudy in the bottle). No look's dish pours Ouzo; a slow look whose
-  automation pours it into coloured water is the obvious home.
+- **48s-5. A bottle's ethanol and anise oil as Liquid Designer dials** (S). The two numbers
+  are a bottle's behaviour (`ethanol`, `anise` in `LiquidBehaviour`) and the Designer does
+  not show them yet: with them a performer could make a stronger or weaker louche (past
+  real: more oil than alcohol can hold is already cloudy in the bottle). The look this item
+  also asked for shipped with 48s after all, as **Louche** (`src/presetsOuzo.ts`): the pull
+  request's `npm run plate` was red on "every liquid with physics in it is used by some
+  preset — ouzo", and the check is right that a bottle no look pours is never seen on Go.
+  A new look, not a new bottle in an old look's dish, so every look that was there is as it
+  was. Its dish is water, Ouzo and Alcohol by thirds; in the lab on its own settings a bloom
+  reads 228 of 255 on a ground of 0, 208 after one drop of Alcohol and 0 after two. How it
+  looks over a show is the owner's (docs/judging.md 148, step 6).
 - **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
   `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
   membrane of precipitate at the front, and the front's speed against its reaction sets the
