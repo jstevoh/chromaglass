@@ -53,9 +53,9 @@ area, each fix striking its own line here.
   - **QA-33b-3** Ferrofluid: Phase Edge, Magnet Strength, Height, Across, Up, Walk and
     Labyrinth flatten Magnet Garden from 37% to 85–93% one colour. A ferrofluid under a
     stronger field spikes and gathers; it does not spread into a sheet.
-  - **QA-33b-4** Light Show Look (Sharpness, Glossiness, Post Blur, Boundary Glow, Particle
-    Colour, Turbulence Detail, Grain Fineness, Blob Surface Tension, Layer Scale Variety)
-    and Film Stock (Grain, Gate Weave) move their settings and nothing shows on Classic.
+  - ~~**QA-33b-4**~~ **Shipped (this PR):** Light Show Look (`Sharpness`, `Glossiness`, `Post Blur`, `Boundary Glow`, `Particle Colour`, `Turbulence Detail`, `Grain Fineness`, `Blob Surface Tension`, `Layer Scale Variety`) and Film Stock (`Grain`, `Gate Weave`) traced on Classic:
+    - Physics acting over steps/seconds (not a bug): `Sharpness` (`sharpenDye` in `fluid.ts`) and `Blob Surface Tension` (`forcesB` immiscibility push, `4.03×` stronger `-0.00000326 → -0.00001313` in lab across `0..1` at Classic `polarity = 0.85`) reshape boundaries over time and move little on slow crisp oil discs in 1.5 s; clarified hover help in `src/lib/controlHelp.ts`.
+    - Mode-gated on Classic by inactive parent controls: `Turbulence Detail` (`turbulenceScale: 0`, also acts over seconds when stirred), `Particle Colour` (`particles: 0`), `Grain Fineness` (`granulation: 0`), `Layer Scale Variety` (`layerCount: 1`), `Boundary Glow` (`projectorFocus: 0.5` and `layerCount: 1`), `Glossiness` (`edgeRelief: 0` in Show mode), `Post Blur` (`gooeyEffect: 0`), and `Film Stock` (`stock: 0`: `Grain`, `Grain Size`, `Gate Weave`, `Gate Edge`, plus stock buttons). Added shared `settingDisabledReason` (`src/lib/settingGate.ts`) across Desk (`DeskPanels.tsx`, `ui/index.tsx`), Settings, and Phone More → Settings/Tabs (`LookSections.tsx`), reducing Classic Tab 4 `bugbash` findings from `45` (`86` live controls) to `25` (`74` live controls; `0` in Film Stock, only `Sharpness` and `Blob Surface Tension` left in Light Show Look).
   - **QA-33b-5** Switches: Patches' Gate pressed twice leaves `sceneMappings` changed; the
     phone's More "Drop" does nothing; pick-one rows carry `aria-pressed` (a switch's
     role) where a radio's `aria-checked` is meant.
