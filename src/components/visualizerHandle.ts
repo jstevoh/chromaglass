@@ -10,6 +10,11 @@ import type { BarNow } from '../lib/barGrid';
 import type { LookPhase, FrameDigest, VisualizerRender, SongShapeReport } from '../sim/frameTypes';
 import type { MidiEvent, MidiTarget } from '../lib/midi';
 
+export interface PlateSnapshot {
+  /** Release GPU copies held for the Undo window. */
+  destroy: () => void;
+}
+
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
@@ -194,4 +199,8 @@ export interface LiquidVisualizerHandle {
    * (the projector's pixels) and letterbox it here. Null returns to the window.
    */
   setStage: (size: { width: number; height: number } | null) => void;
+  /** Copy the live plate state (liquids, bubbles, beads, palette) before a destructive reset (PLAN 49a). */
+  takeSnapshot?: () => PlateSnapshot | null;
+  /** Restore a snapshot taken by `takeSnapshot`, cancelling any drain or handoff. */
+  restoreSnapshot?: (snap: PlateSnapshot) => void;
 }

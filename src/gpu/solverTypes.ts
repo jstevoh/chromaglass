@@ -298,6 +298,16 @@ export interface SolverCarry {
 }
 
 /**
+ * Full GPU field snapshot for plate-level Undo (PLAN 49a): holds exact copies
+ * of dye, velocity, gap and active chemistry/phase fields on the same device
+ * so a drained or cleared plate returns byte-for-byte before the wipe.
+ */
+export interface SolverSnapshot {
+  /** Release copied GPU textures and buffers held by this snapshot. */
+  destroy(): void;
+}
+
+/**
  * What the plate needs of a solver, whichever API it runs on
  * (docs/webgpu-plan.md, P3).
  *
@@ -399,6 +409,10 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /** Copy the live GPU fields for an 8 s Undo safety net (PLAN 49a). */
+  takeSnapshot?(): SolverSnapshot | null;
+  /** Restore fields captured by `takeSnapshot` back onto this solver. */
+  restoreSnapshot?(snap: SolverSnapshot): boolean;
   /**
    * A frame of the video pour, its dye and its motion worked out on the GPU
    * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:

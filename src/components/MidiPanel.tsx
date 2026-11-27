@@ -163,6 +163,13 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
   const [encoder, setEncoder] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [clearArmed, setClearArmed] = useState(false);
+  useEffect(() => {
+    if (!clearArmed) return;
+    const t = setTimeout(() => setClearArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [clearArmed]);
+  const bindingCount = midi.map.bindings.length + (midi.map.sound?.length ?? 0);
   /** Which row's music editor is open, by its key; one at a time. */
   const [musicOpen, setMusicOpen] = useState<string | null>(null);
   const presetName = (id: string) => presets.find(p => p.id === livePresetId(id))?.name;
@@ -281,7 +288,20 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
       <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
         <input value={midi.map.name} onChange={e => midi.rename(e.target.value)} className={`${inputCls} mb-2`} placeholder="Map name" data-testid="midi-map-name" />
         <div className="flex flex-wrap gap-1.5 mb-2">
-          <button onClick={midi.clearMap} className={chip(false)} title="Remove every binding"><Trash2 size={11} className="inline -mt-0.5" /> Clear</button>
+          <button
+            onClick={() => {
+              if (bindingCount === 0) { midi.clearMap(); return; }
+              if (!clearArmed) { setClearArmed(true); return; }
+              setClearArmed(false);
+              midi.clearMap();
+            }}
+            className={chip(clearArmed)}
+            title="Remove every binding"
+            data-testid="midi-clear"
+          >
+            <Trash2 size={11} className="inline -mt-0.5 mr-1" />
+            {clearArmed ? `Clear all ${bindingCount} binding${bindingCount === 1 ? '' : 's'}?` : 'Clear'}
+          </button>
         </div>
         <div className="flex gap-1.5">
           <button onClick={midi.exportMap} className={`${chip(false)} flex-1`} data-testid="midi-export"><Download size={11} className="inline -mt-0.5 mr-1" />Save file</button>

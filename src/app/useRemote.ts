@@ -87,6 +87,11 @@ interface RemoteDeps {
   setClearTrigger: Dispatch<SetStateAction<number>>;
   setDrainTrigger: Dispatch<SetStateAction<number>>;
   triggerLucky: () => void;
+  clearPlate?: () => void;
+  drainPlate?: () => void;
+  luckyPlate?: () => void;
+  undoNotice?: RemoteState['undo'];
+  restorePlateUndo?: () => void;
   setIsAutomated: Dispatch<SetStateAction<boolean>>;
   hideOverlays: () => void;
   setOverlaysVisible: Dispatch<SetStateAction<boolean>>;
@@ -116,7 +121,7 @@ export function useRemote({
   allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
   updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
   cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypes, setSelectedLiquidId,
-  setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
+  setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, clearPlate, drainPlate, luckyPlate, undoNotice, restorePlateUndo, setIsAutomated,
   hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording, togglePerformance,
   goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName, runActionRef, runAction,
   tempoRef, oscOutHearRef,
@@ -242,6 +247,7 @@ export function useRemote({
     cuedPresetId: cued?.id ?? null,
     cuedName: cued?.name ?? null,
     fadeSeconds,
+    undo: undoNotice ?? null,
     filmLoaded: filmSource !== 'none',
     markLoaded,
     rowFading,
@@ -260,7 +266,7 @@ export function useRemote({
     media,
     outputs,
     projector, desk,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs, projector, desk]);
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, undoNotice, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs, projector, desk]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -553,9 +559,10 @@ export function useRemote({
             case 'play':          setIsActive(true); break;
             case 'pause':         setIsActive(false); break;
             case 'seed':          setSeedCount(prev => prev + 1); break;
-            case 'clear':         setClearTrigger(prev => prev + 1); break;
-            case 'drain':         setDrainTrigger(prev => prev + 1); break;
-            case 'lucky':         triggerLucky(); break;
+            case 'clear':         (clearPlate ?? (() => setClearTrigger(prev => prev + 1)))(); break;
+            case 'drain':         (drainPlate ?? (() => setDrainTrigger(prev => prev + 1)))(); break;
+            case 'lucky':         (luckyPlate ?? triggerLucky)(); break;
+            case 'undo-reset':    restorePlateUndo?.(); break;
             case 'automate-on':   setIsAutomated(true); break;
             case 'automate-off':  setIsAutomated(false); break;
             case 'overlays-off':  hideOverlays(); break;

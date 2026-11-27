@@ -34,6 +34,7 @@ export type RemoteAction =
   | 'clear'
   | 'drain'
   | 'lucky'
+  | 'undo-reset'
   | 'automate-on'
   | 'automate-off'
   /** Hide every overlay on the display (a clean projected frame) / bring them back. */
@@ -118,6 +119,8 @@ export interface RemoteState {
   cuedName?: string | null;
   /** Seconds the next Go will take, so the remote can print it on the button. */
   fadeSeconds?: number;
+  /** Active 8 s plate Undo window after a destructive action (PLAN 49a). */
+  undo?: { id: number; title: string } | null;
   /** Whether a film and a logo are loaded, so the remote's mixer can say when a row has nothing on the wall. */
   filmLoaded?: boolean;
   markLoaded?: boolean;

@@ -68,7 +68,7 @@ import { makeNoteVoices, readNoteFeature, resetNoteVoices, type VoiceDrop, type 
 import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
-import { openCamera } from '../lib/cameras';
+import { captureFilmCamera, captureFilmWindow } from '../lib/filmCapture';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
 import { Modulators } from '../lib/modulators';
@@ -87,6 +87,8 @@ import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles, syncBubblesGpu } from '../sim/speciesPoll';
 import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../sim/noteVoicesStep';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
+import { buildPlateSnapshot, applyPlateSnapshot, type PlateSnapshotData } from '../sim/plateSnapshot';
+import type { PlateSnapshot } from './visualizerHandle';
 import { recolourHandoff, type Handoff } from './paletteRecolour';
 
 interface LiquidVisualizerProps {
@@ -1797,119 +1799,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       Nothing is requested until the button is pressed, and the browser's
       picker, not this app, decides what is shared.
     */
-    startFilmWindow: async (onEnded?: () => void, onBlank?: () => void) => {
-      const media = navigator.mediaDevices as MediaDevices & {
-        getDisplayMedia?: (c: DisplayMediaStreamOptions) => Promise<MediaStream>;
-      };
-      if (!media?.getDisplayMedia) throw new Error('This browser cannot capture a window.');
-      // Asked for before `stopFilm`, so a picker the operator cancels leaves
-      // whatever was already playing alone rather than putting the projector
-      // out on the way to a dialog they changed their mind about.
-      /*
-        What the picker is told, and why each part of it.
-
-        `displaySurface: 'browser'` opens the picker on its Tab list. It is a
-        hint, not a restriction — a whole window or a screen is still one
-        click away — and it is the right default for this feature twice over.
-        A film is usually a video playing in a tab, and capturing the *tab*
-        composites through the renderer, while capturing the *window* around
-        it does not always: a video handed to a hardware overlay plane is
-        drawn past the window's own surface, and window capture then yields
-        black frames with the audio and the controls coming through perfectly.
-        That is the most likely reading of a black plate from a playing movie,
-        and the tab is the capture that does not have the problem.
-
-        `selfBrowserSurface: 'exclude'` takes ChromaGlass out of the list.
-        Offering it invites capturing the plate into the plate, and it is the
-        one choice that can only ever be a mistake.
-
-        `surfaceSwitching: 'exclude'` drops the "Share this tab instead"
-        control Chrome otherwise puts up, which is a question about the app's
-        own tab asked in the middle of choosing a film.
-      */
-      const stream = await media.getDisplayMedia({
-        video: { frameRate: { ideal: 30 }, displaySurface: 'browser' },
-        // The plate is driven by the room's sound, not by the captured window,
-        // and asking for audio makes the picker offer a checkbox that does
-        // nothing here.
-        audio: false,
-        selfBrowserSurface: 'exclude',
-        surfaceSwitching: 'exclude',
-      } as DisplayMediaStreamOptions);
-      stopFilm();
-      const f = filmRef.current;
-      const v = filmVideo();
-      f.stream = stream;
-      v.srcObject = stream;
-      f.kind = 'window';
-      filmEndedRef.current = onEnded ?? null;
-      for (const t of stream.getVideoTracks()) {
-        t.addEventListener('ended', () => {
-          const cb = filmEndedRef.current;
-          stopFilm();
-          cb?.();
-        });
-      }
-      try { await v.play(); } catch { /* as above */ }
-
-      /*
-        Say so when the capture is coming through black.
-
-        A window that yields nothing but black pixels is indistinguishable, on
-        the plate, from a film that is simply very dark — and from the feature
-        being broken. So the frames are looked at: a few samples over a second
-        and a half, and if every pixel of every one of them is black the
-        operator is told, because the remedy (share the tab rather than the
-        window) is not something anybody would guess.
-
-        Sampled, not watched: one 32x32 read every 300ms, stopped as soon as
-        anything lights up, on a machine that is also running a fluid solver.
-      */
-      if (onBlank) {
-        const probe = document.createElement('canvas');
-        probe.width = 32; probe.height = 32;
-        const pctx = probe.getContext('2d', { willReadFrequently: true });
-        let looks = 0;
-        const timer = setInterval(() => {
-          looks++;
-          if (!pctx || filmRef.current.kind !== 'window' || v.readyState < 2) {
-            if (looks >= 5) clearInterval(timer);
-            return;
-          }
-          try {
-            pctx.drawImage(v, 0, 0, probe.width, probe.height);
-            const { data } = pctx.getImageData(0, 0, probe.width, probe.height);
-            for (let i = 0; i < data.length; i += 4) {
-              if (data[i] > 8 || data[i + 1] > 8 || data[i + 2] > 8) { clearInterval(timer); return; }
-            }
-          } catch { clearInterval(timer); return; }   // tainted: not ours to read, and not black either
-          if (looks >= 5) { clearInterval(timer); onBlank(); }
-        }, 300);
-      }
-    },
-    startFilmCamera: async (deviceId = '', onEnded) => {
-      stopFilm();
-      const f = filmRef.current;
-      const v = filmVideo();
-      const opened = await openCamera(deviceId, 'environment', { width: 1280 });
-      const stream = opened.stream;
-      f.stream = stream;
-      v.srcObject = stream;
-      f.kind = 'camera';
-      // Unplugged, the same way a captured window is taken away: the film
-      // comes off and the panel is told, rather than the plate holding the
-      // camera's last frame with the source still reading "live".
-      filmEndedRef.current = onEnded ?? null;
-      for (const t of stream.getVideoTracks()) {
-        t.addEventListener('ended', () => {
-          const cb = filmEndedRef.current;
-          stopFilm();
-          cb?.();
-        });
-      }
-      try { await v.play(); } catch { /* as above */ }
-      return { label: opened.label, fellBack: opened.fellBack };
-    },
+    startFilmWindow: (onEnded?: () => void, onBlank?: () => void) =>
+      captureFilmWindow({ film: filmRef.current, video: filmVideo, stop: stopFilm, setEnded: cb => { filmEndedRef.current = cb; }, getEnded: () => filmEndedRef.current }, onEnded, onBlank),
+    startFilmCamera: (deviceId = '', onEnded) =>
+      captureFilmCamera({ film: filmRef.current, video: filmVideo, stop: stopFilm, setEnded: cb => { filmEndedRef.current = cb; }, getEnded: () => filmEndedRef.current }, deviceId, onEnded),
     clearFilm: () => stopFilm(),
     loadMark: (source, width, height) => {
       markRef.current = { source, aspect: width > 0 && height > 0 ? width / height : 1, dirty: true };
@@ -1993,6 +1886,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     },
     applyGesture: (g) => performGestureBanked(g),
     wallToPlate: (u, v, layer, turned = true, reach) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned, reach) ?? { x: u, y: v },
+    takeSnapshot: () => buildPlateSnapshot(fluidsRef.current, bubblesRef.current, beadsRef.current, {
+      livePreset: livePresetRef.current, laidPreset: laidPresetRef.current, harmony: harmonyRef.current,
+      harmonyLock: harmonyLockRef.current, contract: presetContractRef.current, paletteWindow: paletteWindowRef.current,
+      journey: journeyRef.current, injectStyle: injectStyleRef.current, plateLiquids: plateLiquidsRef.current,
+      areas: areasRef.current, melodyLine: melodyLineRef.current, rotationAngles: rotationAnglesRef.current,
+      spinVel: spinVelRef.current, dishSpin: dishSpinRef.current, liquidSpin: liquidSpinRef.current, backDyes: backDyesRef.current,
+    }) as PlateSnapshot,
+    restoreSnapshot: (raw) => {
+      const r = applyPlateSnapshot(fluidsRef.current, bubblesRef.current, beadsRef.current, raw as PlateSnapshotData);
+      livePresetRef.current = r.livePreset; laidPresetRef.current = r.laidPreset; harmonyRef.current = r.harmony;
+      harmonyLockRef.current = r.harmonyLock; presetContractRef.current = r.contract; paletteWindowRef.current = r.paletteWindow;
+      journeyRef.current = r.journey; injectStyleRef.current = r.injectStyle; plateLiquidsRef.current = r.plateLiquids;
+      areasRef.current = r.areas as PlateArea[] | null; melodyLineRef.current = r.melodyLine as MelodyLine;
+      rotationAnglesRef.current = r.rotationAngles; spinVelRef.current = r.spinVel; dishSpinRef.current = r.dishSpin;
+      liquidSpinRef.current = r.liquidSpin; backDyesRef.current = r.backDyes; drainFrameRef.current = 0; handoffRef.current = null;
+      lastClearTrigger.current = clearTriggerRef.current; lastDrainTrigger.current = drainTriggerRef.current; lastSeedCount.current = seedCountRef.current;
+    },
   }));
 
   // Between frames too (the opening, a covered window, a harness's `pour`): at each reading
