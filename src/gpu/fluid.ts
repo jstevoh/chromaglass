@@ -764,8 +764,8 @@ export class WebGPUFluid extends FluidCover {
         reads is never an earlier oil's. One workgroup.
       */
       const rim = this.rimRing();
-      if (thin) this.run(pass, 'rimLaplace', rim, [smooth], args, 1);
-      this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim], args);
+      if (thin) this.run(pass, 'rimLaplace', rim, [smooth, this.squeeze.read], args, 1);
+      this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim, this.squeeze.read], args);
       this.vel.swap();
       if (sealed) this.sealWeight(pass, p, mix!.read, upright, gx, gy, wax, heatLift);
       // Film Hold's push: the film between two drops holds them apart (mixFilm).
