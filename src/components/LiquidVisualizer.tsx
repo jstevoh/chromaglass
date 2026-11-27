@@ -41,6 +41,7 @@ import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } 
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, dishFollow, dishFrame, lookMotor, lookMotorRate } from '../lib/turntable';
+import { pointerOnPlate } from '../lib/pointerPlate';
 import { stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
@@ -1127,7 +1128,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const drawnRectRef = useRef<(() => DOMRect) | null>(null);
   /** A window point on the lead plate, in plate units, as a hand there would land (`chromaglassDebug().plateAt`). */
   const plateAtRef = useRef<((clientX: number, clientY: number) => { x: number; y: number }) | null>(null);
-  const wallPointRef = useRef<((u: number, v: number, layer: number, turned: boolean) => { x: number; y: number }) | null>(null);
+  const wallPointRef = useRef<((u: number, v: number, layer: number, turned: boolean, reach?: boolean) => { x: number; y: number }) | null>(null);
   /**
    * A gesture from any hand, applied to the plate.
    *
@@ -1991,7 +1992,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     applyGesture: (g) => performGestureBanked(g),
-    wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
+    wallToPlate: (u, v, layer, turned = true, reach) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned, reach) ?? { x: u, y: v },
   }));
 
   // Between frames too (the opening, a covered window, a harness's `pour`): at each reading
@@ -5318,7 +5319,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
         padPicture: padPictureSender()?.debug ?? null,
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
-        wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
+        wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true, reach = false) => wallPointRef.current?.(u, v, layer, turned, reach) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
         /** The clears this engine has been handed (`clearTrigger`): `npm run draftwall` reads the wall's against the desk's copy (PLAN.md 8b). */
@@ -6543,9 +6544,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       DOMRect the canvas's own size stands for the screen's box; only its
       proportions are read.
     */
-    wallPointRef.current = (u, v, layer, turned) => {
+    wallPointRef.current = (u, v, layer, turned, reach) => {
       const rect = new DOMRect(0, 0, Math.max(1, canvas.width), Math.max(1, canvas.height));
-      const p = fluidPointAt(u * rect.width, (1 - v) * rect.height, rect, layer, turned);
+      const p = fluidPointAt(u * rect.width, (1 - v) * rect.height, rect, layer, turned, reach);
       return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
     };
     /*
@@ -6554,47 +6555,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       a cell is an angle rounded to a sixtieth of a radian at a third of the
       plate out, which at sixty readings a second is a turn a second of noise.
     */
-    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect, layer = activeLayerRef.current, turned = true) => {
-      const cxp = clientX - rect.left - rect.width / 2;
-      const cyp = -(clientY - rect.top - rect.height / 2); // the plate's uv counts up, CSS counts down
-      const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
-      const angle = turned ? rotationAnglesRef.current[layer] || 0 : 0;
-      const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
-      const ry = cxp * Math.sin(-angle) + cyp * Math.cos(-angle);
-      // Mirror the shader's camera transform so the brush lands under the
-      // cursor at any magnification.
-      const shot = macroShotRef.current;
-      const z = Math.max(0.0001, shot.zoom);
+    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect, layer = activeLayerRef.current, turned = true, reach = false) => {
+      const shot = macroShotRef.current, st = settingsRef.current;
       // As the plate's uniforms have it: gathered back to one plate as the closeup comes in.
-      const spread = c01(settingsRef.current.dishSpread ?? 0) * (1 - macroAmountOf(settingsRef.current));
-      if (spread > 0.001) {
-        // The layers are spread into dishes: this layer's dish is its whole plate.
-        const aspect = rect.width / Math.max(1, rect.height);
-        const cen = layer === 0 ? [0.5 + 0.144 * spread / aspect, 0.5 - 0.02 * spread] : [0.5 - 0.304 * spread / aspect, 0.5 + 0.06 * spread];
-        const rad = layer === 0 ? 0.98 + (0.66 - 0.98) * spread : 0.98 + (0.36 - 0.98) * spread;
-        const u = (clientX - rect.left) / rect.width, v = 1 - (clientY - rect.top) / rect.height;
-        let dx = (u - cen[0]) * aspect / (rad * 0.5), dy = (v - cen[1]) / (rad * 0.5);
-        const ca = Math.cos(-angle), sa = Math.sin(-angle);
-        const px = ca * dx - sa * dy, py = sa * dx + ca * dy;
-        dx = px; dy = py;
-        return { x: (0.5 + dx * 0.5) * GRID_SIZE, y: (0.5 + dy * 0.5) * GRID_SIZE };
-      }
-      let fx = rx / (scale * z) + shot.cx * GRID_SIZE;
-      let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
-      // The second layer is viewed through its own zoom and drift.
-      const view = layer1ViewRef.current;
-      if (layer === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
-        fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
-        fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
-      }
-      return { x: fx, y: fy };
+      const spread = c01(st.dishSpread ?? 0) * (1 - macroAmountOf(st));
+      return pointerOnPlate(clientX - rect.left, clientY - rect.top, rect.width, rect.height, layer, turned ? rotationAnglesRef.current[layer] || 0 : 0,
+        shot.cx, shot.cy, shot.zoom, spread, layer1ViewRef.current, GRID_SIZE, reach);
     };
     plateAtRef.current = (clientX, clientY) => {
-      const p = fluidPointAt(clientX, clientY, drawnRect());
+      const p = fluidPointAt(clientX, clientY, drawnRect(), activeLayerRef.current, true, LAYING_TOOLS.has(activeToolRef.current));
       return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
     };
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
-      const p = fluidPointAt(clientX, clientY, rect);
+      // A pouring hand in the screen's edge band reaches the dish past it (lib/pointerPlate.ts, PLAN 18a-18).
+      const p = fluidPointAt(clientX, clientY, rect, activeLayerRef.current, true, LAYING_TOOLS.has(activeToolRef.current));
       return { x: Math.floor(p.x), y: Math.floor(p.y) };
     };
     /*

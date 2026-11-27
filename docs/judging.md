@@ -3059,6 +3059,14 @@ Whether it looks like a wake at sixty frames is only seen here.
 4. Turn the music on with a stirring cord in Patches: the hits light wakes, the quiet
    lets them come back.
 5. Glow at 0 on any look: the look exactly as before.
+6. **Night Sea** (PLAN 48c-5, 48c-6) with a song that has a real bass line: still and dark
+   while the bass is quiet; on a strong bass note a lattice of waves about 14 mm across
+   stands up within a second and glows blue in its own pattern (brightest under the crests
+   and troughs, the strain's), then fades as the note dies; each kick flashes a ring round
+   the pressed glass. A long held bass dims (the sea tires) and the first notes after a quiet
+   passage are the brightest. Bad: a glow with the bass quiet, a flat blue wash with no
+   lattice in it, a lattice that never goes dark between notes, or the whole plate pulsing
+   with the level as a shader would.
 
 ## 146. Dish Stress: the moulded dish between the sheets (PLAN 31p-3)
 

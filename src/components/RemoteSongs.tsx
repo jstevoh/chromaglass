@@ -1,6 +1,9 @@
-import { ChevronLeft, Play, Square, ListMusic } from 'lucide-react';
+import { Play, Square } from 'lucide-react';
 import { SwitchPill, Tag } from './ui';
 import type { RemoteMessage, RemoteState } from '../lib/remoteProtocol';
+import type { RemoteStatus } from '../hooks/useRemoteLink';
+import { AppModeBar } from './LaptopLink';
+import { RemoteLinkBanner, RemoteNav, type RemoteView } from './RemoteChrome';
 
 /**
  * The remote's Songs screen (PLAN 12-ctl-1): the laptop's set list and its
@@ -24,12 +27,16 @@ import type { RemoteMessage, RemoteState } from '../lib/remoteProtocol';
  * On an iPad the two lists sit side by side, so a whole set and its shows are
  * in view at once.
  */
-export function RemoteSongs({ state, send, connected, onBack, backLabel }: {
+export function RemoteSongs({ state, send, connected, status, onRetry, onSelectView, linkDetail, linkAction, inApp }: {
   state: RemoteState | null;
   send: (m: RemoteMessage) => void;
   connected: boolean;
-  onBack: () => void;
-  backLabel: string;
+  status: RemoteStatus;
+  onRetry: () => void;
+  onSelectView: (view: RemoteView) => void;
+  linkDetail?: string | null;
+  linkAction?: React.ReactNode;
+  inApp?: boolean;
 }) {
   const set = state?.setList;
   const songs = state?.songs;
@@ -47,14 +54,18 @@ export function RemoteSongs({ state, send, connected, onBack, backLabel }: {
       }}
       data-testid="remote-songs"
     >
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-[#0a0a0a]/95 px-4 py-3 backdrop-blur">
-        <button onClick={onBack} className="flex h-11 items-center gap-1 rounded-full border border-white/10 px-3 text-[13px] font-medium text-white/75" data-testid="remote-songs-back">
-          <ChevronLeft size={16} /> {backLabel}
-        </button>
-        <h1 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
-          <ListMusic size={15} /> Songs
-        </h1>
-        <span className={`ml-auto h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'}`} title={connected ? 'Linked' : 'Not linked'} />
+      {inApp && <AppModeBar />}
+      <header className="sticky top-0 z-10 flex flex-col gap-2 border-b border-white/10 bg-[#0a0a0a]/95 px-4 py-2.5 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <RemoteNav view="songs" onSelect={onSelectView} compact />
+        </div>
+        <RemoteLinkBanner
+          connected={connected}
+          status={status}
+          onRetry={onRetry}
+          detail={linkDetail}
+          action={linkAction}
+        />
       </header>
 
       <main className="px-4 pt-4 md:grid md:grid-cols-2 md:gap-8 md:px-8">
