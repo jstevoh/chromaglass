@@ -1,4 +1,5 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { PhonePads } from './PhonePads';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
@@ -25,6 +26,7 @@ const HAND_SLIDERS: readonly [MusicRole, string][] = [['bloom', 'Kick Pour'], ['
 import { musicShakeOf, withMusicShake } from '../../lib/shakeCord';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
+import { clearFilmGroundNote } from '../../lib/controlHelp';
 
 const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 function pinSlider(k: keyof VisualizerSettings, val: number) {
@@ -37,7 +39,9 @@ import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
 import { lookStill } from '../../lib/lookStills';
-import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
+import { isPackLocked } from '../../lib/tierGates';
+import { TierLockBadge, openTierLock } from '../TierLock';
+import { CrashReportButton } from '../CrashReportButton';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
 import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
@@ -390,6 +394,7 @@ export interface PhoneStageProps {
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
+  onMoreOpen?: (open: boolean) => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
 }
@@ -448,6 +453,13 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone, glyph }: {
 
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  const onMoreOpenRef = useRef(p.onMoreOpen);
+  onMoreOpenRef.current = p.onMoreOpen;
+  const moreOpen = sheet === 'more';
+  useEffect(() => {
+    onMoreOpenRef.current?.(moreOpen);
+    return () => { onMoreOpenRef.current?.(false); };
+  }, [moreOpen]);
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const [amountOpen, setAmountOpen] = useState(false);
@@ -842,7 +854,9 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-3">
             <Slider label="Clear Film" value={p.film.clearFilm ?? 0} {...pinSlider('clearFilm', p.film.clearFilm ?? 0)} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
               touch testId="phone-clear-film" />
-            <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+            <p className="-mt-3 text-[12px] leading-snug text-dim">
+              A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. {clearFilmGroundNote(p.lampGround, p.film.clearFilmDye) ?? 'White on the Lamp Ground.'}
+            </p>
             {(p.film.clearFilm ?? 0) > 0.001 && (
               <div className="mt-3 flex items-end gap-3">
                 <div className="flex-1">
@@ -942,8 +956,8 @@ export function PhoneStage(p: PhoneStageProps) {
               both of, and Pour's Stop is here too. */}
           {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
-              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} onMixOrder={p.mixer ? o => p.mixer!.onSetting({ mixOrder: o }) : undefined} />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Video in</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} filmRing={p.mixer?.settings.filmRing} onPlace={p.mixer ? patch => p.mixer!.onSetting(patch) : undefined} />
             </div>
           )}
           </PanelGuard>
@@ -1038,6 +1052,7 @@ export function PhoneStage(p: PhoneStageProps) {
               <div className="flex flex-col gap-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
+                  const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
                     <button
                       key={l.id}
@@ -1045,8 +1060,8 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        // A pack's look without the pack opens the account sheet (PLAN 45a).
-                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        // A pack's look without the pack opens the lock/account sheet (PLAN 45a, 49j).
+                        if (locked) openTierLock('moire', { itemName: l.name });
                         else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
@@ -1060,6 +1075,7 @@ export function PhoneStage(p: PhoneStageProps) {
                         <span className={`block truncate text-[14px] ${on ? 'text-on-lit' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className={`block truncate text-[12px] ${on ? 'text-on-lit' : 'text-dim'}`}>{l.description}</span>}
                       </span>
+                      {locked && <TierLockBadge label="Pro · Pack" />}
                     </button>
                   );
                 })}
@@ -1309,6 +1325,11 @@ export function PhoneStage(p: PhoneStageProps) {
               <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
             )}
           </div>
+          {/* The controller's grid on the glass (PLAN 30c): pads held as long as a finger is on them. */}
+          <div className="mt-3">
+            <p className="mb-1.5 text-[13px] font-medium text-text">Pads</p>
+            <PhonePads testId="phone-pads" />
+          </div>
           {(p.show.running || p.show.paused) && (
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
               {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
@@ -1317,7 +1338,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.score && (
             <>
               <SectionLabel>The song</SectionLabel>
-              <SongScore {...p.score} touch />
+              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
             </>
           )}
           {/*
@@ -1491,6 +1512,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             {p.onShortcuts && <Tile icon={Keyboard} label="Shortcuts" onPress={() => { close(); p.onShortcuts?.(); }} testId="phone-shortcuts" />}
+            <PanelGuard name="The crash report">
+              <CrashReportButton tile />
+            </PanelGuard>
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
             {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}

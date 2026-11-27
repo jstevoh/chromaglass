@@ -142,6 +142,8 @@ export interface FrameView {
   bubblePack: { packed: Float32Array; shape: Float32Array };
   /** The flash guard's gain, from the luminance the last frame read back, times a paced scene's light (lib/scenePacing.ts). */
   dimmerGain: number;
+  /** Where each projector's shutter vane is, 0 open to 1 shut, as the loop walks it (lib/projectorBank.ts, PLAN 51a). */
+  shutters?: ArrayLike<number>;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;

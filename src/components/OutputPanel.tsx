@@ -467,7 +467,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
       <div className="mb-3" data-testid="output-grade">
         <Row label="Output gain" help="Overall brightness of what goes to the projector. One leaves the picture as drawn." value={output.gain} min={0.2} max={3} step={0.05} format={v => `${v.toFixed(2)}×`}
           onChange={v => set({ gain: v })} resetTo={1} testId="output-gain" />
-        <Row label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05}
+        <Row label="Gamma" help="Output power curve pow(c * gain, gamma) on the projected picture. 1 leaves it unchanged; 2.5 deepens shadows and mid-tones to counter ambient room washout." value={output.gamma} min={0.5} max={2.5} step={0.05}
           onChange={v => set({ gamma: v })} resetTo={1} testId="output-gamma" />
       </div>
 
@@ -482,7 +482,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
         {' '}<span className="text-white/70">Rear</span> mirrors the picture for projection through a screen or a gauze from behind, which is how most of these shows were rigged and the surest way to keep the light off the band’s faces.
         {' '}<span className="text-white/70">The corners</span> square up a projector that could not be hung on axis: drag them until the grid’s lines are straight on the wall, or nudge with the arrow keys.
         {' '}<span className="text-white/70">The masks</span> are tape on the light: pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, and <span className="text-white/70">Mask Edge</span> decides whether that stop is a hard line or a fade.
-        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
+        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift <span className="text-white/70">Gamma</span> (up to 2.5, darkening shadows and mid-tones by a power curve after gain) when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
         {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and its switch is in Master (the one place it is, so there is never a second copy to leave in the other state), and like everything on this panel it is not saved in a preset, so no look can switch off a safety and no fader can knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
         {wakeLock && (
           wakeLock.supported
