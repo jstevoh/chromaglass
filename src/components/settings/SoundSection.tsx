@@ -316,7 +316,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         <div className="flex flex-col gap-2 mb-4 mt-2">
           <div className="text-[13px] font-medium text-text">On a New Song</div>
           <div className="grid grid-cols-3 gap-1">
-            {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
+            {([['off', 'Keep'], ['preset', 'New look'], ['random', 'Random look']] as const).map(([mode, label]) => (
               <button
                 aria-pressed={(settings.onNewSong ?? 'off') === mode}
                 key={mode}

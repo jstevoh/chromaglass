@@ -51,7 +51,7 @@ export function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings 
         title={on ? `On ${name}. Click to take it off.` : `Put this on ${name}`}
         aria-label={`${on ? 'Remove from' : 'Add to'} ${name}`}
         data-testid={`pin-${desk}-${String(settingKey)}`}
-        className={`h-[22px] w-[22px] shrink-0 rounded-[4px] border text-[12px] font-bold leading-none transition-colors ${
+        className={`h-[22px] min-w-[26px] shrink-0 rounded-[4px] border px-1 text-[12px] font-bold leading-none transition-colors ${
           on
             ? LIT
             : 'border-white/15 text-dim hover:border-white/40 hover:text-text'
@@ -63,8 +63,8 @@ export function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings 
   };
   return (
     <span className="hidden items-center gap-1 sm:flex pointer-coarse:hidden" data-testid={`pins-${String(settingKey)}`}>
-      {chip('perform', 'P', 'the Perform desk')}
-      {chip('design', 'D', 'the Design bench')}
+      {chip('perform', 'Ri', 'Rides')}
+      {chip('design', 'Re', 'Recipe')}
     </span>
   );
 }
