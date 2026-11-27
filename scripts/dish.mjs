@@ -54,6 +54,17 @@
  *      the same dye to the bit, on the old plate and with Thin Gap on. The
  *      flow is asked to be moving first, so two still plates cannot pass it
  *      (the first version compared two plates with nothing moving at all).
+ *  10. the centrifuge's weight is the density (PLAN 22r): weight is linear
+ *      in Δρ/ρ₀, so flat discs of dye at 1, 2 and 3 times the plate's mean
+ *      drift outward at 1, 2 and 3 times one speed, to 5%, and the one at
+ *      the mean drifts at the Hele-Shaw drop's β Δc ω² r₀ τ / 2, to 15%.
+ *
+ * Owed lines. A line for work not built yet is named by its plan id and
+ * passed in as `--owed=<ids>` on the run line in scripts/checks.json. It
+ * prints " owed" while the plate is in main's state (worked out from a
+ * number the build changes, here the tanh's own ratio), fails if it passes
+ * ("no longer owed: take the id out") and fails if the build has moved off
+ * main's state and still misses. An unknown id is a FAIL.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI,
  * a Linux box's software WebGPU anywhere else.
@@ -64,6 +75,17 @@ let bad = 0;
 const check = (name, ok, detail = '') => {
   if (!ok) bad++;
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
+};
+const IDS = ['22r'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice(7).split(',').filter(Boolean) : []);
+for (const id of owed) if (!IDS.includes(id)) check(`--owed names ${id}, which no line here carries`, false, `known: ${IDS.join(', ')}`);
+// One line of an item: an ordinary check when the item is not owed; when it is, " owed" only while main's state holds.
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(`${name} (${id})`, ok, detail);
+  if (ok) return check(`${name} (${id})`, false, `no longer owed: take ${id} out of --owed — ${detail}`);
+  if (!mainState) return check(`${name} (${id})`, false, `built and misses — ${detail}`);
+  console.log(` owed  ${name} (${id}) — ${detail}`);
 };
 
 const { page, close } = await openLab();
@@ -125,9 +147,15 @@ try {
     // 4. Oil in water, on a flat plate.
     await fresh(0);
     lab.solver().addMix(0.7, 0.5, 0.06, { oil: 1 });
-    // Water's rest drag is 3 s and the oil's 0.06: after 1.5 s the oil has
-    // long since caught the dish and the water has barely begun.
-    await lab.step(90, spin(A, 0, WATER));
+    /*
+      Read a quarter of a second in: long after the oil has caught the dish
+      (its drag time in the 2 mm rest gap is 7 ms, PLAN 38r) and before the
+      disc, going round with the dish at about A r, has carried itself off
+      the spot it is read at (its own radius, 0.06, at 0.2 a second is 0.3 s).
+      This read at 1.5 s while the gap was 6 mm; at 2 mm the disc by then
+      had gone 0.1 of the plate round and inward, and the spot read 0.27.
+    */
+    await lab.step(15, spin(A, 0, WATER));
     const so = await lab.swirl();
     out.oil = { inside: sample(so, disc(0.7, 0.5, 0.025)).az, water: sample(so, disc(0.3, 0.5, 0.04)).az, scale: A * 0.2 };
 
@@ -144,6 +172,23 @@ try {
     out.spun = await centrifuge(3, THICK);
     out.still = await centrifuge(0, THICK);
     out.thinner = await centrifuge(3, THICK / 4);
+    out.tau = { thick: drag(THICK), thinner: drag(THICK / 4) };
+
+    /*
+      10 (PLAN 22r). The weight, as the density. Flat discs (lab.dyeDisc,
+      the same density to the edge, so the disc is one drop of one liquid)
+      over a plate whose mean is 1, at 1, 2 and 3 times that mean, dish and
+      liquid together at 3 rad/s in the thick liquid, which has settled
+      (τ = 17 ms against 0.75 s) so the drift is its steady speed.
+    */
+    out.weight = {};
+    for (const c of [1, 2, 3]) {
+      await fresh(0);
+      lab.dyeDisc(0.72, 0.5, 0.05, [1, 1, 1], c); lab.flush();
+      await lab.step(1, {});
+      await lab.step(45, spin(0, 3, THICK, { meanDensity: 1 }));
+      out.weight[c] = sample(await lab.swirl(), disc(0.72, 0.5, 0.03)).rad;
+    }
 
     // 7. Stop and let the tail run out: the swirl is emptied.
     await fresh(0);
@@ -221,18 +266,69 @@ try {
   check('and oil drawn inward', r.spun.light < 0, `radial ${r.spun.light.toExponential(2)}`);
   check('with nothing spinning, neither moves', r.still.max === 0, `max |w| ${r.still.max}`);
   /*
-    Not simply four. 45 steps is 0.75 s, and the thinner liquid's drag time at
-    the rest gap is 0.6 s, so it is still getting up to speed (the thick one,
-    0.15 s, has long since arrived): each drift is its steady speed times
-    1 − e^(−t/τ). The first version asked for 3 to 5.3 and read 2.84, which
-    is that factor exactly; so the check asks for the answer with it in,
-    which is sharper than waiting for both to settle while the discs move.
+    Not simply four. 45 steps is 0.75 s, and each drift is its steady speed
+    times 1 − e^(−t/τ). In the 6 mm gap this was written on the thinner
+    liquid's drag time was 0.6 s, still getting up to speed (the thick one,
+    0.15 s, had long since arrived): the first version asked for 3 to 5.3
+    and read 2.84, which is that factor exactly; so the check asks for the
+    answer with it in. The drag times are worked out from the rest gap
+    (PLAN 38r: at 2 mm they are 0.067 and 0.017 s, both settled, and the
+    answer is four to a part in 10⁴), not written in as numbers.
   */
   const settle = (tau) => 1 - Math.exp(-0.75 / tau);
-  const want = 4 * settle(0.6) / settle(0.15);
+  const want = 4 * settle(r.tau.thinner) / settle(r.tau.thick);
   const ratio = r.thinner.heavy / Math.max(1e-12, r.spun.heavy);
   check(`the drift scales with the drag time: four times thinner, ${want.toFixed(2)}× faster by 0.75 s, to 5%`,
     Math.abs(ratio / want - 1) < 0.05, `${ratio.toFixed(3)}×`);
+  /*
+    10 (PLAN 22r). The centrifuge's weight. A liquid's weight in the
+    turning frame is its density: the body force on a parcel is ρ ω² r, and
+    on the light show's dyes, a few per cent heavier than the water they are
+    in, the part that moves anything is the excess, Δρ ω² r with Δρ/ρ₀
+    linear in the dye (Boussinesq, 18m-3). The plate's mean is a constant
+    and has no gradient, so taking it off changes nothing a drift can show.
+    The shader passed the excess through a tanh, so dye past the mean stops
+    getting heavier: a disc at three times a mean of 1 weighs tanh 2 +
+    tanh 1 = 1.73 against the one at the mean's 0.76, a ratio of 2.27 where
+    the density says 3.
+
+    And the speed itself, from first principles. Under the cover the drag
+    is the gap's, k = 1/τ, and the flow is Hele-Shaw: u = (F − ∇p)/k with
+    ∇·u = 0. Inside a disc of excess weight β centred at r₀ the force is
+    β ω² (r₀ + ξ); the ξ part is a gradient (its curl lives on the rim,
+    where ξ is along the normal, so it is nil) and the projection takes it,
+    and a force uniform over a disc leaves the disc moving at half of it,
+    F/2k. So the drop drifts outward at β ω² r₀ τ / 2, everywhere inside
+    it, with β = spinDyeWeight × Δc. The line asks for that within 15%
+    (a disc of a 256² grid's cells, and a sample that reads the radial part
+    about the plate's middle, not the drop's direction), at the disc on
+    the mean, where the tanh and the density part by a quarter.
+
+    What an imitation cannot do: a weight that saturates anywhere misses
+    the 3× disc's ratio; one rescaled to make the ratios linear (a larger
+    spinDyeWeight to hide a softer curve) misses the speed; one that reads
+    the density but drops the mean's offset has nothing to gain (the
+    offset is constant) and so passes, which is the physics.
+  */
+  {
+    const w = r.weight, ratio2 = w[2] / Math.max(1e-12, w[1]), ratio3 = w[3] / Math.max(1e-12, w[1]);
+    const lawOk = Math.abs(ratio2 / 2 - 1) < 0.05 && Math.abs(ratio3 / 3 - 1) < 0.05;
+    /*
+      Main's state: the tanh's ratio at 3×, (tanh 2 + tanh 1)/tanh 1 = 2.27
+      (at 2× it is 2 tanh 1 / tanh 1, exactly 2). Main reads 2.39 there, not
+      2.27: over 0.75 s the disc's edge softens, and a tanh of a soft edge
+      is less saturated than of a sharp one. So main's state is within 10%
+      of the tanh's ratio, which a linear weight (3, 25% away) cannot be.
+    */
+    const tanhRatio3 = (Math.tanh(2) + Math.tanh(1)) / Math.tanh(1);
+    line('22r', 'the centrifuge\'s weight is the density: discs at 1, 2 and 3 times the mean drift at 1, 2 and 3 times one speed, to 5%',
+      lawOk, `${ratio2.toFixed(3)}× and ${ratio3.toFixed(3)}× (the tanh's ${tanhRatio3.toFixed(3)} at 3×)`, Math.abs(ratio3 / tanhRatio3 - 1) < 0.1);
+    const want = 0.15 * 1 * 9 * Math.hypot(0.72 - 0.5, 0) * r.tau.thick / 2;
+    // Main's state: the tanh gives the disc at the mean a jump of tanh 0 − tanh(−1) = tanh 1, 0.76 of the density's.
+    line('22r', 'and the disc at the mean drifts at the Hele-Shaw drop\'s β ω² r₀ τ / 2, to 15%',
+      Math.abs(w[1] / want - 1) < 0.15, `${w[1].toExponential(3)} plate widths/s, the law's ${want.toExponential(3)}`,
+      Math.abs(w[1] / (want * Math.tanh(1)) - 1) < 0.15);
+  }
   check('when the spinning stops, the swirl dies away and is emptied', !r.after.nonzero, `max |w| ${r.after.max} after a ${r.after.tail.toFixed(1)} s tail`);
   const g = r.grip;
   check('with Thin Gap on, a pressed palm still goes round with the dish: at least half what the old plate gives',

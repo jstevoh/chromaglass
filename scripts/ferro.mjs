@@ -22,11 +22,11 @@
  * the air field taught, in the same file's neighbour.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, installFrameReader, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
-const PORT = 4338;
+const PORT = port(4338);
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });

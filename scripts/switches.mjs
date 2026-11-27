@@ -88,9 +88,9 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.SWITCHES_PORT ?? 4187);
+const PORT = port(4187, 'SWITCHES_PORT');
 const BASE = `http://localhost:${PORT}/`;
 // The plate's resolution does not change a control's colour, and every
 // millisecond the software renderer spends on it is one the page is not
@@ -121,7 +121,7 @@ const BARS = {
 
 /** The settings sections, as the palette lists them (`lib/settingsMap.ts`): id and the name typed to find it. */
 const SETTINGS_SECTIONS = [['master', 'Master'], ['mixer', 'Mixer'], ['audio-input', 'Sound'], ['room', 'Motion camera'],
-  ['film', 'Film'], ['patches', 'Patches'], ['midi', 'Controller'], ['look', 'Light Show Look'], ['show', 'Show'],
+  ['film', 'Video'], ['patches', 'Patches'], ['midi', 'Controller'], ['look', 'Light Show Look'], ['show', 'Show'],
   ['kaleidoscope', 'Kaleidoscope'], ['lamp', 'Lamp & Light'], ['stock', 'Film Stock'], ['camera', 'Lens'],
   ['macro', 'Macro Closeup'], ['automation', 'Automation'], ['squish', 'Squish Plate'], ['oil', 'Oil & Soap'], ['ferro', 'Ferrofluid'],
   ['reactions', 'Reactions'], ['tilt', 'Tilt & Rock'], ['spin', 'Plate Spin'], ['physics', 'Fluid Physics'],

@@ -208,7 +208,7 @@ export class StandingFilm {
 
   /**
    * Built behind the show, the first time a magnet is close enough to want
-   * it, unless the look opens with one (Opening.film: since PLAN 38k's real
+   * it, unless the look opens with one (Opening.standing: since PLAN 38k's real
    * onset, Magnet Garden's and Ferro Paint's own magnets are), when the
    * opening's list builds and waits for them (filmBuilds below). Until then
    * the plate keeps its ferrofluid as it did without the film.
@@ -325,7 +325,7 @@ export class StandingFilm {
 
 /**
  * The film's pipelines by the keys the film asks for them by, for the
- * opening's list (gpu/fluid.ts, Opening.film) and the film's own build.
+ * opening's list (gpu/fluid.ts, Opening.standing) and the film's own build.
  */
 export function filmBuilds(kernels: Record<string, string> = standingKernels(SPIKES_WGSL)): [string, string][] {
   return [...Object.entries(kernels).map(([name, code]): [string, string] => [`film:${name}`, code]), ['film:window', STAND_WINDOW]];

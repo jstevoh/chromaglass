@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { Track } from '../lib/musicLibrary';
 import { type Drone, type DroneParams, DRONE_DEFAULTS } from '../lib/plateDrone';
 import { type AudioSource, AUDIO_INPUT_KEY } from './shared';
+import { usePlayerReport } from './musicNow';
+import { publishInputs } from './soundNow';
 
 /**
  * What the show listens to, as state: the source, the input it opens, the
@@ -35,6 +37,9 @@ export function useSoundState() {
     navigator.mediaDevices?.addEventListener?.('devicechange', refreshAudioInputs);
     return () => navigator.mediaDevices?.removeEventListener?.('devicechange', refreshAudioInputs);
   }, [refreshAudioInputs]);
+  // The inputs by name and the one chosen, for the remote link to report and
+  // the owner's assistant to pick from (app/soundNow.ts, PLAN 44k-12).
+  useEffect(() => { publishInputs(audioInputs, audioInputId); }, [audioInputs, audioInputId]);
   // ── A music file, played here ──
   // The straightest signal there is: no room, no microphone, no loopback
   // driver. The element plays to the speakers and its stream feeds the show.
@@ -52,16 +57,6 @@ export function useSoundState() {
   const playTrackRef = useRef<(t: Track) => void>(() => {});
   const [musicLoop, setMusicLoop] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  /*
-    Sound is a tab, because the strip it used to live in could not be found.
-
-    The audio sources were gated on `showControls && !showSettings && !deskUp`:
-    they hid when Settings opened, and hid again whenever either desk was up,
-    which is where the work happens. A shelf of music shipped into that strip
-    and the owner reported not being able to see any of it, which is the right
-    outcome for a control nobody can reach.
-  */
-  const [showSound, setShowSound] = useState(false);
   const droneRef = useRef<Drone | null>(null);
   const [droneParams, setDroneParams] = useState<DroneParams>(DRONE_DEFAULTS);
   /** Whether the plate's instrument is sounding: it can be stopped without choosing another source. */
@@ -82,11 +77,13 @@ export function useSoundState() {
   const musicElRef = useRef<HTMLAudioElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
   const musicCtxRef = useRef<{ ctx: AudioContext; src: MediaElementAudioSourceNode; dest: MediaStreamAudioDestinationNode } | null>(null);
+  // The player as the owner's assistant reads it, and its loop's door (app/musicNow.ts, PLAN 44k-2).
+  usePlayerReport({ el: musicElRef, file: musicFile, playing: musicPlaying, loop: musicLoop, length: musicTime.d, setLoop: setMusicLoop });
 
   return {
     audioSource, setAudioSource, audioSourceRef, audioInputId, setAudioInputId, audioInputs,
     refreshAudioInputs, musicFile, setMusicFile, playTrackRef, musicLoop, setMusicLoop, libraryOpen,
-    setLibraryOpen, showSound, setShowSound, droneRef, droneParams, setDroneParams, droneRunning,
+    setLibraryOpen, droneRef, droneParams, setDroneParams, droneRunning,
     setDroneRunning, stopDrone, musicPlaying, setMusicPlaying, musicTime, setMusicTime, musicElRef,
     musicInputRef, musicCtxRef,
   };

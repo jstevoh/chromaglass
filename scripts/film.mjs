@@ -43,13 +43,14 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { watchVideo, WatchError } from './watch.mjs';
 import { AUTOPLAY, withBand, recordTake, untilRunning } from './recorder.mjs';
+import { untilFlowerFree } from './flowergate.mjs';
 
-const PORT = Number(process.env.FILM_PORT ?? 4352);
+const PORT = port(4352, 'FILM_PORT');
 const OUT = path.resolve(process.env.FILM_OUT ?? 'film');
 const ONLY = process.env.FILM_ONLY ? process.env.FILM_ONLY.split(',').map(s => s.trim()).filter(Boolean) : null;
 const SECONDS = Number(process.env.FILM_SECONDS || 120);
@@ -266,6 +267,8 @@ await new Promise(r => setTimeout(r, 2500));
 
 console.log(`  ${looks.length} looks${SHARD ? ` (shard ${SHARD.join('/')})` : ''}, ${TAKES} take${TAKES > 1 ? 's' : ''} each on seeds ${SEEDS.join(', ')}, ${SECONDS} s a take with the band in a box, into ${OUT}\n`);
 const results = [];
+// Before the app opens: no film of a build that draws the flower (PLAN 31s-8, scripts/flowergate.mjs).
+await untilFlowerFree({ dist: 'dist' });
 const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
 try {
   for (const look of looks) {

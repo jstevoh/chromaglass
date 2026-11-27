@@ -20,7 +20,7 @@
  * it**, so the last dozen are printed when it does.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { installFrameReader, frameOf } from './frame.mjs';
@@ -29,7 +29,7 @@ import { PALETTE } from '../src/constants.ts';
 import { PRESETS } from '../src/presets.ts';
 import { watchVideo, freezes, WatchError } from './watch.mjs';
 
-const PORT0 = Number(process.env.GIG_PORT ?? 4540);
+const PORT0 = port(4540, 'GIG_PORT');
 const LOOK = process.env.GIG_LOOK ?? 'soap-film';
 const MINUTES = Number(process.env.GIG_MINUTES ?? 10);
 const SEED = Number(process.env.GIG_SEED ?? 20260924);
@@ -48,7 +48,7 @@ let bits = SEED >>> 0;
 const rnd = () => { bits = (bits * 1664525 + 1013904223) >>> 0; return bits / 4294967296; };
 const pick = (a) => a[Math.floor(rnd() * a.length)];
 
-let server = null, port = PORT0, leaving = false;
+let server = null, served = PORT0, leaving = false;
 for (let t = 0; t < 6 && !server; t++) {
   const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT0 + t), '--strictPort'],
     { detached: true, stdio: ['ignore', 'ignore', 'ignore'] });
@@ -56,7 +56,7 @@ for (let t = 0; t < 6 && !server; t++) {
   child.on('exit', () => { died = true; });
   await new Promise(r => setTimeout(r, 2500));
   if (died) continue;
-  server = child; port = PORT0 + t;
+  server = child; served = PORT0 + t;
 }
 if (!server) { console.error('no free port'); process.exit(2); }
 server.on('exit', (c) => { if (!leaving) { console.error(`\npreview exited (${c})`); process.exit(2); } });
@@ -144,7 +144,16 @@ const actions = [
     return `kaleido ${s.kaleidoscope}, macro ${s.macroMode} x${(s.macroZoom ?? 1).toFixed(1)}, ${s.renderStyle}`;
   } },
   { weight: 1, name: 'desk action', run: async (page) => {
-    const a = pick(['seed', 'automate-toggle', 'spin-front', 'macro-toggle']);
+    const a = pick(['seed', 'automate-toggle', 'spin-front', 'zoom']);
+    // The closeup in and out by its one control, the Macro Zoom (it was the
+    // Macro pad action until the Close-up press was taken out, PLAN QA-32c).
+    // By the keys, the app's own zoom code: + seven times is 4.3x from the
+    // plate, − ten times back to it.
+    if (a === 'zoom') {
+      const zin = !((await page.evaluate(() => window.chromaglassDebug().settings.macroZoom ?? 1)) > 1.05);
+      for (let k = 0; k < (zin ? 7 : 10); k++) await page.keyboard.press(zin ? '+' : '-');
+      return zin ? 'zoom in' : 'zoom out';
+    }
     await page.evaluate((x) => window.chromaglassAction?.(x), a);
     return a;
   } },
@@ -162,7 +171,7 @@ try {
   filmT0 = Date.now();
   await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
   await installFrameReader(page);
-  await page.goto(`http://localhost:${port}/?debug&gpu=mid&tier=local&look=${LOOK}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${served}/?debug&gpu=mid&tier=local&look=${LOOK}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
   // The film is of the whole page; the watch keeps the plate. The desk's
   // meters move with the band whether the plate does or not.

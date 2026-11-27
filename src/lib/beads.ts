@@ -11,6 +11,7 @@
  * uniforms) that the shader reads for the rim and the interior.
  */
 import { makeRng, showSeed, stream, type Rng } from './rng';
+import { DISH_GAP_METRES, DISH_METRES, OPEN_RIM } from './turntable';
 
 export interface Bead {
   x: number;   // logical grid cells
@@ -147,8 +148,29 @@ export function innerLife(seed: number): number { return 15 + 20 * seed; }
 
 /** How long a drop takes to take on a new look's colour: a look fade's order. */
 const RECOLOUR_S = 1.5;
+/** Relaxation time (s) for overlapping drops pushing apart (~0.25 per 1/60 s step). */
+const REPEL_TAU_S = 0.058;
+/** Relaxation time (s) for nearby drops drawing together (1/1.5 s). */
+const ATTRACT_TAU_S = 1 / 1.5;
+const G = 9.81;
 /** Droplets per bead the population asks for, at full drops (see `populateTiny`). */
 const TINY_SHARE = 0.8;
+
+/**
+ * Liquid and gap parameters for `BeadField.setLiquid` (PLAN 18i-2), in SI units.
+ */
+export interface BeadLiquid {
+  /** Live gap between the glasses, metres. */
+  gapMetres: number;
+  /** Dynamic viscosity of the surrounding carrier liquid, Pa·s. */
+  muOut: number;
+  /** Dynamic viscosity of the drop liquid, Pa·s. */
+  muIn: number;
+  /** Signed density difference ρ_drop − ρ_liquid, kg/m³. */
+  deltaRho: number;
+  /** Interfacial tension between the two liquids, N/m. */
+  sigma: number;
+}
 
 /**
  * Which palette entry a drop takes. From the bead's own seed rather than a
@@ -201,12 +223,65 @@ export class BeadField {
 
   /**
    * Viscosity ratio lambda = mu_drop / mu_carrier (PLAN 18i).
-   * In a thin gap, an oil pancake drop lags the depth-mean flow: U_drop = 2U / (1 + lambda).
-   * The 0.8 flow speed was originally tuned by eye for show aesthetics, and
-   * lambda = 1.5 was solved back from 2U / (1 + lambda) = 0.8 as a tuned shortcut.
-   * This is a property on BeadField; per-bottle dynamic coupling awaits 18d-3 Cahn-Hilliard pinch-off.
+   * In a thin gap, a viscous drop lags the depth-mean flow: U_drop = 2U / (1 + lambda).
+   * Starts at 1.5 (the tuned ring lag) until `setLiquid` supplies the live liquids.
    */
   viscosityRatio = 1.5;
+  private gapMetres = DISH_GAP_METRES;
+  private muOut = 0.001;
+  private muIn = 0.0015;
+  private deltaRho = -80;
+  private sigma = 0.03;
+  private liquidSet = false;
+
+  /**
+   * Set the live gap and the two liquids' properties in SI units (PLAN 18i-2).
+   * Updates `viscosityRatio = muIn / muOut` for both the flow lag 2U / (1 + lambda)
+   * and the Hele-Shaw tilt slide Δρ g sinθ b² / (12 μ_out (1 + lambda)).
+   */
+  setLiquid(liquid: BeadLiquid): void {
+    if (Number.isFinite(liquid.gapMetres) && liquid.gapMetres > 0) this.gapMetres = liquid.gapMetres;
+    if (Number.isFinite(liquid.muOut) && liquid.muOut > 0) this.muOut = liquid.muOut;
+    if (Number.isFinite(liquid.muIn) && liquid.muIn >= 0) this.muIn = liquid.muIn;
+    if (Number.isFinite(liquid.deltaRho)) this.deltaRho = liquid.deltaRho;
+    if (Number.isFinite(liquid.sigma) && liquid.sigma > 0) this.sigma = liquid.sigma;
+    this.viscosityRatio = this.muIn / this.muOut;
+    this.liquidSet = true;
+  }
+
+  /** Forget every drop cleanly; wait for repopulate/restore. */
+  snapshot() {
+    return {
+      beads: this.beads.map((b) => ({
+        ...b,
+        color: b.color ? ([...b.color] as [number, number, number]) : undefined,
+        inner: b.inner ? { ...b.inner, color: [...b.inner.color] as [number, number, number] } : undefined,
+      })),
+      dropAmt: this.dropAmt,
+      viscosityRatio: this.viscosityRatio,
+    };
+  }
+
+  restore(s: ReturnType<BeadField['snapshot']>): void {
+    this.beads.length = 0;
+    for (const b of s.beads) {
+      this.beads.push({
+        ...b,
+        color: b.color ? ([...b.color] as [number, number, number]) : undefined,
+        inner: b.inner ? { ...b.inner, color: [...b.inner.color] as [number, number, number] } : undefined,
+      });
+    }
+    this.dropAmt = s.dropAmt;
+    this.viscosityRatio = s.viscosityRatio;
+    this.dirty = true;
+  }
+
+  /** Paterson's Hele-Shaw shape/coalescence relaxation time 2 μ R³ / (b² σ). */
+  private patersonTau(rCells: number): number {
+    const R = Math.max(0.1, rCells) * (DISH_METRES / this.grid);
+    const mu = Math.max(this.muOut, this.muIn);
+    return Math.max(1e-6, (2 * mu * R * R * R) / (this.gapMetres * this.gapMetres * this.sigma));
+  }
   /** The drop mask's pixels and its scratch, kept between frames (see `rasterDrops`). */
   private dropPixels: Uint8ClampedArray | null = null;
   private dropOwn: Float32Array | null = null;
@@ -297,19 +372,39 @@ export class BeadField {
    * old probability filled the plate evenly, since every bead the packed
    * patches refused landed in the gaps between them).
    */
-  populate(count: number, sizeScale = 1, density?: (x: number, y: number) => number): void {
+  populate(count: number, sizeScale = 1, density?: (x: number, y: number) => number, byOil = false): void {
     const N = this.grid;
     // With no droplets (always, at drops 0) the population is the beads, as it
     // always was, and so is every line and every draw below.
     const tinies = this.beads.reduce((n, b) => n + (b.tiny ? 1 : 0), 0);
+    /*
+      By oil (the plate's own call, `byOil`): the dial sets how much oil is on
+      the glass, and the field keeps that, not a head count. A bead is a
+      pancake the gap's height tall, so its oil is its area, r squared; two
+      that merge keep the sum of their areas (the merge below sets
+      r = sqrt(r1² + r2²)), and so does this: the target is `count` beads of
+      the mean area the draw below makes, and the field is topped up only
+      when it holds less oil than that, which is when beads have run off the
+      open rim. Held to a count, every merge was answered by a new bead
+      within half a second, and a plate that should coarsen, the way oil on
+      water does (small drops run together into fewer, bigger ones over
+      minutes), stayed a carpet of the same 125 beads forever: the owner's
+      "too many bubbles". The harnesses that pin a count call without it, and
+      see the count they asked for, to the draw.
+    */
+    const unit = (this.drops > 0 ? DROP_MEAN_R2 : RING_MEAN_R2) * (sizeScale * N / 192) ** 2;
+    let oil = 0;
+    if (byOil) for (const b of this.beads) if (!b.tiny) oil += b.r * b.r;
+    const target = count * unit;
     const want = tinies ? count + tinies : count;
-    while (this.beads.length > want) {
+    while (byOil ? oil > target * 1.1 + unit : this.beads.length > want) {
       const i = this.beads.findIndex((b) => !b.tiny);
       if (i < 0) break;
+      oil -= this.beads[i].r * this.beads[i].r;
       this.beads.splice(i, 1); this.dirty = true;
     }
     let tries = 0;
-    while (this.beads.length - tinies < count && tries++ < count * 6) {
+    while ((byOil ? oil < target : this.beads.length - tinies < count) && tries++ < count * 6) {
       // Two populations: mostly small beads of clearly different sizes, and
       // a tail of big lenses; the small ones spread over a wider range than
       // before so the carpet is not one size.
@@ -342,6 +437,7 @@ export class BeadField {
         const seed = this.rng.float();
         const c = this.drops > 0 ? this.slotColour(seed) : undefined;
         this.beads.push(c ? { x, y, r, age: 0, seed, color: [c[0], c[1], c[2]] } : { x, y, r, age: 0, seed });
+        oil += r * r;
         this.dirty = true;
       }
     }
@@ -404,24 +500,23 @@ export class BeadField {
     }
   }
 
-  /** Something landed or pressed at (x, y): shove the beads out of its way. */
-  disturb(x: number, y: number, r: number, strength = 1): void {
-    for (const b of this.beads) {
-      const dx = b.x - x, dy = b.y - y;
-      const d = Math.hypot(dx, dy);
-      if (d > r * 2 || d < 1e-3) continue;
-      const push = (1 - d / (r * 2)) * r * 0.6 * strength;
-      b.x += dx / d * push;
-      b.y += dy / d * push;
-    }
-    this.dirty = true;
-  }
-
   step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number): void {
     const N = this.grid;
     const bs = this.beads;
     if (bs.length === 0) return;
+    const m = DISH_METRES / N;
     const dropSpeed = 2 / (1 + this.viscosityRatio);
+    /*
+      Signed Hele-Shaw pancake buoyancy/gravity slide (PLAN 18i-2):
+      U_slide = Δρ g sinθ b² / (12 μ_out (1 + λ)), where Δρ = ρ_drop − ρ_liquid
+      and `tiltX`/`tiltY` are sinθ along +x/+y (down the slope for positive tilt).
+      A drop heavier than the surrounding liquid slides down the slope (+), a
+      lighter one (oil in water) rises up it (−).
+    */
+    const slide = (this.deltaRho * G * this.gapMetres * this.gapMetres) / (12 * this.muOut * (1 + this.viscosityRatio)) / m;
+    const sx = Number.isFinite(tiltX) ? tiltX : 0;
+    const sy = Number.isFinite(tiltY) ? tiltY : 0;
+    const dropsMode = this.drops > 0 || this.liquidSet;
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
       /*
@@ -439,18 +534,18 @@ export class BeadField {
         reason (PLAN 18i, `npm run bubblephysics`). So a drop on still paint
         stays exactly where it is, as the bubbles do.
       */
-      b.x += (vx * CELLS_PER_UNIT * dropSpeed - tiltX * 500) * dt;
-      b.y += (vy * CELLS_PER_UNIT * dropSpeed - tiltY * 500) * dt;
+      b.x += (vx * CELLS_PER_UNIT * dropSpeed + sx * slide) * dt;
+      b.y += (vy * CELLS_PER_UNIT * dropSpeed + sy * slide) * dt;
       b.age += dt;
       if (b.inner && (b.inner.age += dt) >= innerLife(b.inner.seed)) delete b.inner;
       if (b.sx !== undefined) {
-        const f = Math.exp(-dt / mergeRelax(b.r, N));
+        const f = Math.exp(-dt / (this.liquidSet ? this.patersonTau(b.r) : mergeRelax(b.r, N)));
         b.sx *= f; b.sy = (b.sy ?? 0) * f;
         if (Math.hypot(b.sx, b.sy) < 0.005) { delete b.sx; delete b.sy; }
       }
     }
     if (this.drops > 0 && this.palette.length) {
-      const k = Math.min(1, dt / RECOLOUR_S);
+      const k = 1 - Math.exp(-dt / RECOLOUR_S);
       const ease = (c: [number, number, number], seed: number) => {
         const t = this.slotColour(seed)!;
         c[0] += (t[0] - c[0]) * k; c[1] += (t[1] - c[1]) * k; c[2] += (t[2] - c[2]) * k;
@@ -576,7 +671,10 @@ export class BeadField {
           // droplet, and a droplet that took one in carried it as a passenger
           // (eighteen did on the drops check's crowd).
           const takes = !!smaller.tiny === !!larger.tiny;
-          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && this.rng.float() < 0.02) || (smaller.tiny && d < touch * 0.6))) {
+          const mergeProb = dropsMode
+            ? 1 - Math.exp(-dt / (this.liquidSet ? this.patersonTau(Math.hypot(b.r, o.r)) : mergeRelax(Math.hypot(b.r, o.r), N)))
+            : 0.02;
+          if (takes && (inside || (d < touch * 0.7 - press && touch < 7 && this.rng.float() < mergeProb) || (smaller.tiny && d < touch * 0.6))) {
             // Merge: pressed hard together, the larger takes the smaller's area.
             const big = b.r >= o.r ? b : o, small = big === b ? o : b;
             const bigR = big.r;
@@ -636,7 +734,9 @@ export class BeadField {
           }
           // Apart when overlapping, firmly; together when near, gently. Each
           // pair is visited from both ends, so each move is half of it.
-          const move = d < want ? (want - d) * 0.25 : -Math.min(d - want, touch * 0.3) * Math.min(1, dt * 1.5) * 0.5;
+          const repelK = dropsMode ? 1 - Math.exp(-dt / REPEL_TAU_S) : 0.25;
+          const attractK = dropsMode ? 1 - Math.exp(-dt / ATTRACT_TAU_S) : Math.min(1, dt * 1.5);
+          const move = d < want ? (want - d) * repelK : -Math.min(d - want, touch * 0.3) * attractK * 0.5;
           b.x -= dx / d * move; b.y -= dy / d * move;
           o.x += dx / d * move; o.y += dy / d * move;
         }
@@ -672,7 +772,15 @@ export class BeadField {
         }
       }
     }
-    for (const b of bs) { b.x = Math.max(2, Math.min(N - 3, b.x)); b.y = Math.max(2, Math.min(N - 3, b.y)); }
+    if (dropsMode) {
+      // Beads reaching the open circular rim leave the dish rather than piling at a square clamp.
+      const cx0 = N / 2, cy0 = N / 2, rimR = OPEN_RIM * N;
+      for (let i = bs.length - 1; i >= 0; i--) {
+        if (Math.hypot(bs[i].x - cx0, bs[i].y - cy0) >= rimR) bs.splice(i, 1);
+      }
+    } else {
+      for (const b of bs) { b.x = Math.max(2, Math.min(N - 3, b.x)); b.y = Math.max(2, Math.min(N - 3, b.y)); }
+    }
     this.dirty = true;
   }
 
@@ -1104,11 +1212,48 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
  * area, and still all of the count, where 3.0 starts to leave the plate
  * short of beads).
  *
- * Out of the closeup nothing moves: the plate's beads are the beads they were,
- * to the bit.
+ * The oil is the dial's, closeup or not (beadPopulation, below): laid larger,
+ * the closeup's beads are fewer, a quarter of the count for the same oil.
  */
 export const MACRO_BEAD_SCALE = 2.0;
 
+/*
+  The mean area, as r² in cells of a 192 grid at size scale 1, of a bead
+  populate() draws: what one bead's worth of oil is, so a count can be turned
+  into oil and back. The rings draw 80% at 0.45 + 2.6uv (u, v uniform: the
+  mean of (uv)² is 1/9) and 20% at 1.8 + 3.4u² (the mean of u⁴ is 1/5); the
+  drops draw a log-normal (median DROP_MEDIAN, σ DROP_SIGMA) kept between
+  DROP_MIN and DROP_MAX, so its mean is summed here once over the kept range.
+*/
+const RING_MEAN_R2 = 0.8 * (0.45 ** 2 + 2 * 0.45 * 2.6 / 4 + 2.6 ** 2 / 9)
+  + 0.2 * (1.8 ** 2 + 2 * 1.8 * 3.4 / 3 + 3.4 ** 2 / 5);
+const DROP_MEAN_R2 = (() => {
+  let w = 0, m = 0;
+  for (let z = -6; z <= 6; z += 0.001) {
+    const r = DROP_MEDIAN * Math.exp(DROP_SIGMA * z);
+    if (r < DROP_MIN || r > DROP_MAX) continue;
+    const p = Math.exp(-z * z / 2); w += p; m += p * r * r;
+  }
+  return m / w;
+})();
+
+/**
+ * How much of the glass the oil covers with the Beads dial at full: a
+ * twentieth. The dial is the amount of oil on the plate, and the field holds
+ * the beads that much oil makes at the dial's size, so the count is the
+ * cover over one bead's area: dial · BEAD_COVER · (plate area) / (π · mean r²
+ * · scale²). Through zero, so a look with a touch of oil has a few beads,
+ * where the old law, 60 + 360·dial, put 60 on the glass at the faintest
+ * touch and 125 at the default 0.18 (2.6% of the glass under oil, laid as
+ * many small rings), and in the closeup, where each bead is laid
+ * MACRO_BEAD_SCALE times wider, the same 125: four times the oil. Now the
+ * default holds 44, a look at 0.7 holds 112 where it held 312, and the
+ * closeup the same oil in its larger beads, a quarter of the count.
+ */
+export const BEAD_COVER = 0.05;
+const BEAD_FULL_COUNT = BEAD_COVER * 192 * 192 / (Math.PI * RING_MEAN_R2);
+
 export function beadPopulation(beadAmt: number, macro?: boolean): [count: number, sizeScale: number] {
-  return [Math.round(60 + 360 * beadAmt), (0.8 + 0.4 * beadAmt) * (macro ? MACRO_BEAD_SCALE : 1)];
+  const s = (0.8 + 0.4 * beadAmt) * (macro ? MACRO_BEAD_SCALE : 1);
+  return [Math.round(BEAD_FULL_COUNT * Math.max(0, beadAmt) / (s * s)), s];
 }

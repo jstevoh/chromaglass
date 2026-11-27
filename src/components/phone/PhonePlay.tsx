@@ -2,16 +2,20 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, CirclePlus, LogIn, Shuffle, User } from 'lucide-react';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { TouchSlider } from '../ui/TouchSlider';
+import { useEscape } from '../../hooks/useEscape';
 import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { PIN_RANGE } from '../../lib/deskPins';
+import { readSetting } from '../../lib/readout';
+import { findPreset } from '../../presets';
+import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 
-/** Evolve's top, the registry's: the dial runs on past 1 to its extreme on every surface. */
-const EVOLVE_MAX = PIN_RANGE.get('automateRate')?.max ?? 1;
+const rangeOf = (k: keyof VisualizerSettings) => { const r = PIN_RANGE.get(k); return { min: r?.min ?? 0, max: r?.max ?? 1 }; };
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
+import { shareClip } from '../../lib/shareClip';
 import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
 
 /**
@@ -33,8 +37,9 @@ import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
  *                and Shuffle, Clear plate and Share clip; Save at the top
  *
  * With Drop on the tray a touch picks its own hand, the way a hand reads a
- * dish (lib/playGesture.ts): a tap drops, a drag streaks, two fingers blow,
- * a still hold presses. The hint over the tray says so on the first visits.
+ * dish (lib/playGesture.ts): a tap drops, a drag streaks, two fingers blow
+ * (or pinch the cover glass once their span changes past PINCH_SPAN), a still
+ * hold presses. The hint over the tray says so on the first visits.
  *
  * It is the same app underneath, as PhoneStage is: every control here calls
  * the handler the desks and the full phone layout call, so a look picked or
@@ -86,6 +91,9 @@ export interface PhonePlayProps {
   onShuffle: () => void;
   /** Save the plate as a new look under a name, asked for every time (QA-18), as the desks' Save. */
   onSave?: (name: string) => void;
+  /** Existing saved looks, so saving a duplicate name offers Replace or Keep both (PLAN 49a). */
+  existingLooks?: { id: string; name: string }[];
+  onReplaceLook?: (id: string, name: string) => void;
   /** The name the field starts with. */
   saveSuggestion?: string;
   dyes: readonly string[];
@@ -93,7 +101,7 @@ export interface PhonePlayProps {
   onDye: (hex: string) => void;
   /** The app's hand: Play sets it from the tray and from the touch itself. */
   onTool: (t: PhoneTool) => void;
-  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom' | 'macroMode'>;
+  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom'>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
@@ -110,13 +118,9 @@ export interface PhonePlayProps {
 }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-/** The zoom the plate is drawn at, as LiquidVisualizer's macroZoomOf reads the look (a closeup look with no zoom of its own is at 4). */
-const zoomOf = (s: PhonePlayProps['settings']) => {
-  const z = s.macroZoom ?? 1;
-  return s.macroMode === true ? (z > 1.05 ? z : 4) : Math.max(1, z);
-};
+/** The zoom the plate is drawn at: the Macro Zoom alone, as LiquidVisualizer's macroZoomOf reads it (PLAN QA-32c). */
+const zoomOf = (s: PhonePlayProps['settings']) => Math.max(1, s.macroZoom ?? 1);
 
 /** A 36-tall glass pill in a 48 px target: lit while pressed, or solid red when what it holds is live (recording). */
 function Pill({ onPress, label, testId, children, pressed, live = false }: { onPress: () => void; label: string; testId: string; children: ReactNode; pressed?: boolean; live?: boolean }) {
@@ -134,6 +138,7 @@ function Pill({ onPress, label, testId, children, pressed, live = false }: { onP
 
 export function PhonePlay(p: PhonePlayProps) {
   const [sheet, setSheet] = useState(false);
+  useEscape(() => { if (sheet) setSheet(false); });
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const [picked, setPicked] = useState<PlayTool>('dropper');
@@ -169,20 +174,27 @@ export function PhonePlay(p: PhonePlayProps) {
     well as on moves, since a finger held still sends no moves.
   */
   useEffect(() => {
-    const down = new Map<number, { x0: number; y0: number; t0: number; travel: number }>();
+    const down = new Map<number, { x0: number; y0: number; x: number; y: number; t0: number; travel: number }>();
     let hand: PlayHand = pickedRef.current;
+    let d0 = 0;
     let timer = 0;
     const apply = () => {
       const now = performance.now();
-      const next = playHand(pickedRef.current, hand, [...down.values()].map(f => ({ travel: f.travel, ms: now - f.t0 })), pinchesRef.current);
-      if (next !== hand) { hand = next; onToolRef.current(next); }
+      let span = 1;
+      if (down.size >= 2) {
+        const [a, b] = down.values();
+        if (d0 === 0) d0 = Math.max(10, Math.hypot(a.x - b.x, a.y - b.y));
+        span = Math.hypot(a.x - b.x, a.y - b.y) / d0;
+      }
+      const next = playHand(pickedRef.current, hand, [...down.values()].map(f => ({ travel: f.travel, ms: now - f.t0 })), pinchesRef.current, span);
+      if (next !== hand) { hand = next; onToolRef.current(next === 'pinch' ? pickedRef.current : next); }
     };
     const onStart = (e: TouchEvent) => {
       if (!(e.target instanceof Element) || e.target.id !== 'liquid-canvas') return;
       const now = performance.now();
       // A new touch starts from the tray's hand, which is the app's at rest.
       if (down.size === 0) hand = pickedRef.current;
-      for (const t of Array.from(e.changedTouches)) down.set(t.identifier, { x0: t.clientX, y0: t.clientY, t0: now, travel: 0 });
+      for (const t of Array.from(e.changedTouches)) down.set(t.identifier, { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, t0: now, travel: 0 });
       setTouched(true);
       apply();
       window.clearTimeout(timer);
@@ -193,6 +205,8 @@ export function PhonePlay(p: PhonePlayProps) {
       for (const t of Array.from(e.changedTouches)) {
         const f = down.get(t.identifier);
         if (!f) continue;
+        f.x = t.clientX;
+        f.y = t.clientY;
         f.travel = Math.max(f.travel, Math.hypot(t.clientX - f.x0, t.clientY - f.y0));
         any = true;
       }
@@ -200,6 +214,7 @@ export function PhonePlay(p: PhonePlayProps) {
     };
     const onEnd = (e: TouchEvent) => {
       for (const t of Array.from(e.changedTouches)) down.delete(t.identifier);
+      if (down.size < 2) d0 = 0;
       if (down.size === 0) window.clearTimeout(timer);
       apply();
     };
@@ -263,23 +278,10 @@ export function PhonePlay(p: PhonePlayProps) {
   );
 
   const take = p.recording.take;
-  const shareClip = async () => {
+  const onClip = async () => {
     if (p.recording.on) { p.recording.onToggle(); return; }
     if (!take) { p.recording.onToggle(); return; }
-    /*
-      The phone's own share sheet where it has one (Messages, Instagram,
-      Photos), with the clip as a file; a download where it has not. Called
-      from the tap itself: a share sheet opened after an await of anything
-      else is refused for want of a user gesture.
-    */
-    const file = new File([take.blob], take.filename, { type: take.blob.type || 'video/mp4' });
-    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-    if (nav.share && nav.canShare?.({ files: [file] })) {
-      try { await nav.share({ files: [file], title: 'ChromaGlass' }); } catch { /* closed without sharing */ }
-      return;
-    }
-    const a = document.createElement('a');
-    a.href = take.url; a.download = take.filename; a.click();
+    await shareClip(take);
   };
   const clipLabel = p.recording.on ? `Stop · ${clock(p.recording.seconds)}` : take ? 'Share clip' : 'Record a clip';
 
@@ -300,12 +302,30 @@ export function PhonePlay(p: PhonePlayProps) {
   const s = p.settings;
   const zoom = zoomOf(s);
   const showHint = !sheet && !touched && picked === 'dropper' && visits < HINT_VISITS && accountShows.length === 0;
-  const saveNamed = () => {
+  const [saveDup, setSaveDup] = useState<{ id: string; name: string } | null>(null);
+  const keepSave = () => {
     const name = saveName?.trim();
     if (!name || !p.onSave) return;
     p.onSave(name);
+    setSaveDup(null);
     setSaveName(null);
     setSaved(true);
+  };
+  const replaceSave = () => {
+    const name = saveName?.trim();
+    if (!name || !saveDup) return;
+    if (p.onReplaceLook) p.onReplaceLook(saveDup.id, name);
+    else p.onSave?.(name);
+    setSaveDup(null);
+    setSaveName(null);
+    setSaved(true);
+  };
+  const saveNamed = () => {
+    const name = saveName?.trim();
+    if (!name || !p.onSave) return;
+    const hit = (p.existingLooks ?? []).find(l => l.name.trim().toLowerCase() === name.toLowerCase());
+    if (hit && !saveDup) { setSaveDup(hit); return; }
+    keepSave();
   };
 
   return (
@@ -320,7 +340,7 @@ export function PhonePlay(p: PhonePlayProps) {
         >
           <span className={`flex h-9 min-w-0 items-center gap-2 rounded-[18px] pl-3.5 pr-2.5 ${GLASS_PILL}`}>
             <span className="truncate text-[14px] font-medium text-text">{p.lookName}</span>
-            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-medium text-text-2" data-testid="play-edited">edited</span>}
+            {p.edited && <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[12px] font-medium text-text-2" data-testid="play-edited">edited</span>}
             {!sheet && <ChevronDown size={14} className="shrink-0 text-text-2" />}
           </span>
         </button>
@@ -343,7 +363,7 @@ export function PhonePlay(p: PhonePlayProps) {
           )}
           {sheet ? (
             p.onSave && (
-              <Pill onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} label="Save this look" testId="play-save" pressed={saveName !== null}>
+              <Pill onPress={() => { setSaveDup(null); setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null)); }} label="Save this look" testId="play-save" pressed={saveName !== null}>
                 {saved ? 'Saved' : 'Save'}
               </Pill>
             )
@@ -361,7 +381,7 @@ export function PhonePlay(p: PhonePlayProps) {
                   <span className="relative flex h-7 w-7 flex-col items-center justify-center gap-px" data-testid="play-record-box">
                     <TapeReels seconds={p.recording.seconds} running={p.recording.on} height={p.recording.on ? 11 : 13} />
                     {p.recording.on && (
-                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[9px] leading-none tabular-nums">
+                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[12px] leading-none tabular-nums">
                         {clock(p.recording.seconds)}
                       </span>
                     )}
@@ -397,7 +417,7 @@ export function PhonePlay(p: PhonePlayProps) {
         )}
         {showHint && (
           <div className={`mb-2 rounded-full px-3 py-1 text-[12px] text-text-2 ${GLASS_PILL}`} data-testid="play-hint">
-            {zoom > 1.05 ? 'tap drops · drag streaks · pinch zooms · hold presses' : 'tap drops · drag streaks · two fingers blow · hold presses'}
+            {zoom > 1.05 ? 'tap drops · drag streaks · pinch zooms · hold presses' : 'tap drops · drag streaks · two fingers blow · pinch squeezes · hold presses'}
           </div>
         )}
         {!sheet ? (
@@ -443,36 +463,46 @@ export function PhonePlay(p: PhonePlayProps) {
               the plate and the buttons a scroll below it.
             */}
             {saveName !== null && (
+              <>
               <form className="flex gap-2 px-4 pb-2" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="play-save-form">
                 <input
                   autoFocus
                   onFocus={e => e.currentTarget.select()}
                   value={saveName}
-                  onChange={e => setSaveName(e.target.value)}
+                  onChange={e => { setSaveName(e.target.value); setSaveDup(null); }}
                   aria-label="Name for the new look"
                   // 16 px: under it, iOS zooms the page in on focus.
                   className="h-12 min-w-0 flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-3 text-[16px] text-text outline-none focus:border-accent"
                   data-testid="play-save-name"
                 />
                 <button type="submit" disabled={!saveName.trim()} data-testid="play-save-confirm"
-                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-40">Save</button>
+                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-65">Save</button>
               </form>
+              {saveDup && (
+                <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="play-save-duplicate">
+                  <span>“{saveDup.name}” already exists.</span>
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={keepSave} className="h-10 rounded-lg border border-white/15 bg-white/10 px-3 text-[13px] font-medium text-text" data-testid="play-save-keep-both">Keep both</button>
+                    <button type="button" onClick={replaceSave} className="h-10 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary" data-testid="play-save-replace">Replace</button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1 landscape:grid landscape:grid-cols-2 landscape:content-start landscape:gap-x-6">
               <div>
-              <TouchSlider glass label="Speed" setting="globalSpeed" min={0} max={0.3} value={s.globalSpeed ?? 0}
-                display={(s.globalSpeed ?? 0) < 0.1 ? (s.globalSpeed ?? 0).toFixed(3) : (s.globalSpeed ?? 0).toFixed(2)} resetTo={p.lookValueOf?.('globalSpeed')} onChange={v => p.onSetting({ globalSpeed: v })} testId="play-slider-speed" />
-              <TouchSlider glass label="Turbulence" setting="turbulenceScale" min={0} max={1} value={s.turbulenceScale ?? 0}
-                display={pct(s.turbulenceScale ?? 0)} resetTo={p.lookValueOf?.('turbulenceScale')} onChange={v => p.onSetting({ turbulenceScale: v })} testId="play-slider-turbulence" />
-              <TouchSlider glass label="Swirl" setting="vorticityConfinement" min={0} max={1} value={s.vorticityConfinement ?? 0}
-                display={pct(s.vorticityConfinement ?? 0)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
-              <TouchSlider glass label="Soap" setting="surfactantFlow" min={0} max={1} value={s.surfactantFlow ?? 0}
-                display={pct(s.surfactantFlow ?? 0)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
-              {/* To 8×, not the pinch's 16: past 8 a phone's plate is a few cells across, and the slider's travel is better spent below. */}
-              <TouchSlider glass label="Zoom" help="How close the camera looks into the plate. One is the whole plate." min={1} max={8} value={Math.min(8, zoom)}
-                display={`${zoom.toFixed(1)}×`} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
-              <TouchSlider glass label="Evolve" setting="automateRate" min={0} max={EVOLVE_MAX} value={s.automateRate ?? 0}
-                display={pct(s.automateRate ?? 0)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
+              <TouchSlider glass label="Speed" setting="globalSpeed" {...rangeOf('globalSpeed')} value={s.globalSpeed ?? 0}
+                display={readSetting('globalSpeed', s.globalSpeed ?? 0, rangeOf('globalSpeed').min, rangeOf('globalSpeed').max)} resetTo={p.lookValueOf?.('globalSpeed')} onChange={v => p.onSetting({ globalSpeed: v })} testId="play-slider-speed" />
+              <TouchSlider glass label="Turbulence" setting="turbulenceScale" {...rangeOf('turbulenceScale')} value={s.turbulenceScale ?? 0}
+                display={readSetting('turbulenceScale', s.turbulenceScale ?? 0, rangeOf('turbulenceScale').min, rangeOf('turbulenceScale').max)} resetTo={p.lookValueOf?.('turbulenceScale')} onChange={v => p.onSetting({ turbulenceScale: v })} testId="play-slider-turbulence" />
+              <TouchSlider glass label="Swirl" setting="vorticityConfinement" {...rangeOf('vorticityConfinement')} value={s.vorticityConfinement ?? 0}
+                display={readSetting('vorticityConfinement', s.vorticityConfinement ?? 0, rangeOf('vorticityConfinement').min, rangeOf('vorticityConfinement').max)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
+              <TouchSlider glass label="Soap" setting="surfactantFlow" {...rangeOf('surfactantFlow')} value={s.surfactantFlow ?? 0}
+                display={readSetting('surfactantFlow', s.surfactantFlow ?? 0, rangeOf('surfactantFlow').min, rangeOf('surfactantFlow').max)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
+              <TouchSlider glass label="Zoom" setting="macroZoom" help="How close the camera looks into the plate. One is the whole plate." {...rangeOf('macroZoom')} value={zoom}
+                display={readSetting('macroZoom', zoom, rangeOf('macroZoom').min, rangeOf('macroZoom').max)} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
+              <TouchSlider glass label="Evolve" setting="automateRate" {...rangeOf('automateRate')} value={s.automateRate ?? 0}
+                display={readSetting('automateRate', s.automateRate ?? 0, rangeOf('automateRate').min, rangeOf('automateRate').max)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
               </div>
               <div className="min-w-0">
 
@@ -484,7 +514,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 {p.looks.map(l => {
                   const on = l.id === p.activeLookId;
                   return (
-                    <button key={l.id} onClick={() => p.onLook(l.id)} aria-pressed={on} data-testid="play-look-tile"
+                    <button key={l.id} onClick={() => (isPackLocked(findPreset(l.id)?.pack) ? openAccountSheet() : p.onLook(l.id))} aria-pressed={on} data-testid="play-look-tile"
                       className="flex w-[76px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
                       {/* Lit like every other chosen thing (PLAN 35a): the slide's own film cannot change colour, so its name takes the lit chip and the mount a lit ring (on a wrapper, since the mount's clipped corner would cut a ring drawn on it). A slide a flick, snapping one at a time (35g). */}
                       <span className={`flex w-full justify-center rounded-[4px] py-1 ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><SlideMount swatch={l.swatch} size={60} /></span>
@@ -516,7 +546,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 <button onClick={p.onClear} data-testid="play-clear"
                   className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Clear plate</button>
                 {p.recording.supported && (
-                  <button onClick={() => { void shareClip(); }} data-testid="play-share"
+                  <button onClick={() => { void onClip(); }} data-testid="play-share"
                     className="h-[52px] min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium tabular-nums text-on-primary">{clipLabel}</button>
                 )}
                 {p.onOpenAccount && (

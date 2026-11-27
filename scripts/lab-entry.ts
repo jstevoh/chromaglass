@@ -2,7 +2,12 @@
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
-import { WebGPUPlate } from '../src/gpu/plate';
+import { FILM_DYE_DEPTH } from '../src/gpu/wgsl/filmDye';
+import { FILM_PRECURSOR } from '../src/gpu/wgsl/film';
+import { WebGPUPlate, lastDisplayName, setLeanDisplay } from '../src/gpu/plate';
+import { DISPLAY_MAIN, plateWgsl } from '../src/gpu/wgsl/plate';
+import { displayGateTests, displayMayMask, leanDisplayWgslCounted } from '../src/gpu/displayLean';
+import type { AirGeo } from '../src/gpu/air';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_PITCH, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
@@ -19,7 +24,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../src/lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, classicDiscs, classicCell, LAVA_BODIES, lavaLampCell, foamSeeds, foamCell, FOAM_WASH, FOAM_CELL_DYE } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
@@ -29,11 +34,12 @@ import { RhythmSheet, stampedVolume, kickRoom } from '../src/lib/sheet';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
+import { makeDropQueue, queueDrop, stepDrops, dropsLive, dropSchedule, dropImpact } from '../src/lib/dropImpact';
 import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
-  advection: 1, sharpness: 0, damping: 0.99, heatDecay: 0.98, turbScale: 0, turbDetail: 3, spin: 0,
+  advection: 1, sharpness: 0, damping: 0.99, heatDecay: 0.98, turbScale: 0, turbDetail: 3,
   immiscibility: 0, phaseSharp: 0.35, phaseTension: 0.18, magnetX: 0.5, magnetY: 0.5, magnetHeight: 0.2,
   magnetStrength: 0, magnetSeconds: 1 / 60, plateCurve: 0, depthDrag: 0, gapSpring: 0.02, gapMemory: 0,
   platePressure: 0.4, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
@@ -55,7 +61,12 @@ function halves(data: number[]): ArrayBuffer {
 
 type Lab = {
   solver: WebGPUFluid; L: number; N: number; time: number; cellClock: number;
+  /** The plate a render asked to keep (`keepPlate`), drawn again by the next that asks: the glitter's flakes live on it (PLAN 47e). */
+  kept?: WebGPUPlate;
+  keptReady?: boolean;
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
+  /** The oil's own colour in the dye laid since the last flush (addOilDye), or null. */
+  oilAdd?: Float32Array | null;
   /** The hands laid this step (layFinger), or null with none down. */
   hands: Float32Array | null;
   /** A Blow's breath laid this step (layBreath), or null with none. */
@@ -73,7 +84,9 @@ let lab: Lab | null = null;
  *  rasteriser's (`npm run lampzero`) reads this rather than trusting the flags. */
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
-let lastDrop: { n: number; h: Float32Array } | null = null;
+let lastDrop: { n: number; h: Float32Array; z: Float32Array } | null = null;
+/** The colour drops on their way in (PLAN 18c-2), drained a step at a time by `step` as the app's sim drains its own. */
+const drops = makeDropQueue();
 const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
@@ -125,6 +138,17 @@ const api = {
     const { dyeAdd } = lab!;
     if (data.length !== dyeAdd.length) throw new Error(`addDye: ${data.length} values for a ${dyeAdd.length}-value plate`);
     for (let k = 0; k < dyeAdd.length; k++) dyeAdd[k] += data[k];
+  },
+  /**
+   * Dye laid in the oil as its own colour, as a look's lay lays it
+   * (FluidSimulation.addOilDensity, PLAN 47z-1): L × L × 4 like addDye, added
+   * to the dye and told to the solver as the oil's on the next flush.
+   */
+  addOilDye(data: number[]) {
+    const l = lab!;
+    if (data.length !== l.dyeAdd.length) throw new Error(`addOilDye: ${data.length} values for a ${l.dyeAdd.length}-value plate`);
+    if (!l.oilAdd) l.oilAdd = new Float32Array(l.dyeAdd.length);
+    for (let k = 0; k < data.length; k++) { l.dyeAdd[k] += data[k]; l.oilAdd[k] += data[k]; }
   },
   /**
    * The oil's share of the dye (Oil Bodies), cell for cell: N × N × 4,
@@ -204,8 +228,8 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath, l.sheetGap);
-    l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath, l.sheetGap, null, l.oilAdd ?? null);
+    l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1); l.oilAdd = null;
     l.hands = null; l.breath = null; l.sheetGap = null;
   },
   /**
@@ -306,13 +330,40 @@ const api = {
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
-      l.solver.step(p, flushed && k === 0);
+      /*
+        A colour drop on its way in (PLAN 18c-2): its volume and its dye
+        this step, through lib/dropImpact.ts's stepDrops as the app's sim
+        does it, then flushed into this step.
+      */
+      let dropped = false;
+      if (dropsLive(drops)) {
+        const { L, dyeAdd } = l;
+        stepDrops(drops, L, (x, y, r, share) => l.solver.pour(x, y, r, share, null, true), (i, j, a, cr, cg, cb) => {
+          const ab = dyeAbsorbances(cr, cg, cb), o = (i + j * L) * 4;
+          dyeAdd[o] += a * ab[0]; dyeAdd[o + 1] += a * ab[1]; dyeAdd[o + 2] += a * ab[2]; dyeAdd[o + 3] += a;
+        });
+        api.flush(p.dt);
+        dropped = true;
+      }
+      l.solver.step(p, (flushed && k === 0) || dropped);
       l.magnets = magnetsOnPlate(p);
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
+  /**
+   * A colour drop as the app's sim queues it on a thin gap (PLAN 18c-2,
+   * lib/dropImpact.ts): `amount` of volume at (x, y) in plate units, laying
+   * `dye` (density) of colour `rgb` (0..1, as a bottle's) with it, over the
+   * next steps `step` runs. Returns its schedule.
+   */
+  drop(x: number, y: number, amount: number, rgb: [number, number, number], dye: number) {
+    const L = lab!.L;
+    queueDrop(drops, L, Math.floor(x * L), Math.floor(y * L), amount, dye, rgb[0], rgb[1], rgb[2]);
+    return dropSchedule(amount, L);
+  },
+  dropImpact,
   /**
    * A pour of a shelf bottle (PLAN 18c, 18d), as the app's onDeposit makes it:
    * its liquid into the species field (null if the bottle lays none, the
@@ -325,6 +376,19 @@ const api = {
     return sp;
   },
   async speciesShare() { return lab!.solver.speciesShare(); },
+  /** The floating glass's gap, metres, as the last step left it (lib/cover.ts; `npm run flush` waits on it). */
+  coverMetres() { return lab!.solver.coverMetres; },
+  /** The cover's ledger as the last step left it (lib/cover.ts CoverState), a copy; `npm run airedge` reads its `wet` (PLAN 38r-16). */
+  coverState() { const c = (lab!.solver as unknown as { cover: object | null }).cover; return c ? { ...c } : null; },
+  /**
+   * The air edge's wet field, 1 where the liquid is and 0 where the air has
+   * come in, on the solver's grid row by row, or null while the solver has no
+   * `readWet` (PLAN 38r-16 builds it; `npm run airedge` is owed until then).
+   */
+  async wet() {
+    const s = lab!.solver as unknown as { readWet?: () => Promise<Float32Array> };
+    return typeof s.readWet === 'function' ? Array.from(await s.readWet()) : null;
+  },
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },
@@ -354,6 +418,9 @@ const api = {
   },
   /** One cell of Clock Glass's lay, as seedPreset lays it (src/lib/oilLay.ts). */
   clockGlassCell,
+  /** Lava Lamp's wax as the app lays it (src/lib/oilLay.ts, PLAN 27f-9c): its bodies, and one cell's oil and dye. */
+  lavaBodies: LAVA_BODIES,
+  lavaLampCell,
   /** The splodascope's crowd as the app lays it (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
   splodascopeDiscs(seed: number, dyes: number) {
     let s = seed;
@@ -361,6 +428,21 @@ const api = {
   },
   /** One cell of the splodascope's lay, as seedPreset lays it. */
   splodascopeCell,
+  /** Classic's dish as the app lays it on an `n`-cell grid (src/lib/oilLay.ts, PLAN 38w-8: the solver's grid in the app, 192 the CPU's), from a seeded stream of the lab's own. */
+  classicDiscs(seed: number, dyes: number, n = 192) {
+    let s = seed;
+    return classicDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes, n);
+  },
+  /** One cell of Classic's lay, as seedPreset lays it. */
+  classicCell,
+  /** Foam Cells' pressed drops as the app lays them on an `n`-cell grid (src/lib/oilLay.ts, PLAN 47z-5), from a seeded stream of the lab's own; one cell of the lay; and its dye's depths. */
+  foamSeeds(seed: number, dyes: number, n: number) {
+    let s = seed;
+    return foamSeeds(() => (s = s * 16807 % 2147483647) / 2147483647, dyes, n);
+  },
+  foamCell,
+  foamWash: FOAM_WASH,
+  foamCellDye: FOAM_CELL_DYE,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
   /** A palette colour as the app lays it: the dye's absorbance per unit (lib/dye.ts). */
@@ -402,6 +484,30 @@ const api = {
     s.device.queue.submit([enc.finish()]);
     await s.device.queue.onSubmittedWorkDone();
   },
+  /**
+   * The closeup's fine dye detail (PLAN 47a-1, gpu/fineDye.ts), read back:
+   * its window, how much the plate adds, and its texels as rgba floats
+   * (texX × texY), or null when there is none. `npm run macroview` asks it
+   * whether stirring, and only stirring, makes detail.
+   */
+  async fine() {
+    const s = lab!.solver;
+    const t = s.fineDetail, w = s.fineWindow;
+    if (!t || !w) return null;
+    const device = s['device'] as GPUDevice;
+    const row = Math.ceil(t.width * 8 / 256) * 256;
+    const buf = device.createBuffer({ size: row * t.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = device.createCommandEncoder();
+    enc.copyTextureToBuffer({ texture: t }, { buffer: buf, bytesPerRow: row }, [t.width, t.height]);
+    device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const half = new Uint16Array(buf.getMappedRange());
+    const out = new Float32Array(t.width * t.height * 4);
+    const f16 = (h: number) => { const e = (h >> 10) & 31, m = h & 1023, sg = h & 32768 ? -1 : 1; return sg * (e === 0 ? m / 1024 * 2 ** -14 : e === 31 ? (m ? NaN : Infinity) : (1 + m / 1024) * 2 ** (e - 15)); };
+    for (let y = 0; y < t.height; y++) for (let x = 0; x < t.width * 4; x++) out[y * t.width * 4 + x] = f16(half[y * row / 2 + x]);
+    buf.unmap(); buf.destroy();
+    return { window: { ...w }, strength: s.fineStrength, data: Array.from(out) };
+  },
   async field(which: 'dye' | 'vel' | 'oilDye' | 'species') { return Array.from(await lab!.solver.readField(which)); },
   /**
    * The clear film (PLAN §20b), read back: its grid, and its thickness and
@@ -426,6 +532,9 @@ const api = {
   },
   /** The thickest film Clear Film lays, as a share of the gap (FILM_MAX in src/gpu/fluid.ts). */
   filmMax: FILM_MAX,
+  // The clear film's dye and the precursor its path is read above (PLAN 20b-13, `npm run lace` 8).
+  filmDyeDepth: FILM_DYE_DEPTH,
+  filmPrecursor: FILM_PRECURSOR,
   async phase() {
     const f = await lab!.solver.readPhase();
     if (!f) return null;
@@ -437,6 +546,27 @@ const api = {
   async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
+  /**
+   * The glitter's flakes on the kept plate, read back: per flake 12 numbers,
+   * (x, y, z, ξ), (radius, aspect, lean, heading), (age, life, generation,
+   * alive) (gpu/wgsl/glint.ts's Speck), x and y in the solver's uv and z in
+   * gap widths. Empty before a kept render with Glitter up (PLAN 47e).
+   */
+  async glintSpecks(count: number) {
+    const l = lab!;
+    const buf = l.kept?.glint['specks'] as GPUBuffer | null | undefined;
+    if (!buf) return [];
+    const device = l.solver['device'] as GPUDevice;
+    const size = count * 48;
+    const read = device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = device.createCommandEncoder();
+    enc.copyBufferToBuffer(buf, 0, read, 0, size);
+    device.queue.submit([enc.finish()]);
+    await read.mapAsync(GPUMapMode.READ);
+    const out = Array.from(new Float32Array(read.getMappedRange().slice(0)));
+    read.unmap(); read.destroy();
+    return out;
+  },
   /**
    * The governor moving the grid, as the app's FluidSimulation moves it (PLAN
    * 9w): the old solver hands over, is let go, and a new one on the same
@@ -529,6 +659,11 @@ const api = {
   },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /** The display the plate last drew with, and the lean display's gates (`npm run leandisplay`). */
+  lastDisplay: lastDisplayName,
+  displayGates: displayGateTests,
+  displayMayMask,
+  displayGateCounts: () => leanDisplayWgslCounted(plateWgsl(DISPLAY_MAIN), 0).found,
   /**
    * The shelf's bottles as src/types.ts writes them, each liquid's real
    * numbers (viscosity, density, refractive index), and the dish's size and
@@ -659,6 +794,8 @@ const api = {
         (PLAN 38h).
       */
       gelAngle?: number;
+      /** The upper moiré sheet's spin, turns (PLAN 45a). */
+      moireTurn?: number;
       /*
         Projectors' own sources (PLAN.md §16b). Each is the plate's display
         drawn again with that source's uniforms, after the wall's draw and in
@@ -678,12 +815,34 @@ const api = {
         it (npm run pixels, the speckle at dye edges).
       */
       grain?: boolean;
+      /*
+        Draw on the plate the last render that asked kept, not a new one: the
+        glitter's flakes (PLAN 47e) are stepped once a frame on the plate's
+        lens pass and born on its first frame, so a check of how they move
+        draws frames on one plate with the solver stepped between them, as
+        the app's frames are (`npm run glint`).
+      */
+      keepPlate?: boolean;
+      /*
+        The whole display rather than the lean one the app opens a look with
+        (`gpu/displayLean.ts`). Left out, the plate draws as the app's first
+        frames do: lean, built for this look's settings, and whole wherever
+        a draw reaches past it. `npm run leandisplay` draws both and compares.
+      */
+      wholeDisplay?: boolean;
+      /** The settings the lean display is built for, when not the ones drawn (`leandisplay`'s fallback control). */
+      leanFrom?: Partial<VisualizerSettings>;
+      /** Gates taken out of the lean display and drawn lean regardless (`leandisplay`'s control that a gate is really compiled out). */
+      leanDrop?: number;
+      /** Registered as the app's opening registers it, the whole one building behind the show (`leandisplay`'s control of that path). */
+      leanBehind?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
-    const plate = new WebGPUPlate(device, 'rgba8unorm');
+    const plate = (cam.keepPlate && l.kept) || new WebGPUPlate(device, 'rgba8unorm');
+    if (cam.keepPlate && !l.kept) l.kept = plate;
     // The closeup's drop kernels, built behind the show in the app; here before the one frame drawn (PLAN §29a).
-    await plate.drop.prepare();
+    if (plate !== l.kept || !l.keptReady) { await plate.drop.prepare(); if (plate === l.kept) l.keptReady = true; }
     const zoom = cam.zoom ?? 1;
     // The beads' mask: a BeadField itself, drawn on the GPU as the app draws
     // it (PLAN 14ab-6), or a picture of it (its render(), square for rings
@@ -707,7 +866,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: cam.gelAngle ?? 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: cam.gelAngle ?? 0, moireTurn: cam.moireTurn ?? 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
@@ -716,6 +875,12 @@ const api = {
     };
     const fluids = cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }];
     fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N });
+    {
+      const mask = displayMayMask({ ...view.settings, ...cam.leanFrom });
+      if (cam.wholeDisplay) setLeanDisplay(device, 'rgba8unorm', null);
+      else if (cam.leanDrop) setLeanDisplay(device, 'rgba8unorm', mask & ~cam.leanDrop, 'forced');
+      else setLeanDisplay(device, 'rgba8unorm', mask, cam.leanBehind ? 'behind' : 'asked');
+    }
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     // Asked for the grain and there is none (an adapter without
@@ -723,11 +888,11 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    // Asked for the air field and there is none: airNear would read a blank
-    // and be 0, which a check of the flat dye beside a hole would take for the
+    // Asked for the air field and there is none: the slope would read a blank
+    // and hold nothing, which a check of the flat dye beside a hole would take for the
     // mask not being there. Say so instead.
     if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
-    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: l.solver.fineDetail, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, airGeo: (l.solver as unknown as { air?: { geo: AirGeo } }).air?.geo ?? null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, faraday: l.solver.fields.faraday, glow: l.solver.fields.glow, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
@@ -773,11 +938,14 @@ const api = {
     }
     // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
     lastDrop = await plate.drop.read();
-    plate.dispose();
+    // A kept plate lives on for the next render that asks for it (its flakes are on it); a fresh lab drops it.
+    if (plate !== l.kept) plate.dispose();
     return cam.sources ? pictures : pictures.wall;
   },
   /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
   dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
+  /** Both the solved drop height h and the packed height z = min(h + domes, gap) in l_c (PLAN 29a-11). */
+  dropSurface() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h), z: Array.from(lastDrop.z) } : null; },
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

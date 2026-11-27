@@ -28,9 +28,13 @@
  *   modes         Play here goes back to the show; More › Laptop remote in
  *                 the phone layout goes back to the remembered laptop
  *   wrong key     the relay's refusal is shown, with the way to fix it
- *   the website   unchanged: no Laptop remote tile and no app bar outside
- *                 the app, and the remote the show server serves itself
- *                 still links to its own origin
+ *   the site link the apps' pointer to chromaglass.art (PLAN.md 12-promo-1,
+ *                 SiteLink.tsx): in More, on the laptop form and in the app
+ *                 bar, opening the site outside the app, in words that never
+ *                 name a price or buying; the TVs say the same words
+ *   the website   unchanged: no Laptop remote tile, no site link and no app
+ *                 bar outside the app, and the remote the show server serves
+ *                 itself still links to its own origin
  *
  * The app is recognised by `window.Capacitor.isNativePlatform()`, which the
  * shell puts on every page; here an init script plays the shell. The plate
@@ -41,12 +45,13 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { WebSocket, WebSocketServer } from 'ws';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { parseLaptopAddress, relaySocketUrl, remoteHref } from '../src/lib/appLink';
 import { detectTier } from '../src/lib/platform';
 import { DEFAULT_SETTINGS } from '../src/types';
+import { SITE_URL, SITE_WORDS } from '../src/components/SiteLink';
 
-const APP_PORT = Number(process.env.APPLINK_PORT ?? 4191);
+const APP_PORT = port(4191, 'APPLINK_PORT');
 const RELAY_PORT = APP_PORT + 1;
 /** A host a crafted link might name as the relay. */
 const STRANGER_PORT = APP_PORT + 2;
@@ -89,6 +94,44 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   check('the app (capacitor://localhost) gets the website\'s ladder', tierAt('localhost', true) === 'hosted', tierAt('localhost', true));
   check('a laptop serving itself still gets the full one', tierAt('localhost', false) === 'local');
   check('the website is still hosted', tierAt('chromaglass.web.app', false) === 'hosted');
+}
+
+// ── The site link's words: pure, and the TVs' copies ───────────────
+/*
+  The owner, 2026-11-14: point people at the website "to try more free
+  chromaglass.art visuals", and "Don't point them to purchase". So the words
+  name the free visuals and the site and nothing that sells. The TVs carry the
+  same sentence beside a QR code; they are read from their sources here so
+  the three apps cannot drift apart.
+*/
+{
+  // Stems, not words, so "buying", "purchases" and "plans" are caught as well as the root.
+  const SELLS = /\b(buy\w*|purchas\w*|pric\w*|upgrad\w*|unlock\w*|subscri\w*|premium|paid|plans?|trial|pro|home|licen[cs]\w*|full version|sale|offer)\b|[$£€]/i;
+  check('the site link points at chromaglass.art', SITE_URL === 'https://chromaglass.art', SITE_URL);
+  check('its words name the free visuals and the site', /free visuals/i.test(SITE_WORDS) && SITE_WORDS.includes('chromaglass.art'), SITE_WORDS);
+  check('and nothing that sells', !SELLS.test(SITE_WORDS), SITE_WORDS);
+  const oneLine = (t) => t.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim();
+  const tvos = readFileSync('tvos/App/Sources/SiteCorner.swift', 'utf8');
+  const tvosWords = tvos.match(/Text\("([^"]+)"\)/)?.[1] ?? '';
+  check('the Apple TV corner says the same words', oneLine(tvosWords) === SITE_WORDS, tvosWords);
+  // The code drawn is the one named: a QR built from any other URL literal would pass a
+  // check that only read the constant.
+  check('and its code is the same site', tvos.includes(`static let site = URL(string: "${SITE_URL}")!`) && /QR\.image\(Self\.site\)/.test(tvos)
+    && (tvos.match(/QR\.image\(/g) ?? []).length === 1);
+  // Live code only: a line commented out must not count as the guard, nor as the placement.
+  const code = (t) => t.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+  const app = code(readFileSync('tvos/App/Sources/ChromaGlassTVApp.swift', 'utf8'));
+  const body = (name) => app.slice(app.indexOf(`struct ${name}`), app.indexOf('\n}\n', app.indexOf(`struct ${name}`)));
+  check('the Apple TV address screen carries the corner', /\.overlay \{ SiteCorner\(\) \}/.test(body('AddressView')));
+  check('and the sign-in screen does not, beside its own code', !/SiteCorner/.test(body('SignInView')));
+  const shown = readFileSync('tvos/App/Sources/ShowView.swift', 'utf8');
+  check('never over the live picture', /^\s*if link\.screen != \.live \{ SiteCorner\(\) \}/m.test(code(shown)) && (code(shown).match(/SiteCorner\(\)/g) ?? []).length === 1);
+  const atv = readFileSync('androidtv/app/src/main/java/app/chromaglass/tv/MainActivity.java', 'utf8');
+  const atvWords = atv.match(/words\.setText\("([^"]+)"\)/)?.[1] ?? '';
+  check('the Google TV corner says the same words', oneLine(atvWords) === SITE_WORDS, atvWords);
+  // Its QR picture (res/drawable-nodpi/site_qr.png) was read back to the site with zxing
+  // when it was made (12-tv-2h); here, that the corner is on the screen at all.
+  check('and the corner is added to its start screen', /^\s*root\.addView\(siteCorner\(\), siteCornerParams\(\)\);/m.test(code(atv)) && code(atv).includes('R.drawable.site_qr'));
 }
 
 // ── In a browser, against a real relay ─────────────────────────────
@@ -148,6 +191,44 @@ const until = async (page, fn, ms = 10_000) => {
   return false;
 };
 const visible = (page, id) => page.getByTestId(id).first().isVisible().catch(() => false);
+/** The site link inside one part of the page, as the phone would follow it. */
+const siteLinkIn = async (page, scope) => {
+  const a = page.getByTestId(scope).getByTestId('app-site-link').first();
+  if (!(await a.isVisible().catch(() => false))) return null;
+  return { href: await a.getAttribute('href'), target: await a.getAttribute('target'), words: (await a.innerText()).trim() };
+};
+const leavesForSite = (l) => l !== null && l.href === SITE_URL && l.target === '_blank' && l.words === SITE_WORDS;
+/**
+ * Whether the words can be read where they are: `innerText` gives the whole sentence even
+ * when the box is cut down to a few letters, so measure the box instead. Not clipped, and
+ * wide enough for the sentence at the bar's 11 px.
+ */
+const siteLinkReadable = (page, scope) => page.getByTestId(scope).getByTestId('app-site-link').first().evaluate((a) => {
+  const words = a.querySelector('span');
+  let clipped = !words || words.scrollWidth > words.clientWidth + 1;
+  for (let el = a; el && el !== document.body; el = el.parentElement) {
+    const r = el.getBoundingClientRect();
+    if (getComputedStyle(el).overflow !== 'visible' && words && words.getBoundingClientRect().right > r.right + 1) clipped = true;
+  }
+  return { width: Math.round(a.getBoundingClientRect().width), clipped };
+}).catch(() => null);
+/**
+ * Tap the link and see where it goes. The app's own page must stay where it was, and the
+ * site must open in a window of its own, which is what Capacitor turns into the system
+ * browser; a stub stands in for the real site so the check needs no internet.
+ */
+const followSiteLink = async (ctx, page, scope) => {
+  await ctx.route(`${SITE_URL}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>site</title>' }));
+  const before = page.url();
+  const popup = ctx.waitForEvent('page', { timeout: 5000 }).catch(() => null);
+  await page.getByTestId(scope).getByTestId('app-site-link').first().tap();
+  const opened = await popup;
+  if (opened) await opened.waitForLoadState('domcontentloaded').catch(() => {});
+  const out = { opened: opened ? opened.url() : null, stayed: page.url() === before };
+  if (opened) await opened.close();
+  await ctx.unroute(`${SITE_URL}/**`);
+  return out;
+};
 // Linked on either of the remote's screens: Controls' header says so in words,
 // Draw (the one it opens on, PLAN §8-draw) marks its root.
 const linked = async (page) => (await page.locator('[data-testid="remote-draw"][data-linked="true"]').count()) > 0
@@ -181,10 +262,16 @@ await part('first use', async () => {
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
   check('More has Laptop remote in the app', await visible(page, 'phone-laptop-remote'));
+  const inMore = await siteLinkIn(page, 'phone-sheet-more');
+  check('More has the site link in the app, opening the site outside it', leavesForSite(inMore), JSON.stringify(inMore));
+  const went = await followSiteLink(ctx, page, 'phone-sheet-more');
+  check('and a tap opens the site in a window of its own, the app staying put', went.opened?.startsWith(SITE_URL) && went.stayed, JSON.stringify(went));
   await page.getByTestId('phone-laptop-remote').tap();
   await until(page, () => visible(page, 'laptop-link'));
   const at = new URL(page.url());
   check('with no laptop remembered it asks for one', at.searchParams.get('remote') === '1' && !at.searchParams.has('relay') && (await visible(page, 'laptop-link')), at.search);
+  const onForm = await siteLinkIn(page, 'laptop-link');
+  check('the laptop form has it too', leavesForSite(onForm), JSON.stringify(onForm));
   await page.waitForTimeout(1000);
   check('and opens no socket to its own origin', sockets.length === 0, sockets.join(', '));
   await page.getByTestId('app-play-here').first().tap();
@@ -222,6 +309,10 @@ await part('linked', async () => {
   // remembers it was left there, so Change laptop below comes back to them.
   await page.getByTestId('draw-controls').tap();
   check('the app bar is there, in Controls', await until(page, () => visible(page, 'app-mode-bar'), 5000));
+  const inBar = await siteLinkIn(page, 'app-mode-bar');
+  check('and carries the site link on the remote', leavesForSite(inBar), JSON.stringify(inBar));
+  const barBox = await siteLinkReadable(page, 'app-mode-bar');
+  check('where the whole sentence can be read', barBox && !barBox.clipped && barBox.width >= 150, JSON.stringify(barBox));
 
   await page.getByTestId('app-change-laptop').tap();
   await until(page, () => visible(page, 'laptop-link'));
@@ -309,6 +400,7 @@ await part('the website', async () => {
   await until(page, () => visible(page, 'phone-sheet-more'), 5000);
   check('the website\'s More sheet opens', await visible(page, 'phone-sheet-more'));
   check('and has no Laptop remote', !(await visible(page, 'phone-laptop-remote')));
+  check('and no site link: the reader is already on the site', (await page.getByTestId('app-site-link').count()) === 0);
   // The control for the app's "no service worker": the same page registers one here.
   check('the website still registers its service worker', await until(page, async () => (await workers(page)) > 0, 5000));
   await page.goto(PRINTED, { waitUntil: 'load' });

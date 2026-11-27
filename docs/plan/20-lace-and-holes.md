@@ -194,6 +194,25 @@ Left from 20b, each its own item:
   into the film (`lab.addFilm`); the Dropper's path (`onDeposit`: Alcohol and Soap as
   the solvent, clear oil joining the film, the front plate only) is judged by eye
   (judging §34). A lab case that drives `onDeposit` as the app does would hold it.
+- **20b-14. On the black ground the film's dye is painted, not lit.** A filter over black is
+  black, so on Lamp Ground 0 the dye is laid as the water's dye is there: its tint over
+  clear water, at the share of the lamp it takes, and a filter over the water's own painted
+  dye (`filmDyePaint`). It is the same convention
+  the water's dye has had since 18b, not the film's physics; it goes when the black ground
+  becomes a lamp seen from the side (scatter), if that is ever built. *A shortcut named.*
+- **20b-15. The film's dye is one concentration everywhere.** It is a dial, not a field: an
+  oil pour of another dye joins the film at the film's colour, and the dye does not
+  thin where the film is stretched (it moves with the oil, so c stays put, which is right
+  for a dye that stays in the oil, but a second dye would need its own c carried with h,
+  as the water's dye is carried with the water). A concentration carried on the film's grid
+  would let a pour of red oil streak a yellow lace.
+- **20b-16. The bubble lens and the edge decodes do not see the film's dye** (as 20b-11 for
+  the film itself): a bubble over dyed film shows the water's colour undyed.
+- **20b-17. The film evaporates under the cover and is clamped** (S; Low). `film.ts:262-263`
+  thins it at a constant rate, cover or not, and `:295` clamps it at 0.95. Under a closed
+  cover the air saturates and evaporation stops. Zero it when the cover is closed and drop the
+  clamp for a conserving limit. Check: the film's volume within 1% over 60 s closed, and a
+  pour's within 0.5%. (38v, from RS-17.)
 
 ## 20c. The lace stays lace: a viscous film
 
@@ -216,9 +235,6 @@ prototype's h³ film reaches about 2. A sheared hole stretches along the flow by
 least 2:1 before it meets another.
 
 - **20c-1. Macro closeup cell field is a look-alike shortcut (opt-in since 33g: no look draws it by default; retained pending physical Rayleigh–Bénard / Marangoni simulation).** The procedural `cellField` in `src/gpu/wgsl/plate.ts` (evaluated at 6x zoom and timed on `cellClock`, verified by `npm run cellride`) draws concentric circular Voronoi cells and slides them with a flow map rather than physically simulating buoyancy-driven or Marangoni surface-tension-gradient convection cells and silicone phase separation (§25f). While 20c introduces physical viscous film drag in the Hele-Shaw solver (`thinGap.ts`), the sub-grid macro cellular structure remains a procedural camera-pass effect until physical density-inversion and micro-droplet solver passes are available.
-
-- **20c-2. Settings tabs on the phone (shipped in #348's review).** Story in
-  `docs/plan-shipped.md` §20c-2 (moved 2026-10-29, 19m).
 
 - **20c-3** (S, a check in a cloud session): `npm run phone` with `PW_WEBGPU=1` in a cloud session fails "every tab of the phone's Settings rail takes a tap where it is drawn" on main e679e6d, with 23 of 24 tabs covered (all but Master), while a script that opens the rail alone at 390×844 finds none covered. Something an earlier step leaves open lies over the strip in the full run; find what `elementFromPoint` lands on instead and close it in the check's path, or fix the overlay if a phone would meet it too. Found in 14m's PR, which ran it on main to rule its own diff out.
 

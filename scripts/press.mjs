@@ -12,11 +12,11 @@
  * motion does not drown the gesture.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, installFrameReader } from './frame.mjs';
 
-const PORT = 4339;
+const PORT = port(4339);
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ n, ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
 

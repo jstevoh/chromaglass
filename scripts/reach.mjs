@@ -16,12 +16,14 @@
 // can: a new directory, a new kind of file, a file that is read at run time
 // by a harness, all run the Mac. Markdown is read by people (the harnesses
 // that mention a `.md` write one or name one in a comment); `.claude/` is the
-// sessions' own; the six workflows named never run a Mac shard's steps (the
-// gallery, controls and film workflows run on a label or by hand, and the
-// iPhone and Mac apps have their own); `ios/` and `desktop/` are the native
+// sessions' own; the eight workflows named never run a Mac shard's steps (the
+// gallery, controls and film workflows run on a label or by hand, the iPhone
+// and Mac apps have their own, `ready.yml` only labels a PR after
+// `Checks` has run, PLAN.md 19al, and `hold.yml` only posts a status after a
+// deploy, PLAN.md 19am); `ios/` and `desktop/` are the native
 // apps, which `npm run build` does not read and which `ios.yml` and
-// `desktop.yml` build. Three scripts about the workflows themselves
-// (`closedruns.mjs`, `macqueue.mjs`, `deploygate.sh`) are run by Measure, the
+// `desktop.yml` build. Four scripts about the workflows themselves
+// (`closedruns.mjs`, `macqueue.mjs`, `deploygate.sh`, `mainhold.mjs`) are run by Measure, the
 // deploy or by hand, and imported by no Mac step; so is the guard that reads
 // a PR's diff for moved bars (`checkguard.mjs`), which reads code as text,
 // and `quick.mjs`, which a session runs by hand (PLAN.md 19k). `checks.yml`
@@ -29,11 +31,14 @@
 // files are read by checks) all reach; which of the shards a change to
 // `scripts/` reaches is `checks.mjs`'s to say.
 //
-// Measure, on ubuntu, runs in full on every push whatever this says: it is
-// what checks the scripts, the docs' JSON and the workflow wiring, and it is
-// not behind a queue. And a run that skipped the Mac is never the run a deploy
-// trusts (`scripts/deploygate.sh`): main's code under a docs-only merge is
-// whatever the last merge left, which a red deploy may not have passed.
+// Since PLAN.md 19ak-20 (the owner's call, 2026-11-22) a pull request runs no
+// Mac shard at all, whatever it changes, and of Measure only the parts the
+// manifest names under `shards.pr`: the node checks, the typecheck and the
+// build. The list below now says only how many of a PR's files would reach
+// the Mac (the reach job's log line) and, with `--reaching --site`, which
+// files the live site is built from (the deploy gate's rule 5). Main's deploy
+// runs every Measure part and every Mac shard, and a run that skipped any of
+// them is never the run a deploy trusts (`scripts/deploygate.sh`).
 //
 // `--diff` compares the checked-out commit with its first parent, with rename
 // detection off: a `git mv` of a Mac-only script to `docs/x.md` lists both
@@ -54,7 +59,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { selectShards, selectMeasure, parseManifest, loadManifest } from './checks.mjs';
+import { selectMeasure, parseManifest, loadManifest } from './checks.mjs';
 
 // Markdown only at the top, in docs/ and in .claude/: a `.md` under src/ or
 // public/ could be imported (`?raw`) or served, and would reach.
@@ -62,11 +67,11 @@ const NOT_MAC = [
   /^[^/]+\.md$/,
   /^docs\/.*\.md$/,
   /^\.claude\//,
-  /^\.github\/workflows\/(closed|gallery|controls|film|ios|desktop)\.yml$/,
+  /^\.github\/workflows\/(closed|gallery|controls|film|ios|desktop|ready|hold)\.yml$/,
   /^ios\//,
   /^desktop\//,
   /^LICENSE[^/]*$/,
-  /^scripts\/(closedruns\.mjs|macqueue\.mjs|deploygate\.sh|checkguard\.mjs|quick\.mjs)$/,
+  /^scripts\/(closedruns\.mjs|macqueue\.mjs|deploygate\.sh|checkguard\.mjs|quick\.mjs|mainhold\.mjs|mainhold-deploys\.json)$/,
 ];
 
 export const reachesMac = (path) => !NOT_MAC.some((re) => re.test(path));
@@ -98,123 +103,6 @@ function atCommit(rev, git) {
   return { manifest: m == null ? null : parseManifest(m, `${rev}:scripts/checks.json`), pkg: p == null ? null : JSON.parse(p) };
 }
 
-/*
-  A green Mac result carries across a merge of main (PLAN.md 19i).
-
-  Measured over 25 merged PRs (#204 to #244, 103 Checks runs): 53 runs started
-  on a push that only merged main in and 8 on a docs-only commit, together 61
-  runs and 2,011 of 3,124 Mac runner-minutes (64 %), on pushes that added none
-  of the PR's own code. They also held 20 of the 29 runs that went red on their
-  first attempt, so most of them measured nothing but the queue and the flakes.
-
-  So when the diff reaches a Mac shard, this asks one more question before the
-  shards queue: does the tree being tested differ from the tree of this PR's
-  last run that passed the Mac only in files the PR does not touch? Each such
-  file then differs because main changed it, and the PR's own code (every file
-  it touches, site or not) is exactly what passed. Stricter than the deploy
-  gate's rule 5, which allows a shared non-site file such as checks.yml: here a
-  file both sides touch, of any kind, runs the Mac, and so does any change the
-  PR made since. What it leaves unmeasured is what rule 5 already accepted for
-  deploys (PLAN.md 19h-3): two changes in different files moving the same
-  picture, which the next run on main with both in it measures.
-
-  Every condition that cannot be shown is "run the Mac", never "carry":
-    - the PR's base is main, and the old run's base is an earlier main
-      (compare: ahead or identical), so the files that moved are main's;
-    - the source is the PR's newest run that ran the Mac shards at all
-      (cancelled runs and runs that skipped or carried are passed over), and
-      it passed every shard it ran, among them every shard this run selects
-      (PLAN.md 19k): a newer Mac run that went red is never stepped over;
-    - its tested commit (the run title's "tests <sha>") can be fetched and is
-      a merge, so its base is its first parent;
-    - every file that differs between the two tested trees either reaches no
-      Mac shard, or is one the PR touches in neither (the merge's blob is its
-      base's blob, then and now).
-
-  `deps` is how the selftest drives it without the network: `api(path)`
-  returns parsed JSON or throws, `git(...args)` returns stdout, and `fetch(sha)`
-  makes a commit available locally.
-*/
-export async function carry({ prNumber, headRef, baseRef, runId, head = 'HEAD', need = MAC_SHARDS }, deps) {
-  const { api, git, fetch: fetchSha } = deps;
-  const no = (why) => ({ carried: false, why });
-  if (baseRef !== 'main') return no(`the PR's base is ${baseRef || 'unknown'}, not main`);
-  if (!prNumber || !headRef) return no('the PR number or head branch is unknown');
-  let runs;
-  try {
-    runs = (await api(`actions/workflows/checks.yml/runs?event=pull_request&branch=${encodeURIComponent(headRef)}&per_page=50`)).workflow_runs;
-  } catch (e) { return no(`the PR's runs could not be read (${e.message})`); }
-  runs = runs
-    .filter((r) => String(r.id) !== String(runId))
-    .filter((r) => r.head_branch === headRef && (r.pull_requests ?? []).some((p) => p.number === Number(prNumber)))
-    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-  let source = null;
-  for (const r of runs) {
-    if (r.status !== 'completed' || r.conclusion === 'cancelled') continue;
-    let jobs;
-    try { jobs = (await api(`actions/runs/${r.id}/jobs?per_page=100&filter=latest`)).jobs; } catch (e) { return no(`run ${r.id}'s jobs could not be read (${e.message})`); }
-    const shards = jobs.filter((j) => j.name.startsWith('WebGPU (macOS) · ')).map((j) => [j.name.slice('WebGPU (macOS) · '.length), j.conclusion]);
-    const ran = shards.filter(([, c]) => c !== 'skipped');
-    if (ran.length === 0) continue;   // skipped the Mac, or carried: look further back
-    // Every shard this run needs, each green. Until PLAN.md 19k this asked
-    // for exactly 'open,plate,show,tools', written here by hand, while
-    // checks.yml had run five shards since 10-11 (19w): from the day 19i
-    // shipped no run ever carried, the same miss deploygate.sh had before #393.
-    const missing = need.filter((n) => !ran.some(([m]) => m === n));
-    if (missing.length || ran.some(([, c]) => c !== 'success') || r.conclusion !== 'success') {
-      return no(`the PR's newest Mac run ${r.id} did not pass ${missing.length ? `${missing.join(', ')}, which this run needs` : 'every shard it ran'} (${shards.map(([n, c]) => `${n}=${c}`).join(', ')})`);
-    }
-    source = r;
-    break;
-  }
-  if (!source) return no('the PR has no earlier run that passed the Mac');
-  const tested = /\(tests ([0-9a-f]{40})\)$/.exec(source.display_title ?? '')?.[1];
-  if (!tested) return no(`run ${source.id}'s title names no tested commit`);
-  let oldBase, newBase;
-  try {
-    fetchSha(tested);
-    const parents = git('rev-list', '--parents', '-n', '1', tested).trim().split(' ');
-    if (parents.length !== 3) return no(`${tested.slice(0, 7)}, the commit run ${source.id} tested, is not a merge`);
-    oldBase = parents[1];
-    newBase = git('rev-parse', `${head}^1`).trim();
-  } catch (e) { return no(`the commit run ${source.id} tested could not be read (${String(e.message).split('\n')[0]})`); }
-  try {
-    const cmp = await api(`compare/${oldBase}...${newBase}`);
-    if (cmp.status !== 'ahead' && cmp.status !== 'identical') return no(`run ${source.id}'s base ${oldBase.slice(0, 7)} is ${cmp.status} of main ${newBase.slice(0, 7)}, not an earlier main`);
-  } catch (e) { return no(`main since run ${source.id}'s base could not be compared (${e.message})`); }
-  const blob = (rev, f) => { try { return git('rev-parse', `${rev}:${f}`).trim(); } catch { return 'absent'; } };
-  const files = git('diff', '--name-only', '--no-renames', tested, head).split('\n').filter(Boolean);
-  const mac = files.filter(reachesMac);
-  const own = mac.filter((f) => blob(head, f) !== blob(`${head}^1`, f) || blob(tested, f) !== blob(oldBase, f));
-  if (own.length) return no(`${own.length} of the ${mac.length} files since run ${source.id} that reach a Mac shard are the PR's own, first ${own.slice(0, 3).join(', ')}`);
-  return {
-    carried: true,
-    run: source.id,
-    tested,
-    why: `carried from run ${source.id} (tests ${tested.slice(0, 7)}): ${files.length} files differ, ${mac.length} of them reach a Mac shard and all are main's, none the PR's`,
-  };
-}
-
-// The network and the checkout, for a run in CI. The token is the job's own
-// (the repository's default is read for every scope, which is all this asks);
-// without one, the public API's limit of 60 an hour is shared by every job on
-// the runner's address, and a 403 is "run the Mac".
-function liveDeps() {
-  const repo = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
-  const git = (...a) => execFileSync('git', a, { stdio: ['ignore', 'pipe', 'pipe'] }).toString();
-  return {
-    git,
-    fetch: (sha) => { git('fetch', '--no-tags', '--quiet', '--depth=2', 'origin', sha); },
-    api: async (p) => {
-      const headers = { Accept: 'application/vnd.github+json' };
-      if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
-      const res = await fetch(`https://api.github.com/repos/${repo}/${p}`, { headers, signal: AbortSignal.timeout(20_000) });
-      if (!res.ok) throw new Error(`${res.status} on ${p.split('?')[0]}`);
-      return res.json();
-    },
-  };
-}
-
 async function selftest() {
   const cases = [
     ['PLAN.md', false],
@@ -224,6 +112,9 @@ async function selftest() {
     ['.claude/agents/check-skeptic.md', false],
     ['.github/workflows/closed.yml', false],
     ['.github/workflows/gallery.yml', false],
+    ['.github/workflows/ready.yml', false],
+    ['.github/workflows/ready.yml.orig', true],
+    ['.github/workflows/hold.yml', false],
     ['ios/App/App/AppDelegate.swift', false],
     ['desktop/main.js', false],
     ['LICENSE', false],
@@ -231,6 +122,7 @@ async function selftest() {
     ['scripts/macqueue.mjs', false],
     ['scripts/deploygate.sh', false],
     ['scripts/checkguard.mjs', false],
+    ['scripts/mainhold.mjs', false],
     ['scripts/closedruns.mjs.bak', true],
     ['scripts/lab/closedruns.mjs', true],
     ['src/gpu/wgsl/plate.ts', true],
@@ -296,6 +188,15 @@ async function selftest() {
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}`);
   }
+  // The environment every child `--diff` below runs in. It is this job's, so
+  // the child finds node, git and the token, but never this run's attempt:
+  // on a re-run (GITHUB_RUN_ATTEMPT 2) a child that inherited it read the real
+  // run's jobs, found the Mac shards that passed in attempt 1, and dropped them
+  // from its answer, so the cases that want every shard got `mac=false` and the
+  // logic shard went red on every re-run (#656's, PLAN.md 19ak-5). The child's
+  // answer is about its scratch tree, never about this run, so it is always a
+  // first attempt of no run.
+  const childEnv = (extra) => ({ ...process.env, GITHUB_RUN_ATTEMPT: '1', GITHUB_RUN_ID: '', ...extra });
   // And `--diff` itself, on a scratch repository with GitHub's shape: a base,
   // a PR branch, and a merge commit whose second parent is the PR's head.
   const runDiff = (changes, prHead, base = () => {}) => {
@@ -324,9 +225,7 @@ async function selftest() {
       execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], {
         cwd: dir,
         stdio: 'pipe',
-        // No base branch, so carry() answers at once without the network: the
-        // carry is driven by its own cases below, against a mocked API.
-        env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out },
+        env: childEnv({ GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out }),
       });
       return fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ');
     } catch {
@@ -362,14 +261,12 @@ async function selftest() {
   };
   const touch = (...fs_) => (git, dir) => { for (const f of fs_) fs.appendFileSync(path.join(dir, f), '// more\n'); };
   const diffs = [
+    // A pull request never runs the Mac (PLAN.md 19ak-20), whatever it changes:
+    // a document, a Mac check's own script, a source file.
     [runDiff((git, dir) => fs.appendFileSync(path.join(dir, 'PLAN.md'), 'shipped\n')), `mac=false ${ALL}`, '--diff: a PLAN.md-only PR skips the Mac'],
-    [runDiff((git) => git('mv', 'scripts/maconly.mjs', 'docs/maconly.md')), `mac=true ${ALL}`, '--diff: a Mac script moved to docs/x.md still reaches (rename detection off)'],
-    [runDiff((git, dir) => fs.appendFileSync(path.join(dir, 'scripts/maconly.mjs'), '// more\n')), `mac=true ${ALL}`, '--diff: a changed script reaches, every shard in a tree with no manifest'],
-    [runDiff(touch('scripts/a.mjs'), undefined, withManifest), 'mac=true shards=["x"]', '--diff: a check\'s script runs its shard alone'],
-    [runDiff(touch('scripts/helper.mjs'), undefined, withManifest), 'mac=true shards=["y"]', '--diff: a helper one check imports runs that check\'s shard'],
-    [runDiff(touch('scripts/c.mjs'), undefined, withManifest), `mac=false ${ALL}`, '--diff: a Measure check\'s script skips the Mac'],
-    [runDiff(touch('scripts/a.mjs', 'src/x.ts'), undefined, withManifest), 'mac=true shards=["x","y"]', '--diff: a check\'s script with a source file runs every shard'],
-    [runDiff((git, dir) => { const p = path.join(dir, 'package.json'); const j = JSON.parse(fs.readFileSync(p, 'utf8')); j.scripts.b += ' --more'; fs.writeFileSync(p, JSON.stringify(j)); }, undefined, withManifest), 'mac=true shards=["y"]', '--diff: an npm script a check runs runs that check\'s shard'],
+    [runDiff((git, dir) => fs.appendFileSync(path.join(dir, 'scripts/maconly.mjs'), '// more\n')), `mac=false ${ALL}`, '--diff: a PR changing a Mac script skips the Mac'],
+    [runDiff(touch('scripts/a.mjs'), undefined, withManifest), `mac=false ${ALL}`, '--diff: a PR changing a Mac check\'s own script skips the Mac'],
+    [runDiff(touch('scripts/a.mjs', 'src/x.ts'), undefined, withManifest), `mac=false ${ALL}`, '--diff: a PR changing a source file skips the Mac'],
     [runDiff((git, dir) => fs.appendFileSync(path.join(dir, 'PLAN.md'), 'x\n'), 'f'.repeat(40)), 'refused', '--diff: a HEAD that is not the merge of PR_HEAD is refused'],
   ];
   // Measure's selection rides the same output (PLAN.md 19k-4): a check
@@ -383,6 +280,28 @@ async function selftest() {
     [touch('scripts/c.mjs', 'src/x.ts'), 'parts=["m"] only=', 'a check script with a source file runs Measure in full'],
     [touch('scripts/never-traced.mjs'), 'parts=["m"] only=', 'a script no check traces runs Measure in full'],
   ];
+  // The parts a pull request runs (PLAN.md 19ak-20): a tree whose manifest
+  // names `shards.pr` runs only those parts, and a selection that falls wholly
+  // outside them runs them in full. Every such run says "partial" to the gate.
+  const withPr = (pr) => (dir) => {
+    withManifest(dir);
+    const p = path.join(dir, 'scripts/checks.json');
+    const m = JSON.parse(fs.readFileSync(p, 'utf8'));
+    m.shards = { measure: ['m', 'n'], mac: ['x', 'y'], pr };
+    m.checks.push({ name: 'E', shard: 'n', run: 'node scripts/e.mjs' });
+    fs.writeFileSync(path.join(dir, 'scripts/e.mjs'), 'export const e = 1;\n');
+    fs.writeFileSync(p, JSON.stringify(m));
+  };
+  for (const [mut, pr, want, what] of [
+    [touch('src/x.ts'), ['m'], 'parts=["m"] only=', 'a source file runs only the PR\'s parts, in full'],
+    [touch('scripts/e.mjs'), ['m'], 'parts=["m"] only=["D","E"]', 'a check outside the PR\'s parts is not run on the PR'],
+    [touch('scripts/c.mjs'), ['n'], 'parts=["n"] only=', 'a selection wholly outside the PR\'s parts runs them in full'],
+  ]) {
+    const raw = runDiff(mut, undefined, withPr(pr));
+    const got = raw.replace(/^.* (parts=)/, '$1');
+    if (got !== want) bad++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
+  }
   for (const [mut, want, what] of MEASURE) {
     const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1');
     if (got !== want) bad++;
@@ -392,7 +311,7 @@ async function selftest() {
   const call = (env) => {
     const out = path.join(os.tmpdir(), `reach-call-${process.pid}`);
     fs.writeFileSync(out, '');
-    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], { stdio: 'pipe', env: { ...process.env, ...env, GITHUB_OUTPUT: out } });
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], { stdio: 'pipe', env: childEnv({ ...env, GITHUB_OUTPUT: out }) });
     const r = fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ');
     fs.rmSync(out);
     return r;
@@ -408,92 +327,7 @@ async function selftest() {
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}${got === want ? '' : ` — got ${got}`}`);
   }
-  bad += await carrySelftest();
   if (bad) process.exit(1);
-}
-
-/*
-  carry() on scratch repositories with GitHub's shape, against a mocked API.
-  Each case builds: main's base B0 (src/a.ts, src/b.ts, scripts/c.mjs,
-  PLAN.md); the PR's head H1 changing src/a.ts; M_old, GitHub's merge of H1
-  into B0, which the mocked earlier run "tests"; then whatever main and the PR
-  do next, and M_new, the merge of the PR's new head into main's new tip, as
-  the run being decided. The controls are the cases that must not carry: one
-  file both sides touch, a PR change since, a newer red Mac run, a base that is
-  not an earlier main, an API that fails, no Mac run at all.
-*/
-async function carrySelftest() {
-  const build = ({ mainChanges, prChanges }) => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carry-'));
-    const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
-    const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.appendFileSync(path.join(dir, f), t); };
-    // Main writes at a file's top and the PR at its bottom, six lines apart,
-    // so a file both sides touch still merges cleanly, as it does on GitHub.
-    const prepend = (f, t) => { const p = path.join(dir, f); fs.writeFileSync(p, t + fs.readFileSync(p, 'utf8')); };
-    git('init', '-q', '-b', 'main');
-    git('config', 'user.email', 'reach@example.invalid');
-    git('config', 'user.name', 'reach');
-    for (const f of ['src/a.ts', 'src/b.ts', 'scripts/c.mjs', 'PLAN.md']) write(f, `// ${f}\n\n\n\n\n\n// end\n`);
-    git('add', '-A'); git('commit', '-qm', 'B0');
-    git('checkout', '-qb', 'pr'); write('src/a.ts', 'export const a = 1;\n'); git('commit', '-qam', 'H1');
-    git('checkout', '-qb', 'mold', 'main'); git('merge', '-q', '--no-ff', '-m', 'M_old', 'pr');
-    const mOld = git('rev-parse', 'HEAD').trim();
-    git('checkout', '-q', 'main');
-    for (const f of mainChanges) prepend(f, '// main\n');
-    if (mainChanges.length) git('commit', '-qam', 'B1');
-    git('checkout', '-q', 'pr');
-    for (const f of prChanges) write(f, '// pr again\n');
-    if (prChanges.length) git('commit', '-qam', 'H2');
-    git('checkout', '-qb', 'mnew', 'main'); git('merge', '-q', '--no-ff', '-m', 'M_new', 'pr');
-    return { dir, git, mOld };
-  };
-  const shardJobs = (c, names = MAC_SHARDS) => ({ jobs: names.map((n) => ({ name: `WebGPU (macOS) · ${n}`, conclusion: c })) });
-  const skippedJobs = { jobs: [{ name: 'WebGPU (macOS) · ${{ matrix.shard }}', conclusion: 'skipped' }] };
-  const run = (id, t, mOld, conclusion = 'success') => ({ id, head_branch: 'pr', pull_requests: [{ number: 7 }], status: 'completed', conclusion, created_at: t, display_title: `PR (tests ${mOld})` });
-  const decide = async ({ mainChanges = [], prChanges = [], runs, jobs, compare = 'ahead', baseRef = 'main', apiFails = false, need }) => {
-    const { dir, git, mOld } = build({ mainChanges, prChanges });
-    try {
-      const api = async (p) => {
-        if (apiFails) throw new Error('503');
-        if (p.startsWith('actions/workflows/')) return { workflow_runs: runs(mOld) };
-        const m = /^actions\/runs\/(\d+)\/jobs/.exec(p);
-        if (m) return jobs[m[1]];
-        if (p.startsWith('compare/')) return { status: compare };
-        throw new Error(`unmocked ${p}`);
-      };
-      return (await carry({ prNumber: '7', headRef: 'pr', baseRef, runId: '99', ...(need ? { need } : {}) }, { api, git, fetch: () => {} })).carried;
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  };
-  const green = { runs: (m) => [run(1, '1', m)], jobs: { 1: shardJobs('success') } };
-  const cases = [
-    [await decide({ ...green, mainChanges: ['src/b.ts'] }), true, 'carry: main changed only a file the PR does not touch'],
-    [await decide({ ...green, mainChanges: ['src/b.ts', 'scripts/c.mjs', 'PLAN.md'] }), true, 'carry: main changed site, script and docs files the PR does not touch'],
-    [await decide({ ...green, prChanges: ['PLAN.md'] }), true, 'carry: the PR\'s new push changed only PLAN.md'],
-    [await decide({ ...green, mainChanges: ['src/a.ts'] }), false, 'no carry: main changed a file the PR touches'],
-    [await decide({ ...green, mainChanges: ['src/b.ts'], prChanges: ['scripts/c.mjs'] }), false, 'no carry: the PR changed a Mac script since the run'],
-    [await decide({ ...green, prChanges: ['src/a.ts'] }), false, 'no carry: the PR changed its own site file since the run'],
-    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(2, '2', m, 'failure'), run(1, '1', m)], jobs: { 1: shardJobs('success'), 2: shardJobs('failure') } }), false, 'no carry: a newer Mac run went red'],
-    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(2, '2', m), run(1, '1', m)], jobs: { 1: shardJobs('success'), 2: skippedJobs } }), true, 'carry: passes over a newer run that skipped the Mac'],
-    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(2, '2', m, 'cancelled'), run(1, '1', m)], jobs: { 1: shardJobs('success') } }), true, 'carry: passes over a cancelled run'],
-    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(1, '1', m)], jobs: { 1: skippedJobs } }), false, 'no carry: no earlier run ran the Mac'],
-    [await decide({ ...green, mainChanges: ['src/b.ts'], compare: 'diverged' }), false, 'no carry: the old base is not an earlier main'],
-    [await decide({ ...green, mainChanges: ['src/b.ts'], apiFails: true }), false, 'no carry: the API fails'],
-    [await decide({ ...green, mainChanges: ['src/b.ts'], baseRef: 'feature' }), false, 'no carry: the PR is not against main'],
-    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [{ ...run(1, '1', m), pull_requests: [{ number: 8 }] }], jobs: { 1: shardJobs('success') } }), false, 'no carry: the green run was another PR\'s'],
-    // The shards themselves (PLAN.md 19k): the list was written here as four
-    // after checks.yml had five, and nothing carried.
-    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(1, '1', m)], jobs: { 1: shardJobs('success', MAC_SHARDS.slice(0, -1)) } }), false, `no carry: the green run ran ${MAC_SHARDS.length - 1} of the ${MAC_SHARDS.length} shards this run needs`],
-    [await decide({ mainChanges: ['src/b.ts'], need: [MAC_SHARDS[1]], runs: (m) => [run(1, '1', m)], jobs: { 1: shardJobs('success', [MAC_SHARDS[1]]) } }), true, 'carry: a run that needs one shard, from a green run of that shard'],
-    [await decide({ mainChanges: ['src/b.ts'], need: MAC_SHARDS.slice(0, 2), runs: (m) => [run(1, '1', m)], jobs: { 1: shardJobs('success', [MAC_SHARDS[1]]) } }), false, 'no carry: a run that needs two shards, from a run of one'],
-  ];
-  let bad = 0;
-  for (const [got, want, what] of cases) {
-    if (got !== want) bad++;
-    console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}${got === want ? '' : ` — got ${got}`}`);
-  }
-  return bad;
 }
 
 // Run, not imported (quick.mjs imports `shipsToSite`).
@@ -528,55 +362,46 @@ if (!isMain) {
     }
     const files = git('diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD').split('\n').filter(Boolean);
     const reaching = files.filter(reachesMac);
-    {
-      const before = atCommit('HEAD^1', git), after = atCommit('HEAD', git);
-      if (after.manifest) {
-        parts = after.manifest.shards.measure;
-        const m = selectMeasure(files, { before, after, root: process.cwd() });
-        console.log(`Measure: ${m.all ? `every check (${m.why})` : m.why}`);
-        if (!m.all && m.parts.length) {
-          parts = m.parts;
-          only = JSON.stringify(m.names);
-          // For the deploy gate (deploygate.sh): such a run is not evidence
-          // for a tree's whole Measure.
-          console.log(`::notice title=measure::partial: ${m.names.length} checks in ${m.parts.join(', ')}`);
-        }
+    const before = atCommit('HEAD^1', git), after = atCommit('HEAD', git);
+    if (after.manifest) {
+      parts = after.manifest.shards.measure;
+      const m = selectMeasure(files, { before, after, root: process.cwd() });
+      console.log(`Measure: ${m.all ? `every check (${m.why})` : m.why}`);
+      if (!m.all && m.parts.length) {
+        parts = m.parts;
+        only = JSON.stringify(m.names);
+      }
+      // A pull request runs only the Measure parts the manifest names for it
+      // (PLAN.md 19ak-20): the node checks, the typecheck and the build. The
+      // rest of Measure, Chromium and the lab on SwiftShader, goes to main's
+      // deploy with the Mac. Of 93 PR runs from 2026-11-14 to 11-21, 52 went
+      // red, and every line behind them was a browser, lab or Mac check timing
+      // a page or a plate on a slow or busy runner (the intro's loading line,
+      // the startup's "moving for good", the ear behind the wall, a film's one
+      // pixel, AAC); the owner's call, 2026-11-22: off the PRs. A selection none of whose checks is in them (never yet: the `always`
+      // checks are in `logic`) runs them in full rather than nothing.
+      const pr = after.manifest.shards.pr;
+      if (pr) {
+        const kept = parts.filter((p) => pr.includes(p));
+        if (kept.length) parts = kept;
+        else { parts = pr; only = ''; }
+      }
+      // For the deploy gate (deploygate.sh): such a run is not evidence for a
+      // tree's whole Measure, so a deploy never trusts it and runs Measure.
+      if (parts.length < after.manifest.shards.measure.length || only) {
+        console.log(`::notice title=measure::partial: ${only ? `${JSON.parse(only).length} checks in ` : ''}${parts.join(', ')}`);
       }
     }
-    mac = reaching.length > 0;
-    why = mac
-      ? `${reaching.length} of ${files.length} changed files reach a Mac shard, first ${reaching.slice(0, 5).join(', ')}`
-      : `none of the ${files.length} changed files reaches a Mac shard: ${files.join(', ')}`;
-    if (mac) {
-      // Which shards (PLAN.md 19k): only those of the checks a check-only
-      // change touches, every one otherwise. A tree with no manifest (the
-      // selftest's scratch repositories) selects every shard.
-      const before = atCommit('HEAD^1', git), after = atCommit('HEAD', git);
-      const picked = after.manifest
-        ? selectShards(reaching, { before, after, root: process.cwd() })
-        : { shards: MAC_SHARDS, why: 'every shard: the tree has no manifest of checks' };
-      shards = picked.shards;
-      why = `${why}; ${picked.shards.length ? `shards ${picked.shards.join(', ')}` : 'no Mac shard'} (${picked.why})`;
-      if (!shards.length) mac = false;
-    }
-    if (mac) {
-      const verdict = await carry({
-        prNumber: process.env.PR_NUMBER,
-        headRef: process.env.GITHUB_HEAD_REF,
-        baseRef: process.env.GITHUB_BASE_REF,
-        runId: process.env.GITHUB_RUN_ID,
-        need: shards,
-      }, liveDeps());
-      if (verdict.carried) {
-        mac = false;
-        why = `${why}; ${verdict.why}`;
-        // For the deploy gate (deploygate.sh), which reads this job's
-        // annotations to follow a carried run back to the run that passed.
-        console.log(`::notice title=carried::run ${verdict.run} tests ${verdict.tested}`);
-      } else {
-        why = `${why}; not carried: ${verdict.why}`;
-      }
-    }
+    // No Mac on a pull request (PLAN.md 19ak-20). The Mac shards, every one,
+    // run on main's deploy (deploy.yml), on the owner's Mac when it is free;
+    // the deploy gate never trusts a run that skipped them, so a deploy can
+    // only ever publish a tree its own Mac run passed: a blank or broken plate
+    // stops there, as it did, rather than on every PR before it. What this
+    // took out: the per-shard selection (19k, 19ak-2), carrying an earlier
+    // run's Mac result (19i) and a re-run skipping the shards that passed
+    // (19ak-3a), all of which existed to make a PR's Mac run cheaper.
+    mac = false;
+    why = `a pull request runs no Mac shard (19ak-20); ${reaching.length} of ${files.length} changed files reach one, and main's deploy runs them all`;
   }
   console.log(why);
   // The matrix needs a list even when the shards are skipped (`mac=false`),

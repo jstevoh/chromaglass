@@ -59,13 +59,13 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None. **Partly shipped** (#355); 18e-1 to 18e-4 open |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
-| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362), **18g-6 shipped** (the rim holds the oil); 18g-2..5, 18g-7, 18g-8 open |
+| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362), **18g-6 shipped** (the rim holds the oil), **18g-7 shipped** (#641, the oil's relaxation stops at the rim); 18g-2..5, 18g-8 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Shipped** (#358, then 38b with #603); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; no timers left, the rim drains |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
-| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); ~~18m-1~~ (#371, 18m-1a implicit step open), ~~18m-5~~ shipped, 18m-2 to 18m-4 and 18m-5a after |
+| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); ~~18m-1~~ (#371, 18m-1a implicit step open), ~~18m-5~~, ~~18m-5a~~ and ~~18m-5b~~ shipped, 18m-2 to 18m-4 and 18m-5c after |
 
 ## 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
 **Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -211,13 +211,10 @@ its frame rate live. "Free" means no new passes or texture reads.
     the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
     radial flow (the pressed rings in the picture). A staggered grid takes all three,
     and `dampGrid`'s job.
-  - ~~**18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.~~
-    Dropped: the owner decided to delete the CPU solver's stepping (2.6, 2026-10-06; 3.1).
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
-  - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages` (`docs/judging.md` §19): Thin Gap needs no look turned off (512², 33 ms/frame; H2b 52 fps), and the in-plane viscosity (18a-10) is 1.52 ms. Story in `docs/plan-shipped.md` §18a-11 (moved 2026-10-29, 19m-2).
-  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped.md` §18a-12 (moved 2026-10-29, 19m-2). Open: whether `hsCycles` from cold should converge on a grid that is not a power of two.
+  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped.md` §18a-12 (moved 2026-10-29, 19m-2). The open question (whether `hsCycles` from cold should converge on a grid that is not a power of two) is answered by 38r part 2 (#650): it did not, because the multigrid's levels stopped at the first odd level (130² had one coarse level, 65²), and the 2 mm gap's stiffer mobility contrast made the stale pressure read as a ring that came back 18% past where it began (`npm run thingap` at 130²). The levels now halve rounding up down to under four cells (130 → 65, 33, 17, 9, 5; even ladders unchanged), and the thin solve's coarsening takes an odd level's missing face as two faces in series.
   - **18a-13, tilt sloshes the liquid: shipped** (the owner, 2026-10-20: tip it one way
     and then the other and the colour should slop and mix). A shallow-water dish on the
     CPU (`lib/slosh.ts`) fed by the owner's tilt alone, its flow added to the thin solve's
@@ -226,13 +223,6 @@ its frame rate live. "Free" means no new passes or texture reads.
     [`docs/plan-shipped.md`](docs/plan-shipped.md) §18a-13; the owner's eyes on the pace
     are `docs/judging.md` §58. Shortcuts, each named in the code, and the items that
     replace them:
-    - **18a-13a. Two layers: shipped** (2026-10-22). Oil lenses ride the water at their
-      capillary thickness, read from the plate's own oil each frame, with the two-layer
-      laminar drag between them; the dish moved to the GPU (`gpu/slosh.ts`). Plate Rock's
-      swing tips it where Frame Sway lets the frame move (`rockAccel`; how the rock itself is
-      driven is 27f-2's). A kick's glass presses the dish over the same radii it presses the gap
-      (`kickPress`: the sheet's one dent off the frame-moving looks). Story in
-      `docs/plan-shipped.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
     - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
       holds a thin layer still and sheds a vortex when the wave turns there. The
       drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
@@ -251,11 +241,6 @@ its frame rate live. "Free" means no new passes or texture reads.
       rides in a spare channel (the derive pass's alpha is free) rather than a new
       binding; touches the plate shader, so `pops`, `straw`, `ferrolook`, `mixer`,
       `grainedge`, `lampzero` and a `look` render.
-    - **18a-13d. A shock-capturing scheme: shipped** (2026-10-22). HLL fluxes over
-      hydrostatic reconstruction, MUSCL with the MC limiter, Heun in time: a dam
-      break runs at Stoker's speed, two cells wide, and no energy is made. Story in
-      `docs/plan-shipped.md` §18a-13d. Still: no Coriolis or centrifugal term, and the
-      CPU film ignores the slosh.
     - **18a-13e. Hold Gravity's moves out of the slosh.** The dial is hand-only, but the
       tilt it follows is Gravity × Tilt Direction as the plate sees them, so a look
       (Lava Lamp has Gravity 1), Evolve or a patch on Gravity slops the liquid too. If
@@ -278,6 +263,96 @@ its frame rate live. "Free" means no new passes or texture reads.
       shipped** (2026-10-29; found by the first deploy run on the owner's Mac, `npm run
       startup`). `gpu/opening.ts` has a `slosh` flag read by `WebGPUSlosh.prepare` and
       `addSlosh`. Story in `docs/plan-shipped.md` §18a-13i.
+    - **18a-13k. The remote's tilt may pour uphill.** `RemoteControl.tsx` sends
+      `y = (beta − 40)/30`, so the top edge raised reads as +y, and +y in the plate is the
+      top of the screen (`downhill`, Tilt Direction 0): the liquid would run toward the edge
+      that went up. The in-app Tilt (`tiltReading`) has it the right way, and `npm run
+      tippad` ties the pad to that one. Not yet seen on a phone; check by hand with the
+      remote on a tipped plate before changing the sign, and fold it into 18a-13e's turn
+      into the dish's frame. (The Tilt knobs, 18a-13m, already turn theirs into the dish:
+      `stepHandTilt`'s `angle`, the place to turn the phone's too once its sign is checked.)
+    - **18a-13o. The dish's slop past the phone's tip.** A named shortcut: past the phone's
+      reach the knobs' tip no longer adds to the slosh dish's held tilt (`extTiltX`,
+      limited to √2 in `tipPlate`; `sloshAccel` clamps it to a unit an axis), because the
+      dish's step keeps its Courant limit only to the Slosh dial's own lean (lib/slosh.ts
+      rockAccel's note). The real answer is a dish step that substeps past that lean, so a
+      steep hand slops the dish as far as it tips it; then lift the limit.
+  - **18a-14, a light press looked pixelated: shipped** (2026-11-22; the owner: "when I use
+    the press tool on a small size, the pressed area becomes pixelated", with Press Amount
+    low on its slider). The thin-gap press laid its bowl, a clamped plate's deflection
+    −3·amount·(1 − d²/R²)², on the 192² CPU grid at a rounded centre and radius, and the
+    bilinear upsample carried it to the 384²/512² solver as flat facets with creases. The
+    film's closing (Stefan's law in `squeezeUpdate`) changes rate at each crease, so the
+    liquid driven out of the gap left in a polygon. At a full Amount the middle reaches the
+    gap's floor and hides it; at a low one every crease shows. The press is now one GPU
+    record (`PlateSolver.pressBowl`, falloff `plate`) with an unrounded centre and radius,
+    evaluated at every solver cell inside the same upsample pass (`upsampleDeltaPress`),
+    so the step folds once and the Reynolds source sees a smooth dh/dt. Desk and phone
+    share `applySquish`. `npm run pressfacets` (gpu=high, 512²): crease score of the
+    bowl's curvature 0.70–0.73 on main, 0.01–0.05 now; at gpu=mid (an even 2×, where the
+    relaxation rounds most of it) 0.04–0.10 against 0.01–0.05. Open: 18a-15.
+  - **18a-15, the rest of the thin gap's laying at solver cells.** The lift's spokes
+    (`liftStep`), the kick's release (`kickRelease`), the bass press and the rhythm sheet
+    still lay the gap on the 192² grid and reach the solver through the bilinear. None was
+    reported, but each has the same facets at a low enough amount. Move each to records
+    like 18a-14's, or lay the sheet at N, and measure the crease energy before and after.
+  - **18a-16, the draught slid the dish out over its rim: shipped** (2026-11-26; reported as
+    Solar Flare, filmed to Hymn to the Dawn, fading to an empty dish by 2:40). On the owner's
+    Mac with no music every build since 11-21 drained Solar Flare to 5–7% of its dye in 150 s;
+    PLAN 38v-1 took away the treble's white sparks, which had been pouring 1200–3900 of dye a
+    ten seconds back in and hid it (Hymn: 0.26–0.35 held before 38v-1, 0.01 after). On a thin
+    gap dye leaves only over the open rim, and Air's uniform −y shear went straight into the
+    gap's solve (p = 0 past the rim), a through-flow. A closed dish answers a uniform stress
+    with its own pressure; what a draught moves is its curl. hsBody lays the gusts as ∇⊥χ, χ a
+    noise held to zero over the dish's outer tenth (`AIR_GUST`). `npm run draught` (lab, 128²,
+    Air 0.35, 600 steps): dye kept 0% → 100%, the gusts' rms 1.73e-2 → 1.69e-2, mean flow
+    6.9e-2 → 5e-8. Then 18a-17.
+  - **18a-17, the colour's weight poured out over the open rim: shipped** (2026-11-27). Rain
+    Drip on a standing plate and Plate Rock's colour weight with no oil (hsBody,
+    `S.up * A.a.x * w`, `A.b.xy * w`) laid a body force into the open-rim solve, and the
+    dish's heavy colour left over the downhill rim: Rain Drip 0.5 kept 1.8% of its dye in
+    600 lab steps, Plate Rock tipped at sinθ 0.27 kept 0.5%. A clock glass's colour falls
+    and pools against its wall. With no oil both are now one in-plane weight laid as the
+    closed dish's circulation, as the oil's lift is (hsLiftSource, hsLiftRelax on the
+    colour alone; `A.b.w` 2). `npm run draught` 5–8: Rain Drip keeps 99.8% and its colour's
+    middle falls 0.14 of the plate; Plate Rock keeps 100% and moves 0.18 downhill; the
+    control (the weight laid straight again) keeps 1.8% and 0.5%. Open: 18a-21.
+  - **18a-18, pour off screen and watch it flow in: shipped** (2026-11-27; the owner: "pour
+    things off screen and have them flow into the visible canvas"). The dish always ran past
+    the picture (the wall's long side is the plate over 1.5, so on 16:9 the open rim is a sixth
+    of the plate past the sides and nearly a third past the top and bottom), but no hand could
+    reach it. lib/pointerPlate.ts (fluidPointAt moved out of the visualizer, unchanged off the
+    band) carries the bottle's tools (Dropper, Pour, Spray, Splatter, Streak) in the outer 16%
+    of each half of the screen out to 0.05 of the plate past the edge (1 cm of the dish), held
+    inside 0.46 of the rim; the mouse, a finger on the phone's stage and the remote pad's drops
+    all reach. What brings it in is the pour's own volume (18c-1). `npm run edgepour`: the
+    mapping (identity off the band to the bit, each edge 0.0500 past, no pixel moving it over
+    0.0027 of the plate) and the lab (128², a Pour held 5 s at the 16:9 wall's right and top
+    edge: 0% in view after a step, 18.1% and 18.9% in view at 5 s; the same colour with no
+    volume 0.00%). Open: 18a-19, 18a-20.
+  - **18a-19, the pushed liquid's share over the rim beside an edge pour.** Next to the open rim
+    a pour's push takes the short way out (p = 0 past it); at 0.05 past the 16:9 wall's top the
+    rim is 0.26 away and little leaves, but past the sides it is 0.12. Measure what a held edge
+    pour sends over the rim against what comes into view, per side, and whether the floating
+    glass's rise (38r-5) should take more of it.
+  - **18a-20, a jug's stream lands with its own momentum.** A real pour from a tipped jug or
+    bottle lands moving (the stream's horizontal speed), so pouring from off screen toward the
+    middle throws the liquid in rather than only spreading it. Ours lands still and spreads
+    radially (the hand loop's 0.12 outward push and the volume source). Model the stream's
+    impact momentum from its height and angle, aimed by the hand's drag, the way 18c-2 models
+    a drop's landing.
+  - **18a-21, the rest through the open rim.** (a) Rain Drip on a standing plate with oil
+    still lays its colour's whole weight directly (κ is the lift over the tilt's weight;
+    a standing plate's oil is 27f-6), so a standing oil look's colour can still leave over
+    the bottom rim. (b) 18a-16's gust noise χ is a new noise, not the Hodge projection of a
+    draught's stress onto closed flows through the same Ψ solve. (c) 15e-12, a heavy
+    bottle's weight (`liquidDrive`), the same fix. (d) Past LIFT_MOST (256) Ψ's grid is
+    coarser than the solver's, so on a 384 or 512 plate Rain Drip's finest fingers are
+    laid at 256 (27f-7's shortcut, now on every Rain Drip look). (e) The opening waits for
+    the lift kernels only for a rocked oil look (Opening.oilLift), so a Rain Drip or rocked
+    look's first seconds, until hsLiftSource and hsLiftRelax are built, still lay the weight
+    into the open rim; widen the wait if `npm run startup` has the slack. A Blow's breath is local
+    and stays open: its liquid comes back.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

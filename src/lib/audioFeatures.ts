@@ -48,6 +48,7 @@
 import { AutoRange } from './audioCalibration.ts';
 import { fft } from './fft.ts';
 import { ChromaEar } from './chroma.ts';
+import { PulseEar } from './pulseEar.ts';
 import { finePitch } from './pitchFine.ts';
 import { AnalyserEmulator } from './analyserEmulator.ts';
 
@@ -163,6 +164,14 @@ export interface OnsetState {
 }
 
 export interface AudioReading {
+  /**
+   * The beat, whatever plays it (`pulseEar.ts`): the kick's own hit where a
+   * kick keeps time, and the band's attack (banjo, tuba, piano) where none
+   * does. What the beat clock and the patch bay's Kick hit read. Optional so
+   * a reading made by hand (a check's, the phone's mirror) can leave it out
+   * and be read as the kick.
+   */
+  beat?: OnsetState;
   /** The time passed in with the frame. */
   time: number;
   /** Each 0..1 against its own recent range. */
@@ -584,6 +593,8 @@ export class AudioFeatures {
   private readonly vals = new Float64Array(15);
 
   private readonly chromaEar = new ChromaEar();
+  /** The beat where there is no kick drum to carry it (`pulseEar.ts`). */
+  private readonly pulseEar = new PulseEar(new OnsetDetector());
   pitch = 0;
   pitchClass = 0;
   pitchFine = 0;
@@ -604,6 +615,7 @@ export class AudioFeatures {
     this.specRing.forEach(r => r.fill(ABS_FLOOR_DB));
     this.specRingPos = 0;
     this.chromaEar.reset();
+    this.pulseEar.reset();
     this.pitch = 0;
     this.pitchClass = 0;
     this.pitchFine = 0;
@@ -823,6 +835,7 @@ export class AudioFeatures {
 
     const chroma = new Array<number>(12);
     this.chromaEar.push(db, this.hzPerBin, time, chroma);
+    const beat = this.pulseEar.update(db, this.hzPerBin, this.top, floor, time, onsets.kick, waking, hand);
 
     return {
       time,
@@ -830,6 +843,7 @@ export class AudioFeatures {
       note: values[5], tonalLow: values[6], tonalMid: values[7], tonalHigh: values[8],
       bands: values.slice(SOUND_SOURCES.length),
       onsets,
+      beat,
       db: Array.from(this.levelDb.subarray(0, SOURCE_NAMES.length)),
       pitch: this.pitch,
       pitchClass: this.pitchClass,

@@ -1,0 +1,26 @@
+# Cloudflare Worker config for the owner's assistant over the internet (PLAN 44h):
+# the remote MCP address claude.ai signs in to, and the tunnel the Mac dials out to.
+# Its own Worker, so it can be deployed, rolled back or deleted without touching
+# song ID, crash reports, feedback or licences.
+#
+# Once (from the repo, signed in to wrangler):
+#   npm run deploy:tunnel
+#   npx wrangler secret put OWNER_UID -c wrangler.tunnel.toml           # the owner's Firebase uid
+#   npx wrangler secret put FIREBASE_API_KEY -c wrangler.tunnel.toml    # the site's own web config
+#   npx wrangler secret put FIREBASE_AUTH_DOMAIN -c wrangler.tunnel.toml
+#   node mcp/chromaglass-mcp.js tunnel key                              # prints the line that sets TUNNEL_KEY_SHA256
+# and add the Worker's host to Firebase Authentication's authorized domains, so its
+# sign-in page can open Google's and Apple's sign-in.
+name = "chromaglass-tunnel"
+main = "mcp/tunnel-worker.js"
+compatibility_date = "2026-07-01"
+
+# One object, `idFromName('owner')`, holds the Mac's socket, the sign-ins and the
+# tokens. SQLite-backed, which the Workers free plan runs.
+[[durable_objects.bindings]]
+name = "TUNNEL"
+class_name = "ShowTunnel"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ShowTunnel"]

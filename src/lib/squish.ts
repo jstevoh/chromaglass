@@ -431,8 +431,8 @@ export const KICK_HOLD = RELEASE_MS / 1000;
   runs out from under the sheet fast enough for the bend to spread before the
   kick lets go, a thick one holds the sheet up round the finger. (As the
   lubrication equation has it, which is the liquid's own pace only in
-  glycerine: in 6 mm of the default oil the layer's viscous time h²/ν is
-  1.6 s, a hundred times the dent's, and the liquid's inertia rings the
+  glycerine: in 2 mm of the default oil the layer's viscous time h²/ν is
+  0.18 s (1.6 s in the 6 mm gap before PLAN 38r), still many times the dent's, and the liquid's inertia rings the
   sheet; PLAN 27f-8(f).)
 
   That was 27f-3, and its reach left out the liquid's weight. A sheet
@@ -470,9 +470,10 @@ export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = DISH_GAP_ME
  * middle as the glass's three stacked (each bowl's middle is three times its
  * amount, so the one dent carries all three's).
  */
-export function kickPress(nu: number, sway: number): { radii: number[]; share: number } {
+export function kickPress(nu: number, sway: number, gapMetres?: number): { radii: number[]; share: number } {
   if (Number.isFinite(sway) && sway > 0) return { radii: KICK_RADII, share: 1 };
-  return { radii: [Math.max(4, Math.round(dentRadius(nu) * 128))], share: KICK_RADII.length };
+  const h = Number.isFinite(gapMetres) ? gapMetres! : DISH_GAP_METRES;
+  return { radii: [Math.max(4, Math.round(dentRadius(nu, KICK_HOLD, h) * 128))], share: KICK_RADII.length };
 }
 /** How long the glass takes to give a kick's press back (s): a third of a second, done before the next kick at 120 bpm. */
 export const KICK_RELEASE = 1 / 3;

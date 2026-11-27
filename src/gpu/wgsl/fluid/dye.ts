@@ -28,7 +28,7 @@ export const DYE_KERNELS: Record<string, string> = {
 @group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 
 fn inDish(p: vec2i) -> bool {
-  return S.thinGap < 0.5 || length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)};
+  return S.thinGap < 0.5 || !pastOpenRim(p);
 }
 
 fn getDye(p: vec2i, n: i32) -> vec4f {
@@ -129,15 +129,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
-  // Pigment coordinates: A.a.xy says which phase to keep and which to reseed.
-  seedGrain: `${HEAD}
+  // Pigment coordinates: advects `src` by A.a.x (disp), then keeps/reseeds phases (A.a.yz).
+  grainStep: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var lin: sampler;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let uv = uvOf(id);
-  let g = textureLoad(src, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(mix(uv, g.rg, A.a.x), mix(uv, vec2f(g.b, g.a), A.a.y)));
+  var g = vec4f(0.0);
+  if (A.a.y > 0.5 || A.a.z > 0.5) {
+    let v = textureSampleLevel(vel, lin, uv, 0.0).xy;
+    let pos = clamp(uv - v * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
+    let o = textureSampleLevel(src, lin, pos, 0.0);
+    g = select(vec4f(0.0), o, finite4(o));
+  }
+  textureStore(dst, vec2i(id.xy), vec4f(select(uv, g.rg, A.a.y > 0.5), select(uv, vec2f(g.b, g.a), A.a.z > 0.5)));
 }`,
 
   sharpenDye: `${HEAD}
@@ -168,16 +176,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, max(clamp(s, min(lo, c), max(hi, c)), vec4f(0.0)));
 }`,
 
-  decayDye: `${HEAD}
+  // Fused dye evap/rim-spill + velocity damping/cooling/lamp-heating.
+  decay: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dstDye: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var dstVel: texture_storage_2d<rgba16float, write>;
+
+// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
+fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
+  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
+}
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   var d = textureLoad(dye, p, 0);
   // PLAN 18g: Colour leaves by flushing over the open rim (OPEN_RIM = 0.5), not by fading.
   // Liquid and dye carried past the circular dish rim spill into the overflow trough and leave the plate.
-  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+  if (S.thinGap > 0.5 && pastOpenRim(p)) {
     d = vec4f(0.0);
   } else {
     // Named regulator shortcut (PLAN 18g / 28d-A, until 18c-2/18g-4 carry a separate
@@ -195,46 +212,110 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // Safety cap (PLAN 18g: "A safety cap stays, named as one"):
   if (!finite4(d)) { d = vec4f(0.0); }
   if (d.a > 6.0) { d *= 6.0 / d.a; }
-  textureStore(dst, p, max(d, vec4f(0.0)));
-}`,
+  let outD = max(d, vec4f(0.0));
+  textureStore(dstDye, p, outD);
 
-  decayVel: `${HEAD}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dye: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
-
-// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
-fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
-  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
-}
-
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  var v = textureLoad(vel, vec2i(id.xy), 0);
+  var v = textureLoad(vel, p, 0);
   // Before the speed limit: an infinite speed through it is inf * 0, a NaN.
   if (!finite4(vec4f(v.xyz, 0.0))) { v = vec4f(0.0); }
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
-  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
-  var temp = v.z * cool;
-  // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
-  let d = textureLoad(dye, vec2i(id.xy), 0);
-  var absorbed = 0.0;
-  if (d.a > 1e-4) {
-    let norm = 1.0 / d.a;
-    let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
-    let through = lampThrough(unit, d.a);
-    absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+  if (A.a.x <= 0.0) {
+    // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
+    let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
+    var temp = v.z * cool;
+    // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
+    var absorbed = 0.0;
+    if (outD.a > 1e-4) {
+      let norm = 1.0 / outD.a;
+      let unit = exp(-max(outD.rgb, vec3f(0.0)) * norm);
+      let through = lampThrough(unit, outD.a);
+      absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+    }
+    // The same at every point of the stage (PLAN 38a): the condenser lights the
+    // liquid evenly, and the hot-spot is light the lens's aperture turns away
+    // after it has gone through the liquid (wgsl/lampField.ts). The old
+    // 1 / (1 + 2.5 r²) here was a shortcut, centred on the plate, not the lamp.
+    temp += S.lampHeat * absorbed * S.dt;
+    v.z = temp;
   }
-  // The same at every point of the stage (PLAN 38a): the condenser lights the
-  // liquid evenly, and the hot-spot is light the lens's aperture turns away
-  // after it has gone through the liquid (wgsl/lampField.ts). The old
-  // 1 / (1 + 2.5 r²) here was a shortcut, centred on the plate, not the lamp.
-  temp += S.lampHeat * absorbed * S.dt;
-  v.z = temp;
-  textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
+  textureStore(dstVel, p, vec4f(v.xyz, 0.0));
+}`,
+
+  /*
+    The lamp's heat carried with the liquid on a thin gap (PLAN 38f). The
+    temperature lives in the velocity's z, and a thin gap never self-advects
+    the velocity (its inertia is the drag time, wgsl/thinGap.ts), so until
+    this the heat stayed in the cell the lamp laid it in while the flow it
+    drove moved the liquid out from under it: a warmed body of Lava Lamp's
+    wax rose out of its heat into cold cells, was heavy again at once, and
+    the lamp's band held the wax as a sheet at its top edge (27f-9e), eroding
+    into the haze below it (27f-9f).
+
+    Heat is an amount carried as the colour is, through the thin solve's own
+    faces in the colour's substeps (carrySubsteps, bodyAdvect): the column's
+    heat h·T, beside the column's liquid h itself through the very same
+    fluxes, and the temperature is the one over the other afterwards. That
+    ratio is what mixing two parcels of liquid gives (the mean weighted by
+    how much of each), and it holds a uniform temperature exactly whatever
+    the gap does in the step (a press, a pour, air arriving): the limited
+    upwind flux is linear in what it carries, slope and all, so a field that
+    is T times the liquid everywhere moves as T times the liquid's flux.
+    Dividing by the gap itself instead would count each press twice, since
+    the gap moved before the solve and the faces carry the liquid it
+    displaced. The heat is split into its warm and cold parts (x, y), as
+    the carry keeps every amount at zero or more and a hand or a boil may
+    take a cell below zero. A.a.x is the rest gap.
+  */
+  heatPack: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var sq: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let h = max(textureLoad(sq, p, 0).r, 0.004) / A.a.x;
+  var t = textureLoad(vel, p, 0).z;
+  if (!finite1(t)) { t = 0.0; }
+  textureStore(dst, p, vec4f(h * max(t, 0.0), h * max(-t, 0.0), h, 0.0));
+}`,
+
+  /*
+    And back into the velocity's z: the heat over the liquid that carried
+    it. A cell the carry all but emptied (an air core, the grid's wall)
+    keeps the temperature it had.
+
+    Rounded to the nearest half-float here, not by the store. The ratio is
+    the temperature to a float32's precision, a hair either side of it even
+    where nothing moved, and the store's own conversion to sixteen bits is
+    the hardware's: on the Mac's Metal it lost 3.2% of a sinking blob's heat
+    in 90 steps (\`npm run heat\` line 9, 96.8% kept, the same with the carry
+    in half-float or float32) where SwiftShader lost 0.1%, a bias of under one
+    step of the half-float a step, always down, which is what a conversion
+    toward zero does. So the nearest half-float is picked in float32 and the
+    store is handed a value it holds exactly: a cell the carry did not change
+    keeps its z bit for bit, and one it did is off by half a step at most,
+    either way.
+  */
+  heatUnpack: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var heat: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+fn nearestHalf(t: f32) -> f32 {
+  var r = quantizeToF16(t);
+  let ulp = exp2(floor(log2(max(abs(r), 6.1e-5))) - 10.0);
+  let e = t - r;
+  if (abs(e) > 0.5 * ulp) { r += sign(e) * ulp; }
+  return r;
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let c = textureLoad(heat, p, 0);
+  let t = (c.x - c.y) / max(c.z, 1e-6);
+  textureStore(dst, p, vec4f(v.xy, select(v.z, nearestHalf(t), c.z > 1e-3 && finite1(t)), v.w));
 }`,
 
   // The drain's inward spiral. A.a.x is the pull, A.a.y how far through it is.

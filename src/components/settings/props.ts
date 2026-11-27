@@ -9,8 +9,9 @@ import type { PinApi } from './controls';
 import type { LiquidDesignerProps } from '../LiquidDesigner';
 import type { OutputConfig, WallTest } from '../../lib/outputConfig';
 import type { TempoLabel, TempoReading } from '../../lib/tempo';
-import type { CartoonShelfProps } from '../CartoonShelf';
-import type { RoomCalibration } from '../../lib/audioCalibration';
+import type { OscOutLabel } from '../../lib/oscOut';
+import type { VideoShelfProps } from '../VideoShelf';
+import type { EarView } from '../../hooks/useEarView';
 import type { EngineStatus } from '../../lib/platform';
 
 /*
@@ -23,8 +24,6 @@ import type { EngineStatus } from '../../lib/platform';
 */
 
 export interface SettingsPanelProps {
-  onPourVideo?: (file: File) => void;
-  onStopPourVideo?: () => void;
   settings: VisualizerSettings;
   /**
    * Song detection, the master switch: whether the app listens for which song
@@ -34,8 +33,8 @@ export interface SettingsPanelProps {
   songDetection?: boolean;
   onSongDetection?: (on: boolean) => void;
   onUpdate: (settings: Partial<VisualizerSettings>) => void;
-  /** Live room-calibration readout, null when auto-calibration is off. */
-  calibration?: RoomCalibration | null;
+  /** The ear's ten-a-second view, for the room calibration's readout, which subscribes to it itself (PLAN.md 46f). */
+  earView?: EarView;
   onRecalibrate?: () => void;
   /** Flick a plate: spin it up and let the bed it rests on slow it down. */
   onFlickPlate?: (layer: number) => void;
@@ -57,8 +56,6 @@ export interface SettingsPanelProps {
   filmSource?: 'none' | 'file' | 'camera' | 'window';
   /** The file playing as the film (its name), while the source is a file. */
   filmName?: string | null;
-  /** The file pouring as dye (its name), or null. */
-  pourName?: string | null;
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
   /** The film's Webcam: which camera it shows, what opened, and whether it was unplugged. */
@@ -122,8 +119,13 @@ export interface SettingsPanelProps {
   midi?: MidiController;
   /** The full MIDI panel, for the things this panel's section does not hold. */
   onOpenMidi?: () => void;
-  /** Open the Sound sheet, where the source is chosen. */
-  onOpenSound?: () => void;
+  /**
+   * Where the sound comes from, drawn at the top of Sound (PLAN 35c-7): the
+   * sources, the shelf, the player and the drone, handed the section's input
+   * picker to draw under the Mic. App() builds it, since the player's state is
+   * its own.
+   */
+  soundSources?: (inputPicker: React.ReactNode) => React.ReactNode;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: TempoLabel;
   onTap?: () => void;
@@ -136,6 +138,12 @@ export interface SettingsPanelProps {
   onTempoClear?: () => void;
   /** Ableton Link on or off at the show server (PLAN.md 13.5-link); offered only while one is there (`tempo.link.available`). */
   onLink?: (on: boolean) => void;
+  /** Live's play and stop move the Sequence (PLAN.md 13.5-link-transport). */
+  onLinkTransport?: (on: boolean) => void;
+  /** OSC out at the show server (PLAN.md 13.5-osc); null or absent until one is there to send it. */
+  oscOut?: OscOutLabel | null;
+  /** Switch it, or move it with a target ("address:port"); false if the target is refused. */
+  onOscOut?: (on: boolean, target?: string) => boolean;
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
   midiClocked?: boolean;
@@ -159,12 +167,12 @@ export interface SettingsPanelProps {
   scope?: 'all' | 'stage';
   /** On a desk panel, where a link to another section goes: the sheet, at that section. */
   onGoTo?: (id: string) => void;
-  /** The public domain cartoons that ship with the app, for the Film section (CartoonShelf, PLAN 14ac). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded and its Play and Pour, for the Video section (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
 }
 
-export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'onOpenSound' | 'onFlickPlate' | 'cartoons'>
-  & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'pourName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
+export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'earView' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'soundSources' | 'onFlickPlate' | 'video'>
+  & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
   & {
     filmInputRef: React.RefObject<HTMLInputElement | null>;
     markInputRef: React.RefObject<HTMLInputElement | null>;

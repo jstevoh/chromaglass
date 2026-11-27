@@ -104,7 +104,7 @@ export function RunLocallyCard({ status }: { status: EngineStatus | null }) {
           data-cg-upgrade-pro-cta
           className="flex-1 rounded-xl border border-amber-300/40 bg-amber-400/20 px-3 py-2 text-center text-[11px] font-bold uppercase tracking-wider text-amber-100 hover:bg-amber-400/30"
         >
-          {isHome ? 'Upgrade to Pro · $164' : 'Upgrade to Pro · $199'}
+          {isHome ? 'Upgrade to Pro · $170' : 'Upgrade to Pro · $199'}
         </a>
         <button
           type="button"

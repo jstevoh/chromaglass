@@ -39,10 +39,10 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
-const PORT = Number(process.env.DRAW_PORT ?? 4197);
+const PORT = port(4197, 'DRAW_PORT');
 const KEY = '4321';
 const BASE = `http://localhost:${PORT}`;
 const HEADED = process.argv.includes('--head');
@@ -151,7 +151,7 @@ async function wallChecks(d, label) {
   check('phone: the remote opens on Draw', await page.getByTestId('remote-draw').isVisible().catch(() => false) && !(await page.getByTestId('remote-main').count()));
   check('phone: and is linked', await linked(page));
   check('phone: the phone layout', (await page.getByTestId('remote-draw').getAttribute('data-layout')) === 'phone');
-  check('phone: it names the look', (await page.getByTestId('draw-linked').innerText()).includes('Classic'), await page.getByTestId('draw-linked').innerText());
+  check('phone: it names the look', (await page.getByTestId('draw-linked').innerText()).includes('Lava Pop'), await page.getByTestId('draw-linked').innerText());
   const w = await wallChecks(d, 'phone');
 
   // Sizes and rails.

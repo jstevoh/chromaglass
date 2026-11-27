@@ -4,6 +4,7 @@ import { LIT } from '../ui';
 import { ViscosityDrip } from '../ui/Playful';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
+import { COVER_FULL_ML, COVER_GLASS_G } from '../../lib/cover';
 
 /*
   Chemistry: the liquid itself. The squish plate, oil and soap, the ferrofluid and
@@ -100,6 +101,25 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
             settingKey="gapThickness"
           />
         )}
+        {/* The liquid under the cover and the glass on it (PLAN 38r-5): the gap is what they make. */}
+        <Slider
+          label="Liquid"
+          value={settings.liquidMl ?? COVER_FULL_ML}
+          min={1}
+          max={150}
+          step={1}
+          onChange={(v: number) => onUpdate({ liquidMl: v })}
+          settingKey="liquidMl"
+        />
+        <Slider
+          label="Cover Weight"
+          value={settings.coverWeight ?? COVER_GLASS_G}
+          min={0}
+          max={1000}
+          step={5}
+          onChange={(v: number) => onUpdate({ coverWeight: v })}
+          settingKey="coverWeight"
+        />
         <Slider
           label="Press Lift"
           value={settings.plateSpring ?? 0.35}
@@ -113,7 +133,7 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
           label="Glass Smear"
           value={settings.glassSmear}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ glassSmear: v })}
           settingKey="glassSmear"
@@ -194,6 +214,26 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ filmHold: v })}
           settingKey="filmHold"
         />
+        {/* How heavy the oil is against the water (PLAN 27f-9c): it acts on a standing plate (Gravity), where a heavy oil is a lava lamp's wax. */}
+        <Slider
+          label="Oil Weight"
+          value={settings.oilWeight ?? -0.05}
+          min={-1}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilWeight: v })}
+          settingKey="oilWeight"
+        />
+        {/* How thick the oil itself is (PLAN 38w-31), on Thickness's scale: a thin oil (a lamp's molten wax) is carried and sinks freely, a thick one lags the water. */}
+        <Slider
+          label="Oil Thickness"
+          value={settings.oilThickness ?? Math.log10(50) / 3}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilThickness: v })}
+          settingKey="oilThickness"
+        />
         <Slider
           label="Soap Bursts"
           value={settings.surfactantFlow ?? 0}
@@ -202,6 +242,15 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           step={0.05}
           onChange={(v: number) => onUpdate({ surfactantFlow: v })}
           settingKey="surfactantFlow"
+        />
+        <Slider
+          label="Soap Breakdown"
+          value={settings.soapBreakdown ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ soapBreakdown: v })}
+          settingKey="soapBreakdown"
         />
         {/*
           A clear oil film against the glass that tears into lace (PLAN §20b):
@@ -217,6 +266,33 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ clearFilm: v })}
           settingKey="clearFilm"
         />
+        {/*
+          The film's own dye (PLAN 20b-13): the lamp filtered over the film's
+          thickness, so the lace is a colour and the holes the water's. Shown
+          while there is a film to dye; the swatch is what one unit lets through.
+        */}
+        {(settings.clearFilm ?? 0) > 0.001 && (
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Slider
+                label="Film Dye"
+                value={settings.clearFilmDye ?? 0}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v: number) => onUpdate({ clearFilmDye: v })}
+                settingKey="clearFilmDye"
+              />
+            </div>
+            <input
+              type="color"
+              aria-label="Film dye colour"
+              value={settings.clearFilmDyeColor ?? '#ffd21a'}
+              onChange={(e) => onUpdate({ clearFilmDyeColor: e.target.value })}
+              className="mb-4 h-6 w-8 cursor-pointer rounded border-0 bg-transparent p-0"
+            />
+          </div>
+        )}
         <Slider
           label="Polarity (Repulsion)"
           value={settings.polarity}
@@ -289,7 +365,7 @@ export const FerroSection = ({ c }: { c: SectionCtx }) => {
           label="Pushes Dye"
           value={settings.phaseDisplace ?? 0}
           min={0}
-          max={1}
+          max={1.2}
           step={0.05}
           onChange={(v: number) => onUpdate({ phaseDisplace: v })}
           settingKey="phaseDisplace"
@@ -436,7 +512,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistry"
         />
         <Slider
-          label="↳ Pattern (Spots to Labyrinth)"
+          label="Pattern"
           value={settings.chemistryPattern ?? 0}
           min={0}
           max={1.0}
@@ -445,7 +521,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryPattern"
         />
         <Slider
-          label="↳ Pattern Width"
+          label="Pattern Width"
           value={settings.chemistryWidth ?? 0.5}
           min={0.1}
           max={1.0}
@@ -454,7 +530,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="chemistryWidth"
         />
         <Slider
-          label="↳ Turing Print"
+          label="Turing Print"
           value={settings.turingPrint ?? 0}
           min={0}
           max={1.0}
@@ -463,7 +539,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingPrint"
         />
         <Slider
-          label="↳ Print Ink (0 is Starch)"
+          label="Print Ink"
           value={settings.turingInk ?? 0}
           min={0}
           max={1.0}
@@ -472,7 +548,7 @@ export const ReactionsSection = ({ c }: { c: SectionCtx }) => {
           settingKey="turingInk"
         />
         <Slider
-          label="↳ Print Drift (0 is Still)"
+          label="Print Drift"
           value={settings.turingDrift ?? 0}
           min={0}
           max={1.0}

@@ -1,0 +1,99 @@
+# 19. The checks, the build and the plan itself (continued)
+
+Part 4 of 4 of §19; it begins at 19al. The section starts in `19-checks-build-plan.md`.
+
+## 19al. The handoff between the two tools waits on whoever notices (2026-11-07)
+
+First built 2026-10-24 as #450 (plan id 19ae then, since given to the phone check),
+closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
+
+- **19al-4. Open: the watcher no longer relays "ready".** With `READY` on the PR, the
+  reviewing thread can subscribe to each Antigravity PR and wake on the comment itself;
+  the Mac watcher keeps only what needs the Mac (full `qa`, driving Antigravity). A
+  process note for the coordinator, once the first live `READY` has been seen.
+- **19al-5. Open: measure how long each hop takes.** From the `READY`, `PASS`/`CHANGES`
+  and merge timestamps on each Antigravity PR: green → review, review → fix, fix →
+  merge. The daily scorecard reads open → merge today; split, it would show which hop to
+  fix next.
+- **19al-7. Open: nothing merges a ready PR by itself.** Found 2026-11-10: those five
+  sat labelled and green for a day, unmerged. Three causes, all in the hop after the
+  label. (1) `ready.yml` only labels and comments, by design: the merge was the
+  reviewing Claude session's, on its own `PASS` (19al-2). The owner's speed rule of
+  2026-11-08 dropped that review for Antigravity's PRs (all but payments, sign-in,
+  security and the licence Worker) but nothing took its place as the step that merges.
+  (2) Nothing wakes a Claude session on the label: no session subscribes to
+  Antigravity's PRs (19al-4 is still open), and the start-of-session queue check in
+  `CLAUDE.md` runs only when some session happens to start for something else.
+  (3) Antigravity does not merge PRs marked `review-owed`, every one of these still
+  said `Review owed: before-merge` from its prompt, and Antigravity was out of credit
+  from 06:29Z that day anyway. The obvious fix, enabling auto-merge when the label goes
+  on, would have shipped a false claim: one of the five (3.1, P7-cpu) was green
+  because it changed only `PLAN.md`, marking the CPU stepping deleted with the code
+  untouched and its own body saying "in progress". So the fix is: `ready.yml` labels
+  `ready-to-merge` (and turns on squash auto-merge, pinned to the head) only when the
+  handoff block says `Left: none`, `Done:` is not "in progress", the PR touches more
+  than the plan when its plan diff marks an item shipped, and no file is under the
+  payments, sign-in or Worker paths; anything else keeps `ready-for-review` for a
+  Claude session. Check: a stubbed-`gh` harness over the five PRs of 2026-11-09 (four
+  merge, P7-cpu stays) in `scripts/checks.json`.
+## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
+
+The owner's rule since 2026-11-01, made mechanical on 2026-11-09 (card 14 adopted
+13:12Z): on 11-08 the fifth shard was red on deploys 699 and 701 and 16 of 34 merges
+landed on a red main.
+
+- **19am-2. Declined (the owner, 2026-11-13): `Main not held red` stays advisory.** It
+  was to be added to ruleset 24848041's required checks, so that the status refused a
+  merge by itself. The owner chose to keep it a status the ship skill and
+  docs/handoff.md's merge step read, and not a rule on main. Nothing to build.
+- **19am-3. Open: the same check line, not the same shard.** A shard holds dozens of
+  lines, so two different flakes in `fifth` on two deploys hold main as if one check
+  were red. The failing lines are in each red job's log (`FAIL` lines from checks.mjs);
+  reading them would let the hold name the line and skip a shard red on two unrelated
+  lines. A quarantined line (19ak-1) still turns a deploy's shard red, so it holds main
+  today; whether a line-level hold skips quarantined lines is the owner's call.
+- **19am-4. Open: a merge during a hold is counted.** The daily scorecard could count
+  merges whose PR's status was red when it merged (a bypass by the owner, or a session
+  ignoring it), from the statuses API.
+- **19am-5. Open: `deploys()` against a recorded API.** The self-test drives the rule
+  and the early stop on saved runs, but not the HTTP reading itself (paging, the re-run
+  attempt lookup, the GraphQL read of each PR's status). A recorded set of responses
+  played through a stub `fetch` would cover it.
+## 19an. Conflict markers reached main and nothing stopped them (2026-11-11)
+
+A squash merge on 2026-11-10 (25i-10) landed `<<<<<<< HEAD` / `=======` / `>>>>>>>` blocks
+in `docs/judging.md` and `PLAN.md`: both sides had added a judging section numbered 121 and
+a running-order row. No check reads a file for markers, so CI was green and the deploy
+published a site built from a tree that still had them (Markdown only, so nothing broke at
+runtime; in a `.ts` file `lint` would have caught it). The judging block was resolved by
+hand, keeping both sections (24.3 stays §121, Chemical Clock's 25i-10 becomes §122, and
+25i-11's reference follows it).
+
+- **19an-1. Open: a check that fails on a committed conflict marker.** A `Measure` line that
+  greps every tracked text file for a line that is exactly `<<<<<<< `-prefixed, `=======` or
+  `>>>>>>> `-prefixed (the three together, so a Markdown rule of `=======` alone is not
+  caught), with a self-test that plants a block and goes red. An entry in
+  `scripts/checks.json`, not a step in `checks.yml`.
+
+## 19ao. The Mac app's ambient TV line fails when the hosted runner draws four frames a second (2026-11-12)
+
+`npm run desktop`'s line "ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds
+the opening rung" went red twice on the hosted macOS runner on PR #820 (runs 43277666913 and
+43277185397) with `drawn=4/s, skipped=118 of 120 Hz offers`, passed on the rerun, and passes
+on main. The code under test did what it should: the solver was at 30, the rung held, and
+118 of 120 offers were skipped. What failed is the floor in `drawCapped`
+(`scripts/desktop.mjs`): on the Mac it asks for five frames and five draws in the counted
+second, to say the plate is drawing and not stalled. That floor was already lowered once
+from 20, with a comment saying it "measured the runner"; at five it still does, because a
+loaded hosted runner drew four.
+
+- **19ao-1. Open: the floor counts frames a second on a machine whose speed is not the
+  feature.** The ceiling (no more than 60 draws on a 120 Hz offer) is the feature and stays.
+  The floor should ask what it means, that the plate is not stalled, without a rate: wait
+  for a set number of draws under ambient mode with a generous deadline (a condition, not a
+  second on the wall clock), then read the ratio of skipped offers to drawn frames over that
+  stretch, which a slow machine does not change. `npm run rungs` already counts the 120 Hz
+  cap on a clock the machine cannot touch; this line then only has to show the app is wired
+  to it and still drawing. Not a lowered number: four today would be three on a worse day.
+  Until then it is a known flake of the `desktop` job: rerun it, and count it in
+  `npm run flakes -- --check 'ambient TV'`.

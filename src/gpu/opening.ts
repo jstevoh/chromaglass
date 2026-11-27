@@ -26,9 +26,20 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
-import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
+import { macroAmountOf } from '../sim/constants';
+import { closeupFine } from './closeupWindow';
+import { WHOLE_DISPLAY, displayMayMask } from './displayLean';
+import { COVER_FULL_ML, coverNew } from '../lib/cover';
+import { DISH_GAP_FIELD_METRES, carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
 import { SPIKE_ONSET, fieldOnAxis } from './wgsl/spikes';
+
+/**
+ * `?lean=0` opens on the whole display, as before `displayLean.ts`: the
+ * other way for `npm run openingtime -- --variants ",lean=0"` to time
+ * against, on one build and interleaved.
+ */
+const LEAN_OFF = (() => { try { return new URLSearchParams(window.location.search).get('lean') === '0'; } catch { return false; } })();
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -80,10 +91,11 @@ export interface Opening {
    * The standing film (wgsl/standing.ts), when the look's own magnet is past
    * the spikes' onset on its axis. Added with PLAN 38k, whose real onset
    * (4 mT, where it was 22) put Magnet Garden's and Ferro Paint's own
-   * magnets past it: \`npm run startup\` on Metal found Magnet Garden asking
+   * magnets past it: `npm run startup` on Metal found Magnet Garden asking
    * for the film's pipelines in its first steps with no list naming them.
+   * Named apart from `film` below, the clear film (§20b), a different layer.
    */
-  film: boolean;
+  standing: boolean;
   /**
    * The plate stood up (Plate Upright), or the dye given weight (Dye
    * Weight): the mix's push on the flow (mixSmooth, mixForce) runs from the
@@ -113,6 +125,83 @@ export interface Opening {
    * then as before. Off the thin gap the dish is never stepped (`stepSlosh`).
    */
   slosh: boolean;
+  /**
+   * The clear film (PLAN §20b): carried, its pressure and its update, from
+   * the first step, when the look lays a film (Clear Film above nought).
+   * Added with Saffron Lace (PLAN 28l), the first look to lay one: `npm run
+   * startup` on the Mac found it asking for all three in its first steps
+   * with no list naming them. The film's level change (filmSplat) is a hand
+   * on the control mid-show, never an opening, so it stays behind the show.
+   */
+  film: boolean;
+  /**
+   * The sealed bottle (PLAN 27f-9): a thin gap stood up (Plate Upright above
+   * nought) takes its weight as the closed cell's circulation from the first
+   * step (sealSource, hsLiftRelax, sealFlow), where every other look builds
+   * them behind the show with the oil's lift. Added with the seal: `npm run
+   * startup` on the Mac found Lava Lamp asking for all three in its first
+   * steps with no list naming them. Until they are built the plate takes its
+   * weight on the open rim, so nothing was compiled on a frame, but the look
+   * opened on the leak the seal is there to stop.
+   */
+  sealed: boolean;
+  /**
+   * The frame's soap film (PLAN 32d): its solver's five kernels and the
+   * plate's three that drive it (the air, the re-dip's state and its lay),
+   * from the first step, when the look hangs a frame (Soap Film above
+   * nought). Added with the film: `npm run startup` on the Mac found Soap
+   * Film asking for all eight in its first steps with no list naming them.
+   * Every other look builds them behind the show, for the hand that turns
+   * Soap Film up mid-set.
+   */
+  soap: boolean;
+  /**
+   * The closeup's fine dye (PLAN 47a-1): its three kernels from the first
+   * step, when the look opens zoomed into the plate with Fine Detail up
+   * (macro-bead, cell-bloom, lace-run). Added with the fine dye's first
+   * kernels: the open check found those three looks asking for all three in
+   * their first steps with no list naming them. A look that opens at the
+   * plate builds them behind the show, for the hand that zooms in mid-set.
+   */
+  closeup: boolean;
+  /**
+   * Faraday waves (PLAN 48f, gpu/faraday.ts): the shaken dish's four
+   * kernels, from the first step when the look opens with its shaker on
+   * (Shaker above nought Hz); every other look builds them behind the show.
+   */
+  faraday: boolean;
+  /** The water's glow (PLAN 48c, gpu/glow.ts): its one pipeline ahead when the look opens glowing, behind the show otherwise. */
+  glow: boolean;
+  /**
+   * The display's effects this look can reach (`displayLean.ts`): the
+   * opening compiles a display with only these, and the whole one behind it.
+   */
+  display: number;
+  /**
+   * The look's own oil, laid with the look and waiting for the solver (Clock
+   * Glass, Splodascope, Lava Lamp, Lava Pop).
+   *
+   * Not a setting: it is what is on the plate. The mix's kernels run only
+   * once something has been poured into the mix (`mixLive`), and on every
+   * other opening nothing has, so they were built behind the show. Until
+   * PLAN 27f-9m these looks' oil was laid before the solver existed and let
+   * go, so their openings never ran the mix either, and the lists were right
+   * about a show that was wrong. With the oil kept for the solver (`mixWait` /
+   * `OwedLay`) it is laid on the solver's first step, and `npm run startup`
+   * on Metal read each asking on the frame for the mix's carry, relax,
+   * potential and update, the oil's force, and the bodies' and lift's kernels.
+   * The simulation says whether oil is waiting (`FluidSimulation.oilPending`),
+   * and the four below follow from it and the settings the step reads.
+   */
+  oil: boolean;
+  /** That oil's surface tension: smoothed shape, rim pressure and force (Oil Tension on, over oil that is there). */
+  oilPull: boolean;
+  /** Oil Bodies: each body's colour kept to it (partition, unspread, land, lay), which runs only over oil that pulls. */
+  oilBodies: boolean;
+  /** Film Hold's push between two drops, on over oil that pulls or under a standing plate's weight. */
+  filmHold: boolean;
+  /** The oil's lift up a rocked plate (PLAN 27f-5): a thin gap, Plate Rock above zero and oil that pulls. */
+  oilLift: boolean;
 }
 
 /**
@@ -136,7 +225,9 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   const viscosity = s.viscosity ?? DEFAULT_SETTINGS.viscosity;
   const bed = (viscosity === 'thin' ? 0.8 : 1.7) * (1 + (s.platePressure ?? DEFAULT_SETTINGS.platePressure ?? 0) * 0.8);
   const dragRate = (0.04 + (s.spinDrag ?? DEFAULT_SETTINGS.spinDrag ?? 0.25) * 1.2) * bed;
-  const tau = dragSeconds(carrierViscosity(viscosity));
+  const ml = Number.isFinite(s.liquidMl) ? s.liquidMl! : COVER_FULL_ML;
+  const coverUnits = coverNew(ml).h / DISH_GAP_FIELD_METRES;
+  const tau = dragSeconds(carrierViscosity(viscosity), coverUnits);
   let dish = 0, liquid = 0;
   for (let k = 0; k < 180; k++) {
     dish = dishFollow(dish, motor, dragRate, 1 / 60);
@@ -146,8 +237,11 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   return false;
 }
 
-export function openingOf(s: Partial<VisualizerSettings>): Opening {
+export function openingOf(s: Partial<VisualizerSettings>, oilWaiting = false): Opening {
   const on = (v: number | undefined) => (v ?? 0) > 0;
+  const thin = (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5;
+  const gravity = on(s.plateUpright) || on(s.solutalBuoyancy);
+  const oilPull = oilWaiting && on(s.oilTension);
   return {
     vorticity: on(s.vorticityConfinement),
     mix: on(s.surfactantFlow),
@@ -159,13 +253,28 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     particles: on(s.particles),
     camera: on(s.camera),
     stock: on(s.stock),
-    thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
+    thinGap: thin,
     spin: lookOpensSpinning(s),
     chemistry: on(s.chemistry),
-    film: on(s.phaseAmount) && on(s.magnetStrength)
+    standing: on(s.phaseAmount) && on(s.magnetStrength)
       && fieldOnAxis(s.magnetStrength!, magnetDepth(s.magnetHeight, s.phaseScale), magnetRadiusAt(s.magnetSize)) > SPIKE_ONSET,
-    gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
-    slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
-      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
+    gravity,
+    slosh: thin
+      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway))
+        // The Tilt knobs tip it too, either way (lib/handTilt.ts).
+        || (on(s.slosh) && (on(s.plateUpright) || on(Math.abs(s.plateTiltX ?? 0)) || on(Math.abs(s.plateTiltY ?? 0))))),
+    film: (s.clearFilm ?? 0) > 0.001,
+    sealed: thin && on(s.plateUpright),
+    soap: (s.soapFilm ?? 0) > 0.001,
+    closeup: closeupFine(s, macroAmountOf({ ...DEFAULT_SETTINGS, ...s })) > 0.001
+      && Math.round(s.kaleidoscope ?? 0) < 2 && !((s.dishSpread ?? 0) > 0.001),
+    faraday: (s.faradayHz ?? 0) > 0,
+    glow: (s.glow ?? 0) > 0.001,
+    display: LEAN_OFF ? WHOLE_DISPLAY : displayMayMask(s),
+    oil: oilWaiting,
+    oilPull,
+    oilBodies: oilPull && on(s.oilBodies),
+    filmHold: on(s.filmHold) && on(s.oilTension) && (oilWaiting || gravity),
+    oilLift: oilPull && thin && on(s.plateRock ?? DEFAULT_SETTINGS.plateRock),
   };
 }

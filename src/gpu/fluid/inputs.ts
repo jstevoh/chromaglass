@@ -7,12 +7,17 @@
 
 import { PingPong, bindGroup } from '../kit';
 import { splatKernel } from '../wgsl/splat';
-import { SPLAT_FLOATS, type SplatList } from '../splats';
+import { kernel } from '../wgsl/fluid';
+import { SPLAT_FLOATS, SplatList } from '../splats';
 import type { SolverCarry } from '../solverTypes';
 import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
-import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RGBA32, type FieldCarry } from './constants';
+import { pouredOf } from '../../lib/bubbleLiquid';
+import { LIQUID_SIGMA } from '../../lib/bubbles';
+import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
 import { FluidPasses } from './passes';
+import type { CoverState } from '../../lib/cover';
+import { captureFluidSnapshot, restoreFluidSnapshot, type FieldSnapshot, type SnapshotScalars, type SnapshotTargets } from './snapshot';
 
 export class FluidInputs extends FluidPasses {
   /**
@@ -29,14 +34,33 @@ export class FluidInputs extends FluidPasses {
   /** `videoFrames` holds a frame this solver poured, so the next can be differenced against it. */
   private videoPrimed = false;
   private videoRefused = false;
+  /** The last ink title's mask (pourInk), kept for the next title at the same size. */
+  private inkSrc: GPUTexture | null = null;
+  /** The ink's carrier's own mask when it is not the letters' (pourInk's `carrier.mask`, PLAN 37x-10g). */
+  private padSrc: GPUTexture | null = null;
+  /** A look's lay at the solver's grid and the oil's part of it (layDye), and whether it has an oil part. */
+  private seedDyeTex: GPUTexture | null = null;
+  private seedOilTex: GPUTexture | null = null;
+  private seedOil = false;
 
   /**
    * Fold the CPU-side deltas into the field. `dyeAdd` is L²×4 (R,G,B
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
+   *
+   * `oilAdd`, L²×4 like `dyeAdd`, is the part of `dyeAdd` a look's lay says
+   * is the oil's own colour (Oil Bodies), sent only by a lay that knows it
+   * (seedPreset's laySplodascope and the like): the oil's colour goes to the
+   * oil and the rest of the frame's dye to the water, where without it the
+   * frame's dye is shared by how much of each cell is oil (bodyLand). Sent
+   * whole, never by rows, and only on the flush that carries a lay.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null, rows: Uint8Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null, rows: Uint8Array | null = null, oilAdd: Float32Array | null = null): void {
     const q = this.device.queue;
+    if (oilAdd) {
+      this.ensureOilDelta();
+      this.uploads.write(q, this.cpuOilTex!, oilAdd, 16, null, this.L);
+    }
     /*
       The press's plate mean used to be worked out here, from the gap deltas
       just handed across over a resting gap of 0.03, so its source could be
@@ -83,27 +107,36 @@ export class FluidInputs extends FluidPasses {
     }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
-    this.writeSplatArgs(0);
+    // The presses' bowls since the last flush, as records (pressBowl).
+    const bowls = !this.bowls.empty;
+    if (bowls) this.splatRecords(this.bowls);
+    this.writeSplatArgs(this.bowls.count);
+    this.bowls.clear();
     const enc = this.device.createCommandEncoder({ label: 'deltas' });
     const pass = enc.beginComputePass({ label: 'deltas' });
     // Onto the full grid, the same bilinear the delta passes used to do
-    // themselves, so the two paths meet at one place. The video pour's
-    // frames since the last flush are added on the way (pourVideo).
+    // themselves. The video pour's frames since the last flush are added
+    // on the way (pourVideo). Only cpuMulTex skips upsample when no bodyLand/bodyLay needs deltaMulTex.
+    const bodyMul = !!((oilAdd || this.oilLayPending || (this.bodiesWanted && !this.oilDyeStale)) && this.mix && this.mixLive);
     if (this.videoPending) {
       this.upsampleSum(pass, this.cpuDyeTex, this.videoDye!.read, this.deltaDyeTex);
-      this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
+      if (!bowls || !this.splatRun(pass, 'upsampleDeltaSumPress', RGBA32, [this.cpuVelTex, this.videoVel!.read, this.splatBuf!, this.deltaVelTex], this.N))
+        this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
       this.videoPending = false;
     } else {
       this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
-      this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
+      // The gap rides in the velocity's delta (.w), and the bowls with it.
+      if (!bowls || !this.splatRun(pass, 'upsampleDeltaPress', RGBA32, [this.cpuVelTex, this.splatBuf!, this.deltaVelTex], this.N))
+        this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
     }
-    this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
+    if (bodyMul) this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
     // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
     if (hands) this.handLive = true;
     if (breath) { this.upsample(pass, this.cpuBreathTex!, this.breathTex!); this.breathLive = true; }
     if (sheet) this.upsample(pass, this.cpuSheetTex!, this.sheetTex!);
-    this.foldDeltas(pass, !!sheet);
+    if (oilAdd) { this.upsample(pass, this.cpuOilTex!, this.deltaOilTex!); this.oilLayPending = true; }
+    this.foldDeltas(pass, !!sheet, bodyMul);
     pass.end();
     this.submit(enc);
   }
@@ -115,6 +148,20 @@ export class FluidInputs extends FluidPasses {
   applySplats(list: SplatList, dt: number): void {
     if (list.empty) return;
     const q = this.device.queue;
+    this.splatRecords(list);
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
+    q.writeBuffer(this.sim, 0, this.simData);
+    this.writeSplatArgs(list.count);
+    const enc = this.device.createCommandEncoder({ label: 'splats' });
+    const pass = enc.beginComputePass({ label: 'splats' });
+    this.splatPass(pass);
+    this.foldDeltas(pass);
+    pass.end();
+    this.submit(enc);
+  }
+
+  /** The records into the splat buffer, grown to hold them. */
+  private splatRecords(list: SplatList): void {
     const bytes = Math.max(64, list.count * SPLAT_FLOATS * 4);
     if (!this.splatBuf || this.splatBuf.size < bytes) {
       if (this.splatBuf) this.disposer.release(this.splatBuf);
@@ -125,16 +172,21 @@ export class FluidInputs extends FluidPasses {
       this.groups.clear();
       this.groupRoot = { kids: new Map() };
     }
-    q.writeBuffer(this.splatBuf, 0, list.records);
-    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
-    q.writeBuffer(this.sim, 0, this.simData);
-    this.writeSplatArgs(list.count);
-    const enc = this.device.createCommandEncoder({ label: 'splats' });
-    const pass = enc.beginComputePass({ label: 'splats' });
-    this.splatPass(pass);
-    this.foldDeltas(pass);
-    pass.end();
-    this.submit(enc);
+    this.device.queue.writeBuffer(this.splatBuf, 0, list.records);
+  }
+
+  /** The presses' bowls waiting for the next flush (pressBowl). */
+  private readonly bowls = new SplatList(16);
+
+  /**
+   * A press on a thin gap, laid as the glass's own bowl at the solver's
+   * resolution (PLAN 18a-14; the reason is upsampleDeltaPress's, in
+   * wgsl/splat.ts). In logical cells, as the splat records are, with the
+   * centre and radius unrounded. It lands with the next applyDeltas, which
+   * the caller owes (the simulation's foldDue).
+   */
+  pressBowl(x: number, y: number, radius: number, amount: number): void {
+    this.bowls.disc(x, y, radius, { gap: -3 * amount, falloff: 'plate' });
   }
 
   /**
@@ -160,14 +212,7 @@ export class FluidInputs extends FluidPasses {
     rec[7] = opts.floor ?? 0.5;                       // the dye a dark pixel still pours
     rec[12] = opts.strength ?? 1.5;
     rec[13] = opts.flipY === false ? 0 : 1;
-    const bytes = SPLAT_FLOATS * 4;
-    if (!this.splatBuf || this.splatBuf.size < bytes) {
-      if (this.splatBuf) this.disposer.release(this.splatBuf);
-      this.splatBuf = this.disposer.track(this.device.createBuffer({ label: 'splats', size: 1024, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
-      this.groups.clear();
-      this.groupRoot = { kids: new Map() };
-    }
-    this.device.queue.writeBuffer(this.splatBuf, 0, rec);
+    this.oneRecord(rec);
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     this.writeSplatArgs(1);
@@ -175,12 +220,170 @@ export class FluidInputs extends FluidPasses {
     const enc = this.device.createCommandEncoder({ label: 'pour image' });
     const pass = enc.beginComputePass({ label: 'pour image' });
     this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // the picture adds; it takes nothing away
-    this.splatRun(pass, 'pourImage', 'rgba32float', [this.splatBuf, this.deltaDyeTex, tex, this.sampler], this.N, false);
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.splatRun(pass, 'pourImage', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, tex, this.sampler], this.N, false);
+    this.run2(
+      pass,
+      'deltaFold',
+      this.dye.write,
+      this.vel.write,
+      [this.dye.read, this.vel.read, this.deltaDyeTex, this.deltaVelTex, this.deltaMulTex],
+      this.arg('delta fold image', [0, -1, 0, 0]),
+    );
     this.dye.swap();
     pass.end();
     this.submit(enc);
     tex.destroy();
+  }
+
+  /**
+   * A title poured as ink (PLAN 37x-10, lib/inkTitle.ts): `mask` is n × n of
+   * coverage 0..1, row 0 at the plate's bottom, and `rgb` the ink's
+   * absorbances; `density` of dye lands where the coverage is 1, added to
+   * what is there and never replacing it, so a title poured over a pool
+   * leaves the pool and the title both.
+   *
+   * At the solver's own grid and not the logical one: the wall is drawn from
+   * this grid, and letters laid at 192 and stretched to 1024 came out soft.
+   * The mask goes over as a texture (8 bits, as the video's frame does) and
+   * each cell takes the mean of its footprint's taps (wgsl/splat.ts
+   * `pourInk`), so a mask at any size lands at this one. Then the same fold
+   * a pour's dye takes (`foldDye`), with Oil Bodies' share of it, so the
+   * ink is ordinary dye from here on. False when nothing was poured.
+   *
+   * `carrier`, on a thin gap: the liquid the ink is made up in (PLAN
+   * 37x-10g), laid into the species field under the same mask, `share` of
+   * the column where the coverage is 1, with its ln(ν/ν_water). A title
+   * poured in the plate's own liquid was smeared by a lively look's flow in
+   * about a second, before anyone could read it (the private rehearsal,
+   * 2026-11-09): the ink was as thin as what it lay in. Made up thick, the
+   * letters are a liquid the flow has to go round (hsPrep reads the
+   * species' viscosity into the drag and the mobility, PLAN 18d), so they
+   * hold their shape while the clear liquid round them moves, and the
+   * carrier's share is carried with the dye from then on, so the two stay
+   * together until the wash breaks them up and the plate mixes them in.
+   */
+  pourInk(mask: Float32Array, n: number, rgb: readonly number[], density: number, carrier?: { share: number; lnNu: number; index: number; mask?: Float32Array }): boolean {
+    if (!(n > 0) || mask.length < n * n || !(density > 0)) return false;
+    const d = this.device;
+    if (!this.inkSrc || this.inkSrc.width !== n) {
+      if (this.inkSrc) this.disposer.release(this.inkSrc);
+      this.inkSrc = this.disposer.track(d.createTexture({
+        label: 'ink mask', size: [n, n], format: 'r8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      }));
+    }
+    const bytes = new Uint8Array(n * n);
+    for (let k = 0; k < n * n; k++) bytes[k] = Math.round(Math.min(1, Math.max(0, mask[k])) * 255);
+    d.queue.writeTexture({ texture: this.inkSrc }, bytes, { bytesPerRow: n }, [n, n]);
+    const rec = new Float32Array(SPLAT_FLOATS);
+    rec.set([rgb[0] * density, rgb[1] * density, rgb[2] * density, density], 4);
+    this.oneRecord(rec);
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    d.queue.writeBuffer(this.sim, 0, this.simData);
+    this.writeSplatArgs(1);
+    const enc = d.createCommandEncoder({ label: 'pour ink' });
+    const pass = enc.beginComputePass({ label: 'pour ink' });
+    this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // the ink adds; it takes nothing away
+    const poured = this.splatRun(pass, 'pourInk', RGBA32, [this.splatBuf!, this.inkSrc, this.sampler, this.deltaDyeTex], this.N, false);
+    if (poured) this.foldDye(pass);
+    if (poured && carrier && carrier.share > 0 && this.thinLive) {
+      if (!this.species) this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
+      const s = this.species;
+      if (!this.speciesLive) for (const t of [s.a, s.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+      let pad = this.inkSrc;
+      if (carrier.mask && carrier.mask.length >= n * n) {
+        if (!this.padSrc || this.padSrc.width !== n) {
+          if (this.padSrc) this.disposer.release(this.padSrc);
+          this.padSrc = this.disposer.track(d.createTexture({
+            label: 'ink pad', size: [n, n], format: 'r8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          }));
+        }
+        for (let k = 0; k < n * n; k++) bytes[k] = Math.round(Math.min(1, Math.max(0, carrier.mask[k])) * 255);
+        d.queue.writeTexture({ texture: this.padSrc }, bytes, { bytesPerRow: n }, [n, n]);
+        pad = this.padSrc;
+      }
+      this.run(pass, 'inkSpecies', s.write, [s.read, pad, this.sampler], this.arg('ink species', [Math.min(1, carrier.share), Math.max(0, carrier.lnNu), 0, carrier.index]));
+      s.swap();
+      this.speciesLive = true;
+      this.speciesQuiet++;
+    }
+    pass.end();
+    this.submit(enc);
+    return poured;
+  }
+
+  /** The oil's share of a lay, the CPU's L² and the solver's N², made together the first time a lay needs them (applyDeltas, layDye). */
+  private ensureOilDelta(): void {
+    if (this.cpuOilTex) return;
+    const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    this.cpuOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
+    this.deltaOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta', size: [this.N, this.N], format: RGBA32, usage }));
+  }
+
+  /**
+   * A look's lay at the solver's own grid (PLAN 38w-8): `dye` the whole lay,
+   * N²×4 in the CPU's delta format (each channel's absorbance times the
+   * amount, then the amount), `oil` the part of it that is the oil's own
+   * colour (applyDeltas' oilAdd, the same format), or null. Held here until
+   * the next lay replaces it, and laid on the plate a share at a time by
+   * layShare.
+   *
+   * Why not the CPU's arrays: they are the 192² grid the app's deltas are
+   * written on, carried up to the solver's by a bilinear (applyDeltas). The
+   * frame on the wall is the middle 0.42 of the plate, so one of those cells
+   * is about seven pixels of a 1080-line wall, and Classic's cells, each a
+   * colour laid in an oil whose rim the solver draws a cell wide, had a dye
+   * edge seven times softer than its oil's: the colour bled past the
+   * meniscus into the water and the small cells were blurs (the owner,
+   * 2026-11-21: "pixelated", then "complexity and clarity"). Laid here, the
+   * dye's edge is the oil's.
+   */
+  layDye(dye: Float32Array, oil: Float32Array | null): boolean {
+    const n = this.N;
+    if (dye.length < n * n * 4) return false;
+    const d = this.device;
+    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    if (!this.seedDyeTex) this.seedDyeTex = this.disposer.track(d.createTexture({ label: 'lay seed dye', size: [n, n], format: RGBA32, usage }));
+    d.queue.writeTexture({ texture: this.seedDyeTex }, dye, { bytesPerRow: n * 16 }, [n, n]);
+    this.seedOil = !!oil && oil.length >= n * n * 4;
+    if (this.seedOil) {
+      this.ensureOilDelta();
+      if (!this.seedOilTex) this.seedOilTex = this.disposer.track(d.createTexture({ label: 'lay seed oil', size: [n, n], format: RGBA32, usage }));
+      d.queue.writeTexture({ texture: this.seedOilTex }, oil!, { bytesPerRow: n * 16 }, [n, n]);
+    }
+    return true;
+  }
+
+  /** `k` of the lay layDye holds onto the plate, through the same fold a CPU delta takes (foldDye), the oil's share to the oil. */
+  layShare(k: number): void {
+    if (!this.seedDyeTex || !(k > 0)) return;
+    const d = this.device;
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    d.queue.writeBuffer(this.sim, 0, this.simData);
+    const enc = d.createCommandEncoder({ label: 'lay share' });
+    const pass = enc.beginComputePass({ label: 'lay share' });
+    const share = this.arg('lay share', [k, 0, 0, 0]);
+    this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // a lay adds; it takes nothing away
+    this.run(pass, 'seedShare', this.deltaDyeTex, [this.seedDyeTex], share);
+    if (this.seedOil) {
+      this.run(pass, 'seedShare', this.deltaOilTex!, [this.seedOilTex!], share);
+      this.oilLayPending = true;
+    }
+    this.foldDye(pass);
+    pass.end();
+    this.submit(enc);
+  }
+
+  /** One splat record in the splat buffer, for a pour of one thing (pourImage, pourInk). */
+  private oneRecord(rec: Float32Array): void {
+    if (!this.splatBuf || this.splatBuf.size < rec.byteLength) {
+      if (this.splatBuf) this.disposer.release(this.splatBuf);
+      this.splatBuf = this.disposer.track(this.device.createBuffer({ label: 'splats', size: 1024, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
+      this.groups.clear();
+      this.groupRoot = { kids: new Map() };
+    }
+    this.device.queue.writeBuffer(this.splatBuf, 0, rec);
   }
 
   /**
@@ -305,24 +508,72 @@ export class FluidInputs extends FluidPasses {
     this.splatRun(pass, 'splatDeltas', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, this.deltaVelTex, this.deltaMulTex], this.N);
   }
 
-  /** Dye, velocity and the plate gap take up whatever is in the delta fields, and with `sheet` the rhythm sheet's change. */
-  private foldDeltas(pass: GPUComputePassEncoder, sheet = false): void {
+  /** The dye (and velocity when `writeVel`) takes up the delta fields (foldDeltas, and pourInk's ink on its own). */
+  private foldDye(pass: GPUComputePassEncoder, writeVel = false, fullRes = true): void {
     /*
       Oil Bodies: the dye that lands this frame is shared between the two
       liquids by how much of each is where it lands (bodyLand), before the
       whole is added to, so both read the same plate.
     */
-    if (this.bodiesWanted && this.mix && this.mixLive && !this.oilDyeStale) {
+    if (this.oilLayPending && this.mix && this.mixLive) {
+      /*
+        A look's lay that says which colour is the oil's (applyDeltas'
+        oilAdd, PLAN 47z-1): the oil takes its own colour, the water the
+        rest, whatever share of each cell is oil. Shared by the oil under
+        each cell instead, as bodyLand does, a lay's rim (a cell or two where
+        the CPU's bilinear colour and the solver's sharper oil disagree, and
+        Cahn–Hilliard then widens to four) handed the water's cobalt to the
+        oil and each drop's colour to the water: the water's colour then
+        crept into each drop from its edge, yellow going orange and brown
+        over ten seconds (28k-5), and each drop's own colour lay round it in
+        the water, where it multiplied with the water's toward black.
+
+        Laid whether or not the last step asked for Oil Bodies, since a look
+        is laid before its first step: the share is made if need be and is
+        no longer stale, so that first step does not share the plate over
+        again by the oil (bodiesFresh). Where the share was stale, the
+        colour already on the plate is shared that way first.
+      */
+      const od = this.ensureOilDye();
+      if (this.oilDyeStale) {
+        for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+        this.run(pass, 'bodyLand', od.write, [od.read, this.dye.read, this.deltaMulTex, this.mix.read], this.arg('body start', [0, 0, 0, 0]));
+        od.swap();
+        this.oilDyeStale = false;
+      }
+      this.run(pass, 'bodyLay', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.deltaOilTex!], this.arg('none', [0, 0, 0, 0]));
+      od.swap();
+    } else if (this.bodiesWanted && this.mix && this.mixLive && !this.oilDyeStale) {
       const od = this.ensureOilDye();
       this.run(pass, 'bodyLand', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.mix.read], this.arg('none', [0, 0, 0, 0]));
       od.swap();
     }
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
+    this.oilLayPending = false;
+    const args = writeVel
+      ? this.arg(fullRes ? 'delta fold' : 'delta fold cpu', [this.thinLive ? 1 : 0, fullRes ? 0 : 1, 0, 0])
+      : this.arg('delta fold dye', [0, -1, 0, 0]);
+    this.run2(
+      pass,
+      'deltaFold',
+      this.dye.write,
+      this.vel.write,
+      [this.dye.read, this.vel.read, this.deltaDyeTex, this.deltaVelTex, fullRes ? this.deltaMulTex : this.cpuMulTex],
+      args,
+    );
     this.dye.swap();
-    this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
-    this.vel.swap();
-    this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
-    this.vel.swap();
+    if (writeVel) this.vel.swap();
+  }
+
+  /**
+   * Dye, velocity and the plate gap take up whatever is in the delta fields, and with `sheet` the rhythm sheet's change.
+   *
+   * What a poured liquid does to the plate is not here any more (PLAN 15e-1):
+   * it ran in this fold, so only on a step something else had written deltas
+   * for, and twice on a step folded twice. It is the step's own now
+   * (`stepLiquids`, passes.ts, which says what was measured).
+   */
+  private foldDeltas(pass: GPUComputePassEncoder, sheet = false, fullRes = true): void {
+    this.foldDye(pass, true, fullRes);
     if (sheet) this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.sheetTex!], this.arg('squeeze delta sheet', [1, this.thinLive ? 1 : 0, 1, 0]));
     else this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
     this.squeeze.swap();
@@ -506,7 +757,7 @@ export class FluidInputs extends FluidPasses {
    * for a check that needs a pool in place (`npm run thick`). Only on a thin
    * gap; in plate units.
    */
-  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume = true): void {
+  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number }, plateSigma = LIQUID_SIGMA): void {
     if (!(radius > 0) || !(take > 0)) return;
     const enc = this.device.createCommandEncoder({ label: 'pour' });
     const pass = enc.beginComputePass({ label: 'pour' });
@@ -517,16 +768,30 @@ export class FluidInputs extends FluidPasses {
       if (!this.species) this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
       const s = this.species;
       if (!this.speciesLive) for (const t of [s.a, s.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-      this.run(pass, 'speciesSplat', s.write, [s.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.scatter ?? 0, sp.index, push ? 1 : 0]));
+      this.run(pass, 'speciesSplat', s.write, [s.read, this.squeeze.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.scatter ?? 0, sp.index, push ? 1 : 0]));
       s.swap();
       this.speciesLive = true;
       this.speciesQuiet++;
+      this.speciesPoured = pouredOf(what ?? sp, plateSigma);
     }
     if (push) {
       this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
     }
     pass.end();
     this.submit(enc);
+  }
+
+  /**
+   * Whether `pour` can push its volume without compiling: `pourVolume` is
+   * built behind the show (fluid.ts, nothing poured in an opening's first
+   * steps), and `computePipeline` builds a missing pipeline on the frame that
+   * asks. Classic's automation drops colour from its first seconds, so a drop
+   * that poured then compiled it in the opening, which `npm run startup`
+   * read as the show's own wait (2.79 and 3.62 s against 1.22 and 1.35 for
+   * ?prepare=0, on 18c-2's branch). Until it is in, a drop is a stamp.
+   */
+  pourReady(): boolean {
+    return !!this.hsPour && this.pipelines.hasCompute(this.pipelineKey('pourVolume', 'thin'), kernel('pourVolume', 'rgba16float'));
   }
 
   /**
@@ -579,6 +844,17 @@ export class FluidInputs extends FluidPasses {
     const soap = (what.soap ?? 0) * amount;
     const body = (what.body ?? 0) * amount;
     const repel = (what.repel ?? 0) * amount;
+    /*
+      A light liquid's weight (an oil, alcohol, a soap: w below zero) goes in
+      liquids1.g as its lightness, a heavy one's in liquids0.a, so each field
+      holds only what is not negative (PLAN 15e-10). The carries keep a
+      field from going below zero (bodyAdvect's floor, there for the dye),
+      and one field of signed w lost every light bottle's weight on its
+      first step: an alcohol drop on a rocked thin gap moved nothing
+      (`npm run liquidfall`). The polarity's sign meets the same floor;
+      on a thin gap it no longer pushes (liquidForces), and the open plate
+      keeps it as it was.
+    */
     const weight = what.weight ?? 0;
     const polar = what.polarity ?? 0;
     const enc = this.device.createCommandEncoder({ label: 'add liquid drop' });
@@ -586,13 +862,14 @@ export class FluidInputs extends FluidPasses {
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     this.run(pass, 'liquidSplat0', this.liquids0.write, [this.liquids0.read],
-      this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, weight]));
+      this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, Math.max(0, weight)]));
     this.liquids0.swap();
     this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
-      this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
+      this.arg('liquid splat 1', [x, y, radius, take, polar, Math.max(0, -weight), 0, 0]));
     this.liquids1.swap();
     pass.end();
     this.submit(enc);
+    this.liquidsLive = true;
   }
 
   addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
@@ -609,6 +886,28 @@ export class FluidInputs extends FluidPasses {
     m.swap();
     pass.end();
     this.submit(enc);
+    this.mixLive = true;
+  }
+
+  /**
+   * Lay the oil cell for cell (Foam Cells, PLAN 47z-5): `oil(x, y, n)` is
+   * asked for every cell of the mix at its middle, in plate units, with the
+   * mix's own size, and what it answers (0..1) replaces the oil there; the
+   * soap and the acidity are cleared with it, as a fresh plate has none.
+   * addMix lays discs, which is all a crowd needs, but a foam's drops are
+   * pressed into polygons with a film between each pair (oilLay.ts,
+   * foamCell), which no sum of discs draws.
+   */
+  layOil(oil: (x: number, y: number, n: number) => number): void {
+    const m = this.ensureMix();
+    const n = this.N, data = new Float32Array(n * n * 4);
+    let sum = 0;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const c = Math.max(0, Math.min(1, oil((i + 0.5) / n, (j + 0.5) / n, n)));
+      data[(i + j * n) * 4] = c; sum += c;
+    }
+    this.device.queue.writeTexture({ texture: m.read }, data, { bytesPerRow: n * 16 }, [n, n]);
+    this.oilPoured = sum / (n * n);
     this.mixLive = true;
   }
 
@@ -703,8 +1002,12 @@ export class FluidInputs extends FluidPasses {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.speciesClears++;
+    this.speciesPoured = null;
+    this.speciesSnap = null;
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
@@ -823,6 +1126,140 @@ export class FluidInputs extends FluidPasses {
     if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
     this.submit(enc);
     return true;
+  }
+
+  private snapshotTargets(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): SnapshotTargets {
+    return {
+      device: this.device,
+      n: this.N,
+      m: this.M,
+      disposed: this.disposed,
+      submit: (enc) => this.submit(enc),
+      dye: this.dye,
+      vel: this.vel,
+      velForced: this.velForced,
+      squeeze: this.squeeze,
+      cur: this.cur,
+      swirl: this.swirl,
+      phase: this.phase,
+      mix: this.mix,
+      ensureMix: () => this.ensureMix(),
+      oilDye: this.oilDye,
+      ensureOilDye: () => this.ensureOilDye(),
+      liquids0: this.liquids0,
+      liquids1: this.liquids1,
+      species: this.species,
+      ensureSpecies: () => (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species')),
+      chem: this.chem,
+      activeMat: this.activeMat,
+      rxn: this.rxn,
+      ensureRxn: () => this.ensureRxn(),
+      lies: this.lies,
+      ensureLies: () => this.ensureLies(),
+      boilAlpha: this.boilAlpha,
+      ensureBoilAlpha: () => (this.boilAlpha ??= new PingPong(this.device, this.disposer, [this.N, this.N], RG32, 'boil alpha')),
+      film: this.film,
+      ensureFilm: () => this.ensureFilm(),
+      hsGap: this.hsGap,
+      hsP: this.hsP,
+      hsP2: this.hsP2,
+      ensureThinGap: () => this.ensureThinGap(),
+      scalars: {
+        phaseLive: this.phaseLive,
+        mixLive: this.mixLive,
+        oilPoured: this.oilPoured,
+        oilDyeStale: this.oilDyeStale,
+        bodiesWanted: this.bodiesWanted,
+        oilLayPending: this.oilLayPending,
+        liquidsLive: this.liquidsLive,
+        speciesLive: this.speciesLive,
+        speciesClears: this.speciesClears,
+        speciesPoured: this.speciesPoured,
+        speciesSnap: this.speciesSnap,
+        speciesDisp: this.speciesDisp,
+        lastSpeciesCarry: this.lastSpeciesCarry,
+        chemLive: this.chemLive,
+        reagentLive: this.reagentLive,
+        rxnLive: this.rxnLive,
+        liesLive: this.liesLive,
+        swirlLive: this.swirlLive,
+        swirlTail: this.swirlTail,
+        boilLive: this.boilLive,
+        boilFresh: this.boilFresh,
+        boilTail: this.boilTail,
+        airPush: this.airPush,
+        airCover: this.airCover,
+        airCoverPrev: this.airCoverPrev,
+        airQuietSeconds: this.airQuietSeconds,
+        filmLaid: this.filmLaid,
+        grainAge: this.grainAge,
+        heatSeconds: this.heatSeconds,
+        coverGap: this.coverGap,
+        lastCurve: this.lastCurve,
+        thinLive: this.thinLive,
+        hsPrimed: this.hsPrimed,
+        phaseGapPrimed: this.phaseGapPrimed,
+        glassFlow: this.glassFlow,
+        ...cover,
+      },
+    };
+  }
+
+  protected captureFieldSnapshot(cover: {
+    cover: CoverState | null; coverMl: number; coverPoured: number; coverLaid: number;
+  }): FieldSnapshot | null {
+    return captureFluidSnapshot(this.snapshotTargets(cover));
+  }
+
+  protected applyFieldSnapshot(snap: FieldSnapshot): SnapshotScalars | null {
+    if (!restoreFluidSnapshot(this.snapshotTargets({
+      cover: null, coverMl: 0, coverPoured: 0, coverLaid: 0,
+    }), snap)) return null;
+    const s = snap.scalars;
+    this.phaseLive = s.phaseLive;
+    this.mixLive = s.mixLive;
+    this.oilPoured = s.oilPoured;
+    this.oilDyeStale = s.oilDyeStale;
+    this.bodiesWanted = s.bodiesWanted;
+    this.oilLayPending = s.oilLayPending;
+    this.liquidsLive = s.liquidsLive;
+    this.speciesLive = s.speciesLive;
+    this.speciesClears = s.speciesClears;
+    this.speciesPoured = s.speciesPoured ? { ...s.speciesPoured } : null;
+    this.speciesSnap = s.speciesSnap
+      ? { L: s.speciesSnap.L, data: new Float32Array(s.speciesSnap.data), poured: { ...s.speciesSnap.poured } }
+      : null;
+    this.speciesDisp = s.speciesDisp;
+    this.lastSpeciesCarry = s.lastSpeciesCarry;
+    this.chemLive = s.chemLive;
+    this.reagentLive = s.reagentLive;
+    this.rxnLive = s.rxnLive;
+    this.liesLive = s.liesLive;
+    this.swirlLive = s.swirlLive;
+    this.swirlTail = s.swirlTail;
+    this.boilLive = s.boilLive;
+    this.boilFresh = s.boilFresh;
+    this.boilTail = s.boilTail;
+    this.airPush = s.airPush;
+    this.airCover = s.airCover;
+    this.airCoverPrev = s.airCoverPrev;
+    this.airQuietSeconds = s.airQuietSeconds;
+    this.air?.setBoilAlpha(this.boilLive && this.boilAlpha ? this.boilAlpha.read : null);
+    this.filmLaid = s.filmLaid;
+    this.grainAge = s.grainAge;
+    this.heatSeconds = s.heatSeconds;
+    this.coverGap = s.coverGap;
+    this.lastCurve = s.lastCurve;
+    this.thinLive = s.thinLive;
+    this.hsPrimed = s.hsPrimed;
+    this.phaseGapPrimed = s.phaseGapPrimed;
+    this.glassFlow = [s.glassFlow[0], s.glassFlow[1]];
+    this.printLive = false;
+    this.videoPending = false;
+    this.rbDyeSeq = -1;
+    return s;
   }
 
   /** One frame of the drain: inward spiral, transport, evaporate. */

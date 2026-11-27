@@ -32,7 +32,7 @@ struct Splat {
   // vx, vy, temperature, and the change in the plate gap.
   c: vec4f,
   // The dye multiplier at the centre (1 leaves it alone), the falloff
-  // (0 flat, 1 linear, 2 squared, 3 gaussian), and a line's far end.
+  // (0 flat, 1 linear, 2 squared, 3 gaussian, 4 plate), and a line's far end.
   d: vec4f,
 };
 
@@ -51,6 +51,10 @@ fn falloff(mode: f32, d: f32, r: f32) -> f32 {
   let t = 1.0 - d / max(r, 0.0001);
   if (mode < 1.5) { return t; }                        // linear
   if (mode < 2.5) { return t * t; }                    // squared
+  if (mode > 3.5) {                                    // plate: a clamped glass's deflection
+    let q = 1.0 - (d * d) / max(r * r, 0.0001);
+    return q * q;
+  }
   let s = max(r * 0.5, 0.0001);                        // gaussian, as splatBlob
   return exp(-(d * d) / (2.0 * s * s));
 }
@@ -135,8 +139,59 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dye, vec2i(id.xy), vec4f(absorb * amount, amount));
 }`,
 
+  /**
+   * A title poured as ink (PLAN 37x-10, `pourInk`): a coverage mask of any
+   * size, its rows counting up the plate as the grid's do, laid at the
+   * solver's own grid as dye. Each cell is the mean of a few bilinear taps
+   * over its footprint, up to four a side, as the video pour samples its
+   * frame: letters taken at one point a cell alias, and a reference pour
+   * laid by nearest cell read 0.789 against the 0.8 the check asks of a
+   * title just landed (`npm run inktitle`). A mask already at the grid's
+   * size takes one tap at each texel's centre, its own value.
+   *
+   * The record's b is the ink: its absorbances × density in rgb, the density
+   * in a. Written to the dye's delta, which the caller adds to the dye.
+   */
+  pourInk: `${SPLAT_STRUCT}
+@group(0) @binding(1) var<storage, read> splats: array<Splat>;
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var lin: sampler;
+@group(0) @binding(4) var dye: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
+  let taps = vec2u(clamp(ceil(vec2f(textureDimensions(src)) / A.n), vec2f(1.0), vec2f(4.0)));
+  var cover = 0.0;
+  for (var j = 0u; j < taps.y; j = j + 1u) {
+    for (var i = 0u; i < taps.x; i = i + 1u) {
+      let uv = (vec2f(id.xy) + (vec2f(f32(i), f32(j)) + 0.5) / vec2f(taps)) / A.n;
+      cover += textureSampleLevel(src, lin, uv, 0.0).r;
+    }
+  }
+  textureStore(dye, vec2i(id.xy), splats[0].b * (cover / f32(taps.x * taps.y)));
+}`,
+
   /** Bilinear from the CPU's 192² delta arrays onto the full grid. */
   upsampleDelta: upsample(false),
+
+  /**
+   * The same, with a press's bowl added where it is laid, at the solver's
+   * own cells (PLAN 18a-14). A press on a thin gap is the glass bending under
+   * a palm, a clamped plate's deflection, −3·amount·(1 − d²/R²)², smooth to
+   * the rim (lib/squish.ts). Laid on the 192² grid, at a whole cell, and
+   * carried up by the bilinear above, that bowl reached a 384² or 768²
+   * solver as flat facets a grid cell wide with creases between them, and
+   * the creases are where the film's closing (Stefan's law, squeezeUpdate)
+   * changes rate: the liquid driven out of the gap left in a polygon, which
+   * the owner saw as a pixelated press. At a full Amount the middle reaches
+   * the floor and the creases sit under glass that is closed anyway; at a
+   * low Amount nothing reaches the floor and every crease shows. The bowl is
+   * one record with an unrounded centre and radius, evaluated here at every
+   * solver cell, so the glass is as smooth as the solver can draw it. Added
+   * in the same pass as the CPU's deltas, so the step still folds once: the
+   * gap's rate (dh/dt, the Reynolds source) is worked out per fold, and a
+   * second fold would also spring the glass twice.
+   */
+  upsampleDeltaPress: upsample(false, true),
 
   /**
    * The same, of the CPU's deltas and the video pour's added (PLAN 14ab-2):
@@ -145,6 +200,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    * bilinear is linear, so the sum's is the sum of each one's.
    */
   upsampleDeltaSum: upsample(true),
+
+  /** Both: a press during a video pour (upsampleDeltaPress's bowl, on the sum). */
+  upsampleDeltaSumPress: upsample(true, true),
 
   /**
    * The video pour's frame, drawn at the logical grid (PLAN 14ab-2). The app
@@ -224,12 +282,20 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 };
 
-/** The upsample's source, of one delta grid or (`sum`) of two added. */
-function upsample(sum: boolean): string {
+/** The upsample's source, of one delta grid or (`sum`) of two added, and (`press`) the records' bowls on top. */
+function upsample(sum: boolean, press = false): string {
   const at = (q: string) => (sum ? `(textureLoad(src, ${q}, 0) + textureLoad(more, ${q}, 0))` : `textureLoad(src, ${q}, 0)`);
+  const bind = (sum ? 3 : 2) + (press ? 1 : 0);
+  // At the splat records' own place for this cell, uv·L, as splatDeltas measures it.
+  const bowls = press ? `
+  var add = vec4f(0.0);
+  for (var k = 0u; k < A.count; k = k + 1u) {
+    let s = splats[k];
+    add += s.c * falloff(s.d.y, splatDist(s, uv * A.l), s.a.z);
+  }` : '';
   return `${SPLAT_STRUCT}
 @group(0) @binding(1) var src: texture_2d<f32>;
-${sum ? '@group(0) @binding(2) var more: texture_2d<f32>;\n' : ''}@group(0) @binding(${sum ? 3 : 2}) var dst: texture_storage_2d<DST_FORMAT, write>;
+${sum ? '@group(0) @binding(2) var more: texture_2d<f32>;\n' : ''}${press ? `@group(0) @binding(${bind - 1}) var<storage, read> splats: array<Splat>;\n` : ''}@group(0) @binding(${bind}) var dst: texture_storage_2d<DST_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
   let uv = (vec2f(id.xy) + 0.5) / A.n;
@@ -242,7 +308,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let b = ${at('vec2i(hi.x, lo.y)')};
   let c = ${at('vec2i(lo.x, hi.y)')};
   let d = ${at('vec2i(hi.x, hi.y)')};
-  textureStore(dst, vec2i(id.xy), mix(mix(a, b, f.x), mix(c, d, f.x), f.y));
+  let up = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);${bowls}
+  textureStore(dst, vec2i(id.xy), up${press ? ' + add' : ''});
 }`;
 }
 

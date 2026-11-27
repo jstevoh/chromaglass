@@ -19,7 +19,8 @@
  *   6. It leaves at the open round rim (not the square round the dish), its
  *      area emptying at the steady π·bσ/(3μ), so time to empty goes as R².
  *   7. It dissolves at Henry's law's real rate, nil on a show's clock, and
- *      scaled past nature the smaller goes first.
+ *      scaled past nature the smaller goes first; Bubble Melt (38b-2) is
+ *      nature at 0 and a factor on D alone above it.
  *   8. Its shape relaxes at Paterson's τ₂ = 2μR³/(b²σ): times at three sizes
  *      go as R³; a merged pair starts as long as it was end to end.
  *   9. Strain stretches it to ε·τ₂ along the stretching axis, and past the
@@ -85,34 +86,48 @@ const GAP = DISH_GAP_METRES;   // the rest gap, metres (lib/turntable.ts, PLAN 3
     `drift ${drift.toFixed(5)} cells over 2 seconds`);
 }
 
-// ── 3. Saffman-Taylor finger wavelength scaling on Straw ─────────────
+// ── 3. The straw's fingers are Paterson's fastest mode at the plate's gap ──
 {
-  const runBlow = (strength) => {
+  /*
+    A straw's bubble is air driven into the liquid between two plates, and
+    its rim breaks into the fastest-growing number of fingers, Paterson's
+    (1981) n = √((1 + 12 Ca R²/b²)/3), with b the gap (lib/bubbles.ts,
+    strawFingers; PLAN.md 15g-12). This section used to ask that the default
+    liquid's bubble carried 6 to 18 lobes in the ratio R·√Ca: that count was
+    worked at a gap 21 times thinner than the plate's, and the owner saw it
+    as flower-like bubbles. At the real 2 mm the default liquid's count is
+    under one finger, so its bubble is round, and the rim fingers where the
+    liquid is thick enough for two or more. So: with the Thickness dial at
+    its top, a firm breath and one twice as hard each draw the bubble with
+    the count's own number of lobes (worked here from the last step's
+    growth, not by calling the code's function), more for the harder one;
+    and in the default liquid neither fingers at all.
+  */
+  const runBlow = (strength, liquid) => {
     const f = new BubbleField(N);
     const still = () => [0, 0];
+    let r0 = 0, n = 0, b = null;
     for (let t = 0; t < 60; t++) {
+      f.liquid(liquid);
       f.blow(96, 96, dt, strength);
       f.step(dt, still, 0, 0, 0);
+      b = f.bubbles.find((q) => q.straw);
+      const uMps = ((b.r - r0) / dt) * (0.2 / N); r0 = b.r;
+      const Ca = (f.liquidMu * uMps) / f.liquidSigma, rOverGap = b.r * (0.2 / N) / f.gapMetres;
+      n = Math.sqrt((1 + 12 * Ca * rOverGap * rOverGap) / 3);
     }
-    const b = f.bubbles.find((q) => q.straw);
-    const speed = (b.r - Math.max(1, N * 0.008)) / 1.0;
-    const uMps = speed * (0.2 / N);
-    const Ca = Math.max(1e-4, (f.liquidMu * uMps) / f.liquidSigma);
-    return { b, lobes: b.lobes, r: b.r, Ca, sqrtCa: Math.sqrt(Ca) };
+    return { lobes: b.lobes, fing: b.fing, n };
   };
 
-  const moderate = runBlow(1.0);
-  const fast = runBlow(2.0);
+  const THICK = { thinGap: 1, gapThickness: 1 };
+  const moderate = runBlow(1.0, THICK), fast = runBlow(2.0, THICK);
+  const oil = runBlow(1.0, {}), oilFast = runBlow(2.0, {});
 
-  // Both lobe counts must sit strictly between clamps (6 and 18)
-  const insideClamps = moderate.lobes > 6 && moderate.lobes < 18 && fast.lobes > 6 && fast.lobes < 18;
-  const actualRatio = fast.lobes / moderate.lobes;
-  const theoreticalRatio = (fast.r * fast.sqrtCa) / (moderate.r * moderate.sqrtCa);
-  const matchesScaling = Math.abs(actualRatio - theoreticalRatio) < 0.15;
-
-  check('straw finger lobes follow Saffman-Taylor m ∝ R·√Ca between clamps',
-    insideClamps && matchesScaling,
-    `lobes ${moderate.lobes} vs ${fast.lobes} (ratio ${actualRatio.toFixed(3)} matches theoretical ${theoreticalRatio.toFixed(3)})`);
+  check('straw finger lobes are Paterson\'s fastest mode at the plate\'s gap: the count\'s own number where the liquid is thick, none in the default liquid',
+    moderate.n >= 2 && fast.n > moderate.n + 1 && moderate.lobes === Math.round(moderate.n) && fast.lobes === Math.round(fast.n) && fast.lobes > moderate.lobes &&
+      moderate.fing > 0.2 && fast.fing > moderate.fing &&
+      oil.n < 1 && oilFast.n < 1 && oil.fing === 0 && oilFast.fing === 0,
+    `Thickness at its top: ${moderate.n.toFixed(2)} and ${fast.n.toFixed(2)} fingers, drawn with ${moderate.lobes} and ${fast.lobes} lobes (fingering ${moderate.fing.toFixed(2)}, ${fast.fing.toFixed(2)}); the default liquid ${oil.n.toFixed(2)} and ${oilFast.n.toFixed(2)}, fingering ${oil.fing.toFixed(3)}, ${oilFast.fing.toFixed(3)}`);
 }
 
 // ── 4. Film drainage merge ───────────────────────────────────────────
@@ -197,9 +212,36 @@ const still = () => [0, 0];
   put(g, 96, 96, 5);
   g.step(dt, still, 0, 0, 0);
   g.bubbles[0].age = 1;
-  g.disturb(96, 96, 3, 'dye', 1);
+  g.engulf(96, 96, 3);
   check('a drop takes the pocket it lands on and throws no daughters',
     g.bubbles.length === 0 && g.events.filter((e) => e.kind === 'pop').length === 1, `${g.bubbles.length} left`);
+
+  /*
+    And it does nothing to the pockets it does not land on (PLAN 15g-17).
+
+    The drop used to kick every pocket within three times its reach outward
+    along "the spreading front", 22 cells a second for dye and 40 for a blow,
+    a velocity of the pocket's own on top of the liquid's. Between two
+    glasses a pocket has nothing to move it but the liquid round it, and
+    the solver carries a drop's spreading (a drop brings volume on a thin
+    gap). So here the liquid is still, a pocket sits 10 cells from where a
+    drop lands (inside the old reach, 3 x 3 + 6 = 15), and after a second on
+    still liquid it must be exactly where it was. On the old `disturb` it
+    went 1.7 cells. A pocket the drop does land on still goes, so the
+    check cannot pass by engulf doing nothing at all (the one above).
+  */
+  const h = new BubbleField(N);
+  put(h, 96, 96, 4);
+  const beside = put(h, 106, 96, 4);
+  h.step(dt, still, 0, 0, 0);
+  for (const b of h.bubbles) b.age = 1;
+  const x0 = beside.x, y0 = beside.y;
+  h.engulf(96, 96, 3);
+  for (let t = 0; t < 60; t++) h.step(dt, still, 0, 0, 0);
+  const moved = Math.hypot(beside.x - x0, beside.y - y0);
+  check('a drop beside a pocket on still liquid leaves it where it was',
+    h.bubbles.length === 1 && h.bubbles[0] === beside && moved < 1e-9,
+    `${h.bubbles.length} of 1 left, the one beside moved ${moved.toExponential(1)} cells in 1 s`);
 }
 
 // ── 6. Leaving at the round rim ──────────────────────────────────────
@@ -261,6 +303,82 @@ const still = () => [0, 0];
     `2 cells gone at ${smallGone?.toFixed(1)} s, 4 cells at ${bigGone?.toFixed(1)} s`);
 }
 
+// ── 7b. Bubble Melt: the same law, its diffusivity scaled past nature (38b-2)
+/*
+  The dial's promises, each against the law and not against a time typed in
+  here. Off is nature (the factor is exactly 1, so every look that does not
+  name the dial keeps the plate of check 7). Up, the dial changes D and only
+  D: Henry's shrink is linear in D, so a pocket's melt time times the factor
+  is the same at every setting, which a dial that also switched the law to
+  a fade or a timer would fail. And at the middle the melt time of a pocket
+  of 2 mm radius is the law's own integral, done here
+  with a step 167 times finer than the frame's, at two sizes so the small
+  one is seen to go first on the dial's own path, and short enough to
+  watch, which nature's is not. The factor itself is held to the dial's
+  mapping written out here again, 10^(6 + 5v), so a wrong floor or a
+  linear dial cannot hide behind a constant t·k.
+*/
+{
+  const f = new BubbleField(N);
+  f.liquid({ bubbleMelt: 0 });
+  const off = f.dissolve;
+  f.liquid({ bubbleMelt: 0.8 });
+  f.liquid({});
+  const absent = f.dissolve;
+  const meltTime = (v, r) => {
+    const g = new BubbleField(N);
+    g.liquid({ bubbleMelt: v });
+    const b = put(g, 96, 96, r);
+    for (let t = 0; t < 60 * 3600; t++) {
+      g.step(dt, still, 0, 0, 0);
+      if (g.events.length) return { t: NaN, k: g.dissolve, events: g.events.length };
+      if (!g.bubbles.includes(b)) return { t: (t + 1) * dt, k: g.dissolve, events: 0 };
+    }
+    return { t: Infinity, k: g.dissolve, events: 0 };
+  };
+  check('Bubble Melt off is nature\'s rate, and a look without it is the same',
+    off === 1 && absent === 1, `factor ${off} at 0, ${absent} absent`);
+
+  const runs = [0.3, 0.6, 0.9].map((v) => ({ v, ...meltTime(v, 8) }));
+  const tk = runs.map((r) => r.t * r.k);
+  const spread = Math.max(...tk) / Math.min(...tk) - 1;
+  const mapped = runs.every((r) => Math.abs(r.k / 10 ** (6 + 5 * r.v) - 1) < 1e-9);
+  check('up, it scales air\'s diffusivity by 10^(6 + 5v) and nothing else: melt time × factor holds across the dial',
+    mapped && runs.every((r) => Number.isFinite(r.t) && r.events === 0) && runs[0].t > runs[1].t && runs[1].t > runs[2].t && spread < 0.05,
+    runs.map((r) => `${r.v}: ${r.t.toFixed(2)} s at ${r.k.toExponential(1)}`).join(', ') + `; t·k spread ${(spread * 100).toFixed(1)}%`);
+
+  // The law's integral from a radius to the 0.3-cell floor, at the middle's factor.
+  const lawTime = (R0, k) => {
+    const mu = f.liquidMu, sigma = f.liquidSigma, L = f.liquidOstwald, D = 2e-9 * (1e-3 / mu) * k;
+    let R = R0, T = 0;
+    const h = 1e-4;
+    while (R > 0.3 * M) {
+      const dA = 2 * Math.PI * D * L * (sigma * (2 / GAP + 1 / R) / 101325) / Math.max(1, Math.log(0.1 / R));
+      const A = Math.PI * R * R - dA * h;
+      R = A > 0 ? Math.sqrt(A / Math.PI) : 0;
+      T += h;
+    }
+    return T;
+  };
+  const mid = meltTime(0.5, 2e-3 / M), small = meltTime(0.5, 1e-3 / M);
+  const T = lawTime(2e-3, mid.k), Ts = lawTime(1e-3, small.k);
+  check('at the middle, pockets of 2 and 1 mm radius (the music\'s smallest, and half it) melt on the law\'s own clock, the small first, inside half a minute',
+    Math.abs(mid.k / 10 ** 8.5 - 1) < 1e-9 && Math.abs(mid.t / T - 1) < 0.03 && Math.abs(small.t / Ts - 1) < 0.03
+      && small.t < mid.t / 3 && mid.t < 30 && mid.events === 0 && small.events === 0,
+    `2 mm ${mid.t.toFixed(2)} s (law ${T.toFixed(2)} s), 1 mm ${small.t.toFixed(2)} s (law ${Ts.toFixed(2)} s) at ${mid.k.toExponential(1)}× nature`);
+
+  // Very gentle to very extreme (the owner, 2026-10-31): at its first step a
+  // 2 mm pocket thins over a set, longer than the 5–30 s the flow keeps one
+  // on the plate many times over; at the top the straw's 8 mm one is gone
+  // inside a second. Both ends by the law's own integral at the dial's factor.
+  const g0 = new BubbleField(N), g1 = new BubbleField(N);
+  g0.liquid({ bubbleMelt: 0.05 }); g1.liquid({ bubbleMelt: 1 });
+  const gentle = lawTime(2e-3, g0.dissolve), extreme = lawTime(8e-3, g1.dissolve);
+  check('the dial runs from very gentle to very extreme: 2 mm takes over ten minutes at its first step, 8 mm under a second at the top',
+    gentle > 600 && extreme < 1,
+    `2 mm in ${(gentle / 60).toFixed(1)} min at 0.05 (${g0.dissolve.toExponential(1)}×), 8 mm in ${extreme.toFixed(2)} s at 1 (${g1.dissolve.toExponential(1)}×)`);
+}
+
 // ── 8. Paterson's τ₂ ─────────────────────────────────────────────────
 {
   const relax = (r) => {
@@ -317,8 +435,14 @@ const still = () => [0, 0];
     the rim), which pushes the rim out at 2εR·cos 2θ against τ₂'s pull back:
     it settles at deformation 2ε·τ₂. Here ε is chosen for D = 0.25.
   */
+  /*
+    Held for five of its τ₂, so what is read is where it settles and not the
+    way there: 2.6 s for this 20-cell pocket at the 2 mm gap (PLAN 38r), where
+    the 4 s this ran at the 6 mm gap (τ₂ 0.28 s) is only 1.6 of them and the
+    stretch read 0.230, 79% of the law, which is 1 − e^(−1.56) of it.
+  */
   const eLow = 0.125 / tau;
-  const low = run(r, eLow, 4);
+  const low = run(r, eLow, Math.ceil(5 * tau));
   const D = 2 * eLow * tau, want = Math.sqrt((1 + D) / (1 - D)) - 1;
   check('held in a strain ε it settles at deformation 2ε·τ₂ along the stretching axis',
     low.split === 0 && Math.abs(low.b.sx / want - 1) < 0.05 && Math.abs(low.b.sy) < 0.01 * want,
@@ -338,10 +462,17 @@ const still = () => [0, 0];
     for (let t = 0; t < 30; t++) f.step(dt, push, 0, 0, 0);
     return (2 * r - Math.hypot(c.x - a.x, c.y - a.y)) / r;
   };
-  const small = pressed(3), big = pressed(14);
+  /*
+    The small pair is 1.5 cells (1.6 mm): a millimetre pocket, whose τ₂ at
+    the 2 mm gap is a millisecond, what the 3-cell pair's was at the 6 mm gap
+    this was written on (τ₂ goes as R³/b²). At 2 mm a 3-cell pair's is 9 ms,
+    half a frame, and a push squeezes it 2% of its radius: it is no longer
+    the small pocket the law says stays round (PLAN 38r).
+  */
+  const small = pressed(1.5), big = pressed(14);
   check('pushed together, big pockets squeeze flat against each other and small ones stay round',
     big > 20 * Math.max(small, 1e-6) && big > 0.01,
-    `overlap ${(small * 100).toFixed(3)} % of the radius at 3 cells, ${(big * 100).toFixed(2)} % at 14`);
+    `overlap ${(small * 100).toFixed(3)} % of the radius at 1.5 cells, ${(big * 100).toFixed(2)} % at 14`);
 
   const f = new BubbleField(N);
   const s = put(f, 90, 96, 4), b = put(f, 90 + 4 + 12 - 2, 96, 12);
