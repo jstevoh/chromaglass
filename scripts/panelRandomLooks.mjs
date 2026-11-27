@@ -71,10 +71,18 @@ export function randomLooks({ check }) {
   // The opening look: the same picker, the options shared.ts gives it, over fresh seeds.
   const openings = new Set();
   let openPack = 0;
+  /*
+    One stream of draws across the sixty openings, each a fresh show (forgetPicks). Not a
+    generator seeded afresh at k × 7919 for each: a multiplicative generator's first draw from
+    a seed linear in k is k × c mod 1, a lattice, so the sixty first draws stepped evenly
+    round the list and how many looks they hit was the list's length against that step
+    (26 at main's length; one look more, Night Sea in PLAN 48c-5, and 17), not the picker's
+    spread. One stream hits 25 at both lengths (measured 2026-11-27).
+  */
+  let s2 = 7919;
+  const r2 = () => { s2 = (s2 * 16807) % 2147483647; return s2 / 2147483647; };
   for (let k = 1; k <= 60; k++) {
     forgetPicks();
-    let s2 = k * 7919;
-    const r2 = () => { s2 = (s2 * 16807) % 2147483647; return s2 / 2147483647; };
     const o = pickLook(PRESETS, r2, { locked: (pack) => !!pack });
     if (!o) continue;
     openings.add(o.id); if (o.pack) openPack++;

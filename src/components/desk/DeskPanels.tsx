@@ -352,13 +352,9 @@ function CuesBody({ p }: { p: DeskProps }) {
         </div>
       )}
       {/*
-        Fade and Go, as small as they can be and still be hit in the dark: one
-        row of fade times across the column and a Go a finger's height. They
-        were 140px of the column with Back and Freeze under them, which the
-        owner never pressed (2026-10-10: "I don't use them. We can keep the
-        shortcuts though"). Back is still ⌫ and Freeze still F, from the
-        keyboard (App's key handler), ⌘K, and a learned MIDI pad
-        (`action:revert`, `action:play-toggle` in the Controller's map).
+        Fade, Back and Go in the cue footer (PLAN 49a / H3-07): Back returns
+        as a visible control beside Go so returning from an accidental fade or
+        look change never depends on remembering ⌫ during a set.
       */}
       <div className="flex shrink-0 flex-col gap-1.5 border-t border-border px-3 py-2" data-testid="cue-go">
         <div className="flex items-center gap-2">
@@ -372,15 +368,32 @@ function CuesBody({ p }: { p: DeskProps }) {
             testId="fade-segmented"
           />
         </div>
-        <Button
-          variant="primary" full height={36} kbd="Space"
-          onClick={p.onGo}
-          disabled={!next}
-          midiKey="action:go"
-          testId="go-button"
-        >
-          <span className="min-w-0 truncate">{next ? `Go to ${next.name}` : 'Nothing cued'}</span>
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {p.onBack && (
+            <Button
+              height={36}
+              kbd="⌫"
+              onClick={p.onBack}
+              disabled={!p.canBack}
+              midiKey="action:revert"
+              testId="back-button"
+              title="Back to the previous look"
+            >
+              Back
+            </Button>
+          )}
+          <div className="min-w-0 flex-1">
+            <Button
+              variant="primary" full height={36} kbd="Space"
+              onClick={p.onGo}
+              disabled={!next}
+              midiKey="action:go"
+              testId="go-button"
+            >
+              <span className="min-w-0 truncate">{next ? `Go to ${next.name}` : 'Nothing cued'}</span>
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -580,15 +593,15 @@ function RecipeBody({ p }: { p: DeskProps }) {
           for the closeup and it always reads what the plate is doing
           (PLAN QA-32c).
         */}
-        {/* Randomise replaces every setting at once, so it asks first. */}
+        {/* Protected by the 8 s Undo toast rather than an inline "Sure?" prompt (PLAN 49a). */}
         <Button
           full height={32}
-          variant={p.randomiseArmed ? 'primary' : 'secondary'}
+          variant="secondary"
           onClick={p.onRandomise}
           midiKey="action:lucky"
           testId="randomise-button"
         >
-          {p.randomiseArmed ? 'Sure?' : 'Randomise'}
+          Randomise
         </Button>
       </div>
     </div>
