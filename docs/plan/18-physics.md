@@ -324,7 +324,10 @@ its frame rate live. "Free" means no new passes or texture reads.
     draught's stress onto closed flows through the same Ψ solve. (c) 15e-12, a heavy
     bottle's weight (`liquidDrive`), the same fix. (d) Past LIFT_MOST (256) Ψ's grid is
     coarser than the solver's, so on a 384 or 512 plate Rain Drip's finest fingers are
-    laid at 256 (27f-7's shortcut, now on every Rain Drip look). A Blow's breath is local
+    laid at 256 (27f-7's shortcut, now on every Rain Drip look). (e) The opening waits for
+    the lift kernels only for a rocked oil look (Opening.oilLift), so a Rain Drip or rocked
+    look's first seconds, until hsLiftSource and hsLiftRelax are built, still lay the weight
+    into the open rim; widen the wait if `npm run startup` has the slack. A Blow's breath is local
     and stays open: its liquid comes back.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)

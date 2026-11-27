@@ -67,7 +67,7 @@ const OPEN_WEIGHT = {
   setup(b) {
     b.onLoad({ filter: /src[\\/]gpu[\\/]fluid\.ts$/ }, (a) => {
       const s = readFileSync(a.path, 'utf8');
-      const at = /const closing = thin && !lifting && \(rockOn \|\| dripWeightOf\(p\) > 0\);/g;
+      const at = /const closing = thin && [^;\n]*;/g;
       const found = s.match(at)?.length ?? 0;
       if (found !== 1) throw new Error(`draught: the open-weight control found ${found} of 1 closing lines in fluid.ts`);
       return { contents: s.replace(at, 'const closing = false;'), loader: 'ts' };

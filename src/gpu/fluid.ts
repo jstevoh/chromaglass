@@ -798,7 +798,7 @@ export class WebGPUFluid extends FluidCover {
         down S.up, and hsBody adds it to the tilt's as one in-plane weight
         (A.b.w 2). With oil, Rain Drip stays laid directly (27f-6).
       */
-      const closing = thin && !lifting && (rockOn || dripWeightOf(p) > 0);
+      const closing = thin && !(!!mix && this.mixLive && oil > 0.001) && (rockOn || (dripWeightOf(p) > 0 && upright > 0.001));
       const mixTex = lifting ? mix!.read : this.blank('rgba');
       // The oil's own share of the colour, with Oil Bodies (WATER_DYE in wgsl/thinGap.ts).
       const oilDyeTex = lifting && bodiesOn && this.oilDye ? this.oilDye.read : this.blank('rgba');
