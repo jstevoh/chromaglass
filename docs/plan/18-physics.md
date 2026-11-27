@@ -313,7 +313,8 @@ its frame rate live. "Free" means no new passes or texture reads.
     (`npm run draught` line 4: Rain Drip 0.5 upright keeps 1.8%). The oil's lift already goes
     through the closed circulation (hsLiftRelax); lay these through it too, and replace
     18a-16's new gust noise with the Hodge projection of a draught's stress onto closed flows
-    through the same solve. A Blow's breath is local and stays open: its liquid comes back.
+    through the same solve (with 15e-12, a heavy bottle's weight, the same fix). A Blow's breath
+    is local and stays open: its liquid comes back.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
