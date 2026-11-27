@@ -17,6 +17,8 @@ export interface SnapshotScalars {
   oilLayPending: boolean;
   liquidsLive: boolean;
   speciesLive: boolean;
+  /** The ouzo's solvent field is on the plate (PLAN 48s). */
+  solventLive: boolean;
   speciesClears: number;
   speciesPoured: { sigma: number; rho: number } | null;
   speciesSnap: { L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null;
@@ -71,6 +73,8 @@ export interface SnapshotTargets {
   liquids1: PingPong;
   species: PingPong | null;
   ensureSpecies: () => PingPong;
+  solvent: PingPong | null;
+  ensureSolvent: () => PingPong;
   chem: PingPong;
   activeMat: PingPong;
   rxn: PingPong | null;
@@ -104,6 +108,7 @@ export interface FieldSnapshot extends SolverSnapshot {
   readonly liquids0: GPUTexture | null;
   readonly liquids1: GPUTexture | null;
   readonly species: GPUTexture | null;
+  readonly solvent: GPUTexture | null;
   readonly chem: GPUTexture | null;
   readonly activeMat: GPUTexture | null;
   readonly rxn: GPUTexture | null;
@@ -172,6 +177,7 @@ export function captureFluidSnapshot(t: SnapshotTargets): FieldSnapshot | null {
     liquids0: copyPp(t.liquids0, s.liquidsLive),
     liquids1: copyPp(t.liquids1, s.liquidsLive),
     species: copyPp(t.species, s.speciesLive),
+    solvent: copyPp(t.solvent, s.speciesLive && s.solventLive),
     chem: copyPp(t.chem, s.chemLive || s.reagentLive),
     activeMat: copyPp(t.activeMat, s.chemLive || s.reagentLive),
     rxn: copyPp(t.rxn, s.rxnLive),
@@ -221,6 +227,7 @@ export function restoreFluidSnapshot(t: SnapshotTargets, snap: FieldSnapshot): b
     putPp(snap.liquids1, t.liquids1);
   }
   if (snap.species) putPp(snap.species, t.ensureSpecies());
+  if (snap.solvent) putPp(snap.solvent, t.ensureSolvent());
   if (snap.chem) putPp(snap.chem, t.chem);
   if (snap.activeMat) putPp(snap.activeMat, t.activeMat);
   if (snap.rxn) putPp(snap.rxn, t.ensureRxn());
