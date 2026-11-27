@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 import { LogIn, User } from 'lucide-react';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
+import { useScrollEdges } from '../ui/ScrollCue';
 import { LensCap } from '../ui/Playful';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
@@ -51,6 +52,7 @@ import { readEngineStatus } from '../../lib/readout';
 const DECK_H = { knobs: 268, other: 236 } as const;
 const STRIP_H = 36;
 const SCREENS = new Set(['songs', 'sequences']);
+const FLEX_COLUMN_PANELS = new Set(['cues', 'rides', 'recipe', 'audio-input']);
 const COLUMN_W = { left: LEFT_WIDTH, right: RIDES_WIDTH } as const;
 /**
  * A side column: as wide as the widest panel in it asks (`columnWidth`), at
@@ -91,6 +93,7 @@ export function Desk(p: DeskProps) {
    */
   const [gesture, setGesture] = useState<{ id: string; x: number; y: number; w: number; h: number } | null>(null);
   const browserButton = useRef<HTMLButtonElement | null>(null);
+  const deckScroll = useScrollEdges('x', [l.deck.join('|'), l.deckCollapsed, windowW]);
 
   // ── Panels in their own windows (PLAN.md 8g) ────────────────────────
   /*
@@ -349,16 +352,7 @@ export function Desk(p: DeskProps) {
   const column = (slot: 'left' | 'right') => {
     const ids = l[slot];
     if (ids.length === 0) return null;
-    const one = ids.length === 1 && !l.collapsed.includes(ids[0]);
-    return (
-      <aside
-        className={`flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide p-2 ${slot === 'left' ? 'border-r' : 'border-l'} border-border ${dashed}`}
-        data-slot={slot}
-        data-testid={`desk-${slot}`}
-      >
-        {ids.map(id => frame(id, { className: one ? 'min-h-0 flex-1' : 'shrink-0' }))}
-      </aside>
-    );
+    return <DeskColumn key={slot} slot={slot} ids={ids} collapsed={l.collapsed} dashed={dashed} renderFrame={frame} />;
   };
 
   /**
@@ -561,7 +555,7 @@ export function Desk(p: DeskProps) {
 
       {/* ── The deck ──────────────────────────────────────────────── */}
       {l.deckCollapsed && l.deck.length > 0 ? (
-        <div className="col-[1/-1] flex items-center gap-1.5 overflow-x-auto scrollbar-hide border-t border-border px-2" data-slot="deck" data-testid="deck-strip">
+        <div className="col-[1/-1] flex items-center gap-1.5 overflow-x-auto cg-scroll border-t border-border px-2" data-slot="deck" data-testid="deck-strip">
           {l.deck.map(id => (
             <button
               key={id}
@@ -585,28 +579,54 @@ export function Desk(p: DeskProps) {
           </button>
         </div>
       ) : (
-        <div
-          className={`col-[1/-1] flex min-h-0 items-stretch gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide border-t border-border p-2 ${dashed}`}
-          data-slot="deck"
-          data-testid="desk-deck"
-        >
-          {l.deck.map(id => {
-            const spec = PANEL_BY_ID.get(id);
-            const folded = l.collapsed.includes(id);
-            return frame(id, { className: `shrink-0 ${folded ? 'self-start' : ''}`, style: { width: spec?.deckWidth ?? 266 } });
-          })}
-          <button
-            onClick={openBrowser}
-            className="min-w-[180px] flex-1 rounded-lg border border-dashed border-border-strong text-[13px] text-dim transition-colors hover:bg-hover hover:text-text-2"
-            data-testid="deck-add"
-          >
-            + Panel here
-          </button>
+        <div className="relative col-[1/-1] flex min-h-0 items-stretch border-t border-border">
+          {deckScroll.start && (
+            <button
+              type="button"
+              onClick={() => deckScroll.scrollBy(-320)}
+              className="flex w-7 shrink-0 items-center justify-center border-r border-border bg-surface text-[16px] text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="More panels to the left"
+              aria-label="Scroll deck left"
+              data-testid="deck-scroll-left"
+            >‹</button>
+          )}
+          <div className="relative flex min-h-0 min-w-0 flex-1 items-stretch">
+            <div
+              ref={deckScroll.ref}
+              className={`flex min-h-0 min-w-0 flex-1 items-stretch gap-2 overflow-x-auto overflow-y-hidden cg-scroll p-2 ${dashed}`}
+              data-slot="deck"
+              data-testid="desk-deck"
+            >
+              {l.deck.map(id => {
+                const spec = PANEL_BY_ID.get(id);
+                const folded = l.collapsed.includes(id);
+                return frame(id, { className: `shrink-0 ${folded ? 'self-start' : ''}`, style: { width: spec?.deckWidth ?? 266 } });
+              })}
+              <button
+                onClick={openBrowser}
+                className="min-w-[180px] flex-1 rounded-lg border border-dashed border-border-strong text-[13px] text-dim transition-colors hover:bg-hover hover:text-text-2"
+                data-testid="deck-add"
+              >
+                + Panel here
+              </button>
+            </div>
+            {deckScroll.start && <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-bg/85 to-transparent" aria-hidden />}
+            {deckScroll.end && <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg/90 to-transparent" aria-hidden />}
+          </div>
+          {deckScroll.end && (
+            <button
+              type="button"
+              onClick={() => deckScroll.scrollBy(320)}
+              className="flex w-7 shrink-0 items-center justify-center border-l border-border bg-surface text-[16px] text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="More panels to the right"
+              aria-label="Scroll deck right"
+              data-testid="deck-scroll-right"
+            >›</button>
+          )}
           {l.deck.length > 0 && (
             <button
               onClick={() => set(x => ({ ...x, deckCollapsed: true }))}
-              className="w-7 shrink-0 self-start rounded-md text-[13px] text-faint hover:bg-hover hover:text-text"
-              style={{ height: 28 }}
+              className="flex w-7 shrink-0 items-center justify-center border-l border-border bg-surface text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
               title="Fold the deck to a strip (⌥D): the plate takes its height"
               aria-label="Fold the deck"
               data-testid="deck-fold"
@@ -738,9 +758,55 @@ export function Desk(p: DeskProps) {
           at={browser}
           onDock={(id) => set(x => openPanel(x, id, 'deck'))}
           onFloat={(id) => set(x => openPanel(x, id, 'float'))}
+          onReveal={(id) => {
+            requestAnimationFrame(() => {
+              document.querySelector(`[data-panel="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            });
+          }}
           onStage={p.onStage}
           onClose={() => setBrowser(null)}
         />
+      )}
+    </div>
+  );
+}
+
+function DeskColumn({ slot, ids, collapsed, dashed, renderFrame }: {
+  slot: 'left' | 'right';
+  ids: string[];
+  collapsed: string[];
+  dashed: string;
+  renderFrame: (id: string, opts?: { className?: string }) => ReactNode;
+}) {
+  const scroll = useScrollEdges<HTMLElement>('y', [ids.join('|'), collapsed.join('|')]);
+  const one = ids.length === 1 && !collapsed.includes(ids[0]);
+  // Give the last scrollable panel (e.g. Rides under Bottles, Sound under Controller) remaining column height so its footer stays pinned on screen.
+  let flexIdx = -1;
+  if (one) flexIdx = 0;
+  else {
+    for (let i = ids.length - 1; i >= 0; i--) {
+      if (!collapsed.includes(ids[i]) && FLEX_COLUMN_PANELS.has(ids[i])) { flexIdx = i; break; }
+    }
+  }
+  return (
+    <div className={`relative flex min-h-0 flex-col ${slot === 'left' ? 'border-r' : 'border-l'} border-border`}>
+      <aside
+        ref={scroll.ref}
+        className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden cg-scroll p-2 ${dashed}`}
+        data-slot={slot}
+        data-testid={`desk-${slot}`}
+      >
+        {ids.map((id, i) => renderFrame(id, { className: i === flexIdx ? (one ? 'min-h-0 flex-1' : 'min-h-[180px] flex-1') : 'shrink-0' }))}
+      </aside>
+      {scroll.end && (
+        <button
+          type="button"
+          onClick={() => scroll.scrollBy(220)}
+          className="flex h-6 shrink-0 items-center justify-center gap-1 border-t border-border bg-surface/90 text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+          data-testid={`desk-${slot}-more`}
+        >
+          More panels ↓
+        </button>
       )}
     </div>
   );
@@ -872,12 +938,12 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
         <button
           ref={button}
           onClick={toggle}
-          className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
+          className="flex min-w-[84px] items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
           title="New, Save, and your saved preset palettes"
           data-testid="doc-menu-button"
         >
           <span className="truncate">{p.lookName ?? 'Untitled'}</span>
-          <span className="text-faint">⌄</span>
+          <span className="shrink-0 text-faint">⌄</span>
         </button>
         {p.edited && <Tag>edited</Tag>}
         {at && createPortal((

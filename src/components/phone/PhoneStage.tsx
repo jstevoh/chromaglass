@@ -800,7 +800,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       {on
                         ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} height={24} testId="phone-bottle-in-hand" />
                         : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} height={24} />}
-                      <span className="truncate">{l.name}</span>
+                      <span className="line-clamp-2 text-left leading-tight">{l.name}</span>
                     </button>
                   );
                 })}
@@ -869,7 +869,7 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
 
           <SectionLabel>Palette</SectionLabel>
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-4 flex gap-1.5 overflow-x-auto cg-scroll px-4 pb-1">
             <button
               onClick={() => p.onPalette(null)}
               aria-pressed={p.paletteLock == null}
