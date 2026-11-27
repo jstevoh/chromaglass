@@ -18,7 +18,33 @@ area, each fix striking its own line here.
 
 - **QA-33a** Run the bug bash on main and write the grouped findings (Antigravity, the
   Mac). Shipped as a report when the list is in the project's files.
-- **QA-33b** Fix threads, one per area of the list, each a QA item of its own.
+- **QA-33b** Fix threads, one per area of the list, each a QA item of its own. The
+  list (2026-11-26) went to Antigravity as six briefs, the small ones batched:
+  - **QA-33b-1** Lens: Tank turns the plate black (luma 0.30 → 0.003 on Classic, 0.27 →
+    0.003 on Magnet Garden), and Focus, Aperture, Bloom, Glow, Glow Shear, Glitter and
+    Lens Stop show nothing on Classic.
+  - **QA-33b-2** One dial's end blacks out the picture: the Wall's Gamma (0.35 → 0.004,
+    more than a gamma of 2.5 can do) and Oil & Soap's Clear Film on Magnet Garden
+    (0.27 → 0.014).
+  - **QA-33b-3** Ferrofluid: Phase Edge, Magnet Strength, Height, Across, Up, Walk and
+    Labyrinth flatten Magnet Garden from 37% to 85–93% one colour. A ferrofluid under a
+    stronger field spikes and gathers; it does not spread into a sheet.
+  - **QA-33b-4** Light Show Look (Sharpness, Glossiness, Post Blur, Boundary Glow, Particle
+    Colour, Turbulence Detail, Grain Fineness, Blob Surface Tension, Layer Scale Variety)
+    and Film Stock (Grain, Gate Weave) move their settings and nothing shows on Classic.
+  - **QA-33b-5** Switches: Patches' Gate pressed twice leaves `sceneMappings` changed; the
+    phone's More "Drop" does nothing; pick-one rows carry `aria-pressed` (a switch's
+    role) where a radio's `aria-checked` is meant.
+  - **QA-33b-6** Simulation: the finest grid drops the plate from 62 to 14 fps on the
+    owner's laptop.
+- **QA-33d** The sweep's own mistakes in the 2026-11-26 run. Rides' Drain emptied the
+  plate and every later control on its tab was judged against the drained plate (about
+  fifty "flat 19%→97%" findings, one number); and a row of `aria-pressed` buttons with
+  one chosen (the phone's 41 look buttons) was judged as switches that "don't come
+  back". The sweep now opens the tab again when the plate stays empty with the settings
+  back, and reads such a row as a choice. Left: "unseen" waits 1.5 s, short for slow
+  physics, and does not say when a look has the feature off; five controls time out on
+  click (Controller "What this does", Wall corner, three Dyes picture/video/album).
 - **QA-33c** The sweep cannot judge what a control *should* do, only that it did
   something and nothing broke; a dial that works but feels wrong is the owner's list
   and the heuristic review, not this.
