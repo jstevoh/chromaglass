@@ -262,6 +262,13 @@ through cords and preset patches, and the plate shader is untouched.
   and a sequence chosen are not on its list, so the tools say Undo leaves them. Put
   them on it (the bpm and source before, the sequence before) if the owner wants it.
 - **44k-9.** Saving a made look: 44c-2 above, now at rank 9.
+- **44k-19. Read a saved look whole.** *(S, found 2026-11-27 shipping the owner's looks, 34b-7.)*
+  `list_looks` gives a saved look's id and name and `get_settings` the plate's settings once it is
+  played, but nothing gives the look's own dyes, injection and liquids (`contract`, `injectStyles`,
+  `liquids` in the stored record): the Mac app's storage is closed to a session, and a set list's
+  file carries only looks in the set. So the three looks shipped with dyes picked from their papers,
+  not the ones saved. Add `read_look` (any mode): the stored record of one look, data only.
+  *Measure:* `npm run assistant` reads back a look saved with a contract and liquids, field for field.
 - **44k-10a. The ear's real doors, in a browser.** *(S, found building 44k-10.)* As
   44k-2c: `npm run assistant` drives `askEar` with doors built by hand, so a door in
   `useBench` or `useListen` that never fires, or a `publishRoom` in `useCastFeed` that

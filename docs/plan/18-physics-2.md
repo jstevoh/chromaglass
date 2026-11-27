@@ -100,7 +100,23 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 - **18d-5** Soap and alcohol into the GPU's surfactant with a σ(Γ) law (the bottles now
   carry σ). Delete the CPU Marangoni force and the dye multiply, and give alcohol its burst
   and evaporation. Its description still says it "rises through water".
-- **18d-6** Retire the colour-difference tension (Immiscibility). It is a look change.
+- **18d-6a** Hold Apart is a tension and no more. Past real it rounds pools and draws streaks
+  back, and the colours still blend across their edge at the rate the flow and the grid blend
+  them: nothing un-mixes. The whole law for two liquids that will not quite mix is the
+  regular solution's, one free energy for both effects: the interaction χ slows the dye's
+  interdiffusion, D(1 − 2χc(1 − c)), and past χ = 2 un-mixes it (Cahn–Hilliard, with the same
+  K as the stress). Needs a composition the three bands of absorbance are not (which dye is
+  which), so with 18l-1's dye channels. (M; Medium on looks that turn the dial up.)
+- **18d-6b** Hold Apart on the old plate (Thin Gap off) is laid after that plate's two
+  projections, so the part of the stress a pressure would take is carried into the dye for a
+  step. Laid whole, a pool lost 88% of its dye in five seconds in the lab; it is laid as the
+  share Momentum's loss takes off a step instead, which keeps 99.6% and rounds the pool about
+  a sixth as fast as between the glasses (2.50 to 2.42 against 1.99). Move it before the first
+  projection with the old plate's other forces if the old plate is kept. (S; Low.)
+- **18d-6c** The five looks that set Polarity highest (Macro Bead, Roy 1963, Poster 1969, Milk
+  Marbling, Lens Pools) open with Hold Apart 0 like the rest. Judge them on the Mac when
+  filming is allowed again (judging §149) and give `holdApart` to any that should keep its
+  colours to bodies. (S; the owner's eyes.)
 - **18d-7** Milk's `repel`. Milk is a miscible emulsion, so this goes to 18j (scattering).
 - **18d-8** Retire the CPU fields (soap, body, repel at 192²) and their pass once 18d-2 to
   18d-7 have moved each to the GPU.

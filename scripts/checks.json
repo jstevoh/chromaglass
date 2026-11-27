@@ -3189,7 +3189,9 @@
         "The plate's forces as forces on a thin gap (PLAN 18a-2): a body force",
         "(Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity",
         "says, Glass Smear is the glass sliding and Updraft a draught's shear,",
-        "each against the old reading it replaced."
+        "each against the old reading it replaced. And two dyes in one water",
+        "mix with no force between them, Hold Apart past that a tension that",
+        "rounds a pool and leaves a straight edge alone (PLAN 18d-6)."
       ]
     },
     {
@@ -3617,6 +3619,19 @@
       "why": [
         "Pushes Dye: where the ferrofluid grows the colour leaves and packs",
         "along its edge, conserved, and at 0 nothing changes."
+      ]
+    },
+    {
+      "name": "The oil's colour rides the oil",
+      "shard": "plate",
+      "run": "npm run oilride",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-29: Classic's colours washed out under a hand. With Oil Bodies",
+        "on a thin gap, Beat Squeeze kicks and Plate Rock for five seconds: the",
+        "oil keeps its share of the dye (main handed 0.54% of it to the water),",
+        "inside the oil, none stranded in open water, no oil made or lost.",
+        "About six minutes on software WebGPU at 192²."
       ]
     },
     {

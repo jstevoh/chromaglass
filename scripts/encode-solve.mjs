@@ -119,7 +119,7 @@ const residualsOf = async (page, thin, samples, gap) => page.evaluate(async ({ t
   for (let k = 0; k < samples; k++) {
     lab.vel(0.35 + 0.05 * k, 0.5, 0.12, [2, 1, 0, 0]);
     lab.flush();
-    await lab.step(gap, { thinGap: thin ? 1 : 0, immiscibility: 0.5 });
+    await lab.step(gap, { thinGap: thin ? 1 : 0, holdApart: 0.5 });
     const solved = thin ? s.hsP : s.press;
     const r = await read(solved, 'solved');
     const b = await read(zero, 'zero');
@@ -171,7 +171,7 @@ export async function solveLines(page, run, check) {
   const open = await page.evaluate(async () => {
     const { counts } = window.__encode;
     counts.dispatches = 0; counts.by = {}; counts.on = true;
-    await lab.step(4, { thinGap: 0, immiscibility: 0.5 });
+    await lab.step(4, { thinGap: 0, holdApart: 0.5 });
     counts.on = false;
     return { dispatches: counts.dispatches / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])) };
   });
@@ -255,7 +255,7 @@ export async function gridLines(page, check) {
       window.__solve = {}; // its buffers belonged to the last solver's device
       lab.dye(0.5, 0.5, 0.2, [1, 0.6, 0.3], 3);
       lab.flush();
-      await lab.step(4, { thinGap: 1, immiscibility: 0.5 });
+      await lab.step(4, { thinGap: 1, holdApart: 0.5 });
     }, g);
     const { reads } = await residualsOf(page, true, 3, 1);
     return reads.map((x) => x.rel).sort((a, b) => a - b)[1];

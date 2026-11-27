@@ -114,6 +114,15 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // look stops reading as one: Waves goes to the sea, Ripple to a pond.
   'moire-waves':        [7, 16, 9, 19, 18, 23], // ice, teal, cobalt, jade, ultramarine, lavender
   'moire-ripple':       [16, 7, 2, 0],          // teal water; ice, hot pink and yellow oil
+  // The owner's saved looks (presetsOwner.ts, PLAN 34b-7). Their saved dyes
+  // could not be read off the Mac (the app's storage is closed to this, and a
+  // set's file carries only looks in the set), so each is the family the
+  // owner's own papers and LED already named: Classical Vibe's sienna and ice,
+  // Mushy Mushy's lavender, cobalt and jade, Soapy Mess's amber and blue,
+  // with the neighbours that keep a mix from going to mud.
+  'classical-vibe':     [17, 16, 12, 7, 21],    // amber, teal, sienna, ice, coral: warm and cool, the plate as it played
+  'mushy-mushy':        [23, 9, 19, 20, 18],    // lavender, cobalt, jade, magenta, ultramarine
+  'soapy-mess':         [17, 8, 20, 16, 7],     // amber, blue, magenta, teal, ice: a soap film's own orders of colour
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
@@ -155,6 +164,9 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'night-sea':          ['drop'],                 // a drop now and then into the dark sea (48c-5)
   'louche':             ['drop'],                 // a dropper's drops: each one a bloom or a window (48s)
   'saffron-lace':       ['drop'],                 // an eyedropper's drops: each one a hole in the film, or more film
+  'classical-vibe':     ['pour', 'drop'],
+  'mushy-mushy':        ['drop', 'splatter'],
+  'soapy-mess':         ['pour', 'drop'],
 };
 
 /**
@@ -262,6 +274,11 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
   // is the lavender wash's body, which holds its place under the film.
   'saffron-lace':       ['glycerine', 'soap', 'oil', 'alcohol'],
+  // The owner's looks: Classical Vibe a thin water, nothing but dye; Mushy Mushy
+  // thick, with the activator that sets its reaction going; Soapy Mess soap on water.
+  'classical-vibe':     ['water'],
+  'mushy-mushy':        ['syrup', 'water', 'activator'],
+  'soapy-mess':         ['soap', 'water', 'water'],
 };
 
 /**

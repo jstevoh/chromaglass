@@ -341,7 +341,7 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   A new look, not a new bottle in an old look's dish, so every look that was there is as it
   was. Its dish is water, Ouzo and Alcohol by thirds; in the lab on its own settings a bloom
   reads 228 of 255 on a ground of 0, 208 after one drop of Alcohol and 0 after two. How it
-  looks over a show is the owner's (docs/judging.md 149, step 6).
+  looks over a show is the owner's (docs/judging.md 150, step 6).
 - **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
   `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
   membrane of precipitate at the front, and the front's speed against its reaction sets the
