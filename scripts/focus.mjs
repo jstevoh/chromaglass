@@ -111,6 +111,9 @@ try {
     o.hair = await r({ projFocusA: 0.02 });
     o.nudge = await r({ projFocusA: 0.12 });
     o.down = await r({ projFocusA: -0.5 });
+    // Into a texture (the camera's, the film stock's, a projector's): the flipped columns pass, turned upright by the lab.
+    o.flipSharp = await r({}, { flip: true });
+    o.flipSoft = await r({ projFocusA: 0.5 }, { flip: true });
     for (const k of SET) o[`soft${k}`] = await r({ projFocusA: k });
     // Two projectors on two plates of dye and no slide: the blue pool and the teal, the back plate turned half round.
     await lab.create(128); lab.dye(0.38, 0.5, 0.17, BLUE, 0.6); lab.dye(0.62, 0.36, 0.1, TEAL, 0.8); lab.flush(); await lab.step(1);
@@ -120,6 +123,17 @@ try {
     o.twoAsoftB = await r2({ ...TWO, projCross: 0, projFocusB: 0.75 }, BACK);
     o.twoBsoft = await r2({ ...TWO, projCross: 1, projFocusB: 0.75 }, BACK);
     o.twoMid = await r2({ ...TWO, projCross: 0.5, projFocusB: 0.75 }, BACK);
+    /*
+      The same on a wall dimmed after the two lights are added (the lamp's
+      hot-spot, the dish's rims): those multiply both lights, so B's share
+      must not move with them. Taken against the finished wall (the first
+      build), a corner at 0.6 of the hot-spot read B's share 3.1 times too
+      big and blurred a sharp A with B's lens (the pre-push review).
+    */
+    const LIT = { lampHotspot: 0.8, dishSpread: 0.7 };
+    o.litA = await r2({ ...TWO, ...LIT, projCross: 0 }, BACK);
+    o.litBsoft = await r2({ ...TWO, ...LIT, projCross: 1, projFocusB: 0.75 }, BACK);
+    o.litMid = await r2({ ...TWO, ...LIT, projCross: 0.5, projFocusB: 0.75 }, BACK);
     return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.from(v)]));
   }, [S, NEUTRAL, TWO, BACK, BLUE, TEAL, SET]);
 } finally { await lab.close(); }
@@ -221,6 +235,21 @@ const boxOf = (k, hb = false) => { const b = new Float32Array(4); focusBoxPx(b, 
   check('two projectors, B racked out: B alone is the sharp B through B\'s bar, A alone stays sharp, and at the crossfade\'s middle the wall is half of A sharp plus half of B soft in linear light, within 1% of the lamp',
     errB < 2 && sharpB > 3 * errB && keptA <= 1 && worst <= 2.6,
     `B off its box ${f2(errB)} levels (sharp ${f2(sharpB)}); A ${keptA} levels from sharp; the middle's worst ${f2(worst)} levels`);
+}
+
+// ── 5. Dimmed after the add, and into a texture ──────────────────────
+{
+  const mid = (A, Bs, M) => { let w = 0; for (let k = 0; k < M.length; k++) if (k % 4 !== 3) w = Math.max(w, Math.abs(M[k] - disp(0.5 * lin(A[k]) + 0.5 * lin(Bs[k])))); return w; };
+  const worst = mid(shots.litA, shots.litBsoft, shots.litMid);
+  // The lit wall is dimmer than the plain one somewhere (the control: else the case is the one above).
+  const dimmed = meanLin(shots.litA) < meanLin(shots.twoA) * 0.97;
+  check('with the lamp\'s hot-spot and the dish\'s rims up, the crossfade\'s middle is still half of A sharp plus half of B soft in linear light, within 1% of the lamp',
+    worst <= 2.6 && dimmed, `worst ${f2(worst)} levels; the lit wall's light ${f3(meanLin(shots.litA))} against ${f3(meanLin(shots.twoA))}`);
+  const [hx, hy] = boxOf(0.5);
+  const flipErr = edgeAbs(shots.flipSoft, boxed(shots.flipSharp, hx, hy), shots.flipSharp, boxed(shots.flipSharp, hx, hy));
+  const flipMoved = edgeAbs(shots.flipSoft, shots.flipSharp, shots.flipSharp, boxed(shots.flipSharp, hx, hy));
+  check('drawn into a texture (flipped, as for the camera or a projector), racked is the sharp picture through the same box, the right way up',
+    flipErr < 2 && flipMoved > 3 * flipErr, `off the box ${f2(flipErr)} levels, sharp ${f2(flipMoved)}`);
 }
 
 const failed = checks.filter(c => !c.ok).length;

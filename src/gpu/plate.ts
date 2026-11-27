@@ -461,7 +461,8 @@ export class WebGPUPlate {
     const soft = PlateFocus.wanted(this.pack);
     const focusOn = soft && !lensOn && !fields[0]?.tank && this.focus.ready(format, toTexture, two)
       && !!this.pipelines.renderPipeline(focusDisplay, displayRecipe(this.device, FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true));
-    if (!soft && this.focus.holding) this.focus.release();
+    // Sharp, or soft under the lens pass or the tank, which draw it sharp: its pictures go (130 MB at 2560 by 1600 with two).
+    if (!focusOn && this.focus.holding) this.focus.release();
     const finish = this.pack.get('finishInMain')[0];
     if (lensOn || focusOn) this.pack.set('finishInMain', 0);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);

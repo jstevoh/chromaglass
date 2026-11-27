@@ -29,8 +29,10 @@
  * past the rack is capped at FOCUS_TAPS a row and a column.
  *
  * Not drawn with it, for now (PLAN 51b-3): the lens pass (glitter or the side
- * lamp up) draws the plate sharp, as does the tank's side view; a projector's
- * own source (the Mixer's plate rows into a projector, 16b) is drawn sharp.
+ * lamp up) draws the plate sharp, as does the tank's side view, and a
+ * projector's own plate source (16b, `drawSource`). The mixer's rows laid
+ * over both plates (the film, the LED ring) are in the display's picture
+ * before the split, so they are shared out by B's share and blurred with it.
  */
 
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';

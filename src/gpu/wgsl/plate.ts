@@ -3317,7 +3317,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Over both plates: the film projector, and the mixer's other rows ──
-  if (U.projA.w < 0.5) { outColor *= U.projA.rgb; } else { noteShare(outColor); }
+  if (U.projA.w < 0.5) { outColor *= U.projA.rgb; }
   outColor = mixSourcesAt(polar(outColor, fuv0), U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
 
   // ── Lamp warmth ──────────────────────────────────────────────────
