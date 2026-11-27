@@ -25,6 +25,7 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 - `PhoneInkTitle.tsx`: `PhoneInkTitle`, the Title switch and its Sweep (PLAN 37x-10), on the More sheet and the remote's Controls.
 - `PhoneMoire.tsx`: `PhoneMoire`, the moiré pack's sheets on the Looks sheet (the desk's lists and try-it rule, PLAN 45a).
 - `PhoneStage.tsx`: the stage. Its microscope opens the Macro Zoom (`onZoom(zoom)`, the slider's value; it was the closeup's on/off until PLAN QA-32c).
+- `PhonePads.tsx`: `PhonePads`, the APC40's three pad layouts on Motion → Pads (PLAN 30c): pads held while a finger is on them, through lib/padDoor.ts into the same holds as the controller's.
 - `TvLink.tsx`: the `?tvlink` page: sign in, then type the code a TV shows, to link it to the account's Home or Pro (PLAN 12-tv-signin). `main.tsx` routes it before the show, like the remote; it loads no engine.
 
 ## Checks
