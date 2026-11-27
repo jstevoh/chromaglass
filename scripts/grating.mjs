@@ -24,7 +24,9 @@
  * and there it is.
  *
  * The fix is `dampGrid` (wgsl/fluid.ts): a filter that takes out the
- * checkerboard and the band near it and leaves everything else. Asked here:
+ * checkerboard and the band near it and leaves everything else. It runs on
+ * the old plate (Thin Gap off); on a thin gap, where since 18a-8 the flow has
+ * no checkerboard to lay, it is retired (18a-8b, section 7). Asked here:
  *
  *   1. the checkerboard goes in a second, faint or strong, with a little
  *      diffusion or none, and the reported spread around it within five
@@ -43,6 +45,8 @@
  *      keep a pool of what they laid, the two alike: the same push took
  *      one held pool to a third of the other's on the Mac (the phone's
  *      two-finger Drop reds; the comment above section 6 has them)
+ *   7. on a thin gap, with no pass: the pressed plate grows no more in that
+ *      band than with the pass forced on, and the finest diagonals keep
  *
  * Every measure is taken in all four of the dye's channels and the worst one
  * judged: the grating is colour (blue and white over violet), so a pass that
@@ -175,20 +179,34 @@ try {
     the frequencies within it. What a real edge puts there is the same in
     both runs; what differs is what the grid grew.
   */
-  const pressed = (gridDamp) => page.evaluate(async ([N, over]) => {
+  /*
+    Each run also says whether its steps ran as a thin gap (`lab.thinLive`)
+    and how far the dye moved: the mean change of its density from the first
+    ten steps to the last, against its mean, so section 7 can tell a thin
+    plate whose presses moved its dye from one that sat still.
+  */
+  const pressed = async (gridDamp, extra = {}) => {
+    const r = await pressRun(gridDamp, extra);
+    return Object.assign(r.band, { thin: r.thin, moved: r.moved });
+  };
+  const pressRun = (gridDamp, extra) => page.evaluate(async ([N, over]) => {
     await lab.create(N, N);
     let s = 7; const r = () => (s = s * 16807 % 2147483647) / 2147483647;
     for (let i = 0; i < 14; i++) lab.dye(0.2 + 0.6 * r(), 0.2 + 0.6 * r(), 0.05 + 0.08 * r(), [0.4, 1.0, 0.3], 1.2);
     lab.flush();
+    let first;
     for (let k = 0; k < 60; k++) {
       lab.vel(0.2 + 0.6 * r(), 0.2 + 0.6 * r(), 0.08, [(r() - 0.5) * 0.4, (r() - 0.5) * 0.4, 0, 0]);
       const x = 0.25 + 0.5 * r(), y = 0.25 + 0.5 * r();
       for (const rr of [0.1, 0.07, 0.04]) lab.vel(x, y, rr, [0, 0, 0, -0.3]);
       lab.flush(); await lab.step(10, over);
+      if (k === 0) first = await lab.field('dye');
     }
     const d = await lab.field('dye');
     const M = Math.floor(0.1 * N);
-    return [0, 1, 2, 3].map((c) => {
+    let change = 0, held = 0;
+    for (let k = 3; k < d.length; k += 4) { change += Math.abs(d[k] - first[k]); held += first[k]; }
+    const band = [0, 1, 2, 3].map((c) => {
       let mean = 0;
       const g = new Float64Array(N * N);
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = d[(y * N + x) * 4 + c]; mean += v; g[y * N + x] = (x + y) & 1 ? -v : v; }
@@ -213,7 +231,8 @@ try {
       }
       return Math.sqrt(2 * e) / (N * N) / mean;
     });
-  }, [N, { ...STILL, platePressure: 0.35, gridDamp }]);
+    return { band, thin: lab.thinLive(), moved: change / held };
+  }, [N, { ...STILL, platePressure: 0.35, gridDamp, ...extra }]);
   /*
     Held under 0.68, not the third it was written with (re-baselined
     with the owner's word, 2026-10-03, in the PR that balanced the press
@@ -335,6 +354,60 @@ try {
   const drift = drifts.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0);
   check('dye is made or lost only by a few parts per million a second', Math.abs(drift) < 1e-5,
     `${drift >= 0 ? '+' : ''}${(drift * 1e6).toFixed(2)} ppm a second over ten, worst channel`);
+
+  // ── 7. On a thin gap, no grating grows and no pass is needed ──────
+  /*
+    Everything above is the old plate (Thin Gap off), where the collocated
+    projection still lays a checkerboard the pass has to take out. Every look
+    opens on a thin gap, and there the pass no longer runs (PLAN 18a-8b): since
+    18a-8 (#1022) the thin solve's faces are the flow's state, so the flow has
+    no checkerboard to ride into the colour (`npm run gridnull`). Asked here,
+    on section 2's pressed plate with Thin Gap on:
+
+      - as it ships (no pass), the band around the checkerboard after ten
+        seconds is within THIN_SAME of the same plate with the pass forced on at
+        the old plate's strength (measured 2.94e-3 against 2.85e-3, 1.03: what
+        is in the band is the moving fronts' own edges, which the pass cannot
+        tell from a grating and leaves, section 2's comment), and it is under
+        THIN_CLEANER of what the old plate grows with no pass (6.33e-3 there,
+        0.46), so the source the pass was written for is gone, not hidden;
+      - the liquid's finest diagonal, texture four cells across, keeps over
+        THIN_KEEP of itself over a second as it ships (0.986), where the pass,
+        forced on, takes it under THIN_FORCED (0.817). That control is also
+        what says `gridDamp` reaches a thin step at all, so the first line is
+        not two runs of the same thing.
+
+    Around them: the runs say they stepped as a thin gap (and section 2's as
+    the old plate), the thin plate's dye moved at least THIN_MOVED as far as
+    the old plate's (a still plate grows nothing in the band and would pass
+    the rest), and the band measure itself moves past THIN_SAME where the
+    pass has a grating to take (section 2's plate, off against on, 1/0.64).
+
+    A pass that came back on the thin gap fails the second line; a flow mode
+    that came back fails the first (it grows the band with the pass off, which
+    the forced pass would hold down).
+  */
+  const PASS = 0.05; // GRID_DAMP, the old plate's strength
+  const THIN = { thinGap: 1 };
+  const THIN_SAME = 1.15, THIN_CLEANER = 0.75, THIN_KEEP = 0.95, THIN_FORCED = 0.9, THIN_MOVED = 0.5;
+  const thinShip = await pressed(undefined, THIN), thinForced = await pressed(PASS, THIN);
+  check('the thin runs stepped as a thin gap and section 2\'s as the old plate', thinShip.thin && thinForced.thin && !off.thin && !on.thin,
+    `thin ${thinShip.thin}/${thinForced.thin}, old ${off.thin}/${on.thin}`);
+  check(`and the thin plate's pushes and presses moved its dye at least ${THIN_MOVED} as far as the old plate's`, thinShip.moved >= THIN_MOVED * off.moved,
+    `${thinShip.moved.toFixed(3)} of its mean against ${off.moved.toFixed(3)}`);
+  const graded = Math.min(...off.map((v, c) => v / on[c]));
+  check(`the band tells a grating from none: on the old plate it reads over ${THIN_SAME} of itself with the pass off`, graded > THIN_SAME, `${graded.toFixed(2)}, worst channel`);
+  const same = Math.max(...thinShip.map((v, c) => v / thinForced[c]));
+  const cleaner = Math.max(...thinShip.map((v, c) => v / off[c]));
+  check('on a thin gap, the pressed plate grows no more grid-scale ripple with no pass than with one', same < THIN_SAME,
+    `${thinShip[3].toExponential(2)} of the dye as it ships against ${thinForced[3].toExponential(2)} with the pass forced on, worst channel ${pc(same)}`);
+  check('and under three quarters of what the old plate grows with none', cleaner < THIN_CLEANER,
+    `against ${off[3].toExponential(2)}, worst channel ${pc(cleaner)}`);
+  const diagKept = (r) => worst(r, kept((x, y) => Math.cos(Math.PI / 2 * (x + y))), Math.min);
+  const t4 = diagKept(await run('diag4', { extra: THIN }));
+  const t4Forced = diagKept(await run('diag4', { extra: { ...THIN, gridDamp: PASS } }));
+  check('the control: on a thin gap the pass, forced on, softens texture four cells across', t4Forced < THIN_FORCED, `${pc(t4Forced)} kept after a second`);
+  check('and as it ships the thin gap keeps it', t4 > THIN_KEEP, `${pc(t4)} kept after a second`);
 } finally {
   await close();
 }
@@ -401,10 +474,17 @@ const oldPush = (strength) => ({
       const src = readFileSync(args.path, 'utf8');
       const at = '  /*\n    There was a fingering push here, and it is gone on purpose.';
       if (!src.includes(at)) throw new Error('grating: the control could not find where the fingering push was in wgsl/fluid/forces.ts');
-      // The push as it shipped until it was taken out.
-      const push = `  if (d >= 0.05) {
-    let gx = (bilerpN(dye, uv + eL, S.n).a - bilerpN(dye, uv - eL, S.n).a) * 0.5;
-    let gy = (bilerpN(dye, uv + eL.yx, S.n).a - bilerpN(dye, uv - eL.yx, S.n).a) * 0.5;
+      /*
+        The push as it shipped until it was taken out. Its one-cell step is its
+        own (eP): forcesB's \`eL\` went with the tension's gradient in 18d-6
+        (#1016), and with it missing this kernel did not compile, so both
+        controls stepped no force at all and read their laid pools (52 at five
+        seconds and at ten) while the as-is plate moved.
+      */
+      const push = `  let eP = vec2f(1.0 / S.l, 0.0);
+  if (d >= 0.05) {
+    let gx = (bilerpN(dye, uv + eP, S.n).a - bilerpN(dye, uv - eP, S.n).a) * 0.5;
+    let gy = (bilerpN(dye, uv + eP.yx, S.n).a - bilerpN(dye, uv - eP.yx, S.n).a) * 0.5;
     let g2 = gx * gx + gy * gy;
     if (g2 > 0.005) {
       let g = sqrt(g2);

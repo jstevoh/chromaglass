@@ -262,8 +262,9 @@ export interface GpuStepParams {
   particleLife: number;
   /**
    * The share of the grid's checkerboard the dye loses a step (dampGrid).
-   * Left out, the solver's own GRID_DAMP; the app never sets it. For
-   * `npm run grating`, to step the same pressed plate with the pass off.
+   * Left out, the solver's own GRID_DAMP on the old plate and none on a thin
+   * gap (PLAN 18a-8b); the app never sets it. For `npm run grating`, to step
+   * the same pressed plate with the pass off, or on a thin gap with it on.
    */
   gridDamp?: number;
   /**
