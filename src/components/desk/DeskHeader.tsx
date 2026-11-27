@@ -245,8 +245,8 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
         <StatusDot
           on
           tone="live"
-          label={`Rec ${dots.rec}`}
-          short="Rec"
+          label={dots.recWhat ? `Rec · ${dots.recWhat} ${dots.rec}` : `Rec ${dots.rec}`}
+          short={dots.recWhat ? `${dots.recWhat} ${dots.rec}` : 'Rec'}
           tight={t}
           onClick={onRecord}
           title={`Recording ${dots.recWhat ?? 'Plate video'} (${dots.rec}). Click for the Record panel, or press R to stop.`}

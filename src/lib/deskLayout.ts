@@ -23,7 +23,7 @@
  * drives every operation in node.
  */
 
-import { SETTINGS_SECTIONS, SECTION_BY_ID, resolveSection } from './settingsMap.ts';
+import { SETTINGS_SECTIONS, SECTION_BY_ID, sectionSearchText, resolveSection } from './settingsMap.ts';
 import { PINNABLE } from './deskPins.ts';
 
 /**
@@ -99,6 +99,8 @@ export interface PanelSpec {
    * as wide as its widest panel asks; the rest take the column as it is.
    */
   columnWidth?: number;
+  /** Aliases and search terms for panels not backed by a Settings section (`⌘K` and `⌘P`). */
+  terms?: string;
 }
 
 /**
@@ -106,23 +108,23 @@ export interface PanelSpec {
  * settings section. Their ids are not section ids, so they cannot collide.
  */
 const OWN: PanelSpec[] = [
-  { id: 'cues',    name: 'Cues',    category: 'play',  kind: 'own', deckWidth: 304 },
-  { id: 'rides',   name: 'Rides',   category: 'play',  kind: 'own', deckWidth: 312 },
-  { id: 'recipe',  name: 'Recipe',  category: 'play',  kind: 'own', deckWidth: 320 },
+  { id: 'cues',    name: 'Cues',    category: 'play',  kind: 'own', deckWidth: 304, terms: 'set list setlist go fade cue back saved looks' },
+  { id: 'rides',   name: 'Rides',   category: 'play',  kind: 'own', deckWidth: 312, terms: 'faders sliders perform strip choose mixer drain' },
+  { id: 'recipe',  name: 'Recipe',  category: 'play',  kind: 'own', deckWidth: 320, terms: 'knobs controls design bench randomise' },
   // The song as a timeline, its show's cues and the nudge (PLAN 28h): the deck's widest, because a lane of sections is read across.
-  { id: 'score',   name: 'Score',   category: 'play',  kind: 'own', deckWidth: 400 },
-  { id: 'bottles', name: 'Bottles', category: 'pour', kind: 'own', deckWidth: 312 },
-  { id: 'dyes',    name: 'Dyes',    category: 'pour', kind: 'own', deckWidth: 360 },
-  { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340 },
+  { id: 'score',   name: 'Score',   category: 'play',  kind: 'own', deckWidth: 400, terms: 'song timeline sections nudge cues' },
+  { id: 'bottles', name: 'Bottles', category: 'pour', kind: 'own', deckWidth: 312, terms: 'liquids pour drop viscosity' },
+  { id: 'dyes',    name: 'Dyes',    category: 'pour', kind: 'own', deckWidth: 360, terms: 'palette colour color swatches image video pour' },
+  { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340, terms: 'dropper spray splatter pour streak blow press finger magnet spin tip slosh amount' },
   // Side-by-side QR code and full "Phone · iPad / not linked" header need 400 px.
-  { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 400 },
+  { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 400, terms: 'ipad remote qr pair link mobile controller' },
   /*
     The Mac app's stream to YouTube, Twitch and the rest (PLAN 37x-4d). In
     Play because it is run during the show, beside the cues, not set up once
     with the room. Listed only where it can stream (`PanelBrowser`, lib/liveShow's
     `liveAvailable`); on the website a tab that has it says so in its body.
   */
-  { id: 'live',    name: 'Live Show', category: 'play', kind: 'own', deckWidth: 340, columnWidth: 340 },
+  { id: 'live',    name: 'Live Show', category: 'play', kind: 'own', deckWidth: 340, columnWidth: 340, terms: 'stream youtube twitch rtmps broadcast live' },
   /*
     The three that were screens of their own, behind the Sequence and Sound
     chips, before every tab was a set of panels (2026-10-27): a tab can only
@@ -130,8 +132,8 @@ const OWN: PanelSpec[] = [
     tab, and taking its chip away would have lost it. Each is the screen's own
     component drawn in a panel (`Sheet embed`), so nothing in it was rewritten.
   */
-  { id: 'songs',     name: 'Songs',         category: 'play', kind: 'own', deckWidth: 400, columnWidth: 420 },
-  { id: 'sequences', name: 'Sequences',     category: 'play', kind: 'own', deckWidth: 400, columnWidth: 360 },
+  { id: 'songs',     name: 'Songs',         category: 'play', kind: 'own', deckWidth: 400, columnWidth: 420, terms: 'song tracks music setlist shows listen' },
+  { id: 'sequences', name: 'Sequences',     category: 'play', kind: 'own', deckWidth: 400, columnWidth: 360, terms: 'sequencer sequence cues stages show timeline' },
 ];
 
 /**
@@ -405,3 +407,10 @@ export const OLD_LAYOUT_KEY = (name: LayoutName) => `chromaglass-desk-layout:${n
 
 /** For the browser: is this section one of the settings sections? (The desk's own panels are not.) */
 export const isSectionPanel = (id: string): boolean => SECTION_BY_ID.has(id);
+
+/** Everything a search (`⌘K`, `⌘P`) can match for any panel in `PANELS`. */
+export function panelSearchText(p: PanelSpec): string {
+  const sec = SECTION_BY_ID.get(p.id);
+  const base = sec ? sectionSearchText(sec) : `${p.name} ${p.terms ?? ''} ${p.category}`;
+  return `${base} ${p.name} ${p.terms ?? ''}`.toLowerCase();
+}
