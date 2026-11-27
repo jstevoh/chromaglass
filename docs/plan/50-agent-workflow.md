@@ -44,6 +44,20 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   Each PR moves one piece (the input writers, the readbacks, the post chain, the governor's
   feed) as a pure move, held against the 26 checks that read the file as text (19ai-3a) and
   `samelook`. Done when `LiquidVisualizer.tsx` is under 40 KB.
+  - **50c-1 shipped** (2026-11-27): the seam written down (`src/engine/README.md`: the engine
+    owns the per-frame state, takes typed messages, sends events, imports no React) and the
+    first piece moved verbatim: the pointer and the fingers (mouse, touches, Spin hands, the
+    closeup's Alt-drag and two-finger camera) to `src/engine/pointer.ts`, `coverPinch.ts`
+    from `components/` beside it. `LiquidVisualizer.tsx` 390,411 to 373,454 bytes. No check
+    read the moved text. The order of the next moves (50c-2 debug report, 50c-3 the GPU's
+    guards, 50c-4 the governor, 50c-5 the clocks: Antigravity's, briefed 2026-11-27 in the
+    owner's files under `antigravity/engine-50c/`, strictly one after another; 50c-6 the
+    device's start, which writes the effect's own state, so Claude designs its home first;
+    50c-7 on: `renderFrame` by stage) is the README's table.
+  - **50c-1a. Found along the way: the pointer reads the frame's box, not its own.** The
+    moved handlers read `stageRef`, `frameRef` and `macroShotRef` as the loop writes them,
+    so in a worker (50d) the page side needs a copy of the camera's shot each frame to map a
+    finger to the plate; today they share one object. Name it in 50d's message shape.
 - **50d** *The plate on its own thread* (rank 4, L, after 50c; Claude designs, the owner OKs
   the message shape since it is an export between domains). Once the engine is a module, it
   runs in a worker on an `OffscreenCanvas`, so React, the desk, the remote and the page's
