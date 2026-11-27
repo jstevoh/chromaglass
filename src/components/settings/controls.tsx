@@ -116,7 +116,7 @@ export const Slider = ({ label, value, min, max, step, onChange, icon: Icon, dis
             <button
               type="button"
               onClick={tip.toggle}
-              className="inline-flex min-w-0 items-center gap-1 text-left pointer-coarse:min-h-[44px]"
+              className="inline-flex min-h-6 min-w-6 items-center gap-1 text-left pointer-coarse:min-h-[44px]"
             >
               <span className="truncate">{label}</span>
               <Info size={12} className="hidden shrink-0 text-white/45 pointer-coarse:inline" aria-hidden />
