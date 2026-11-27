@@ -5,7 +5,7 @@
  * the solver's class chain; the map is at the top of `gpu/fluid.ts`.
  */
 
-import { PingPong, bindGroup } from '../kit';
+import { FIELD_USAGE, PingPong, bindGroup } from '../kit';
 import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
@@ -48,8 +48,8 @@ export class FluidPasses extends FluidFields {
 
   /**
    * A carry on a thin gap through the solve's own faces (THIN_FACE in
-   * wgsl/fluid.ts), in one pass: runPressed's bindings with the solve's P in
-   * place of the pressure, then the gap and the mobility.
+   * wgsl/fluid.ts), in one pass: runPressed's bindings with the solve's faces
+   * (hsFlow, PLAN 18a-8) in place of the pressure, then the gap and the mobility.
    */
   protected runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
     // bodyAdvectThin carries amounts, so while there is air it takes it (airLiquid in wgsl/fluid.ts, PLAN 15g-8b);
@@ -65,7 +65,7 @@ export class FluidPasses extends FluidFields {
     const last = this.groupAt(at, ride);
     let group = last.group;
     if (!group) {
-      group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!, ...(air ?? [])]);
+      group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsFlow!, this.squeeze.read, this.hsMob!, ...(air ?? [])]);
       last.group = group;
     }
     pass.setPipeline(pipe);
@@ -178,7 +178,7 @@ export class FluidPasses extends FluidFields {
     const last = this.groupAt(at, air[0]);
     let group = last.group;
     if (!group) {
-      group = bindGroup(this.device, pipe, [this.sim, args, ride, air[2], this.hsP!, ...(planned ? [this.carrySub!] : []), this.squeeze.read, this.hsMob!, air[0], air[1], air[3]]);
+      group = bindGroup(this.device, pipe, [this.sim, args, ride, air[2], this.hsFlow!, ...(planned ? [this.carrySub!] : []), this.squeeze.read, this.hsMob!, air[0], air[1], air[3]]);
       last.group = group;
     }
     pass.setPipeline(pipe);
@@ -196,7 +196,7 @@ export class FluidPasses extends FluidFields {
 
   /**
    * phaseAdvect: runPressed's bindings, then the gap, the gap the phase last
-   * saw, and the thin solve's pressure and mobility (a stand-in for each until
+   * saw, and the thin solve's faces (hsFlow, PLAN 18a-8) and mobility (a stand-in for each until
    * Thin Gap has run: the kernel reads them only under it).
    */
   protected runPhaseAdvect(pass: GPUComputePassEncoder, args: GPUBuffer): void {
@@ -216,7 +216,7 @@ export class FluidPasses extends FluidFields {
     if (!group) {
       const gap = this.ensurePhaseGap();
       group = bindGroup(this.device, pipe, [this.sim, args, this.phase.read, ride, this.phase.write, this.press, this.squeeze.read, gap,
-        thin ? this.hsP! : gap, thin ? this.hsMob! : gap, this.ensureStand()]);
+        thin ? this.hsFlow! : gap, thin ? this.hsMob! : gap, this.ensureStand()]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -276,7 +276,7 @@ export class FluidPasses extends FluidFields {
       const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${ride.label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
-        ga = bindGroup(this.device, adv, [this.sim, a, there, ride, back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        ga = bindGroup(this.device, adv, [this.sim, a, there, ride, back, this.press, this.squeeze.read, gap, this.hsFlow!, this.hsMob!, stand, this.phaseSub!]);
         this.groups.set(ka, ga);
       }
       pass.setPipeline(adv);
@@ -607,6 +607,45 @@ export class FluidPasses extends FluidFields {
     if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
     this.run(pass, 'speciesSplat', sp.write, [sp.read, this.squeeze.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
+    if (this.solventLive && this.solvent) this.stepOuzo(pass, this.solvent);
+  }
+
+  /**
+   * The ouzo's solvent carried with the colour (PLAN 48s), beside the
+   * chemistry's carry and by the same call: the colour's arguments and, while
+   * there is air, the air's, so the ethanol and the oil cross the same faces
+   * in the same substeps as the dye and the species they were poured with,
+   * and leave a bubble's hole as those do. Nothing with no ouzo on the plate.
+   */
+  protected carrySolvent(pass: GPUComputePassEncoder, args: GPUBuffer, argsAt?: GPUBuffer[]): void {
+    if (!this.solventLive || !this.solvent) return;
+    this.carrySubsteps(pass, 'bodyAdvect', this.solvent, args, undefined, argsAt);
+    this.solventCarried = true;
+  }
+  private solventCarried = false;
+
+  /**
+   * The ouzo's stage (PLAN 48s; lib/ouzo.ts, wgsl/fluid/ouzo.ts), after the
+   * species' and only while there is anise oil on the plate. Where the colour
+   * was carried some other way and the species alone (the maze's sixths),
+   * the solvent is carried here as the species just was; then the phase
+   * change and the rim in one pass (`ouzoCloud`), then the droplets'
+   * scattering onto the species for the plate.
+   */
+  private stepOuzo(pass: GPUComputePassEncoder, v: PingPong): void {
+    if (!this.solventCarried) this.carrySubsteps(pass, 'bodyAdvect', v, this.arg('solvent advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
+    this.solventCarried = false;
+    this.run(pass, 'ouzoCloud', v.write, [v.read, this.squeeze.read], this.arg('none', [0, 0, 0, 0]));
+    v.swap();
+    this.writeCloudView(pass);
+  }
+
+  /** The species with the droplets' scattering added (`ouzoView`), for the plate: after a step, and after an Undo has put both fields back. */
+  protected writeCloudView(pass: GPUComputePassEncoder): void {
+    if (!this.species || !this.solvent) return;
+    this.cloudView ??= this.disposer.track(this.device.createTexture({ label: 'cloud view', size: [this.N, this.N], format: 'rgba32float', usage: FIELD_USAGE }));
+    this.run(pass, 'ouzoView', this.cloudView, [this.species.read, this.solvent.read], this.arg('none', [0, 0, 0, 0]));
+    this.cloudFresh = true;
   }
 
   /** The heat carried with the liquid on a thin gap (PLAN 38f): h·T and h, made on the first thin step. */
@@ -916,13 +955,29 @@ export class FluidPasses extends FluidFields {
     this.ensureThinGap();
     const ride = this.ride();
     this.hsRun(pass, 'carryCourant', `carryCourant:${ride.label}:${this.squeeze.read.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, REST_GAP]),
-      [ride, this.hsP!, this.carryMost!, this.squeeze.read, this.hsMob!]);
+      [ride, this.hsFlow!, this.carryMost!, this.squeeze.read, this.hsMob!]);
     this.hsRun(pass, 'carryPlan', 'carryPlan', this.arg('carry plan', [CARRY_COURANT, CARRY_SUBSTEPS, Math.ceil(this.N / 8), CARRY_PAIRS]),
       [this.carryMost!, this.carryInd!, this.carrySub!], 1);
   }
 
   /**
-   * One carry (`bodyAdvect` or `mixAdvect`) of `field` along the step's
+   * Whether the dye can be carried as its two liquids' shares this step
+   * (PLAN 38w-29, 38w-32; the advect dye stage in fluid.ts): the split, the
+   * join and the oil's own carry (`sharp`, the thin gap's with or without
+   * the air, or the old plate's) all built. Asking builds the ones that are
+   * not, so the step after a bubble first lands or Thin Gap is first turned
+   * off carries the old way only until they are in.
+   */
+  /** How many steps carried the oil's colour in the air's room (bodyAdvectSharpSubAir): `npm run oilride -- --plate=air` asks it ran, not only that there was air. */
+  sharpAirCarries = 0;
+
+  protected splitReady(sharp: string, od: PingPong): boolean {
+    const f = od.read.format;
+    return !!this.pipeline('bodyWater', f) && !!this.pipeline('bodyJoin', f) && !!this.pipeline(sharp, f);
+  }
+
+  /**
+   * One carry (`bodyAdvect`, `bodyAdvectSharp` or `mixAdvect`) of `field` along the step's
    * velocity, in the substeps planCarry chose: the first as always, the rest
    * in pairs that go to the write field and back, each pair dispatched
    * indirectly so one this step does not need runs no workgroups. The field
@@ -936,10 +991,11 @@ export class FluidPasses extends FluidFields {
       airArgs; airLiquid in wgsl/fluid.ts, PLAN 15g-8b), in their Air kernels;
       until one is built, the plain carry, which keeps every amount too.
     */
-    const airPipe = argsAt && name === 'bodyAdvect' ? this.pipeline(`${kernelName}Air`, field.format) : null;
+    const airPipe = argsAt && name !== 'mixAdvect' ? this.pipeline(`${kernelName}Air`, field.format) : null;
     const pipe = airPipe ?? this.pipeline(kernelName, field.format);
     if (!pipe) return;
     if (!airPipe) argsAt = undefined;
+    else if (name === 'bodyAdvectSharp') this.sharpAirCarries++;
     const ride = this.ride();
     const air = airPipe ? this.airPair() : null;
     const group = (a: GPUBuffer, src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
@@ -949,7 +1005,7 @@ export class FluidPasses extends FluidFields {
       if (air) at = this.groupAt(at, air[0]);
       let g = at.group;
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, a, src, ride, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : []), ...(air ?? [])]);
+        g = bindGroup(this.device, pipe, [this.sim, a, src, ride, dst, this.hsFlow!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : []), ...(air ?? [])]);
         at.group = g;
       }
       return g;
@@ -1120,7 +1176,7 @@ export class FluidPasses extends FluidFields {
     this.vel.swap();
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${airCur.label}:${airPrev.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
-      [this.vel.read, this.squeeze.read, airCur, airPrev, this.div, mob, this.hsGap!, this.hsPour!]);
+      [this.vel.read, this.squeeze.read, airCur, airPrev, this.div, mob, this.hsGap!, this.hsPour!, this.hsFlow!, this.hsFlowStar!]);
     this.hsPrimed = true;
     // Each coarse level's faces and rim, from the level above it.
     for (let l = 0; l < this.mg.length; l++) {
@@ -1176,7 +1232,7 @@ export class FluidPasses extends FluidFields {
     if (this.airSettle > 0) this.airSettle--;
     for (let c = 0; c < this.hsCycles + (settle ? this.hsCycles : this.airPush > 0 ? 1 : 0); c++) this.hsCycle(pass, 0);
     this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
-      [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press]);
+      [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press, this.hsFlowStar!, this.hsFlow!]);
     this.vel.swap();
   }
 

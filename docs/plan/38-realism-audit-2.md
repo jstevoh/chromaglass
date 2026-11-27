@@ -287,7 +287,7 @@ is in the project's files).
   main one body, its width ± 10% (36% by 360 steps, the ends drawing in); now 11 bodies,
   ± 59% (12–14 by 360 steps, 6.6 widths a bead); a ribbon 8 cells wide stays one at 180. No
   effect at 192² (the 2 mm gap is 1.9 cells, under the narrowest thread the field draws,
-  THREAD_CELLS). Still open: Classic under a hand in the app at 512² judged (judging 150), and
+  THREAD_CELLS). Still open: Classic under a hand in the app at 512² judged (judging 151), and
   the band's width against the strain rate, which a press thins into threads only once 38w-28
   gives the water its shear.
 - **38w-28. Classic's water moves at the 1969 speed** (M; High, after 38w-27). The round-five
@@ -315,10 +315,9 @@ is in the project's files).
   loss (and bodyPartition's own note records the same direction in its drift). CH in a
   diffuse band is the profile restoring itself, not oil going anywhere, so the colour is
   left to bodyPartition there.
-- **38w-32. The oil's colour rides the oil with air on the plate and on the old plate** (S–M;
-  Medium, after 38w-29). The split carry runs only on a thin gap with no air: the air's
-  carries (bodyAdvectSubAir, airLiquid) are built for the one MC limiter, and the old
-  plate's single carry (bodyAdvect, runPressed) still carries the oil's share with MC. Give
-  bodyAdvectSharp an Air variant and the pressed path the same split, and run oilride with
-  a bubble down and with Thin Gap off. Fusing bodyWater into the dye's first substep and
-  bodyJoin into its last would also save the two passes.
+- **38w-33. The split carry's two passes fused into the carry** (S; Low, after 38w-32).
+  bodyWater and bodyJoin are two pointwise passes a step round the dye's carry (one or two
+  loads a cell each). Fold the split into the dye's first substep (read dye less the oil's
+  share there) and the join into its last, in the plain, pair and Air kernels alike, and
+  the old plate's single bodyAdvect; `npm run oilride` on all three plates and `npm run
+  thick`'s timing say it is the same carry and cheaper.

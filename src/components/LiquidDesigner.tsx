@@ -143,13 +143,13 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
       <div className="flex flex-wrap gap-2 mb-3">
         {canMake && (
           <button type="button" onClick={() => startFrom()} data-testid="liquid-design"
-            className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
+            className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
             <Plus size={12} /> Design a liquid
           </button>
         )}
         {canMake && (
           <>
-            <button type="button" onClick={() => fileRef.current?.click()} data-testid="liquid-load" className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
+            <button type="button" onClick={() => fileRef.current?.click()} data-testid="liquid-load" className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
               <Upload size={12} /> Load a file…
             </button>
             <input ref={fileRef} type="file" accept=".json,application/json" multiple hidden
@@ -158,7 +158,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
         )}
         {custom.length > 0 && (
           <button type="button" onClick={() => download('my.liquids.json', writeLiquidFile(custom))}
-            className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
+            className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
             <Download size={12} /> Save all to a file
           </button>
         )}
@@ -180,10 +180,10 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
                 <div className="text-[13px] truncate">{l.name}</div>
                 {l.description && <div className="text-[11px] opacity-40 truncate">{l.description}</div>}
               </button>
-              {canMake && <button type="button" data-testid="liquid-edit" className="text-[11px] px-2 py-1 rounded bg-white/5 hover:bg-white/10" onClick={() => edit(l)}>Edit</button>}
-              <button type="button" aria-label={`Save ${l.name} to a file`} className="p-1.5 rounded bg-white/5 hover:bg-white/10"
+              {canMake && <button type="button" data-testid="liquid-edit" className="text-[11px] px-2 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded bg-white/5 hover:bg-white/10" onClick={() => edit(l)}>Edit</button>}
+              <button type="button" aria-label={`Save ${l.name} to a file`} className="flex items-center justify-center p-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded bg-white/5 hover:bg-white/10"
                 onClick={() => download(fileName(l.name), writeLiquidFile([l]))}><Download size={12} /></button>
-              <button type="button" aria-label={`Remove ${l.name}`} className="p-1.5 rounded bg-white/5 hover:bg-red-500/20"
+              <button type="button" aria-label={`Remove ${l.name}`} className="flex items-center justify-center p-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded bg-white/5 hover:bg-red-500/20"
                 onClick={() => { if (window.confirm(`Take ${l.name} off the shelf?`)) onRemove(l.id); }}><Trash2 size={12} /></button>
             </li>
           ))}
@@ -252,14 +252,14 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={save} className="px-3 py-1.5 rounded-md bg-emerald-500/25 hover:bg-emerald-500/35 text-[12px]">
+            <button type="button" onClick={save} className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-emerald-500/25 hover:bg-emerald-500/35 text-[12px]">
               Put it on the shelf
             </button>
             <button type="button" onClick={() => download(fileName(finished.name), writeLiquidFile([finished]))}
-              className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
+              className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
               <Download size={12} /> Save to a file
             </button>
-            <button type="button" onClick={() => setDraft(null)} className="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-[12px] ml-auto">
+            <button type="button" onClick={() => setDraft(null)} className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-white/5 hover:bg-white/10 text-[12px] ml-auto">
               Cancel
             </button>
           </div>

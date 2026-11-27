@@ -1905,6 +1905,17 @@
       ]
     },
     {
+      "name": "The thin gap's flow has no mode the pressure cannot see",
+      "shard": "lab2",
+      "run": "npm run gridnull",
+      "why": [
+        "PLAN.md 18a-8 (scripts/gridnull.mjs): with the faces as the flow's state, a checkerboard",
+        "laid in the flow is gone in a step on water and the oil and leaves no flow elsewhere, an",
+        "eight-cell wave of water keeps its inertia against a long one, and a floored dent's rim",
+        "under a steady push is smooth, its faces too. About 90 s on SwiftShader (cloud, 2026-11-27)."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
@@ -3235,6 +3246,18 @@
       ]
     },
     {
+      "name": "Lava Pop's colour stays in its dish",
+      "shard": "lab",
+      "run": "npm run rimdye",
+      "timeout": 15,
+      "why": [
+        "Lava Pop left running (PLAN 18a-23): Oil Bodies' colour levelling read",
+        "the cells past the open rim as neighbours, and they are cleared every",
+        "step, so the water's colour seeped over the rim and was wiped there;",
+        "it now stops at the rim, as the dye's dispersion and the oil's do."
+      ]
+    },
+    {
       "name": "Keep Full refills an emptied dish in the app",
       "shard": "plate",
       "run": "npm run keepfullapp",
@@ -3645,6 +3668,28 @@
         "oil keeps its share of the dye (main handed 0.54% of it to the water),",
         "inside the oil, none stranded in open water, no oil made or lost.",
         "About six minutes on software WebGPU at 192²."
+      ]
+    },
+    {
+      "name": "The oil's colour rides the oil past a bubble",
+      "shard": "plate",
+      "run": "npm run oilride -- --plate=air",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-32: the same hand with a bubble drifting through the oil, the",
+        "carries taking the air: the oil keeps its share of the dye (0.65% went",
+        "to the water before the split carry ran with air). About nine minutes."
+      ]
+    },
+    {
+      "name": "The oil's colour rides the oil on the old plate",
+      "shard": "plate",
+      "run": "npm run oilride -- --plate=old",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-32: the same hand with Thin Gap off: the oil keeps its share",
+        "of the dye (1.21% went to the water before the old plate's carry was",
+        "split). About five minutes."
       ]
     },
     {

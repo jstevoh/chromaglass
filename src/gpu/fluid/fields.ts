@@ -409,9 +409,12 @@ export class FluidFields extends FluidCore {
       this.hsSealSrc = this.disposer.track(this.device.createBuffer({ label: 'seal source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
       // The thin solve's own P, packed as the old solver's pressure is. The thin
-      // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
+      // carries read the faces since 18a-8 (hsFlow); hsGradient hands phaseAdvect's area form c·P
       // in that one (wgsl/thinGap.ts, hsGradient).
       this.hsP = buf('thin gap pressure', this.N);
+      // The solve's faces, the flow's state, and what u* would carry through them (PLAN 18a-8, wgsl/thinFlow.ts).
+      this.hsFlow = this.disposer.track(this.device.createBuffer({ label: 'thin gap faces', size: Math.max(16, 4 * this.N * this.N * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+      this.hsFlowStar = this.disposer.track(this.device.createBuffer({ label: 'thin gap faces before', size: Math.max(16, 2 * this.N * this.N * 4), usage: GPUBufferUsage.STORAGE }));
       // The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12).
       this.hsWarm = this.disposer.track(this.device.createBuffer({ label: 'thin warm start', size: (WARM_FIT + 4) * 4, usage: GPUBufferUsage.STORAGE }));
       this.hsP2 = buf('thin gap pressure before', this.N);
@@ -502,8 +505,8 @@ export class FluidFields extends FluidCore {
         side by side (packDyeBodies in wgsl/pack.ts, PLAN 47z-1).
       */
       oilDye: this.bodiesWanted && !this.oilDyeStale && this.oilDye && !(this.printLive && this.printDye) && this.mixLive && this.mix ? this.oilDye.read : null,
-      /** The poured species field (carries scatter in b channel). */
-      species: this.speciesLive && this.species ? this.species.read : null,
+      /** The poured species field (carries scatter in b channel); with ouzo on the plate, the same with its cloud's scatter added (PLAN 48s, `cloudView`). */
+      species: !this.speciesLive || !this.species ? null : this.solventLive && this.cloudFresh && this.cloudView ? this.cloudView : this.species.read,
       /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */
       soapFilm: this.soapPlate?.field ?? null,
       /** The tank's dye (PLAN 47n), or null when Tank is off: the plate draws it in its own place. */

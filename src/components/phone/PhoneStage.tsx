@@ -7,8 +7,8 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus, Keyboard,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save, Video, User, LogIn,
-  Crosshair, LayoutGrid, Plus, Share2,
+  Laptop, Save, Video, User, LogIn, Slash, Cable, FlaskConical, Sliders, Camera, Download, ArrowLeft,
+  Crosshair, LayoutGrid, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { makesText } from '../../lib/recordChoice';
@@ -35,8 +35,11 @@ function pinSlider(k: keyof VisualizerSettings, val: number) {
 }
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
+import { MidiPanel, type MidiPanelProps } from '../MidiPanel';
 import { PhoneMoire } from './PhoneMoire';
 import { PhoneInkTitle } from './PhoneInkTitle';
+import { PhoneSaveForm, type ExistingLook } from './PhoneSaveForm';
+import { PhoneTabsBody, type PhoneTabs, type PhoneSheetKey } from './PhoneTabsBody';
 import { findPreset } from '../../presets';
 import { LookChip, LookPicture } from '../ui/LookChip';
 import { isPackLocked } from '../../lib/tierGates';
@@ -55,10 +58,6 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
-import { TabStrip } from '../desk/TabStrip';
-import type { TabEdit } from '../../hooks/useDeskLayout';
-import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
-import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
 import { SiteLink } from '../SiteLink';
 import { Bottle, LiveBottle, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 import { PicturePaletteButton } from '../PicturePaletteButton';
@@ -114,34 +113,8 @@ export interface PhoneLook {
   swatch: string;
 }
 
-type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs' | 'feedback';
-
-/**
- * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
- * reordered, added and taken away the same way, each tab's panels stacked in
- * one sheet. A settings section or one of the screens (Songs, Sequences,
- * Sound with its player and drone) is drawn in it whole; the desk's own panels (the bottles,
- * the set list, the rides) were built for a mouse, and the phone has its own
- * of each, so their card opens that sheet instead.
- */
-export interface PhoneTabs {
-  tabs: { id: string; name: string }[];
-  tab: string;
-  onTab: (id: string) => void;
-  onEdit: (e: TabEdit) => void;
-  /** The panels out on the tab that is up, in reading order. */
-  panels: string[];
-  onAdd: (id: string) => void;
-  onRemove: (id: string) => void;
-  /** A panel drawn whole, or null for one of the desk's own. */
-  render: (id: string) => ReactNode | null;
-}
-
-/** The phone's own sheet for each of the desk's own panels. */
-const OWN_SHEET: Record<string, Exclude<SheetName, 'tabs' | 'more'>> = {
-  bottles: 'dye', dyes: 'dye', tools: 'dye', cues: 'looks', recipe: 'play', rides: 'play', score: 'play', mixer: 'mix',
-};
-const SHEET_NAME: Record<string, string> = { dye: 'Dye', looks: 'Looks', play: 'Motion', mix: 'Mix', sound: 'Sound' };
+type SheetName = PhoneSheetKey;
+export type { PhoneTabs };
 type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
 
 export interface PhoneStageProps {
@@ -159,12 +132,21 @@ export interface PhoneStageProps {
    * Save the current settings as a new preset under a name, the desk's Save
    * on the phone. It lands under Yours in this same sheet.
    */
-  onSaveLook?: (name: string) => void;
-  /** Existing saved looks, so saving a duplicate name offers Replace or Keep both (PLAN 49a). */
-  existingLooks?: { id: string; name: string }[];
-  onReplaceLook?: (id: string, name: string) => void;
+  onSaveLook?: (name: string, description?: string, forSong?: boolean) => void;
   /** The name the save field starts with. */
   saveSuggestion?: string;
+  /** Currently open user look, when saving can overwrite it directly (H4-16). */
+  replaceName?: string | null;
+  onReplace?: () => void;
+  /** Track playing now, so the saved look can bind to it. */
+  songName?: string | null;
+  /** User-saved looks checked for duplicate-name collisions. */
+  existingLooks?: ExistingLook[];
+  onReplaceExisting?: (id: string) => void;
+  /** Ids of user-created looks for delete/export actions in the Looks sheet. */
+  userLookIds?: Set<string>;
+  onDeleteLook?: (id: string) => void;
+  onExportLook?: (id: string) => void;
   /**
    * The back plate's own look (PLAN.md §16a): a look sent to the back plate
    * alone, what it is on (null while it follows the front), and the way back
@@ -397,10 +379,12 @@ export interface PhoneStageProps {
   onMoreOpen?: (open: boolean) => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
+  /** Desk MIDI & Learn props rendered inside the phone's MIDI sub-sheet (H4-12). */
+  midiProps?: Omit<MidiPanelProps, 'onClose' | 'embed'>;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
-function PhoneSheet({ title, onClose, children, testId }: { title: string; onClose: () => void; children: ReactNode; testId: string }) {
+function PhoneSheet({ title, onClose, onBack, children, testId }: { title: string; onClose: () => void; onBack?: () => void; children: ReactNode; testId: string }) {
   // As the desk's Sheet: listened for once, or the key can be dropped (useEscape).
   useEscape(onClose);
   return (
@@ -413,8 +397,15 @@ function PhoneSheet({ title, onClose, children, testId }: { title: string; onClo
         style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center justify-between px-4 pt-2">
-          <span className="text-[15px] font-medium text-text">{title}</span>
-          <button onClick={onClose} className="-mr-2 flex h-12 w-12 items-center justify-center rounded-full text-muted active:bg-active" aria-label={`Close ${title}`}>
+          <div className="flex min-w-0 items-center gap-1">
+            {onBack && (
+              <button onClick={onBack} className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted active:bg-active" aria-label="Back to More" data-testid="phone-sheet-back">
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <span className="truncate text-[15px] font-medium text-text">{title}</span>
+          </div>
+          <button onClick={onClose} className="-mr-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-muted active:bg-active" aria-label={`Close ${title}`}>
             <X size={20} />
           </button>
         </div>
@@ -475,30 +466,7 @@ export function PhoneStage(p: PhoneStageProps) {
   const [lookTo, setLookTo] = useState<'all' | 'back'>('all');
   /** The Looks sheet's name field, while a save is being named; null when it is not. */
   const [saveName, setSaveName] = useState<string | null>(null);
-  const [saveDup, setSaveDup] = useState<{ id: string; name: string } | null>(null);
-  const keepSave = () => {
-    const name = saveName?.trim();
-    if (!name || !p.onSaveLook) return;
-    p.onSaveLook(name);
-    setSaveDup(null);
-    setSaveName(null);
-  };
-  const replaceSave = () => {
-    const name = saveName?.trim();
-    if (!name || !saveDup) return;
-    if (p.onReplaceLook) p.onReplaceLook(saveDup.id, name);
-    else p.onSaveLook?.(name);
-    setSaveDup(null);
-    setSaveName(null);
-  };
-  const saveNamed = () => {
-    const name = saveName?.trim();
-    if (!name || !p.onSaveLook) return;
-    const hit = (p.existingLooks ?? []).find(l => l.name.trim().toLowerCase() === name.toLowerCase());
-    if (hit && !saveDup) { setSaveDup(hit); return; }
-    keepSave();
-  };
-  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); setSaveDup(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
+  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
   /*
@@ -960,47 +928,45 @@ export function PhoneStage(p: PhoneStageProps) {
               <VideoShelf {...p.video} size="phone" prefix="phone-" mixOrder={p.mixer?.settings.mixOrder} filmRing={p.mixer?.settings.filmRing} onPlace={p.mixer ? patch => p.mixer!.onSetting(patch) : undefined} />
             </div>
           )}
+          {p.deskTabs && (
+            <button
+              onClick={() => open('liquids')}
+              data-testid="phone-dye-designer"
+              className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active"
+            >
+              <FlaskConical size={18} /> Design or load liquids
+            </button>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'looks' && (
-        <PhoneSheet title="Preset palettes" onClose={close} testId="phone-sheet-looks">
-          <PanelGuard name="The preset palettes sheet" inline onClose={close}>
+        <PhoneSheet title="Looks" onClose={close} testId="phone-sheet-looks">
+          <PanelGuard name="The Looks sheet" inline onClose={close}>
           <div className={`grid gap-1.5 ${[p.onRevert, p.onSaveLook].filter(Boolean).length === 2 ? 'grid-cols-3' : [p.onRevert, p.onSaveLook].some(Boolean) ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
-            {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
-            {/* The desk's Save, here: a new preset from what is on the plate,
+            <Tile icon={Shuffle} label="Random look" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
+            {p.onRevert && <Tile icon={Undo2} label="Back" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
+            {/* The desk's Save, here: a new look from what is on the plate,
                 under a name, listed under Yours below as soon as it is saved. */}
-            {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => { setSaveDup(null); setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null)); }} testId="phone-save-look" />}
+            {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} testId="phone-save-look" />}
           </div>
-          {saveName !== null && (
-            <>
-            <form className="mt-2 flex gap-1.5" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="phone-save-form">
-              <input
-                autoFocus
-                onFocus={e => e.currentTarget.select()}
+          {saveName !== null && p.onSaveLook && (
+            <div className="mt-2">
+              <PhoneSaveForm
                 value={saveName}
-                onChange={e => { setSaveName(e.target.value); setSaveDup(null); }}
-                aria-label="Name for the new preset"
-                // 16 px: under it, iOS zooms the page in on focus.
-                className="h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none focus:border-accent"
-                data-testid="phone-save-name"
+                onValueChange={setSaveName}
+                replaceName={p.replaceName}
+                onReplace={p.onReplace}
+                songName={p.songName}
+                existingLooks={p.existingLooks}
+                onReplaceExisting={p.onReplaceExisting}
+                onSave={(name, desc, forSong) => p.onSaveLook?.(name, desc, forSong)}
+                onDone={() => setSaveName(null)}
+                prefix="phone"
+                ariaLabel="Name for the new look"
               />
-              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-65" data-testid="phone-save-confirm">
-                Save
-              </button>
-            </form>
-            {saveDup && (
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-200" data-testid="phone-save-duplicate">
-                <span>“{saveDup.name}” already exists.</span>
-                <div className="flex gap-1.5">
-                  <button type="button" onClick={keepSave} className="h-10 rounded-lg border border-border bg-elevated px-3 text-[13px] font-medium text-text" data-testid="phone-save-keep-both">Keep both</button>
-                  <button type="button" onClick={replaceSave} className="h-10 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary" data-testid="phone-save-replace">Replace</button>
-                </div>
-              </div>
-            )}
-            </>
+            </div>
           )}
           <div className="mt-3">
             <Slider label="Lamp Ground" value={p.lampGround} {...pinSlider('lampGround', p.lampGround)} step={0.05} onChange={p.onLampGround}
@@ -1059,8 +1025,10 @@ export function PhoneStage(p: PhoneStageProps) {
               <div className="flex flex-wrap gap-3 px-1 py-1">
                 {p.looks.filter(l => l.group === g).map(l => {
                   const on = l.id === p.activeLookId;
+                  const own = p.userLookIds?.has(l.id);
                   const locked = isPackLocked(findPreset(l.id)?.pack);
                   return (
+                    <div key={l.id} className="flex items-center gap-1">
                     <LookChip
                       key={l.id}
                       lookId={l.id}
@@ -1085,6 +1053,29 @@ export function PhoneStage(p: PhoneStageProps) {
                       {/* A pack's look without the pack wears the lock its row wore (PLAN 49j), over the chip's foot. */}
                       {locked && <TierLockBadge label="Pro" className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 text-[11px]" />}
                     </LookChip>
+                      {own && p.onExportLook && (
+                        <button
+                          type="button"
+                          onClick={() => p.onExportLook?.(l.id)}
+                          aria-label={`Save ${l.name} to a file`}
+                          data-testid={`phone-look-export-${l.id}`}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-elevated text-text-2 active:bg-active"
+                        >
+                          <Download size={16} />
+                        </button>
+                      )}
+                      {own && p.onDeleteLook && (
+                        <button
+                          type="button"
+                          onClick={() => { if (window.confirm(`Delete saved look “${l.name}”?`)) p.onDeleteLook?.(l.id); }}
+                          aria-label={`Delete ${l.name}`}
+                          data-testid={`phone-look-delete-${l.id}`}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-elevated text-text-2 active:bg-active"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -1101,11 +1092,12 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="text-[13px] leading-snug text-muted">What the plate listens to. It moves with whatever is playing.</p>
             <VuMeter read={p.readLevel} listening={p.audioSource !== 'none'} deaf={p.audioSource !== 'none' && p.deaf} width={72} />
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
+            <Tile icon={Slash} label="Silent" on={p.audioSource === 'none'} onPress={() => p.onAudioSource('none')} testId="phone-sound-none" />
             <Tile icon={Mic} label="Microphone" on={p.audioSource === 'microphone'} onPress={() => p.onAudioSource(p.audioSource === 'microphone' ? 'none' : 'microphone')} testId="phone-sound-mic" />
-            <Tile icon={Music} label="Band" on={p.audioSource === 'simulated'} onPress={() => p.onAudioSource(p.audioSource === 'simulated' ? 'none' : 'simulated')} testId="phone-sound-band" />
+            <Tile icon={Music} label="A band in a box" on={p.audioSource === 'simulated'} onPress={() => p.onAudioSource(p.audioSource === 'simulated' ? 'none' : 'simulated')} testId="phone-sound-band" />
             <Tile icon={Waves} label="The shelf" on={shelfOpen || !!(p.nowPlaying?.src)} onPress={() => setShelfOpen(v => !v)} testId="phone-sound-shelf" />
-            <Tile icon={FileAudio} label="A song file" on={p.audioSource === 'file' && !p.nowPlaying?.src} onPress={() => { p.onMusicFile(); }} testId="phone-sound-file" />
+            <Tile icon={FileAudio} label="Your file" on={p.audioSource === 'file' && !p.nowPlaying?.src} onPress={() => { p.onMusicFile(); }} testId="phone-sound-file" />
           </div>
           {p.nowPlaying && (
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-elevated p-2" data-testid="phone-now-playing">
@@ -1173,6 +1165,20 @@ export function PhoneStage(p: PhoneStageProps) {
                 {p.barLine ? `${p.barLine}.` : 'Listening for the beat.'}
               </p>
             </div>
+          )}
+          <div className="mt-3">
+            <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
+            {(p.show.running || p.show.paused) && (
+              <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
+                {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
+              </p>
+            )}
+          </div>
+          {p.score && (
+            <>
+              <SectionLabel>The song</SectionLabel>
+              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
+            </>
           )}
           <SectionLabel>Tap the tempo</SectionLabel>
           <div className="flex items-stretch gap-2" data-testid="phone-tempo">
@@ -1322,15 +1328,11 @@ export function PhoneStage(p: PhoneStageProps) {
 
       {sheet === 'play' && (
         <PhoneSheet title="Motion" onClose={close} testId="phone-sheet-play">
-          <PanelGuard name="The Play sheet" inline onClose={close}>
-          <div className="grid grid-cols-2 gap-1.5">
-            <Tile icon={Hourglass} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
-            <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
+          <PanelGuard name="The Motion sheet" inline onClose={close}>
+          <div className={`grid gap-1.5 ${p.tilt.supported ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <Tile icon={Hourglass} label="Evolve" on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
             {p.tilt.supported && (
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
-            )}
-            {p.onAmbientMode && (
-              <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
             )}
           </div>
           {/* The controller's grid on the glass (PLAN 30c): pads held as long as a finger is on them. */}
@@ -1338,17 +1340,6 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mb-1.5 text-[13px] font-medium text-text">Pads</p>
             <PhonePads testId="phone-pads" />
           </div>
-          {(p.show.running || p.show.paused) && (
-            <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
-              {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
-            </p>
-          )}
-          {p.score && (
-            <>
-              <SectionLabel>The song</SectionLabel>
-              <SongScore {...p.score} touch onOpenSound={() => open('sound')} />
-            </>
-          )}
           {/*
             The desk's Tip pad under a thumb (PLAN 18a-13j): for a phone on a stand,
             an iPad, or a hand that would rather not tip the phone itself. Hidden
@@ -1380,7 +1371,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className="mt-4">
-            <Slider label="Evolve speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
+            <Slider label="Evolve Speed" value={p.evolveSpeed} {...pinSlider('automateRate', p.evolveSpeed)} step={0.01} onChange={p.onEvolveSpeed}
               disabled={!p.evolving} touch testId="phone-evolve-speed" />
             {!p.evolving && (
               <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-evolve-speed-says">
@@ -1451,10 +1442,22 @@ export function PhoneStage(p: PhoneStageProps) {
           <SectionLabel>Do something to it</SectionLabel>
           <div className="grid grid-cols-4 gap-1.5">
             <Tile icon={RotateCw} label="Flick" onPress={p.onSpin} testId="phone-spin" />
-            <Tile icon={Shuffle} label="Random" onPress={() => { p.onLucky(); close(); }} testId="phone-lucky" />
+            <Tile icon={Shuffle} label="Randomise" onPress={() => { p.onLucky(); close(); }} testId="phone-lucky" />
             <Tile icon={Waves} label="Drain" onPress={() => { p.onDrain(); close(); }} testId="phone-drain" />
             <Tile icon={Trash2} label="Clear" onPress={() => { p.onClear(); close(); }} testId="phone-clear" />
           </div>
+          <SectionLabel>Show &amp; Stage</SectionLabel>
+          <div className={`grid gap-1.5 ${p.onAmbientMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
+            {p.onAmbientMode && (
+              <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
+            )}
+          </div>
+          {(p.show.running || p.show.paused) && (
+            <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
+              {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
+            </p>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}
@@ -1478,7 +1481,7 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
 
       {sheet === 'tabs' && p.deskTabs && (
-        <PhoneSheet title="Tabs" onClose={close} testId="phone-sheet-tabs">
+        <PhoneSheet title="Tabs" onClose={close} onBack={() => open('more')} testId="phone-sheet-tabs">
           <PanelGuard name="The Tabs sheet" inline onClose={close}>
             <PhoneTabsBody t={p.deskTabs} openSheet={open} />
           </PanelGuard>
@@ -1486,9 +1489,120 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
       {/* Settings → Feedback, the same pane the sheet draws (PLAN 39a), a tap from More rather than at the far end of the Settings strip. */}
       {sheet === 'feedback' && (
-        <PhoneSheet title="Feedback" onClose={close} testId="phone-sheet-feedback">
+        <PhoneSheet title="Feedback" onClose={close} onBack={() => open('more')} testId="phone-sheet-feedback">
           <PanelGuard name="The Feedback sheet" inline onClose={close}>
             <FeedbackPane card="" title="hidden" />
+          </PanelGuard>
+        </PhoneSheet>
+      )}
+      {sheet === 'record' && (
+        <PhoneSheet title="Record" onClose={close} onBack={() => open('more')} testId="phone-sheet-record">
+          <PanelGuard name="The Record sheet" inline onClose={close}>
+            <div className="flex flex-col gap-3">
+              <Tile
+                icon={p.recording.on ? Square : Circle}
+                label={p.recording.on ? `Stop · ${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
+                on={p.recording.on}
+                tone="live"
+                onPress={p.recording.onToggle}
+                testId="phone-record"
+                glyph={<TapeReels seconds={p.recording.seconds} running={p.recording.on} height={20} />}
+              />
+              {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
+              <div className="flex flex-col gap-1.5" data-testid="phone-record-makes">
+                <SectionLabel>Record makes</SectionLabel>
+                <Segmented
+                  value={p.recording.choice.video && p.recording.choice.take ? 'both' : p.recording.choice.take ? 'take' : 'video'}
+                  options={[['video', 'Plate video'], ['take', 'Take'], ['both', 'Both']] as const}
+                  onChange={(v) => p.recording.onChoice({ video: v !== 'take', take: v !== 'video' })}
+                  height={48}
+                  fill
+                  testId="phone-record-makes-segmented"
+                />
+                <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
+                {/* The clip's frame (lib/clipFrame.ts, PLAN 34f): 9:16 to post, or the screen as it is. */}
+                <SectionLabel>Clip frame</SectionLabel>
+                <Segmented
+                  value={p.recording.shape}
+                  options={[['portrait', 'Portrait 9:16'], ['plate', 'Screen as it is']] as const}
+                  onChange={p.recording.onShape}
+                  height={48}
+                  fill
+                  testId="phone-record-shape"
+                />
+                <p className="text-[12px] text-dim">
+                  {p.recording.shape === 'portrait'
+                    ? 'The middle 9:16 of the screen, with sound, as an MP4 where this phone can write one: ready for Reels and TikTok.'
+                    : 'The whole screen, as it is.'}
+                </p>
+                {p.recording.take && !p.recording.on && canShareClip(p.recording.take) && (
+                  <button
+                    type="button"
+                    onClick={() => { void shareClip(p.recording.take!); }}
+                    data-testid="phone-share-clip"
+                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-[14px] font-medium text-text active:bg-hover"
+                  >
+                    <Share2 size={16} />Share the last clip
+                  </button>
+                )}
+              </div>
+            </div>
+          </PanelGuard>
+        </PhoneSheet>
+      )}
+      {sheet === 'wall' && p.deskTabs && (
+        <PhoneSheet title="Wall & Mapping" onClose={close} onBack={() => open('more')} testId="phone-sheet-wall">
+          <PanelGuard name="The Wall & Mapping sheet" inline onClose={close}>
+            {p.onAmbientMode && (
+              <div className="mb-4">
+                <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
+              </div>
+            )}
+            <SectionLabel>Wall</SectionLabel>
+            {p.deskTabs.render('projectors')}
+            <SectionLabel>Mapping</SectionLabel>
+            {p.deskTabs.render('mapping')}
+          </PanelGuard>
+        </PhoneSheet>
+      )}
+      {sheet === 'sequencer' && p.deskTabs && (
+        <PhoneSheet title="Sequencer" onClose={close} onBack={() => open('more')} testId="phone-sheet-sequencer">
+          <PanelGuard name="The Sequencer sheet" inline onClose={close}>
+            {p.deskTabs.render('sequences')}
+          </PanelGuard>
+        </PhoneSheet>
+      )}
+      {sheet === 'midi' && (
+        <PhoneSheet title="MIDI & Learn" onClose={close} onBack={() => open('more')} testId="phone-sheet-midi">
+          <PanelGuard name="The MIDI sheet" inline onClose={close}>
+            {p.deskTabs?.render('midi')}
+            {p.midiProps && (
+              <>
+                <SectionLabel>Learn &amp; Bindings</SectionLabel>
+                <MidiPanel {...p.midiProps} onClose={() => {}} embed />
+              </>
+            )}
+          </PanelGuard>
+        </PhoneSheet>
+      )}
+      {sheet === 'patches' && p.deskTabs && (
+        <PhoneSheet title="Patches" onClose={close} onBack={() => open('more')} testId="phone-sheet-patches">
+          <PanelGuard name="The Patches sheet" inline onClose={close}>
+            {p.deskTabs.render('patches')}
+          </PanelGuard>
+        </PhoneSheet>
+      )}
+      {sheet === 'liquids' && p.deskTabs && (
+        <PhoneSheet title="Liquid Designer" onClose={close} onBack={() => open('more')} testId="phone-sheet-liquids">
+          <PanelGuard name="The Liquid Designer sheet" inline onClose={close}>
+            {p.deskTabs.render('liquids')}
+          </PanelGuard>
+        </PhoneSheet>
+      )}
+      {sheet === 'camera' && p.deskTabs && (
+        <PhoneSheet title="Motion camera" onClose={close} onBack={() => open('more')} testId="phone-sheet-camera">
+          <PanelGuard name="The Motion camera sheet" inline onClose={close}>
+            {p.deskTabs.render('room')}
           </PanelGuard>
         </PhoneSheet>
       )}
@@ -1497,36 +1611,50 @@ export function PhoneStage(p: PhoneStageProps) {
           <PanelGuard name="The More sheet" inline onClose={close}>
           {/*
             Song titles as ink (PLAN 37x-10): the desk's Logo & Titles switch,
-            on the phone. Above the tiles, not after Record makes where it
-            first went: Songs, Settings, Guide and the rest close this sheet
-            to open their own, so anything below them is a sheet the hand (and
-            `npm run switches`, which walks the sheet in order and found the
-            switch gone by the time it reached it) has to open again. The
-            switch is the one thing here changed mid-set; the tiles lead away.
+            on the phone. Kept in its own Titles & Logo group above the
+            navigation tiles (H2-04): Songs, Settings, Guide and the rest close
+            this sheet or open another, so anything below them is a sheet the
+            hand (and `npm run switches`, which walks the sheet in order) would
+            have to open again.
           */}
-          {p.mixer && <div className="mb-3"><PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} /></div>}
+          {p.mixer && (
+            <>
+              <SectionLabel>Titles &amp; Logo</SectionLabel>
+              <PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} />
+            </>
+          )}
+          <SectionLabel>Show &amp; Tools</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
               label={p.recording.on ? `${makesText(p.recording.choice)} · ${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
               on={p.recording.on}
               tone="live"
-              onPress={p.recording.onToggle}
-              testId="phone-record"
+              onPress={() => open('record')}
+              testId="phone-open-record"
               glyph={<TapeReels seconds={p.recording.seconds} running={p.recording.on} height={20} />}
             />
-            <Tile icon={Clapperboard} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
+            {p.deskTabs && <Tile icon={Monitor} label="Wall" onPress={() => open('wall')} testId="phone-wall" />}
+            {p.deskTabs && <Tile icon={Clapperboard} label="Sequencer" onPress={() => open('sequencer')} testId="phone-sequencer" />}
+            {(p.deskTabs || p.midiProps) && <Tile icon={Sliders} label="MIDI" onPress={() => open('midi')} testId="phone-midi" />}
+            {p.deskTabs && <Tile icon={Cable} label="Patches" onPress={() => open('patches')} testId="phone-patches" />}
+            {p.deskTabs && <Tile icon={FlaskConical} label="Liquids" onPress={() => open('liquids')} testId="phone-liquids" />}
+            <Tile icon={Music} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
+            {p.deskTabs && <Tile icon={Camera} label="Motion cam" onPress={() => open('camera')} testId="phone-motion-cam" />}
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
-            <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
+          </div>
+          <SectionLabel>Screen &amp; Help</SectionLabel>
+          <div className="grid grid-cols-3 gap-1.5">
+            {p.onPlayScreen && <Tile icon={Waves} label="Play" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
+            <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
+            {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
+            <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             {p.onShortcuts && <Tile icon={Keyboard} label="Shortcuts" onPress={() => { close(); p.onShortcuts?.(); }} testId="phone-shortcuts" />}
             <PanelGuard name="The crash report">
               <CrashReportButton tile />
             </PanelGuard>
-            <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
-            {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
-            {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
-            {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
+            {p.onOpenAccount && <Tile icon={signedOut ? LogIn : User} label={signedOut ? 'Sign in' : 'Account'} onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
@@ -1534,44 +1662,6 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
           {/* The website's free visuals, in the apps only (SiteLink.tsx renders nothing on the site). */}
           <div className="mt-3"><SiteLink look="sheet" /></div>
-          {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
-          <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
-            <SectionLabel>Record makes</SectionLabel>
-            <Segmented
-              value={p.recording.choice.video && p.recording.choice.take ? 'both' : p.recording.choice.take ? 'take' : 'video'}
-              options={[['video', 'Plate video'], ['take', 'Take'], ['both', 'Both']] as const}
-              onChange={(v) => p.recording.onChoice({ video: v !== 'take', take: v !== 'video' })}
-              height={44}
-              fill
-              testId="phone-record-makes-segmented"
-            />
-            <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
-            {/* The clip's frame (lib/clipFrame.ts, PLAN 34f): 9:16 to post, or the screen as it is. */}
-            <SectionLabel>Clip frame</SectionLabel>
-            <Segmented
-              value={p.recording.shape}
-              options={[['portrait', 'Portrait 9:16'], ['plate', 'Screen as it is']] as const}
-              onChange={p.recording.onShape}
-              height={44}
-              fill
-              testId="phone-record-shape"
-            />
-            <p className="text-[12px] text-dim">
-              {p.recording.shape === 'portrait'
-                ? 'The middle 9:16 of the screen, with sound, as an MP4 where this phone can write one: ready for Reels and TikTok.'
-                : 'The whole screen, as it is.'}
-            </p>
-            {p.recording.take && !p.recording.on && canShareClip(p.recording.take) && (
-              <button
-                type="button"
-                onClick={() => { void shareClip(p.recording.take!); }}
-                data-testid="phone-share-clip"
-                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-[14px] font-medium text-text active:bg-hover"
-              >
-                <Share2 size={16} />Share the last clip
-              </button>
-            )}
-          </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
               <SectionLabel>Running shows on your account</SectionLabel>
@@ -1595,67 +1685,11 @@ export function PhoneStage(p: PhoneStageProps) {
           )}
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
-            {p.onPlayScreen && ' Simple screen is the plain one: the plate, the dyes and three hands.'}
+            {p.onPlayScreen && ' Play is the plain one: the plate, the dyes and three hands.'}
             {isPhoneApp() && ' Laptop remote makes this phone the remote for a show running on the laptop; Play here brings it back.'}
           </p>
           </PanelGuard>
         </PhoneSheet>
-      )}
-    </div>
-  );
-}
-
-function PhoneTabsBody({ t, openSheet }: { t: PhoneTabs; openSheet: (s: SheetName) => void }) {
-  const [adding, setAdding] = useState(false);
-  const out = new Set(t.panels);
-  return (
-    <div className="flex flex-col gap-2" data-testid="phone-tabs-body">
-      <TabStrip tabs={t.tabs} tab={t.tab} onTab={t.onTab} onEdit={t.onEdit} onAddPanel={() => setAdding(true)} height={44} touch />
-      {t.panels.length === 0 && <p className="text-[13px] text-dim">Nothing on this tab yet. Add a panel below.</p>}
-      {t.panels.map(id => {
-        const spec = PANEL_BY_ID.get(id);
-        const body = t.render(id);
-        const own = OWN_SHEET[id];
-        return (
-          <section key={id} className="rounded-lg border border-border bg-elevated" data-testid={`phone-tab-panel-${id}`}>
-            <div className="flex items-center justify-between pl-3">
-              <span className="text-[14px] font-medium text-text">{spec?.name ?? id}</span>
-              <button onClick={() => t.onRemove(id)} className="flex h-12 w-12 items-center justify-center text-muted active:bg-active"
-                aria-label={`Take ${spec?.name ?? id} off this tab`} data-testid={`phone-tab-remove-${id}`}><X size={16} /></button>
-            </div>
-            {body ? (
-              <div className="max-h-[60dvh] overflow-y-auto border-t border-border px-3 pb-3 pt-2">{body}</div>
-            ) : own ? (
-              <button onClick={() => openSheet(own)} className="mx-3 mb-3 flex h-12 w-[calc(100%-24px)] items-center justify-center rounded-lg border border-border-strong text-[14px] text-text-2 active:bg-active"
-                data-testid={`phone-tab-open-${id}`}>Open {SHEET_NAME[own]}</button>
-            ) : (
-              <p className="px-3 pb-3 text-[13px] text-dim">On the laptop's desk.</p>
-            )}
-          </section>
-        );
-      })}
-      <button onClick={() => setAdding(a => !a)} aria-expanded={adding}
-        className={`flex h-12 items-center justify-center gap-2 rounded-lg border border-dashed text-[14px] ${adding ? LIT : 'border-border-strong text-text-2 active:bg-active'}`}
-        data-testid="phone-tab-add"><Plus size={16} /> Panel on this tab</button>
-      {adding && (
-        <div className="flex flex-col gap-1" data-testid="phone-tab-add-list">
-          {SETTINGS_CATEGORIES.map(c => {
-            const rows = PANELS.filter(x => x.category === c.id && !out.has(x.id));
-            if (rows.length === 0) return null;
-            return (
-              <div key={c.id}>
-                <SectionLabel>{c.name}</SectionLabel>
-                <div className="grid grid-cols-2 gap-1">
-                  {rows.map(x => (
-                    <button key={x.id} onClick={() => { t.onAdd(x.id); setAdding(false); }}
-                      className="h-12 truncate rounded-lg border border-border bg-elevated px-3 text-left text-[14px] text-text-2 active:bg-active"
-                      data-testid={`phone-tab-add-${x.id}`}>{x.name}</button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       )}
     </div>
   );

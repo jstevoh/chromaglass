@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
+import { useLookDocument } from './app/useLookDocument';
 import type { EarView } from './hooks/useEarView';
 import { EarMeters, EarPercent } from './components/EarLeaves';
 import { RenderPanel } from './components/RenderPanel';
@@ -925,36 +926,14 @@ export default function App() {
 
   const { layerReport } = useLayerReport({ deskLayout, visualizerRef });
 
-  const [docId, setDocId] = useState<string | null>(null);
-  const [docDirty, setDocDirty] = useState(false);
+  const {
+    docId, setDocId, docDirty, setDocDirty,
+    saveCurrentPreset, replacePresetById, replaceLookById, replaceLook, deleteSavedLook,
+  } = useLookDocument({
+    visualizerRef, getSettings: () => settingsRef.current, userPresets, getCurrentSong: () => currentSong,
+    setPinnedPresetId, setToast, openSaveSheet: (on) => setShowSave(on),
+  });
 
-  const saveCurrentPreset = (name: string, description: string, forSong = false) => {
-    const plate = visualizerRef.current?.describePlate();
-    // From the ref: ⌘K's list is memoised and would otherwise hand this the
-    // settings as they stood when the list was last built.
-    const p = userPresets.saveCurrent(name, description, settingsRef.current, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null, forSong ? currentSong : null);
-    setPinnedPresetId(p.id);
-    setDocId(p.id);
-    setDocDirty(false);
-    setToast(`Saved “${p.name}”`);
-  };
-
-  /*
-    Save asks for a name, every time: a new preset made from what is on the
-    plate now.
-
-    Reported by the owner (2026-10-05) as Save not working on the desk, when
-    what they wanted was to name a new preset from the current settings. It
-    did work, once: the first Save of a session asked for a name. From then
-    on the look just saved, or any saved look opened, was "the document", and
-    Save wrote over it without a word bar a toast for two seconds at the
-    bottom of the plate. Naming a second preset meant finding Save as… in a
-    menu hung off the look's name in the breadcrumb, which nothing pointed
-    to. Measured in `npm run saves`: the second Save on the Design desk
-    opened no sheet. So Save names a new one now, on both desks, ⌘S and the
-    phone alike, and writing over the look you opened is the sheet's second
-    button, named for the look it would replace, and the look menu's.
-  */
   const newPalette = () => {
     setDocId(null);
     setDocDirty(false);
@@ -963,29 +942,6 @@ export default function App() {
   };
 
   const saveLook = () => setShowSave(true);
-  /** Write over the saved look that is open, keeping its name and song. */
-  const replaceLook = () => {
-    if (!docId) { setShowSave(true); return; }
-    const plate = visualizerRef.current?.describePlate();
-    const saved = userPresets.saveOver(docId, settingsRef.current, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null);
-    // Taken out underneath us (another tab, say): the sheet stays up to save
-    // it as a new one, and says why the Replace did nothing.
-    if (!saved) { setDocId(null); setShowSave(true); setToast('That preset is gone; save it under a name'); return; }
-    setShowSave(false);
-    setDocDirty(false);
-    setToast(`Saved over “${saved.name}”`);
-  };
-  const replaceLookById = (id: string, name: string, description = '', forSong = false) => {
-    const p = visualizerRef.current?.describePlate();
-    const s = userPresets.saveOver(id, settingsRef.current, p?.contract ?? null, p?.injectStyles ?? null, p?.liquids ?? null);
-    if (!s) { saveCurrentPreset(name, description, forSong); return; }
-    setPinnedPresetId(s.id); setDocId(s.id); setDocDirty(false); setToast(`Saved over “${s.name}”`);
-  };
-  /** A saved look taken out of the library; the plate keeps what is on it. */
-  const deleteSavedLook = (id: string) => {
-    userPresets.remove(id);
-    if (docId === id) setDocId(null);
-  };
 
   /**
    * An empty plate.
@@ -2330,7 +2286,7 @@ export default function App() {
               (`macroHold`, the same `max(0.5, … ?? 5)` LiquidVisualizer gives MacroCamera). */}
           <span className="mx-1 h-3 w-px bg-white/20" />
           {([
-            ['hold', 'Hold', 'Hold still where it is aimed. Alt-drag on the plate to pan, Alt-click to fix on a spot; Random Evolve wanders it slowly.'],
+            ['hold', 'Hold', 'Hold still where it is aimed. Alt-drag on the plate to pan, Alt-click to fix on a spot; Evolve wanders it slowly.'],
             ['follow', 'Follow', 'Locked on: rides the liquid where it is aimed and never cuts away. Alt-click on something to follow it.'],
             ['auto', 'Auto', `Picks its own subjects: rides one for Shot Length (${shotLabel(settings.macroHold)}), then cuts to another.`],
           ] as const).map(([mode, label, title]) => (
@@ -2683,9 +2639,9 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* Random Evolve */}
+                {/* Evolve */}
                 <div className="flex flex-col items-center gap-1.5 w-full">
-                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Random Evolve</span>
+                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Evolve</span>
                   <button
                     role="switch"
                     aria-checked={isAutomated}
@@ -2715,7 +2671,7 @@ export default function App() {
                       onChange={e => updateSettings({ automateRate: valueOfKey('automateRate', +e.target.value) })}
                       className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
                       style={{ background: `linear-gradient(to right, rgb(192,132,252) ${evolveAt * 100}%, rgba(255,255,255,0.1) ${evolveAt * 100}%)` }}
-                      title="How busy Random Evolve is: how often it pours, thins and strokes"
+                      title="How busy Evolve is: how often it pours, thins and strokes"
                       data-testid="evolve-speed"
                     />
                   </div>
@@ -2910,7 +2866,17 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── The phone (components/phone/PhoneStage.tsx) ─────────── */}
-      {phone && showControls && phoneScreenUp === 'play' && (
+      {phone && showControls && (() => {
+        const phoneSave = {
+          saveSuggestion: docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look',
+          replaceName: docId ? docName : null,
+          onReplace: replaceLook,
+          songName: musicIntel.state.track?.title ?? null,
+          existingLooks: userPresets.presets,
+          onReplaceExisting: replacePresetById,
+        };
+        return (<>
+      {phoneScreenUp === 'play' && (
         <PanelGuard name="Play">
         <PhonePlay
           lookName={activePresetName ?? (fading > 0 ? allPresets.find(p => p.id === pinnedPresetId)?.name ?? null : null) ?? pinnedLookName ?? 'Untitled'}
@@ -2920,10 +2886,8 @@ export default function App() {
           lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
           onShuffle={luckyPlate}
-          onSave={(name) => saveCurrentPreset(name, '', false)}
-          existingLooks={userPresets.presets}
-          onReplaceLook={(id, name) => replaceLookById(id, name)}
-          saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          onSave={(name, desc, forSong) => saveCurrentPreset(name, desc ?? '', forSong ?? false)}
+          {...phoneSave}
           dyes={DROPPER_COLORS.slice(0, 8)}
           dye={liquidTypes.find(t => t.id === selectedLiquidId)?.color ?? DROPPER_COLORS[0]}
           onDye={(hex) => updateLiquidColor(selectedLiquidId, hex)}
@@ -2954,9 +2918,7 @@ export default function App() {
         />
         </PanelGuard>
       )}
-      {phone && showControls && (
-        <>
-          {phoneScreenUp === 'stage' && (
+      {phoneScreenUp === 'stage' && (
           <PanelGuard name="The phone controls">
           <PhoneStage
             deskTabs={{
@@ -2983,10 +2945,11 @@ export default function App() {
             onLook={(id) => goLookNow(id)}
             onRandomLook={() => randomLookPlate(randomLook(activePresetId, stream('phone.look').float) ?? null)}
             onRevert={previousLook.current ? revertLook : null}
-            onSaveLook={(name) => saveCurrentPreset(name, '', false)}
-            existingLooks={userPresets.presets}
-            onReplaceLook={(id, name) => replaceLookById(id, name)}
-            saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+            onSaveLook={(name, desc, forSong) => saveCurrentPreset(name, desc ?? '', forSong ?? false)}
+            {...phoneSave}
+            userLookIds={new Set(userPresets.presets.map(p => p.id))}
+            onDeleteLook={deleteSavedLook}
+            onExportLook={(id) => { const p = userPresets.presets.find(u => u.id === id); if (p) userPresets.exportPreset(p); }}
             onBackLook={(id) => backLookNow(id)}
             backLook={backLookName}
             onBackFollowsFront={backFollowsFront}
@@ -3107,6 +3070,7 @@ export default function App() {
             recording={phoneRecording}
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
+            midiProps={{ midi, presets: allPresets, setItems: cues.map((c, index) => ({ index, name: c.name })), activity: showActivity, onActivity: setShowActivity, onSetup: () => openSettingsAt('midi') }}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
@@ -3118,8 +3082,8 @@ export default function App() {
           />
           </PanelGuard>
           )}
-        </>
-      )}
+        </>);
+      })()}
 
       {/* ── Run-it-locally nudge (hosted build, once the governor has stepped down) ── */}
       {/* One child per AnimatePresence: it tells its children apart by key, two
@@ -3327,11 +3291,11 @@ export default function App() {
             <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
             <AlphaBadge className="hidden sm:inline-block" />
           </h1>
-          {/* The preset's name is the menu: one click from the top of the screen. */}
+          {/* The look's menu, one click from the top. */}
           <button
             onClick={() => setPresetMenu(presetMenu === 'title' ? 'none' : 'title')}
             className="flex items-center gap-2 mt-0.5 py-1.5 -mx-1 px-1 rounded-lg group"
-            title="Choose a preset palette"
+            title="Choose a look"
             aria-haspopup="menu"
             aria-expanded={presetMenu === 'title'}
             data-testid="preset-title-button"
@@ -3340,7 +3304,7 @@ export default function App() {
               {activePresetName ? activePresetName : 'Custom'}
             </p>
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase tracking-wider font-bold flex items-center gap-1 group-hover:bg-white/20 transition-colors">
-              Preset <ChevronDown size={9} />
+              Look <ChevronDown size={9} />
             </span>
           </button>
           {presetMenu === 'title' && (
@@ -3528,7 +3492,7 @@ export default function App() {
           onSave={saveLook}
           onSaveOver={docId ? replaceLook : undefined}
           onNew={newPlate}
-          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
+          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id), description: u.description }))}
           openLookId={docId}
           onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
           onDeleteSaved={deleteSavedLook}

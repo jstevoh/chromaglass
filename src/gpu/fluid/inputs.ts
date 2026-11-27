@@ -307,6 +307,13 @@ export class FluidInputs extends FluidPasses {
       s.swap();
       this.speciesLive = true;
       this.speciesQuiet++;
+      // With ouzo on the plate (PLAN 48s): the ink takes the column's place, so the same share of the ethanol and the oil goes with what it replaced.
+      if (this.solventLive && this.solvent) {
+        const v = this.solvent;
+        this.run(pass, 'inkSpecies', v.write, [v.read, pad, this.sampler], this.arg('ink solvent', [Math.min(1, carrier.share), 0, 0, 0]));
+        v.swap();
+        if (this.cloudFresh) this.writeCloudView(pass);
+      }
     }
     pass.end();
     this.submit(enc);
@@ -757,7 +764,7 @@ export class FluidInputs extends FluidPasses {
    * for a check that needs a pool in place (`npm run thick`). Only on a thin
    * gap; in plate units.
    */
-  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number }, plateSigma = LIQUID_SIGMA): void {
+  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number; ethanol?: number; anise?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number }, plateSigma = LIQUID_SIGMA): void {
     if (!(radius > 0) || !(take > 0)) return;
     const enc = this.device.createCommandEncoder({ label: 'pour' });
     const pass = enc.beginComputePass({ label: 'pour' });
@@ -773,6 +780,29 @@ export class FluidInputs extends FluidPasses {
       this.speciesLive = true;
       this.speciesQuiet++;
       this.speciesPoured = pouredOf(what ?? sp, plateSigma);
+      /*
+        A bottle with ethanol or anise oil in it (PLAN 48s, lib/ouzo.ts) lays
+        both in the solvent field with the same kernel, the same dome and the
+        same share as its species, so the three land as one liquid. The field
+        starts at the first pour that brings oil: alcohol alone clouds
+        nothing, and a plate with no anise on it carries nothing for it (an
+        alcohol pour made before any anise is therefore not remembered, PLAN
+        48s-2). Once it is there, alcohol poured on a cloud is ethanol the
+        cloud dissolves in, and a liquid with neither that is laid in a
+        column's place (no push: speciesSplat replaces that share of the
+        column) takes the same share of the ethanol and the oil out with it.
+        The plate's view is then made again, so a pour onto a stopped plate
+        is not drawn with the species as it was before it.
+      */
+      const ethanol = sp.ethanol ?? 0, anise = sp.anise ?? 0;
+      if (anise > 0 || (this.solventLive && (ethanol > 0 || !push))) {
+        const v = (this.solvent ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'solvent'));
+        if (!this.solventLive) for (const t of [v.a, v.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+        this.run(pass, 'speciesSplat', v.write, [v.read, this.squeeze.read], this.arg('solvent splat', [x, y, radius, take, ethanol, anise, 0, push ? 1 : 0]));
+        v.swap();
+        this.solventLive = true;
+      }
+      if (this.solventLive && this.cloudFresh) this.writeCloudView(pass);
     }
     if (push) {
       this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
@@ -1009,6 +1039,7 @@ export class FluidInputs extends FluidPasses {
     this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.solventLive = this.cloudFresh = false;
     this.speciesClears++;
     this.speciesPoured = null;
     this.speciesSnap = null;
@@ -1083,6 +1114,7 @@ export class FluidInputs extends FluidPasses {
       liquids0: copy(this.liquids0, this.liquidsLive),
       liquids1: copy(this.liquids1, this.liquidsLive),
       speciesPoured: this.speciesPoured ? { ...this.speciesPoured } : null,
+      solvent: copy(this.solvent, this.speciesLive && this.solventLive),
       destroy: () => { for (const t of made.splice(0)) t.destroy(); },
     };
     this.submit(enc);
@@ -1145,6 +1177,25 @@ export class FluidInputs extends FluidPasses {
       this.speciesQuiet++;
       this.speciesPoured = carry.speciesPoured ? { ...carry.speciesPoured } : null;
     }
+    /*
+      And the ouzo's ethanol and oil with it (PLAN 48s). The species came
+      across a governor's move from 18d-10 on, and a plate that kept its
+      Ouzo's share and viscosity but dropped the oil would have lost its
+      cloud, and the oil, the moment the frame rate dipped. Its channels are
+      amounts per unit of plate as the species' are (ethanol, oil dissolved,
+      oil as droplets), so the same area average keeps each sum; a coarse
+      cell that takes in cloudy and clear cells holds for one step the
+      droplets of the cloudy ones, and the next step's ouzoCloud puts it on
+      the curve at its own mix, the oil's sum untouched. The plate's view is
+      written here so the frame before that step draws the carried cloud.
+    */
+    if (carry.species && carry.solvent) {
+      const v = (this.solvent ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'solvent'));
+      this.run(pass, 'carryArea', v.write, [carry.solvent], this.arg('carry solvent', [carry.n, this.N, 0, 0]));
+      v.swap();
+      this.solventLive = true;
+      this.writeCloudView(pass);
+    }
     if (carry.liquids0 && carry.liquids1) {
       this.run(pass, 'carryArea', this.liquids0.write, [carry.liquids0], this.arg('carry liquids 0', [carry.n, this.N, 0, 0]));
       this.liquids0.swap();
@@ -1188,6 +1239,8 @@ export class FluidInputs extends FluidPasses {
       liquids1: this.liquids1,
       species: this.species,
       ensureSpecies: () => (this.species ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species')),
+      solvent: this.solvent,
+      ensureSolvent: () => (this.solvent ??= new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'solvent')),
       chem: this.chem,
       activeMat: this.activeMat,
       rxn: this.rxn,
@@ -1201,6 +1254,7 @@ export class FluidInputs extends FluidPasses {
       hsGap: this.hsGap,
       hsP: this.hsP,
       hsP2: this.hsP2,
+      hsFlow: this.hsFlow,
       ensureThinGap: () => this.ensureThinGap(),
       scalars: {
         phaseLive: this.phaseLive,
@@ -1211,6 +1265,7 @@ export class FluidInputs extends FluidPasses {
         oilLayPending: this.oilLayPending,
         liquidsLive: this.liquidsLive,
         speciesLive: this.speciesLive,
+        solventLive: this.solventLive,
         speciesClears: this.speciesClears,
         speciesPoured: this.speciesPoured,
         speciesSnap: this.speciesSnap,
@@ -1295,6 +1350,23 @@ export class FluidInputs extends FluidPasses {
     this.printLive = false;
     this.videoPending = false;
     this.rbDyeSeq = -1;
+    /*
+      The ouzo's cloud with the plate it was on (PLAN 48s): the solvent came
+      back with the species, and what the plate is handed is made again from
+      the two here, so the frame after an Undo shows the cloud that was undone
+      to rather than the one undone, or none.
+    */
+    this.solventLive = s.speciesLive && s.solventLive;
+    this.cloudFresh = false;
+    if (this.solventLive) {
+      this.simF[0] = this.N; this.simF[1] = this.L;
+      this.device.queue.writeBuffer(this.sim, 0, this.simData);
+      const enc = this.device.createCommandEncoder({ label: 'undo cloud view' });
+      const pass = enc.beginComputePass({ label: 'undo cloud view' });
+      this.writeCloudView(pass);
+      pass.end();
+      this.submit(enc);
+    }
     return s;
   }
 
