@@ -983,9 +983,20 @@ export class FluidPasses extends FluidFields {
    * indirectly so one this step does not need runs no workgroups. The field
    * ends swapped once, as a single carry leaves it.
    */
-  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'bodyAdvectSharp' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
-    // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
-    const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
+  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'bodyAdvectSharp' | 'bodyAdvectSplit' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
+    /*
+      With `also`, two fields through the same faces in one pass: the
+      species (always rgba32float) on bodyAdvect's pair, or, for
+      bodyAdvectSplit, the oil's share of the dye beside the dye (PLAN
+      38w-33, carryShares, wgsl/fluid/split.ts). The split's first substep
+      reads the whole dye and writes the water's share to a texture of its
+      own (`water`), which the rest carry on; every substep writes the
+      joined dye to the dye's next texture, so the last that runs leaves it
+      there, and the dye swaps once at the end.
+    */
+    const split = name === 'bodyAdvectSplit';
+    if (split && !also) return;
+    const kernelName = split ? 'bodyAdvectSplitSub' : also ? 'bodyAdvectPairSub' : `${name}Sub`;
     /*
       The amounts' carries take the air while there is any (`argsAt`, from
       airArgs; airLiquid in wgsl/fluid.ts, PLAN 15g-8b), in their Air kernels;
@@ -994,55 +1005,130 @@ export class FluidPasses extends FluidFields {
     const airPipe = argsAt && name !== 'mixAdvect' ? this.pipeline(`${kernelName}Air`, field.format) : null;
     const pipe = airPipe ?? this.pipeline(kernelName, field.format);
     if (!pipe) return;
+    const onPipe = split ? this.pipeline(airPipe ? 'bodyAdvectSplitOnSubAir' : 'bodyAdvectSplitOnSub', field.format) : pipe;
+    if (!onPipe) return;
     if (!airPipe) argsAt = undefined;
-    else if (name === 'bodyAdvectSharp') this.sharpAirCarries++;
+    else if (name === 'bodyAdvectSharp' || split) this.sharpAirCarries++;
     const ride = this.ride();
     const air = airPipe ? this.airPair() : null;
-    const group = (a: GPUBuffer, src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
-      let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'carry'), pipe), a), src), dst);
+    const whole = split ? field.write : undefined;
+    const group = (p: GPUComputePipeline, a: GPUBuffer, src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
+      let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'carry'), p), a), src), dst);
       if (src2) at = this.groupAt(at, src2);
+      if (whole) at = this.groupAt(at, whole);
       at = this.groupAt(this.groupAt(at, this.squeeze.read), ride);
       if (air) at = this.groupAt(at, air[0]);
       let g = at.group;
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, a, src, ride, dst, this.hsFlow!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : []), ...(air ?? [])]);
+        g = bindGroup(this.device, p, [this.sim, a, src, ride, dst, this.hsFlow!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : []), ...(whole ? [whole] : []), ...(air ?? [])]);
         at.group = g;
       }
       return g;
     };
+    // The split's water's share rides its own texture after the first substep; anything else, the field itself.
+    const on = split ? this.ensureWaterShare() : field;
     // Taking the air, each substep its own arguments, which carry its index, and airGive before each, through the same dispatch.
     const gives = !!air;
     const w = Math.ceil(this.N / 8);
     const a0 = argsAt ? argsAt[0] : args;
     if (gives) this.airGive(pass, true, a0);
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, group(a0, field.read, field.write, also?.read, also?.write));
+    pass.setBindGroup(0, group(pipe, a0, field.read, on.write, also?.read, also?.write));
     pass.dispatchWorkgroups(w, w);
-    field.swap();
+    on.swap();
     also?.swap();
-    const there = argsAt ? null : group(args, field.read, field.write, also?.read, also?.write);
-    const back = argsAt ? null : group(args, field.write, field.read, also?.write, also?.read);
+    const there = argsAt ? null : group(onPipe, args, on.read, on.write, also?.read, also?.write);
+    const back = argsAt ? null : group(onPipe, args, on.write, on.read, also?.write, also?.read);
     for (let k = 0; k < CARRY_PAIRS; k++) {
       for (let half = 1; half <= 2; half++) {
         const a = argsAt ? argsAt[half + 2 * k] : args;
         if (gives) this.airGive(pass, true, a, 12 * k);
-        pass.setPipeline(pipe);
+        pass.setPipeline(onPipe);
         pass.setBindGroup(0, half === 1
-          ? there ?? group(a, field.read, field.write, also?.read, also?.write)
-          : back ?? group(a, field.write, field.read, also?.write, also?.read));
+          ? there ?? group(onPipe, a, on.read, on.write, also?.read, also?.write)
+          : back ?? group(onPipe, a, on.write, on.read, also?.write, also?.read));
         pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
       }
     }
+    if (split) field.swap();
     // What a dry core still holds above its film, to the liquid at its rim (airShed in wgsl/fluid.ts).
-    if (gives && this.air) {
+    if (gives && this.air && split) {
+      // Each share its own (airShedSplit, PLAN 38w-33): the shed floors what a dry cell keeps.
+      this.run2(pass, 'airShedSplit', field.write, also!.write, [field.read, also!.read, this.air.prev, this.air.field], a0);
+      field.swap();
+      also!.swap();
+    } else if (gives && this.air) {
       for (const f of also ? [field, also] : [field]) {
         this.run(pass, 'airShed', f.write, [f.read, this.air.prev, this.air.field], a0);
         f.swap();
       }
     }
     // And the rest of the way with the glass's drift.
+    if (split) { this.shiftShares(pass, field, also!); return; }
     this.shiftCarried(pass, field, name === 'mixAdvect' ? 'mix' : 'amount');
     if (also) this.shiftCarried(pass, also);
+  }
+
+  /*
+    The glass's drift of the dye and the oil's share of it together
+    (driftShiftSplit, PLAN 38w-33): each share drifted with its own
+    neighbours, the dye written as their sum, as shiftCarried drifted them
+    apart before the join.
+  */
+  protected shiftShares(pass: GPUComputePassEncoder, dye: PingPong, od: PingPong): void {
+    if (!this.riding) return;
+    this.sharesDrifted++;
+    this.run2(pass, 'driftShiftSplit', dye.write, od.write, [dye.read, od.read, this.squeeze.read], this.arg('drift shift amount', [...this.driftCells, 0, 0, 0, 0]));
+    dye.swap();
+    od.swap();
+  }
+
+  /**
+   * The plate's dye carried as its two liquids' shares (PLAN 38w-29, 38w-32,
+   * 38w-33; the advect dye stage in fluid.ts): on a thin gap through `args`
+   * (and `argsAt` while there is air), on the old plate (`thin` false) in
+   * bodyAdvect's one step. One pass of both shares where its kernels are
+   * built and `fuseSplit` is on; else the split, the two carries and the
+   * join apart, as 38w-29 shipped them (`npm run splitcarry` asks both give
+   * the same fields); else, until those are built too, the whole dye and the
+   * oil's share both the dye's way. Returns whether `rider` (the species)
+   * rode the dye's carry; the fused pass carries no third field, so the
+   * species then takes its own stage.
+   */
+  protected carryShares(pass: GPUComputePassEncoder, od: PingPong, thin: boolean, args: GPUBuffer, rider?: PingPong, argsAt?: GPUBuffer[]): boolean {
+    const f = od.read.format;
+    this.sharesThin = thin;
+    this.sharesArgs = args;
+    this.sharesAt = argsAt;
+    // The drift's per-share kernel is asked only while riding, which waits for it (driftBuilds); the shed's with air, built behind as the air's carries are.
+    if (this.fuseSplit && (!argsAt || this.pipeline('airShedSplit', f))) {
+      this.lastShareCarry = 'one pass';
+      if (thin && this.pipeline(argsAt ? 'bodyAdvectSplitSubAir' : 'bodyAdvectSplitSub', f) && this.pipeline(argsAt ? 'bodyAdvectSplitOnSubAir' : 'bodyAdvectSplitOnSub', f)) {
+        this.carrySubsteps(pass, 'bodyAdvectSplit', this.dye, args, od, argsAt);
+        return false;
+      }
+      if (!thin && this.pipeline('bodyAdvectSplit', f)) {
+        this.runPressed2(pass, 'bodyAdvectSplit', this.dye.write, od.write, [this.dye.read, od.read, this.velForced], args);
+        this.dye.swap();
+        od.swap();
+        return false;
+      }
+    }
+    const none = this.arg('none', [0, 0, 0, 0]);
+    const split = this.splitReady(thin ? (argsAt ? 'bodyAdvectSharpSubAir' : 'bodyAdvectSharpSub') : 'bodyAdvectSharp', od);
+    this.lastShareCarry = split ? 'apart' : 'whole';
+    if (split) { this.run(pass, 'bodyWater', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
+    if (thin) {
+      this.carrySubsteps(pass, 'bodyAdvect', this.dye, args, rider, argsAt);
+      this.carrySubsteps(pass, split ? 'bodyAdvectSharp' : 'bodyAdvect', od, args, undefined, argsAt);
+    } else {
+      this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], args);
+      this.dye.swap();
+      this.runPressed(pass, split ? 'bodyAdvectSharp' : 'bodyAdvect', od.write, [od.read, this.velForced], args);
+      od.swap();
+    }
+    if (split) { this.run(pass, 'bodyJoin', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
+    return thin && !!rider;
   }
 
   /**

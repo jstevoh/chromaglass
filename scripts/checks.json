@@ -3693,6 +3693,19 @@
       ]
     },
     {
+      "name": "The oil's colour rides the oil in one pass",
+      "shard": "plate",
+      "run": "npm run splitcarry",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-33: the dye's two liquids' shares carried in one pass, split and",
+        "joined in every substep, where 38w-29 took four. On the thin plate, with",
+        "a bubble and on the old plate, the same start carried both ways for the",
+        "last step: the same oil's share and dye to the float's rounding,",
+        "every amount kept, and on the thin plate cheaper on the GPU's queue."
+      ]
+    },
+    {
       "name": "Oil and water as bodies",
       "shard": "plate",
       "run": "npm run bodies",

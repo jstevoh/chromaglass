@@ -328,6 +328,8 @@ export class FluidCore {
     the dye needs to know it exists.
   */
   protected oilDye: PingPong | null = null;
+  /** The water's share of the dye between its carry's substeps (ensureWaterShare). */
+  protected waterShare: PingPong | null = null;
   /** The slump's K Δt/Δx² a cell, once a step (PLAN 18m, wgsl/slump.ts); made on the first step that slumps. */
   protected slumpK: GPUTexture | null = null;
   /** The oil blurred wide, for colour astray from its liquid to find the way back (bodyPartition). */
@@ -388,6 +390,21 @@ export class FluidCore {
    * stage of its own, and ask that both ways give the same fields.
    */
   fuseSpecies = true;
+  /**
+   * Whether the dye's two liquids' shares go through the faces in one pass
+   * (PLAN 38w-33, wgsl/fluid/split.ts). Only `npm run splitcarry` turns it
+   * off, to carry the same plate the way 38w-29 did (split, two carries,
+   * join) and ask that both ways give the same fields, and time them.
+   */
+  fuseSplit = true;
+  /** How the last step carried the dye's two shares (carryShares): in one pass, apart, or whole (the split's kernels not built yet); null with no Oil Bodies. For `npm run splitcarry`. */
+  lastShareCarry: 'one pass' | 'apart' | 'whole' | null = null;
+  /** How many drifts of the glass moved both shares together (driftShiftSplit). For `npm run splitcarry`. */
+  sharesDrifted = 0;
+  /** The last share carry's plate and arguments, which benchShares repeats. */
+  protected sharesThin = false;
+  protected sharesArgs: GPUBuffer | null = null;
+  protected sharesAt: GPUBuffer[] | undefined = undefined;
   /** How the last step carried the species: with the colour ('pair'), in its own stage ('alone'), or not at all (null). For `npm run thick`. */
   lastSpeciesCarry: 'pair' | 'alone' | null = null;
   /*

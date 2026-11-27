@@ -80,6 +80,23 @@ export class FluidFields extends FluidCore {
     pass.dispatchWorkgroups(w, w);
   }
 
+  /** As runPressed, for a kernel that writes two textures (bodyAdvectSplit): the reads, both written, then the pressure. */
+  protected runPressed2(pass: GPUComputePassEncoder, name: string, dst0: GPUTexture, dst1: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void {
+    const pipe = this.pipeline(name, dst0.format);
+    if (!pipe) return;
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'press'), pipe), dst0), dst1), args);
+    for (const r of reads) at = this.groupAt(at, r);
+    let group = at.group;
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...reads, dst0, dst1, this.press]);
+      at.group = group;
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
   /** The gap the ferrofluid has seen, made zero (unprimed) the first time. */
   protected ensurePhaseGap(): GPUBuffer {
     if (!this.phaseGap) {
@@ -265,6 +282,12 @@ export class FluidFields extends FluidCore {
     // colour already in it.
     if (!this.oilDye) { this.oilDye = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'oil dye'); this.oilDyeStale = true; }
     return this.oilDye;
+  }
+
+  /** The water's share of the dye between the substeps of its carry with the oil's (PLAN 38w-33, carrySubsteps): made the first time Oil Bodies carries in one pass. */
+  protected ensureWaterShare(): PingPong {
+    if (!this.waterShare) this.waterShare = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'water share');
+    return this.waterShare;
   }
 
 

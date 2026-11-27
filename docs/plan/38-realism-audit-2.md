@@ -315,9 +315,9 @@ is in the project's files).
   loss (and bodyPartition's own note records the same direction in its drift). CH in a
   diffuse band is the profile restoring itself, not oil going anywhere, so the colour is
   left to bodyPartition there.
-- **38w-33. The split carry's two passes fused into the carry** (S; Low, after 38w-32).
-  bodyWater and bodyJoin are two pointwise passes a step round the dye's carry (one or two
-  loads a cell each). Fold the split into the dye's first substep (read dye less the oil's
-  share there) and the join into its last, in the plain, pair and Air kernels alike, and
-  the old plate's single bodyAdvect; `npm run oilride` on all three plates and `npm run
-  thick`'s timing say it is the same carry and cheaper.
+- **38w-34. The poured liquids' species rides the split carry too** (S; Low, after 38w-33).
+  With Oil Bodies and a pour on the plate the species is carried in its own stage again
+  (bodyAdvectPairSub could no longer take it: the dye's carry is now the split's one pass).
+  A third field in the split kernels (three storage targets and the species' rgba32float
+  fits the four allowed) would put it back on the same faces; `npm run thick` with Oil
+  Bodies on says what it saves.
