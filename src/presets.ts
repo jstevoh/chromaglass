@@ -333,7 +333,6 @@ export const PRESETS: Preset[] = [
       turbulenceDetail: 4,
       blobSurfaceTension: 0.35,  // 28i-7: was 0.15, and the bodies ran together
       edgeRelief: 0.65,
-      bubbles: 0.17,
       boundaryContrast: 0.75,     // hard psychedelic color interfaces
       saturationBoost: 1.6,      // hyper-saturated
       glossiness: 0.0,
@@ -1059,7 +1058,6 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.0,
       dyeBudget: 1.1,
       edgeRelief: 0.0,
-      bubbles: 0.07,
       plateRock: 0.5,
       beatSqueeze: 0.35,
       layerScaleVariety: 0.0,
@@ -1128,7 +1126,6 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.45,
       turbulenceDetail: 3,
       blobSurfaceTension: 0.75,
-      bubbles: 0.12,
       layerScaleVariety: 0,
       boundaryContrast: 0.7,
       saturationBoost: 1.55,
@@ -1199,7 +1196,6 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.22,
       turbulenceDetail: 2,
       blobSurfaceTension: 0.65,
-      bubbles: 0.1,
       layerScaleVariety: 0,
       boundaryContrast: 0.8,
       saturationBoost: 1.55,
@@ -1270,7 +1266,6 @@ export const PRESETS: Preset[] = [
       turbulenceScale: 0.7,
       turbulenceDetail: 4,
       blobSurfaceTension: 0.15,
-      bubbles: 0.15,
       layerScaleVariety: 0,
       boundaryContrast: 0.8,
       saturationBoost: 1.5,
@@ -1330,7 +1325,6 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.45,
       dyeBudget: 1.0,
       edgeRelief: 0.15,
-      bubbles: 0.15,
       beads: 0.2,
       fingering: 0.6,              // a palm on the glass lifts into spokes as they move on
       plateRock: 0.35,
@@ -1486,7 +1480,6 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.2,
       dyeBudget: 0.3,
       edgeRelief: 0.55,
-      bubbles: 0.05,
       plateRock: 0.25,
       beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
@@ -1519,6 +1512,7 @@ export const PRESETS: Preset[] = [
     name: 'Oil & Water',
     description: 'Amber oil on teal water between two glasses: each keeps its own colour, the oil rounds into bodies, threads break into beads, and bodies that touch merge.',
     settings: {
+      bubbles: 0.2,
       globalSpeed: 0.0126,
       advection: 0.45,
       platePressure: 0.5,
@@ -1830,6 +1824,7 @@ export const PRESETS: Preset[] = [
     name: 'Clock Glass',
     description: 'Two curved clock glasses with coloured oil and water between them: cells of red, amber and blue oil, each with its dark rim, drift in purple water and gather in the deep middle, and a press spreads them into a thin bright film that creeps back.',
     settings: {
+      bubbles: 0.2,
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
       /*
@@ -1899,6 +1894,7 @@ export const PRESETS: Preset[] = [
     name: 'Splodascope',
     description: 'A crowd of yellow, green, red and pink oil drops packed edge to edge in blue water, lit from below: they press together without merging, some sit inside others, and a kick on the glass breaks a few films so neighbours run together.',
     settings: {
+      bubbles: 0.2,
       lampGround: 1,
       /*
         After the owner's photograph of a splodascope (2026-10-25): round

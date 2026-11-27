@@ -459,6 +459,18 @@ function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
               testId="toggle-evolve"
             />
             {/*
+              Keep full (PLAN 18a-22, sim/keepFull.ts), beside Evolve because
+              both are what the plate does left alone; unlike Evolve it only
+              tops the dish up with drops of its own bottles and changes
+              nothing else. The room's switch, so a look change keeps it.
+            */}
+            <Toggle
+              label="Keep it full"
+              on={!!p.settings.keepFull}
+              onChange={on => p.onSetting({ keepFull: on })}
+              testId="toggle-keepfull"
+            />
+            {/*
               Follow beat stood here, a switch that wrote Beat Prediction as 0
               or 0.7: the same setting as the Sound section's slider, drawn
               twice, and the switch read "off" at 0.04 and set 0.7 over
@@ -569,6 +581,12 @@ function RecipeBody({ p }: { p: DeskProps }) {
                   if (on && (p.settings.automateRate ?? 0) < 0.02) p.onSetting({ automateRate: 0.15 });
                 }}
                 testId="toggle-evolve"
+              />
+              <Toggle
+                label="Keep it full"
+                on={!!p.settings.keepFull}
+                onChange={on => p.onSetting({ keepFull: on })}
+                testId="toggle-keepfull"
               />
             </div>
           )}
@@ -1076,7 +1094,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
                   <p className="text-[12px] leading-snug text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
                 ) : (
                   <p className="text-[12px] leading-snug text-dim">
-                    No show server behind this page, so the code opens the show on the phone itself. Link to this show via the Mac app (or <span className="font-mono text-[12px]">npm run remote</span>).
+                    No show server behind this page, so the code opens the show on the phone itself. Open the show in the ChromaGlass Mac app to pair a phone remote.
                   </p>
                 )}
                 <code className="break-all rounded-md bg-elevated px-2 py-1 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
@@ -1139,7 +1157,7 @@ export function PanelBody({ id, p, narrow = false }: { id: string; p: DeskProps;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
     case 'live': return <LiveShowPanel />;
-    case 'score': return p.score ? <SongScore {...p.score} /> : null;
+    case 'score': return p.score ? <SongScore {...p.score} onOpenSound={p.onSound} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;
   }

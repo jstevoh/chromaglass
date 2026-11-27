@@ -20,9 +20,9 @@ folder, and modules small enough to read whole, turn a 50 KB hunt into a 2 KB re
 | Fluid physics | the fields and how they move | `src/gpu/fluid.ts` and `src/gpu/fluid/` (the solver), `src/gpu/wgsl/fluid.ts` and `src/gpu/wgsl/fluid/` (its passes), `src/sim/` (`FluidSimulation`: each layer's seeding and pours, handed to the solver; the frame's shapes in `frameTypes.ts`), `lib/bubbles`, `beads`, `soapFilm`, `turntable` |
 | Rendering | how the fields are drawn and projected | `src/gpu/wgsl/plate.ts`, `src/gpu/plate.ts`, `src/gpu/output.ts`, `lib/outputConfig`, `lib/plateSources`, `lib/mixer` |
 | Sound | readings from the audio, and the cords that carry them | `hooks/useAudioAnalyzer.ts`, `lib/audioFeatures`, `lib/earClock`, `lib/sceneMap` (cords), `lib/areaCords`, `lib/plateDrone` |
-| Show | looks, set lists, MIDI, the frame loop | `src/presets.ts`, `lib/lookFade`, `lib/setList`, `lib/midi`, the frame loop in `LiquidVisualizer.tsx` |
+| Show | looks, set lists, MIDI, the frame loop | `src/presets.ts`, `lib/lookFade`, `lib/setList`, `lib/midi`, the frame loop in `LiquidVisualizer.tsx` on its way to `src/engine/` (50c) |
 | Desks | app state, settings and panels | `App.tsx` and its hooks in `src/app/`, `components/desk/`, `SettingsPanel.tsx` and its sections in `components/settings/` |
-| Phone | the phone and iPad layout | `components/phone/`, `lib/phone`, the touch handlers in `LiquidVisualizer.tsx` |
+| Phone | the phone and iPad layout | `components/phone/`, `lib/phone`, the touch handlers in `engine/pointer.ts` |
 | Accounts and licence | sign-in, keys, tiers, the Workers | `lib/firebaseAuth`, `lib/accountLicense`, `lib/licenseKey`, `lib/tierGates`, `server/` |
 | Mac app | the Electron shell, projector, updates | `desktop/`, `lib/macApp`, `hooks/useProjector`, `hooks/useCastSession` |
 | iPhone app and remote | the Capacitor app, the laptop link | `ios/`, `lib/appLink`, `lib/remoteProtocol`, `components/RemoteControl.tsx`, `server/remote-server.js` |
@@ -70,5 +70,5 @@ when no open PR touches the file.
 | 19ai-7 | `src/gpu/fluid.ts` split into a class chain | shipped |
 | 19ai-8 | `App()` into domain hooks | shipped; what stayed is 19ai-8a, 8b |
 | 19ai-9 | `SettingsPanel.tsx` one file per section | shipped; its props are 19ai-9a |
-| 19ai-10 | the frame loop, one piece at a time, as PRs touch it | open, spread out |
+| 19ai-10 | the frame loop, one piece at a time, into `src/engine/` (PLAN 50c) | open; the pointer moved (50c-1) |
 | 19ai-5b | `docs/plan-shipped.md` (810 KB), `docs/guide.md`, `docs/judging.md` by part | open |

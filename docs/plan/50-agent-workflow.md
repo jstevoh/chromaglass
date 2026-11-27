@@ -44,6 +44,20 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   Each PR moves one piece (the input writers, the readbacks, the post chain, the governor's
   feed) as a pure move, held against the 26 checks that read the file as text (19ai-3a) and
   `samelook`. Done when `LiquidVisualizer.tsx` is under 40 KB.
+  - **50c-1 shipped** (2026-11-27): the seam written down (`src/engine/README.md`: the engine
+    owns the per-frame state, takes typed messages, sends events, imports no React) and the
+    first piece moved verbatim: the pointer and the fingers (mouse, touches, Spin hands, the
+    closeup's Alt-drag and two-finger camera) to `src/engine/pointer.ts`, `coverPinch.ts`
+    from `components/` beside it. `LiquidVisualizer.tsx` 390,411 to 373,454 bytes. No check
+    read the moved text. The order of the next moves (50c-2 debug report, 50c-3 the GPU's
+    guards, 50c-4 the governor, 50c-5 the clocks: Antigravity's, briefed 2026-11-27 in the
+    owner's files under `antigravity/engine-50c/`, strictly one after another; 50c-6 the
+    device's start, which writes the effect's own state, so Claude designs its home first;
+    50c-7 on: `renderFrame` by stage) is the README's table.
+  - **50c-1a. Found along the way: the pointer reads the frame's box, not its own.** The
+    moved handlers read `stageRef`, `frameRef` and `macroShotRef` as the loop writes them,
+    so in a worker (50d) the page side needs a copy of the camera's shot each frame to map a
+    finger to the plate; today they share one object. Name it in 50d's message shape.
 - **50d** *The plate on its own thread* (rank 4, L, after 50c; Claude designs, the owner OKs
   the message shape since it is an export between domains). Once the engine is a module, it
   runs in a worker on an `OffscreenCanvas`, so React, the desk, the remote and the page's
@@ -66,8 +80,35 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   it arrives, 2026-12-04 to 12-11). Two Antigravity lanes in separate worktrees, 50b's table
   nightly on the machine that is not deploying; the Air keeps the deploy runner. No cloud cost.
 
+- **50i** *A nightly parity run: main against a branch, numbers only* (the owner,
+  2026-11-27: "Let's get all of these going"; taken off the parked list below). ~~Shipped:
+  `npm run sameapp` sweeps every look and the bug bash's desk and phone (QA-33) on both
+  sides with one ruler (this tree's `bugbash.mjs` pointed at each side's build), and
+  compares what the sweep reads as numbers: frame rate, the plate's brightness, colour,
+  flatness, detail, cast and motion, each control's settings moved, page changed and plate
+  moved, and the findings. Claude set the tolerances (the floors and their reasons are in
+  the script's head), and each run sweeps four control looks twice on the base first and
+  raises a floor to twice the same tree's spread on a noisy night; a look counts as changed
+  only when both of its moments moved the same way, a control only across a 3×-to-1× gap
+  of its drift. Nightly on the owner's Mac at 11:30 PM from its own clone
+  (`npm run sameapp -- install-agent`, `scripts/sameapp-nightly.sh`): last night's main
+  against tonight's, every look every night and a quarter of the desk and phone (all of
+  it every four nights), each piece one `maclock.mjs run` so a deploy waits at most one
+  piece; skipped on battery; off switch `rm ~/cg-scratch/sameapp/LIVE`. Never films, never a
+  gate; the report is `~/cg-scratch/sameapp/latest.md`. `npm run sameapp -- --selftest` (logic
+  shard) holds the comparison.~~
+  - **50i-2** *Tighten the floors from the first week* (S, Claude). The floors are reasoned,
+    not measured: no same-tree spread from the Mac existed when they were set. After seven
+    nights, read the `tolerances.spread` of each `parity.json` and set each floor to about
+    twice the week's largest, in a Claude PR with the numbers.
+  - **50i-3** *Open branches too* (S, Claude). The nightly compares the day's merges; a
+    branch is compared by hand (`npm run sameapp -- --head <branch>`). An open PR labelled
+    `parity` could be swept the same night once the run's length on the Air is known.
+  - **50i-4** *The report where the owner reads it* (S). `latest.md` lives on the Mac; copy
+    it to the NAS's ChromaGlass folder, or let the foreman post its high and medium lines.
+
 Parked by the owner's turn (2026-11-27), not dropped: a weekly mutation run proving checks
-can fail, a main-against-branch parity run, failures grouped by fingerprint before briefing,
+can fail, failures grouped by fingerprint before briefing,
 the foreman re-running `Measured:` receipts, the scorecard as a script, a README drift check.
 They came from the write-up of an agent-built service port (traffic mirrored to the old and
 new systems, mismatches grouped by shape, human corrections written down as tests) and suit a
