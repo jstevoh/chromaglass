@@ -718,13 +718,17 @@ export interface VisualizerSettings {
     as v^3.4, colour temperature as v^0.42. A shutter is its vane, 0 open to
     1 shut, walked there in 80 ms. The crossfade is A at 0, B at 1, linear in
     light; it fades only with Two Projectors on a back plate. Defaults are
-    today's picture.
+    today's picture. Each focus is its head's rack (PLAN 51b,
+    lib/projectorFocus.ts), -1 to 1, 0 sharp: the first half either way the
+    rack's real travel, past it a ramp to a melt.
   */
   projLampA?: number;
   projLampB?: number;
   projShutterA?: number;
   projShutterB?: number;
   projCross?: number;
+  projFocusA?: number;
+  projFocusB?: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -1255,6 +1259,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   projShutterA: 0,
   projShutterB: 0,
   projCross: 0.5,
+  projFocusA: 0,
+  projFocusB: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second
