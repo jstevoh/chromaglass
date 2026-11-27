@@ -28,8 +28,21 @@
  *  4. The control: the same lab with the old draught's uniform shear put back
  *     on top of the gusts (a build-time edit of wgsl/thinGap.ts, as
  *     lampcontrol.mjs edits the plate) loses the dish and slides it, so 1 and
- *     3 can fail. Rain Drip on a standing plate, which still goes through the
- *     open rim (PLAN 18a-17), is printed beside it, not held.
+ *     3 can fail.
+ *
+ * And the colour's own weight with no oil (PLAN 18a-17). Rain Drip on a
+ * standing plate and Plate Rock's tilt laid the heavy colour's weight
+ * straight into the same open-rim solve, and the colour left over the downhill
+ * rim (Rain Drip 0.5 kept 1.8% of the dish in 600 steps). hsBody now lays both
+ * as the closed dish's circulation, as the oil's lift is (hsLiftRelax):
+ *  5. Rain Drip 0.5 on a standing plate keeps the dish's dye (at least 97%).
+ *  6. And it still falls: the colour's middle moves down the plate (S.up is
+ *     +y, gravity −y), at least DROP of the plate further than with it off.
+ *  7. Plate Rock tipped with no oil (rockX ROCK_SIN, about the phone's full
+ *     tip) keeps the dish's dye, and its colour moves downhill (+x) too.
+ *  8. The control: the same lab with the weight laid straight into the open
+ *     rim again (fluid.ts's `closing` made false at build time) loses Rain
+ *     Drip's dish, so 5 can fail.
  */
 import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
@@ -44,6 +57,20 @@ const OLD_SHEAR = {
       const found = s.match(at)?.length ?? 0;
       if (found !== 1) throw new Error(`draught: the old-shear control found ${found} of 1 gust lines in wgsl/thinGap.ts`);
       return { contents: s.replace(at, '$1 + vec2f(0.0, -S.air * 8.0 * S.dt);'), loader: 'ts' };
+    });
+  },
+};
+
+/** The control's build for 5 to 8: the colour's weight with no oil laid straight into the open-rim solve, as before 18a-17. */
+const OPEN_WEIGHT = {
+  name: 'open-weight',
+  setup(b) {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]fluid\.ts$/ }, (a) => {
+      const s = readFileSync(a.path, 'utf8');
+      const at = /const closing = thin && !lifting && \(rockOn \|\| dripWeightOf\(p\) > 0\);/g;
+      const found = s.match(at)?.length ?? 0;
+      if (found !== 1) throw new Error(`draught: the open-weight control found ${found} of 1 closing lines in fluid.ts`);
+      return { contents: s.replace(at, 'const closing = false;'), loader: 'ts' };
     });
   },
 };
@@ -63,6 +90,10 @@ const check = (name, ok, detail = '') => {
 const OLD_GUST = 1.73e-2;
 const STEPS = 600;
 const DISC = Math.PI * 0.44 * 0.44 / 2 * 128 * 128;
+/** The tip for 7: sinθ about the phone's full tip (lib/handTilt.ts). */
+const ROCK_SIN = 0.27;
+/** How far, in plate widths, Rain Drip's colour must fall further than the still plate's in 600 steps. */
+const DROP = 0.05;
 
 const run = (page, over) => page.evaluate(async ({ over, steps }) => {
     await lab.create(128, 128);
@@ -72,7 +103,9 @@ const run = (page, over) => page.evaluate(async ({ over, steps }) => {
     const inDish = (i, j, n) => { const u = (i + 0.5) / n - 0.5, v = (j + 0.5) / n - 0.5; return u * u + v * v < 0.25; };
     const dye = async () => { const f = await lab.field('dye'); const n = Math.sqrt(f.length / 4); let s = 0;
       for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (inDish(i, j, n)) s += f[(i + j * n) * 4 + 3];
-      return { s, f: f.filter((_, k) => k % 4 === 3) }; };
+      let cx = 0, cy = 0;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (inDish(i, j, n)) { const a = f[(i + j * n) * 4 + 3]; cx += a * (i + 0.5) / n; cy += a * (j + 0.5) / n; }
+      return { s, cx: cx / s, cy: cy / s, f: f.filter((_, k) => k % 4 === 3) }; };
     const speed = async () => { const v = await lab.field('vel'); const n = Math.sqrt(v.length / 4); let q = 0, mx = 0, my = 0, c = 0;
       for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (inDish(i, j, n)) { const o = (i + j * n) * 4; q += v[o] ** 2 + v[o + 1] ** 2; mx += v[o]; my += v[o + 1]; c++; }
       const rms = Math.sqrt(q / c), mean = Math.hypot(mx / c, my / c);
@@ -83,21 +116,29 @@ const run = (page, over) => page.evaluate(async ({ over, steps }) => {
     const sp = await speed();
     await lab.step(steps - 30, base);
     const after = await dye();
-    return { before: before.s, kept: after.s / before.s, thin: lab.thinLive(), ...sp, field: Array.from(after.f) };
+    return { before: before.s, kept: after.s / before.s, dx: after.cx - before.cx, dy: after.cy - before.cy, thin: lab.thinLive(), ...sp, field: Array.from(after.f) };
   }, { over, steps: STEPS });
 
-let still, air, drip, shear;
+let still, air, drip, rock, shear, openDrip, openRock;
 {
   const { page, close } = await openLab();
   try {
     still = await run(page, { air: 0 });
     air = await run(page, { air: 0.35 });
     drip = await run(page, { air: 0, drip: 0.5, plateUpright: 1 });
+    rock = await run(page, { air: 0, rockX: ROCK_SIN });
   } finally { await close(); }
 }
 {
   const { page, close } = await openLab({ plugins: [OLD_SHEAR], tag: 'old-shear' });
   try { shear = await run(page, { air: 0.35 }); } finally { await close(); }
+}
+{
+  const { page, close } = await openLab({ plugins: [OPEN_WEIGHT], tag: 'open-weight' });
+  try {
+    openDrip = await run(page, { air: 0, drip: 0.5, plateUpright: 1 });
+    openRock = await run(page, { air: 0, rockX: ROCK_SIN });
+  } finally { await close(); }
 }
 {
   if (process.argv.includes('--rms')) console.log(`      rms ${air.rms.toExponential(3)} mean ${air.mean.toExponential(3)} gust ${air.gust.toExponential(3)} kept ${air.kept.toFixed(3)}`);
@@ -116,7 +157,14 @@ let still, air, drip, shear;
     `mean ${air.mean.toExponential(2)}, rms ${air.rms.toExponential(2)}`);
   check('4. control: the old uniform shear put back loses the dish and slides it', shear.kept < 0.5 && shear.mean > 0.5 * shear.rms,
     `${(100 * shear.kept).toFixed(1)}% left, mean flow ${shear.mean.toExponential(2)} of rms ${shear.rms.toExponential(2)}`);
-  console.log(`      (Rain Drip 0.5 on a standing plate, still through the open rim, PLAN 18a-17: ${(100 * drip.kept).toFixed(1)}% left)`);
+  check('5. Rain Drip 0.5 on a standing plate keeps the dish\'s dye', drip.thin && drip.kept >= 0.97,
+    `${(100 * drip.kept).toFixed(1)}% left after ${STEPS} steps (bar 97%; laid into the open rim, 1.8% before 18a-17)`);
+  check('6. and its colour still falls down the plate', still.dy - drip.dy >= DROP,
+    `its middle moved ${drip.dy.toFixed(4)} in y against the still plate's ${still.dy.toFixed(4)} (bar ${DROP} further down)`);
+  check('7. Plate Rock tipped with no oil keeps the dish\'s dye, and its colour moves downhill', rock.kept >= 0.97 && rock.dx - still.dx >= DROP,
+    `${(100 * rock.kept).toFixed(1)}% left; its middle moved ${rock.dx.toFixed(4)} in x against ${still.dx.toFixed(4)} (rockX ${ROCK_SIN})`);
+  check('8. control: the weight laid straight into the open rim loses Rain Drip\'s dish', openDrip.kept < 0.5,
+    `${(100 * openDrip.kept).toFixed(1)}% left (Plate Rock that way: ${(100 * openRock.kept).toFixed(1)}%)`);
 }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

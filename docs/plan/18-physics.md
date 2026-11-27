@@ -306,15 +306,26 @@ its frame rate live. "Free" means no new passes or texture reads.
     with its own pressure; what a draught moves is its curl. hsBody lays the gusts as ∇⊥χ, χ a
     noise held to zero over the dish's outer tenth (`AIR_GUST`). `npm run draught` (lab, 128²,
     Air 0.35, 600 steps): dye kept 0% → 100%, the gusts' rms 1.73e-2 → 1.69e-2, mean flow
-    6.9e-2 → 5e-8. Open: 18a-17.
-  - **18a-17, the other pushes through the open rim.** Rain Drip on a standing plate and Plate
-    Rock's colour weight with no oil (hsBody, `S.up * A.a.x * w`, `A.b.xy * w`) still lay a
-    body force into the open-rim solve, so the dish's heavy colour leaves over the downhill rim
-    (`npm run draught` line 4: Rain Drip 0.5 upright keeps 1.8%). The oil's lift already goes
-    through the closed circulation (hsLiftRelax); lay these through it too, and replace
-    18a-16's new gust noise with the Hodge projection of a draught's stress onto closed flows
-    through the same solve (with 15e-12, a heavy bottle's weight, the same fix). A Blow's breath
-    is local and stays open: its liquid comes back.
+    6.9e-2 → 5e-8. Then 18a-17.
+  - **18a-17, the colour's weight poured out over the open rim: shipped** (2026-11-27). Rain
+    Drip on a standing plate and Plate Rock's colour weight with no oil (hsBody,
+    `S.up * A.a.x * w`, `A.b.xy * w`) laid a body force into the open-rim solve, and the
+    dish's heavy colour left over the downhill rim: Rain Drip 0.5 kept 1.8% of its dye in
+    600 lab steps, Plate Rock tipped at sinθ 0.27 kept 0.5%. A clock glass's colour falls
+    and pools against its wall. With no oil both are now one in-plane weight laid as the
+    closed dish's circulation, as the oil's lift is (hsLiftSource, hsLiftRelax on the
+    colour alone; `A.b.w` 2). `npm run draught` 5–8: Rain Drip keeps 99.8% and its colour's
+    middle falls 0.14 of the plate; Plate Rock keeps 100% and moves 0.18 downhill; the
+    control (the weight laid straight again) keeps 1.8% and 0.5%. Open: 18a-18.
+  - **18a-18, the rest through the open rim.** (a) Rain Drip on a standing plate with oil
+    still lays its colour's whole weight directly (κ is the lift over the tilt's weight;
+    a standing plate's oil is 27f-6), so a standing oil look's colour can still leave over
+    the bottom rim. (b) 18a-16's gust noise χ is a new noise, not the Hodge projection of a
+    draught's stress onto closed flows through the same Ψ solve. (c) 15e-12, a heavy
+    bottle's weight (`liquidDrive`), the same fix. (d) Past LIFT_MOST (256) Ψ's grid is
+    coarser than the solver's, so on a 384 or 512 plate Rain Drip's finest fingers are
+    laid at 256 (27f-7's shortcut, now on every Rain Drip look). A Blow's breath is local
+    and stays open: its liquid comes back.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
