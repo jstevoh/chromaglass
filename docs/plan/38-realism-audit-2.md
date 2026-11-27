@@ -195,6 +195,11 @@ is in the project's files).
   roundness (perimeter² / 4π·area, or the spread of rim radius by angle) for each cell after
   classicdish's run at 192² and 384²; if it worsens with smaller cells and lifts at 384², use
   the isotropic nine-point Laplacian in the oil's chemical potential.
+  *Measured 2026-11-27 (lab, Classic's liquid, 192², 30 drops of radius 3–7 cells left 300
+  steps):* the Laplacian is not it. At rest every drop is round on the five-point stencil
+  (four-fold harmonic of the rim radius 0.002 at radius 3–4, a square is about 0.07), and the
+  nine-point read the same (0.003). So the squares come from the lay or the flow: look at
+  `classicCell`'s floors (38w-16, the same squares in the dye) first.
 - **38w-11. classicdish's size bar on the references' own measure** (S; Medium). The bar is a
   cell diameter, 5–15% of the frame's height, a proxy chosen after the owner's call for more
   detail; the stills were measured by the watch tool's form scale, a correlation length against
@@ -286,3 +291,20 @@ is in the project's files).
   colour made it four times worse (9,200 to 5,300). In the real dish a dye dissolved in oil
   moves with the oil, so the fix is to carry the oil's dye as its concentration times the
   oil's own flux, in the carry and in the Cahn–Hilliard flux alike, so no colour is stranded.
+  *Shipped 2026-11-27 (`npm run oilride`):* on a thin gap the dye is carried as its two
+  liquids' shares, the water's (dye less the oil's) with MC and the corner as before, the
+  oil's with the oil's own superbee and no corner (bodyWater, bodyAdvectSharp, bodyJoin).
+  Classic's liquid at 192² under Beat Squeeze kicks and Plate Rock, 300 steps: the oil's
+  share 5193.2 → 5164.9 before (0.54% to the water), 5193.1 → 5193.4 after. *Failed:* the
+  oil's colour riding Cahn–Hilliard's flux as well (each mixUpdate substep's face flux
+  M(μa − μb) times the colour's concentration in the oil, conservative): 5132.5, twice the
+  loss (and bodyPartition's own note records the same direction in its drift). CH in a
+  diffuse band is the profile restoring itself, not oil going anywhere, so the colour is
+  left to bodyPartition there.
+- **38w-32. The oil's colour rides the oil with air on the plate and on the old plate** (S–M;
+  Medium, after 38w-29). The split carry runs only on a thin gap with no air: the air's
+  carries (bodyAdvectSubAir, airLiquid) are built for the one MC limiter, and the old
+  plate's single carry (bodyAdvect, runPressed) still carries the oil's share with MC. Give
+  bodyAdvectSharp an Air variant and the pressed path the same split, and run oilride with
+  a bubble down and with Thin Gap off. Fusing bodyWater into the dye's first substep and
+  bodyJoin into its last would also save the two passes.

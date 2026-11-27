@@ -50,7 +50,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { holdApartPull, HOLD_APART_CELLS, AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { phaseCHPlan, phaseCapillaryPull } from './fluid/phase';
 import { heatViscPlan } from './fluid/heat';
@@ -169,6 +169,9 @@ export class WebGPUFluid extends FluidCover {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      // The ouzo's phase change and its cloud for the plate (PLAN 48s), behind the show as the species' are.
+      ['ouzoCloud', [RGBA32], false],
+      ['ouzoView', [RGBA32], false],
       // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
       ['inkSpecies', [RGBA32], false],
       // The layered seed's oil share (38w-15, `layShare`): waited for when oil waits (Lava Pop).
@@ -189,6 +192,8 @@ export class WebGPUFluid extends FluidCover {
       ['bodyUnspread', [dye], open.oilBodies],
       ['bodyLand', [dye], open.oilBodies],
       ['bodyLay', [dye], open.oilBodies],
+      ['bodyWater', [dye], open.oilBodies && open.thinGap],
+      ['bodyJoin', [dye], open.oilBodies && open.thinGap],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -276,6 +281,8 @@ export class WebGPUFluid extends FluidCover {
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
       // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
+      // The oil's colour carried as the oil is (PLAN 38w-29, the advect dye stage), from the open where the look keeps its bodies.
+      add(`bodyAdvectSharpSub:${dye}`, kernel('bodyAdvectSharpSub', dye), open.oilBodies);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's lift up a rocked plate (PLAN 27f-5): waited for where a look's own oil opens on one (Opening.oilLift), else behind the show.
@@ -379,7 +386,11 @@ export class WebGPUFluid extends FluidCover {
     const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
     const thin = this.thinGapOn(p);
     f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
-    f[6] = fin(p.turbScale, 0); f[7] = 0; f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
+    f[6] = fin(p.turbScale, 0); f[9] = thin ? 1 : 0;
+    // Hold Apart (PLAN 18d-6, constants.ts): the stress's coefficient and cap for the step; 0 at the dial's 0.
+    const holdSeconds = fin(p.magnetSeconds, 1 / 60) / Math.max(fin(disp, 0), 1e-7);
+    f[8] = holdApartPull(fin(p.holdApart, 0), thin ? this.coverH2 : 1, holdSeconds, this.L);
+    f[7] = HOLD_APART_CELLS / Math.max(fin(disp, 0) * this.N, 1e-9);
     f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = dripOf(p); f[13] = fin(p.air, 0);
     f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
@@ -906,7 +917,7 @@ export class WebGPUFluid extends FluidCover {
       */
       stage('current', (pass) => this.stepCurrent(pass));
       stage('forces', (pass) => {
-        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('current grid thin', [1, this.M, 0, swirlScale]));
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read, this.holdSoftStep(pass, p)], this.arg('current grid thin', [1, this.M, 0, swirlScale]));
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
@@ -948,7 +959,7 @@ export class WebGPUFluid extends FluidCover {
       stage('forces', (pass) => {
         // The gap rides along: the plate's depth is a mobility on the flow that
         // carries the dye (F), fused into forcesB for velForced.
-        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read],
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read, this.holdSoftStep(pass, p)],
           this.arg('add current', [0, this.M, p.depthDrag, swirlScale]));
         this.vel.swap();
       });
@@ -1096,6 +1107,7 @@ export class WebGPUFluid extends FluidCover {
         speciesCarried = !!rider;
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
       if (!bodiesOn) { 
@@ -1127,11 +1139,22 @@ export class WebGPUFluid extends FluidCover {
       }
       if (thin) {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
+        /*
+          The oil's colour is carried as the oil is (PLAN 38w-29): the dye
+          split into the water's share and the oil's, each through the faces
+          with its own liquid's limiter, then joined (bodyAdvectSharp says
+          why). Not yet while there is air: the air's carries are built for
+          the one limiter (PLAN 38w-32).
+        */
+        const split = !thinAt && !!this.pipeline('bodyWater', od.read.format) && !!this.pipeline('bodyJoin', od.read.format);
+        if (split) { this.run(pass, 'bodyWater', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
-        this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv, undefined, thinAt);
+        this.carrySubsteps(pass, split ? 'bodyAdvectSharp' : 'bodyAdvect', od, thinAdv, undefined, split ? undefined : thinAt);
+        if (split) { this.run(pass, 'bodyJoin', this.dye.write, [this.dye.read, od.read], none); this.dye.swap(); }
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
         if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);

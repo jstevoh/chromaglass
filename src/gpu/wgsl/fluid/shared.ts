@@ -21,8 +21,8 @@ struct Sim {
   disp: f32,           // velocity → uv displacement for advection
   visc: f32,
   turbScale: f32,
-  free7: f32,          // was the music's eddies (PLAN 38u-5); the slot is kept so every offset after it stands
-  tension: f32,
+  holdCap: f32,        // the most Hold Apart may add in a step (HOLD_APART_CELLS in this unit, PLAN 18d-6); the music's eddies had the slot (PLAN 38u-5)
+  tension: f32,        // Hold Apart's stress coefficient for the step (holdApartPull), 0 where dyes mix as dyes do
   thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
   vibF: f32,

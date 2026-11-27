@@ -103,6 +103,16 @@ export interface LiquidBehaviour {
    * scattering is PLAN 18j.
    */
   scatter?: number;
+  /**
+   * How much of the bottle is ethanol, and how much is anise oil dissolved
+   * in it, each a volume fraction of the bottle (PLAN 48s). The solver
+   * carries both where the bottle is poured, and wherever water has thinned
+   * the ethanol past what holds the oil, the oil comes out as a white cloud
+   * of micron droplets: the ouzo effect (lib/ouzo.ts has the measured curve).
+   * Ethanol alone clouds nothing, and poured on a cloud dissolves it.
+   */
+  ethanol?: number;
+  anise?: number;
 }
 
 export interface LiquidType {
@@ -676,7 +686,20 @@ export interface VisualizerSettings {
   glassSmear: number;
   rainDrip: number;
   viscosity: ViscosityMode;
-  polarity: number; // Repulsion between blobs
+  /*
+    Hold Apart (PLAN 18d-6), 0 to 1: how hard two waters that differ only in
+    their dye hold apart. 0 is real and every look's default: two dyes in the
+    same water are one liquid with no edge to carry a tension, and they mix
+    as dyes do (the dye's own diffusion, the flow's folding, the light taken
+    out band by band). Past 0 the dial scales the stress a steep change of
+    composition does carry (Korteweg's; gpu/fluid/constants.ts has the law
+    and the numbers), up to a cooking oil's tension against water across a
+    unit step of dye at 1: pools round, filaments draw back, colours keep to
+    bodies. It replaces Polarity and Blob Surface Tension, the two dials
+    whose product sized a push between unlike colours; a saved look that
+    still carries either reads as 0 here.
+  */
+  holdApart: number;
   
   /*
     Heat Slide.
@@ -705,13 +728,17 @@ export interface VisualizerSettings {
     as v^3.4, colour temperature as v^0.42. A shutter is its vane, 0 open to
     1 shut, walked there in 80 ms. The crossfade is A at 0, B at 1, linear in
     light; it fades only with Two Projectors on a back plate. Defaults are
-    today's picture.
+    today's picture. Each focus is its head's rack (PLAN 51b,
+    lib/projectorFocus.ts), -1 to 1, 0 sharp: the first half either way the
+    rack's real travel, past it a ramp to a melt.
   */
   projLampA?: number;
   projLampB?: number;
   projShutterA?: number;
   projShutterB?: number;
   projCross?: number;
+  projFocusA?: number;
+  projFocusB?: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -832,7 +859,6 @@ export interface VisualizerSettings {
   // Light Show Look (rendering)
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
-  blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
   boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and now only shades that step in the closeup (18e-7)
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
@@ -1230,7 +1256,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   glassSmear: 0,
   rainDrip: 0.0,
   viscosity: 'thick',
-  polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
+  holdApart: 0,             // real: two dyes in one water mix (PLAN 18d-6)
   evaporationRate: 0.003,   // very slow evaporation — colors persist
   airVelocity: 0.0,
   vibrationFrequency: 0.0,
@@ -1243,6 +1269,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   projShutterA: 0,
   projShutterB: 0,
   projCross: 0.5,
+  projFocusA: 0,
+  projFocusB: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second
@@ -1302,7 +1330,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
-  blobSurfaceTension: 0.3,  // colours hold apart loosely
   boundaryContrast: 0.45,   // the optical path's contrast; no line between two dyes (18e-5)
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour

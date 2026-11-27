@@ -15,6 +15,7 @@ import { GRID_FILTER_KERNELS } from './fluid/gridFilter';
 import { REACTION_KERNELS } from './fluid/reactions';
 import { FIELD_KERNELS } from './fluid/fields';
 import { SEAL_KERNELS } from './fluid/seal';
+import { OUZO_KERNELS } from './fluid/ouzo';
 import { HEAD, NOISE_WGSL, PACKED, THIN_FACE, W } from './fluid/shared';
 import { thinGapKernels } from './thinGap';
 import { filmKernels } from './film';
@@ -43,6 +44,8 @@ export const KERNELS: Record<string, string> = {
   ...FIELD_KERNELS,
   // A standing plate's weight inside a sealed bottle (PLAN 27f-9): see wgsl/fluid/seal.ts.
   ...SEAL_KERNELS,
+  // Anise oil out of solution where its alcohol is watered down (PLAN 48s): see wgsl/fluid/ouzo.ts.
+  ...OUZO_KERNELS,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
   // A clear film that tears (PLAN §20b): see wgsl/film.ts.
@@ -463,6 +466,49 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`;
 KERNELS.bodyAdvectPairSubAir = airLiquid(KERNELS.bodyAdvectPairSub, 'bodyAdvectPairSubAir', 'A.a.x * sub[0]');
 KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
+/*
+  The oil's colour carried as the oil is (PLAN 38w-29): bodyAdvect with the
+  oil's own limiter, superbee (mixAdvect's for the oil, and why), and none of
+  the corner's transverse share, which the oil's carry does not take.
+
+  What was reported: Classic's colours washed out under a hand (the owner,
+  round five, 2026-11-22: Beat Squeeze 0.6, Plate Rock 1.6); the oil's own
+  colour fell 10,070 to 9,250 in 41 s on the live app. With Oil Bodies the
+  plate's dye holds both liquids' colours and the oil carries its share of it
+  beside; bodyPartition reads the water's share as the dye less the oil's,
+  never less than none. Both were carried with van Leer's MC and the corner's
+  share while the oil itself is carried with superbee and none, so the oil's
+  edge and its colour's edge parted a little every substep, and where the
+  colour ran ahead of its oil or lagged it bodyPartition handed it to the
+  water. Carrying the oil's share with superbee alone (tried in PR #946) made
+  it four times worse, and that is why: the oil's share then went where the
+  oil went, but the dye still carried the oil's colour inside it the MC way,
+  so the two disagreed by more, and the share was clipped to the dye.
+
+  So the dye is carried as its two liquids: the water's share (bodyWater,
+  the dye less the oil's) the way the water's colour is, MC with the corner,
+  and the oil's share the way the oil is, then the two joined (bodyJoin).
+  Measured with `npm run oilride` (Classic's liquid at 192², the hand
+  above as Beat Squeeze kicks at 120 bpm and Plate Rock tipping round, 300
+  steps): the oil's share went 5193.2 to 5164.9 before (0.54% handed to the
+  water, about 4% over the owner's 41 s), 5193.1 to 5193.4 with this; of it,
+  inside the oil, 98.8% kept against 99.3%. Moving the oil's colour with the
+  oil's Cahn–Hilliard flux as well was tried and measured worse (5132.5,
+  1.17% lost): PLAN 38w-29 keeps the reasons. Two passes a step more, both a
+  load or two a cell; the oil's share's carry is the one it always ran.
+*/
+const MC_SLOPE = `fn mm(a: vec4f, b: vec4f) -> vec4f {
+  let l = min(min(2.0 * abs(a), 2.0 * abs(b)), 0.5 * abs(a + b));
+  return select(vec4f(0.0), sign(a) * l, a * b > vec4f(0.0));
+}`;
+if (KERNELS.bodyAdvect.split(MC_SLOPE).length !== 2) throw new Error('bodyAdvect cannot take the oil\'s limiter: its slope moved');
+KERNELS.bodyAdvectSharp = KERNELS.bodyAdvect.replace(MC_SLOPE, `fn sb1(a: f32, b: f32) -> f32 {
+  if (a * b <= 0.0) { return 0.0; }
+  return sign(a) * max(min(2.0 * abs(a), abs(b)), min(abs(a), 2.0 * abs(b)));
+}
+fn mm(a: vec4f, b: vec4f) -> vec4f { return vec4f(sb1(a.x, b.x), sb1(a.y, b.y), sb1(a.z, b.z), sb1(a.w, b.w)); }`);
+KERNELS.bodyAdvectSharpSub = thinFaced(substepped('bodyAdvectSharp'), 'bodyAdvectSharpSub');
+
 KERNELS.bodyAdvectThin = cornered(thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin'), 'bodyAdvectThin');
 KERNELS.bodyAdvectThinAir = airLiquid(KERNELS.bodyAdvectThin, 'bodyAdvectThinAir', 'A.a.x');
 

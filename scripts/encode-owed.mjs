@@ -143,7 +143,7 @@ export async function owedLines(page, check) {
     const air = window.__air;
     // The plate as encode left it, never given a bubble: its air, over four thin steps.
     air.passes = 0; air.on = true;
-    await lab.step(4, { thinGap: 1, immiscibility: 0.5 });
+    await lab.step(4, { thinGap: 1, holdApart: 0.5 });
     air.on = false;
     const bare = { passes: air.passes / 4, live: air.live.size };
     // The open plate's step by kernel, four of them, each carry told by whether it binds the velocity's own pair.
@@ -171,7 +171,7 @@ export async function owedLines(page, check) {
       };
       proto.dispatchWorkgroupsIndirect = function (...a) { if (counts.on && ofLiquids(this)) liq++; return indirect.apply(this, a); };
       counts.dispatches = 0; counts.indirect = 0; counts.by = {}; counts.on = true;
-      try { await lab.step(4, { thinGap: thin ? 1 : 0, immiscibility: 0.5 }); } finally { counts.on = false; proto.dispatchWorkgroups = dispatch; proto.dispatchWorkgroupsIndirect = indirect; }
+      try { await lab.step(4, { thinGap: thin ? 1 : 0, holdApart: 0.5 }); } finally { counts.on = false; proto.dispatchWorkgroups = dispatch; proto.dispatchWorkgroupsIndirect = indirect; }
       for (const f of Object.values(tagged)) for (const k of Object.keys(f)) f[k] /= 4;
       return { dispatches: (counts.dispatches + counts.indirect) / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])), tagged, liq: liq / 4 };
     };
@@ -181,11 +181,11 @@ export async function owedLines(page, check) {
     // The control: one bubble on the same plate, stamped on each step.
     s.setBubbles(new Float32Array([0.5, 0.5, 0.06, 1]), 1, 0.05, new Float32Array(4));
     air.passes = 0; air.on = true;
-    await lab.step(4, { thinGap: 1, immiscibility: 0.5 });
+    await lab.step(4, { thinGap: 1, holdApart: 0.5 });
     air.on = false;
     const bubble = { passes: air.passes / 4, live: air.live.size };
     s.setBubbles(new Float32Array(4), 0, 0.05);
-    await lab.step(2, { thinGap: 1, immiscibility: 0.5 });
+    await lab.step(2, { thinGap: 1, holdApart: 0.5 });
     // Last, because it leaves a liquid on the plate: the same steps once one drop of a liquid is poured,
     // the thin gap's beside the open plate's (every look opens thin), then a clear and a second pour.
     const thinBare = await countStep(true);

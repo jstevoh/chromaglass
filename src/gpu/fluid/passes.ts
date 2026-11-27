@@ -5,14 +5,14 @@
  * the solver's class chain; the map is at the top of `gpu/fluid.ts`.
  */
 
-import { PingPong, bindGroup } from '../kit';
+import { FIELD_USAGE, PingPong, bindGroup } from '../kit';
 import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST, HOLD_APART_FINE, HOLD_APART_WIDER } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -607,6 +607,45 @@ export class FluidPasses extends FluidFields {
     if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
     this.run(pass, 'speciesSplat', sp.write, [sp.read, this.squeeze.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
+    if (this.solventLive && this.solvent) this.stepOuzo(pass, this.solvent);
+  }
+
+  /**
+   * The ouzo's solvent carried with the colour (PLAN 48s), beside the
+   * chemistry's carry and by the same call: the colour's arguments and, while
+   * there is air, the air's, so the ethanol and the oil cross the same faces
+   * in the same substeps as the dye and the species they were poured with,
+   * and leave a bubble's hole as those do. Nothing with no ouzo on the plate.
+   */
+  protected carrySolvent(pass: GPUComputePassEncoder, args: GPUBuffer, argsAt?: GPUBuffer[]): void {
+    if (!this.solventLive || !this.solvent) return;
+    this.carrySubsteps(pass, 'bodyAdvect', this.solvent, args, undefined, argsAt);
+    this.solventCarried = true;
+  }
+  private solventCarried = false;
+
+  /**
+   * The ouzo's stage (PLAN 48s; lib/ouzo.ts, wgsl/fluid/ouzo.ts), after the
+   * species' and only while there is anise oil on the plate. Where the colour
+   * was carried some other way and the species alone (the maze's sixths),
+   * the solvent is carried here as the species just was; then the phase
+   * change and the rim in one pass (`ouzoCloud`), then the droplets'
+   * scattering onto the species for the plate.
+   */
+  private stepOuzo(pass: GPUComputePassEncoder, v: PingPong): void {
+    if (!this.solventCarried) this.carrySubsteps(pass, 'bodyAdvect', v, this.arg('solvent advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
+    this.solventCarried = false;
+    this.run(pass, 'ouzoCloud', v.write, [v.read, this.squeeze.read], this.arg('none', [0, 0, 0, 0]));
+    v.swap();
+    this.writeCloudView(pass);
+  }
+
+  /** The species with the droplets' scattering added (`ouzoView`), for the plate: after a step, and after an Undo has put both fields back. */
+  protected writeCloudView(pass: GPUComputePassEncoder): void {
+    if (!this.species || !this.solvent) return;
+    this.cloudView ??= this.disposer.track(this.device.createTexture({ label: 'cloud view', size: [this.N, this.N], format: 'rgba32float', usage: FIELD_USAGE }));
+    this.run(pass, 'ouzoView', this.cloudView, [this.species.read, this.solvent.read], this.arg('none', [0, 0, 0, 0]));
+    this.cloudFresh = true;
   }
 
   /** The heat carried with the liquid on a thin gap (PLAN 38f): h·T and h, made on the first thin step. */
@@ -928,7 +967,7 @@ export class FluidPasses extends FluidFields {
    * indirectly so one this step does not need runs no workgroups. The field
    * ends swapped once, as a single carry leaves it.
    */
-  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
+  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'bodyAdvectSharp' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
     // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
     const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
     /*
@@ -1273,6 +1312,26 @@ export class FluidPasses extends FluidFields {
    * cell with both above zero computes `(dye - od) + od` in float32, which is
    * not bit-identical to `dye` across different exponents.
    */
+  /**
+   * Hold Apart's stress for this step's forcesB (PLAN 18d-6): the dye blurred onto the stress's own grid (four passes
+   * of holdSoft, along x and y a cell apart and again `HOLD_APART_WIDER` apart, between the two textures) and the
+   * stress's divergence taken there, while the dial is up. With the dial at 0 the dye itself, which fills the binding
+   * and is not read (S.tension is 0 there).
+   */
+  protected holdSoftStep(pass: GPUComputePassEncoder, p: GpuStepParams): GPUTexture {
+    if (!((p.holdApart ?? 0) > 0)) return this.dye.read;
+    this.ensureHoldApart();
+    const m = this.L * HOLD_APART_FINE;
+    const w = HOLD_APART_WIDER;
+    this.run(pass, 'holdSoft', this.holdForce!, [this.dye.read], this.arg('hold x', [1, 0, 0, 0]), m);
+    this.run(pass, 'holdSoft', this.holdSoft!, [this.holdForce!], this.arg('hold y', [0, 1, 0, 0]), m);
+    this.run(pass, 'holdSoft', this.holdForce!, [this.holdSoft!], this.arg('hold wide x', [w, 0, 0, 0]), m);
+    this.run(pass, 'holdSoft', this.holdSoft!, [this.holdForce!], this.arg('hold wide y', [0, w, 0, 0]), m);
+    // A.a.x: how far from the open rim the stress starts, in these cells: the blur's reach (2 + 2w), the two differences' (2) and one over.
+    this.run(pass, 'holdStress', this.holdForce!, [this.holdSoft!], this.arg('hold stress', [5 + 2 * w, 0, 0, 0]), m);
+    return this.holdForce!;
+  }
+
   protected disperseWanted(dm: number, kappaT: number, dispCells: number, bodies: boolean): boolean {
     return bodies || dm > 0 || (kappaT > 0 && dispCells > 0);
   }
