@@ -141,8 +141,15 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
       </ProMakerUpsell>
 
       <div className="flex flex-wrap gap-2 mb-3">
+        {/*
+          aria-expanded: the button opens the draft editor below it, a part of
+          the panel that is closed until pressed. Saying so tells a screen
+          reader there is more, and is how `npm run readable` finds the draft
+          to measure its type (PLAN 49i-guard-2), as it finds every other
+          closed part of a panel, without a list of them kept by hand.
+        */}
         {canMake && (
-          <button type="button" onClick={() => startFrom()} data-testid="liquid-design"
+          <button type="button" onClick={() => startFrom()} data-testid="liquid-design" aria-expanded={!!draft}
             className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
             <Plus size={12} /> Design a liquid
           </button>
