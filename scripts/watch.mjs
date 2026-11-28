@@ -163,6 +163,49 @@ function findYtDlp() {
   return null;
 }
 
+/**
+ * The sound encoder the self-tests' clips are made with, as ffmpeg arguments
+ * (47x-6). libvorbis first, which every clip was made and measured with
+ * until now; then libopus, what Chrome's MediaRecorder itself writes into a
+ * WebM, and what Homebrew's default ffmpeg has when it has no libvorbis (the
+ * owner's Mac, 2026-11-22: the self-test could not make one clip). Null when
+ * the build has neither, and the caller says so with the version it found.
+ */
+function clipAudio(ffPath) {
+  const r = spawnSync(ffPath, ['-hide_banner', '-encoders'], { encoding: 'utf8' });
+  const has = name => new RegExp(`^\\s*A\\S*\\s+${name}\\s`, 'm').test(r.stdout ?? '');
+  for (const enc of ['libvorbis', 'libopus']) if (has(enc)) return ['-c:a', enc];
+  return null;
+}
+
+/**
+ * Add one pixel to the 4×4×4 colour histogram the cut test compares (47x-6),
+ * shared between the bins either side of it on each channel by how near it
+ * is to each bin's middle (32, 96, 160, 224), as a linear interpolation
+ * does. Counted whole into one bin, as it was, a picture whose colours move
+ * smoothly moves its pixels between bins in jumps: the self-test's clip D
+ * crossfades red to magenta over three seconds, and the sample in which its
+ * blue channel crossed 128 moved a third of the picture from one bin to the
+ * next at once, a change of 0.31 against 0.03 around it, and read as a hard
+ * cut on some builds; on others the crossing fell across two samples, 0.20
+ * and 0.22, under the bar, and it passed. Shared, a colour moving by a
+ * little moves its weight by a little (the crossfade's largest change is now
+ * 0.05, the bar 0.25), and a cut still moves it all.
+ */
+function softBin(hist, r, g, b) {
+  const at = v => { const p = Math.max(0, Math.min(3, (v - 32) / 64)), lo = Math.min(2, Math.floor(p)); return [lo, p - lo]; };
+  const [r0, rf] = at(r), [g0, gf] = at(g), [b0, bf] = at(b);
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) {
+    const w = (i ? rf : 1 - rf) * (j ? gf : 1 - gf) * (k ? bf : 1 - bf);
+    if (w) hist[(r0 + i) * 16 + (g0 + j) * 4 + b0 + k] += w;
+  }
+}
+
+/** The first line of `ffmpeg -version`, for a self-test to say which build it ran on. */
+function ffmpegVersion(ffPath) {
+  return (spawnSync(ffPath, ['-version'], { encoding: 'utf8' }).stdout ?? '').split('\n')[0].trim() || 'unknown ffmpeg';
+}
+
 const INSTALL = 'Install: `brew install ffmpeg yt-dlp` on a Mac; in a cloud session `python3 -m pip install yt-dlp imageio-ffmpeg`.';
 
 let FF_ = null;
@@ -358,17 +401,64 @@ function decode(vf, onFrame, extraArgs = []) {
   });
 }
 
-/** Mono 8 kHz samples, for loudness. */
+/**
+ * The clock every read counts on: zero at the picture's first frame, and
+ * sample k the frame on screen k / rate after it (47x-6).
+ *
+ * What was reported: the self-test's A and B (sound against motion) and D
+ * (one composition change in a crossfade) failed on the owner's Mac with
+ * ffmpeg-full 9.0.2, and with Homebrew's default ffmpeg, which has no
+ * libvorbis, the self-test could not make its clips. Reproduced 2026-11-28 on
+ * Ubuntu's ffmpeg 6.1 by making the same clips with libopus: the same three
+ * failed. The encoder did not change the clips; it changed where the
+ * container puts their first frame. With libvorbis the picture starts 32 ms
+ * into the file (the decoder drops Vorbis's first block, and the muxer moves
+ * the picture to match), with libopus 7 ms, and ffmpeg's fps filter, left to
+ * its default (round=near, from the file's zero), gave sample k the last
+ * frame within half a sample of k / rate: frame 3k on the Vorbis clips and
+ * 3k + 1, a thirtieth of a second later, on the Opus ones. The sound for
+ * sample k was read from the stream's first decoded sample, wherever that
+ * lay. So the picture and the sound were each a few milliseconds off on
+ * their own count, and which frame a sample took hung on those few
+ * milliseconds: one frame later moved the motion against the sound by a
+ * third of a sample, and the best lag to the next sample.
+ *
+ * setpts=PTS-STARTPTS makes the first frame zero, so a frame made for time
+ * t is at t whatever the muxer did, and round=up takes for sample k the last
+ * frame at or before k / rate, what a player shows then (a 30 fps film at
+ * ten samples a second: frame 3k exactly). The sound is put on the same
+ * clock in decodeAudio, from `pictureStart`.
+ */
+const sampleAt = rate => `setpts=PTS-STARTPTS,fps=${rate}:round=up`;
+
+/**
+ * Where the picture's first frame sits on the file's clock, in seconds
+ * (after the seek, as the reads decode it), for decodeAudio to start the
+ * sound there. 0 when it cannot be read.
+ */
+function pictureStart() {
+  const r = spawnSync(ff(), ['-hide_banner', '-nostats', ...seekArgs(), '-an', '-vf', 'showinfo', '-frames:v', '1', '-f', 'null', '-'], { encoding: 'utf8' });
+  const m = /pts_time:\s*(-?[\d.]+)/.exec(r.stderr ?? '');
+  return m ? Math.max(0, +m[1]) : 0;
+}
+
+/**
+ * Mono 8 kHz samples, for loudness, on the picture's clock (sampleAt):
+ * aresample's first_pts=0 pads or trims the sound so its first sample is at
+ * the file's zero (the first decoded sample was taken as zero wherever it
+ * lay, and a sound starting 0.2 s into a file read 0.2 s early), then the
+ * part before the picture's first frame is dropped.
+ */
 function decodeAudio() {
   return new Promise((resolve, reject) => {
-    const p = spawn(ff(), ['-hide_banner', '-nostats', '-loglevel', 'error', ...seekArgs(), '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1']);
+    const p = spawn(ff(), ['-hide_banner', '-nostats', '-loglevel', 'error', ...seekArgs(), '-vn', '-ac', '1', '-af', 'aresample=8000:first_pts=0', '-ar', '8000', '-f', 's16le', 'pipe:1']);
     const chunks = []; let err = '';
     p.stdout.on('data', d => chunks.push(d));
     p.stderr.on('data', d => (err += d));
     p.on('close', code => {
       if (code !== 0) return reject(new Error(err));
-      const b = Buffer.concat(chunks);
-      resolve(new Int16Array(b.buffer, b.byteOffset, b.length >> 1));
+      const b = Buffer.concat(chunks), all = new Int16Array(b.buffer, b.byteOffset, b.length >> 1);
+      resolve(all.subarray(Math.min(all.length, Math.round(pictureStart() * 8000))));
     });
   });
 }
@@ -459,7 +549,7 @@ async function watch() {
   const c = opt.crop ?? (autocrop ? { x: autocrop.x, y: autocrop.y, w: autocrop.w, h: autocrop.h } : null);
   const pre = c ? `crop=trunc(iw*${c.w}/2)*2:trunc(ih*${c.h}/2)*2:trunc(iw*${c.x}):trunc(ih*${c.y}),` : '';
   const sampled = [];
-  const { n, w, h } = await decode(`${pre}fps=${rate},scale=${aw}:-2:flags=area`, (px) => { sampled.push(Buffer.from(px)); });
+  const { n, w, h } = await decode(`${pre}${sampleAt(rate)},scale=${aw}:-2:flags=area`, (px) => { sampled.push(Buffer.from(px)); });
   if (!n) fail('decoded no frames');
   const span = n / rate;
 
@@ -496,7 +586,7 @@ async function watch() {
       if (Y < 0.1) dark++;
       if (Y > 0.92) bright++;
       if (prev) diff += Math.abs(Y - prev[p]);
-      hist[(px[i] >> 6) * 16 + (px[i + 1] >> 6) * 4 + (px[i + 2] >> 6)]++;
+      softBin(hist, px[i], px[i + 1], px[i + 2]);
       let H0 = -1;
       if (S > 0.25) {
         H0 = mx === r ? ((g - b) / (mx - mn)) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4;
@@ -611,7 +701,7 @@ async function watch() {
   const tw = best.tw - (best.tw % 2), th = Math.round(tw / aspect / 2) * 2;
   const tiles = [];
   const sel = picks.map(k => `eq(n,${k})`).join('+');
-  await decode(`${pre}fps=${rate},select='${sel}',scale=${tw}:${th}:flags=lanczos`, (px, i, W, H) => tiles.push({ k: picks[i], px: Buffer.from(px), W, H }));
+  await decode(`${pre}${sampleAt(rate)},select='${sel}',scale=${tw}:${th}:flags=lanczos`, (px, i, W, H) => tiles.push({ k: picks[i], px: Buffer.from(px), W, H }));
   const sheets = [];
   for (let s = 0; s * per < tiles.length; s++) {
     const group = tiles.slice(s * per, (s + 1) * per);
@@ -1022,6 +1112,9 @@ const SW_ = 320, SH_ = 180, SFPS = 30;
  * WebM through a pipe, the way MediaRecorder writes it, so the file has no
  * duration and no cues: the case the app's own recordings are.
  */
+let CLIP_AUDIO_ = null;
+const clipAudioArgs = () => (CLIP_AUDIO_ ??= clipAudio(ff()) ?? fail(`the self-test makes its clips with libvpx and libvorbis or libopus, and ${ffmpegVersion(ff())} has neither sound encoder. ${INSTALL}`, 2));
+
 async function makeClip(dir, name, { sec, frame, sound, delay = 0 }) {
   const wav = Buffer.alloc(44 + sec * 8000 * 2);
   wav.write('RIFF', 0); wav.writeUInt32LE(36 + sec * 16000, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16);
@@ -1031,7 +1124,7 @@ async function makeClip(dir, name, { sec, frame, sound, delay = 0 }) {
   const wavPath = path.join(dir, `${name}.wav`), clip = path.join(dir, `${name}.webm`);
   fs.writeFileSync(wavPath, wav);
   const p = spawn(ff(), ['-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${SW_}x${SH_}`, '-r', String(SFPS), '-i', 'pipe:0',
-    '-i', wavPath, '-c:v', 'libvpx', '-b:v', '2M', '-c:a', 'libvorbis', '-shortest', '-f', 'webm', 'pipe:1'], { stdio: ['pipe', 'pipe', 'inherit'] });
+    '-i', wavPath, '-c:v', 'libvpx', '-b:v', '2M', ...clipAudioArgs(), '-shortest', '-f', 'webm', 'pipe:1'], { stdio: ['pipe', 'pipe', 'inherit'] });
   const file = fs.createWriteStream(clip);
   p.stdout.pipe(file);
   const done = Promise.all([
@@ -1463,7 +1556,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch, fetchElsewhere, writePng, label };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, clipAudio, ffmpegVersion, pickSource, ffmpegLocation, fetchArgs, macFetch, fetchElsewhere, writePng, label };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where

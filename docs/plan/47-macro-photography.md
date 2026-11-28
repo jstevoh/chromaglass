@@ -440,23 +440,16 @@ Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
 an unsteady measure says "may vary from take to take", and every word names its source.
 
-- **47x-6** the watch selftest's A, B (sound against motion lag) and D (one composition change
-  in the crossfade) fail on a Mac's ffmpeg-full 9.0.2, on main as well as this branch, and the
-  Homebrew default ffmpeg has no libvorbis, so the selftest cannot make its clips at all. Find
-  whether the encoder or the reads moved, and say in the selftest which ffmpeg it needs.
+- **47x-6b** run `npm run watch -- --selftest`, `npm run watchwords` and `npm run watchcard` on the
+  owner's Mac with ffmpeg-full 9.0.2 and with Homebrew's default ffmpeg, to confirm 47x-6 there.
 - **47x-9** the overall read against itself. Swells, rests and the peak's place come from one
   take of a moving fluid: run two takes of one look through it and find which of its sentences
   hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
   check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
-- **47x-11** two takes of one look still read as changed on Ubuntu. On main's deploy of
-  2026-11-22 (f825ee6b, Measure sound, after 47x-10 shipped) "drift → drift2 (the same look,
-  another phase): no steady change past a step" failed with show/turnover and show/own flow
-  speed each 1.3 steps apart between the two takes. #936 merged without that shard running,
-  so this is its first Ubuntu read. Find which of the two measures the phase moves (the
-  turnover's window against the stripes' period, as 47x-10 found for the flow), fix the read,
-  not the bar. Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the
-  check now closes on the "n/m checks passed" tally a quarantine counts against, where its old
-  "watchwords: 1 of 58 FAIL" line read as a second FAIL and no quarantine could match.
+- **47x-17** own flow speed on a rigid slide is the read's own floor, 0.11 to 0.16 % of the width a
+  second across phases of one drift, so a ratio between two takes of a picture that only slides
+  can still reach most of a step (0.87 at worst of eight). Take the floor out of it as carried
+  does (47v-5), or let the words compare a show measure under its floor as held.
 - **47x-15** refit the card's bands from the owner's ratings once there are enough.
 - **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
   references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
@@ -615,9 +608,6 @@ makers, video QA). It reads look and motion, not content. Its public name is **r
 under the MIT licence (the owner, 2026-11-28). Five pieces, one PR each, in this
 order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-plan.md`.
 
-- **47p-2** the self-test green on a stock ffmpeg: 47x-6 (A, B, D fail on ffmpeg-full 9.0.2, the
-  Homebrew default has no libvorbis) and 47x-11 (two takes of one look read as changed on
-  Ubuntu, quarantined to 12-06). The root cause, not the bar.
 - **47p-3** general mode by default: the physics read, the liquid-calibrated report card
   (`REAL_SHOW_CARDS`), "Settings to try" and the wet show's words only for liquid footage or a
   `--liquid` flag; otherwise a general read in general words, with a check that non-liquid

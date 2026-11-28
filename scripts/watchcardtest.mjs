@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { watchVideo, findFfmpeg } from './watch.mjs';
+import { watchVideo, findFfmpeg, clipAudio, ffmpegVersion } from './watch.mjs';
 import { reportCard, REAL_SHOW_CARDS } from './watchcard.mjs';
 import { MEASURE_SETTINGS } from './watchsettings.mjs';
 
@@ -41,6 +41,9 @@ if (!ff) {
   console.error('ffmpeg not found (set FFMPEG=...)');
   process.exit(2);
 }
+// libvorbis or libopus, whichever the build has (47x-6, clipAudio in watch.mjs).
+const AUDIO = clipAudio(ff);
+const audioArgs = () => AUDIO ?? (console.error(`${ffmpegVersion(ff)} has neither libvorbis nor libopus, so no clip with sound can be made`), process.exit(2));
 
 // 5x7 bitmap glyphs for crisp deterministic title cards and corner logos (no font deps).
 const FONT5X7 = {
@@ -106,7 +109,7 @@ async function encodeWebm(outPath, { sec, fps = FPS, bitrate = '2M', extraArgs =
     for (let i = 0; i < nAud; i++) wav.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round(sound(i / 8000)))), 44 + i * 2);
     wavPath = `${outPath}.wav`;
     fs.writeFileSync(wavPath, wav);
-    args.push('-i', wavPath, '-c:v', 'libvpx', '-b:v', bitrate, ...extraArgs, '-c:a', 'libvorbis', '-shortest', '-f', 'webm', outPath);
+    args.push('-i', wavPath, '-c:v', 'libvpx', '-b:v', bitrate, ...extraArgs, ...audioArgs(), '-shortest', '-f', 'webm', outPath);
   } else {
     args.push('-an', '-c:v', 'libvpx', '-b:v', bitrate, ...extraArgs, '-f', 'webm', outPath);
   }
