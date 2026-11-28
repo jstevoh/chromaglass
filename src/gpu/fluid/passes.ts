@@ -1232,6 +1232,11 @@ export class FluidPasses extends FluidFields {
     this.vel.swap();
   }
 
+  /** The stir's kernels, built behind the thin gap's own (prepareThinGap): a lab that awaits that build has them from its first step. */
+  protected async buildStir(): Promise<void> {
+    for (const name of STIR_KERNEL_NAMES) await this.pipelines.prepareCompute(this.pipelineKey(name, 'thin'), kernel(name, 'rgba16float'));
+  }
+
   /** Whether the stir's kernels are built, as sealReady asks for the seal's. */
   protected stirReady(): boolean {
     let ready = true;

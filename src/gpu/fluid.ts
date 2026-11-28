@@ -827,7 +827,7 @@ export class WebGPUFluid extends FluidCover {
       /*
         With no oil the colour's own weight (Plate Rock's, the comet's,
         Rain Drip's on a standing plate) goes through the same closed
-        circulation (PLAN 18a-17, 18a-25; hsBody says why): laid into the
+        circulation (18a-17, 18a-25; hsBody says why): laid into the
         open-rim solve, the heavy colour left over the downhill rim
         (\`npm run draught\`). hsBody adds Rain Drip's pull, down S.up, to
         the tilt's as one weight (A.b.w 2). With oil it is laid directly.
@@ -1716,6 +1716,7 @@ export class WebGPUFluid extends FluidCover {
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;
         for (const [key, code] of WebGPUFluid.driftBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
+        await this.buildStir();
       })();
     }
     return this.hsBuilding;

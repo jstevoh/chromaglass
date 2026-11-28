@@ -27,10 +27,12 @@
  *  2. And still stirs: the flow's rms in the middle of the dish (r < 0.3)
  *     within a quarter of the open curl's there (the control's, below), and
  *     the dye's picture moved against the still plate's.
- *  3. With no ring at the rim: the rms between r 0.38 and 0.47 under twice
- *     the middle's (a window on ψ, the obvious fix, made a jet there).
+ *  3. With no ring at the rim: the rms between r 0.38 and 0.49 over the
+ *     middle's no more than 1.5 times the open curl's same ratio (a window
+ *     on ψ, the obvious fix, made a jet there).
  *  4. The comet's pull 1.5 (cometX 2.25, with the draught on so the old
- *     code laid it too) keeps the dish's dye (at least 97%; 0.04% before).
+ *     code laid it too) keeps the dish's dye (at least 97%; 0.04% before),
+ *     and moves its colour along +x against the draught alone.
  *  5. And the comet alone still pulls: the colour's middle moves along +x,
  *     at least PULL of the plate further than the still plate's.
  *  6. The control: the same lab with both laid open again (forcesB's curl on
@@ -68,7 +70,7 @@ const check = (name, ok, detail = '') => {
 };
 const STEPS = 600;
 const DISC = Math.PI * 0.44 * 0.44 / 2 * 128 * 128;
-/** Turbulence 0.5 through lib/stir.ts stirOf, t(1 + 3t³). */
+/** Turbulence 0.5 through lib/stir.ts stirOf, t(1 + 3t³) (copied: this script runs on plain node; musicstir holds stirOf's own value). */
 const TURB = 0.5 * (1 + 3 * 0.5 ** 3);
 /** Comet Flow 1.5 at angle 0, as fluidSimulation hands it (× 1.5). */
 const COMET = 1.5 * 1.5;
@@ -86,17 +88,13 @@ const run = (page, over) => page.evaluate(async ({ over, steps }) => {
     return { s, cx: cx / s, f: f.filter((_, k) => k % 4 === 3) }; };
   const speed = async () => { const v = await lab.field('vel'); const n = Math.sqrt(v.length / 4); const q = [0, 0], c = [0, 0];
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const r = Math.sqrt(r2(i, j, n)), o = (i + j * n) * 4, k = r < 0.3 ? 0 : r > 0.38 && r < 0.47 ? 1 : -1;
+      const r = Math.sqrt(r2(i, j, n)), o = (i + j * n) * 4, k = r < 0.3 ? 0 : r > 0.38 && r < 0.49 ? 1 : -1;
       if (k >= 0) { q[k] += v[o] ** 2 + v[o + 1] ** 2; c[k]++; }
     }
     return { mid: Math.sqrt(q[0] / c[0]), ring: Math.sqrt(q[1] / c[1]) }; };
   const base = { thinGap: 1, dt: 0.05, advection: 0.7, ...over };
   const before = await dye();
-  /*
-    The flow read halfway: the stir's own kernels are built behind the first
-    steps (stirReady), as the app's are behind the show, and Φ then relaxes
-    from still over a few tens of steps; at 30 steps it read 0 here.
-  */
+  // The flow read halfway, when Φ has long relaxed from still (it is warm from step to step, wgsl/fluid/stir.ts).
   await lab.step(steps / 2, base);
   const sp = await speed();
   await lab.step(steps / 2, base);
@@ -104,12 +102,13 @@ const run = (page, over) => page.evaluate(async ({ over, steps }) => {
   return { before: before.s, kept: after.s / before.s, dx: after.cx - before.cx, thin: lab.thinLive(), ...sp, field: Array.from(after.f) };
 }, { over, steps: STEPS });
 
-let still, turb, comet, pull, openTurb, openComet;
+let still, turb, draught, comet, pull, openTurb, openComet;
 {
   const { page, close } = await openLab();
   try {
     still = await run(page, {});
     turb = await run(page, { turbScale: TURB, turbDetail: 4 });
+    draught = await run(page, { air: 0.35 });
     comet = await run(page, { air: 0.35, cometX: COMET });
     pull = await run(page, { cometX: COMET });
   } finally { await close(); }
@@ -123,20 +122,22 @@ let still, turb, comet, pull, openTurb, openComet;
 }
 {
   const pct = (x) => `${(100 * x).toFixed(2)}%`;
-  check('0. the lab ran the thin gap and laid the disc', turb.thin && still.thin && openTurb.thin && Math.abs(turb.before / DISC - 1) < 0.01,
-    `thin ${turb.thin}/${still.thin}/${openTurb.thin}; laid ${turb.before.toFixed(1)} against the disc's ${DISC.toFixed(1)}`);
+  const all = [still, turb, draught, comet, pull, openTurb, openComet];
+  check('0. every run ran the thin gap and laid the disc', all.every((r) => r.thin && Math.abs(r.before / DISC - 1) < 0.01),
+    `thin ${all.map((r) => r.thin).join('/')}; laid ${all.map((r) => r.before.toFixed(1)).join('/')} against the disc's ${DISC.toFixed(1)}`);
   check('1. Turbulence 0.5 keeps the dish\'s dye', turb.kept >= 0.97,
     `${pct(turb.kept)} left after ${STEPS} steps (bar 97%; laid open ${pct(openTurb.kept)}; still ${pct(still.kept)})`);
   let moved = 0, total = 0;
   for (let k = 0; k < turb.field.length; k++) { moved += Math.abs(turb.field[k] - still.field[k]); total += still.field[k]; }
-  check('2a. and still stirs the middle as hard as the open curl did', Math.abs(turb.mid / openTurb.mid - 1) <= 0.25,
-    `rms ${turb.mid.toExponential(2)} at r < 0.3 against the open curl's ${openTurb.mid.toExponential(2)}`);
+  check('2a. and still stirs the middle as hard as the open curl did', Math.abs(turb.mid / openTurb.mid - 1) <= 0.25 && turb.mid > 10 * still.mid,
+    `rms ${turb.mid.toExponential(2)} at r < 0.3 against the open curl's ${openTurb.mid.toExponential(2)} (still plate ${still.mid.toExponential(2)})`);
   check('2b. and the dye\'s picture moves with it', moved / total > 0.05,
     `${(100 * moved / total).toFixed(1)}% of the dye in a different place than on the still plate (bar 5%)`);
-  check('3. with no ring at the rim', turb.ring < 2 * turb.mid,
-    `rms ${turb.ring.toExponential(2)} between r 0.38 and 0.47 against ${turb.mid.toExponential(2)} in the middle (bar 2x)`);
-  check('4. the comet\'s pull 1.5 keeps the dish\'s dye', comet.kept >= 0.97,
-    `${pct(comet.kept)} left (bar 97%; laid open ${pct(openComet.kept)})`);
+  const ringOf = (r) => r.ring / r.mid;
+  check('3. with no ring at the rim: its wall flow against the middle\'s no more than half again the open curl\'s', ringOf(turb) < 1.5 * ringOf(openTurb),
+    `rms between r 0.38 and 0.49 over the middle's: ${ringOf(turb).toFixed(2)}, the open curl's ${ringOf(openTurb).toFixed(2)} (bar 1.5x it)`);
+  check('4. the comet\'s pull 1.5 keeps the dish\'s dye, and pulls it', comet.kept >= 0.97 && comet.dx - draught.dx >= PULL,
+    `${pct(comet.kept)} left (bar 97%; laid open ${pct(openComet.kept)}); its middle moved ${comet.dx.toFixed(4)} in x against the draught alone's ${draught.dx.toFixed(4)}`);
   check('5. and the comet alone still pulls the colour along +x', pull.kept >= 0.97 && pull.dx - still.dx >= PULL,
     `${pct(pull.kept)} left; its middle moved ${pull.dx.toFixed(4)} in x against the still plate's ${still.dx.toFixed(4)} (bar ${PULL} further)`);
   check('6. control: both laid open again lose their dishes', openTurb.kept < 0.5 && openComet.kept < 0.5,
