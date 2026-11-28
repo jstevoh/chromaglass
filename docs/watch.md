@@ -56,6 +56,12 @@ config's `mode` (`auto`, `liquid` or `general`). Measured on real films and the 
 Node 20 or later and `ffmpeg` (with `ffprobe`) on the PATH; `yt-dlp` only for links. No npm
 packages: the scripts import only Node's own modules.
 
+`--selftest` and its two neighbours (`npm run watchwords`, `npm run watchcard`) make their own
+clips, so their ffmpeg needs the `libvpx` encoder and `libvorbis` or `libopus` for the sound.
+Either gives the same reads (measured on ffmpeg 6.1 with each, 2026-11-28), so Homebrew's default
+`ffmpeg`, which has no libvorbis, will do; when neither is there the self-test says which ffmpeg it
+found (PLAN 47x-6).
+
 ## Its config file
 
 Where the tool keeps things is in `reelreader.config.json` (every field is optional; what each means
