@@ -396,13 +396,6 @@ the checks and the build §19.
   phones out (phones already in, the laptop and its display are untouched). If a venue
   ever meets that, the fix is a longer key for the tunnel, not a looser budget.
 
-## ~~14o. The song-ID Worker is open to anyone~~
-- ~~**14o-count**~~ **parked: the song-ID Worker was retired with Song ID on 2026-11-27 and is kept in `archive/song-id/`** (S): the counters are in Workers KV, which takes one write a second per
-  key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
-  free plan meters about 500 lookups a day, and a second lookup from one address in the
-  same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
-  (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
-  plan's quota. *Measure:* the same harness with a store that allows one write a second.
 ## 14p. Show night runs whatever merged last
 
 **Read in the code.** `npm run show` is `npm run update && npm run remote`, and `update`

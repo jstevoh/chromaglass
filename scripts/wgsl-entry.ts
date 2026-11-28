@@ -16,6 +16,8 @@ import { STEP_WGSL, SPLAT_WGSL, LENS_WGSL } from '../src/gpu/wgsl/glint';
 import { TANK_KERNELS } from '../src/gpu/wgsl/tank';
 import { TANK_DRAW_WGSL } from '../src/gpu/tankDraw';
 import { FARADAY_KERNELS } from '../src/gpu/wgsl/faraday';
+import { SURFACE_KERNELS } from '../src/gpu/wgsl/surfaceHeight';
+import { PACK_SURFACE_KERNEL } from '../src/gpu/wgsl/plateSurface';
 import { GLOW_KERNELS } from '../src/gpu/wgsl/glow';
 
 /** The closeup's fine dye (PLAN 47a): carried, averaged and turned into detail, built behind the show. */
@@ -55,6 +57,8 @@ const FORMATS: Record<string, string> = {};
   await check('tank.draw', TANK_DRAW_WGSL);
   // The dish on a shaker (PLAN 48f): its standing wave's step, built behind the show unless the look opens shaken.
   for (const [name, code] of Object.entries(FARADAY_KERNELS)) await check(`faraday.${name}`, code);
+  for (const [name, code] of Object.entries(SURFACE_KERNELS)) await check(`surface.${name}`, code);
+  await check('plate.packSurface', PACK_SURFACE_KERNEL);
   for (const [name, code] of Object.entries(SOAP_PLATE_KERNELS)) await check(`soapPlate.${name}`, code);
   for (const [name, code] of Object.entries(SOAP_AIR_KERNELS)) await check(`soapAir.${name}`, code);
   for (const [name, code] of Object.entries(FINE_KERNELS)) await check(`fine.${name}`, code);
@@ -63,6 +67,6 @@ const FORMATS: Record<string, string> = {};
   // The lens pass after the plate (PLAN 47e, 47d, 47b-side): glitter, the lens, the side lamp.
   const glint = { step: STEP_WGSL, splat: SPLAT_WGSL, lens: LENS_WGSL };
   for (const [name, code] of Object.entries(glint)) await check(`glint.${name}`, code);
-  out.push(`checked ${Object.keys(glint).length + Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(SOAP_AIR_KERNELS).length + Object.keys(TANK_KERNELS).length + Object.keys(FARADAY_KERNELS).length + Object.keys(GLOW_KERNELS).length + 1 + Object.keys(FINE_KERNELS).length} shaders`);
+  out.push(`checked ${Object.keys(glint).length + Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(SOAP_AIR_KERNELS).length + Object.keys(TANK_KERNELS).length + Object.keys(FARADAY_KERNELS).length + Object.keys(SURFACE_KERNELS).length + 1 + Object.keys(GLOW_KERNELS).length + 1 + Object.keys(FINE_KERNELS).length} shaders`);
   return out;
 };

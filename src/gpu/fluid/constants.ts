@@ -30,8 +30,11 @@ export interface FieldCarry extends SolverCarry {
   readonly mix: GPUTexture | null;
   readonly rxn: GPUTexture | null;
   readonly lies: GPUTexture | null;
+  readonly surfaceHeight: GPUTexture | null;
   /** Oil Bodies' tally of the oil poured: the oil is carried, so its tally is. */
   readonly oilPoured: number;
+  /** And the oil's tension against water, N/m (oilSigma, PLAN 38e): the oil's, so carried with it. */
+  readonly oilSigma: number;
   /**
    * The poured liquids (PLAN 18d-10): the species (each bottle's share and
    * what it is made of) and the two fields of their forces, with the last
@@ -160,17 +163,19 @@ export const PHASE_COMPRESS = 1;
   one (PLAN 38r) a drop rounds nine times slower. Kept at 4e-4 the half
   sheets in `npm run oillift` settled off the rim at 0.017 mm/s against a
   lens that now rises nine times slower too (0.71 mm/s), over the frame's 2%
-  of it. PLAN 38e (σ in N/m from each bottle) replaces the 4e-4 itself.
+  of it. PLAN 38e put σ in N/m from each bottle in place of the 4e-4 on a
+  thin gap (oilMobility, after LIQUID_DENSITY): the 4e-4 at 6 mm was
+  σ = 0.0239 N/m by that law (OIL_TENSION_SIGMA).
 
   Only between two glasses. The old open plate has no gap and no Darcy
   drag for the h² to come from, so it keeps the 4e-4 it was set at: carried
   there too, the strip of oil `npm run physics` lays on the old plate
   rounded from an aspect of 5.58 to 4.87 in its 0.72 s against under 3.9
-  (the Mac's run on the first try of this, PLAN 38r part 2).
+  (the Mac's run on the first try of this, PLAN 38r part 2). There it is
+  scaled by the oil's σ over OIL_TENSION_SIGMA, since a capillary force is
+  σ times the curvature with or without a gap (oilTensionOf).
 */
 export const OIL_TENSION = 4e-4;
-/** OIL_TENSION on a thin gap: the gap's h² against the 6 mm it was set on (above). */
-export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The most the oil's surface tension may move the liquid in a step, in cells
   (see mixForce). A drop rounding up is a slow thing, a second or so for a
@@ -181,14 +186,15 @@ export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
 export const OIL_CELLS = 0.5;
 /*
   The oil's tension in a sealed bottle (a standing plate, PLAN 27f-9q), as a
-  multiple of OIL_TENSION_GAP, and the most it may move the liquid in a step.
+  multiple of the thin gap's own (oilTensionOf), and the most it may move
+  the liquid in a step.
 
   Reported: Lava Lamp's wax would not hold round; it hung in stalks and
   sheets. In the gap of a Hele-Shaw cell the wax's weight and its surface
   tension are both resisted by the same Darcy drag, 12μ/h², so what
   decides a blob's shape is their ratio, the Bond number Δρ g R²/σ, and the
   gap drops out of it. PLAN 38r took the gap from 6 mm to 2 mm and scaled
-  the tension by h² (OIL_TENSION_GAP, a ninth) but not the standing plate's
+  the tension by h² (then OIL_TENSION_GAP, a ninth; oilMobility now) but not the standing plate's
   weight (DYE_WEIGHT and HEAT_LIFT, laid by sealWeight), which
   is what keeps the lamp's approved cycle at its speed (PLAN 27f-9h, #820).
   So in the lamp every blob was nine times as heavy against its own skin as
@@ -1014,17 +1020,32 @@ export const LIQUID_FALL = 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 */
 export const DYE_LAYER = 3.55e-4;
 /*
-  The explicit slump's limits (wgsl/slump.ts, "The shortcuts (PLAN 18m-1,
-  18m-1a)"): a face moves at most SLUMP_FACE of the difference across it in
-  a substep (¼ is the edge of stability on a square grid), in at most
-  SLUMP_SUBSTEPS substeps a step. At 1024² with Heavy dye at 1 (g′ = 1.47 m/s²)
-  the worst cell (half the gap deep, 1 mm, where η³(1 − η/b)³ peaks; slumpPlan)
-  has an inertial bound of about 2.8 a frame at 60 Hz, which asks for
-  ceil(2.8 / 0.24) = 12 substeps. In the 6 mm gap before PLAN 38r a cell at
-  DYE_CAP (2.13 mm) asked for 20, which is why the cap is 20.
+  The implicit slump's plan (wgsl/slump.ts, "The step", "And the
+  substeps"; fluid/slump.ts, PLAN 18m-1a). The step is backward Euler, stable
+  at any rate, so these are for accuracy, not stability. SLUMP_COURANT is how
+  many cells the fastest face may move in a substep (the slower of its
+  viscous rate and its Froude front, as a face is held; on the default
+  light-oil Thickness the viscous one): with lagged K a
+  pool at the dye's cap drains a cell a substep from its edge in, so one cell
+  a substep is a drain that runs at the front's own speed on every plate.
+  At 1024² with Dye Weight 1 at 60 Hz the front's Courant number is 2.75 a
+  frame (u_f = 0.032 m/s at half the 2 mm gap), so three substeps; one at
+  256² and 512² with food colouring. SLUMP_SUBSTEPS caps a long frame (the
+  step's seconds are held to 0.1): six times the substeps a 60 Hz frame wants
+  at 1024² would be 17, and past the cap a substep crosses more than a cell,
+  which slows the drain and nothing else. SLUMP_SWEEPS caps the red-black
+  sweeps a substep, planned as 2a + 2 from the largest face rate a (four at
+  the least: six at 256² with Dye Weight 1, nine at 512², the cap at 768²
+  and 1024², where a is about nine a substep). In the CPU model of the
+  kernels the deep pool of `npm run slump` 12 leaves 3.8e-6 of its L2 as
+  residual at 256², 2.7e-5 at 1024², and at most 2.9e-4 of its dye on the
+  checkerboard (the bar is 1e-3). The fluxes are taken from what the sweeps
+  reached, so a residual moves the dye a hair less far, never makes or
+  loses any.
 */
-export const SLUMP_FACE = 0.24;
-export const SLUMP_SUBSTEPS = 20;
+export const SLUMP_COURANT = 1;
+export const SLUMP_SUBSTEPS = 8;
+export const SLUMP_SWEEPS = 12;
 /** The Froude number for a gravity current front in the slumping regime (Huppert and Simpson 1980). */
 export const FROUDE_FRONT = 1.19;
 /** The dye's cap per cell (decayDye), the deepest layer the slump has to be ready for. */
@@ -1036,6 +1057,41 @@ export const DYE_CAP = 6;
   taken as water's, as liquidProps takes the poured ones' against it.
 */
 export const LIQUID_DENSITY = 1000;
+/*
+  The oil's surface tension in newtons a metre (PLAN 38e): what mixForce's
+  σ is, in the flow's units, for a tension σ between the oil and the water.
+
+  Between two glasses a curved interface is a jump in pressure σκ
+  (Young–Laplace), and the liquid answers a pressure gradient as Darcy
+  says, u = (h²/12μ)(f − ∇p). So the capillary force σκ∇c (mixForce) is
+  read, as every body force on a thin gap is (hsPrep), as the speed it
+  drives the reference liquid to at the rest gap: h₀²σκ∇c/12μ_ref, with
+  h₀ = REST_GAP_METRES, the gap itself and not a number typed for it. In
+  plate widths, with κ and ∇c per plate width, that is oilMobility(σ)·κ∇c
+  plate widths a second; mixForce takes κ and ∇c in cells, so the host
+  multiplies by N², and by the cover's (h/h₀)² (coverH2) on a live cover.
+  A slightly oval drop of radius R then relaxes at λ = h²σ/(4μR³).
+
+  It was a 0–1 dial times OIL_TENSION_GAP, the lab's 4e-4 at 6 mm carried
+  to 2 mm by h² (PLAN 38r): by this law that number is σ = 0.0239 N/m
+  (OIL_TENSION_SIGMA, `npm run gap` holds it), so the shelf's sunflower oil
+  at 0.027 (lib/liquidProps.ts interfacialTension) rounds 13% faster than
+  the looks did and the silicone at 0.037 55% faster, each now its own.
+  The dial is unchanged in range and is the share of the oil's own tension.
+
+  The cap (OIL_CELLS, SEALED_CELLS) stays: lifting it is 38e's second half,
+  which needs the lab (Film Hold's crowd, the breath on a drop, the sealed
+  lamp's haze, PLAN 27f-9q) and is not done here.
+*/
+export function oilMobility(sigma: number): number {
+  return (REST_GAP_METRES ** 2 * sigma) / (12 * LIQUID_DENSITY * NU_REF) / PLATE_METRES ** 3;
+}
+/** The σ, N/m, that the lab's OIL_TENSION was on the 6 mm gap by oilMobility's law. */
+export const OIL_TENSION_SIGMA = OIL_TENSION * (REST_GAP_METRES / 0.006) ** 2 / oilMobility(1);
+/** mixForce's σ for an oil of tension `sigma` N/m: Darcy's on a thin gap, OIL_TENSION scaled by σ on the old plate. */
+export function oilTensionOf(sigma: number, thin: boolean): number {
+  return thin ? oilMobility(sigma) : OIL_TENSION * sigma / OIL_TENSION_SIGMA;
+}
 /*
   The liquid's thickness, as a kinematic viscosity in m²/s, from the
   Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)

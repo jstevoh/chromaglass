@@ -85,6 +85,10 @@
  *        Iridescence 1 nothing brighter than at 0, at Film Physics 0 and 1,
  *        and the film still drawn. Main multiplies by up to 1.7, a front-lit
  *        soap film's reflection: 22 levels over at Film Physics 0
+ *   16.  the projector's bubble film is light through it (38h-14): the
+ *        same at the plate's own bubbles, at Film Physics 0 and 1, and the
+ *        film still drawn. Main at Film Physics 0 multiplied by the
+ *        rainbow taken as reflected light: 54 levels over the lamp
  *
  * Every number asked is printed. Run against main before 38h it
  * read 0/8: the droplets' dots, the oil's 8%, the gel's 1.5, Glossiness's
@@ -212,7 +216,29 @@ try {
       }
       out.dropletsBig = { over, dark: dark / (a.length / 4) };
     }
-    out.gloss = await shot({ glossiness: 1 });
+    /*
+      Glossiness scales the slope the optics read (plateTransmit.ts), and what
+      a slope does to transmitted light goes as the index step across it.
+      Since 38u-10 the dye's index is its measured one, 1.78e-5 a unit of
+      each channel's absorbance, where the stand-in this line was written on
+      was 0.06 a unit of the dye's density: so at the real default the dye's
+      relief bends nothing past the pupil and Glossiness at 1 darkened 0.00% of
+      the plate (it read 18.55% on main). The dial is not dead, the dye is
+      real: so the line's "darker" half is asked where the level wash's index
+      is the old stand-in's, on a baseline at the same boost, and its "never
+      brighter" half is asked there and at the real default both. The wash's
+      three channels sum to 1.05 a unit of density (0.35 each), so its
+      stand-in is 0.06 / (1.78e-5 x 1.05), x3210. The pools sum to 1.9 and
+      2.2, so at that boost they bend about twice what they did on main
+      (21% of the plate darker against 18.55%): the "darker" half is the
+      easier for it, and the level half is asked at main's own index. At
+      x3370, the figure first written here (0.06 / 1.78e-5, as if a dye's
+      channels summed to 1), the wash moved 2 levels against main's 1.
+    */
+    const WASH_STAND_IN = Math.round(0.06 / (1.78e-5 * 3 * 0.35));
+    out.plainLit = await shot({ dyeIndexBoost: WASH_STAND_IN });
+    out.gloss = await shot({ glossiness: 1, dyeIndexBoost: WASH_STAND_IN });
+    out.glossReal = await shot({ glossiness: 1 });
     out.gel = await shot({ gelWheel: 1 });
     out.dish = await shot({ dishVignette: 1 });
     out.dishOff = plain;
@@ -401,14 +427,15 @@ const lamp = top(r.empty);
     lamp < 250 && d.over <= SLACK && d.dark > DOES, `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${lamp}`);
 }
 for (const [i, key, name, off] of [
-  [2, 'gloss', 'Glossiness at 1', 'plain'],
+  [2, 'gloss', 'Glossiness at 1 (Dye Index Boost 3210, the wash\'s old stand-in; and at the real dye, never brighter)', 'plainLit'],
   [3, 'gel', 'the gel at 1', 'plain'],
 ]) {
   const d = compare(r[key], r[off]);
   const f = key === 'gloss' ? levelMoved(r[key], r[off]) : null;
+  const real = key === 'gloss' ? compare(r.glossReal, r.plain) : null;
   check(`${i}. ${name}: no pixel brighter than without it (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+${f ? `, the level wash not moved (by over ${SLACK})` : ''}`,
-    lamp < 250 && d.over <= SLACK && d.dark > DOES && (!f || (f.n > 0.02 * P && f.most <= SLACK)),
-    `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${lamp}${f ? `; the level wash (${pct(f.n / P)}) moved by at most ${f.most}` : ''}`);
+    lamp < 250 && d.over <= SLACK && d.dark > DOES && (!f || (f.n > 0.02 * P && f.most <= SLACK)) && (!real || real.over <= SLACK),
+    `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${lamp}${f ? `; the level wash (${pct(f.n / P)}) moved by at most ${f.most}` : ''}${real ? `; at the real dye brightest by ${real.over}, ${pct(real.dark)} darker` : ''}`);
 }
 {
   /*
@@ -641,9 +668,8 @@ const oilThere = up8 > 20 && down8 > 20;
   already wears at Film Physics 1, so a grey stand-in or a second film of
   its own cannot pass. Not caught: a gain inside camFilm the same at both
   Iridescences cancels from the comparison (there is no film-free picture
-  of a bubble to hold it to); the review reads camFilm. The projector's own bubbles are printed beside it:
-  at Film Physics 0 they still wear the reflected film above Iridescence
-  0.25 (PLAN 38h-14). The owed state is main's: brighter by over 10 levels.
+  of a bubble to hold it to); the review reads camFilm. The projector's own
+  bubbles are line 16. The owed state is main's: brighter by over 10 levels.
 */
 {
   const f = r2.film;
@@ -652,12 +678,27 @@ const oilThere = up8 > 20 && down8 > 20;
   const cam = [0, 1].map((fp) => ({ fp, up: compare(f[`cam${fp}1`], f[`cam${fp}0`]), moved: moved(f[`cam${fp}1`], f[`cam${fp}0`], FILM_MOVE) }));
   // The camera wears the transmitted table at any Film Physics: the same picture at 0 and 1, at each Iridescence.
   const same = Math.max(...[0, 1].map((ir) => Math.max(compare(f[`cam0${ir}`], f[`cam1${ir}`]).over, compare(f[`cam1${ir}`], f[`cam0${ir}`]).over, 0)));
-  const plate = [0, 1].map((fp) => compare(f[`plate${fp}1`], f[`plate${fp}0`]).over);
   const over = Math.max(...cam.map((c) => c.up.over));
   line('film', `15. the camera's bubble film is light through it: at Iridescence 1 no pixel brighter than at 0 (by over ${SLACK}), at Film Physics 0 and 1, the film still drawn (over ${pct(DOES)} of the picture moved at each), and Film Physics 0 drawing the camera's bubbles as 1 does (by ${SLACK})`,
     over <= SLACK && cam.every((c) => c.moved > DOES) && same <= SLACK,
-    `${cam.map((c) => `Film Physics ${c.fp}: brightest by ${c.up.over}, ${pct(c.moved)} moved`).join('; ')}; Film Physics 0 against 1 differs by ${same}; the projector's bubbles, printed only: brightest by ${plate.join(' and ')}`,
+    `${cam.map((c) => `Film Physics ${c.fp}: brightest by ${c.up.over}, ${pct(c.moved)} moved`).join('; ')}; Film Physics 0 against 1 differs by ${same}`,
     over > 10);
+  /*
+    16 (PLAN 38h-14). The projector's own bubbles, on the same plate and the
+    same pockets, at Iridescence 1 against 0, at Film Physics 0 and 1. The
+    projector throws only the light through a pocket's film, T = 1 - R
+    (bubbleFilm.ts's projectorFilm): at Film Physics 1 soap's measured
+    table, at 0 the stylised rainbow taken as the reflected colour and
+    passed as its complement. So no pixel brighter (by over SLACK), and the
+    film still draws (over DOES of the picture moved by any level at each
+    Film Physics), so a film taken off altogether cannot pass. Main read
+    54 and 0: at Film Physics 0 it multiplied the plate by 0.45 + 1.25 x
+    the rainbow, a front-lit film's reflection, up to 1.7 times the lamp.
+  */
+  const plate = [0, 1].map((fp) => ({ fp, up: compare(f[`plate${fp}1`], f[`plate${fp}0`]).over, moved: moved(f[`plate${fp}1`], f[`plate${fp}0`], FILM_MOVE) }));
+  check(`16. the projector's bubble film is light through it: at Iridescence 1 no pixel brighter than at 0 (by over ${SLACK}), at Film Physics 0 and 1, the film still drawn (over ${pct(DOES)} of the picture moved at each)`,
+    plate.every((c) => c.up <= SLACK && c.moved > DOES),
+    plate.map((c) => `Film Physics ${c.fp}: brightest by ${c.up}, ${pct(c.moved)} moved`).join('; '));
 }
 
 const failed = checks.filter((c) => !c.ok).length;

@@ -3190,7 +3190,20 @@ enough to bead, by design).
 To put it back: THREAD in `src/gpu/wgsl/fluid/capillary.ts` returns 0 from threadCurve
 (`npm run beads` then reads one body, as main did).
 
-## 152. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
+## 152. The Magnet's domes in the closeup (PLAN 29a-13)
+
+The domes a magnet stands were black blobs in the macro view. Their sides now mirror the lit
+liquid round them as a camera records a dark gloss under water, with the light's glint on
+each top.
+
+1. Magnet Garden (or Ferro Paint) with the domes standing, zoom in to 4x-6x on them: each dome
+   should read as a raised, glossy black cone: a coloured sheen down its sides, brighter toward
+   its foot, and a bright point on its top.
+2. Relief / 3D at 0: the old flat drawing, black domes.
+3. Bad: domes that read as holes or bowls rather than raised, a sheen that looks painted on, or
+   any change to the plate at 1x.
+
+## 153. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
 
 Filmed on the owner's Mac before and after (2026-11-01); the films are on one page in the
 project. `spikes`, `standing`, `ferrodrag`, `ferrohold` and `ferropour` check the physics
@@ -3203,7 +3216,7 @@ in the lab; only the Mac shows whether it reads as ferrofluid.
 4. Not this change (9t-12): a wide pool dragged by the Magnet turns to worms and creeps,
    the same before and after.
 
-## 153. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
+## 154. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
 
 The labyrinth's period now follows Labyrinth (the coil's field) through the magnetic Bond
 number. Magnet Garden and Ferro Paint sit at the top of the dial, where the period is 0.042

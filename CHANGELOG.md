@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the dye bends light at its real strength (PLAN 38u-10)
+
+- The dye's refractive index is its measured one (tartrazine's dn/dc over its absorbance),
+  about 2e-5 for a deep dye, where it was a stand-in 300 to 600 times that scaled by Boundary
+  Contrast. A dye-only look no longer shows bright and dark lines at its edges out of focus.
+- **Dye Index Boost** (Settings → Look, MIDI, the desks, the phone) brings them back: ×1 is
+  real, up to ×4000 (the strong fringe the plate drew before sits at about ×1500 to ×3400, by how many colours a dye takes). The phone remote has it too, and Evolve leaves it alone.
+- The optical path is stored less clear water's, so a real dye's step is kept and not rounded
+  to ten times its size (PLAN 38u-20).
+
+### Fixed — the Magnet's domes have depth in the closeup (PLAN 29a-13)
+
+- Zoomed in, the domes a magnet stands out of the ferrofluid show a dark glossy sheen down
+  their sides (the lit liquid round them, mirrored) and a glint on each top, where they were
+  flat black blobs. The plate at 1x is unchanged.
+
 ### Added — Keep it full, for a plate left running (PLAN 18a-22)
 
 - **Keep it full** (`keepFull`): when the dish runs below the amount its look is made with,

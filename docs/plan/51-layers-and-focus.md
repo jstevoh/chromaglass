@@ -238,11 +238,16 @@ counts is this run's full size against its smaller picture, which halves two mel
 
 Found while building it, not done:
 
-- **51c-2 · An A/B deck dissolve** (S to M). The plan's two-projector form, A racking out while
-  B racks in with the next look, 51a's crossfade carrying the light, needs B to draw a look of
-  its own: the back plate's look is its solver's and dyes only (16a), drawn with the front's
-  settings in one display. With 16b's own sources or 51a-3's plates, a Go could go to the dark
-  projector, rack it in under the crossfade and leave the lit one to rack out.
+- **51c-6 · A dark A's melt drawn for nothing** (S). A deck dissolve holds a dark A melted
+  for a quarter of the fade at each end; the pass still draws it, because the Mixer's rows
+  where neither projector has light go to A's share. Give those rows their own share, then
+  skip A's melt when A is dark as B's is.
+- **51c-4 · Each deck its own drawing** (M, after 16b). A deck Go changes the rest of a look
+  (lamp ground, glass, lacing, blend) on both projectors at once, hidden in the middle half;
+  with 16b's own sources each projector would take its own and nothing would change on the lit one.
+- **51c-5 · Decks on the APC40** (S, with 51h). The crossfader drives `projCross` and the deck
+  glide hands it back on a touch; the Projectors layout should light a pad for Decks and show
+  which deck is dark.
 - **51c-3 · A short dissolve's ring** (S). Under 2 s the look's fade is under a second, and the
   handover never runs shorter than one, so the ferrofluid ring's swap falls past the rack's
   middle. Hold the handover inside the rack's middle half too, or give Focus Dissolve a 2 s floor.

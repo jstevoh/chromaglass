@@ -316,7 +316,7 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Video on LED Ring, which moves the picture under the dish (PLAN 14ag-9).
 // Nor the projector bank's lamps, shutters and crossfade, the operator's hands (PLAN 51a).
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
-  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack', 'projDeck',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
@@ -556,6 +556,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'projFocusB',      label: 'Focus B',          min: -1, max: 1 },
   // A look change racked out and back (PLAN 51c): 0 off, a half the head's full rack, 1 a glow.
   { key: 'projRack',        label: 'Focus Dissolve',   min: 0, max: 1 },
+  // A Go to the dark projector, the crossfade carrying the light (PLAN 51c-2): a switch.
+  { key: 'projDeck',        label: 'Decks',            min: 0, max: 1, step: 1 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },
@@ -600,6 +602,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
+  // A cube on the travel: 1 to 4000 is three and a half decades, real (1)
+  // to the first stand-in's 300 to 600 in the bottom half, and 18e-2's
+  // retuned stand-in (about 1500 to 3400, by the dye's colours: dyeIndex.ts)
+  // in the top third.
+  { key: 'dyeIndexBoost',   label: 'Dye Index Boost',  min: 1, max: 4000, curve: 3 },
   { key: 'glassSmear',      label: 'Glass Smear',      min: 0, max: 3, wanderSpan: 1 },
   { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },

@@ -7270,6 +7270,29 @@ spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up a
 yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
 bytes different at any relief.
 
+### 29a-13. The Magnet's domes in the closeup: a dark gloss, not one black
+
+Asked 2026-11-01 by the owner, after the films of Magnet Garden's domes on their real
+onset (#662): "Let's make sure we have 3d in the macro view". Rendered in the lab (a pool
+0.09 of the plate across on 256², held over the hand's Magnet for 160 steps, Magnet
+Garden's settings, 6x), each dome in the closeup was a black blob with a dim red dot on its
+top. The shapes were there: the domes stand 2.2 l_c, with slopes from 0 to 63 degrees, and
+90% of a dome's surface is past Snell's window (49 of 136 cells) or faces down (73). Such a
+surface can show only what it mirrors of the lamp-lit liquid round it, at Fresnel's 0.5 to
+4% under water, and the display multiplied its colours (display values, shown as they are
+on an sRGB canvas) by that reflectance as if they were light: 2% of a white came to 5 of
+255, where a camera records about 39. A 30 times brighter room only grew the dot on the
+top, since the sides do not see the room. Now the plate's colour is taken back to light
+(a 2.2 power), the reflection worked there and encoded as a camera's frame is; the studio's
+lights are radiances already. Measured (`npm run ferrodrop`, 13 checks, the three new on that
+pool, read over the pixels the plate says stand past 1.5 full, the screen-to-plate mapping
+held by 98.4% of the water's pixels drawn lit): the domes' brightest channel 2 of 255 in the
+middle and 1 to 6 across (both red on main), now 23 and 7 to 38; the ten older lines unchanged in verdict (the drop's light spread
+176 of 255, its brightest up and left, the dye line blue 197 to 0, red 209 to 187, the 1x
+plate 0 bytes different). No setting and no phone change: the phone draws the same plate
+shader. Found along the way: 29a-14 (the ridges), 29a-15 (the dye's amount over a dome),
+38h-12 (the bubbles' walls on display values too). Judging §152.
+
 ### 29c. The drop follows the hand and holds together (#373)
 
 Reported 2026-10-11 (the handoff's `drag-today.png`): a magnet at 0.35–0.5, height 0.2,
@@ -13035,6 +13058,24 @@ model cannot reach one, the PR says what it reached and asks.
     just inside the contact, was a black band (2 to 94 of 179). A pale fringe a cell past
     the rim on the lamp ground (119 against 105) is unchanged and stays 38h-9's. Found:
     38h-11.
+  - **38h-14 (shipped 2026-11-08).** The projector's bubble film still reflected at Film
+    Physics 0. Found writing 38h-6's check: the plate's own bubbles at Iridescence 1 read 51
+    to 54 levels brighter than at 0, because plate.ts's bubble block multiplied the lamp by
+    `0.45 + 1.25 × filmC` above Iridescence 0.25, a reflected rainbow added on top of the
+    light. A pocket between the glasses throws only what passes its film, T = 1 − R, the
+    pale complement, and a film splits light, never adds it. Film Physics 0 now treats the
+    stylised rainbow as R with a peak of FILM_R_RAINBOW = 0.55 and draws
+    cp·(1 − 0.55·clamp(0.6·irid)·filmC); Film Physics 1 still mixes in the measured table's
+    transmitted colour, unchanged. The code moved to `src/gpu/wgsl/bubbleFilm.ts`
+    (`projectorFilm`), plate.ts being at its size ceiling. Measured: `npm run nolight` line
+    16 (new), the plate's bubbles at Iridescence 1 against 0 at Film Physics 0 and 1, no
+    pixel brighter by over 1 and over 0.2% of the picture still moved: main 54 over (4.39%
+    moved), this 0 at both (4.34% and 3.12%; landed on 2026-11-27's main, after the
+    bubbles' rework, 0 at both again with 4.59% and 3.19% moved). The lab's stills: 30 → 0 at Iridescence 0.6,
+    53 → 0 at 1; the plate's mean at Iridescence 1 160.0 → 158.4. Only looks with
+    Iridescence over 0.25 change (Soap Film, and what Lucky, drift or MIDI push there): a
+    cream glow becomes a pale cool tint. The owner judged it from before/after clips filmed
+    on the Mac (Soap Film, Acid Trip at 0.6 and 1, Crowd Plate at 1) and kept it.
   - **38h-4 (shipped 2026-10-31).** The back plate's lamp read the grain as its share of
     the opacity (`grained1 / film1`, grainedDepth's factor), which is 1 in a body near
     opaque, so on a lamp look with two plates the back plate's pools lost their grain. It
@@ -15742,6 +15783,47 @@ both ways): 27 gate, 11 owed.
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
 
+## 38u-10. The dye bends light at its real strength, and a dial says when it is more (2026-11-14)
+
+The third pass (38u) found the dye's index a stand-in: the derive pass added d·0.015·max(1,
+3·Boundary Contrast) to water's 1.333, so a pool of dye stepped the optical path by 0.015 to
+0.06, and its Becke lines out of focus were drawn at a strength the dial chose. The owner,
+2026-11-14: "real strength (measured dn/dc), plus a dial named as a boost", in every look.
+
+- `wgsl/dyeIndex.ts`: tartrazine, a yellow food dye, has a molar absorptivity of 25.0
+  L/(mmol·cm) at its peak and a dn/dc of 0.41 mL/g (arXiv 2503.05105). A dissolved absorber
+  raises the index in proportion to how much it absorbs (Kramers–Kronig), so the dye's index
+  rise is its summed absorbance across the three channels times 1.78e-5 per stored unit. A
+  dye that takes 96% of one channel's light across the gap raises the index by 2e-5; the old
+  stand-in was 300 to 600 times that.
+- **Dye Index Boost** (×1 real to ×4000; the plate drew its old stand-in at about ×1500 to ×3400, by how many of the three colours a dye takes; Settings → Look, MIDI, the desks, the phone's Looks
+  sheet) multiplies it, named as a boost past real. Default ×1 in every look. Boundary
+  Contrast no longer touches the dye's index (18e-6 updated).
+- **Dye Index Boost** is also on the phone remote (`?remote`), and Evolve's drift leaves it
+  alone (`lib/drift.ts`): a look that ships real stays real.
+- **38u-20 with it.** The derive pass stored the whole path (about 1.333) in a half float, whose
+  step there is 1e-3, ten times a real dye's rise: the review found the wall's shadowgraph out
+  of focus seeing the dye at ×1 as a stair of one whole step (0.44% of the light at Focus 1,
+  where the real index makes 0.04%). `.w` now holds the path less clear water's 1.333, where a
+  half float steps by under 1e-7; the shadowgraph's Laplacian ignores the offset and the
+  closeup's only other read of `.w` is on camera views, which write 0.
+- `npm run derive`: the path's rise over the dye reads 1.011e-4 against 1.009e-4 predicted
+  from the paper's numbers (0.2%) at ×1000, and 1.012e-4 (0.3%) read straight off `.w` at ×1
+  (38u-20's line; one rounding step, 9.77e-4, before); linear in the dial (0.1% off from ×1 to
+  ×1000); clear water 1.3330; and the plate's own shadowgraph stencil on the stored path at
+  Focus 1 and Boundary Contrast 1 changes the light by 0.087% at ×1 (under one byte's step) and
+  140% at ×1000. The Becke doublet line is asked at ×500.
+
+- **Landed on 18e-2's path.** Main had meanwhile retuned the stand-in to 0.06 a unit and read
+  the dye's rim in focus from the same path's gradient (`.z`, `oplPupilLoss`). The measured
+  index takes both: one `calcOpl`, `n = 1.333 + dyeDn + oil + film + poured`, `.z = |∇(n·h)|`,
+  `.w = n·h − 1.333`, the dye's taps cell means (`cellDye`, 31s-8). Boundary Contrast's index
+  gain on `.w` went with it; it stays `defocusShadow`'s gain. At ×1 the dye's rim in focus is
+  about 1500 to 3400 times fainter than 18e-2's stand-in drew it (0.06 a unit of density against 1.78e-5 a unit of each channel, and a dye's channels sum to 1 to 2.3 a unit of its density).
+
+What changes on the wall: at ×1 a dye-only look shows no Becke lines out of focus, as a real
+dye in water would not; they come back with the dial. Left open: one dn/dc for every dye and no
+dispersion (38u-19).
 `forces.ts`'s `nominal` stays the 2 mm on purpose (the old plate's depth drag). Left open:
 the 38v half (milk's scatter and transmission and the glint's `GAP_METRES`; check first:
 Claude). Verified with `npm run gap -- --owed=puddle,settle,lift,pinch`, `npm run lint`,
@@ -16320,3 +16402,18 @@ dragged drop 7.4 R behind.
   "every look's own magnet raises none" turned to "is past it".
 - Found along the way: `startup` 1b's red on GitHub's Macs is the intro's 1.5 s frame cap,
   not this change (19aa-7, fixed on main by 19aa-7a).
+### 38e-1: oil's surface tension in newtons a metre, from each bottle (2026-11-27, from PR #624)
+
+The thin gap's capillary pull was a 0–1 dial times `OIL_TENSION_GAP`, the lab's 4e-4 at 6 mm
+carried to 2 mm by h². It is now `oilMobility(σ)`, Darcy's h₀²σ/12μ_ref over the plate's
+width cubed, times the cover's (h/h₀)² and the sealed bottle's `SEALED_TENSION` as before,
+with σ each pour's own tension against water: a bottle's `interfacial` (sunflower 27 mN/m,
+silicone 37) or, for a Designer oil with only its tension against air, Antonow's
+|γ_w − γ_o| (`interfacialTension` in `src/lib/liquidProps.ts`). The plate's oil has one σ,
+averaged by the area each pour covers (`oilSigma`, carried across a resize and kept in
+Undo's snapshot); a look's own laid oil is the shelf's Oil. The old plate keeps its 4e-4,
+scaled by σ over the σ it stood for. By the same law the old number was σ = 0.0239 N/m, so
+every oil look rounds 13% faster with sunflower oil and 55% with silicone. The dial keeps
+its 0–1 range and is the share of the oil's own tension. `npm run gap` part 4 holds the law
+in SI from the millimetres (its first run caught the 6 mm ratio written upside down, σ 1.93
+N/m). The cap is unchanged: 38e-2.

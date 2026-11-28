@@ -61,7 +61,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   on the Mac film decides whether the look stays (2026-11-12: "one last try").
 - **27h-1, shipped (#626).** Twenty-five dials let further where their consumer allowed it;
   story in `docs/plan-shipped.md` §27h-1.
-- **27h-2, shipped (this PR).** The dials whose top the solver held a second time: Swirl,
+- **27h-2, shipped (#1040).** The dials whose top the solver held a second time: Swirl,
   Dye Weight and Heat Spread to 2, Pushes Dye to 1.2, Drop Height to 2, Background Loop to
   1.4, Glass Smear to 3 with no gate, Momentum's lasting current to 0.999. Story in
   `docs/plan-shipped.md` §27h-2; `npm run widedials`.
@@ -82,3 +82,10 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   oil 0 at every sample of 150 s). Clock Glass and Splodascope lost theirs the same way.
   The oil waits now (`src/sim/mixWait.ts`) and is laid when the solver attaches;
   `npm run oillaid`.
+- ~~**27h-2c. Dye Weight past 1 on a deep 1024² pool.**~~ **Shipped** with 18m-1a: the slump is
+  a backward-Euler step, stable at any rate, with no face guard; at 1024² Dye Weight 2 plans four
+  substeps to keep its front under a cell each (`src/gpu/fluid/slump.ts`). Was: at 6 mm and 1024² the slump asks
+  27 substeps at Dye Weight 2 against `SLUMP_SUBSTEPS`' 20, and the face guard holds it:
+  stable, the front a little under its Froude speed. 38r part 2's 2 mm gap takes this back
+  under 20 (about 16); if it does not land, raise the cap (a SHOUTING_CASE number: name it
+  under Check changes).

@@ -93,6 +93,14 @@ export interface LiquidBehaviour {
   density?: number;
   /** Surface tension against air, mN/m (water 72.8). */
   tension?: number;
+  /**
+   * For a liquid that will not mix with water, the tension of its interface
+   * with water, mN/m: what rounds an oil drop between the glasses, and the
+   * one of these the oil's capillary force reads (PLAN 38e; lib/liquidProps.ts
+   * interfacialTension, which falls back to Antonow's rule on `tension` for
+   * a bottle without it).
+   */
+  interfacial?: number;
   /** Refractive index (water 1.333). */
   index?: number;
   /**
@@ -732,7 +740,9 @@ export interface VisualizerSettings {
     lib/projectorFocus.ts), -1 to 1, 0 sharp: the first half either way the
     rack's real travel, past it a ramp to a melt. The focus dissolve (PLAN
     51c, lib/focusDissolve.ts) is how far a Go racks them out and back, on the
-    same scale, 0 off.
+    same scale, 0 off. Decks (PLAN 51c-2, lib/deckDissolve.ts), a switch:
+    on, with two projectors, a Go goes to the dark one and the crossfade
+    carries the light over; 0 off, today's Go.
   */
   projLampA?: number;
   projLampB?: number;
@@ -742,6 +752,7 @@ export interface VisualizerSettings {
   projFocusA?: number;
   projFocusB?: number;
   projRack?: number;
+  projDeck?: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -862,6 +873,7 @@ export interface VisualizerSettings {
   // Light Show Look (rendering)
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
+  dyeIndexBoost: number;      // how many times the dye's measured refractive index rise the optical path takes, 1 to 4000 (the stand-in index the plate drew before sits at about 1500 to 3400, by the dye's colours); 1 is real, so a dye's Becke lines are faint unless boosted (PLAN 38u-10)
   boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and now only shades that step in the closeup (18e-7)
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
@@ -1275,6 +1287,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   projFocusA: 0,
   projFocusB: 0,
   projRack: 0,
+  projDeck: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second
@@ -1334,6 +1347,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
+  dyeIndexBoost: 1,         // the dye's real index: the owner's call for every look (38u-10)
   boundaryContrast: 0.45,   // the optical path's contrast; no line between two dyes (18e-5)
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour

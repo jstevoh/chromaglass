@@ -70,6 +70,10 @@ const LIGHT_STACK = new Set([
   // The projector lens's focal plane (PLAN 18e): 0.5 is sharp focus on the
   // plate, so drifting it around 0.5 would defocus looks that ship sharp.
   'projectorFocus',
+  // The dye's index (PLAN 38u-10): ×1 is the dye's measured strength, and
+  // anything past it a boost the performer chooses; Evolve wandering it would
+  // put bright and dark lines at every edge of a look that ships real.
+  'dyeIndexBoost',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',
@@ -120,7 +124,7 @@ const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle'
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
   // The projector bank (PLAN 51a): the operator's lamps, shutters and crossfade; a wandered lamp is the wall amber or overdriven.
-  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack', 'projDeck',
   // Where the video sits on the plate (PLAN 14ag): a hand frames it, nothing wanders it.
   'filmZoom', 'filmX', 'filmY', 'filmRing',
   // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.

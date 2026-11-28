@@ -36,6 +36,52 @@ export class FluidFields extends FluidCore {
     return this.argWrite(name);
   }
 
+  /**
+   * The grid filter's three kernels in the dye's format (PLAN 18a-8c), with
+   * the old plate's builds (WebGPUFluid.oldPlateBuilds). Every opening waited
+   * for them until 18a-8c, though none had run them since 18a-8b took the
+   * filter off the thin gap, which every look opens on: three compiles of the
+   * show's wait for a stage that stayed dark. Built with the old plate's own
+   * pipelines instead, they are waited for by a look that opens with Thin Gap
+   * off and otherwise built off the frame when Thin Gap is first turned off
+   * (prepareOldPlate), the plate staying thin until they are in, so the first
+   * old step finds all three.
+   */
+  protected static gridBuilds(dye: GPUTextureFormat): [string, string][] {
+    return (['dampGridCurv', 'dampGridLimit', 'dampGrid'] as const).map((name): [string, string] => [`${name}:${dye}`, kernel(name, dye)]);
+  }
+
+  /**
+   * The grid's checkerboard out of the dye (dampGrid, and why), topped up to
+   * GRID_DAMP a step on the old plate: `top` is what is left of it after the
+   * Jacobi diffusion's 8a/(1+8a). None on a thin gap, whose faces lay no
+   * checkerboard (GRID_DAMP's note, 18a-8b).
+   *
+   * All three kernels are asked before any runs. Each reads the one before
+   * it, and `run` skips a kernel that failed to build and goes on to the
+   * next, so a dampGridCurv that never built would leave dampGrid adding the
+   * last field's scratchA into the dye, and the swap would hand the plate
+   * that. All three or none, as the slump asks. They are built wherever the
+   * old plate runs (gridBuilds); only a lab that forces `gridDamp` onto a
+   * thin gap (`npm run grating`, section 7) builds them here, on its frame.
+   * Three calls rather than a walk over a list: no closure made a step.
+   */
+  protected dampGrids(pass: GPUComputePassEncoder, top: number, bodiesOn: boolean): void {
+    const f = this.dye.write.format;
+    if (!this.pipeline('dampGridCurv', f) || !this.pipeline('dampGridLimit', f) || !this.pipeline('dampGrid', f)) return;
+    const k = this.arg4('dye grid', top);
+    this.dampGridOf(pass, this.dye, k);
+    // The oil's share has the same grid in it, from the same faces.
+    if (bodiesOn && this.oilDye) this.dampGridOf(pass, this.oilDye, k);
+  }
+
+  private dampGridOf(pass: GPUComputePassEncoder, field: PingPong, k: GPUBuffer): void {
+    this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
+    this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
+    this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
+    field.swap();
+  }
+
   /** `pipeline`'s key for a kernel built under a suffix of its own (`hsRun`'s `:thin`), made once. */
   protected pipelineKey(name: string, suffix: string): string {
     let bySuffix = this.pipelineKeys.get(name);
@@ -265,15 +311,17 @@ export class FluidFields extends FluidCore {
     return this.oilReach;
   }
 
-  /** The slump's per-cell rate, made once (PLAN 18m). */
-  protected ensureSlump(): GPUTexture {
-    if (!this.slumpK) {
-      this.slumpK = this.disposer.track(this.device.createTexture({
-        label: 'slump rate', size: [this.N, this.N], format: R32,
-        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-      }));
+  /**
+   * The slump's solve (PLAN 18m-1a), made once: `x` the amount the sweeps
+   * reach, a float a cell, and `faces` each cell's east then north face rate,
+   * two floats a cell. Row-major, as the thin gap's buffers are.
+   */
+  protected ensureSlump(): { x: GPUBuffer; faces: GPUBuffer } {
+    if (!this.slumpBufs) {
+      const make = (label: string, floats: number) => this.disposer.track(this.device.createBuffer({ label, size: floats * 4, usage: GPUBufferUsage.STORAGE }));
+      this.slumpBufs = { x: make('slump amount', this.N * this.N), faces: make('slump faces', 2 * this.N * this.N) };
     }
-    return this.slumpK;
+    return this.slumpBufs;
   }
 
   protected ensureOilDye(): PingPong {
@@ -542,6 +590,8 @@ export class FluidFields extends FluidCore {
       coverMetres: this.coverGap * GAP_METRES,
       /** The shaken dish's standing wave (PLAN 48f), or null with no shaker. */
       faraday: this.faradayPlate?.field ?? null,
+      /** Free-surface and oil-layer height field in metres (PLAN 31s-1). */
+      surfaceHeight: this.surfaceHeight?.live ? this.surfaceHeight.field : null,
       /** The water's glow (PLAN 48c), or null when Glow is off. */
       glow: this.glowPlate?.field ?? null,
     };
@@ -562,6 +612,8 @@ export class FluidFields extends FluidCore {
     this.tankPlate = null;
     this.faradayPlate?.dispose();
     this.faradayPlate = null;
+    this.surfaceHeight?.dispose();
+    this.surfaceHeight = null;
     this.glowPlate?.dispose();
     this.glowPlate = null;
     this.slosh = null;

@@ -12,6 +12,7 @@ import { WebGPUSlosh } from '../slosh';
 import type { SoapFilmPlate } from '../soapFilmPlate';
 import type { TankPlate } from '../tankPlate';
 import type { FaradayPlate } from '../faraday';
+import { SurfaceHeight } from '../surfaceHeight';
 import type { GlowPlate } from '../glow';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
@@ -19,7 +20,7 @@ import { WebGPUParticles } from '../particles';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
 import { RowUploads } from '../../lib/deltaRows';
-import { REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
+import { OIL_TENSION_SIGMA, REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
 
 export class FluidCore {
   readonly N: number;
@@ -111,6 +112,8 @@ export class FluidCore {
   protected tankPlate: TankPlate | null = null;
   /** The shaken dish's standing waves (PLAN 48f), made while Shaker is up. */
   protected faradayPlate: FaradayPlate | null = null;
+  /** Free-surface and oil-layer height field `h` in metres (PLAN 31s-1). */
+  protected surfaceHeight: SurfaceHeight | null = null;
   /** The water's glow (PLAN 48c, gpu/glow.ts), made while Glow is up. */
   protected glowPlate: GlowPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
@@ -330,8 +333,8 @@ export class FluidCore {
   protected oilDye: PingPong | null = null;
   /** The water's share of the dye between its carry's substeps (ensureWaterShare). */
   protected waterShare: PingPong | null = null;
-  /** The slump's K Δt/Δx² a cell, once a step (PLAN 18m, wgsl/slump.ts); made on the first step that slumps. */
-  protected slumpK: GPUTexture | null = null;
+  /** The slump's solve (PLAN 18m-1a, wgsl/slump.ts): the amount the sweeps reach and each cell's east and north face rates, rewritten every substep; made on the first step that slumps (fields.ts ensureSlump). */
+  protected slumpBufs: { x: GPUBuffer; faces: GPUBuffer } | null = null;
   /** The oil blurred wide, for colour astray from its liquid to find the way back (bodyPartition). */
   protected oilReach: PingPong | null = null;
   /** Whether the last step asked for Oil Bodies (the setting, and oil's tension to have oil at all). */
@@ -415,6 +418,25 @@ export class FluidCore {
     when the plate is full of them.
   */
   protected oilPoured = 0;
+  /*
+    The oil's tension against the water, N/m (PLAN 38e): each pour's own
+    (lib/liquidProps.ts interfacialTension), averaged by the plate it
+    covers, so a dish of sunflower oil is at 27 mN/m and one with silicone
+    poured into it goes toward 37 as the silicone's share grows. One number
+    for the plate's oil, not one a cell: the oil is one field, and two oils
+    on one plate share it.
+
+    Oil a look lays with no bottle (its own bodies, a lava lamp's wax,
+    oilLay.ts) is at OIL_TENSION_SIGMA, the tension the looks were tuned
+    at, and not the shelf's sunflower 27 mN/m. Measured on the owner's Mac
+    with sunflower's number for it: lavacycle's no-cool-glass control fell
+    0.88 to 0.71 by 40 s (bar 0.05), where main's 0.0239 holds it; that
+    control's window in the wax's weight and tension is narrow and not yet
+    understood (PLAN 19ak-25b), and a lamp's paraffin is not sunflower oil
+    either, so 27 mN/m would be no more real. The wax gets a measured σ
+    of its own once 19ak-25b says why the window is narrow (PLAN 38e-3).
+  */
+  protected oilSigma = OIL_TENSION_SIGMA;
   protected rxnLive = false;
   /** What the plate draws from the liquids' own physics, packed (see packView). */
   protected viewTex: GPUTexture | null = null;
@@ -849,6 +871,7 @@ export class FluidCore {
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.liquidsLive = false;
+    if (this.surfaceHeight) this.surfaceHeight.clear(pass);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     this.solventLive = this.cloudFresh = false;
@@ -857,6 +880,7 @@ export class FluidCore {
     this.speciesSnap = null;
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
+    this.oilSigma = OIL_TENSION_SIGMA;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     this.mixLive = false;
