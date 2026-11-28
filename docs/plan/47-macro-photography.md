@@ -752,6 +752,11 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
   owner's npm account), then push the build and the tag `v0.1.0`; deploy the omnibrains.org card
   and its demo report from the Mac (source /mnt/project-files/omnibrains-site/, card added
   2026-11-28).
+- **47p-6f** npm by trusted publishing (shipped, this PR): release.yml updates npm to 11.5.1+ and
+  publishes with GitHub's OIDC token once the owner sets jstevoh/reelreader + release.yml as the
+  package's trusted publisher on npm. The release also runs by hand (workflow_dispatch) and makes
+  its own tag, because a cloud session's git proxy refuses a tag push (403); the NPM_TOKEN secret (a 2FA-bypass token, expiring 2026-12-05;
+  npm revokes such tokens in January 2027) is only the fallback until then, then deleted.
 - **47p-6c** community lists: submissions drafted, posted only with the owner's OK.
 - **47p-6d** native Windows untried: watch.mjs's run-as-command test compares a URL's pathname
   with a resolved path, which differs on a drive letter. macOS, Linux and WSL work.
